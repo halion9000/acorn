@@ -21999,42 +21999,12 @@ components:
           type: array
           title: Tools
           default: []
-        threatmate:
-          items:
-            $ref: '#/components/schemas/PostureCheck'
-          type: array
-          title: Threatmate
-          default: []
-        threatmate_refreshed_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Threatmate Refreshed At
-        liongard:
-          items:
-            $ref: '#/components/schemas/PostureCheck'
-          type: array
-          title: Liongard
-          default: []
-        liongard_refreshed_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Liongard Refreshed At
-        itglue:
-          items:
-            $ref: '#/components/schemas/PostureCheck'
-          type: array
-          title: Itglue
-          default: []
-        itglue_refreshed_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Itglue Refreshed At
+        tool_checks:
+          additionalProperties:
+            $ref: '#/components/schemas/ToolChecksOut'
+          type: object
+          title: Tool Checks
+          default: {}
       type: object
       required:
       - client_id
@@ -28337,6 +28307,12 @@ components:
           type: array
           maxItems: 80
           title: Checks
+        source:
+          anyOf:
+          - type: string
+            pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          - type: 'null'
+          title: Source
       type: object
       required:
       - vendor
@@ -36394,6 +36370,23 @@ components:
       - access_token
       - refresh_token
       title: TokenResponse
+    ToolChecksOut:
+      properties:
+        checks:
+          items:
+            $ref: '#/components/schemas/PostureCheck'
+          type: array
+          title: Checks
+        refreshed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Refreshed At
+      type: object
+      required:
+      - checks
+      title: ToolChecksOut
     ToolCoverage:
       properties:
         tool:

@@ -27,7 +27,7 @@ from app.models.signin import ClientM365Check, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
-from app.services.infra_review import ITGLUE_SOURCE, LIONGARD_SOURCE, THREATMATE_SOURCE, saas_products
+from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
 
@@ -76,6 +76,11 @@ class PostureCheck(BaseModel):
     evidence: str
 
 
+class ToolChecksOut(BaseModel):
+    checks: list[PostureCheck]
+    refreshed_at: datetime | None = None
+
+
 class ClientPosture(BaseModel):
     client_id: uuid.UUID
     client_name: str | None
@@ -87,15 +92,8 @@ class ClientPosture(BaseModel):
     open_cases: int
     # The tools this client is mapped to (Huntress, NinjaOne...), for the page to show and link to the client's page in each.
     tools: list[PostureTool] = []
-    # What ThreatMate says about the client (security score, patching, end-of-life software); empty until CORE has sent it for a mapped client.
-    threatmate: list[PostureCheck] = []
-    threatmate_refreshed_at: datetime | None = None
-    # Likewise for Liongard (disk encryption, EDR coverage, e-mail domain records, stale licensed users).
-    liongard: list[PostureCheck] = []
-    liongard_refreshed_at: datetime | None = None
-    # Likewise for IT Glue (domain-name and SSL-certificate expiry).
-    itglue: list[PostureCheck] = []
-    itglue_refreshed_at: datetime | None = None
+    # What each tool says about the client as plain checks (ThreatMate, Liongard, IT Glue, Field Effect...), by the tool's source name; only tools the client is mapped to, and only once CORE has sent them.
+    tool_checks: dict[str, ToolChecksOut] = {}
 
 
 def devices_part(rollups: list[ClientRollup], client_id: uuid.UUID) -> PostureDevices:
@@ -112,20 +110,24 @@ def devices_part(rollups: list[ClientRollup], client_id: uuid.UUID) -> PostureDe
     return PostureDevices()
 
 
-async def _tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, aliases: list[Any], source: str) -> tuple[list[PostureCheck], datetime | None]:
-    """The checks one tool sent for this client, or none when the client is not mapped to that tool (then nothing is read) or nothing has been sent."""
-    if not any(v == source for v, _, _ in aliases):
-        return [], None
+async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, aliases: list[Any]) -> dict[str, ToolChecksOut]:
+    """The checks each tool sent for this client. Only tools the client is mapped to are read (none at all, no query, for a client mapped to none of them); a tool that sent nothing is left out."""
+    mapped = {v for v, _, _ in aliases}
+    sources = [source for source, vendor in TOOL_CHECK_SOURCES.items() if vendor in mapped]
+    if not sources:
+        return {}
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
-        row = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source == source))).scalars().first()
-    if row is None:
-        return [], None
-    checks = [
-        PostureCheck(key=str(c["key"]), status=str(c["status"]), evidence=str(c.get("evidence", "")))
-        for c in (row.checks or [])
-        if isinstance(c, dict) and c.get("key") and c.get("status")
-    ]
-    return checks, row.refreshed_at
+        rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_(sources)))).scalars().all()
+    out: dict[str, ToolChecksOut] = {}
+    for row in rows:
+        checks = [
+            PostureCheck(key=str(c["key"]), status=str(c["status"]), evidence=str(c.get("evidence", "")))
+            for c in (row.checks or [])
+            if isinstance(c, dict) and c.get("key") and c.get("status")
+        ]
+        if checks:
+            out[row.source] = ToolChecksOut(checks=checks, refreshed_at=row.refreshed_at)
+    return dict(sorted(out.items()))
 
 
 @router.get(
@@ -184,9 +186,7 @@ async def client_posture(
                 .first()
             )
         saas_checks = [c for c in (saas_row.checks if saas_row is not None else []) if isinstance(c, dict)]
-    tm_checks, tm_refreshed = await _tool_checks(db, owner, client_id, aliases, THREATMATE_SOURCE)
-    lg_checks, lg_refreshed = await _tool_checks(db, owner, client_id, aliases, LIONGARD_SOURCE)
-    ig_checks, ig_refreshed = await _tool_checks(db, owner, client_id, aliases, ITGLUE_SOURCE)
+    tool_checks = await _all_tool_checks(db, owner, client_id, aliases)
     tools = [
         PostureTool(
             vendor=v, vendor_client_id=i, vendor_client_name=n or None, product=saas_products(saas_checks) if v == "datto-saas" else None
@@ -204,12 +204,7 @@ async def client_posture(
         alerts=PostureAlerts(open=row[0], critical=row[1], high=row[2], without_ticket=row[3]),
         open_cases=cases,
         tools=tools,
-        threatmate=tm_checks,
-        threatmate_refreshed_at=tm_refreshed,
-        liongard=lg_checks,
-        liongard_refreshed_at=lg_refreshed,
-        itglue=ig_checks,
-        itglue_refreshed_at=ig_refreshed,
+        tool_checks=tool_checks,
     )
 
 

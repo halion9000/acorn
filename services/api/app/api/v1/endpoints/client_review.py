@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import and_, bindparam, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -32,7 +32,7 @@ from app.models.client_review_answer import ClientReviewAnswer
 from app.models.signin import ClientM365Check, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
-from app.services.infra_review import ITGLUE_SOURCE, LIONGARD_SOURCE, SAAS_SOURCES, THREATMATE_SOURCE
+from app.services.infra_review import CIPP_BASELINE_SOURCE, SAAS_SOURCES, TOOL_CHECK_SOURCES
 from app.services.m365_review import M365Answer, m365_answers
 from app.services.review_overrides import MAX_PER_CLIENT, clean_answer, merge_m365, merge_readiness, merge_tech, readiness_counts
 from app.services.sat_review import SAT_SOURCE
@@ -153,14 +153,23 @@ class M365CheckIn(BaseModel):
 
 
 def m365_baseline_query(client_id: uuid.UUID) -> Any:
-    """The client's Microsoft 365 baseline row: every checks row except those other tools send under their own source (training, backups, ThreatMate, Liongard, IT Glue)."""
-    return select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.notin_([SAT_SOURCE, THREATMATE_SOURCE, LIONGARD_SOURCE, ITGLUE_SOURCE, *SAAS_SOURCES]))
+    """The client's Microsoft 365 baseline row: the one CIPP sends under its own source. Every other tool's checks (training, backups, the tools in ``TOOL_CHECK_SOURCES``) are rows of their own."""
+    return select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source == CIPP_BASELINE_SOURCE)
 
 
 class M365ChecksReport(BaseModel):
     vendor: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
     vendor_client_id: str = Field(min_length=1, max_length=200)
     checks: list[M365CheckIn] = Field(default_factory=list, max_length=80)
+    # Where the checks are kept when that is not the tool's own name (CIPP's Microsoft 365 baseline is its own name; its extra checks are "cipp-health"). Only a tool in ``TOOL_CHECK_SOURCES`` may name
+    # a source, and only its own, so a report can never overwrite another tool's rows or the baseline.
+    source: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
+
+    @model_validator(mode="after")
+    def _own_source_only(self) -> "M365ChecksReport":
+        if self.source is not None and TOOL_CHECK_SOURCES.get(self.source) != self.vendor:
+            raise ValueError(f"{self.vendor} may not write checks under {self.source}")
+        return self
 
 
 class _M365View:
@@ -178,7 +187,7 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
     accepted = 0
     for tid in by_tenant:
         async with acting_as_tenant(db, tid):
-            values = {"tenant_id": tid, "source": report.vendor, "checks": [c.model_dump() for c in report.checks], "refreshed_at": now}
+            values = {"tenant_id": tid, "source": report.source or report.vendor, "checks": [c.model_dump() for c in report.checks], "refreshed_at": now}
             stmt = pg_insert(ClientM365Check).values(values)
             update = {c: stmt.excluded[c] for c in values if c not in ("tenant_id", "source")}
             await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source"], set_=update))
@@ -331,7 +340,7 @@ async def client_review(
         )
         typed = list((await db.execute(select(ClientReviewAnswer).where(ClientReviewAnswer.tenant_id == client_id))).scalars().all())
         saas_rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_(SAAS_SOURCES)))).scalars().all()
-        tool_rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_([THREATMATE_SOURCE, LIONGARD_SOURCE, ITGLUE_SOURCE])))).scalars().all()
+        tool_rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_(list(TOOL_CHECK_SOURCES))))).scalars().all()
         a = (
             await db.execute(
                 select(

@@ -24,15 +24,31 @@ export interface Posture {
   open_cases: number;
   /** The tools this client is mapped to. Absent from an older API. */
   tools?: { vendor: string; vendor_client_id: string; vendor_client_name?: string | null; product?: string | null }[];
-  /** What ThreatMate says about the client (security score, patching, end-of-life software). Absent from an older API. */
-  threatmate?: PostureCheck[];
-  threatmate_refreshed_at?: string | null;
-  /** The same for Liongard (disk encryption, EDR coverage, e-mail domain records, stale licensed users). */
-  liongard?: PostureCheck[];
-  liongard_refreshed_at?: string | null;
-  /** The same for IT Glue (domain-name and SSL-certificate expiry). */
-  itglue?: PostureCheck[];
-  itglue_refreshed_at?: string | null;
+  /** What each tool says about the client as plain checks, by the tool's source name; only tools the client is mapped to and that have sent theirs. Absent from an older API. */
+  tool_checks?: Record<string, { checks: PostureCheck[]; refreshed_at?: string | null }>;
+}
+
+/** How each tool that sends checks is named on the page, in the order shown. A tool not listed here is shown under its source name. */
+export const TOOL_CHECK_LABELS: Record<string, string> = {
+  threatmate: "ThreatMate",
+  liongard: "Liongard",
+  itglue: "IT Glue",
+  fieldeffect: "Field Effect",
+  "cipp-health": "Microsoft 365 health (CIPP)",
+  ninjaone: "NinjaOne",
+  halopsa: "HaloPSA",
+  meraki: "Meraki",
+  slide: "Slide",
+  autoelevate: "AutoElevate",
+  huntress: "Huntress",
+};
+
+/** The tools that sent checks, in a steady order: the named ones first as listed above, then any other by name. */
+export function toolCheckEntries(tc: NonNullable<Posture["tool_checks"]> | undefined): [string, { checks: PostureCheck[]; refreshed_at?: string | null }][] {
+  const names = Object.keys(TOOL_CHECK_LABELS);
+  return Object.entries(tc ?? {})
+    .filter(([, v]) => Array.isArray(v?.checks) && v.checks.length > 0)
+    .sort(([a], [b]) => (names.indexOf(a) === -1 ? 99 : names.indexOf(a)) - (names.indexOf(b) === -1 ? 99 : names.indexOf(b)) || a.localeCompare(b));
 }
 
 interface Client {
@@ -223,9 +239,9 @@ export function ClientPosture() {
               </p>
             )}
           </section>
-          <ToolChecks tool="threatmate" label="ThreatMate" checks={shown.threatmate ?? []} refreshedAt={shown.threatmate_refreshed_at} />
-          <ToolChecks tool="liongard" label="Liongard" checks={shown.liongard ?? []} refreshedAt={shown.liongard_refreshed_at} />
-          <ToolChecks tool="itglue" label="IT Glue" checks={shown.itglue ?? []} refreshedAt={shown.itglue_refreshed_at} />
+          {toolCheckEntries(shown.tool_checks).map(([source, v]) => (
+            <ToolChecks key={source} tool={source} label={TOOL_CHECK_LABELS[source] ?? source} checks={v.checks} refreshedAt={v.refreshed_at} />
+          ))}
           <DomainChecks clientId={shown.client_id} />
           <section>
             <h3 className="mb-2 text-sm uppercase text-slate-500">Alerts and cases</h3>

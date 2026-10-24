@@ -233,6 +233,23 @@ THREATMATE_SOURCE = "threatmate"
 LIONGARD_SOURCE = "liongard"
 # IT Glue sends a client's domain-name and SSL-certificate expiry checks under this source.
 ITGLUE_SOURCE = "itglue"
+# The one source CIPP's Microsoft 365 baseline checks are stored under (the client review's Microsoft 365 questions read it).
+CIPP_BASELINE_SOURCE = "cipp"
+# The tools that send a client's own plain checks to the client posture page and review, each under its own source: {source: the tool the client is mapped to it by}. A report may only write its
+# own source (so one tool can never replace another's rows, or the baseline); CIPP's extra checks use "cipp-health" because "cipp" is the baseline.
+TOOL_CHECK_SOURCES = {
+    "threatmate": "threatmate",
+    "liongard": "liongard",
+    "itglue": "itglue",
+    "fieldeffect": "fieldeffect",
+    "cipp-health": "cipp",
+    "ninjaone": "ninjaone",
+    "halopsa": "halopsa",
+    "meraki": "meraki",
+    "slide": "slide",
+    "autoelevate": "autoelevate",
+    "huntress": "huntress",
+}
 _BACKUP_OS = {"windows", "mac", "linux"}
 STALE_SNAPSHOT_DAYS = 3
 

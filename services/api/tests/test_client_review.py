@@ -177,15 +177,31 @@ def test_tech_stack_says_not_enrolled_when_the_tool_maps_other_clients_but_not_t
     assert a["edr_pc"].status == "not_seen" and "not enrolled in Huntress" in a["edr_pc"].evidence
 
 
-def test_the_microsoft_365_baseline_row_leaves_out_every_other_tools_checks():
+def test_the_microsoft_365_baseline_row_is_the_one_cipp_sends_and_no_other_tools_checks():
     import uuid
 
     from app.api.v1.endpoints.client_review import m365_baseline_query
+    from app.services.infra_review import TOOL_CHECK_SOURCES
 
     sql = str(m365_baseline_query(uuid.uuid4()).compile(compile_kwargs={"literal_binds": True}))
-    for other in ("huntress-sat", "threatmate", "liongard", "itglue", "datto-saas", "dropsuite"):
-        assert f"'{other}'" in sql, f"{other} checks must not be read as the Microsoft 365 baseline"
-    assert "NOT IN" in sql
+    assert "source = 'cipp'" in sql
+    for other in ("huntress-sat", "datto-saas", "dropsuite", *TOOL_CHECK_SOURCES):
+        assert f"'{other}'" not in sql, f"{other} checks must not be read as the Microsoft 365 baseline"
+
+
+def test_a_checks_report_may_name_only_its_own_source_so_it_can_never_replace_another_tools_rows():
+    import pytest
+    from pydantic import ValidationError
+
+    from app.api.v1.endpoints.client_review import M365ChecksReport
+
+    body = {"vendor_client_id": "t1", "checks": []}
+    assert M365ChecksReport(vendor="cipp", source="cipp-health", **body).source == "cipp-health"
+    assert M365ChecksReport(vendor="cipp", **body).source is None, "CIPP's own baseline report names no source"
+    assert M365ChecksReport(vendor="threatmate", source="threatmate", **body).source == "threatmate"
+    for vendor, source in (("cipp", "cipp"), ("threatmate", "cipp-health"), ("liongard", "threatmate"), ("cipp", "huntress-sat"), ("cipp", "datto-saas")):
+        with pytest.raises(ValidationError):
+            M365ChecksReport(vendor=vendor, source=source, **body)
 
 
 # ---- questions the tools answer for a client ------------------------------------------------------------------------------------------------------------

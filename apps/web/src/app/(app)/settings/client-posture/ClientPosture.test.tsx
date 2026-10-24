@@ -6,7 +6,7 @@ const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a> }));
 
-import { ClientPosture, coverage, postureLinks } from './ClientPosture';
+import { ClientPosture, coverage, postureLinks, toolCheckEntries } from './ClientPosture';
 
 const reply = (body: unknown, ok = true) => ({ ok, status: ok ? 200 : 500, json: () => Promise.resolve(body) });
 const posture = (over: Record<string, unknown> = {}) => ({
@@ -136,5 +136,19 @@ describe('the tools a client is linked to', () => {
     );
     const links = within(screen.getByLabelText('Tools this client is linked to')).getAllByRole('link');
     expect(links.map((l) => l.getAttribute('href'))).toEqual(['https://portal.dattobackup.com/status/saas/overview', 'https://app.backupify.com/office365/customers/494057']);
+  });
+});
+
+describe('toolCheckEntries', () => {
+  const c = (key: string) => ({ checks: [{ key, status: 'met', evidence: 'e' }], refreshed_at: null });
+
+  it('lists the tools that sent checks in a steady order, named ones first, then any other by name', () => {
+    const out = toolCheckEntries({ zeta: c('z'), itglue: c('i'), threatmate: c('t'), alpha: c('a'), 'cipp-health': c('c') }).map(([k]) => k);
+    expect(out).toEqual(['threatmate', 'itglue', 'cipp-health', 'alpha', 'zeta']);
+  });
+
+  it('leaves out a tool with no checks, and copes with no checks at all (an older API)', () => {
+    expect(toolCheckEntries({ threatmate: { checks: [] }, liongard: c('l') }).map(([k]) => k)).toEqual(['liongard']);
+    expect(toolCheckEntries(undefined)).toEqual([]);
   });
 });

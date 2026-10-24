@@ -65,6 +65,8 @@ def test_the_posture_of_a_client_in_datto_saas_still_reports_its_alert_counts_an
             if "client_aliases" in text:
                 return SimpleNamespace(all=lambda: [("datto-saas", "494057", "Acme"), ("huntress", "5", "Acme")])
             if "client_m365_checks" in text:
+                if ".source IN" in text:  # the tool-checks query (several sources at once) for a client mapped to Huntress: it has sent none
+                    return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
                 row = SimpleNamespace(checks=[{"key": "saas_backup_google", "status": "met", "evidence": "e"}])
                 return SimpleNamespace(scalars=lambda: SimpleNamespace(first=lambda: row))
             if "FROM cases" in text:
@@ -77,10 +79,11 @@ def test_the_posture_of_a_client_in_datto_saas_still_reports_its_alert_counts_an
     assert [(t.vendor, t.product) for t in out.tools] == [("datto-saas", "google"), ("huntress", None)]
 
 
-# ---- ThreatMate's checks for a client mapped to ThreatMate --------------------------------------------------------------------------------------------
+# ---- the checks each tool sent for a client mapped to it --------------------------------------------------------------------------------------------------
 
 
-def _posture_with(monkeypatch, aliases, tm_checks):
+def _posture_with(monkeypatch, aliases, rows):
+    """The whole posture endpoint for a client mapped as ``aliases``, where ``rows`` are the checks rows the database holds: [(source, checks)]. Returns the posture and the number of check-row queries made."""
     import asyncio
     import contextlib
     import uuid as _uuid
@@ -90,74 +93,7 @@ def _posture_with(monkeypatch, aliases, tm_checks):
     from app.api.v1.endpoints import client_posture as cp
 
     owner = _uuid.uuid4()
-    queried = []
-
-    async def scope(db, o, cid):
-        return [owner], {}
-
-    async def load(*a, **k):
-        return []
-
-    monkeypatch.setattr(cp, "_scope", scope)
-    monkeypatch.setattr(cp, "_load_cached", load)
-    monkeypatch.setattr(cp, "_master_of", lambda t: None)
-    monkeypatch.setattr(cp, "acting_as_tenant", lambda db, tid: contextlib.nullcontext())
-
-    class DB:
-        async def get(self, model, key):
-            return None
-
-        async def execute(self, statement, params=None):
-            text = str(statement)
-            if "identity_mfa_users" in text:
-                return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
-            if "client_aliases" in text:
-                return SimpleNamespace(all=lambda: aliases)
-            if "client_m365_checks" in text:
-                queried.append(text)
-                row = SimpleNamespace(checks=tm_checks, refreshed_at=datetime(2026, 10, 24, tzinfo=UTC))
-                return SimpleNamespace(scalars=lambda: SimpleNamespace(first=lambda: row))
-            if "FROM cases" in text:
-                return SimpleNamespace(scalar_one=lambda: 0)
-            return SimpleNamespace(one=lambda: (0, 0, 0, 0))
-
-    out = asyncio.run(cp.client_posture(owner, SimpleNamespace(tenant_id=owner, user_id=_uuid.uuid4()), DB()))
-    return out, queried
-
-
-def test_a_client_mapped_to_threatmate_shows_its_checks(monkeypatch):
-    checks = [
-        {"key": "threatmate_security_score", "status": "met", "evidence": "ThreatMate security score 97.9 out of 100"},
-        {"key": "threatmate_patching", "status": "not_met", "evidence": "1 of 3 devices are patch-compliant in ThreatMate (33.3%)"},
-        {"key": "", "status": "met", "evidence": "dropped: no key"},
-        "not a dict",
-    ]
-    out, _ = _posture_with(monkeypatch, [("threatmate", "11218", "Acme")], checks)
-    assert [(c.key, c.status) for c in out.threatmate] == [("threatmate_security_score", "met"), ("threatmate_patching", "not_met")]
-    assert out.threatmate[1].evidence.startswith("1 of 3 devices")
-    assert out.threatmate_refreshed_at is not None
-
-
-def test_a_client_not_mapped_to_threatmate_reads_no_threatmate_row_and_shows_none(monkeypatch):
-    out, queried = _posture_with(monkeypatch, [("huntress", "5", "Acme")], [{"key": "threatmate_patching", "status": "met", "evidence": "x"}])
-    assert out.threatmate == [] and out.threatmate_refreshed_at is None
-    assert queried == [], "no ThreatMate row is read for a client that is not mapped to it"
-
-
-def test_a_client_mapped_to_both_tools_shows_each_tools_checks_separately(monkeypatch):
-    import asyncio
-    import contextlib
-    import uuid as _uuid
-    from datetime import UTC, datetime
-    from types import SimpleNamespace
-
-    from app.api.v1.endpoints import client_posture as cp
-
-    owner = _uuid.uuid4()
-    rows = {
-        "threatmate": [{"key": "threatmate_patching", "status": "met", "evidence": "tm"}],
-        "liongard": [{"key": "liongard_email_domain_records", "status": "not_met", "evidence": "0 of 2 domains"}, {"key": "liongard_edr_coverage", "status": "met", "evidence": "2 of 2"}],
-    }
+    queries = []
 
     async def scope(db, o, cid):
         return [owner], {}
@@ -179,23 +115,41 @@ def test_a_client_mapped_to_both_tools_shows_each_tools_checks_separately(monkey
             if "identity_mfa_users" in text:
                 return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
             if "client_aliases" in text:
-                return SimpleNamespace(all=lambda: [("threatmate", "11", "Acme"), ("liongard", "7", "Acme")])
+                return SimpleNamespace(all=lambda: aliases)
             if "client_m365_checks" in text:
-                which = "liongard" if "'liongard'" in text else "threatmate"
-                return SimpleNamespace(scalars=lambda: SimpleNamespace(first=lambda: SimpleNamespace(checks=rows[which], refreshed_at=datetime(2026, 10, 24, tzinfo=UTC))))
+                queries.append(text)
+                asked = [src for src, _ in rows if f"'{src}'" in text]
+                got = [SimpleNamespace(source=src, checks=checks, refreshed_at=datetime(2026, 10, 24, tzinfo=UTC)) for src, checks in rows if src in asked]
+                return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: got, first=lambda: got[0] if got else None))
             if "FROM cases" in text:
                 return SimpleNamespace(scalar_one=lambda: 0)
             return SimpleNamespace(one=lambda: (0, 0, 0, 0))
 
     out = asyncio.run(cp.client_posture(owner, SimpleNamespace(tenant_id=owner, user_id=_uuid.uuid4()), DB()))
-    assert [c.key for c in out.threatmate] == ["threatmate_patching"]
-    assert [(c.key, c.status) for c in out.liongard] == [("liongard_email_domain_records", "not_met"), ("liongard_edr_coverage", "met")]
-    assert out.liongard_refreshed_at is not None
+    return out, queries
 
 
-def test_a_client_mapped_to_it_glue_shows_its_expiry_checks(monkeypatch):
-    checks = [{"key": "itglue_domain_expiry", "status": "partly", "evidence": "IT Glue documents 3 domains; 1 expire within 30 days: a.com (2026-11-01)"}]
-    out, _ = _posture_with(monkeypatch, [("itglue", "9", "Acme")], checks)
-    assert [(c.key, c.status) for c in out.itglue] == [("itglue_domain_expiry", "partly")]
-    assert out.itglue_refreshed_at is not None
-    assert out.threatmate == [] and out.liongard == [], "a client mapped only to IT Glue reads no other tool's row"
+def test_checks_are_shown_per_tool_and_only_for_tools_the_client_is_mapped_to(monkeypatch):
+    rows = [
+        ("threatmate", [{"key": "threatmate_patching", "status": "not_met", "evidence": "1 of 3"}, {"key": "", "status": "met", "evidence": "dropped: no key"}, "not a dict"]),
+        ("liongard", [{"key": "liongard_edr_coverage", "status": "met", "evidence": "2 of 2"}]),
+        ("itglue", [{"key": "itglue_domain_expiry", "status": "partly", "evidence": "1 expires soon"}]),
+    ]
+    out, queries = _posture_with(monkeypatch, [("threatmate", "11", "Acme"), ("liongard", "7", "Acme")], rows)
+    assert list(out.tool_checks) == ["liongard", "threatmate"], "IT Glue sent checks but the client is not mapped to it"
+    assert [(c.key, c.status) for c in out.tool_checks["threatmate"].checks] == [("threatmate_patching", "not_met")]
+    assert out.tool_checks["liongard"].checks[0].evidence == "2 of 2"
+    assert out.tool_checks["threatmate"].refreshed_at is not None
+    assert len(queries) == 1, "all the tools' rows are read in one query"
+    assert "'itglue'" not in queries[0]
+
+
+def test_cipps_extra_checks_are_read_from_their_own_source_when_the_client_is_mapped_to_cipp(monkeypatch):
+    rows = [("cipp-health", [{"key": "cipp_licences", "status": "partly", "evidence": "3 unused"}]), ("cipp", [{"key": "baseline_x", "status": "met", "evidence": "the Microsoft 365 baseline is not a tool check"}])]
+    out, _ = _posture_with(monkeypatch, [("cipp", "tenant-1", "Acme")], rows)
+    assert list(out.tool_checks) == ["cipp-health"]
+
+
+def test_a_client_mapped_to_no_checking_tool_reads_no_check_rows_at_all(monkeypatch):
+    out, queries = _posture_with(monkeypatch, [("dnsfilter", "5", "Acme")], [("threatmate", [{"key": "k", "status": "met", "evidence": "x"}])])
+    assert out.tool_checks == {} and queries == []
