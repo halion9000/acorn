@@ -134,6 +134,7 @@ TOOL_ITEMS = (
     ("threatmate_hardening", "hardening", "Are computers configured to a security baseline?"),
     ("threatmate_cyber_insurance", "cyber_insurance_baseline", "Do computers meet the cyber insurance baseline?"),
     ("fieldeffect_account_risk", "account_risk", "Are the client's Microsoft 365 accounts free of high-risk activity?"),
+    ("cipp_inactive_accounts", "inactive_accounts", "Are accounts nobody signs in to removed or switched off?"),
     ("fieldeffect_device_risk", "device_risk", "Are the client's computers free of critical and high-risk findings?"),
 )
 
