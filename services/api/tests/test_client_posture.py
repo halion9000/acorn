@@ -156,7 +156,7 @@ def test_a_client_mapped_to_both_tools_shows_each_tools_checks_separately(monkey
     owner = _uuid.uuid4()
     rows = {
         "threatmate": [{"key": "threatmate_patching", "status": "met", "evidence": "tm"}],
-        "liongard": [{"key": "liongard_disk_encryption", "status": "not_met", "evidence": "0 of 2 workstations"}, {"key": "liongard_edr_coverage", "status": "met", "evidence": "2 of 2"}],
+        "liongard": [{"key": "liongard_email_domain_records", "status": "not_met", "evidence": "0 of 2 domains"}, {"key": "liongard_edr_coverage", "status": "met", "evidence": "2 of 2"}],
     }
 
     async def scope(db, o, cid):
@@ -189,5 +189,5 @@ def test_a_client_mapped_to_both_tools_shows_each_tools_checks_separately(monkey
 
     out = asyncio.run(cp.client_posture(owner, SimpleNamespace(tenant_id=owner, user_id=_uuid.uuid4()), DB()))
     assert [c.key for c in out.threatmate] == ["threatmate_patching"]
-    assert [(c.key, c.status) for c in out.liongard] == [("liongard_disk_encryption", "not_met"), ("liongard_edr_coverage", "met")]
+    assert [(c.key, c.status) for c in out.liongard] == [("liongard_email_domain_records", "not_met"), ("liongard_edr_coverage", "met")]
     assert out.liongard_refreshed_at is not None

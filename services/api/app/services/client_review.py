@@ -12,7 +12,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.services.device_merge import os_kind
-from app.services.infra_review import EDR_TOOLS, backup_readiness, edr_summary, network_online, saas_backup
+from app.services.infra_review import EDR_TOOLS, backup_readiness, edr_summary, encryption_readiness, network_online, saas_backup
 from app.services.sat_review import sat_training
 
 # Which machines each tool should be on. Phones and tablets are never counted against a tool that has no agent for them.
@@ -127,7 +127,6 @@ def _banded(percent: float, met: float, partly: float) -> str:
 
 # (the check a tool sends, the checklist key, the question): Liongard's and ThreatMate's per-client checks that answer a readiness question.
 TOOL_ITEMS = (
-    ("liongard_disk_encryption", "disk_encryption", "Are computers' disks encrypted?"),
     ("liongard_email_domain_records", "email_domain_records", "Are the client's e-mail domains protected against spoofing (SPF, DMARC, DKIM)?"),
     ("threatmate_hardening", "hardening", "Are computers configured to a security baseline?"),
     ("threatmate_cyber_insurance", "cyber_insurance_baseline", "Do computers meet the cyber insurance baseline?"),
@@ -262,6 +261,10 @@ def readiness(
             _banded(secure_percent, 60, 40),
             f"Microsoft Secure Score is {secure_percent:.0f}%.",
         )
+
+    disks = encryption_readiness(devices) if devices is not None else None
+    if disks is not None:
+        add("disk_encryption", "Are workstations' disks encrypted (BitLocker)?", disks[0], disks[1])
 
     # Questions a tool answers from what it sees on the client's machines and domains; each is listed only when that tool has sent its check for this client.
     for check_key, key, question in TOOL_ITEMS:

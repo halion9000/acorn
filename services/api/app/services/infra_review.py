@@ -387,3 +387,42 @@ def saas_products(checks: list[dict[str, Any]] | None) -> str | None:
     microsoft, google = "saas_backup_microsoft" in keys, "saas_backup_google" in keys
     return "both" if microsoft and google else "microsoft" if microsoft else "google" if google else None
 
+
+
+# ---- BitLocker, from every tool that reports it -------------------------------------------------------------------------------------------------------------
+
+
+def encryption_state(device: Any) -> bool | None:
+    """Whether the device's fixed drives are all BitLocker-encrypted, from the tools that report it (NinjaOne, Liongard: ``details.bitlocker_encrypted``). True or False when any tool says; if
+    tools disagree it is False (one tool sees a drive that is not protected). None when no tool reports it, which is not the same as "no"."""
+    seen = [s.details["bitlocker_encrypted"] for s in getattr(device, "sources", []) if isinstance(getattr(s, "details", None), dict) and isinstance(s.details.get("bitlocker_encrypted"), bool)]
+    if not seen:
+        return None
+    return all(seen)
+
+
+def _windows_workstation(device: Any) -> bool:
+    text = _kind_text(getattr(device, "os", None))
+    return getattr(device, "kind", "computer") == "computer" and "windows" in text and "server" not in text
+
+
+def encryption_readiness(devices: list[Any]) -> tuple[str, str] | None:
+    """The disk-encryption answer for a client: the share of its Windows workstations that have a BitLocker reading and are fully encrypted. Servers are not held to BitLocker. Most machines have no
+    reading yet (a tool reports it for some), so the answer says how many it rests on, and "met" needs readings for most of the workstations as well as nearly all of them being encrypted.
+    None when the client has no Windows workstation."""
+    ws = [d for d in devices if _windows_workstation(d)]
+    if not ws:
+        return None
+    known = [(d, encryption_state(d)) for d in ws]
+    known = [(d, e) for d, e in known if e is not None]
+    if not known:
+        return ("unknown", f"None of the client's {len(ws)} Windows workstations has a BitLocker reading yet (NinjaOne and Liongard report it for some machines).")
+    encrypted = sum(1 for _, e in known if e)
+    percent = 100 * encrypted / len(known)
+    status = "met" if percent >= 95 else "partly" if percent >= 70 else "not_met"
+    if status == "met" and len(known) / len(ws) < 0.8:
+        status = "partly"
+    tools = sorted({s.vendor for d, _ in known for s in d.sources if isinstance(s.details, dict) and isinstance(s.details.get("bitlocker_encrypted"), bool)})
+    missing = len(ws) - len(known)
+    tail = f"; {missing} of the client's {len(ws)} workstations have no reading yet" if missing else ""
+    return (status, f"{encrypted} of {len(known)} Windows workstations with a BitLocker reading ({', '.join(tools)}) have every fixed drive fully encrypted and protected ({percent:.0f}%){tail}.")

@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from app.services.client_review import device_facts, readiness
-from app.services.infra_review import backup_summary, edr_summary, hypervisor_of, network_online, network_role, saas_backup
+from app.services.infra_review import backup_summary, edr_summary, encryption_readiness, encryption_state, hypervisor_of, network_online, network_role, saas_backup
 from app.services.tech_stack import tech_stack
 from app.services.vcio_proposals import drafts_from_readiness
 
@@ -374,3 +374,55 @@ def test_saas_products_say_which_cloud_the_checks_cover():
     assert saas_products([chk("saas_backup_email", "met")]) is None
     assert saas_products(None) is None
     assert saas_products([]) is None
+
+
+# ---- BitLocker from every tool that reports it -------------------------------------------------------------------------------------------------------------
+
+
+def laptop(name, *sources, os="Windows 11 Pro"):
+    return dev(list(sources), os=os, hostname=name)
+
+
+def bl(vendor, value):
+    return src(vendor, bitlocker_encrypted=value)
+
+
+def test_a_devices_encryption_comes_from_whichever_tools_report_it_and_a_disagreement_is_not_encrypted():
+    assert encryption_state(laptop("a", bl("ninjaone", True))) is True
+    assert encryption_state(laptop("a", bl("ninjaone", False))) is False
+    assert encryption_state(laptop("a", bl("ninjaone", True), bl("liongard", True))) is True
+    assert encryption_state(laptop("a", bl("ninjaone", True), bl("liongard", False))) is False
+    assert encryption_state(laptop("a", src("ninjaone"), src("huntress", bitlocker_encrypted="yes"))) is None, "no tool gives a yes/no, so there is no answer (not 'no')"
+    assert encryption_state(laptop("a")) is None
+
+
+def test_the_clients_answer_is_the_share_of_workstations_with_a_reading_that_are_encrypted_and_says_how_many_it_rests_on():
+    ws = [laptop(f"p{i}", bl("ninjaone", i < 9)) for i in range(10)] + [laptop(f"q{i}", src("ninjaone")) for i in range(5)]
+    status, evidence = encryption_readiness(ws)
+    assert status == "partly", "9 of 10 with a reading is 90%, below the 95% for met"
+    assert "9 of 10 Windows workstations with a BitLocker reading (ninjaone)" in evidence and "(90%)" in evidence
+    assert "5 of the client's 15 workstations have no reading yet" in evidence
+
+
+def test_met_needs_nearly_all_encrypted_and_readings_for_most_workstations():
+    well = [laptop(f"p{i}", bl("ninjaone", True)) for i in range(10)]
+    assert encryption_readiness(well)[0] == "met"
+    thin = well[:2] + [laptop(f"q{i}", src("ninjaone")) for i in range(8)]
+    assert encryption_readiness(thin)[0] == "partly", "everything read is encrypted but only 2 of 10 were read"
+    assert encryption_readiness([laptop(f"p{i}", bl("ninjaone", i < 3)) for i in range(10)])[0] == "not_met"
+
+
+def test_no_workstation_no_answer_no_readings_unknown_and_servers_and_other_systems_are_left_out():
+    assert encryption_readiness([]) is None
+    assert encryption_readiness([laptop("srv", bl("ninjaone", False), os="Windows Server 2019"), laptop("mac", os="macOS 14")]) is None
+    status, evidence = encryption_readiness([laptop("a", src("ninjaone")), laptop("b")])
+    assert status == "unknown" and "None of the client's 2 Windows workstations" in evidence
+    only_ws = encryption_readiness([laptop("srv", bl("ninjaone", False), os="Windows Server 2019"), laptop("pc", bl("liongard", True))])
+    assert only_ws[0] == "met" and "1 of 1" in only_ws[1], "the server's reading is not counted"
+
+
+def test_the_readiness_checklist_has_the_encryption_question_when_the_client_has_workstations():
+    ws = [laptop(f"p{i}", bl("ninjaone", True)) for i in range(5)]
+    item = {i.key: i for i in readiness(device_facts(ws, 0, 0), None, None, devices=ws).items}["disk_encryption"]
+    assert item.question == "Are workstations' disks encrypted (BitLocker)?" and item.status == "met"
+    assert "disk_encryption" not in {i.key for i in readiness(device_facts([], 0, 0), None, None, devices=[]).items}

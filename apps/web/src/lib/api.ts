@@ -563,6 +563,8 @@ export interface DeviceRow {
   online?: boolean | null;
   /** Whole days since a tool last saw it online, once that is a week or more. */
   offline_days?: number | null;
+  /** Whether every fixed drive is BitLocker-encrypted, from the tools that report it (NinjaOne, Liongard); null when none does. Absent from an older API. */
+  encrypted?: boolean | null;
   first_seen: string;
   sources: DeviceSourceRef[];
   /** False when a master tool is set and none of its feeds reports this device. */
@@ -592,7 +594,7 @@ export interface DeviceAlert {
 
 export interface DeviceList {
   master_vendor: string | null;
-  summary: { total: number; not_in_master: number; not_in_addigy?: number; not_in_threatmate?: number; not_in_huntress?: number; not_in_screenconnect?: number; not_in_fieldeffect?: number; reporting_tools?: string[]; needs_attention?: number; stale_agents?: number; offline?: number; with_alerts?: number; hidden?: number; long_offline?: number; kinds?: Partial<Record<DeviceKind, number>> };
+  summary: { total: number; not_in_master: number; not_in_addigy?: number; not_in_threatmate?: number; not_in_huntress?: number; not_in_screenconnect?: number; not_in_fieldeffect?: number; not_encrypted?: number; encryption_known?: number; reporting_tools?: string[]; needs_attention?: number; stale_agents?: number; offline?: number; with_alerts?: number; hidden?: number; long_offline?: number; kinds?: Partial<Record<DeviceKind, number>> };
   items: DeviceRow[];
   total: number;
   page: number;
@@ -613,6 +615,8 @@ export interface DeviceQuery {
   attention?: boolean;
   /** Only devices whose protection agent has not checked in for two weeks or more. */
   stale?: boolean;
+  /** Only Windows workstations a tool reports are not (or are) fully BitLocker-encrypted. */
+  encryption?: 'not_encrypted' | 'encrypted';
   /** Only devices no tool has seen online for a week or more. */
   offline?: boolean;
   /** Only devices with at least one open alert. */
@@ -774,6 +778,7 @@ export const devicesApi = {
     if (q.missing) p.set('missing', q.missing);
     if (q.attention) p.set('attention', 'true');
     if (q.stale) p.set('stale', 'true');
+    if (q.encryption) p.set('encryption', q.encryption);
     if (q.offline) p.set('offline', 'true');
     if (q.hasAlerts) p.set('has_alerts', 'true');
     if (q.hidden) p.set('hidden', 'true');
@@ -800,6 +805,7 @@ export const devicesApi = {
     if (q.missing) p.set('missing', q.missing);
     if (q.attention) p.set('attention', 'true');
     if (q.stale) p.set('stale', 'true');
+    if (q.encryption) p.set('encryption', q.encryption);
     if (q.offline) p.set('offline', 'true');
     if (q.hasAlerts) p.set('has_alerts', 'true');
     if (q.hidden) p.set('hidden', 'true');

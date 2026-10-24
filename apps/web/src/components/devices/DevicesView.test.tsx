@@ -691,3 +691,37 @@ describe('devices waiting for their client to be mapped', () => {
     expect(options).toEqual(expect.arrayContaining(['fieldeffect', 'auvik', 'datto-bcdr', 'meraki', 'unifi', 'slide', 'autoelevate']));
   });
 });
+
+describe('BitLocker', () => {
+  const summary = (over: Record<string, unknown> = {}) => ({ total: 3, not_in_master: 0, not_encrypted: 4, encryption_known: 9, ...over });
+
+  it('marks a machine a tool reports is not encrypted, and only that one', async () => {
+    listMock.mockResolvedValue(list([device({ hostname: 'PLAIN-1', encrypted: false }), device({ hostname: 'SAFE-1', encrypted: true }), device({ hostname: 'UNKNOWN-1', encrypted: null })], { summary: summary() }));
+    render(<DevicesView />);
+    const plain = (await screen.findByText('PLAIN-1')).closest('tr') as HTMLElement;
+    expect(within(plain).getByTestId('not-encrypted-badge')).toHaveTextContent('Not encrypted');
+    expect(within((await screen.findByText('SAFE-1')).closest('tr') as HTMLElement).queryByTestId('not-encrypted-badge')).not.toBeInTheDocument();
+    expect(within((await screen.findByText('UNKNOWN-1')).closest('tr') as HTMLElement).queryByTestId('not-encrypted-badge')).not.toBeInTheDocument();
+  });
+
+  it('shows the count on a tile that filters to the machines that are not encrypted', async () => {
+    listMock.mockResolvedValue(list([device({ hostname: 'PLAIN-1', encrypted: false })], { summary: summary() }));
+    render(<DevicesView />);
+    await screen.findByText('PLAIN-1');
+    expect(screen.getByTestId('devices-not-encrypted')).toHaveTextContent('4');
+    await userEvent.click(screen.getByRole('button', { name: /Not encrypted \(BitLocker\)/ }));
+    await waitFor(() => expect(listMock.mock.calls.at(-1)![0]).toMatchObject({ encryption: 'not_encrypted' }));
+  });
+
+  it('has no encryption tile until a tool has given a reading for some machine', async () => {
+    listMock.mockResolvedValue(list([device({ hostname: 'A-1' })], { summary: summary({ not_encrypted: 0, encryption_known: 0 }) }));
+    render(<DevicesView />);
+    await screen.findByText('A-1');
+    expect(screen.queryByTestId('devices-not-encrypted')).not.toBeInTheDocument();
+  });
+
+  it('a link can ask for the machines that are not encrypted', () => {
+    expect(filtersFromParams(new URLSearchParams('encryption=not_encrypted'))?.notEncryptedOnly).toBe(true);
+    expect(filtersFromParams(new URLSearchParams('encryption=encrypted'))).toBeNull();
+  });
+});

@@ -34,6 +34,7 @@ from app.models.tenant import Tenant
 from app.services.client_mapping import auto_link_by_devices, record_device_hints, tenant_hidden
 from app.services.device_merge import DeviceMergeError, auto_merge_same_name, can_undo, dismiss_pair, merge_devices, undo_merge
 from app.services.device_upsert import DeviceReport, possible_duplicates, upsert_device
+from app.services.infra_review import encryption_state
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,12 @@ class DeviceOut(BaseModel):
         """computer, network, camera or other (see ``device_kind``)."""
         return device_kind(self.sources)
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def encrypted(self) -> bool | None:
+        """Whether every fixed drive is BitLocker-encrypted, from the tools that report it (NinjaOne, Liongard); None when none does, which is not the same as "no" (see ``encryption_state``)."""
+        return encryption_state(self)
+
 
 class DeviceSummary(BaseModel):
     total: int
@@ -165,6 +172,9 @@ class DeviceSummary(BaseModel):
     # ConnectWise Control (ScreenConnect) runs on Windows and Linux machines only: iPhones, iPads and Macs are not counted. Field Effect: every machine but phones and tablets.
     not_in_screenconnect: int = 0
     not_in_fieldeffect: int = 0
+    # Windows machines a tool reports are not fully BitLocker-encrypted, and how many have any reading (a tool reports it for some machines only). Servers carry no reading.
+    not_encrypted: int = 0
+    encryption_known: int = 0
     # Tools that report at least one device here. A "not in <tool>" tile only means something once the tool feeds devices, so the page shows it only then.
     reporting_tools: list[str] = Field(default_factory=list)
     # Devices a tool reports a problem with (Huntress: agent not checking in, Defender or firewall unhealthy, tamper protection not in force).
@@ -576,11 +586,12 @@ def filter_devices(
     hidden: bool = False,
     os: str | None = None,
     kind: str | None = None,
+    encryption: str | None = None,
 ) -> list[DeviceOut]:
     """The devices a page (or an export) asked for: every filter given must hold. ``search`` matches the name, serial number, client name or any IP address, ignoring case. Sorted by client, then name."""
     rows = [d for d in everything if (d.hidden_since is not None) == hidden]
     # The problem filters agree with the problem counts: a device offline for a month is not in them (the Offline filter still shows it).
-    if not_in_master or missing or has_alerts or attention or stale:
+    if not_in_master or missing or has_alerts or attention or stale or encryption:
         rows = [d for d in rows if not long_offline(d)]
     if search:
         needle = search.strip().lower()
@@ -610,6 +621,10 @@ def filter_devices(
         rows = [d for d in rows if attention_of(d)]
     if stale:
         rows = [d for d in rows if stale_days_of(d) is not None]
+    if encryption == "not_encrypted":
+        rows = [d for d in rows if d.encrypted is False]
+    elif encryption == "encrypted":
+        rows = [d for d in rows if d.encrypted is True]
     return sorted(rows, key=lambda d: (d.client_name or "", d.hostname.lower()))
 
 
@@ -671,6 +686,7 @@ async def list_devices(
         default=None, pattern="^(windows|mac|ios|linux)$", description="Only devices running this kind of operating system."
     ),
     kind: str | None = Query(default=None, pattern="^(computer|network|camera|other)$", description="Only this kind of device: computers, network devices, cameras or other."),
+    encryption: str | None = Query(default=None, pattern="^(not_encrypted|encrypted)$", description="Only Windows workstations a tool reports are not (or are) fully BitLocker-encrypted."),
 ) -> DeviceListOut:
     owner = current_user.tenant_id
     scope, clients = await _scope(db, owner, client_id)
@@ -688,6 +704,8 @@ async def list_devices(
         not_in_huntress=sum(1 for d in counted if is_missing_from(d, "huntress")),
         not_in_screenconnect=sum(1 for d in counted if is_missing_from(d, "screenconnect")),
         not_in_fieldeffect=sum(1 for d in counted if is_missing_from(d, "fieldeffect")),
+        not_encrypted=sum(1 for d in counted if d.encrypted is False),
+        encryption_known=sum(1 for d in counted if d.encrypted is not None),
         reporting_tools=sorted({s.vendor for d in loaded for s in d.sources}),
         needs_attention=sum(1 for d in counted if attention_of(d)),
         stale_agents=sum(1 for d in counted if stale_days_of(d) is not None),
@@ -709,6 +727,7 @@ async def list_devices(
         hidden=hidden,
         os=os,
         kind=kind,
+        encryption=encryption,
     )
     total = len(rows)
     start = (page - 1) * page_size
@@ -758,6 +777,7 @@ async def export_devices(
     hidden: bool = Query(default=False),
     os: str | None = Query(default=None, pattern="^(windows|mac|ios|linux)$"),
     kind: str | None = Query(default=None, pattern="^(computer|network|camera|other)$"),
+    encryption: str | None = Query(default=None, pattern="^(not_encrypted|encrypted)$"),
 ) -> Response:
     owner = current_user.tenant_id
     scope, clients = await _scope(db, owner, client_id)
@@ -776,6 +796,7 @@ async def export_devices(
         hidden=hidden,
         os=os,
         kind=kind,
+        encryption=encryption,
     )
     body = devices_csv(rows)
     return Response(

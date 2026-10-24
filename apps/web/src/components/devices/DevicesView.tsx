@@ -73,6 +73,7 @@ export function filtersFromParams(params: URLSearchParams | null): Partial<Saved
   if (missing === 'addigy' || missing === 'threatmate' || missing === 'huntress' || missing === 'screenconnect' || missing === 'fieldeffect') out.missing = missing;
   if (params.get('attention') === '1') out.attentionOnly = true;
   if (params.get('stale') === '1') out.staleOnly = true;
+  if (params.get('encryption') === 'not_encrypted') out.notEncryptedOnly = true;
   if (params.get('offline') === '1') out.offlineOnly = true;
   if (params.get('alerts') === '1') out.alertsOnly = true;
   return Object.keys(out).length > 0 ? out : null;
@@ -104,6 +105,7 @@ interface SavedDeviceFilters {
   gapsOnly: boolean;
   attentionOnly: boolean;
   staleOnly: boolean;
+  notEncryptedOnly?: boolean;
   offlineOnly: boolean;
   alertsOnly: boolean;
 }
@@ -133,6 +135,7 @@ export default function DevicesView() {
   const [missing, setMissing] = useState<Missing | null>(null);
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [staleOnly, setStaleOnly] = useState(false);
+  const [notEncryptedOnly, setNotEncryptedOnly] = useState(false);
   const [offlineOnly, setOfflineOnly] = useState(false);
   const [alertsOnly, setAlertsOnly] = useState(false);
   const [hiddenOnly, setHiddenOnly] = useState(false);
@@ -153,6 +156,7 @@ export default function DevicesView() {
       setGapsOnly(saved.gapsOnly === true);
       setAttentionOnly(saved.attentionOnly === true);
       setStaleOnly(saved.staleOnly === true);
+      setNotEncryptedOnly(saved.notEncryptedOnly === true);
       setOfflineOnly(saved.offlineOnly === true);
       setAlertsOnly(saved.alertsOnly === true);
     }
@@ -161,20 +165,20 @@ export default function DevicesView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (filtersRestored) saveFilters('devices', { clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, offlineOnly, alertsOnly } satisfies SavedDeviceFilters);
-  }, [filtersRestored, clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, offlineOnly, alertsOnly]);
+    if (filtersRestored) saveFilters('devices', { clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, offlineOnly, alertsOnly } satisfies SavedDeviceFilters);
+  }, [filtersRestored, clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, offlineOnly, alertsOnly]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      setData(await devicesApi.list({ page, pageSize: 50, clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, hidden: hiddenOnly || undefined }));
+      setData(await devicesApi.list({ page, pageSize: 50, clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, hidden: hiddenOnly || undefined }));
     } catch (err) {
       setError(devicesLoadError(err));
     } finally {
       setLoading(false);
     }
-  }, [page, clientId, search, vendor, os, kind, gapsOnly, missing, offlineOnly, alertsOnly, attentionOnly, staleOnly, hiddenOnly]);
+  }, [page, clientId, search, vendor, os, kind, gapsOnly, missing, offlineOnly, alertsOnly, attentionOnly, staleOnly, notEncryptedOnly, hiddenOnly]);
 
   useEffect(() => {
     const t = setTimeout(() => void load(), search ? 250 : 0);
@@ -190,7 +194,7 @@ export default function DevicesView() {
 
   const exportCsv = async () => {
     try {
-      const text = await devicesApi.exportCsv({ clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, hidden: hiddenOnly || undefined });
+      const text = await devicesApi.exportCsv({ clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, hidden: hiddenOnly || undefined });
       const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
       const link = document.createElement('a');
       link.href = url;
@@ -294,6 +298,23 @@ export default function DevicesView() {
             {data?.summary.stale_agents ?? '—'}
           </div>
         </button>
+        {(data?.summary.encryption_known ?? 0) > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setNotEncryptedOnly(!notEncryptedOnly);
+              setPage(1);
+            }}
+            aria-pressed={notEncryptedOnly}
+            title={`Windows workstations a tool (NinjaOne, Liongard) reports are not fully BitLocker-encrypted. ${data?.summary.encryption_known ?? 0} machines have a reading; the rest are unknown, not "no".`}
+            className={`rounded-lg border p-3 text-left ${notEncryptedOnly ? 'border-amber-500 bg-amber-500/10' : 'border-gray-800 bg-gray-900/60'}`}
+          >
+            <div className="text-xs text-gray-400">Not encrypted (BitLocker)</div>
+            <div className="text-2xl font-semibold text-amber-300" data-testid="devices-not-encrypted">
+              {data?.summary.not_encrypted ?? '—'}
+            </div>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -591,6 +612,11 @@ function DeviceRowView({ d, master, open, onToggle, onHide }: { d: DeviceRow; ma
         <td className="px-3 py-2 text-gray-400">
           {d.last_online ? when(d.last_online) : '—'}
           {d.offline_days != null && <span className="ml-2 rounded bg-gray-700/60 px-1.5 py-0.5 text-[11px] text-gray-300">Offline {d.offline_days}d</span>}
+          {d.encrypted === false && (
+            <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] text-amber-300" data-testid="not-encrypted-badge" title="A tool reports a fixed drive that is not fully BitLocker-encrypted and protected">
+              Not encrypted
+            </span>
+          )}
           {d.auto_hidden ? (
             <span className="ml-2 rounded bg-gray-700/60 px-1.5 py-0.5 text-[11px] text-gray-300" title="Every tool that reports a check-in time has gone 10 days without one. It shows again as soon as one does." data-testid="auto-hidden">
               Hidden: no tool has seen it for 10+ days

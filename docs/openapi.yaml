@@ -9973,6 +9973,19 @@ paths:
           title: Kind
         description: 'Only this kind of device: computers, network devices, cameras
           or other.'
+      - name: encryption
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(not_encrypted|encrypted)$
+          - type: 'null'
+          description: Only Windows workstations a tool reports are not (or are) fully
+            BitLocker-encrypted.
+          title: Encryption
+        description: Only Windows workstations a tool reports are not (or are) fully
+          BitLocker-encrypted.
       responses:
         '200':
           description: Successful Response
@@ -10091,6 +10104,15 @@ paths:
             pattern: ^(computer|network|camera|other)$
           - type: 'null'
           title: Kind
+      - name: encryption
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(not_encrypted|encrypted)$
+          - type: 'null'
+          title: Encryption
       responses:
         '200':
           description: Successful Response
@@ -24444,6 +24466,15 @@ components:
           title: Kind
           description: computer, network, camera or other (see ``device_kind``).
           readOnly: true
+        encrypted:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Encrypted
+          description: Whether every fixed drive is BitLocker-encrypted, from the
+            tools that report it (NinjaOne, Liongard); None when none does, which
+            is not the same as "no" (see ``encryption_state``).
+          readOnly: true
       type: object
       required:
       - id
@@ -24452,6 +24483,7 @@ components:
       - last_seen
       - first_seen
       - kind
+      - encrypted
       title: DeviceOut
     DeviceSettings:
       properties:
@@ -24523,6 +24555,14 @@ components:
         not_in_fieldeffect:
           type: integer
           title: Not In Fieldeffect
+          default: 0
+        not_encrypted:
+          type: integer
+          title: Not Encrypted
+          default: 0
+        encryption_known:
+          type: integer
+          title: Encryption Known
           default: 0
         reporting_tools:
           items:
