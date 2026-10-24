@@ -133,6 +133,8 @@ TOOL_ITEMS = (
     ("threatmate_external_exposure", "external_exposure", "Is the client's public-facing infrastructure free of serious issues?"),
     ("threatmate_hardening", "hardening", "Are computers configured to a security baseline?"),
     ("threatmate_cyber_insurance", "cyber_insurance_baseline", "Do computers meet the cyber insurance baseline?"),
+    ("fieldeffect_account_risk", "account_risk", "Are the client's Microsoft 365 accounts free of high-risk activity?"),
+    ("fieldeffect_device_risk", "device_risk", "Are the client's computers free of critical and high-risk findings?"),
 )
 
 
