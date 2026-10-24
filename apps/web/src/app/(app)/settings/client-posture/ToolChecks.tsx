@@ -39,6 +39,8 @@ const TITLE: Record<string, string> = {
   meraki_wan: 'Internet connections',
   slide_alerts: 'Backup alerts',
   slide_appliance: 'Backup appliance',
+  autoelevate_enforcing: 'Admin-rights protection',
+  autoelevate_requests: 'Elevation requests',
 };
 
 const STATUS: Record<string, { text: string; className: string }> = {
@@ -59,7 +61,7 @@ export function ToolChecks({ tool, label, checks, refreshedAt }: { tool: string;
           const st = STATUS[c.status] ?? STATUS.partly;
           return (
             <div key={c.key} className="rounded border border-slate-800 p-2" data-testid={`check-${c.key}`}>
-              <div className="text-xs uppercase text-slate-500">{TITLE[c.key] ?? c.key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp|ninjaone|halopsa|meraki|slide)_/, '').replace(/_/g, ' ')}</div>
+              <div className="text-xs uppercase text-slate-500">{TITLE[c.key] ?? c.key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp|ninjaone|halopsa|meraki|slide|autoelevate)_/, '').replace(/_/g, ' ')}</div>
               <span className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[11px] ${st.className}`}>{st.text}</span>
               <div className="mt-1 text-xs text-slate-400">{c.evidence}</div>
             </div>
