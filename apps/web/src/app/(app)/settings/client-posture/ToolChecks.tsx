@@ -31,6 +31,8 @@ const TITLE: Record<string, string> = {
   cipp_inactive_accounts: 'Unused accounts',
   cipp_subscriptions: 'Microsoft 365 subscriptions',
   cipp_unused_licences: 'Unused licences',
+  ninjaone_unsupported_os: 'Windows support status',
+  ninjaone_antivirus: 'Antivirus',
 };
 
 const STATUS: Record<string, { text: string; className: string }> = {
@@ -51,7 +53,7 @@ export function ToolChecks({ tool, label, checks, refreshedAt }: { tool: string;
           const st = STATUS[c.status] ?? STATUS.partly;
           return (
             <div key={c.key} className="rounded border border-slate-800 p-2" data-testid={`check-${c.key}`}>
-              <div className="text-xs uppercase text-slate-500">{TITLE[c.key] ?? c.key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp)_/, '').replace(/_/g, ' ')}</div>
+              <div className="text-xs uppercase text-slate-500">{TITLE[c.key] ?? c.key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp|ninjaone)_/, '').replace(/_/g, ' ')}</div>
               <span className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[11px] ${st.className}`}>{st.text}</span>
               <div className="mt-1 text-xs text-slate-400">{c.evidence}</div>
             </div>
