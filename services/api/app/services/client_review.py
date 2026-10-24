@@ -136,6 +136,7 @@ TOOL_ITEMS = (
     ("fieldeffect_account_risk", "account_risk", "Are the client's Microsoft 365 accounts free of high-risk activity?"),
     ("ninjaone_unsupported_os", "supported_os", "Are all computers on a version of Windows Microsoft still supports?"),
     ("ninjaone_antivirus", "antivirus_current", "Does every Windows computer have antivirus switched on and up to date?"),
+    ("meraki_admin_2fa", "network_admin_mfa", "Do the people who manage the client's network sign in with two-step verification?"),
     ("cipp_inactive_accounts", "inactive_accounts", "Are accounts nobody signs in to removed or switched off?"),
     ("fieldeffect_device_risk", "device_risk", "Are the client's computers free of critical and high-risk findings?"),
 )

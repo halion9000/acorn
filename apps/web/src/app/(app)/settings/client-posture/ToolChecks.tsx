@@ -34,6 +34,9 @@ const TITLE: Record<string, string> = {
   ninjaone_unsupported_os: 'Windows support status',
   ninjaone_antivirus: 'Antivirus',
   halopsa_agreement: 'Support agreement',
+  meraki_licence: 'Meraki licence',
+  meraki_admin_2fa: 'Meraki administrators',
+  meraki_wan: 'Internet connections',
 };
 
 const STATUS: Record<string, { text: string; className: string }> = {
@@ -54,7 +57,7 @@ export function ToolChecks({ tool, label, checks, refreshedAt }: { tool: string;
           const st = STATUS[c.status] ?? STATUS.partly;
           return (
             <div key={c.key} className="rounded border border-slate-800 p-2" data-testid={`check-${c.key}`}>
-              <div className="text-xs uppercase text-slate-500">{TITLE[c.key] ?? c.key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp|ninjaone|halopsa)_/, '').replace(/_/g, ' ')}</div>
+              <div className="text-xs uppercase text-slate-500">{TITLE[c.key] ?? c.key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp|ninjaone|halopsa|meraki)_/, '').replace(/_/g, ' ')}</div>
               <span className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[11px] ${st.className}`}>{st.text}</span>
               <div className="mt-1 text-xs text-slate-400">{c.evidence}</div>
             </div>
