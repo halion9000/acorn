@@ -49,4 +49,19 @@ describe('ToolChecks', () => {
     expect(within(screen.getByTestId('check-liongard_edr_coverage')).getByText('EDR coverage')).toBeInTheDocument();
     expect(within(screen.getByTestId('check-liongard_stale_licensed_users')).getByText('Needs attention')).toBeInTheDocument();
   });
+
+  it('names the hardening and cyber insurance checks in plain words', () => {
+    render(
+      <ToolChecks
+        tool="threatmate"
+        label="ThreatMate"
+        checks={[
+          { key: 'threatmate_hardening', status: 'not_met', evidence: 'ThreatMate endpoint hardening: 45% of checks pass on the 12 of 62 devices assessed' },
+          { key: 'threatmate_cyber_insurance', status: 'partly', evidence: "ThreatMate's Cyber Insurance Baseline: 60 of 100 checks pass (60%)" },
+        ]}
+      />,
+    );
+    expect(within(screen.getByTestId('check-threatmate_hardening')).getByText('Endpoint hardening')).toBeInTheDocument();
+    expect(within(screen.getByTestId('check-threatmate_cyber_insurance')).getByText('Cyber insurance baseline')).toBeInTheDocument();
+  });
 });

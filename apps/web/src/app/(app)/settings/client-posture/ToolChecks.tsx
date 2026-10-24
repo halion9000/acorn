@@ -15,6 +15,8 @@ const TITLE: Record<string, string> = {
   threatmate_security_score: 'Security score',
   threatmate_patching: 'Patching',
   threatmate_end_of_life: 'End-of-life software',
+  threatmate_hardening: 'Endpoint hardening',
+  threatmate_cyber_insurance: 'Cyber insurance baseline',
   liongard_disk_encryption: 'Disk encryption (BitLocker)',
   liongard_edr_coverage: 'EDR coverage',
   liongard_email_domain_records: 'E-mail domain records',
