@@ -229,6 +229,8 @@ SAAS_NAMES = {"datto-saas": "Datto SaaS Protection", "dropsuite": "Dropsuite"}
 SAAS_SOURCES = tuple(SAAS_NAMES)
 # ThreatMate sends a client's security score, patching and end-of-life checks under this source; they are shown on the client posture page and are not Microsoft 365 baseline checks.
 THREATMATE_SOURCE = "threatmate"
+# Liongard sends a client's disk encryption, EDR coverage, e-mail domain record and stale-licence checks under this source; likewise shown on the client posture page.
+LIONGARD_SOURCE = "liongard"
 _BACKUP_OS = {"windows", "mac", "linux"}
 STALE_SNAPSHOT_DAYS = 3
 

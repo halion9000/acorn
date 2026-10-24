@@ -183,6 +183,6 @@ def test_the_microsoft_365_baseline_row_leaves_out_every_other_tools_checks():
     from app.api.v1.endpoints.client_review import m365_baseline_query
 
     sql = str(m365_baseline_query(uuid.uuid4()).compile(compile_kwargs={"literal_binds": True}))
-    for other in ("huntress-sat", "threatmate", "datto-saas", "dropsuite"):
+    for other in ("huntress-sat", "threatmate", "liongard", "datto-saas", "dropsuite"):
         assert f"'{other}'" in sql, f"{other} checks must not be read as the Microsoft 365 baseline"
     assert "NOT IN" in sql

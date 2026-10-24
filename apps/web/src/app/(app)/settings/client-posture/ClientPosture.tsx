@@ -12,7 +12,7 @@ import VendorBadge from "@/components/mssp/VendorBadge";
 import { vendorLabel } from "@/components/mssp/ClientMapping";
 import { vendorClientUrl } from "@/lib/vendor-links";
 import { DomainChecks } from "./DomainChecks";
-import { ThreatMateChecks, type PostureCheck } from "./ThreatMateChecks";
+import { ToolChecks, type PostureCheck } from "./ToolChecks";
 
 export interface Posture {
   client_id: string;
@@ -27,6 +27,9 @@ export interface Posture {
   /** What ThreatMate says about the client (security score, patching, end-of-life software). Absent from an older API. */
   threatmate?: PostureCheck[];
   threatmate_refreshed_at?: string | null;
+  /** The same for Liongard (disk encryption, EDR coverage, e-mail domain records, stale licensed users). */
+  liongard?: PostureCheck[];
+  liongard_refreshed_at?: string | null;
 }
 
 interface Client {
@@ -217,7 +220,8 @@ export function ClientPosture() {
               </p>
             )}
           </section>
-          <ThreatMateChecks checks={shown.threatmate ?? []} refreshedAt={shown.threatmate_refreshed_at} />
+          <ToolChecks tool="threatmate" label="ThreatMate" checks={shown.threatmate ?? []} refreshedAt={shown.threatmate_refreshed_at} />
+          <ToolChecks tool="liongard" label="Liongard" checks={shown.liongard ?? []} refreshedAt={shown.liongard_refreshed_at} />
           <DomainChecks clientId={shown.client_id} />
           <section>
             <h3 className="mb-2 text-sm uppercase text-slate-500">Alerts and cases</h3>

@@ -21989,6 +21989,18 @@ components:
             format: date-time
           - type: 'null'
           title: Threatmate Refreshed At
+        liongard:
+          items:
+            $ref: '#/components/schemas/PostureCheck'
+          type: array
+          title: Liongard
+          default: []
+        liongard_refreshed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Liongard Refreshed At
       type: object
       required:
       - client_id

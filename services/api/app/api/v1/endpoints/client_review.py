@@ -32,7 +32,7 @@ from app.models.client_review_answer import ClientReviewAnswer
 from app.models.signin import ClientM365Check, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
-from app.services.infra_review import SAAS_SOURCES, THREATMATE_SOURCE
+from app.services.infra_review import LIONGARD_SOURCE, SAAS_SOURCES, THREATMATE_SOURCE
 from app.services.m365_review import M365Answer, m365_answers
 from app.services.review_overrides import MAX_PER_CLIENT, clean_answer, merge_m365, merge_readiness, merge_tech, readiness_counts
 from app.services.sat_review import SAT_SOURCE
@@ -153,8 +153,8 @@ class M365CheckIn(BaseModel):
 
 
 def m365_baseline_query(client_id: uuid.UUID) -> Any:
-    """The client's Microsoft 365 baseline row: every checks row except those other tools send under their own source (training, backups, ThreatMate)."""
-    return select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.notin_([SAT_SOURCE, THREATMATE_SOURCE, *SAAS_SOURCES]))
+    """The client's Microsoft 365 baseline row: every checks row except those other tools send under their own source (training, backups, ThreatMate, Liongard)."""
+    return select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.notin_([SAT_SOURCE, THREATMATE_SOURCE, LIONGARD_SOURCE, *SAAS_SOURCES]))
 
 
 class M365ChecksReport(BaseModel):

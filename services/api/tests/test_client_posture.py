@@ -142,3 +142,52 @@ def test_a_client_not_mapped_to_threatmate_reads_no_threatmate_row_and_shows_non
     out, queried = _posture_with(monkeypatch, [("huntress", "5", "Acme")], [{"key": "threatmate_patching", "status": "met", "evidence": "x"}])
     assert out.threatmate == [] and out.threatmate_refreshed_at is None
     assert queried == [], "no ThreatMate row is read for a client that is not mapped to it"
+
+
+def test_a_client_mapped_to_both_tools_shows_each_tools_checks_separately(monkeypatch):
+    import asyncio
+    import contextlib
+    import uuid as _uuid
+    from datetime import UTC, datetime
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints import client_posture as cp
+
+    owner = _uuid.uuid4()
+    rows = {
+        "threatmate": [{"key": "threatmate_patching", "status": "met", "evidence": "tm"}],
+        "liongard": [{"key": "liongard_disk_encryption", "status": "not_met", "evidence": "0 of 2 workstations"}, {"key": "liongard_edr_coverage", "status": "met", "evidence": "2 of 2"}],
+    }
+
+    async def scope(db, o, cid):
+        return [owner], {}
+
+    async def load(*a, **k):
+        return []
+
+    monkeypatch.setattr(cp, "_scope", scope)
+    monkeypatch.setattr(cp, "_load_cached", load)
+    monkeypatch.setattr(cp, "_master_of", lambda t: None)
+    monkeypatch.setattr(cp, "acting_as_tenant", lambda db, tid: contextlib.nullcontext())
+
+    class DB:
+        async def get(self, model, key):
+            return None
+
+        async def execute(self, statement, params=None):
+            text = str(statement.compile(compile_kwargs={"literal_binds": True})) if hasattr(statement, "compile") else str(statement)
+            if "identity_mfa_users" in text:
+                return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
+            if "client_aliases" in text:
+                return SimpleNamespace(all=lambda: [("threatmate", "11", "Acme"), ("liongard", "7", "Acme")])
+            if "client_m365_checks" in text:
+                which = "liongard" if "'liongard'" in text else "threatmate"
+                return SimpleNamespace(scalars=lambda: SimpleNamespace(first=lambda: SimpleNamespace(checks=rows[which], refreshed_at=datetime(2026, 10, 24, tzinfo=UTC))))
+            if "FROM cases" in text:
+                return SimpleNamespace(scalar_one=lambda: 0)
+            return SimpleNamespace(one=lambda: (0, 0, 0, 0))
+
+    out = asyncio.run(cp.client_posture(owner, SimpleNamespace(tenant_id=owner, user_id=_uuid.uuid4()), DB()))
+    assert [c.key for c in out.threatmate] == ["threatmate_patching"]
+    assert [(c.key, c.status) for c in out.liongard] == [("liongard_disk_encryption", "not_met"), ("liongard_edr_coverage", "met")]
+    assert out.liongard_refreshed_at is not None

@@ -452,3 +452,21 @@ def test_a_stale_exposure_row_is_not_shown():
     old = src(A, "threatmate", "amy@a.com", details={"exposed_in": 3}, refreshed_at=NOW - timedelta(days=10))
     people = ip.build_people(NAMES, [ms(A, "amy@a.com")], [old], NOW)
     assert people[0].exposure is None
+
+
+def test_liongard_breach_lines_are_exposure_too_and_the_worst_reading_wins():
+    people = ip.build_people(
+        NAMES,
+        [ms(A, "amy@a.com"), ms(A, "bo@a.com")],
+        [
+            src(A, "liongard", "amy@a.com", details={"exposed_in": 9, "latest_breach": "2024-06", "password_exposed": True, "stealer_log": False, "malware": False, "breaches": []}),
+            tm("amy@a.com", exposed_in=2, stealer_log=True),
+            src(A, "liongard", "bo@a.com", details={"exposed_in": 4, "latest_breach": None, "password_exposed": False}),
+        ],
+        NOW,
+    )
+    amy = next(p for p in people if p.email == "amy@a.com")
+    assert amy.vendors == ["cipp"], "neither exposure tool is listed as a tool that knows the person"
+    assert (amy.exposure.stealer_log, amy.exposure.count) == (True, 2), "a stealer-log reading is worse than a bigger count"
+    bo = next(p for p in people if p.email == "bo@a.com")
+    assert (bo.exposure.count, bo.exposure.latest) == (4, None)

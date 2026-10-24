@@ -25,7 +25,7 @@ _SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
 # The tools that back up people's mailboxes: what each says about a person is shown on their row.
 BACKUP_TOOLS = ("dropsuite", "datto-saas")
 # Tools that say where a person's address turned up in a breach. They describe people other tools know; an exposed address no directory knows is not made into a person.
-EXPOSURE_TOOLS = ("threatmate",)
+EXPOSURE_TOOLS = ("threatmate", "liongard")
 # A Dropsuite mailbox with no backup in this long is stale.
 FRESH_HOURS = 48
 

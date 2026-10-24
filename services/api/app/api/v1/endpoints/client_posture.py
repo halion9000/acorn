@@ -9,7 +9,7 @@ import asyncio
 import contextlib
 import uuid
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -27,7 +27,7 @@ from app.models.signin import ClientM365Check, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
-from app.services.infra_review import THREATMATE_SOURCE, saas_products
+from app.services.infra_review import LIONGARD_SOURCE, THREATMATE_SOURCE, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
 
@@ -90,6 +90,9 @@ class ClientPosture(BaseModel):
     # What ThreatMate says about the client (security score, patching, end-of-life software); empty until CORE has sent it for a mapped client.
     threatmate: list[PostureCheck] = []
     threatmate_refreshed_at: datetime | None = None
+    # Likewise for Liongard (disk encryption, EDR coverage, e-mail domain records, stale licensed users).
+    liongard: list[PostureCheck] = []
+    liongard_refreshed_at: datetime | None = None
 
 
 def devices_part(rollups: list[ClientRollup], client_id: uuid.UUID) -> PostureDevices:
@@ -104,6 +107,22 @@ def devices_part(rollups: list[ClientRollup], client_id: uuid.UUID) -> PostureDe
                 offline=r.offline,
             )
     return PostureDevices()
+
+
+async def _tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, aliases: list[Any], source: str) -> tuple[list[PostureCheck], datetime | None]:
+    """The checks one tool sent for this client, or none when the client is not mapped to that tool (then nothing is read) or nothing has been sent."""
+    if not any(v == source for v, _, _ in aliases):
+        return [], None
+    async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
+        row = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source == source))).scalars().first()
+    if row is None:
+        return [], None
+    checks = [
+        PostureCheck(key=str(c["key"]), status=str(c["status"]), evidence=str(c.get("evidence", "")))
+        for c in (row.checks or [])
+        if isinstance(c, dict) and c.get("key") and c.get("status")
+    ]
+    return checks, row.refreshed_at
 
 
 @router.get(
@@ -162,20 +181,8 @@ async def client_posture(
                 .first()
             )
         saas_checks = [c for c in (saas_row.checks if saas_row is not None else []) if isinstance(c, dict)]
-    tm_checks: list[PostureCheck] = []
-    tm_refreshed: datetime | None = None
-    if any(v == THREATMATE_SOURCE for v, _, _ in aliases):
-        async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
-            tm_row = (
-                (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source == THREATMATE_SOURCE))).scalars().first()
-            )
-        if tm_row is not None:
-            tm_refreshed = tm_row.refreshed_at
-            tm_checks = [
-                PostureCheck(key=str(c["key"]), status=str(c["status"]), evidence=str(c.get("evidence", "")))
-                for c in (tm_row.checks or [])
-                if isinstance(c, dict) and c.get("key") and c.get("status")
-            ]
+    tm_checks, tm_refreshed = await _tool_checks(db, owner, client_id, aliases, THREATMATE_SOURCE)
+    lg_checks, lg_refreshed = await _tool_checks(db, owner, client_id, aliases, LIONGARD_SOURCE)
     tools = [
         PostureTool(
             vendor=v, vendor_client_id=i, vendor_client_name=n or None, product=saas_products(saas_checks) if v == "datto-saas" else None
@@ -195,6 +202,8 @@ async def client_posture(
         tools=tools,
         threatmate=tm_checks,
         threatmate_refreshed_at=tm_refreshed,
+        liongard=lg_checks,
+        liongard_refreshed_at=lg_refreshed,
     )
 
 
