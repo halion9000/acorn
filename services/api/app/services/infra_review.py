@@ -250,6 +250,7 @@ TOOL_CHECK_SOURCES = {
     "autoelevate": "autoelevate",
     "huntress": "huntress",
     "dnsfilter": "dnsfilter",
+    "datto-saas-seats": "datto-saas",
 }
 _BACKUP_OS = {"windows", "mac", "linux"}
 STALE_SNAPSHOT_DAYS = 3

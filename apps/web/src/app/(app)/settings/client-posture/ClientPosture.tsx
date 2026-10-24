@@ -42,6 +42,7 @@ export const TOOL_CHECK_LABELS: Record<string, string> = {
   autoelevate: "AutoElevate",
   huntress: "Huntress",
   dnsfilter: "DNSFilter",
+  "datto-saas-seats": "Datto SaaS Protection",
 };
 
 /** The tools that sent checks, in a steady order: the named ones first as listed above, then any other by name. */

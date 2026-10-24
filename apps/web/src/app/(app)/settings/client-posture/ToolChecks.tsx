@@ -21,6 +21,7 @@ const TITLE: Record<string, string> = {
   threatmate_dmarc: 'DMARC and SPF',
   threatmate_hardening: 'Endpoint hardening',
   threatmate_cyber_insurance: 'Cyber insurance baseline',
+  threatmate_frameworks: 'Compliance frameworks',
   liongard_disk_encryption: 'Disk encryption (BitLocker)',
   liongard_edr_coverage: 'EDR coverage',
   liongard_email_domain_records: 'E-mail domain records',
@@ -45,6 +46,10 @@ const TITLE: Record<string, string> = {
   huntress_quiet_agents: 'Agents gone quiet',
   dnsfilter_threat_blocking: 'Threat blocking (DNS)',
   dnsfilter_org_mfa: 'DNS filtering sign-in',
+  datto_saas_seats: 'Mailbox backup coverage',
+  threatmate_ai_tools: 'AI tools in use',
+  threatmate_pentest: 'Vulnerability scans',
+  threatmate_m365_controls: 'Microsoft 365 identity controls',
 };
 
 const STATUS: Record<string, { text: string; className: string }> = {
@@ -65,7 +70,7 @@ export function ToolChecks({ tool, label, checks, refreshedAt }: { tool: string;
           const st = STATUS[c.status] ?? STATUS.partly;
           return (
             <div key={c.key} className="rounded border border-slate-800 p-2" data-testid={`check-${c.key}`}>
-              <div className="text-xs uppercase text-slate-500">{TITLE[c.key] ?? c.key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp|ninjaone|halopsa|meraki|slide|autoelevate|huntress|dnsfilter)_/, '').replace(/_/g, ' ')}</div>
+              <div className="text-xs uppercase text-slate-500">{TITLE[c.key] ?? c.key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp|ninjaone|halopsa|meraki|slide|autoelevate|huntress|dnsfilter|datto)_/, '').replace(/_/g, ' ')}</div>
               <span className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[11px] ${st.className}`}>{st.text}</span>
               <div className="mt-1 text-xs text-slate-400">{c.evidence}</div>
             </div>

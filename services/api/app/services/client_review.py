@@ -133,6 +133,7 @@ TOOL_ITEMS = (
     ("threatmate_external_exposure", "external_exposure", "Is the client's public-facing infrastructure free of serious issues?"),
     ("threatmate_hardening", "hardening", "Are computers configured to a security baseline?"),
     ("threatmate_cyber_insurance", "cyber_insurance_baseline", "Do computers meet the cyber insurance baseline?"),
+    ("datto_saas_seats", "mailbox_backup_coverage", "Is every mailbox in the client's Microsoft 365 or Google tenant backed up?"),
     ("fieldeffect_account_risk", "account_risk", "Are the client's Microsoft 365 accounts free of high-risk activity?"),
     ("ninjaone_unsupported_os", "supported_os", "Are all computers on a version of Windows Microsoft still supports?"),
     ("ninjaone_antivirus", "antivirus_current", "Does every Windows computer have antivirus switched on and up to date?"),
