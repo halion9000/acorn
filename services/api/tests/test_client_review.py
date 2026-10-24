@@ -186,3 +186,31 @@ def test_the_microsoft_365_baseline_row_leaves_out_every_other_tools_checks():
     for other in ("huntress-sat", "threatmate", "liongard", "datto-saas", "dropsuite"):
         assert f"'{other}'" in sql, f"{other} checks must not be read as the Microsoft 365 baseline"
     assert "NOT IN" in sql
+
+
+# ---- questions the tools answer for a client ------------------------------------------------------------------------------------------------------------
+
+
+def _items(r):
+    return {i.key: i for i in r.items}
+
+
+def test_the_checks_liongard_and_threatmate_sent_become_checklist_questions_with_their_evidence():
+    checks = {
+        "liongard_disk_encryption": {"key": "liongard_disk_encryption", "status": "not_met", "evidence": "Liongard: 0 of 2 workstations have every fixed drive fully encrypted with BitLocker"},
+        "liongard_email_domain_records": {"key": "liongard_email_domain_records", "status": "partly", "evidence": "Liongard checked 3 domains"},
+        "threatmate_hardening": {"key": "threatmate_hardening", "status": "met", "evidence": "ThreatMate endpoint hardening: 90%"},
+        "threatmate_cyber_insurance": {"key": "threatmate_cyber_insurance", "status": "partly", "evidence": "ThreatMate's Cyber Insurance Baseline: 7 of 10 checks pass (70%)"},
+    }
+    items = _items(readiness(device_facts([], 0, 0), None, None, tool_checks=checks))
+    assert (items["disk_encryption"].status, items["email_domain_records"].status, items["hardening"].status, items["cyber_insurance_baseline"].status) == ("not_met", "partly", "met", "partly")
+    assert items["disk_encryption"].evidence.startswith("Liongard: 0 of 2 workstations")
+    assert items["disk_encryption"].question == "Are computers' disks encrypted?"
+
+
+def test_a_client_none_of_those_tools_has_checks_for_gets_none_of_those_questions_and_a_bad_status_is_ignored():
+    keys = set(_items(readiness(device_facts([], 0, 0), None, None)))
+    assert not keys & {"disk_encryption", "email_domain_records", "hardening", "cyber_insurance_baseline"}
+    odd = {"liongard_disk_encryption": {"key": "liongard_disk_encryption", "status": "who knows", "evidence": "x"}}
+    assert "disk_encryption" not in _items(readiness(device_facts([], 0, 0), None, None, tool_checks=odd))
+    assert "disk_encryption" not in _items(readiness(device_facts([], 0, 0), None, None, tool_checks={}))

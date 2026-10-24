@@ -125,6 +125,15 @@ def _banded(percent: float, met: float, partly: float) -> str:
     return "met" if percent >= met else "partly" if percent >= partly else "not_met"
 
 
+# (the check a tool sends, the checklist key, the question): Liongard's and ThreatMate's per-client checks that answer a readiness question.
+TOOL_ITEMS = (
+    ("liongard_disk_encryption", "disk_encryption", "Are computers' disks encrypted?"),
+    ("liongard_email_domain_records", "email_domain_records", "Are the client's e-mail domains protected against spoofing (SPF, DMARC, DKIM)?"),
+    ("threatmate_hardening", "hardening", "Are computers configured to a security baseline?"),
+    ("threatmate_cyber_insurance", "cyber_insurance_baseline", "Do computers meet the cyber insurance baseline?"),
+)
+
+
 def readiness(
     facts: DeviceFacts,
     mfa: dict[str, int] | None,
@@ -133,6 +142,7 @@ def readiness(
     devices: list[Any] | None = None,
     saas: list[dict[str, Any]] | None = None,
     enrolled_in: set[str] | None = None,
+    tool_checks: dict[str, dict[str, Any]] | None = None,
 ) -> Readiness:
     """The checklist. ``mfa`` is ``counts_for_mfa``'s output (None when no multi-factor data has arrived); ``secure_percent`` is the Microsoft Secure Score as a percentage (None when not read)."""
     cov = {c.tool: c for c in facts.coverage}
@@ -252,6 +262,12 @@ def readiness(
             _banded(secure_percent, 60, 40),
             f"Microsoft Secure Score is {secure_percent:.0f}%.",
         )
+
+    # Questions a tool answers from what it sees on the client's machines and domains; each is listed only when that tool has sent its check for this client.
+    for check_key, key, question in TOOL_ITEMS:
+        got = (tool_checks or {}).get(check_key)
+        if got is not None and got.get("status") in ("met", "partly", "not_met"):
+            add(key, question, str(got["status"]), str(got.get("evidence", "")))
 
     for key, question in (
         ("email_filtering", "Is e-mail filtered for phishing and malware?"),

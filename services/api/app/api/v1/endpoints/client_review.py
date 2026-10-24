@@ -331,6 +331,7 @@ async def client_review(
         )
         typed = list((await db.execute(select(ClientReviewAnswer).where(ClientReviewAnswer.tenant_id == client_id))).scalars().all())
         saas_rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_(SAAS_SOURCES)))).scalars().all()
+        tool_rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_([THREATMATE_SOURCE, LIONGARD_SOURCE])))).scalars().all()
         a = (
             await db.execute(
                 select(
@@ -367,7 +368,10 @@ async def client_review(
     sat_checks = [c for c in (sat_row.checks if sat_row is not None else []) if isinstance(c, dict)]
     # Each cloud backup tool's checks, tagged with the tool that sent them so the answer can name it.
     saas_checks = [{**c, "source": row.source} for row in saas_rows for c in (row.checks or []) if isinstance(c, dict)]
-    ready = readiness(facts, mfa, score.percent if score else None, sat=sat_checks, devices=shown, saas=saas_checks, enrolled_in={v for v, tid in aliases if tid == client_id})
+    tool_checks = {c["key"]: c for row in tool_rows for c in (row.checks or []) if isinstance(c, dict) and isinstance(c.get("key"), str)}
+    ready = readiness(
+        facts, mfa, score.percent if score else None, sat=sat_checks, devices=shown, saas=saas_checks, enrolled_in={v for v, tid in aliases if tid == client_id}, tool_checks=tool_checks
+    )
     merge_readiness(ready.items, typed)
     counts = readiness_counts(ready.items)
     ready.met, ready.partly, ready.not_met, ready.unknown = counts["met"], counts["partly"], counts["not_met"], counts["unknown"]
