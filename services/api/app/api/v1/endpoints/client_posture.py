@@ -27,7 +27,7 @@ from app.models.signin import ClientM365Check, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
-from app.services.infra_review import LIONGARD_SOURCE, THREATMATE_SOURCE, saas_products
+from app.services.infra_review import ITGLUE_SOURCE, LIONGARD_SOURCE, THREATMATE_SOURCE, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
 
@@ -93,6 +93,9 @@ class ClientPosture(BaseModel):
     # Likewise for Liongard (disk encryption, EDR coverage, e-mail domain records, stale licensed users).
     liongard: list[PostureCheck] = []
     liongard_refreshed_at: datetime | None = None
+    # Likewise for IT Glue (domain-name and SSL-certificate expiry).
+    itglue: list[PostureCheck] = []
+    itglue_refreshed_at: datetime | None = None
 
 
 def devices_part(rollups: list[ClientRollup], client_id: uuid.UUID) -> PostureDevices:
@@ -183,6 +186,7 @@ async def client_posture(
         saas_checks = [c for c in (saas_row.checks if saas_row is not None else []) if isinstance(c, dict)]
     tm_checks, tm_refreshed = await _tool_checks(db, owner, client_id, aliases, THREATMATE_SOURCE)
     lg_checks, lg_refreshed = await _tool_checks(db, owner, client_id, aliases, LIONGARD_SOURCE)
+    ig_checks, ig_refreshed = await _tool_checks(db, owner, client_id, aliases, ITGLUE_SOURCE)
     tools = [
         PostureTool(
             vendor=v, vendor_client_id=i, vendor_client_name=n or None, product=saas_products(saas_checks) if v == "datto-saas" else None
@@ -204,6 +208,8 @@ async def client_posture(
         threatmate_refreshed_at=tm_refreshed,
         liongard=lg_checks,
         liongard_refreshed_at=lg_refreshed,
+        itglue=ig_checks,
+        itglue_refreshed_at=ig_refreshed,
     )
 
 

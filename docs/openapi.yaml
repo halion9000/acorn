@@ -22023,6 +22023,18 @@ components:
             format: date-time
           - type: 'null'
           title: Liongard Refreshed At
+        itglue:
+          items:
+            $ref: '#/components/schemas/PostureCheck'
+          type: array
+          title: Itglue
+          default: []
+        itglue_refreshed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Itglue Refreshed At
       type: object
       required:
       - client_id

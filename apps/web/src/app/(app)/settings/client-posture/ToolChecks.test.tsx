@@ -64,4 +64,21 @@ describe('ToolChecks', () => {
     expect(within(screen.getByTestId('check-threatmate_hardening')).getByText('Endpoint hardening')).toBeInTheDocument();
     expect(within(screen.getByTestId('check-threatmate_cyber_insurance')).getByText('Cyber insurance baseline')).toBeInTheDocument();
   });
+
+  it('names the IT Glue expiry checks in plain words under their own heading', () => {
+    render(
+      <ToolChecks
+        tool="itglue"
+        label="IT Glue"
+        checks={[
+          { key: 'itglue_domain_expiry', status: 'not_met', evidence: 'IT Glue documents 2 domains; 1 expired: old.com (2026-10-14)' },
+          { key: 'itglue_certificate_expiry', status: 'partly', evidence: 'IT Glue documents 1 certificate; 1 expire within 30 days: mail (2026-11-02)' },
+        ]}
+      />,
+    );
+    expect(within(screen.getByTestId('itglue-checks')).getByText('IT Glue')).toBeInTheDocument();
+    expect(within(screen.getByTestId('check-itglue_domain_expiry')).getByText('Domain names')).toBeInTheDocument();
+    expect(within(screen.getByTestId('check-itglue_domain_expiry')).getByText('Problem')).toBeInTheDocument();
+    expect(within(screen.getByTestId('check-itglue_certificate_expiry')).getByText('SSL certificates')).toBeInTheDocument();
+  });
 });

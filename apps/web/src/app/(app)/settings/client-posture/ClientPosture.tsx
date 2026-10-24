@@ -30,6 +30,9 @@ export interface Posture {
   /** The same for Liongard (disk encryption, EDR coverage, e-mail domain records, stale licensed users). */
   liongard?: PostureCheck[];
   liongard_refreshed_at?: string | null;
+  /** The same for IT Glue (domain-name and SSL-certificate expiry). */
+  itglue?: PostureCheck[];
+  itglue_refreshed_at?: string | null;
 }
 
 interface Client {
@@ -222,6 +225,7 @@ export function ClientPosture() {
           </section>
           <ToolChecks tool="threatmate" label="ThreatMate" checks={shown.threatmate ?? []} refreshedAt={shown.threatmate_refreshed_at} />
           <ToolChecks tool="liongard" label="Liongard" checks={shown.liongard ?? []} refreshedAt={shown.liongard_refreshed_at} />
+          <ToolChecks tool="itglue" label="IT Glue" checks={shown.itglue ?? []} refreshedAt={shown.itglue_refreshed_at} />
           <DomainChecks clientId={shown.client_id} />
           <section>
             <h3 className="mb-2 text-sm uppercase text-slate-500">Alerts and cases</h3>

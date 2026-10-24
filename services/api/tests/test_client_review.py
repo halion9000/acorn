@@ -183,7 +183,7 @@ def test_the_microsoft_365_baseline_row_leaves_out_every_other_tools_checks():
     from app.api.v1.endpoints.client_review import m365_baseline_query
 
     sql = str(m365_baseline_query(uuid.uuid4()).compile(compile_kwargs={"literal_binds": True}))
-    for other in ("huntress-sat", "threatmate", "liongard", "datto-saas", "dropsuite"):
+    for other in ("huntress-sat", "threatmate", "liongard", "itglue", "datto-saas", "dropsuite"):
         assert f"'{other}'" in sql, f"{other} checks must not be read as the Microsoft 365 baseline"
     assert "NOT IN" in sql
 
@@ -198,12 +198,17 @@ def _items(r):
 def test_the_checks_liongard_and_threatmate_sent_become_checklist_questions_with_their_evidence():
     checks = {
         "liongard_email_domain_records": {"key": "liongard_email_domain_records", "status": "partly", "evidence": "Liongard checked 3 domains"},
+        "itglue_domain_expiry": {"key": "itglue_domain_expiry", "status": "not_met", "evidence": "IT Glue documents 2 domains; 1 expired: old.com (2026-10-14)"},
+        "itglue_certificate_expiry": {"key": "itglue_certificate_expiry", "status": "met", "evidence": "IT Glue documents 1 certificate; none expires within 30 days"},
         "threatmate_hardening": {"key": "threatmate_hardening", "status": "met", "evidence": "ThreatMate endpoint hardening: 90%"},
         "threatmate_cyber_insurance": {"key": "threatmate_cyber_insurance", "status": "partly", "evidence": "ThreatMate's Cyber Insurance Baseline: 7 of 10 checks pass (70%)"},
     }
     items = _items(readiness(device_facts([], 0, 0), None, None, tool_checks=checks))
     assert (items["email_domain_records"].status, items["hardening"].status, items["cyber_insurance_baseline"].status) == ("partly", "met", "partly")
     assert items["email_domain_records"].evidence == "Liongard checked 3 domains"
+    assert (items["domain_expiry"].status, items["certificate_expiry"].status) == ("not_met", "met")
+    assert items["domain_expiry"].question == "Are the client's domain names renewed ahead of expiry?"
+    assert items["domain_expiry"].evidence.endswith("old.com (2026-10-14)")
     assert "disk_encryption" not in items, "disk encryption is answered from the machines, not from a tool's own check"
     stray = _items(readiness(device_facts([], 0, 0), None, None, tool_checks={"liongard_disk_encryption": {"key": "liongard_disk_encryption", "status": "not_met", "evidence": "old"}}))
     assert "disk_encryption" not in stray
@@ -211,7 +216,7 @@ def test_the_checks_liongard_and_threatmate_sent_become_checklist_questions_with
 
 def test_a_client_none_of_those_tools_has_checks_for_gets_none_of_those_questions_and_a_bad_status_is_ignored():
     keys = set(_items(readiness(device_facts([], 0, 0), None, None)))
-    assert not keys & {"email_domain_records", "hardening", "cyber_insurance_baseline"}
+    assert not keys & {"email_domain_records", "hardening", "cyber_insurance_baseline", "domain_expiry", "certificate_expiry"}
     odd = {"liongard_email_domain_records": {"key": "liongard_email_domain_records", "status": "who knows", "evidence": "x"}}
     assert "email_domain_records" not in _items(readiness(device_facts([], 0, 0), None, None, tool_checks=odd))
     assert "email_domain_records" not in _items(readiness(device_facts([], 0, 0), None, None, tool_checks={}))

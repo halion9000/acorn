@@ -191,3 +191,11 @@ def test_a_client_mapped_to_both_tools_shows_each_tools_checks_separately(monkey
     assert [c.key for c in out.threatmate] == ["threatmate_patching"]
     assert [(c.key, c.status) for c in out.liongard] == [("liongard_email_domain_records", "not_met"), ("liongard_edr_coverage", "met")]
     assert out.liongard_refreshed_at is not None
+
+
+def test_a_client_mapped_to_it_glue_shows_its_expiry_checks(monkeypatch):
+    checks = [{"key": "itglue_domain_expiry", "status": "partly", "evidence": "IT Glue documents 3 domains; 1 expire within 30 days: a.com (2026-11-01)"}]
+    out, _ = _posture_with(monkeypatch, [("itglue", "9", "Acme")], checks)
+    assert [(c.key, c.status) for c in out.itglue] == [("itglue_domain_expiry", "partly")]
+    assert out.itglue_refreshed_at is not None
+    assert out.threatmate == [] and out.liongard == [], "a client mapped only to IT Glue reads no other tool's row"

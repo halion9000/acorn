@@ -231,6 +231,8 @@ SAAS_SOURCES = tuple(SAAS_NAMES)
 THREATMATE_SOURCE = "threatmate"
 # Liongard sends a client's disk encryption, EDR coverage, e-mail domain record and stale-licence checks under this source; likewise shown on the client posture page.
 LIONGARD_SOURCE = "liongard"
+# IT Glue sends a client's domain-name and SSL-certificate expiry checks under this source.
+ITGLUE_SOURCE = "itglue"
 _BACKUP_OS = {"windows", "mac", "linux"}
 STALE_SNAPSHOT_DAYS = 3
 
