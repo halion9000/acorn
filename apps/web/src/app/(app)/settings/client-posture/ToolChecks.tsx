@@ -23,6 +23,7 @@ const TITLE: Record<string, string> = {
   liongard_edr_coverage: 'EDR coverage',
   liongard_email_domain_records: 'E-mail domain records',
   liongard_stale_licensed_users: 'Stale licensed users',
+  liongard_iis_certificates: 'Web server certificates (IIS)',
 };
 
 const STATUS: Record<string, { text: string; className: string }> = {

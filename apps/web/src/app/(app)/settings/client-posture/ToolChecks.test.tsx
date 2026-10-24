@@ -39,6 +39,7 @@ describe('ToolChecks', () => {
           { key: 'liongard_disk_encryption', status: 'not_met', evidence: 'Liongard: 0 of 2 workstations have every fixed drive fully encrypted with BitLocker' },
           { key: 'liongard_edr_coverage', status: 'met', evidence: 'Liongard: 2 of 2 Windows machines list an EDR agent (100%)' },
           { key: 'liongard_stale_licensed_users', status: 'partly', evidence: 'Liongard: 3 stale Microsoft 365 users still hold a licence' },
+          { key: 'liongard_iis_certificates', status: 'not_met', evidence: "Liongard: of 2 IIS certificates on the client's servers, 1 expired: mail.acme.com (12 days ago)" },
         ]}
       />,
     );
@@ -48,6 +49,7 @@ describe('ToolChecks', () => {
     expect(within(screen.getByTestId('check-liongard_disk_encryption')).getByText('Problem')).toBeInTheDocument();
     expect(within(screen.getByTestId('check-liongard_edr_coverage')).getByText('EDR coverage')).toBeInTheDocument();
     expect(within(screen.getByTestId('check-liongard_stale_licensed_users')).getByText('Needs attention')).toBeInTheDocument();
+    expect(within(screen.getByTestId('check-liongard_iis_certificates')).getByText('Web server certificates (IIS)')).toBeInTheDocument();
   });
 
   it('names the hardening and cyber insurance checks in plain words', () => {
