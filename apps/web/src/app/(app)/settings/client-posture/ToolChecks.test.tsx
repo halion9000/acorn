@@ -60,11 +60,15 @@ describe('ToolChecks', () => {
         checks={[
           { key: 'threatmate_hardening', status: 'not_met', evidence: 'ThreatMate endpoint hardening: 45% of checks pass on the 12 of 62 devices assessed' },
           { key: 'threatmate_cyber_insurance', status: 'partly', evidence: "ThreatMate's Cyber Insurance Baseline: 60 of 100 checks pass (60%)" },
+          { key: 'threatmate_external_exposure', status: 'not_met', evidence: 'ThreatMate scans 1 public address and 2 domains from outside and finds 1 high issue' },
+          { key: 'threatmate_dmarc', status: 'partly', evidence: "ThreatMate finds DMARC issues on 2 and SPF issues on 1 of the client's 3 domains" },
         ]}
       />,
     );
     expect(within(screen.getByTestId('check-threatmate_hardening')).getByText('Endpoint hardening')).toBeInTheDocument();
     expect(within(screen.getByTestId('check-threatmate_cyber_insurance')).getByText('Cyber insurance baseline')).toBeInTheDocument();
+    expect(within(screen.getByTestId('check-threatmate_external_exposure')).getByText('External exposure')).toBeInTheDocument();
+    expect(within(screen.getByTestId('check-threatmate_dmarc')).getByText('DMARC and SPF')).toBeInTheDocument();
   });
 
   it('names the IT Glue expiry checks in plain words under their own heading', () => {

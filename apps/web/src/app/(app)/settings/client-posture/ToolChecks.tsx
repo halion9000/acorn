@@ -17,6 +17,8 @@ const TITLE: Record<string, string> = {
   threatmate_end_of_life: 'End-of-life software',
   itglue_domain_expiry: 'Domain names',
   itglue_certificate_expiry: 'SSL certificates',
+  threatmate_external_exposure: 'External exposure',
+  threatmate_dmarc: 'DMARC and SPF',
   threatmate_hardening: 'Endpoint hardening',
   threatmate_cyber_insurance: 'Cyber insurance baseline',
   liongard_disk_encryption: 'Disk encryption (BitLocker)',

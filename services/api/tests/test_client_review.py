@@ -200,6 +200,7 @@ def test_the_checks_liongard_and_threatmate_sent_become_checklist_questions_with
         "liongard_email_domain_records": {"key": "liongard_email_domain_records", "status": "partly", "evidence": "Liongard checked 3 domains"},
         "itglue_domain_expiry": {"key": "itglue_domain_expiry", "status": "not_met", "evidence": "IT Glue documents 2 domains; 1 expired: old.com (2026-10-14)"},
         "itglue_certificate_expiry": {"key": "itglue_certificate_expiry", "status": "met", "evidence": "IT Glue documents 1 certificate; none expires within 30 days"},
+        "threatmate_external_exposure": {"key": "threatmate_external_exposure", "status": "not_met", "evidence": "ThreatMate scans 1 public address and 2 domains from outside and finds 1 high issue"},
         "threatmate_hardening": {"key": "threatmate_hardening", "status": "met", "evidence": "ThreatMate endpoint hardening: 90%"},
         "threatmate_cyber_insurance": {"key": "threatmate_cyber_insurance", "status": "partly", "evidence": "ThreatMate's Cyber Insurance Baseline: 7 of 10 checks pass (70%)"},
     }
@@ -207,6 +208,7 @@ def test_the_checks_liongard_and_threatmate_sent_become_checklist_questions_with
     assert (items["email_domain_records"].status, items["hardening"].status, items["cyber_insurance_baseline"].status) == ("partly", "met", "partly")
     assert items["email_domain_records"].evidence == "Liongard checked 3 domains"
     assert (items["domain_expiry"].status, items["certificate_expiry"].status) == ("not_met", "met")
+    assert items["external_exposure"].status == "not_met" and items["external_exposure"].question == "Is the client's public-facing infrastructure free of serious issues?"
     assert items["domain_expiry"].question == "Are the client's domain names renewed ahead of expiry?"
     assert items["domain_expiry"].evidence.endswith("old.com (2026-10-14)")
     assert "disk_encryption" not in items, "disk encryption is answered from the machines, not from a tool's own check"
@@ -216,7 +218,7 @@ def test_the_checks_liongard_and_threatmate_sent_become_checklist_questions_with
 
 def test_a_client_none_of_those_tools_has_checks_for_gets_none_of_those_questions_and_a_bad_status_is_ignored():
     keys = set(_items(readiness(device_facts([], 0, 0), None, None)))
-    assert not keys & {"email_domain_records", "hardening", "cyber_insurance_baseline", "domain_expiry", "certificate_expiry"}
+    assert not keys & {"email_domain_records", "hardening", "cyber_insurance_baseline", "domain_expiry", "certificate_expiry", "external_exposure"}
     odd = {"liongard_email_domain_records": {"key": "liongard_email_domain_records", "status": "who knows", "evidence": "x"}}
     assert "email_domain_records" not in _items(readiness(device_facts([], 0, 0), None, None, tool_checks=odd))
     assert "email_domain_records" not in _items(readiness(device_facts([], 0, 0), None, None, tool_checks={}))

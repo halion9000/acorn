@@ -130,6 +130,7 @@ TOOL_ITEMS = (
     ("liongard_email_domain_records", "email_domain_records", "Are the client's e-mail domains protected against spoofing (SPF, DMARC, DKIM)?"),
     ("itglue_domain_expiry", "domain_expiry", "Are the client's domain names renewed ahead of expiry?"),
     ("itglue_certificate_expiry", "certificate_expiry", "Are the client's SSL certificates renewed ahead of expiry?"),
+    ("threatmate_external_exposure", "external_exposure", "Is the client's public-facing infrastructure free of serious issues?"),
     ("threatmate_hardening", "hardening", "Are computers configured to a security baseline?"),
     ("threatmate_cyber_insurance", "cyber_insurance_baseline", "Do computers meet the cyber insurance baseline?"),
 )
