@@ -27,7 +27,7 @@ from app.models.signin import ClientM365Check, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
-from app.services.infra_review import saas_products
+from app.services.infra_review import THREATMATE_SOURCE, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
 
@@ -68,6 +68,14 @@ class PostureTool(BaseModel):
     product: str | None = None
 
 
+class PostureCheck(BaseModel):
+    """One plain check a tool reported for this client (ThreatMate's security score, patching, end-of-life software): met, partly or not met, and what it saw."""
+
+    key: str
+    status: str
+    evidence: str
+
+
 class ClientPosture(BaseModel):
     client_id: uuid.UUID
     client_name: str | None
@@ -79,6 +87,9 @@ class ClientPosture(BaseModel):
     open_cases: int
     # The tools this client is mapped to (Huntress, NinjaOne...), for the page to show and link to the client's page in each.
     tools: list[PostureTool] = []
+    # What ThreatMate says about the client (security score, patching, end-of-life software); empty until CORE has sent it for a mapped client.
+    threatmate: list[PostureCheck] = []
+    threatmate_refreshed_at: datetime | None = None
 
 
 def devices_part(rollups: list[ClientRollup], client_id: uuid.UUID) -> PostureDevices:
@@ -151,6 +162,20 @@ async def client_posture(
                 .first()
             )
         saas_checks = [c for c in (saas_row.checks if saas_row is not None else []) if isinstance(c, dict)]
+    tm_checks: list[PostureCheck] = []
+    tm_refreshed: datetime | None = None
+    if any(v == THREATMATE_SOURCE for v, _, _ in aliases):
+        async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
+            tm_row = (
+                (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source == THREATMATE_SOURCE))).scalars().first()
+            )
+        if tm_row is not None:
+            tm_refreshed = tm_row.refreshed_at
+            tm_checks = [
+                PostureCheck(key=str(c["key"]), status=str(c["status"]), evidence=str(c.get("evidence", "")))
+                for c in (tm_row.checks or [])
+                if isinstance(c, dict) and c.get("key") and c.get("status")
+            ]
     tools = [
         PostureTool(
             vendor=v, vendor_client_id=i, vendor_client_name=n or None, product=saas_products(saas_checks) if v == "datto-saas" else None
@@ -168,6 +193,8 @@ async def client_posture(
         alerts=PostureAlerts(open=row[0], critical=row[1], high=row[2], without_ticket=row[3]),
         open_cases=cases,
         tools=tools,
+        threatmate=tm_checks,
+        threatmate_refreshed_at=tm_refreshed,
     )
 
 

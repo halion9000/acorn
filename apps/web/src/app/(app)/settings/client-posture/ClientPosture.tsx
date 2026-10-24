@@ -12,6 +12,7 @@ import VendorBadge from "@/components/mssp/VendorBadge";
 import { vendorLabel } from "@/components/mssp/ClientMapping";
 import { vendorClientUrl } from "@/lib/vendor-links";
 import { DomainChecks } from "./DomainChecks";
+import { ThreatMateChecks, type PostureCheck } from "./ThreatMateChecks";
 
 export interface Posture {
   client_id: string;
@@ -23,6 +24,9 @@ export interface Posture {
   open_cases: number;
   /** The tools this client is mapped to. Absent from an older API. */
   tools?: { vendor: string; vendor_client_id: string; vendor_client_name?: string | null; product?: string | null }[];
+  /** What ThreatMate says about the client (security score, patching, end-of-life software). Absent from an older API. */
+  threatmate?: PostureCheck[];
+  threatmate_refreshed_at?: string | null;
 }
 
 interface Client {
@@ -213,6 +217,7 @@ export function ClientPosture() {
               </p>
             )}
           </section>
+          <ThreatMateChecks checks={shown.threatmate ?? []} refreshedAt={shown.threatmate_refreshed_at} />
           <DomainChecks clientId={shown.client_id} />
           <section>
             <h3 className="mb-2 text-sm uppercase text-slate-500">Alerts and cases</h3>

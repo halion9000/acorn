@@ -175,3 +175,14 @@ def test_tech_stack_handles_machines_with_no_sources_unknown_systems_and_many_so
 def test_tech_stack_says_not_enrolled_when_the_tool_maps_other_clients_but_not_this_one():
     a = _stack([_dev("Windows 11", "ninjaone")], mapped={"huntress", "ninjaone"}, enrolled={"ninjaone"})
     assert a["edr_pc"].status == "not_seen" and "not enrolled in Huntress" in a["edr_pc"].evidence
+
+
+def test_the_microsoft_365_baseline_row_leaves_out_every_other_tools_checks():
+    import uuid
+
+    from app.api.v1.endpoints.client_review import m365_baseline_query
+
+    sql = str(m365_baseline_query(uuid.uuid4()).compile(compile_kwargs={"literal_binds": True}))
+    for other in ("huntress-sat", "threatmate", "datto-saas", "dropsuite"):
+        assert f"'{other}'" in sql, f"{other} checks must not be read as the Microsoft 365 baseline"
+    assert "NOT IN" in sql

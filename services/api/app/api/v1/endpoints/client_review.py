@@ -32,7 +32,7 @@ from app.models.client_review_answer import ClientReviewAnswer
 from app.models.signin import ClientM365Check, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
-from app.services.infra_review import SAAS_SOURCES
+from app.services.infra_review import SAAS_SOURCES, THREATMATE_SOURCE
 from app.services.m365_review import M365Answer, m365_answers
 from app.services.review_overrides import MAX_PER_CLIENT, clean_answer, merge_m365, merge_readiness, merge_tech, readiness_counts
 from app.services.sat_review import SAT_SOURCE
@@ -150,6 +150,11 @@ class M365CheckIn(BaseModel):
     key: str = Field(pattern=r"^[a-z0-9_]{1,60}$")
     status: str = Field(pattern=r"^(met|partly|not_met)$")
     evidence: str = Field(default="", max_length=300)
+
+
+def m365_baseline_query(client_id: uuid.UUID) -> Any:
+    """The client's Microsoft 365 baseline row: every checks row except those other tools send under their own source (training, backups, ThreatMate)."""
+    return select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.notin_([SAT_SOURCE, THREATMATE_SOURCE, *SAAS_SOURCES]))
 
 
 class M365ChecksReport(BaseModel):
@@ -315,7 +320,7 @@ async def client_review(
         score_row = (await db.execute(select(IdentitySecureScore).where(IdentitySecureScore.tenant_id == client_id))).scalars().first()
         vcio_row = (await db.execute(select(ClientVcioReview).where(ClientVcioReview.tenant_id == client_id))).scalars().first()
         m365_row = (
-            (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.notin_([SAT_SOURCE, *SAAS_SOURCES]))))
+            (await db.execute(m365_baseline_query(client_id)))
             .scalars()
             .first()
         )

@@ -227,6 +227,8 @@ BACKUP_TOOLS = {"datto-bcdr": "Datto BCDR", "slide": "Slide"}
 # The tools that back up Microsoft 365 / Google Workspace data or email in the cloud, by the source name each sends its checks under.
 SAAS_NAMES = {"datto-saas": "Datto SaaS Protection", "dropsuite": "Dropsuite"}
 SAAS_SOURCES = tuple(SAAS_NAMES)
+# ThreatMate sends a client's security score, patching and end-of-life checks under this source; they are shown on the client posture page and are not Microsoft 365 baseline checks.
+THREATMATE_SOURCE = "threatmate"
 _BACKUP_OS = {"windows", "mac", "linux"}
 STALE_SNAPSHOT_DAYS = 3
 

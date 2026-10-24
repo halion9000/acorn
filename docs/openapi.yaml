@@ -21977,6 +21977,18 @@ components:
           type: array
           title: Tools
           default: []
+        threatmate:
+          items:
+            $ref: '#/components/schemas/PostureCheck'
+          type: array
+          title: Threatmate
+          default: []
+        threatmate_refreshed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Threatmate Refreshed At
       type: object
       required:
       - client_id
@@ -30646,6 +30658,26 @@ components:
       - high
       - without_ticket
       title: PostureAlerts
+    PostureCheck:
+      properties:
+        key:
+          type: string
+          title: Key
+        status:
+          type: string
+          title: Status
+        evidence:
+          type: string
+          title: Evidence
+      type: object
+      required:
+      - key
+      - status
+      - evidence
+      title: PostureCheck
+      description: 'One plain check a tool reported for this client (ThreatMate''s
+        security score, patching, end-of-life software): met, partly or not met, and
+        what it saw.'
     PostureDevices:
       properties:
         devices:
