@@ -249,6 +249,7 @@ TOOL_CHECK_SOURCES = {
     "slide": "slide",
     "autoelevate": "autoelevate",
     "huntress": "huntress",
+    "dnsfilter": "dnsfilter",
 }
 _BACKUP_OS = {"windows", "mac", "linux"}
 STALE_SNAPSHOT_DAYS = 3

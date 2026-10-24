@@ -41,6 +41,7 @@ export const TOOL_CHECK_LABELS: Record<string, string> = {
   slide: "Slide",
   autoelevate: "AutoElevate",
   huntress: "Huntress",
+  dnsfilter: "DNSFilter",
 };
 
 /** The tools that sent checks, in a steady order: the named ones first as listed above, then any other by name. */
