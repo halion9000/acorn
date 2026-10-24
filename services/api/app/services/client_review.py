@@ -138,6 +138,7 @@ TOOL_ITEMS = (
     ("ninjaone_antivirus", "antivirus_current", "Does every Windows computer have antivirus switched on and up to date?"),
     ("meraki_admin_2fa", "network_admin_mfa", "Do the people who manage the client's network sign in with two-step verification?"),
     ("autoelevate_enforcing", "admin_rights_control", "Is local administrator access controlled on every computer?"),
+    ("huntress_protection", "protection_healthy", "Is endpoint protection healthy and tamper-proof on every computer?"),
     ("cipp_inactive_accounts", "inactive_accounts", "Are accounts nobody signs in to removed or switched off?"),
     ("fieldeffect_device_risk", "device_risk", "Are the client's computers free of critical and high-risk findings?"),
 )
