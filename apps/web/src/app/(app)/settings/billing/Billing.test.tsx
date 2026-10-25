@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
 
-import { Billing, changeText, clientCsv, differenceText, gapText, totalsCsv } from './Billing';
+import { Billing, changeText, clientCsv, differenceText, gapText, sparkPoints, totalsCsv } from './Billing';
 
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 
@@ -18,6 +18,8 @@ beforeEach(() => {
     if (url.startsWith('/api/v1/billing/summary'))
       return json({ generated_at: '', days: 30, rows: [{ source: 'cipp', item: 'Microsoft 365 Business Premium', unit: 'licence', clients: 12, total: 310, available: 14, change: 6 }, { source: 'ninjaone', item: 'Macs', unit: 'device', clients: 5, total: 40, available: null, change: null }] });
     if (url.startsWith('/api/v1/mssp/children')) return json([{ id: 'c2', name: 'Beta' }, { id: 'c1', name: 'Acme' }]);
+    if (url.startsWith('/api/v1/billing/clients/c1/history'))
+      return json({ client_id: 'c1', source: 'ninjaone', item: 'Windows workstations', days: 90, points: [{ at: '2026-08-01T00:00:00Z', count: 10 }, { at: '2026-09-01T00:00:00Z', count: 16 }, { at: '2026-10-25T00:00:00Z', count: 13 }] });
     if (url.startsWith('/api/v1/billing/clients/c1'))
       return json({ client_id: 'c1', days: 30, rows: [{ source: 'ninjaone', item: 'Windows workstations', unit: 'device', count: 13, available: null, change: -2, first_seen_at: '2026-09-01T00:00:00Z', updated_at: '2026-10-25T00:00:00Z' }] });
     if (url.startsWith('/api/v1/billing/reconcile'))
@@ -49,6 +51,15 @@ describe('helpers', () => {
 
 describe('gapText', () => {
   it('says which way the tool is off', () => expect([gapText(-20), gapText(5)]).toEqual(['counts 20 fewer', 'counts 5 more']));
+});
+
+describe('sparkPoints', () => {
+  it('scales a series into the box: time across, higher counts higher up, and a flat series in the middle', () => {
+    const pts = [{ at: '2026-10-01T00:00:00Z', count: 10 }, { at: '2026-10-03T00:00:00Z', count: 20 }, { at: '2026-10-05T00:00:00Z', count: 15 }];
+    expect(sparkPoints(pts, 100, 40)).toBe('0.0,40.0 50.0,0.0 100.0,20.0');
+    expect(sparkPoints([{ at: '2026-10-01T00:00:00Z', count: 5 }, { at: '2026-10-02T00:00:00Z', count: 5 }], 100, 40)).toBe('0.0,20.0 100.0,20.0');
+    expect(sparkPoints([], 100, 40)).toBe('');
+  });
 });
 
 describe('differenceText', () => {
@@ -116,6 +127,19 @@ describe('Billing', () => {
     const row = within(table).getByText('Windows workstations').closest('tr')!;
     expect(within(row).getByText('13')).toBeInTheDocument();
     expect(within(row).getByText('-2')).toBeInTheDocument();
+  });
+
+  it("shows a count's trend for a client on request", async () => {
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'By client' }));
+    await userEvent.selectOptions(await screen.findByLabelText('Client'), 'c1');
+    const table = await screen.findByTestId('billing-client');
+    await userEvent.click(within(table).getByText('Trend'));
+    const trend = await screen.findByTestId('billing-trend');
+    expect(trend).toHaveTextContent('10 to 16 over 90 days');
+    expect(authFetch.mock.calls.some((c) => String(c[0]).includes('/c1/history?source=ninjaone&item=Windows%20workstations'))).toBe(true);
+    await userEvent.click(within(table).getByText('Hide trend'));
+    expect(screen.queryByTestId('billing-trend')).toBeNull();
   });
 
   it('lists the changes with what a count was and is, and new items as new', async () => {

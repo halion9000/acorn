@@ -4,7 +4,7 @@
  * The numbers a bill is made from: what each tool counts for each client (licences bought, machines managed, people covered), the total across clients, how every count moved, and a log of each change.
  * CORE reads the counts from the tools once a day. Backed by GET /api/v1/billing/clients/{id}, /billing/summary and /billing/changes.
  */
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
 
@@ -200,11 +200,48 @@ function Totals() {
   );
 }
 
+export interface SeriesPoint {
+  at: string;
+  count: number;
+}
+
+/** The points of a series as the "points" attribute of an SVG polyline, scaled into a box (time across, count up; a flat series sits in the middle). */
+export function sparkPoints(points: SeriesPoint[], width: number, height: number): string {
+  if (points.length === 0) return "";
+  const times = points.map((p) => Date.parse(p.at));
+  const counts = points.map((p) => p.count);
+  const t0 = Math.min(...times);
+  const t1 = Math.max(...times);
+  const lo = Math.min(...counts);
+  const hi = Math.max(...counts);
+  const x = (t: number) => (t1 === t0 ? width / 2 : ((t - t0) / (t1 - t0)) * width);
+  const y = (c: number) => (hi === lo ? height / 2 : height - ((c - lo) / (hi - lo)) * height);
+  return points.map((p, i) => `${x(times[i]).toFixed(1)},${y(p.count).toFixed(1)}`).join(" ");
+}
+
+function Trend({ clientId, source, item, days }: { clientId: string; source: string; item: string; days: number }) {
+  const { data, error } = useJson<{ points: SeriesPoint[] }>(`/api/v1/billing/clients/${encodeURIComponent(clientId)}/history?source=${encodeURIComponent(source)}&item=${encodeURIComponent(item)}&days=${Math.max(days, 90)}`);
+  if (error) return <span role="alert" className="text-xs text-red-300">{error}</span>;
+  if (!data) return <span className="text-xs text-slate-500">Loading…</span>;
+  const counts = data.points.map((p) => p.count);
+  return (
+    <div className="flex items-center gap-3" data-testid="billing-trend">
+      <svg width={240} height={48} viewBox="0 0 240 48" role="img" aria-label={`${item} over time`}>
+        <polyline fill="none" stroke="currentColor" strokeWidth={2} className="text-sky-400" points={sparkPoints(data.points, 236, 44)} transform="translate(2 2)" />
+      </svg>
+      <span className="text-xs text-slate-400">
+        {Math.min(...counts)} to {Math.max(...counts)} over {Math.max(days, 90)} days
+      </span>
+    </div>
+  );
+}
+
 function ByClient() {
   const [clients, setClients] = useState<Client[] | null>(null);
   const [clientId, setClientId] = useState("");
   const [days, setDays] = useState(30);
   const [error, setError] = useState<string | null>(null);
+  const [trendOf, setTrendOf] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
     authFetch("/api/v1/mssp/children")
@@ -254,20 +291,38 @@ function ByClient() {
               <th className="pr-3">Count</th>
               <th className="pr-3">Not assigned</th>
               <th className="pr-3">Change</th>
-              <th>First seen</th>
+              <th className="pr-3">First seen</th>
+              <th className="print:hidden" />
             </tr>
           </thead>
           <tbody>
-            {data.rows.map((r) => (
-              <tr key={`${r.source}:${r.item}`} className="border-t border-slate-800 text-slate-300">
-                <td className="py-1 pr-3">{toolName(r.source)}</td>
-                <td className="pr-3">{r.item}</td>
-                <td className="pr-3 font-medium">{r.count}</td>
-                <td className="pr-3">{r.available ?? "—"}</td>
-                <td className={`pr-3 ${changeClass(r.change)}`}>{changeText(r.change)}</td>
-                <td className="text-xs text-slate-500">{new Date(r.first_seen_at).toLocaleDateString()}</td>
-              </tr>
-            ))}
+            {data.rows.map((r) => {
+              const key = `${r.source}:${r.item}`;
+              return (
+                <Fragment key={key}>
+                  <tr className="border-t border-slate-800 text-slate-300">
+                    <td className="py-1 pr-3">{toolName(r.source)}</td>
+                    <td className="pr-3">{r.item}</td>
+                    <td className="pr-3 font-medium">{r.count}</td>
+                    <td className="pr-3">{r.available ?? "—"}</td>
+                    <td className={`pr-3 ${changeClass(r.change)}`}>{changeText(r.change)}</td>
+                    <td className="pr-3 text-xs text-slate-500">{new Date(r.first_seen_at).toLocaleDateString()}</td>
+                    <td className="print:hidden">
+                      <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300" onClick={() => setTrendOf(trendOf === key ? null : key)}>
+                        {trendOf === key ? "Hide trend" : "Trend"}
+                      </button>
+                    </td>
+                  </tr>
+                  {trendOf === key ? (
+                    <tr className="text-slate-300">
+                      <td colSpan={7} className="pb-2">
+                        <Trend clientId={clientId} source={r.source} item={r.item} days={days} />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       )}
