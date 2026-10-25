@@ -627,6 +627,21 @@
     }
   },
   {
+    "tool": "aisoc_score_history",
+    "method": "GET",
+    "path": "/client-posture/{client_id}/score-history",
+    "query": [
+      "days"
+    ],
+    "enums": {},
+    "numbers": {
+      "days": {
+        "min": 2,
+        "max": 730
+      }
+    }
+  },
+  {
     "tool": "aisoc_sweep_runs",
     "method": "GET",
     "path": "/client-posture/sweeps/latest",

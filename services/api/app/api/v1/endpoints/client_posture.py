@@ -24,11 +24,12 @@ from app.db.rls_scope import acting_as_tenant
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.identity_source import IdentitySource
-from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, CoreSweepRun, IdentityMfaUser
+from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, ClientScoreHistory, CoreSweepRun, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
 from app.services import fleet_cache
+from app.services.score_history import trend as score_trend
 from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
@@ -325,6 +326,39 @@ async def check_history(
         client_id=client_id,
         rows=[CheckHistoryRow(key=r.key, source=r.source, status=r.status, previous_status=r.previous_status, evidence=r.evidence, observed_at=r.observed_at) for r in rows],
     )
+
+
+class ScoreDay(BaseModel):
+    day: str
+    score: int | None
+    met: int
+    partly: int
+    not_met: int
+    accepted: int
+
+
+class ScoreHistoryOut(BaseModel):
+    client_id: uuid.UUID
+    days: int
+    rows: list[ScoreDay]
+    # First and last score in the window and which way it went: better, worse, same or none.
+    first: int | None
+    last: int | None
+    change: int | None
+    direction: str
+
+
+@router.get("/{client_id}/score-history", response_model=ScoreHistoryOut, summary="A client's check score day by day, and whether it got better or worse")
+async def score_history(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 90) -> ScoreHistoryOut:
+    owner = current_user.tenant_id
+    await _client_of_owner(db, owner, client_id)
+    days = max(2, min(days, 730))
+    since = (datetime.now(UTC) - timedelta(days=days)).date()
+    async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
+        rows = (await db.execute(select(ClientScoreHistory).where(ClientScoreHistory.tenant_id == client_id, ClientScoreHistory.day >= since).order_by(ClientScoreHistory.day))).scalars().all()
+    shown = [{"day": r.day.isoformat(), "score": r.score, "met": r.met, "partly": r.partly, "not_met": r.not_met, "accepted": r.accepted} for r in rows]
+    t = score_trend(shown)
+    return ScoreHistoryOut(client_id=client_id, days=days, rows=[ScoreDay(**r) for r in shown], first=t["first"], last=t["last"], change=t["change"], direction=t["direction"])
 
 
 class AcceptIn(BaseModel):

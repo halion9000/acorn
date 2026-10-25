@@ -456,3 +456,31 @@ async def test_billed_lines_are_checked_against_the_tool_counts_they_are_mapped_
     await run(world["msp"], lambda db: bl.delete_map("NinjaOne RMM (Included)", user, db))
     gone = await run(world["msp"], lambda db: bl.billing_map(user, db))
     assert gone.mapped == []
+
+
+async def test_each_report_of_a_clients_checks_keeps_one_score_row_for_the_day_and_the_endpoint_gives_the_trend(world):
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'ninjaone', 'n-1', 'n-1', 'n-1', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+
+    def report(checks):
+        return ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-1", checks=checks)
+
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report([{"key": "a", "status": "not_met", "evidence": ""}, {"key": "b", "status": "met", "evidence": ""}])))
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report([{"key": "a", "status": "met", "evidence": ""}, {"key": "b", "status": "met", "evidence": ""}])))
+    out = await run(world["msp"], lambda db: cp.score_history(world["client"], NS(tenant_id=world["msp"]), db))
+    assert len(out.rows) == 1, "two reports on one day make one row, the last one"
+    assert (out.rows[0].score, out.rows[0].met, out.rows[0].not_met) == (100, 2, 0)
+    assert out.direction == "none", "one day is not a trend"
+    with pytest.raises(HTTPException) as e:
+        await run(world["msp"], lambda db: cp.score_history(world["stranger"], NS(tenant_id=world["msp"]), db))
+    assert e.value.status_code == 404

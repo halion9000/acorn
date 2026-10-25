@@ -8,6 +8,7 @@ from data AiSOC already holds, and what it does not hold is reported as unknown 
 from __future__ import annotations
 
 import contextlib
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
@@ -33,12 +34,15 @@ from app.models.signin import ClientCheckHistory, ClientM365Check, CoreSweepRun,
 from app.models.tenant import Tenant
 from app.services import fleet_cache
 from app.services.check_history import changes as check_changes
+from app.services.score_history import record_today
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
 from app.services.infra_review import CIPP_BASELINE_SOURCE, SAAS_SOURCES, TOOL_CHECK_SOURCES
 from app.services.m365_review import M365Answer, m365_answers
 from app.services.review_overrides import MAX_PER_CLIENT, clean_answer, merge_m365, merge_readiness, merge_tech, readiness_counts
 from app.services.sat_review import SAT_SOURCE
 from app.services.tech_stack import TechAnswer, tech_stack
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/client-review", tags=["posture"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -201,6 +205,11 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
             stmt = pg_insert(ClientM365Check).values(values)
             update = {c: stmt.excluded[c] for c in values if c not in ("tenant_id", "source")}
             await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source"], set_=update))
+            try:
+                async with db.begin_nested():  # a failure to keep the daily score (an older database without the table) must not lose the checks
+                    await record_today(db, tid, now)
+            except Exception:  # noqa: BLE001
+                logger.warning("score history not recorded for %s", tid, exc_info=True)
             accepted += 1
     fleet_cache.clear()
     return VcioReviewResponse(accepted=accepted, unmapped=unmapped, ignored=ignored, unmapped_clients=waiting)

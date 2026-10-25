@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, Numeric, SmallInteger, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -246,3 +246,17 @@ class IdentitySecureScore(Base):
     history: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     improvements: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     refreshed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class ClientScoreHistory(Base):
+    """A client's check score on one day (migration 106): the last report of the day wins."""
+
+    __tablename__ = "client_score_history"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    score: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    met: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    partly: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    not_met: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    accepted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

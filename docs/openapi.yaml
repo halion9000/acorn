@@ -11148,6 +11148,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/{client_id}/score-history:
+    get:
+      tags:
+      - posture
+      summary: A client's check score day by day, and whether it got better or worse
+      operationId: score_history_api_v1_client_posture__client_id__score_history_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 90
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreHistoryOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/client-posture/{client_id}/acceptances/{key}:
     put:
       tags:
@@ -35081,6 +35117,79 @@ components:
       - findings_closed
       - error_message
       title: ScanRunOut
+    ScoreDay:
+      properties:
+        day:
+          type: string
+          title: Day
+        score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Score
+        met:
+          type: integer
+          title: Met
+        partly:
+          type: integer
+          title: Partly
+        not_met:
+          type: integer
+          title: Not Met
+        accepted:
+          type: integer
+          title: Accepted
+      type: object
+      required:
+      - day
+      - score
+      - met
+      - partly
+      - not_met
+      - accepted
+      title: ScoreDay
+    ScoreHistoryOut:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        days:
+          type: integer
+          title: Days
+        rows:
+          items:
+            $ref: '#/components/schemas/ScoreDay'
+          type: array
+          title: Rows
+        first:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: First
+        last:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Last
+        change:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Change
+        direction:
+          type: string
+          title: Direction
+      type: object
+      required:
+      - client_id
+      - days
+      - rows
+      - first
+      - last
+      - change
+      - direction
+      title: ScoreHistoryOut
     ScoredChange:
       properties:
         client_id:
