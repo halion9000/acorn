@@ -484,3 +484,30 @@ async def test_each_report_of_a_clients_checks_keeps_one_score_row_for_the_day_a
     with pytest.raises(HTTPException) as e:
         await run(world["msp"], lambda db: cp.score_history(world["stranger"], NS(tenant_id=world["msp"]), db))
     assert e.value.status_code == 404
+
+
+async def test_a_check_can_be_marked_not_applicable_with_no_end_date_and_it_leaves_the_score(world):
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'ninjaone', 'n-9', 'n-9', 'n-9', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+    checks = [{"key": "fw", "status": "not_met", "evidence": ""}, {"key": "av", "status": "met", "evidence": ""}]
+    user = NS(tenant_id=world["msp"], user_id=uuid.uuid4())
+    out = await run(world["msp"], lambda db: cp.accept_check(world["client"], "fw", cp.AcceptIn(reason="No firewall on site", not_applicable=True), user, db))
+    assert out.not_applicable is True and out.expires_at is None
+    with pytest.raises(HTTPException) as e:
+        await run(world["msp"], lambda db: cp.accept_check(world["client"], "fw", cp.AcceptIn(reason="No firewall on site", not_applicable=True, expires_in_days=30), user, db))
+    assert e.value.status_code == 422
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-9", checks=checks)))
+    hist = await run(world["msp"], lambda db: cp.score_history(world["client"], NS(tenant_id=world["msp"]), db))
+    assert (hist.rows[0].score, hist.rows[0].not_met, hist.rows[0].accepted) == (100, 0, 1), "the check that does not apply is not counted against the client"
+    again = await run(world["msp"], lambda db: cp.accept_check(world["client"], "fw", cp.AcceptIn(reason="Accepted for now", expires_in_days=30), user, db))
+    assert again.not_applicable is False, "a later ordinary acceptance replaces it"

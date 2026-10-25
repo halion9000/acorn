@@ -144,6 +144,8 @@ class ClientCheckAcceptance(Base):
     accepted_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The check does not apply to this client at all (migration 107): no end date, left out of the score.
+    not_applicable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
 
 class CoreSweepRun(Base):

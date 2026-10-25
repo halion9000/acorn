@@ -19,7 +19,7 @@ export interface PostureCheck {
   /** The accounts, machines or systems behind the verdict, when the tool says which. */
   items?: string[];
   /** Set when a person accepted this check for the client and it has not run out. */
-  accepted?: { reason: string; accepted_at: string; expires_at?: string | null } | null;
+  accepted?: { reason: string; accepted_at: string; expires_at?: string | null; not_applicable?: boolean } | null;
 }
 
 export interface CheckHistoryRow {
@@ -157,13 +157,16 @@ export function ToolChecks({
   if (shown.length === 0) return null;
   const stale = isStale(refreshedAt);
 
-  const accept = async (key: string) => {
+  const accept = async (key: string, notApplicable = false) => {
     if (!clientId) return;
-    const reason = window.prompt('Why is this accepted for this client?');
+    const reason = window.prompt(notApplicable ? 'Why does this not apply to this client? (for example: no firewall on site)' : 'Why is this accepted for this client?');
     if (!reason || reason.trim().length < 3) return;
-    const days = window.prompt('For how many days? Leave empty to accept until you remove it.', '90');
-    const body: { reason: string; expires_in_days?: number } = { reason: reason.trim() };
-    if (days && days.trim() !== '') body.expires_in_days = Number(days);
+    const body: { reason: string; expires_in_days?: number; not_applicable?: boolean } = { reason: reason.trim() };
+    if (notApplicable) body.not_applicable = true;
+    else {
+      const days = window.prompt('For how many days? Leave empty to accept until you remove it.', '90');
+      if (days && days.trim() !== '') body.expires_in_days = Number(days);
+    }
     try {
       const res = await authFetch(`/api/v1/client-posture/${encodeURIComponent(clientId)}/acceptances/${encodeURIComponent(key)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!res.ok) throw new Error(`The API answered ${res.status}`);
@@ -210,7 +213,7 @@ export function ToolChecks({
               <span className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[11px] ${st.className}`}>{st.text}</span>
               {c.accepted ? (
                 <span className="ml-1 inline-block rounded border border-sky-500/40 px-1.5 py-0.5 text-[11px] text-sky-300" data-testid={`accepted-${c.key}`}>
-                  Accepted{c.accepted.expires_at ? ` until ${day(c.accepted.expires_at)}` : ''}
+                  {c.accepted.not_applicable ? 'Not applicable' : `Accepted${c.accepted.expires_at ? ` until ${day(c.accepted.expires_at)}` : ''}`}
                 </span>
               ) : null}
               {c.since ? <span className="ml-1 text-[11px] text-slate-600">since {day(c.since)}</span> : null}
@@ -248,12 +251,17 @@ export function ToolChecks({
                   </button>
                   {c.accepted ? (
                     <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void unaccept(c.key)}>
-                      Stop accepting
+                      {c.accepted.not_applicable ? 'Applies after all' : 'Stop accepting'}
                     </button>
                   ) : c.status !== 'met' ? (
-                    <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void accept(c.key)}>
-                      Accept this
-                    </button>
+                    <>
+                      <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void accept(c.key)}>
+                        Accept this
+                      </button>
+                      <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void accept(c.key, true)}>
+                        Not applicable
+                      </button>
+                    </>
                   ) : null}
                 </div>
               ) : null}

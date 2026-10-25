@@ -90,6 +90,8 @@ class CheckAcceptanceOut(BaseModel):
     reason: str
     accepted_at: datetime
     expires_at: datetime | None = None
+    # The check does not apply to this client (as opposed to a risk that does and was accepted).
+    not_applicable: bool = False
 
 
 class ToolChecksOut(BaseModel):
@@ -148,7 +150,7 @@ async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, alia
         accepted_rows = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id))).scalars().all()
     since = {k: t for k, t in since_rows}
     now = datetime.now(UTC)
-    accepted = {a.key: CheckAcceptanceOut(reason=a.reason, accepted_at=a.accepted_at, expires_at=a.expires_at) for a in accepted_rows if a.expires_at is None or a.expires_at > now}
+    accepted = {a.key: CheckAcceptanceOut(reason=a.reason, accepted_at=a.accepted_at, expires_at=a.expires_at, not_applicable=a.not_applicable) for a in accepted_rows if a.expires_at is None or a.expires_at > now}
     out: dict[str, ToolChecksOut] = {}
     for row in rows:
         checks = [
@@ -365,6 +367,8 @@ class AcceptIn(BaseModel):
     reason: str
     # Days from now until the acceptance runs out; none means until someone removes it.
     expires_in_days: int | None = None
+    # The check does not apply to this client at all (no firewall, no domain controller). Has no end date.
+    not_applicable: bool = False
 
 
 MAX_ACCEPT_DAYS = 730
@@ -384,6 +388,8 @@ async def accept_check(
         raise HTTPException(status_code=422, detail="That is not a check key")
     if body.expires_in_days is not None and not 1 <= body.expires_in_days <= MAX_ACCEPT_DAYS:
         raise HTTPException(status_code=422, detail=f"The end date must be 1 to {MAX_ACCEPT_DAYS} days away")
+    if body.not_applicable and body.expires_in_days is not None:
+        raise HTTPException(status_code=422, detail="A check that does not apply has no end date")
     now = datetime.now(UTC)
     expires = now + timedelta(days=body.expires_in_days) if body.expires_in_days else None
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
@@ -392,12 +398,12 @@ async def accept_check(
             count = (await db.execute(select(func.count()).select_from(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id))).scalar_one()
             if count >= MAX_ACCEPTANCES_PER_CLIENT:
                 raise HTTPException(status_code=422, detail=f"A client can have at most {MAX_ACCEPTANCES_PER_CLIENT} accepted checks")
-        values = {"tenant_id": client_id, "key": key, "reason": reason, "accepted_by": current_user.user_id, "accepted_at": now, "expires_at": expires}
+        values = {"tenant_id": client_id, "key": key, "reason": reason, "accepted_by": current_user.user_id, "accepted_at": now, "expires_at": expires, "not_applicable": body.not_applicable}
         stmt = pg_insert(ClientCheckAcceptance).values(values)
         await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "key")}))
         await db.commit()
     fleet_cache.clear()
-    return CheckAcceptanceOut(reason=reason, accepted_at=now, expires_at=expires)
+    return CheckAcceptanceOut(reason=reason, accepted_at=now, expires_at=expires, not_applicable=body.not_applicable)
 
 
 @router.delete("/{client_id}/acceptances/{key}", status_code=204, summary="Stop accepting a check for a client")

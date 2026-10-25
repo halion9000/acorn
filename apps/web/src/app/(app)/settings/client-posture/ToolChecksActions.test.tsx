@@ -67,6 +67,21 @@ describe('ToolChecks with history and accepted risks', () => {
     expect(JSON.parse(init.body)).toEqual({ reason: 'Client is retiring them', expires_in_days: 60 });
   });
 
+  it('marks a check not applicable with a reason and no end date, and shows it as such', async () => {
+    const prompt = vi.spyOn(window, 'prompt').mockImplementation(() => 'No firewall on site');
+    authFetch.mockImplementation(() => json({}));
+    const onChanged = vi.fn();
+    const { rerender } = render(<ToolChecks tool="ninjaone" label="NinjaOne" checks={checks} clientId="c1" onChanged={onChanged} />);
+    await userEvent.click(within(screen.getByTestId('check-ninjaone_antivirus')).getByText('Not applicable'));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(authFetch.mock.calls[0][1].body)).toEqual({ reason: 'No firewall on site', not_applicable: true });
+    const na = [{ ...checks[0], accepted: { reason: 'No firewall on site', accepted_at: '2026-10-21T00:00:00Z', not_applicable: true } }];
+    rerender(<ToolChecks tool="ninjaone" label="NinjaOne" checks={na} clientId="c1" />);
+    expect(screen.getByTestId('accepted-ninjaone_antivirus')).toHaveTextContent('Not applicable');
+    expect(screen.getByText('Applies after all')).toBeInTheDocument();
+  });
+
   it('offers no accept button for a check that is fine, and removes an acceptance on request', async () => {
     authFetch.mockImplementation(() => json({}));
     const onChanged = vi.fn();
