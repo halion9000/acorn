@@ -43,3 +43,47 @@ def test_two_tenants_with_the_same_normalized_name_are_never_confident():
     s = suggest("Acme Dental", twins)
     assert [x.score for x in s] == [1.0, 1.0]
     assert not is_confident(s)
+
+
+def test_the_shortcut_in_score_gives_exactly_the_slow_answer():
+    """score() skips the slow similarity ratio when a cheap bound says it cannot matter; the answer must not change."""
+    import random
+    from difflib import SequenceMatcher
+
+    from app.services.client_matching import EXACT, normalize_name, score
+
+    def slow(a, b):
+        na, nb = normalize_name(a), normalize_name(b)
+        if not na or not nb:
+            return 0.0
+        if na == nb:
+            return EXACT
+        ta, tb = set(na.split()), set(nb.split())
+        if ta <= tb or tb <= ta:
+            return 0.85 if min(len(ta), len(tb)) >= 1 and len(na) >= 3 and len(nb) >= 3 else 0.0
+        return round(max(len(ta & tb) / len(ta | tb), SequenceMatcher(None, na, nb).ratio() * 0.9), 4)
+
+    words = ["acme", "dental", "group", "oak", "harbor", "legal", "bay", "city", "partners", "hotel", "fidelity", "revival", "medical", "llc", "inc", "co"]
+    rnd = random.Random(7)
+    names = [" ".join(rnd.choice(words) for _ in range(rnd.randint(1, 4))) for _ in range(150)]
+    for a in names:
+        for b in names[:40]:
+            assert score(a, b) == slow(a, b), (a, b)
+
+
+def test_a_floor_changes_nothing_at_or_above_it():
+    import random
+    from difflib import SequenceMatcher
+
+    from app.services.client_matching import EXACT, normalize_name, score
+
+    words = ["acme", "dental", "group", "oak", "harbor", "legal", "bay", "city", "partners", "hotel", "fidelity", "revival", "medical", "llc", "inc", "co", "acmee", "dentl"]
+    rnd = random.Random(11)
+    names = [" ".join(rnd.choice(words) for _ in range(rnd.randint(1, 4))) for _ in range(160)]
+    for floor in (0.6, 0.75):
+        for a in names:
+            for b in names[:50]:
+                full, quick = score(a, b), score(a, b, floor)
+                assert (quick >= floor) == (full >= floor), (a, b, floor, full, quick)
+                if full >= floor:
+                    assert quick == full, (a, b, floor)

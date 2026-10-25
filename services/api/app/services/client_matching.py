@@ -10,6 +10,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from difflib import SequenceMatcher
+from functools import lru_cache
 
 # Words that say what KIND of company it is, not which one. Dropped so "Acme Dental, LLC" and "Acme Dental" are the same name.
 _NOISE = frozenset(
@@ -20,6 +21,7 @@ EXACT = 1.0
 SUGGEST_THRESHOLD = 0.6
 
 
+@lru_cache(maxsize=8192)
 def normalize_name(name: str) -> str:
     """Lowercase, strip accents and punctuation, turn "&" into "and", drop company-type words, collapse spaces."""
     text = unicodedata.normalize("NFKD", name or "")
@@ -43,8 +45,8 @@ class Suggestion:
     reason: str | None = None
 
 
-def score(a: str, b: str) -> float:
-    """0..1 similarity of two names. 1.0 only when they normalize to the same text; one name wholly containing the other's words scores high but below exact."""
+def score(a: str, b: str, floor: float = 0.0) -> float:
+    """0..1 similarity of two names. With a ``floor``, a pair that cannot reach it may come back as 0.0 instead of its exact (lower) score, which is much faster for a caller that only keeps scores at or above the floor. 1.0 only when they normalize to the same text; one name wholly containing the other's words scores high but below exact."""
     na, nb = normalize_name(a), normalize_name(b)
     if not na or not nb:
         return 0.0
@@ -55,13 +57,18 @@ def score(a: str, b: str) -> float:
         # "Acme" vs "Acme Dental Group": every word of the shorter is in the longer. Likely the same customer, but never as sure as an exact match.
         return 0.85 if min(len(ta), len(tb)) >= 1 and len(na) >= 3 and len(nb) >= 3 else 0.0
     jaccard = len(ta & tb) / len(ta | tb)
-    ratio = SequenceMatcher(None, na, nb).ratio()
-    return round(max(jaccard, ratio * 0.9), 4)
+    matcher = SequenceMatcher(None, na, nb)
+    if floor and jaccard < floor and (matcher.real_quick_ratio() * 0.9 < floor or matcher.quick_ratio() * 0.9 < floor):
+        return 0.0
+    # The similarity ratio can never beat its cheap upper bound: when even that bound times 0.9 does not pass the word overlap, the overlap is the answer and the slow ratio is skipped.
+    if matcher.real_quick_ratio() * 0.9 <= jaccard or matcher.quick_ratio() * 0.9 <= jaccard:
+        return round(jaccard, 4)
+    return round(max(jaccard, matcher.ratio() * 0.9), 4)
 
 
 def suggest(vendor_client_name: str, candidates: list[Candidate], limit: int = 3) -> list[Suggestion]:
     """The best-matching tenants for a vendor client name, best first, only those scoring at least SUGGEST_THRESHOLD."""
-    scored = [Suggestion(c.tenant_id, c.name, score(vendor_client_name, c.name)) for c in candidates]
+    scored = [Suggestion(c.tenant_id, c.name, score(vendor_client_name, c.name, SUGGEST_THRESHOLD)) for c in candidates]
     kept = [s for s in scored if s.score >= SUGGEST_THRESHOLD]
     kept.sort(key=lambda s: (-s.score, s.name.lower()))
     return kept[:limit]
@@ -92,7 +99,7 @@ def duplicate_groups(candidates: list[Candidate]) -> list[list[Candidate]]:
 
     for i in range(len(candidates)):
         for j in range(i + 1, len(candidates)):
-            if score(candidates[i].name, candidates[j].name) >= DUPLICATE_THRESHOLD:
+            if score(candidates[i].name, candidates[j].name, DUPLICATE_THRESHOLD) >= DUPLICATE_THRESHOLD:
                 parent[find(i)] = find(j)
     groups: dict[int, list[Candidate]] = {}
     for i, c in enumerate(candidates):

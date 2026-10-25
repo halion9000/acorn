@@ -188,6 +188,7 @@ async def list_clients(current_user: Annotated[AuthUser, Depends(require_permiss
         current_user.tenant_id,
         [uuid.UUID(c.tenant_id) for c in candidates],
         lambda tid: acting_as_tenant(db, tid),
+        only={(a.vendor, a.vendor_client_id) for a in aliases if a.child_tenant_id is None and not a.ignored},  # only a client still to map gets suggestions
     )
     out = [
         ClientAliasOut(
