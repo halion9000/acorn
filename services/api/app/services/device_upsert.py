@@ -18,7 +18,7 @@ from typing import Any
 from sqlalchemy import delete, func, select
 
 from app.models.device import Device, DeviceSource
-from app.services.device_identity import could_be_same_machine, hostname_key, normalize_serial
+from app.services.device_identity import could_be_same_machine, hostname_key, ip_brand_pairs, is_placeholder_name, normalize_serial
 
 
 @dataclass
@@ -139,7 +139,8 @@ async def possible_duplicates(db: Any, tenant_id: uuid.UUID) -> list[tuple[uuid.
     by_name: dict[str, list[Device]] = {}
     for d in rows:
         key = hostname_key(d.hostname)
-        if key and not (d.id in only_screenconnect and not d.serial_number):
+        # A made-up name ("Device@10.7.220.92") is no evidence of anything; those devices are paired by address and maker below.
+        if key and not is_placeholder_name(key) and not (d.id in only_screenconnect and not d.serial_number):
             by_name.setdefault(key, []).append(d)
     pairs: list[tuple[uuid.UUID, uuid.UUID]] = []
     for group in by_name.values():
@@ -153,4 +154,6 @@ async def possible_duplicates(db: Any, tenant_id: uuid.UUID) -> list[tuple[uuid.
                 if (lo, hi) in dismissed:
                     continue
                 pairs.append((lo, hi))
+    # A device with a made-up name is offered next to another device in the client that has one of its addresses and does not disagree about the maker.
+    pairs += ip_brand_pairs(rows, tools, dismissed, set(pairs))
     return pairs

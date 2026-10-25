@@ -14,7 +14,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.device import Device, DeviceMergeDismissal, DeviceMergeLog, DeviceSource
-from app.services.device_identity import could_be_same_machine, hostname_key
+from app.services.device_identity import could_be_same_machine, hostname_key, is_placeholder_name
 
 
 class DeviceMergeError(ValueError):
@@ -271,7 +271,7 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
     by_name: dict[str, list[Device]] = {}
     for d in devices:
         key = hostname_key(d.hostname)
-        if key and usable_for_merge(key):
+        if key and usable_for_merge(key) and not is_placeholder_name(key):
             by_name.setdefault(key, []).append(d)
     vendors: dict[uuid.UUID, set[str]] = {}
     for device_id, vendor, external_id in (

@@ -8,6 +8,7 @@ machines (or one machine renamed). A pair is merged on its name only when it is 
 from __future__ import annotations
 
 import re
+from typing import Any
 
 _PLACEHOLDERS = frozenset(
     {
@@ -50,10 +51,48 @@ def normalize_serial(raw: object) -> str | None:
     return text[:100]
 
 
+_ENDS_IN_IPV4 = re.compile(r"(^|[^0-9])\d{1,3}(\.\d{1,3}){3}$")
+
+
 def hostname_key(raw: object) -> str:
-    """A hostname reduced for comparison: lower-case, first label only (``PC-01.corp.local`` and ``pc-01`` are one name)."""
+    """A hostname reduced for comparison: lower-case, first label only (``PC-01.corp.local`` and ``pc-01`` are one name).
+
+    A name that ends in an IP address is kept whole: its dots separate the numbers, not a domain, and cutting at the first one would make ``Device@10.7.220.92`` and ``Device@10.7.20.55`` both ``device@10``.
+    """
     text = str(raw or "").strip().lower()
+    if _ENDS_IN_IPV4.search(text):
+        return text
     return text.split(".", 1)[0].strip()
+
+
+def is_placeholder_name(key: str) -> bool:
+    """True for the name a tool invents for a device it could not name (Auvik's ``Device@10.7.220.92``). Two of them say nothing about being the same machine."""
+    return key.startswith("device@")
+
+
+_NO_IP = ("0.0.0.0", "127.", "169.254.", "255.")
+
+
+def usable_ips(addresses: object) -> set[str]:
+    """The IPv4 addresses of a device that can identify it: dotted quads, not 0.0.0.0, loopback, link-local or broadcast."""
+    out: set[str] = set()
+    for a in addresses if isinstance(addresses, (list, tuple, set)) else []:
+        text = str(a).strip()
+        if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", text) and not text.startswith(_NO_IP):
+            out.add(text)
+    return out
+
+
+def brand_key(manufacturer: object) -> str:
+    """A maker's name reduced for comparison (``Ubiquiti Inc.`` and ``ubiquiti`` agree)."""
+    text = re.sub(r"[^a-z0-9]+", " ", str(manufacturer or "").lower()).strip()
+    return " ".join(w for w in text.split() if w not in {"inc", "llc", "ltd", "corp", "co", "networks", "technologies"})
+
+
+def same_brand(a: object, b: object) -> bool:
+    """True when two makers do not disagree: either is unknown, or one name contains the other."""
+    ka, kb = brand_key(a), brand_key(b)
+    return not ka or not kb or ka in kb or kb in ka
 
 
 # Meraki and UniFi list physical network hardware, each unit once and with its own identity. So two records from one of them are two units however alike their names (a closet of access points
@@ -68,3 +107,34 @@ def could_be_same_machine(a: set[str], b: set[str]) -> bool:
     if hw_a and hw_b:
         return False
     return not ((hw_a and b & AGENT_TOOLS) or (hw_b and a & AGENT_TOOLS))
+
+
+def ip_brand_pairs(devices: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], taken: set[tuple[Any, Any]]) -> list[tuple[Any, Any]]:
+    """Pairs of one client's devices where one has a made-up name (Auvik's ``Device@10.7.220.92``) and the other holds one of its addresses without disagreeing about the maker.
+
+    Names say nothing for such a device, so it is matched on what Auvik does know: an address and, when both sides state one, the brand. Two different serial numbers, a hardware unit against a machine an agent
+    runs on, dismissed pairs and pairs already ``taken`` are left out. Two made-up names are looked at once, from the one whose id sorts first. Each pair is ordered by id text.
+    """
+    out: list[tuple[Any, Any]] = []
+    seen = set(taken)
+    for a in devices:
+        if not is_placeholder_name(hostname_key(a.hostname)):
+            continue
+        ips = usable_ips(a.ip_addresses)
+        if not ips:
+            continue
+        for b in devices:
+            if b.id == a.id or (is_placeholder_name(hostname_key(b.hostname)) and str(b.id) < str(a.id)):
+                continue
+            if not (ips & usable_ips(b.ip_addresses)) or not same_brand(a.manufacturer, b.manufacturer):
+                continue
+            if a.serial_number and b.serial_number:
+                continue
+            if not could_be_same_machine(tools.get(a.id, set()), tools.get(b.id, set())):
+                continue
+            lo, hi = sorted((a.id, b.id), key=str)
+            if (lo, hi) in dismissed or (lo, hi) in seen:
+                continue
+            seen.add((lo, hi))
+            out.append((lo, hi))
+    return out
