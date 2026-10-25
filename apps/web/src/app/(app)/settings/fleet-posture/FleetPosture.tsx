@@ -264,7 +264,12 @@ export function FleetPosture() {
   return (
     <div className="space-y-4 p-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-100">Fleet posture</h1>
+        <div className="flex items-start justify-between gap-4">
+          <h1 className="text-xl font-semibold text-slate-100">Fleet posture</h1>
+          <button type="button" onClick={() => window.print()} className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 print:hidden">
+            Print
+          </button>
+        </div>
         <p className="mt-1 text-sm text-slate-400">Every client&apos;s tool checks side by side: who needs attention first, what is about to lapse, and what changed.</p>
       </div>
       <div role="tablist" className="flex flex-wrap gap-2">

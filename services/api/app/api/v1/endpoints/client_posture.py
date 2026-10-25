@@ -28,6 +28,7 @@ from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
+from app.services import fleet_cache
 from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, coverage_matrix, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
@@ -361,6 +362,7 @@ async def accept_check(
         stmt = pg_insert(ClientCheckAcceptance).values(values)
         await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "key")}))
         await db.commit()
+    fleet_cache.clear()
     return CheckAcceptanceOut(reason=reason, accepted_at=now, expires_at=expires)
 
 
@@ -373,6 +375,7 @@ async def remove_acceptance(client_id: uuid.UUID, key: str, current_user: Annota
         if existing is not None:
             await db.delete(existing)
             await db.commit()
+    fleet_cache.clear()
 
 
 class SweepRunOut(BaseModel):
@@ -426,7 +429,17 @@ async def sweep_runs(current_user: Annotated[AuthUser, Depends(require_permissio
 
 
 async def _fleet_checks(db: Any, owner: uuid.UUID) -> tuple[list[FleetCheck], dict[uuid.UUID, str], dict[uuid.UUID, dict[str, datetime]]]:
-    """The latest tool checks of every shown client, with since-when and whether each is accepted. One read per client (each under that client's own scope)."""
+    """The latest tool checks of every shown client, with since-when and whether each is accepted. One read per client (each under that client's own scope); kept for 30 seconds (see fleet_cache)."""
+    key = f"fleet:{owner}"
+    cached = fleet_cache.get(key)
+    if cached is not None:
+        return cached
+    result = await _read_fleet_checks(db, owner)
+    fleet_cache.put(key, result)
+    return result
+
+
+async def _read_fleet_checks(db: Any, owner: uuid.UUID) -> tuple[list[FleetCheck], dict[uuid.UUID, str], dict[uuid.UUID, dict[str, datetime]]]:
     _ids, clients = await _scope(db, owner, None)
     shown, names = _ids[1:], clients
     sources = list(TOOL_CHECK_SOURCES)

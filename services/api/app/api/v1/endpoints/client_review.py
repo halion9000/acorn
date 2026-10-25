@@ -31,6 +31,7 @@ from app.models.client_alias import ClientAlias
 from app.models.client_review_answer import ClientReviewAnswer
 from app.models.signin import ClientCheckHistory, ClientM365Check, CoreSweepRun, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
+from app.services import fleet_cache
 from app.services.check_history import changes as check_changes
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
 from app.services.infra_review import CIPP_BASELINE_SOURCE, SAAS_SOURCES, TOOL_CHECK_SOURCES
@@ -201,6 +202,7 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
             update = {c: stmt.excluded[c] for c in values if c not in ("tenant_id", "source")}
             await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source"], set_=update))
             accepted += 1
+    fleet_cache.clear()
     return VcioReviewResponse(accepted=accepted, unmapped=unmapped, ignored=ignored, unmapped_clients=waiting)
 
 

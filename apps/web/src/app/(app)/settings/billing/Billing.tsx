@@ -456,7 +456,12 @@ export function Billing() {
   return (
     <div className="space-y-4 p-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-100">Licences and counts</h1>
+        <div className="flex items-start justify-between gap-4">
+          <h1 className="text-xl font-semibold text-slate-100">Licences and counts</h1>
+          <button type="button" onClick={() => window.print()} className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 print:hidden">
+            Print
+          </button>
+        </div>
         <p className="mt-1 text-sm text-slate-400">What each tool counts for each client, read once a day, and every change, to check an invoice against.</p>
       </div>
       <div role="tablist" className="flex flex-wrap gap-2 print:hidden">
