@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
 
-import { Billing, changeText, clientCsv, differenceText, gapText, sparkPoints, totalsCsv } from './Billing';
+import { Billing, changeText, clientCsv, differenceText, gapText, sparkPoints, totalsCsv, trueUpAction, trueUpCsv } from './Billing';
 
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 
@@ -59,6 +59,18 @@ describe('sparkPoints', () => {
     expect(sparkPoints(pts, 100, 40)).toBe('0.0,40.0 50.0,0.0 100.0,20.0');
     expect(sparkPoints([{ at: '2026-10-01T00:00:00Z', count: 5 }, { at: '2026-10-02T00:00:00Z', count: 5 }], 100, 40)).toBe('0.0,20.0 100.0,20.0');
     expect(sparkPoints([], 100, 40)).toBe('');
+  });
+});
+
+describe('true-up list', () => {
+  it('says what to do to a line', () => expect([trueUpAction(0), trueUpAction(2), trueUpAction(-3)]).toEqual(['no change', 'raise by 2', 'lower by 3']));
+  it('lists only the lines that disagree, by client then line, with the quantity to change to and where it came from', () => {
+    const row = (client: string, item: string, billed: number, counted: number) => ({ client_id: client, client_name: client, invoice_item: item, billed, counted, difference: counted - billed, parts: [{ source: 'ninjaone', item: 'Macs', count: counted }] });
+    const csv = trueUpCsv([row('Beta', 'Huntress "MDR"', 10, 12), row('Acme', 'NinjaOne RMM', 16, 14), row('Acme', 'Liongard', 5, 5)]).split('\n');
+    expect(csv[0]).toBe('"Client","Invoice line","Billed now","Change to","Action","Counted from"');
+    expect(csv).toHaveLength(3);
+    expect(csv[1]).toBe('"Acme","NinjaOne RMM","16","14","lower by 2","NinjaOne Macs: 14"');
+    expect(csv[2]).toBe('"Beta","Huntress ""MDR""","10","12","raise by 2","NinjaOne Macs: 12"');
   });
 });
 

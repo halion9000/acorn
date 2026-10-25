@@ -336,6 +336,23 @@ export function differenceText(d: number): string {
   return d > 0 ? `uses ${d} more than billed` : `billed for ${-d} more than used`;
 }
 
+/** What to do to the invoice line to make it match what the tools count: "raise by 2", "lower by 3" or "no change". */
+export function trueUpAction(difference: number): string {
+  if (difference === 0) return "no change";
+  return difference > 0 ? `raise by ${difference}` : `lower by ${-difference}`;
+}
+
+/** A print-ready true-up list: one row per invoice line that disagrees, grouped by client name, with the quantity to change it to. Quantities only. */
+export function trueUpCsv(rows: ReconcileRow[]): string {
+  const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const lines = [["Client", "Invoice line", "Billed now", "Change to", "Action", "Counted from"].map(cell).join(",")];
+  const sorted = [...rows].filter((r) => r.difference !== 0).sort((a, b) => a.client_name.localeCompare(b.client_name) || a.invoice_item.localeCompare(b.invoice_item));
+  for (const r of sorted) {
+    lines.push([r.client_name, r.invoice_item, r.billed, r.counted, trueUpAction(r.difference), r.parts.map((p) => `${toolName(p.source)} ${p.item}: ${p.count}`).join("; ")].map(cell).join(","));
+  }
+  return lines.join("\n");
+}
+
 function Reconcile() {
   const { data, error } = useJson<{ rows: ReconcileRow[]; unmapped_lines: number }>("/api/v1/billing/reconcile");
   return (
@@ -345,6 +362,11 @@ function Reconcile() {
       {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
       {data && data.unmapped_lines > 0 && <p className="text-xs text-amber-300">{data.unmapped_lines} billed line{data.unmapped_lines === 1 ? "" : "s"} left out because nobody has mapped {data.unmapped_lines === 1 ? "it" : "them"} yet.</p>}
       {data && data.rows.length === 0 && <p className="text-sm text-slate-400">Nothing disagrees.</p>}
+      {data && data.rows.length > 0 && (
+        <button type="button" className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 print:hidden" onClick={() => download("true-up.csv", trueUpCsv(data.rows))}>
+          Download true-up list (CSV)
+        </button>
+      )}
       {data && data.rows.length > 0 && (
         <table className="w-full text-left text-sm" data-testid="billing-reconcile">
           <thead className="text-xs uppercase text-slate-500">
