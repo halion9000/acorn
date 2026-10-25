@@ -130,3 +130,18 @@ def test_a_small_gap_is_not_a_disagreement_even_when_it_is_a_big_fraction():
     from app.services.license_counts import endpoint_disagreements
 
     assert endpoint_disagreements({"a": [{"source": "ninjaone", "item": "Macs", "count": 5}, {"source": "huntress", "item": "Agents", "count": 3}]}) == []
+
+
+def test_last_reported_takes_the_newest_count_per_client_and_tool_and_marks_the_silent_ones_first():
+    from app.services.license_counts import last_reported
+
+    now = datetime(2026, 10, 25, 12, tzinfo=UTC)
+    rows = [
+        {"client": "a", "source": "ninjaone", "updated_at": now - timedelta(days=9)},
+        {"client": "a", "source": "ninjaone", "updated_at": now - timedelta(hours=3)},
+        {"client": "a", "source": "huntress", "updated_at": now - timedelta(days=5)},
+        {"client": "b", "source": "huntress", "updated_at": now - timedelta(days=2, hours=23)},
+        {"client": "b", "source": "slide", "updated_at": now - timedelta(days=3)},
+    ]
+    out = last_reported(rows, now)
+    assert [(r["client"], r["source"], r["days_ago"], r["silent"]) for r in out] == [("a", "huntress", 5, True), ("b", "slide", 3, True), ("b", "huntress", 2, False), ("a", "ninjaone", 0, False)]

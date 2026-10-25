@@ -22,7 +22,7 @@ from app.db.rls_scope import acting_as_tenant
 from app.db.rls_sessions import adopt_tenant
 from app.models.signin import BillingItemMap, ClientLicenseCount, ClientLicenseHistory
 from app.models.tenant import Tenant
-from app.services.license_counts import BASELINE_TOOL, changes, count_at, delta, endpoint_disagreements, reconcile, suggest, totals, unusual, window_start
+from app.services.license_counts import BASELINE_TOOL, changes, count_at, delta, endpoint_disagreements, last_reported, reconcile, suggest, totals, unusual, window_start
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -345,3 +345,33 @@ async def data_quality(current_user: Annotated[AuthUser, Depends(require_permiss
     per_client, names = await _all_client_counts(db, owner)
     rows = [DisagreementRow(client_id=d["client"], client_name=names.get(d["client"]) or str(d["client"]), tool=d["tool"], tool_count=d["tool_count"], baseline_count=d["baseline_count"], gap=d["gap"]) for d in endpoint_disagreements(per_client)]
     return DataQualityOut(generated_at=datetime.now(UTC), baseline_tool=BASELINE_TOOL, rows=rows[: max(1, min(limit, 2000))])
+
+
+class LastReportedRow(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    source: str
+    last_reported_at: datetime
+    days_ago: int
+    # More than two days ago: the daily report from this tool for this client stopped arriving.
+    silent: bool
+
+
+@router.get("/last-reported", response_model=list[LastReportedRow], summary="When each tool last reported a count for each client, silent ones first")
+async def last_reported_grid(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, only_silent: bool = False, limit: int = 1000
+) -> list[LastReportedRow]:
+    owner = current_user.tenant_id
+    ids, names = await _scope(db, owner, None)
+    rows: list[dict[str, Any]] = []
+    for cid in ids[1:]:
+        async with _as(db, owner, cid):
+            held = (await db.execute(select(ClientLicenseCount.source, ClientLicenseCount.updated_at).where(ClientLicenseCount.tenant_id == cid))).all()
+        rows += [{"client": cid, "source": src, "updated_at": at} for src, at in held]
+    out = [
+        LastReportedRow(client_id=r["client"], client_name=names.get(r["client"]) or str(r["client"]), source=r["source"], last_reported_at=r["last_reported_at"], days_ago=r["days_ago"], silent=r["silent"])
+        for r in last_reported(rows, datetime.now(UTC))
+    ]
+    if only_silent:
+        out = [r for r in out if r.silent]
+    return out[: max(1, min(limit, 5000))]

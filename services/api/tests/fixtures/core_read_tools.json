@@ -725,6 +725,22 @@
     }
   },
   {
+    "tool": "aisoc_last_reported",
+    "method": "GET",
+    "path": "/billing/last-reported",
+    "query": [
+      "only_silent",
+      "limit"
+    ],
+    "enums": {},
+    "numbers": {
+      "limit": {
+        "min": 1,
+        "max": 200
+      }
+    }
+  },
+  {
     "tool": "aisoc_list_people",
     "method": "GET",
     "path": "/identities",

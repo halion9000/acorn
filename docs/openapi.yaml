@@ -11663,6 +11663,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/last-reported:
+    get:
+      tags:
+      - billing
+      summary: When each tool last reported a count for each client, silent ones first
+      operationId: last_reported_grid_api_v1_billing_last_reported_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: only_silent
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Only Silent
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 1000
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LastReportedRow'
+                title: Response Last Reported Grid Api V1 Billing Last Reported Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/license-counts:
     post:
       tags:
@@ -29109,6 +29148,37 @@ components:
         the first event to land. Keeping the shape minimal avoids paying
 
         the full ``ConnectorResponse`` cost on every poll tick.'
+    LastReportedRow:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        source:
+          type: string
+          title: Source
+        last_reported_at:
+          type: string
+          format: date-time
+          title: Last Reported At
+        days_ago:
+          type: integer
+          title: Days Ago
+        silent:
+          type: boolean
+          title: Silent
+      type: object
+      required:
+      - client_id
+      - client_name
+      - source
+      - last_reported_at
+      - days_ago
+      - silent
+      title: LastReportedRow
     LicenseCountIn:
       properties:
         item:

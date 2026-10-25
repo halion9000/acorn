@@ -175,3 +175,25 @@ def endpoint_disagreements(per_client: dict[Any, list[dict[str, Any]]]) -> list[
                 out.append({"client": client, "tool": tool, "tool_count": n, "baseline_count": base, "gap": gap})
     out.sort(key=lambda r: (-abs(r["gap"]), str(r["client"]), r["tool"]))
     return out
+
+
+SILENT_AFTER_DAYS = 2
+
+
+def last_reported(rows: list[dict[str, Any]], now: datetime, silent_after_days: int = SILENT_AFTER_DAYS) -> list[dict[str, Any]]:
+    """When each tool last reported a count for each client, silent ones first.
+
+    ``rows`` is [{client, source, updated_at}] (one per stored count). Returns one entry per client and tool: the newest ``updated_at`` among that client's counts from that tool, how many whole days ago that
+    is, and ``silent`` when it is more than ``silent_after_days`` days ago (the daily report stopped arriving: a stopped feed, a removed mapping or a tool that lost access).
+    """
+    latest: dict[tuple[Any, str], datetime] = {}
+    for r in rows:
+        k = (r["client"], r["source"])
+        if k not in latest or r["updated_at"] > latest[k]:
+            latest[k] = r["updated_at"]
+    out = []
+    for (client, source), at in latest.items():
+        days = max(0, (now - at).days)
+        out.append({"client": client, "source": source, "last_reported_at": at, "days_ago": days, "silent": days > silent_after_days})
+    out.sort(key=lambda r: (not r["silent"], -r["days_ago"], str(r["client"]), r["source"]))
+    return out
