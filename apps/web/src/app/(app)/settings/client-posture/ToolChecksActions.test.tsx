@@ -6,7 +6,7 @@ const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
 
 import { ToolChecks, isStale, STALE_HOURS } from './ToolChecks';
-import { SourceHealth, sortRuns, type SweepRun } from './SourceHealth';
+import { SourceHealth, failureKind, sortRuns, type SweepRun } from './SourceHealth';
 
 const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
 
@@ -103,6 +103,20 @@ describe('ToolChecks list and explanation', () => {
   it('offers no list link for a check that carries none', () => {
     render(<ToolChecks tool="ninjaone" label="NinjaOne" checks={[{ key: 'ninjaone_antivirus', status: 'met', evidence: 'fine' }]} />);
     expect(screen.queryByText(/Which ones/)).toBeNull();
+  });
+});
+
+describe('failureKind', () => {
+  it('says who to look at for each kind of first error', () => {
+    expect(failureKind('Acme: fetch failed')).toBe('A.C.O.R.N could not be reached');
+    expect(failureKind('Acme: A.C.O.R.N refused the checks (500)')).toBe('A.C.O.R.N could not be reached');
+    expect(failureKind('Meraki refused the API key')).toBe('the tool refused the key');
+    expect(failureKind('Huntress returned 403')).toBe('the tool refused the key');
+    expect(failureKind('CIPP returned 429')).toBe('the tool is rate limiting CORE');
+    expect(failureKind("api.huntress.io didn't answer within 30s")).toBe('the tool is slow or down');
+    expect(failureKind('Huntress returned 504')).toBe('the tool is slow or down');
+    expect(failureKind('something odd')).toBeNull();
+    expect(failureKind('')).toBeNull();
   });
 });
 

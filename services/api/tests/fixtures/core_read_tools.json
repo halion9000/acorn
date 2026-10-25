@@ -688,5 +688,51 @@
     "query": [],
     "enums": {},
     "numbers": {}
+  },
+  {
+    "tool": "aisoc_list_people",
+    "method": "GET",
+    "path": "/identities",
+    "query": [
+      "search",
+      "client_id",
+      "source",
+      "only_in",
+      "kind",
+      "admin",
+      "disabled",
+      "mfa",
+      "exposed",
+      "page_size",
+      "page"
+    ],
+    "enums": {
+      "kind": [
+        "user",
+        "guest",
+        "shared",
+        "other"
+      ],
+      "mfa": [
+        "covered",
+        "registered_not_required",
+        "none",
+        "unknown"
+      ],
+      "exposed": [
+        "any",
+        "serious"
+      ]
+    },
+    "numbers": {
+      "page_size": {
+        "min": 1,
+        "max": 100
+      },
+      "page": {
+        "min": 1,
+        "max": 10000
+      }
+    }
   }
 ]

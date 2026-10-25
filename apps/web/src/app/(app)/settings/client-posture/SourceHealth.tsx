@@ -29,6 +29,20 @@ const HEALTH: Record<string, { text: string; className: string }> = {
   stale: { text: 'Not run for 48 hours', className: 'text-amber-300' },
 };
 
+/**
+ * What kind of trouble a sweep's first error describes, in words that say who to look at: A.C.O.R.N or the network (nothing could be sent), the tool's own key, the tool slowing CORE down, or the tool being
+ * slow. Anything else is shown as it is.
+ */
+export function failureKind(message: string): string | null {
+  const m = message.toLowerCase();
+  if (!m) return null;
+  if (/refused the (api )?(key|token)|\b40[13]\b|unauthori[sz]ed|forbidden|can't read that/.test(m)) return "the tool refused the key";
+  if (/slow down|\b429\b|rate limit/.test(m)) return "the tool is rate limiting CORE";
+  if (/didn't answer|timed out|timeout|\b50[234]\b/.test(m)) return "the tool is slow or down";
+  if (/fetch failed|econnrefused|couldn't reach|a\.c\.o\.r\.n refused/.test(m)) return "A.C.O.R.N could not be reached";
+  return null;
+}
+
 /** The runs that need a look first: failing, then partly, then stale, then fine, each in the order given. */
 export function sortRuns(runs: SweepRun[]): SweepRun[] {
   const rank: Record<string, number> = { failed: 0, partly: 1, stale: 2, ok: 3 };
@@ -82,7 +96,12 @@ export function SourceHealth() {
                 <td className="pr-3">{r.waiting}</td>
                 <td className={h.className}>
                   {h.text}
-                  {r.first_error ? <span className="ml-1 text-slate-500">({r.first_error})</span> : null}
+                  {r.first_error ? (
+                    <span className="ml-1 text-slate-500">
+                      ({failureKind(r.first_error) ? `${failureKind(r.first_error)}: ` : ""}
+                      {r.first_error})
+                    </span>
+                  ) : null}
                 </td>
               </tr>
             );
