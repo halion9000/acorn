@@ -13,7 +13,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import and_, bindparam, func, not_, select, text
+from sqlalchemy import and_, bindparam, delete, func, not_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -25,13 +25,13 @@ from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.identity_source import IdentitySource
 from app.services.audit import emit_audit
-from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, ClientScoreHistory, CoreSweepRun, IdentityMfaUser
+from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, ClientScoreHistory, ClientScoreTarget, CoreSweepRun, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
 from app.services import fleet_cache
 from app.services.score_history import trend as score_trend
-from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import below_target, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
@@ -364,6 +364,33 @@ async def score_history(client_id: uuid.UUID, current_user: Annotated[AuthUser, 
     return ScoreHistoryOut(client_id=client_id, days=days, rows=[ScoreDay(**r) for r in shown], first=t["first"], last=t["last"], change=t["change"], direction=t["direction"])
 
 
+class TargetIn(BaseModel):
+    # 1 to 100; none removes the target.
+    target: int | None = None
+
+
+class TargetOut(BaseModel):
+    client_id: uuid.UUID
+    target: int | None
+
+
+@router.put("/{client_id}/target", response_model=TargetOut, summary="Set the score a client should stay at or above, or remove it")
+async def set_target(client_id: uuid.UUID, body: TargetIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> TargetOut:
+    owner = current_user.tenant_id
+    await _client_of_owner(db, owner, client_id)
+    if body.target is not None and not 1 <= body.target <= 100:
+        raise HTTPException(status_code=422, detail="A target is a score from 1 to 100")
+    if body.target is None:
+        await db.execute(delete(ClientScoreTarget).where(ClientScoreTarget.tenant_id == owner, ClientScoreTarget.client_id == client_id))
+    else:
+        values = {"tenant_id": owner, "client_id": client_id, "target": body.target, "updated_by": current_user.user_id, "updated_at": datetime.now(UTC)}
+        stmt = pg_insert(ClientScoreTarget).values(values)
+        await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "client_id"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "client_id")}))
+    await db.commit()
+    fleet_cache.clear()
+    return TargetOut(client_id=client_id, target=body.target)
+
+
 class AcceptIn(BaseModel):
     reason: str
     # Days from now until the acceptance runs out; none means until someone removes it.
@@ -534,6 +561,9 @@ class FleetClient(BaseModel):
     accepted: int
     # Tools whose rows for this client are older than 48 hours.
     stale_tools: list[str] = []
+    # The score a person said this client should stay at or above, and whether it is under it.
+    target: int | None = None
+    below_target: bool = False
 
 
 class FleetOut(BaseModel):
@@ -549,9 +579,16 @@ async def fleet_summary(current_user: Annotated[AuthUser, Depends(require_permis
     by_client: dict[str, list[FleetCheck]] = {}
     for c in checks:
         by_client.setdefault(c.client_id, []).append(c)
-    summaries = [
-        {"client_id": uuid.UUID(cid), "client_name": names.get(uuid.UUID(cid)), "stale_tools": stale_sources(refreshed.get(uuid.UUID(cid), {}), now), **summarize(rows)} for cid, rows in by_client.items()
-    ]
+    try:
+        async with db.begin_nested():  # an older database without the table must still show the fleet
+            targets = {cid: t for cid, t in (await db.execute(select(ClientScoreTarget.client_id, ClientScoreTarget.target).where(ClientScoreTarget.tenant_id == owner))).all()}
+    except Exception:  # noqa: BLE001
+        targets = {}
+    summaries = []
+    for cid, rows in by_client.items():
+        s = summarize(rows)
+        target = targets.get(uuid.UUID(cid))
+        summaries.append({"client_id": uuid.UUID(cid), "client_name": names.get(uuid.UUID(cid)), "stale_tools": stale_sources(refreshed.get(uuid.UUID(cid), {}), now), "target": target, "below_target": below_target(s["score"], target), **s})
     return FleetOut(generated_at=now, clients=[FleetClient(**s) for s in rank_clients(summaries)])
 
 

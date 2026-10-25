@@ -262,3 +262,15 @@ class ClientScoreHistory(Base):
     partly: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     not_met: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     accepted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class ClientScoreTarget(Base):
+    """The score a client should stay at or above (migration 108), owned by the account that owns the feed."""
+
+    __tablename__ = "client_score_targets"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    target: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

@@ -11184,6 +11184,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/{client_id}/target:
+    put:
+      tags:
+      - posture
+      summary: Set the score a client should stay at or above, or remove it
+      operationId: set_target_api_v1_client_posture__client_id__target_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TargetIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/client-posture/{client_id}/acceptances/{key}:
     put:
       tags:
@@ -27331,6 +27366,15 @@ components:
           type: array
           title: Stale Tools
           default: []
+        target:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Target
+        below_target:
+          type: boolean
+          title: Below Target
+          default: false
       type: object
       required:
       - client_id
@@ -37045,6 +37089,31 @@ components:
         plot tactics as bars and immediately see that, e.g. *exfiltration*
 
         averages 38/100 while *execution* averages 78/100.'
+    TargetIn:
+      properties:
+        target:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Target
+      type: object
+      title: TargetIn
+    TargetOut:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        target:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Target
+      type: object
+      required:
+      - client_id
+      - target
+      title: TargetOut
     TaskResponse:
       properties:
         id:

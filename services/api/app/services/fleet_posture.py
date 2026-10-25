@@ -65,6 +65,11 @@ def rank_clients(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(summaries, key=lambda s: (s["score"] is None, s["score"] if s["score"] is not None else 0, -s["not_met"], str(s.get("client_name") or "").lower()))
 
 
+def below_target(score: int | None, target: int | None) -> bool:
+    """True when a client has both a score and a target and the score is under it. No score (no checks) is not below anything."""
+    return score is not None and target is not None and score < target
+
+
 def board_rows(checks: list[FleetCheck], keys: tuple[str, ...] | list[str], include_met: bool = False) -> list[FleetCheck]:
     """The rows of a board: the checks named, worst first (accepted ones after the rest of their status), then by client name. Fine checks only when asked for."""
     wanted = set(keys)

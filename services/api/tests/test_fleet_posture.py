@@ -84,3 +84,13 @@ def test_accepted_risks_that_run_out_soonest_come_first_and_expired_ones_are_gon
     assert [r["key"] for r in expiring_acceptances(rows, now, 7)] == ["k4"]
     assert [r["key"] for r in expiring_acceptances(rows, now, 30)] == ["k4", "k1"], "no end date is never expiring"
     assert expiring_acceptances([], now) == []
+
+
+def test_a_client_is_below_target_only_when_it_has_both_a_score_and_a_target_and_the_score_is_under():
+    from app.services.fleet_posture import below_target
+
+    assert below_target(70, 80) is True
+    assert below_target(80, 80) is False, "meeting the target is not below it"
+    assert below_target(95, 80) is False
+    assert below_target(None, 80) is False, "no checks, no score, nothing to miss"
+    assert below_target(50, None) is False

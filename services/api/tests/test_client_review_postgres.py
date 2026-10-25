@@ -514,3 +514,41 @@ async def test_a_check_can_be_marked_not_applicable_with_no_end_date_and_it_leav
     assert (hist.rows[0].score, hist.rows[0].not_met, hist.rows[0].accepted) == (100, 0, 1), "the check that does not apply is not counted against the client"
     again = await run(world["msp"], lambda db: cp.accept_check(world["client"], "fw", cp.AcceptIn(reason="Accepted for now", expires_in_days=30), user, db))
     assert again.not_applicable is False, "a later ordinary acceptance replaces it"
+
+
+async def test_a_target_is_set_replaced_and_removed_and_the_fleet_flags_a_client_below_it(world):
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'ninjaone', 'n-7', 'n-7', 'n-7', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+    checks = [{"key": "a", "status": "met", "evidence": ""}, {"key": "b", "status": "not_met", "evidence": ""}]
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-7", checks=checks)))
+    user = NS(tenant_id=world["msp"], user_id=None)
+
+    def mine(fleet):
+        return next(c for c in fleet.clients if c.client_id == world["client"])
+
+    cp.fleet_cache.clear()
+    assert mine(await run(world["msp"], lambda db: cp.fleet_summary(NS(tenant_id=world["msp"]), db))).target is None
+    out = await run(world["msp"], lambda db: cp.set_target(world["client"], cp.TargetIn(target=80), user, db))
+    assert out.target == 80
+    flagged = mine(await run(world["msp"], lambda db: cp.fleet_summary(NS(tenant_id=world["msp"]), db)))
+    assert (flagged.score, flagged.target, flagged.below_target) == (50, 80, True)
+    await run(world["msp"], lambda db: cp.set_target(world["client"], cp.TargetIn(target=40), user, db))
+    assert mine(await run(world["msp"], lambda db: cp.fleet_summary(NS(tenant_id=world["msp"]), db))).below_target is False
+    with pytest.raises(HTTPException) as e:
+        await run(world["msp"], lambda db: cp.set_target(world["client"], cp.TargetIn(target=101), user, db))
+    assert e.value.status_code == 422
+    with pytest.raises(HTTPException) as e2:
+        await run(world["msp"], lambda db: cp.set_target(world["stranger"], cp.TargetIn(target=50), user, db))
+    assert e2.value.status_code == 404
+    await run(world["msp"], lambda db: cp.set_target(world["client"], cp.TargetIn(target=None), user, db))
+    assert mine(await run(world["msp"], lambda db: cp.fleet_summary(NS(tenant_id=world["msp"]), db))).target is None

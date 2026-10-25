@@ -17,7 +17,7 @@ beforeEach(() => {
       return json({
         generated_at: '2026-10-25T00:00:00Z',
         clients: [
-          { client_id: 'c1', client_name: 'Acme', score: 40, met: 1, partly: 1, not_met: 3, accepted: 0, stale_tools: ['ninjaone'] },
+          { client_id: 'c1', client_name: 'Acme', score: 40, met: 1, partly: 1, not_met: 3, accepted: 0, stale_tools: ['ninjaone'], target: 80, below_target: true },
           { client_id: 'c2', client_name: 'Beta', score: null, met: 0, partly: 0, not_met: 0, accepted: 2, stale_tools: [] },
         ],
       });
@@ -47,6 +47,31 @@ describe('endsText', () => {
   const now = Date.parse('2026-10-25T12:00:00Z');
   it('says how long an acceptance has left', () => {
     expect([endsText(null, now), endsText('2026-10-26T01:00:00Z', now), endsText('2026-10-30T12:00:00Z', now), endsText('2026-10-25T09:00:00Z', now)]).toEqual(['no end date', 'ends in 1 day', 'ends in 5 days', 'ends today']);
+  });
+});
+
+describe('FleetPosture targets', () => {
+  it('shows a target and marks a client below it', async () => {
+    render(<FleetPosture />);
+    const row = await screen.findByTestId('fleet-client-c1');
+    expect(row).toHaveTextContent('80% (below)');
+    expect(within(screen.getByTestId('fleet-client-c2')).getByText('Set')).toBeInTheDocument();
+  });
+
+  it('sets a target from a prompt and reloads, and refuses a number outside 1 to 100 without calling the API', async () => {
+    const answers = ['150', '60'];
+    vi.spyOn(window, 'prompt').mockImplementation(() => answers.shift() ?? null);
+    render(<FleetPosture />);
+    const beta = await screen.findByTestId('fleet-client-c2');
+    await userEvent.click(within(beta).getByText('Set'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('1 to 100');
+    expect(authFetch.mock.calls.some((c) => String(c[0]).endsWith('/target'))).toBe(false);
+    await userEvent.click(within(screen.getByTestId('fleet-client-c2')).getByText('Set'));
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]) === '/api/v1/client-posture/c2/target')).toBe(true));
+    const call = authFetch.mock.calls.find((c) => String(c[0]).endsWith('/target'))!;
+    expect(call[1].method).toBe('PUT');
+    expect(JSON.parse(call[1].body)).toEqual({ target: 60 });
+    await waitFor(() => expect(authFetch.mock.calls.filter((c) => String(c[0]).endsWith('/fleet/summary')).length).toBe(2));
   });
 });
 

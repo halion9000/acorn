@@ -19,6 +19,8 @@ export interface FleetClient {
   not_met: number;
   accepted: number;
   stale_tools: string[];
+  target?: number | null;
+  below_target?: boolean;
 }
 
 export interface BoardRow {
@@ -70,7 +72,7 @@ export function changeWord(c: Pick<FleetChange, "status" | "previous_status">): 
   return a > b ? "worse" : a < b ? "better" : "same";
 }
 
-function useJson<T>(url: string | null): { data: T | null; error: string | null } {
+function useJson<T>(url: string | null, reload = 0): { data: T | null; error: string | null } {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -92,21 +94,43 @@ function useJson<T>(url: string | null): { data: T | null; error: string | null 
     return () => {
       live = false;
     };
-  }, [url]);
+  }, [url, reload]);
   return { data, error };
 }
 
 function Worst() {
-  const { data, error } = useJson<{ clients: FleetClient[] }>("/api/v1/client-posture/fleet/summary");
+  const [reload, setReload] = useState(0);
+  const [problem, setProblem] = useState<string | null>(null);
+  const { data, error } = useJson<{ clients: FleetClient[] }>("/api/v1/client-posture/fleet/summary", reload);
+  const setTarget = async (c: FleetClient) => {
+    const answer = window.prompt(`Target score for ${c.client_name ?? "this client"} (1 to 100). Leave empty to remove it.`, c.target ? String(c.target) : "");
+    if (answer === null) return;
+    const value = answer.trim() === "" ? null : Number(answer);
+    if (value !== null && (!Number.isInteger(value) || value < 1 || value > 100)) {
+      setProblem("A target is a whole number from 1 to 100.");
+      return;
+    }
+    try {
+      const res = await authFetch(`/api/v1/client-posture/${encodeURIComponent(c.client_id)}/target`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target: value }) });
+      if (!res.ok) throw new Error(`The API answered ${res.status}`);
+      setProblem(null);
+      setReload((n) => n + 1);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Could not save");
+    }
+  };
   if (error) return <p role="alert" className="text-sm text-red-300">{error}</p>;
   if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
   if (data.clients.length === 0) return <p className="text-sm text-slate-400">No client has sent checks yet.</p>;
   return (
+    <>
+    {problem && <p role="alert" className="mb-2 text-sm text-red-300">{problem}</p>}
     <table className="w-full text-left text-sm" data-testid="fleet-worst">
       <thead className="text-xs uppercase text-slate-500">
         <tr>
           <th className="py-1 pr-3">Client</th>
           <th className="pr-3">Score</th>
+          <th className="pr-3">Target</th>
           <th className="pr-3">Problems</th>
           <th className="pr-3">Need attention</th>
           <th className="pr-3">Accepted</th>
@@ -122,6 +146,12 @@ function Worst() {
               </Link>
             </td>
             <td className="pr-3">{c.score === null ? "—" : `${c.score}%`}</td>
+            <td className="pr-3">
+              {c.target ? <span className={c.below_target ? "text-red-300" : "text-slate-300"}>{c.target}%{c.below_target ? " (below)" : ""}</span> : <span className="text-slate-600">none</span>}{" "}
+              <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300 print:hidden" onClick={() => void setTarget(c)}>
+                {c.target ? "Change" : "Set"}
+              </button>
+            </td>
             <td className={`pr-3 ${c.not_met > 0 ? "text-red-300" : ""}`}>{c.not_met}</td>
             <td className={`pr-3 ${c.partly > 0 ? "text-amber-300" : ""}`}>{c.partly}</td>
             <td className="pr-3">{c.accepted}</td>
@@ -130,6 +160,7 @@ function Worst() {
         ))}
       </tbody>
     </table>
+    </>
   );
 }
 
