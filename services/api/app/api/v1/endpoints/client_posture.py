@@ -28,7 +28,7 @@ from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
-from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, coverage_matrix, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
@@ -78,6 +78,8 @@ class PostureCheck(BaseModel):
     evidence: str
     # Since when the check has had this status (the last time it changed), when A.C.O.R.N has seen it change; None for a check seen only once, before history was kept.
     since: datetime | None = None
+    # The accounts, machines or systems behind the verdict, when the tool says which.
+    items: list[str] = []
     # Set when a person has accepted this check for the client (and it has not run out).
     accepted: "CheckAcceptanceOut | None" = None
 
@@ -122,6 +124,12 @@ def devices_part(rollups: list[ClientRollup], client_id: uuid.UUID) -> PostureDe
     return PostureDevices()
 
 
+def _items_of(check: dict) -> list[str]:
+    """The short strings a check carries as its list (ignoring anything else, and capped)."""
+    raw = check.get("items")
+    return [i[:120] for i in raw if isinstance(i, str) and i.strip()][:40] if isinstance(raw, list) else []
+
+
 async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, aliases: list[Any]) -> dict[str, ToolChecksOut]:
     """The checks each tool sent for this client. Only tools the client is mapped to are read (none at all, no query, for a client mapped to none of them); a tool that sent nothing is left out."""
     mapped = {v for v, _, _ in aliases}
@@ -142,7 +150,7 @@ async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, alia
     out: dict[str, ToolChecksOut] = {}
     for row in rows:
         checks = [
-            PostureCheck(key=str(c["key"]), status=str(c["status"]), evidence=str(c.get("evidence", "")), since=since.get(str(c["key"])), accepted=accepted.get(str(c["key"])))
+            PostureCheck(key=str(c["key"]), status=str(c["status"]), evidence=str(c.get("evidence", "")), since=since.get(str(c["key"])), accepted=accepted.get(str(c["key"])), items=_items_of(c))
             for c in (row.checks or [])
             if isinstance(c, dict) and c.get("key") and c.get("status")
         ]
@@ -438,7 +446,7 @@ async def _fleet_checks(db: Any, owner: uuid.UUID) -> tuple[list[FleetCheck], di
                 if isinstance(c, dict) and c.get("key") and c.get("status"):
                     key = str(c["key"])
                     out.append(
-                        FleetCheck(client_id=str(cid), client_name=names.get(cid) or str(cid), source=r.source, key=key, status=str(c["status"]), evidence=str(c.get("evidence", "")), refreshed_at=r.refreshed_at, since=since.get(key), accepted=key in accepted)
+                        FleetCheck(client_id=str(cid), client_name=names.get(cid) or str(cid), source=r.source, key=key, status=str(c["status"]), evidence=str(c.get("evidence", "")), refreshed_at=r.refreshed_at, since=since.get(key), accepted=key in accepted, items=tuple(_items_of(c)))
                     )
     return out, names, refreshed
 
@@ -483,6 +491,7 @@ class FleetBoardRow(BaseModel):
     evidence: str
     since: datetime | None = None
     accepted: bool = False
+    items: list[str] = []
 
 
 class FleetBoardOut(BaseModel):
@@ -510,8 +519,21 @@ async def fleet_board(
         board=board,
         title=title,
         keys=list(keys),
-        rows=[FleetBoardRow(client_id=uuid.UUID(r.client_id), client_name=r.client_name, source=r.source, key=r.key, status=r.status, evidence=r.evidence, since=r.since, accepted=r.accepted) for r in rows],
+        rows=[FleetBoardRow(client_id=uuid.UUID(r.client_id), client_name=r.client_name, source=r.source, key=r.key, status=r.status, evidence=r.evidence, since=r.since, accepted=r.accepted, items=list(r.items)) for r in rows],
     )
+
+
+@router.get("/fleet/coverage", summary="Which tool each client is mapped to, and which tools it is missing")
+async def fleet_coverage(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> dict[str, Any]:
+    owner = current_user.tenant_id
+    ids, names = await _scope(db, owner, None)
+    shown = {str(i): names.get(i) or str(i) for i in ids[1:]}
+    rows = (
+        await db.execute(
+            select(ClientAlias.child_tenant_id, ClientAlias.vendor).where(ClientAlias.tenant_id == owner, ClientAlias.ignored.is_(False), ClientAlias.child_tenant_id.is_not(None))
+        )
+    ).all()
+    return coverage_matrix([(str(c), v) for c, v in rows if str(c) in shown], shown)
 
 
 class FleetChange(BaseModel):

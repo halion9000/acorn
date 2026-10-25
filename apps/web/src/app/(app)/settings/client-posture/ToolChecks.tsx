@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { CHECK_HELP } from './checkHelp';
 
 /**
  * What one tool says about the client as plain checks CORE reads once a day and sends for a client that is mapped to that tool: ThreatMate (security score, patching, end-of-life software) and
@@ -15,6 +16,8 @@ export interface PostureCheck {
   evidence: string;
   /** Since when the check has had this status, when A.C.O.R.N has seen it change. */
   since?: string | null;
+  /** The accounts, machines or systems behind the verdict, when the tool says which. */
+  items?: string[];
   /** Set when a person accepted this check for the client and it has not run out. */
   accepted?: { reason: string; accepted_at: string; expires_at?: string | null } | null;
 }
@@ -146,6 +149,8 @@ export function ToolChecks({
   onlyProblems?: boolean;
 }) {
   const [openHistory, setOpenHistory] = useState<string | null>(null);
+  const [openItems, setOpenItems] = useState<string | null>(null);
+  const [openHelp, setOpenHelp] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   if (checks.length === 0) return null;
   const shown = onlyProblems ? checks.filter((c) => c.status !== 'met') : checks;
@@ -211,6 +216,31 @@ export function ToolChecks({
               {c.since ? <span className="ml-1 text-[11px] text-slate-600">since {day(c.since)}</span> : null}
               <div className="mt-1 text-xs text-slate-400">{c.evidence}</div>
               {c.accepted ? <div className="mt-1 text-xs text-sky-200/80">Reason: {c.accepted.reason}</div> : null}
+              <div className="mt-1 flex gap-3 text-[11px] print:hidden">
+                {c.items && c.items.length > 0 ? (
+                  <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setOpenItems(openItems === c.key ? null : c.key)}>
+                    {openItems === c.key ? 'Hide the list' : `Which ones (${c.items.length})`}
+                  </button>
+                ) : null}
+                {CHECK_HELP[c.key] ? (
+                  <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setOpenHelp(openHelp === c.key ? null : c.key)}>
+                    {openHelp === c.key ? 'Hide' : 'What this means'}
+                  </button>
+                ) : null}
+              </div>
+              {openItems === c.key && c.items ? (
+                <ul className="mt-1 max-h-40 list-disc space-y-0.5 overflow-y-auto pl-4 text-xs text-slate-400" data-testid={`items-${c.key}`}>
+                  {c.items.map((i) => (
+                    <li key={i}>{i}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {openHelp === c.key && CHECK_HELP[c.key] ? (
+                <div className="mt-1 space-y-0.5 text-xs text-slate-400" data-testid={`help-${c.key}`}>
+                  <p>{CHECK_HELP[c.key].why}</p>
+                  <p className="text-slate-300">To fix: {CHECK_HELP[c.key].fix}</p>
+                </div>
+              ) : null}
               {clientId ? (
                 <div className="mt-1 flex gap-3 text-[11px] print:hidden">
                   <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setOpenHistory(openHistory === c.key ? null : c.key)}>

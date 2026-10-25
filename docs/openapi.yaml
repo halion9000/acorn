@@ -11315,6 +11315,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/fleet/coverage:
+    get:
+      tags:
+      - posture
+      summary: Which tool each client is mapped to, and which tools it is missing
+      operationId: fleet_coverage_api_v1_client_posture_fleet_coverage_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Fleet Coverage Api V1 Client Posture Fleet Coverage
+                  Get
+      security:
+      - HTTPBearer: []
   /api/v1/client-posture/fleet/changes:
     get:
       tags:
@@ -26605,6 +26623,12 @@ components:
           type: boolean
           title: Accepted
           default: false
+        items:
+          items:
+            type: string
+          type: array
+          title: Items
+          default: []
       type: object
       required:
       - client_id
@@ -28815,6 +28839,13 @@ components:
           maxLength: 300
           title: Evidence
           default: ''
+        items:
+          items:
+            type: string
+            maxLength: 120
+          type: array
+          maxItems: 40
+          title: Items
       type: object
       required:
       - key
@@ -31245,6 +31276,12 @@ components:
             format: date-time
           - type: 'null'
           title: Since
+        items:
+          items:
+            type: string
+          type: array
+          title: Items
+          default: []
         accepted:
           anyOf:
           - $ref: '#/components/schemas/CheckAcceptanceOut'

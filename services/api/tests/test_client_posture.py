@@ -182,6 +182,36 @@ def test_each_check_says_since_when_it_has_had_its_status_and_whether_a_person_a
     assert by["threatmate_end_of_life"].since is None and by["threatmate_end_of_life"].accepted is None
 
 
+def test_a_check_carries_the_list_behind_it_and_a_malformed_list_is_ignored(monkeypatch):
+    rows = [
+        (
+            "ninjaone",
+            [
+                {"key": "ninjaone_antivirus", "status": "not_met", "evidence": "x", "items": ["PC-1: none installed", "", 7, "PC-2: switched off"]},
+                {"key": "ninjaone_patching", "status": "partly", "evidence": "y", "items": "not a list"},
+                {"key": "ninjaone_unsupported_os", "status": "met", "evidence": "z"},
+            ],
+        )
+    ]
+    out, _ = _posture_with(monkeypatch, [("ninjaone", "1", "Acme")], rows)
+    by = {c.key: c for c in out.tool_checks["ninjaone"].checks}
+    assert by["ninjaone_antivirus"].items == ["PC-1: none installed", "PC-2: switched off"]
+    assert by["ninjaone_patching"].items == [] and by["ninjaone_unsupported_os"].items == []
+
+
+def test_a_report_may_carry_up_to_forty_short_items_per_check_and_no_more():
+    import pytest
+    from app.api.v1.endpoints.client_review import M365CheckIn
+    from pydantic import ValidationError
+
+    assert M365CheckIn(key="k", status="met").items == []
+    assert len(M365CheckIn(key="k", status="met", items=["x" * 120] * 40).items) == 40
+    with pytest.raises(ValidationError):
+        M365CheckIn(key="k", status="met", items=["x"] * 41)
+    with pytest.raises(ValidationError):
+        M365CheckIn(key="k", status="met", items=["x" * 121])
+
+
 def test_a_sweeps_health_is_stale_after_48_hours_then_failed_partly_or_ok():
     from datetime import UTC, datetime, timedelta
 

@@ -44,6 +44,7 @@ class FleetCheck:
     refreshed_at: datetime | None = None
     since: datetime | None = None
     accepted: bool = False
+    items: tuple[str, ...] = ()
 
 
 def summarize(checks: list[FleetCheck]) -> dict[str, Any]:
@@ -69,6 +70,25 @@ def board_rows(checks: list[FleetCheck], keys: tuple[str, ...] | list[str], incl
     wanted = set(keys)
     rows = [c for c in checks if c.key in wanted and (include_met or c.status != "met")]
     return sorted(rows, key=lambda c: (c.accepted, STATUS_ORDER.get(c.status, 3), c.client_name.lower(), c.key))
+
+
+def coverage_matrix(aliases: list[tuple[str, str]], names: dict[str, str]) -> dict[str, Any]:
+    """Which tool each client is mapped to. ``aliases`` is [(client id, vendor)]; tools are listed most-used first (ties by name), clients by name, each with the tools it has and the ones it is missing among
+    those at least one other client has."""
+    have: dict[str, set[str]] = {}
+    for cid, vendor in aliases:
+        have.setdefault(cid, set()).add(vendor)
+    counts: dict[str, int] = {}
+    for vendors in have.values():
+        for v in vendors:
+            counts[v] = counts.get(v, 0) + 1
+    tools = sorted(counts, key=lambda v: (-counts[v], v))
+    clients = [
+        {"client_id": cid, "client_name": names.get(cid, cid), "tools": [v for v in tools if v in have.get(cid, set())], "missing": [v for v in tools if v not in have.get(cid, set())]}
+        for cid in names
+    ]
+    clients.sort(key=lambda c: (-len(c["tools"]), str(c["client_name"]).lower()))
+    return {"tools": [{"vendor": v, "clients": counts[v]} for v in tools], "clients": clients}
 
 
 def stale_sources(refreshed: dict[str, datetime], now: datetime, hours: int = 48) -> list[str]:

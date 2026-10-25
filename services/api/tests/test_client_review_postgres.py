@@ -326,7 +326,7 @@ async def test_the_fleet_views_rank_clients_list_a_board_and_show_the_days_chang
 
     await run(world["msp"], alias)
     checks = [
-        {"key": "cipp_inactive_accounts", "status": "not_met", "evidence": "4 licensed accounts have not signed in"},
+        {"key": "cipp_inactive_accounts", "status": "not_met", "evidence": "4 licensed accounts have not signed in", "items": ["a@x.com (200 days)", "b@x.com (300 days)"]},
         {"key": "cipp_subscriptions", "status": "met", "evidence": "3 subscriptions, none lapsed"},
         {"key": "cipp_unused_licences", "status": "partly", "evidence": "9 of 20 unused"},
     ]
@@ -342,6 +342,8 @@ async def test_the_fleet_views_rank_clients_list_a_board_and_show_the_days_chang
     board = await run(world["msp"], lambda db: cp.fleet_board("licences", user, db))
     rows = [(r.key, r.status) for r in board.rows if r.client_id == world["client"]]
     assert rows == [("cipp_inactive_accounts", "not_met"), ("cipp_unused_licences", "partly")], "worst first, and the fine check is left out"
+    first = [r for r in board.rows if r.client_id == world["client"]][0]
+    assert first.items == ["a@x.com (200 days)", "b@x.com (300 days)"], "the list behind a check survives storing and reading (a field a copy leaves out is lost silently)"
     with_met = await run(world["msp"], lambda db: cp.fleet_board("backups", user, db, include_met=True))
     assert [r for r in with_met.rows if r.client_id == world["client"]] == [], "a board only holds its own checks"
     with pytest.raises(HTTPException) as e:

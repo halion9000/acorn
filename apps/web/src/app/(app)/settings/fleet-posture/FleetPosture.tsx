@@ -30,6 +30,7 @@ export interface BoardRow {
   evidence: string;
   since?: string | null;
   accepted: boolean;
+  items?: string[];
 }
 
 export interface FleetChange {
@@ -40,6 +41,11 @@ export interface FleetChange {
   status: string;
   previous_status: string | null;
   observed_at: string;
+}
+
+export interface Coverage {
+  tools: { vendor: string; clients: number }[];
+  clients: { client_id: string; client_name: string; tools: string[]; missing: string[] }[];
 }
 
 export type BoardMeta = Record<string, { title: string; keys: string[] }>;
@@ -157,12 +163,63 @@ function Board({ board, title }: { board: string; title: string }) {
                 {st.text}
                 {r.accepted ? " (accepted)" : ""}
               </td>
-              <td className="text-xs text-slate-400">{r.evidence}</td>
+              <td className="text-xs text-slate-400">
+                {r.evidence}
+                {r.items && r.items.length > 0 ? (
+                  <details className="mt-0.5">
+                    <summary className="cursor-pointer text-slate-500">Which ones ({r.items.length})</summary>
+                    <ul className="list-disc pl-4">
+                      {r.items.map((i) => (
+                        <li key={i}>{i}</li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
+              </td>
             </tr>
           );
         })}
       </tbody>
     </table>
+  );
+}
+
+function CoverageTab() {
+  const { data, error } = useJson<Coverage>("/api/v1/client-posture/fleet/coverage");
+  if (error) return <p role="alert" className="text-sm text-red-300">{error}</p>;
+  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (data.tools.length === 0) return <p className="text-sm text-slate-400">No client is mapped to a tool yet.</p>;
+  return (
+    <div className="overflow-x-auto">
+      <table className="text-left text-xs" data-testid="fleet-coverage">
+        <thead className="text-slate-500">
+          <tr>
+            <th className="py-1 pr-3">Client</th>
+            {data.tools.map((t) => (
+              <th key={t.vendor} className="px-2 text-center" title={`${t.clients} clients`}>
+                {TOOL_CHECK_LABELS[t.vendor] ?? t.vendor}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.clients.map((c) => (
+            <tr key={c.client_id} className="border-t border-slate-800 text-slate-300" data-testid={`coverage-${c.client_id}`}>
+              <td className="py-1 pr-3">
+                <Link href={clientHref(c.client_id)} className="text-sky-300 hover:underline">
+                  {c.client_name}
+                </Link>
+              </td>
+              {data.tools.map((t) => (
+                <td key={t.vendor} className={`px-2 text-center ${c.tools.includes(t.vendor) ? "text-emerald-300" : "text-slate-600"}`}>
+                  {c.tools.includes(t.vendor) ? "✓" : "—"}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -203,7 +260,7 @@ function Changes() {
 export function FleetPosture() {
   const { data: boards } = useJson<BoardMeta>("/api/v1/client-posture/fleet/boards");
   const [tab, setTab] = useState<string>("worst");
-  const tabs: [string, string][] = [["worst", "Worst clients"], ["changes", "What changed"], ...Object.entries(boards ?? {}).map(([k, v]) => [k, v.title] as [string, string])];
+  const tabs: [string, string][] = [["worst", "Worst clients"], ["changes", "What changed"], ["coverage", "Coverage"], ...Object.entries(boards ?? {}).map(([k, v]) => [k, v.title] as [string, string])];
   return (
     <div className="space-y-4 p-6">
       <div>
@@ -217,7 +274,7 @@ export function FleetPosture() {
           </button>
         ))}
       </div>
-      {tab === "worst" ? <Worst /> : tab === "changes" ? <Changes /> : <Board key={tab} board={tab} title={boards?.[tab]?.title ?? tab} />}
+      {tab === "worst" ? <Worst /> : tab === "changes" ? <Changes /> : tab === "coverage" ? <CoverageTab /> : <Board key={tab} board={tab} title={boards?.[tab]?.title ?? tab} />}
     </div>
   );
 }

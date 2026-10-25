@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, coverage_matrix, rank_clients, stale_sources, summarize
 
 
 def chk(status, key="k", client="Acme", accepted=False):
@@ -50,3 +50,19 @@ def test_every_board_names_checks_and_no_check_is_named_twice_in_one_board():
 def test_stale_sources_are_the_ones_older_than_48_hours():
     now = datetime(2026, 10, 25, tzinfo=UTC)
     assert stale_sources({"a": now - timedelta(hours=3), "b": now - timedelta(hours=49), "c": now - timedelta(days=9)}, now) == ["b", "c"]
+
+
+def test_the_coverage_matrix_lists_tools_most_used_first_and_what_each_client_lacks():
+    names = {"a": "Acme", "b": "Beta", "c": "Cora"}
+    m = coverage_matrix([("a", "ninjaone"), ("a", "huntress"), ("b", "ninjaone"), ("c", "slide"), ("a", "ninjaone")], names)
+    assert m["tools"] == [{"vendor": "ninjaone", "clients": 2}, {"vendor": "huntress", "clients": 1}, {"vendor": "slide", "clients": 1}]
+    by = {c["client_name"]: c for c in m["clients"]}
+    assert by["Acme"]["tools"] == ["ninjaone", "huntress"] and by["Acme"]["missing"] == ["slide"]
+    assert by["Beta"]["missing"] == ["huntress", "slide"]
+    assert [c["client_name"] for c in m["clients"]][0] == "Acme", "clients with the most tools first"
+
+
+def test_a_client_mapped_to_nothing_is_still_listed_missing_everything():
+    m = coverage_matrix([("a", "ninjaone")], {"a": "Acme", "z": "Zed"})
+    assert {c["client_name"]: c["missing"] for c in m["clients"]} == {"Acme": [], "Zed": ["ninjaone"]}
+    assert coverage_matrix([], {"z": "Zed"}) == {"tools": [], "clients": [{"client_id": "z", "client_name": "Zed", "tools": [], "missing": []}]}

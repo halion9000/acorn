@@ -78,6 +78,34 @@ describe('ToolChecks with history and accepted risks', () => {
   });
 });
 
+describe('ToolChecks list and explanation', () => {
+  const withItems = [{ key: 'ninjaone_antivirus', status: 'not_met', evidence: '2 of 12 have no antivirus', items: ['PC-ONE: none installed', 'PC-TWO: switched off'] }];
+
+  it('lists the machines behind a check on request', async () => {
+    render(<ToolChecks tool="ninjaone" label="NinjaOne" checks={withItems} />);
+    expect(screen.queryByTestId('items-ninjaone_antivirus')).toBeNull();
+    await userEvent.click(screen.getByText('Which ones (2)'));
+    const list = screen.getByTestId('items-ninjaone_antivirus');
+    expect(within(list).getByText('PC-ONE: none installed')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('Hide the list'));
+    expect(screen.queryByTestId('items-ninjaone_antivirus')).toBeNull();
+  });
+
+  it('explains why a check matters and how to fix it, only for a check that has an explanation', async () => {
+    render(<ToolChecks tool="ninjaone" label="NinjaOne" checks={[...withItems, { key: 'made_up_check', status: 'partly', evidence: 'x' }]} />);
+    expect(within(screen.getByTestId('check-made_up_check')).queryByText('What this means')).toBeNull();
+    await userEvent.click(within(screen.getByTestId('check-ninjaone_antivirus')).getByText('What this means'));
+    const help = screen.getByTestId('help-ninjaone_antivirus');
+    expect(help).toHaveTextContent(/no working, up-to-date antivirus is unprotected/);
+    expect(help).toHaveTextContent(/To fix: Install or switch on antivirus/);
+  });
+
+  it('offers no list link for a check that carries none', () => {
+    render(<ToolChecks tool="ninjaone" label="NinjaOne" checks={[{ key: 'ninjaone_antivirus', status: 'met', evidence: 'fine' }]} />);
+    expect(screen.queryByText(/Which ones/)).toBeNull();
+  });
+});
+
 describe('SourceHealth', () => {
   const run = (source: string, health: string, over: Partial<SweepRun> = {}): SweepRun => ({ source, title: source, ran_at: '2026-10-25T00:00:00Z', accounts: 10, sent: 10, failed: 0, waiting: 0, skipped: 0, first_error: '', health, ...over });
 

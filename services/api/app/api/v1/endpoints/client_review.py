@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy import and_, bindparam, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -151,6 +151,8 @@ class M365CheckIn(BaseModel):
     key: str = Field(pattern=r"^[a-z0-9_]{1,60}$")
     status: str = Field(pattern=r"^(met|partly|not_met)$")
     evidence: str = Field(default="", max_length=300)
+    # The accounts, machines or systems behind the verdict, so the page can list them (at most 40, each short). A tool that has none sends none.
+    items: list[Annotated[str, StringConstraints(max_length=120)]] = Field(default_factory=list, max_length=40)
 
 
 def m365_baseline_query(client_id: uuid.UUID) -> Any:
