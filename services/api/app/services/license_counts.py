@@ -142,3 +142,36 @@ def reconcile(billed: list[dict[str, Any]], held: list[dict[str, Any]], mapping:
         rows.append({"invoice_item": item, "billed": int(b["count"]), "counted": counted, "difference": counted - int(b["count"]), "parts": shown})
     rows.sort(key=lambda r: (-abs(r["difference"]), r["invoice_item"]))
     return {"rows": rows, "unmapped": unmapped}
+
+
+# The count every other endpoint tool is held against: what the RMM manages.
+BASELINE_TOOL = "ninjaone"
+BASELINE_ITEMS = ("Windows workstations", "Windows servers", "Macs", "Linux servers")
+# Tools that count the same machines, and the item that does it.
+ENDPOINT_COUNTS = {"huntress": "Agents", "autoelevate": "Computers", "dnsfilter": "Roaming agents", "fieldeffect": "Endpoint devices"}
+DISAGREE_FRACTION = 0.2
+DISAGREE_MIN_GAP = 3
+
+
+def endpoint_disagreements(per_client: dict[Any, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Clients where a tool counts noticeably fewer or more machines than the RMM does.
+
+    ``per_client`` is {client: [{source, item, count}]}. A tool that has a count for a client is compared with the RMM's endpoint total (when the RMM has one): it disagrees when the gap is at least
+    ``DISAGREE_MIN_GAP`` machines and more than ``DISAGREE_FRACTION`` of the RMM's count. Biggest gap first. A tool with no row for the client is not here (that is coverage, not disagreement).
+    """
+    out: list[dict[str, Any]] = []
+    for client, rows in per_client.items():
+        have = {(r["source"], r["item"]): int(r["count"]) for r in rows}
+        base_parts = [have[(BASELINE_TOOL, i)] for i in BASELINE_ITEMS if (BASELINE_TOOL, i) in have]
+        if not base_parts:
+            continue
+        base = sum(base_parts)
+        for tool, item in ENDPOINT_COUNTS.items():
+            if (tool, item) not in have:
+                continue
+            n = have[(tool, item)]
+            gap = n - base
+            if abs(gap) >= DISAGREE_MIN_GAP and abs(gap) > base * DISAGREE_FRACTION:
+                out.append({"client": client, "tool": tool, "tool_count": n, "baseline_count": base, "gap": gap})
+    out.sort(key=lambda r: (-abs(r["gap"]), str(r["client"]), r["tool"]))
+    return out

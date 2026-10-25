@@ -710,6 +710,21 @@
     "numbers": {}
   },
   {
+    "tool": "aisoc_data_quality",
+    "method": "GET",
+    "path": "/billing/data-quality",
+    "query": [
+      "limit"
+    ],
+    "enums": {},
+    "numbers": {
+      "limit": {
+        "min": 1,
+        "max": 200
+      }
+    }
+  },
+  {
     "tool": "aisoc_list_people",
     "method": "GET",
     "path": "/identities",

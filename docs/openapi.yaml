@@ -11633,6 +11633,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/data-quality:
+    get:
+      tags:
+      - billing
+      summary: Clients where a security tool counts noticeably fewer or more machines
+        than the RMM manages, biggest gap first
+      operationId: data_quality_api_v1_billing_data_quality_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 500
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataQualityOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/license-counts:
     post:
       tags:
@@ -24689,6 +24719,26 @@ components:
       - window_days
       - label
       title: DashboardPeriod
+    DataQualityOut:
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        baseline_tool:
+          type: string
+          title: Baseline Tool
+        rows:
+          items:
+            $ref: '#/components/schemas/DisagreementRow'
+          type: array
+          title: Rows
+      type: object
+      required:
+      - generated_at
+      - baseline_tool
+      - rows
+      title: DataQualityOut
     DecisionRequest:
       properties:
         decision:
@@ -25519,6 +25569,36 @@ components:
       required:
       - accepted
       title: DirectoryAuditsResponse
+    DisagreementRow:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        tool:
+          type: string
+          title: Tool
+        tool_count:
+          type: integer
+          title: Tool Count
+        baseline_count:
+          type: integer
+          title: Baseline Count
+        gap:
+          type: integer
+          title: Gap
+      type: object
+      required:
+      - client_id
+      - client_name
+      - tool
+      - tool_count
+      - baseline_count
+      - gap
+      title: DisagreementRow
     DiscoverResponse:
       properties:
         discovered:

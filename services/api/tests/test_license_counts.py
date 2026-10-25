@@ -109,3 +109,24 @@ def test_a_change_of_more_than_a_fifth_of_at_least_five_is_unusual():
     assert unusual(13, 10) is True
     assert unusual(3, 2) is False  # too small to matter
     assert unusual(40, None) is False  # first sight: nothing to compare with
+
+
+def test_a_tool_that_counts_far_fewer_machines_than_the_rmm_is_flagged_with_the_gap():
+    from app.services.license_counts import endpoint_disagreements
+
+    per = {
+        "a": [{"source": "ninjaone", "item": "Windows workstations", "count": 40}, {"source": "ninjaone", "item": "Macs", "count": 10}, {"source": "huntress", "item": "Agents", "count": 30}],
+        "b": [{"source": "ninjaone", "item": "Windows workstations", "count": 40}, {"source": "huntress", "item": "Agents", "count": 38}],
+        "c": [{"source": "huntress", "item": "Agents", "count": 9}],
+        "d": [{"source": "ninjaone", "item": "Windows workstations", "count": 3}, {"source": "huntress", "item": "Agents", "count": 0}],
+        "e": [{"source": "ninjaone", "item": "Windows workstations", "count": 40}],
+    }
+    out = endpoint_disagreements(per)
+    assert [(r["client"], r["tool"], r["gap"], r["baseline_count"]) for r in out] == [("a", "huntress", -20, 50), ("d", "huntress", -3, 3)]
+    # b is within a fifth, c has no RMM count to compare with, e has no tool count (coverage, not disagreement).
+
+
+def test_a_small_gap_is_not_a_disagreement_even_when_it_is_a_big_fraction():
+    from app.services.license_counts import endpoint_disagreements
+
+    assert endpoint_disagreements({"a": [{"source": "ninjaone", "item": "Macs", "count": 5}, {"source": "huntress", "item": "Agents", "count": 3}]}) == []
