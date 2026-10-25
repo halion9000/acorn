@@ -38,6 +38,7 @@ export interface ChangeRow {
   count: number;
   previous_count: number | null;
   observed_at: string;
+  unusual?: boolean;
 }
 
 export interface ReconcileRow {
@@ -440,6 +441,7 @@ function Changes() {
                 <td className="pr-3">{c.item}</td>
                 <td className={changeClass(c.previous_count === null ? c.count : c.count - c.previous_count)}>
                   {c.previous_count === null ? `new: ${c.count}` : `${c.previous_count} → ${c.count}`}
+                  {c.unusual ? <span className="ml-2 rounded bg-amber-900/50 px-1 text-xs text-amber-300" title="Moved by more than a fifth">unusual</span> : null}
                 </td>
               </tr>
             ))}

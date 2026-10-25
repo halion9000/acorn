@@ -54,6 +54,17 @@ def delta(current: int, then: int | None) -> int | None:
     return None if then is None else current - then
 
 
+UNUSUAL_FRACTION = 0.2
+UNUSUAL_MIN_PREVIOUS = 5
+
+
+def unusual(count: int, previous: int | None) -> bool:
+    """A change big enough to look at twice: more than a fifth of what the count was, when it was at least five (a change from 2 to 3 is not news)."""
+    if previous is None or previous < UNUSUAL_MIN_PREVIOUS:
+        return False
+    return abs(count - previous) > previous * UNUSUAL_FRACTION
+
+
 def totals(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """One line per tool and item across clients: how many clients have it, the total, the total not assigned (licences) and the total a while ago, with the change."""
     by: dict[tuple[str, str], dict[str, Any]] = {}

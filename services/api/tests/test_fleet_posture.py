@@ -66,3 +66,21 @@ def test_a_client_mapped_to_nothing_is_still_listed_missing_everything():
     m = coverage_matrix([("a", "ninjaone")], {"a": "Acme", "z": "Zed"})
     assert {c["client_name"]: c["missing"] for c in m["clients"]} == {"Acme": [], "Zed": ["ninjaone"]}
     assert coverage_matrix([], {"z": "Zed"}) == {"tools": [], "clients": [{"client_id": "z", "client_name": "Zed", "tools": [], "missing": []}]}
+
+
+def test_accepted_risks_that_run_out_soonest_come_first_and_expired_ones_are_gone():
+    from datetime import UTC, datetime, timedelta
+
+    from app.services.fleet_posture import expiring_acceptances
+
+    now = datetime(2026, 10, 25, tzinfo=UTC)
+    rows = [
+        {"client_name": "B", "key": "k1", "expires_at": now + timedelta(days=20)},
+        {"client_name": "A", "key": "k2", "expires_at": None},
+        {"client_name": "C", "key": "k3", "expires_at": now - timedelta(days=1)},
+        {"client_name": "D", "key": "k4", "expires_at": now + timedelta(days=3)},
+    ]
+    assert [r["key"] for r in expiring_acceptances(rows, now)] == ["k4", "k1", "k2"]
+    assert [r["key"] for r in expiring_acceptances(rows, now, 7)] == ["k4"]
+    assert [r["key"] for r in expiring_acceptances(rows, now, 30)] == ["k4", "k1"], "no end date is never expiring"
+    assert expiring_acceptances([], now) == []

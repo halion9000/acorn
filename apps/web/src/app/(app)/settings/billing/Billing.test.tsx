@@ -26,7 +26,7 @@ beforeEach(() => {
       return json({ mapped: [{ invoice_item: 'Datto SaaS (Included)', counted: [{ source: 'datto-saas', item: 'Billable seats' }] }], unmapped: [{ invoice_item: 'Huntress for Workstations (Included)', clients: 120, suggestion: [{ source: 'huntress', item: 'Agents' }] }, { invoice_item: 'Liongard (Included)', clients: 150, suggestion: [] }], counted_items: [] });
     if (url.startsWith('/api/v1/billing/map')) return json({});
     if (url.startsWith('/api/v1/billing/changes'))
-      return json([{ client_id: 'c1', client_name: 'Acme', source: 'ninjaone', item: 'Windows workstations', unit: 'device', count: 13, previous_count: 15, observed_at: '2026-10-24T00:00:00Z' }, { client_id: 'c2', client_name: 'Beta', source: 'cipp', item: 'Business Basic', unit: 'licence', count: 5, previous_count: null, observed_at: '2026-10-23T00:00:00Z' }]);
+      return json([{ client_id: 'c1', client_name: 'Acme', source: 'ninjaone', item: 'Windows workstations', unit: 'device', count: 13, previous_count: 15, observed_at: '2026-10-24T00:00:00Z' }, { client_id: 'c2', client_name: 'Beta', source: 'cipp', item: 'Business Basic', unit: 'licence', count: 5, previous_count: null, observed_at: '2026-10-23T00:00:00Z' }, { client_id: 'c1', client_name: 'Acme', source: 'ninjaone', item: 'Macs', unit: 'device', count: 3, previous_count: 10, observed_at: '2026-10-22T00:00:00Z', unusual: true }]);
     return json({});
   });
 });
@@ -116,6 +116,7 @@ describe('Billing', () => {
     const table = await screen.findByTestId('billing-changes');
     expect(within(table).getByText('15 → 13')).toBeInTheDocument();
     expect(within(table).getByText('new: 5')).toBeInTheDocument();
+    expect(within(table).getAllByText('unusual')).toHaveLength(1);
   });
 
   it('says so when nothing has been counted yet', async () => {

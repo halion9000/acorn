@@ -360,6 +360,12 @@ async def test_the_fleet_views_rank_clients_list_a_board_and_show_the_days_chang
     assert mine_changes[0] == ("cipp_inactive_accounts", "not_met"), "what got worse comes first"
     assert len(mine_changes) == 3
 
+    accepted = await run(world["msp"], lambda db: cp.fleet_acceptances(user, db))
+    mine_accepted = [a for a in accepted if a.client_id == world["client"]]
+    assert [(a.key, a.reason) for a in mine_accepted] == [("cipp_inactive_accounts", "Staff on leave")]
+    soon = await run(world["msp"], lambda db: cp.fleet_acceptances(user, db, within_days=7))
+    assert [a for a in soon if a.client_id == world["client"]] == [], "one with no end date is not about to expire"
+
 
 async def test_license_counts_are_stored_diffed_into_history_and_totalled_across_clients(world):
     from datetime import timedelta

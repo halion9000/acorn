@@ -22,7 +22,7 @@ from app.db.rls_scope import acting_as_tenant
 from app.db.rls_sessions import adopt_tenant
 from app.models.signin import BillingItemMap, ClientLicenseCount, ClientLicenseHistory
 from app.models.tenant import Tenant
-from app.services.license_counts import changes, count_at, delta, reconcile, suggest, totals, window_start
+from app.services.license_counts import changes, count_at, delta, reconcile, suggest, totals, unusual, window_start
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -177,6 +177,8 @@ class ChangeRow(BaseModel):
     count: int
     previous_count: int | None
     observed_at: datetime
+    # More than a fifth of what it was (and at least five before): worth a second look.
+    unusual: bool = False
 
 
 @router.get("/changes", response_model=list[ChangeRow], summary="Every change to a count across all clients in the last days, newest first")
@@ -191,7 +193,7 @@ async def changes_log(
         async with _as(db, owner, cid):
             rows = (await db.execute(select(ClientLicenseHistory).where(ClientLicenseHistory.tenant_id == cid, ClientLicenseHistory.observed_at >= since))).scalars().all()
         out += [
-            ChangeRow(client_id=cid, client_name=names.get(cid) or str(cid), source=r.source, item=r.item, unit=r.unit, count=r.count, previous_count=r.previous_count, observed_at=r.observed_at) for r in rows
+            ChangeRow(client_id=cid, client_name=names.get(cid) or str(cid), source=r.source, item=r.item, unit=r.unit, count=r.count, previous_count=r.previous_count, observed_at=r.observed_at, unusual=unusual(r.count, r.previous_count)) for r in rows
         ]
     out.sort(key=lambda c: c.observed_at, reverse=True)
     return out[: max(1, min(limit, 2000))]

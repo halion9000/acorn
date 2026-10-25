@@ -29,7 +29,7 @@ from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
 from app.services import fleet_cache
-from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, coverage_matrix, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
@@ -573,3 +573,26 @@ async def fleet_changes(current_user: Annotated[AuthUser, Depends(require_permis
     # Worsening first (a check that became not met), then the newest.
     out.sort(key=lambda c: (c.status != "not_met", -c.observed_at.timestamp()))
     return out[: max(1, min(limit, 1000))]
+
+
+class FleetAcceptance(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    key: str
+    reason: str
+    accepted_at: datetime
+    expires_at: datetime | None
+
+
+@router.get("/fleet/acceptances", response_model=list[FleetAcceptance], summary="Accepted risks across all clients that still stand, the ones about to run out first")
+async def fleet_acceptances(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, within_days: int | None = None, limit: int = 300) -> list[FleetAcceptance]:
+    owner = current_user.tenant_id
+    ids, names = await _scope(db, owner, None)
+    now = datetime.now(UTC)
+    rows: list[dict[str, Any]] = []
+    for cid in ids[1:]:
+        async with _as(db, owner, cid):
+            found = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == cid))).scalars().all()
+        rows += [{"client_id": cid, "client_name": names.get(cid) or str(cid), "key": a.key, "reason": a.reason, "accepted_at": a.accepted_at, "expires_at": a.expires_at} for a in found]
+    kept = expiring_acceptances(rows, now, None if within_days is None else max(1, min(within_days, 400)))
+    return [FleetAcceptance(**r) for r in kept[: max(1, min(limit, 1000))]]

@@ -94,3 +94,17 @@ def coverage_matrix(aliases: list[tuple[str, str]], names: dict[str, str]) -> di
 def stale_sources(refreshed: dict[str, datetime], now: datetime, hours: int = 48) -> list[str]:
     """The sources whose latest rows for a client are older than ``hours``, for a client that should be getting them daily."""
     return sorted(s for s, t in refreshed.items() if now - t > timedelta(hours=hours))
+
+
+def expiring_acceptances(rows: list[dict[str, Any]], now: datetime, within_days: int | None = None) -> list[dict[str, Any]]:
+    """Accepted risks that still stand, soonest to run out first (ones with no end date last).
+
+    Each row has ``expires_at`` (or None). One already past is not listed (it stopped counting when it ran out). ``within_days`` keeps only those that end inside that many days; an acceptance with no
+    end date is never "expiring", so it is dropped when ``within_days`` is given.
+    """
+    live = [r for r in rows if r["expires_at"] is None or r["expires_at"] > now]
+    if within_days is not None:
+        limit = now + timedelta(days=within_days)
+        live = [r for r in live if r["expires_at"] is not None and r["expires_at"] <= limit]
+    far = datetime.max.replace(tzinfo=now.tzinfo)
+    return sorted(live, key=lambda r: (r["expires_at"] or far, r.get("client_name") or ""))

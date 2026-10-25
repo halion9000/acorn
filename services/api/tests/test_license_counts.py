@@ -96,3 +96,16 @@ def test_the_biggest_difference_comes_first_whichever_way_it_goes():
     held = [{"source": "t", "item": "a", "count": 9}, {"source": "t", "item": "b", "count": 25}]
     r = reconcile(billed, held, {"A": [{"source": "t", "item": "a"}], "B": [{"source": "t", "item": "b"}]})
     assert [x["invoice_item"] for x in r["rows"]] == ["B", "A"]
+
+
+def test_a_change_of_more_than_a_fifth_of_at_least_five_is_unusual():
+    from app.services.license_counts import unusual
+
+    assert unusual(10, 5) is True  # doubled
+    assert unusual(3, 10) is True  # dropped by 70 percent
+    assert unusual(0, 8) is True  # gone
+    assert unusual(11, 10) is False  # a tenth
+    assert unusual(12, 10) is False  # exactly a fifth is not more than a fifth
+    assert unusual(13, 10) is True
+    assert unusual(3, 2) is False  # too small to matter
+    assert unusual(40, None) is False  # first sight: nothing to compare with
