@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import and_, bindparam, func, not_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -24,6 +24,7 @@ from app.db.rls_scope import acting_as_tenant
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.identity_source import IdentitySource
+from app.services.audit import emit_audit
 from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, ClientScoreHistory, CoreSweepRun, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
@@ -377,7 +378,7 @@ MAX_ACCEPTANCES_PER_CLIENT = 200
 
 @router.put("/{client_id}/acceptances/{key}", response_model=CheckAcceptanceOut, summary="Accept a failing check for a client, with a reason and an optional end date")
 async def accept_check(
-    client_id: uuid.UUID, key: str, body: AcceptIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+    client_id: uuid.UUID, key: str, body: AcceptIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, request: Request = None  # type: ignore[assignment]
 ) -> CheckAcceptanceOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
@@ -402,19 +403,38 @@ async def accept_check(
         stmt = pg_insert(ClientCheckAcceptance).values(values)
         await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "key")}))
         await db.commit()
+    await emit_audit(
+        db=db,
+        tenant_id=owner,
+        actor_id=current_user.user_id,
+        action="posture:check_not_applicable" if body.not_applicable else "posture:check_accepted",
+        resource="client_check",
+        resource_id=f"{client_id}:{key}",
+        changes={"client": str(client_id), "key": key, "reason": reason, "expires_at": expires.isoformat() if expires else None},
+        request=request,
+    )
+    await db.commit()
     fleet_cache.clear()
     return CheckAcceptanceOut(reason=reason, accepted_at=now, expires_at=expires, not_applicable=body.not_applicable)
 
 
 @router.delete("/{client_id}/acceptances/{key}", status_code=204, summary="Stop accepting a check for a client")
-async def remove_acceptance(client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> None:
+async def remove_acceptance(
+    client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, request: Request = None  # type: ignore[assignment]
+) -> None:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
         existing = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id, ClientCheckAcceptance.key == key))).scalar_one_or_none()
+        removed = existing is not None
         if existing is not None:
             await db.delete(existing)
             await db.commit()
+    if removed:
+        await emit_audit(
+            db=db, tenant_id=owner, actor_id=current_user.user_id, action="posture:check_acceptance_removed", resource="client_check", resource_id=f"{client_id}:{key}", changes={"client": str(client_id), "key": key}, request=request
+        )
+        await db.commit()
     fleet_cache.clear()
 
 

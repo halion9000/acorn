@@ -62,6 +62,7 @@ async def world():
     yield ids
     async with engine.begin() as c:
         await c.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+        await c.execute(text("set local session_replication_role = replica"))  # the audit log refuses deletes (and the cascade from tenants); this is a disposable database
         await c.execute(text("delete from cases where tenant_id = :t"), {"t": ids["client"]})
         await c.execute(text("delete from tenants where id = any(cast(:t as uuid[]))"), {"t": [str(x) for x in ids.values()]})
     await engine.dispose()
@@ -292,7 +293,7 @@ async def test_history_records_only_changes_acceptances_expire_and_sweep_runs_ar
     only_b = await run(world["msp"], lambda db: cp.check_history(world["client"], NS(tenant_id=world["msp"]), db, key="b"))
     assert [r.status for r in only_b.rows] == ["partly", "not_met"], "newest first"
 
-    user = NS(tenant_id=world["msp"], user_id=uuid.uuid4())
+    user = NS(tenant_id=world["msp"], user_id=None)
     out = await run(world["msp"], lambda db: cp.accept_check(world["client"], "b", cp.AcceptIn(reason="  Replace in January ", expires_in_days=30), user, db))
     assert out.reason == "Replace in January" and out.expires_at is not None
     again = await run(world["msp"], lambda db: cp.accept_check(world["client"], "b", cp.AcceptIn(reason="Still waiting"), user, db))
@@ -303,6 +304,8 @@ async def test_history_records_only_changes_acceptances_expire_and_sweep_runs_ar
     await run(world["msp"], lambda db: cp.remove_acceptance(world["client"], "b", user, db))
     left = (await run(world["msp"], lambda db: db.execute(text("select count(*) from client_check_acceptances where tenant_id = :t"), {"t": world["client"]}))).scalar_one()
     assert left == 0
+    actions = (await run(world["msp"], lambda db: db.execute(text("select action from audit_log where tenant_id = :t and resource = 'client_check' order by created_at"), {"t": world["msp"]}))).scalars().all()
+    assert actions == ["posture:check_accepted", "posture:check_accepted", "posture:check_acceptance_removed"], "each accept and the removal is in the audit log (the refused one is not)"
 
     report = ep.SweepRunsReport(runs=[ep.SweepRunIn(source="ninjaone", title="NinjaOne client checks", accounts=10, sent=7, failed=1, waiting=2, skipped=0, first_error="Acme: boom")])
     assert await run(world["msp"], lambda db: ep.apply_sweep_runs(db, world["msp"], report)) == 1
@@ -332,7 +335,7 @@ async def test_the_fleet_views_rank_clients_list_a_board_and_show_the_days_chang
     ]
     report = ep.M365ChecksReport(vendor="cipp", vendor_client_id="f-1", source="cipp-health", checks=checks)
     await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report))
-    user = NS(tenant_id=world["msp"], user_id=uuid.uuid4())
+    user = NS(tenant_id=world["msp"], user_id=None)
 
     summary = await run(world["msp"], lambda db: cp.fleet_summary(user, db))
     mine = [c for c in summary.clients if c.client_id == world["client"]]
@@ -393,7 +396,7 @@ async def test_license_counts_are_stored_diffed_into_history_and_totalled_across
     await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], report(Windows_workstations=10, Macs=4), now=long_ago + timedelta(days=1)))
     await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], report(Windows_workstations=13)))
 
-    user = NS(tenant_id=world["msp"], user_id=uuid.uuid4())
+    user = NS(tenant_id=world["msp"], user_id=None)
     got = await run(world["msp"], lambda db: bl.client_counts(world["client"], user, db, days=30))
     by = {r.item: r for r in got.rows}
     assert set(by) == {"Windows workstations"}, "Macs is no longer reported, so it is gone"
@@ -431,7 +434,7 @@ async def test_billed_lines_are_checked_against_the_tool_counts_they_are_mapped_
     counted = bl.LicenseCountsReport(vendor="ninjaone", vendor_client_id="r-ninjaone", counts=[bl.LicenseCountIn(item="Windows workstations", unit="device", count=14), bl.LicenseCountIn(item="Macs", unit="device", count=4)])
     for r in (billed, counted):
         await run(world["msp"], lambda db, r=r: bl.apply_license_counts(db, world["msp"], r))
-    user = NS(tenant_id=world["msp"], user_id=uuid.uuid4())
+    user = NS(tenant_id=world["msp"], user_id=None)
 
     before = await run(world["msp"], lambda db: bl.billing_map(user, db))
     un = {u["invoice_item"]: u for u in before.unmapped}
@@ -500,7 +503,7 @@ async def test_a_check_can_be_marked_not_applicable_with_no_end_date_and_it_leav
 
     await run(world["msp"], alias)
     checks = [{"key": "fw", "status": "not_met", "evidence": ""}, {"key": "av", "status": "met", "evidence": ""}]
-    user = NS(tenant_id=world["msp"], user_id=uuid.uuid4())
+    user = NS(tenant_id=world["msp"], user_id=None)
     out = await run(world["msp"], lambda db: cp.accept_check(world["client"], "fw", cp.AcceptIn(reason="No firewall on site", not_applicable=True), user, db))
     assert out.not_applicable is True and out.expires_at is None
     with pytest.raises(HTTPException) as e:
