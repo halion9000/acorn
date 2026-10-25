@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
 
-import { Billing, changeText, clientCsv, differenceText, totalsCsv } from './Billing';
+import { Billing, changeText, clientCsv, differenceText, gapText, totalsCsv } from './Billing';
 
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 
@@ -25,6 +25,10 @@ beforeEach(() => {
     if (url.startsWith('/api/v1/billing/map') && !mapCalls.length)
       return json({ mapped: [{ invoice_item: 'Datto SaaS (Included)', counted: [{ source: 'datto-saas', item: 'Billable seats' }] }], unmapped: [{ invoice_item: 'Huntress for Workstations (Included)', clients: 120, suggestion: [{ source: 'huntress', item: 'Agents' }] }, { invoice_item: 'Liongard (Included)', clients: 150, suggestion: [] }], counted_items: [] });
     if (url.startsWith('/api/v1/billing/map')) return json({});
+    if (url.startsWith('/api/v1/billing/data-quality'))
+      return json({ generated_at: '', baseline_tool: 'ninjaone', rows: [{ client_id: 'c1', client_name: 'Acme', tool: 'huntress', tool_count: 30, baseline_count: 50, gap: -20 }] });
+    if (url.startsWith('/api/v1/billing/last-reported'))
+      return json([{ client_id: 'c2', client_name: 'Beta', source: 'dnsfilter', last_reported_at: '2026-10-19T00:00:00Z', days_ago: 6, silent: true }]);
     if (url.startsWith('/api/v1/billing/changes'))
       return json([{ client_id: 'c1', client_name: 'Acme', source: 'ninjaone', item: 'Windows workstations', unit: 'device', count: 13, previous_count: 15, observed_at: '2026-10-24T00:00:00Z' }, { client_id: 'c2', client_name: 'Beta', source: 'cipp', item: 'Business Basic', unit: 'licence', count: 5, previous_count: null, observed_at: '2026-10-23T00:00:00Z' }, { client_id: 'c1', client_name: 'Acme', source: 'ninjaone', item: 'Macs', unit: 'device', count: 3, previous_count: 10, observed_at: '2026-10-22T00:00:00Z', unusual: true }]);
     return json({});
@@ -41,6 +45,10 @@ describe('helpers', () => {
     expect(csv.split('\n')[1]).toBe('Microsoft 365 (CIPP),"Business ""Premium"", annual",licence,2,30,,-1');
     expect(clientCsv([{ source: 'ninjaone', item: 'Macs', unit: 'device', count: 4, available: null, change: null, first_seen_at: '', updated_at: '' }], 'Acme', 7).split('\n')[1]).toBe('Acme,NinjaOne,Macs,device,4,,');
   });
+});
+
+describe('gapText', () => {
+  it('says which way the tool is off', () => expect([gapText(-20), gapText(5)]).toEqual(['counts 20 fewer', 'counts 5 more']));
 });
 
 describe('differenceText', () => {
@@ -117,6 +125,17 @@ describe('Billing', () => {
     expect(within(table).getByText('15 → 13')).toBeInTheDocument();
     expect(within(table).getByText('new: 5')).toBeInTheDocument();
     expect(within(table).getAllByText('unusual')).toHaveLength(1);
+  });
+
+  it('shows tools that count different machines than NinjaOne and tools that went silent', async () => {
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Data quality' }));
+    const gap = await screen.findByTestId('billing-disagree');
+    expect(within(gap).getByText('counts 20 fewer')).toBeInTheDocument();
+    expect(within(gap).getByText('Acme')).toBeInTheDocument();
+    const silent = await screen.findByTestId('billing-silent');
+    expect(within(silent).getByText('6 days ago')).toBeInTheDocument();
+    expect(authFetch.mock.calls.some((c) => String(c[0]).includes('last-reported?only_silent=true'))).toBe(true);
   });
 
   it('says so when nothing has been counted yet', async () => {

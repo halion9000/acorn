@@ -452,9 +452,80 @@ function Changes() {
   );
 }
 
+export function gapText(gap: number): string {
+  return gap < 0 ? `counts ${-gap} fewer` : `counts ${gap} more`;
+}
+
+function DataQuality() {
+  const quality = useJson<{ rows: { client_id: string; client_name: string; tool: string; tool_count: number; baseline_count: number; gap: number }[] }>("/api/v1/billing/data-quality");
+  const silent = useJson<{ client_id: string; client_name: string; source: string; last_reported_at: string; days_ago: number; silent: boolean }[]>("/api/v1/billing/last-reported?only_silent=true");
+  const error = quality.error ?? silent.error;
+  return (
+    <div className="space-y-6">
+      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-slate-200">Tools that count different machines than NinjaOne</h2>
+        <p className="text-sm text-slate-400">A security tool whose count for a client is at least three machines and a fifth away from what NinjaOne manages. A tool with no count for the client is not listed here.</p>
+        {!quality.data && !quality.error && <p className="text-sm text-slate-500">Loading…</p>}
+        {quality.data && quality.data.rows.length === 0 && <p className="text-sm text-slate-400">No tool disagrees with NinjaOne.</p>}
+        {quality.data && quality.data.rows.length > 0 && (
+          <table className="w-full text-left text-sm" data-testid="billing-disagree">
+            <thead className="text-xs uppercase text-slate-500">
+              <tr>
+                <th className="py-1 pr-3">Client</th>
+                <th className="pr-3">Tool</th>
+                <th className="pr-3">Tool counts</th>
+                <th className="pr-3">NinjaOne manages</th>
+                <th>Gap</th>
+              </tr>
+            </thead>
+            <tbody>
+              {quality.data.rows.map((r) => (
+                <tr key={`${r.client_id}:${r.tool}`} className="border-t border-slate-800 text-slate-300">
+                  <td className="py-1 pr-3">{r.client_name}</td>
+                  <td className="pr-3">{toolName(r.tool)}</td>
+                  <td className="pr-3">{r.tool_count}</td>
+                  <td className="pr-3">{r.baseline_count}</td>
+                  <td className={r.gap < 0 ? "text-amber-300" : "text-sky-300"}>{gapText(r.gap)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-slate-200">Tools that stopped reporting</h2>
+        <p className="text-sm text-slate-400">No count from the tool for the client in more than two days: a stopped feed, a removed mapping or lost access.</p>
+        {!silent.data && !silent.error && <p className="text-sm text-slate-500">Loading…</p>}
+        {silent.data && silent.data.length === 0 && <p className="text-sm text-slate-400">Every tool reported in the last two days.</p>}
+        {silent.data && silent.data.length > 0 && (
+          <table className="w-full text-left text-sm" data-testid="billing-silent">
+            <thead className="text-xs uppercase text-slate-500">
+              <tr>
+                <th className="py-1 pr-3">Client</th>
+                <th className="pr-3">Tool</th>
+                <th>Last reported</th>
+              </tr>
+            </thead>
+            <tbody>
+              {silent.data.map((r) => (
+                <tr key={`${r.client_id}:${r.source}`} className="border-t border-slate-800 text-slate-300">
+                  <td className="py-1 pr-3">{r.client_name}</td>
+                  <td className="pr-3">{toolName(r.source)}</td>
+                  <td className="text-amber-300">{r.days_ago} days ago</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export function Billing() {
-  const [tab, setTab] = useState<"totals" | "client" | "changes" | "reconcile" | "mapping">("totals");
-  const tabs: [typeof tab, string][] = [["totals", "Totals by tool"], ["client", "By client"], ["changes", "Changes"], ["reconcile", "Billed vs counted"], ["mapping", "Invoice mapping"]];
+  const [tab, setTab] = useState<"totals" | "client" | "changes" | "reconcile" | "mapping" | "quality">("totals");
+  const tabs: [typeof tab, string][] = [["totals", "Totals by tool"], ["client", "By client"], ["changes", "Changes"], ["reconcile", "Billed vs counted"], ["mapping", "Invoice mapping"], ["quality", "Data quality"]];
   return (
     <div className="space-y-4 p-6">
       <div>
@@ -473,7 +544,7 @@ export function Billing() {
           </button>
         ))}
       </div>
-      {tab === "totals" ? <Totals /> : tab === "client" ? <ByClient /> : tab === "reconcile" ? <Reconcile /> : tab === "mapping" ? <Mapping /> : <Changes />}
+      {tab === "totals" ? <Totals /> : tab === "client" ? <ByClient /> : tab === "reconcile" ? <Reconcile /> : tab === "mapping" ? <Mapping /> : tab === "quality" ? <DataQuality /> : <Changes />}
     </div>
   );
 }
