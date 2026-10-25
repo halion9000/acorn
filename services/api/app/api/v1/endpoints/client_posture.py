@@ -642,6 +642,8 @@ class FleetAcceptance(BaseModel):
     reason: str
     accepted_at: datetime
     expires_at: datetime | None
+    # The check does not apply to the client at all, as opposed to a risk that does and was accepted.
+    not_applicable: bool = False
 
 
 @router.get("/fleet/acceptances", response_model=list[FleetAcceptance], summary="Accepted risks across all clients that still stand, the ones about to run out first")
@@ -653,6 +655,6 @@ async def fleet_acceptances(current_user: Annotated[AuthUser, Depends(require_pe
     for cid in ids[1:]:
         async with _as(db, owner, cid):
             found = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == cid))).scalars().all()
-        rows += [{"client_id": cid, "client_name": names.get(cid) or str(cid), "key": a.key, "reason": a.reason, "accepted_at": a.accepted_at, "expires_at": a.expires_at} for a in found]
+        rows += [{"client_id": cid, "client_name": names.get(cid) or str(cid), "key": a.key, "reason": a.reason, "accepted_at": a.accepted_at, "expires_at": a.expires_at, "not_applicable": a.not_applicable} for a in found]
     kept = expiring_acceptances(rows, now, None if within_days is None else max(1, min(within_days, 400)))
     return [FleetAcceptance(**r) for r in kept[: max(1, min(limit, 1000))]]

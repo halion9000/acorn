@@ -27176,6 +27176,10 @@ components:
             format: date-time
           - type: 'null'
           title: Expires At
+        not_applicable:
+          type: boolean
+          title: Not Applicable
+          default: false
       type: object
       required:
       - client_id

@@ -257,10 +257,65 @@ function Changes() {
   );
 }
 
+export interface FleetAcceptance {
+  client_id: string;
+  client_name: string;
+  key: string;
+  reason: string;
+  accepted_at: string;
+  expires_at: string | null;
+  not_applicable?: boolean;
+}
+
+/** "ends in 5 days", "ended" (never shown, the API leaves those out) or "no end date". */
+export function endsText(expiresAt: string | null, nowMs: number = Date.now()): string {
+  if (!expiresAt) return "no end date";
+  const days = Math.ceil((Date.parse(expiresAt) - nowMs) / 86_400_000);
+  return days <= 0 ? "ends today" : days === 1 ? "ends in 1 day" : `ends in ${days} days`;
+}
+
+function Accepted() {
+  const { data, error } = useJson<FleetAcceptance[]>("/api/v1/client-posture/fleet/acceptances");
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-slate-400">Risks a person accepted, and checks marked not applicable, across all clients. The ones about to run out come first; those with no end date are last.</p>
+      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+      {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
+      {data && data.length === 0 && <p className="text-sm text-slate-400">Nothing is accepted.</p>}
+      {data && data.length > 0 && (
+        <table className="w-full text-left text-sm" data-testid="fleet-accepted">
+          <thead className="text-xs uppercase text-slate-500">
+            <tr>
+              <th className="py-1 pr-3">Client</th>
+              <th className="pr-3">Check</th>
+              <th className="pr-3">Why</th>
+              <th>Until</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((a) => (
+              <tr key={`${a.client_id}:${a.key}`} className="border-t border-slate-800 text-slate-300">
+                <td className="py-1 pr-3">
+                  <Link href={clientHref(a.client_id)} className="text-sky-300 hover:underline">
+                    {a.client_name}
+                  </Link>
+                </td>
+                <td className="pr-3">{a.key.replace(/_/g, " ")}</td>
+                <td className="pr-3">{a.reason}</td>
+                <td className={a.expires_at ? "text-amber-300" : "text-slate-500"}>{a.not_applicable ? "not applicable" : endsText(a.expires_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export function FleetPosture() {
   const { data: boards } = useJson<BoardMeta>("/api/v1/client-posture/fleet/boards");
   const [tab, setTab] = useState<string>("worst");
-  const tabs: [string, string][] = [["worst", "Worst clients"], ["changes", "What changed"], ["coverage", "Coverage"], ...Object.entries(boards ?? {}).map(([k, v]) => [k, v.title] as [string, string])];
+  const tabs: [string, string][] = [["worst", "Worst clients"], ["changes", "What changed"], ["coverage", "Coverage"], ["accepted", "Accepted risks"], ...Object.entries(boards ?? {}).map(([k, v]) => [k, v.title] as [string, string])];
   return (
     <div className="space-y-4 p-6">
       <div>
@@ -279,7 +334,7 @@ export function FleetPosture() {
           </button>
         ))}
       </div>
-      {tab === "worst" ? <Worst /> : tab === "changes" ? <Changes /> : tab === "coverage" ? <CoverageTab /> : <Board key={tab} board={tab} title={boards?.[tab]?.title ?? tab} />}
+      {tab === "worst" ? <Worst /> : tab === "changes" ? <Changes /> : tab === "coverage" ? <CoverageTab /> : tab === "accepted" ? <Accepted /> : <Board key={tab} board={tab} title={boards?.[tab]?.title ?? tab} />}
     </div>
   );
 }

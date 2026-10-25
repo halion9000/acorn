@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
 
-import { FleetPosture, changeWord, clientHref } from './FleetPosture';
+import { FleetPosture, changeWord, clientHref, endsText } from './FleetPosture';
 
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 
@@ -22,6 +22,11 @@ beforeEach(() => {
         ],
       });
     if (url.includes('/fleet/boards/renewals')) return json({ board: 'renewals', title: 'Renewals', keys: [], rows: [{ client_id: 'c1', client_name: 'Acme', source: 'meraki', key: 'meraki_licence', status: 'not_met', evidence: 'The Meraki licence has expired', accepted: false }] });
+    if (url.endsWith('/fleet/acceptances'))
+      return json([
+        { client_id: 'c1', client_name: 'Acme', key: 'ninjaone_patching', reason: 'Replacing in January', accepted_at: '2026-10-01T00:00:00Z', expires_at: new Date(Date.now() + 5 * 86_400_000 + 3_600_000).toISOString() },
+        { client_id: 'c2', client_name: 'Beta', key: 'meraki_wan', reason: 'No firewall on site', accepted_at: '2026-10-02T00:00:00Z', expires_at: null, not_applicable: true },
+      ]);
     if (url.endsWith('/fleet/coverage')) return json({ tools: [{ vendor: 'ninjaone', clients: 2 }, { vendor: 'slide', clients: 1 }], clients: [{ client_id: 'c1', client_name: 'Acme', tools: ['ninjaone', 'slide'], missing: [] }, { client_id: 'c2', client_name: 'Beta', tools: ['ninjaone'], missing: ['slide'] }] });
     if (url.includes('/fleet/changes')) return json([{ client_id: 'c1', client_name: 'Acme', key: 'ninjaone_antivirus', source: 'ninjaone', status: 'not_met', previous_status: 'met', observed_at: '2026-10-25T00:00:00Z' }]);
     return json({});
@@ -35,6 +40,23 @@ describe('helpers', () => {
     expect(changeWord({ status: 'not_met', previous_status: 'partly' })).toBe('worse');
     expect(changeWord({ status: 'met', previous_status: 'not_met' })).toBe('better');
     expect(changeWord({ status: 'met', previous_status: 'met' })).toBe('same');
+  });
+});
+
+describe('endsText', () => {
+  const now = Date.parse('2026-10-25T12:00:00Z');
+  it('says how long an acceptance has left', () => {
+    expect([endsText(null, now), endsText('2026-10-26T01:00:00Z', now), endsText('2026-10-30T12:00:00Z', now), endsText('2026-10-25T09:00:00Z', now)]).toEqual(['no end date', 'ends in 1 day', 'ends in 5 days', 'ends today']);
+  });
+});
+
+describe('FleetPosture accepted risks', () => {
+  it('lists accepted risks with when they end, and marks the ones that do not apply', async () => {
+    render(<FleetPosture />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Accepted risks' }));
+    const table = await screen.findByTestId('fleet-accepted');
+    expect(within(table).getByText('Replacing in January').closest('tr')).toHaveTextContent('ends in 6 days');
+    expect(within(table).getByText('No firewall on site').closest('tr')).toHaveTextContent('not applicable');
   });
 });
 
