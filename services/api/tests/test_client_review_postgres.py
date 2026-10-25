@@ -405,3 +405,48 @@ async def test_license_counts_are_stored_diffed_into_history_and_totalled_across
     with pytest.raises(HTTPException) as e:
         await run(world["msp"], lambda db: bl.client_counts(world["stranger"], user, db))
     assert e.value.status_code == 404
+
+
+async def test_billed_lines_are_checked_against_the_tool_counts_they_are_mapped_to(world):
+    from app.api.v1.endpoints import billing as bl
+
+    async def aliases(db):
+        for vendor in ("halopsa", "ninjaone"):
+            await db.execute(
+                text(
+                    "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                    "values (:t, :v, :id, :nm, :nm, :c, false, 'manual')"
+                ),
+                {"t": world["msp"], "v": vendor, "id": f"r-{vendor}", "nm": f"r-{vendor}", "c": world["client"]},
+            )
+
+    await run(world["msp"], aliases)
+    billed = bl.LicenseCountsReport(vendor="halopsa", vendor_client_id="r-halopsa", counts=[bl.LicenseCountIn(item="NinjaOne RMM (Included)", unit="other", count=16), bl.LicenseCountIn(item="Liongard (Included)", unit="other", count=1)])
+    counted = bl.LicenseCountsReport(vendor="ninjaone", vendor_client_id="r-ninjaone", counts=[bl.LicenseCountIn(item="Windows workstations", unit="device", count=14), bl.LicenseCountIn(item="Macs", unit="device", count=4)])
+    for r in (billed, counted):
+        await run(world["msp"], lambda db, r=r: bl.apply_license_counts(db, world["msp"], r))
+    user = NS(tenant_id=world["msp"], user_id=uuid.uuid4())
+
+    before = await run(world["msp"], lambda db: bl.billing_map(user, db))
+    un = {u["invoice_item"]: u for u in before.unmapped}
+    assert "NinjaOne RMM (Included)" in un and un["NinjaOne RMM (Included)"]["suggestion"][0] == {"source": "ninjaone", "item": "Windows workstations"}
+    assert un["Liongard (Included)"]["suggestion"] == []
+    assert any(c.source == "ninjaone" and c.item == "Macs" for c in before.counted_items)
+    assert not any(c.source == "halopsa" for c in before.counted_items), "what is billed is not something to map to"
+
+    nothing = await run(world["msp"], lambda db: bl.reconcile_billing(user, db))
+    assert [r for r in nothing.rows if r.client_id == world["client"]] == [] and nothing.unmapped_lines >= 2
+
+    saved = await run(world["msp"], lambda db: bl.save_map(bl.MapIn(invoice_item=" NinjaOne RMM (Included) ", counted=[bl.CountedRef(source="ninjaone", item="Windows workstations"), bl.CountedRef(source="ninjaone", item="Macs")]), user, db))
+    assert saved.invoice_item == "NinjaOne RMM (Included)"
+    after = await run(world["msp"], lambda db: bl.reconcile_billing(user, db))
+    mine = [r for r in after.rows if r.client_id == world["client"]]
+    assert [(r.invoice_item, r.billed, r.counted, r.difference) for r in mine] == [("NinjaOne RMM (Included)", 16, 18, 2)]
+    assert [p["count"] for p in mine[0].parts] == [14, 4]
+
+    again = await run(world["msp"], lambda db: bl.billing_map(user, db))
+    assert [m.invoice_item for m in again.mapped] == ["NinjaOne RMM (Included)"] and "NinjaOne RMM (Included)" not in {u["invoice_item"] for u in again.unmapped}
+
+    await run(world["msp"], lambda db: bl.delete_map("NinjaOne RMM (Included)", user, db))
+    gone = await run(world["msp"], lambda db: bl.billing_map(user, db))
+    assert gone.mapped == []

@@ -664,5 +664,29 @@
         "max": 200
       }
     }
+  },
+  {
+    "tool": "aisoc_billing_reconcile",
+    "method": "GET",
+    "path": "/billing/reconcile",
+    "query": [
+      "include_matches",
+      "limit"
+    ],
+    "enums": {},
+    "numbers": {
+      "limit": {
+        "min": 1,
+        "max": 200
+      }
+    }
+  },
+  {
+    "tool": "aisoc_billing_map",
+    "method": "GET",
+    "path": "/billing/map",
+    "query": [],
+    "enums": {},
+    "numbers": {}
   }
 ]

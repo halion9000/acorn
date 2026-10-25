@@ -11489,6 +11489,108 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/map:
+    get:
+      tags:
+      - billing
+      summary: Which tool counts each invoice line is checked against, and the lines
+        still to map
+      operationId: billing_map_api_v1_billing_map_get
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapOut'
+    put:
+      tags:
+      - billing
+      summary: Say which tool counts an invoice line should equal
+      operationId: save_map_api_v1_billing_map_put
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapRow'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - billing
+      summary: Stop checking an invoice line against tool counts
+      operationId: delete_map_api_v1_billing_map_delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: invoice_item
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Invoice Item
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/reconcile:
+    get:
+      tags:
+      - billing
+      summary: Where what is billed and what the tools count disagree, biggest difference
+        first
+      operationId: reconcile_billing_api_v1_billing_reconcile_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: include_matches
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Include Matches
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 500
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconcileOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/license-counts:
     post:
       tags:
@@ -23776,6 +23878,22 @@ components:
       - first_seen_at
       - updated_at
       title: CountRow
+    CountedRef:
+      properties:
+        source:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          title: Source
+        item:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Item
+      type: object
+      required:
+      - source
+      - item
+      title: CountedRef
     CoverageCell:
       properties:
         techniqueId:
@@ -29420,6 +29538,48 @@ components:
       required:
       - id
       title: ManualTicketRequest
+    MapIn:
+      properties:
+        invoice_item:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Invoice Item
+        counted:
+          items:
+            $ref: '#/components/schemas/CountedRef'
+          type: array
+          maxItems: 12
+          title: Counted
+      type: object
+      required:
+      - invoice_item
+      - counted
+      title: MapIn
+    MapOut:
+      properties:
+        mapped:
+          items:
+            $ref: '#/components/schemas/MapRow'
+          type: array
+          title: Mapped
+        unmapped:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Unmapped
+        counted_items:
+          items:
+            $ref: '#/components/schemas/CountedRef'
+          type: array
+          title: Counted Items
+      type: object
+      required:
+      - mapped
+      - unmapped
+      - counted_items
+      title: MapOut
     MapRequest:
       properties:
         child_tenant_id:
@@ -29436,6 +29596,21 @@ components:
           title: New Tenant Name
       type: object
       title: MapRequest
+    MapRow:
+      properties:
+        invoice_item:
+          type: string
+          title: Invoice Item
+        counted:
+          items:
+            $ref: '#/components/schemas/CountedRef'
+          type: array
+          title: Counted
+      type: object
+      required:
+      - invoice_item
+      - counted
+      title: MapRow
     MarketplaceItemSummary:
       properties:
         id:
@@ -32654,6 +32829,63 @@ components:
         used (string → ``action`` with priority ``99`` and risk ``"low"``).
 
         The plan calls for the structured shape; this is a migration aid.'
+    ReconcileOut:
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        rows:
+          items:
+            $ref: '#/components/schemas/ReconcileRow'
+          type: array
+          title: Rows
+        unmapped_lines:
+          type: integer
+          title: Unmapped Lines
+      type: object
+      required:
+      - generated_at
+      - rows
+      - unmapped_lines
+      title: ReconcileOut
+    ReconcileRow:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        invoice_item:
+          type: string
+          title: Invoice Item
+        billed:
+          type: integer
+          title: Billed
+        counted:
+          type: integer
+          title: Counted
+        difference:
+          type: integer
+          title: Difference
+        parts:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Parts
+      type: object
+      required:
+      - client_id
+      - client_name
+      - invoice_item
+      - billed
+      - counted
+      - difference
+      - parts
+      title: ReconcileRow
     RedispositionApplyRequest:
       properties:
         alert_ids:

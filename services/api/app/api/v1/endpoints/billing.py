@@ -20,9 +20,9 @@ from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
 from app.api.v1.endpoints.signins import targets_by_tenant
 from app.db.rls_scope import acting_as_tenant
 from app.db.rls_sessions import adopt_tenant
-from app.models.signin import ClientLicenseCount, ClientLicenseHistory
+from app.models.signin import BillingItemMap, ClientLicenseCount, ClientLicenseHistory
 from app.models.tenant import Tenant
-from app.services.license_counts import changes, count_at, delta, totals, window_start
+from app.services.license_counts import changes, count_at, delta, reconcile, suggest, totals, window_start
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -195,3 +195,126 @@ async def changes_log(
         ]
     out.sort(key=lambda c: c.observed_at, reverse=True)
     return out[: max(1, min(limit, 2000))]
+
+
+# ---- what is billed against what is counted ----------------------------------------------------------------------------------------------------------------------------
+
+BILLED_SOURCE = "halopsa"
+
+
+class CountedRef(BaseModel):
+    source: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
+    item: str = Field(min_length=1, max_length=80)
+
+
+class MapIn(BaseModel):
+    invoice_item: str = Field(min_length=1, max_length=120)
+    counted: list[CountedRef] = Field(max_length=12)
+
+
+class MapRow(BaseModel):
+    invoice_item: str
+    counted: list[CountedRef]
+
+
+class MapOut(BaseModel):
+    mapped: list[MapRow]
+    # Invoice lines HaloPSA bills that nobody has mapped yet, with the counts one probably equals (a person confirms it), and how many clients are billed for it.
+    unmapped: list[dict[str, Any]]
+    # The counts the tools hold, to map to: (tool, item) pairs.
+    counted_items: list[CountedRef]
+
+
+async def _all_client_counts(db: Any, owner: uuid.UUID) -> tuple[dict[uuid.UUID, list[dict[str, Any]]], dict[uuid.UUID, str]]:
+    ids, names = await _scope(db, owner, None)
+    out: dict[uuid.UUID, list[dict[str, Any]]] = {}
+    for cid in ids[1:]:
+        async with _as(db, owner, cid):
+            held = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == cid))).scalars().all()
+        out[cid] = [{"source": r.source, "item": r.item, "count": r.count} for r in held]
+    return out, names
+
+
+async def _mapping(db: Any, owner: uuid.UUID) -> dict[str, list[dict[str, str]]]:
+    rows = (await db.execute(select(BillingItemMap).where(BillingItemMap.tenant_id == owner))).scalars().all()
+    return {r.invoice_item: [c for c in (r.counted or []) if isinstance(c, dict) and c.get("source") and c.get("item")] for r in rows}
+
+
+@router.get("/map", response_model=MapOut, summary="Which tool counts each invoice line is checked against, and the lines still to map")
+async def billing_map(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> MapOut:
+    owner = current_user.tenant_id
+    mapping = await _mapping(db, owner)
+    per_client, _names = await _all_client_counts(db, owner)
+    billed_clients: dict[str, int] = {}
+    tool_items: set[tuple[str, str]] = set()
+    for rows in per_client.values():
+        for r in rows:
+            if r["source"] == BILLED_SOURCE:
+                billed_clients[r["item"]] = billed_clients.get(r["item"], 0) + 1
+            else:
+                tool_items.update([(r["source"], r["item"])])
+    unmapped = [{"invoice_item": i, "clients": n, "suggestion": suggest(i)} for i, n in sorted(billed_clients.items(), key=lambda kv: (-kv[1], kv[0])) if i not in mapping]
+    return MapOut(
+        mapped=[MapRow(invoice_item=i, counted=[CountedRef(**c) for c in cs]) for i, cs in sorted(mapping.items())],
+        unmapped=unmapped,
+        counted_items=[CountedRef(source=s, item=i) for s, i in sorted(tool_items)],
+    )
+
+
+@router.put("/map", response_model=MapRow, summary="Say which tool counts an invoice line should equal")
+async def save_map(body: MapIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> MapRow:
+    owner = current_user.tenant_id
+    item = " ".join(body.invoice_item.split())
+    if not item:
+        raise HTTPException(status_code=422, detail="Name the invoice line")
+    counted = [c.model_dump() for c in body.counted]
+    values = {"tenant_id": owner, "invoice_item": item, "counted": counted, "updated_by": current_user.user_id, "updated_at": datetime.now(UTC)}
+    stmt = pg_insert(BillingItemMap).values(values)
+    await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "invoice_item"], set_={c: stmt.excluded[c] for c in ("counted", "updated_by", "updated_at")}))
+    await db.commit()
+    return MapRow(invoice_item=item, counted=body.counted)
+
+
+@router.delete("/map", status_code=204, summary="Stop checking an invoice line against tool counts")
+async def delete_map(invoice_item: str, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> None:
+    owner = current_user.tenant_id
+    await db.execute(delete(BillingItemMap).where(BillingItemMap.tenant_id == owner, BillingItemMap.invoice_item == " ".join(invoice_item.split())))
+    await db.commit()
+
+
+class ReconcileRow(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    invoice_item: str
+    billed: int
+    counted: int
+    difference: int
+    parts: list[dict[str, Any]]
+
+
+class ReconcileOut(BaseModel):
+    generated_at: datetime
+    rows: list[ReconcileRow]
+    # How many billed lines were left out because nobody has mapped them.
+    unmapped_lines: int
+
+
+@router.get("/reconcile", response_model=ReconcileOut, summary="Where what is billed and what the tools count disagree, biggest difference first")
+async def reconcile_billing(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, include_matches: bool = False, limit: int = 500
+) -> ReconcileOut:
+    owner = current_user.tenant_id
+    mapping = await _mapping(db, owner)
+    per_client, names = await _all_client_counts(db, owner)
+    out: list[ReconcileRow] = []
+    unmapped_lines = 0
+    for cid, rows in per_client.items():
+        billed = [{"item": r["item"], "count": r["count"]} for r in rows if r["source"] == BILLED_SOURCE]
+        held = [r for r in rows if r["source"] != BILLED_SOURCE]
+        result = reconcile(billed, held, mapping)
+        unmapped_lines += len(result["unmapped"])
+        for r in result["rows"]:
+            if include_matches or r["difference"] != 0:
+                out.append(ReconcileRow(client_id=cid, client_name=names.get(cid) or str(cid), **r))
+    out.sort(key=lambda r: (-abs(r.difference), r.client_name.lower(), r.invoice_item))
+    return ReconcileOut(generated_at=datetime.now(UTC), rows=out[: max(1, min(limit, 2000))], unmapped_lines=unmapped_lines)

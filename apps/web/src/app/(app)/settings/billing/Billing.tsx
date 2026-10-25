@@ -40,6 +40,22 @@ export interface ChangeRow {
   observed_at: string;
 }
 
+export interface ReconcileRow {
+  client_id: string;
+  client_name: string;
+  invoice_item: string;
+  billed: number;
+  counted: number;
+  difference: number;
+  parts: { source: string; item: string; count: number }[];
+}
+
+export interface MapView {
+  mapped: { invoice_item: string; counted: { source: string; item: string }[] }[];
+  unmapped: { invoice_item: string; clients: number; suggestion: { source: string; item: string }[] }[];
+  counted_items: { source: string; item: string }[];
+}
+
 interface Client {
   id: string;
   name: string;
@@ -258,6 +274,136 @@ function ByClient() {
   );
 }
 
+/** "uses 2 more than billed", "billed for 3 more than used", or "matches". */
+export function differenceText(d: number): string {
+  if (d === 0) return "matches";
+  return d > 0 ? `uses ${d} more than billed` : `billed for ${-d} more than used`;
+}
+
+function Reconcile() {
+  const { data, error } = useJson<{ rows: ReconcileRow[]; unmapped_lines: number }>("/api/v1/billing/reconcile");
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-slate-400">Each invoice line HaloPSA bills, against the tool counts it is mapped to. Only mapped lines are compared; map more under Invoice mapping.</p>
+      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+      {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
+      {data && data.unmapped_lines > 0 && <p className="text-xs text-amber-300">{data.unmapped_lines} billed line{data.unmapped_lines === 1 ? "" : "s"} left out because nobody has mapped {data.unmapped_lines === 1 ? "it" : "them"} yet.</p>}
+      {data && data.rows.length === 0 && <p className="text-sm text-slate-400">Nothing disagrees.</p>}
+      {data && data.rows.length > 0 && (
+        <table className="w-full text-left text-sm" data-testid="billing-reconcile">
+          <thead className="text-xs uppercase text-slate-500">
+            <tr>
+              <th className="py-1 pr-3">Client</th>
+              <th className="pr-3">Invoice line</th>
+              <th className="pr-3">Billed</th>
+              <th className="pr-3">Counted</th>
+              <th>Difference</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.rows.map((r) => (
+              <tr key={`${r.client_id}:${r.invoice_item}`} className="border-t border-slate-800 text-slate-300">
+                <td className="py-1 pr-3">{r.client_name}</td>
+                <td className="pr-3">
+                  {r.invoice_item}
+                  <div className="text-xs text-slate-500">{r.parts.map((p) => `${toolName(p.source)} ${p.item}: ${p.count}`).join("; ")}</div>
+                </td>
+                <td className="pr-3">{r.billed}</td>
+                <td className="pr-3">{r.counted}</td>
+                <td className={r.difference > 0 ? "text-amber-300" : "text-sky-300"}>{differenceText(r.difference)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function Mapping() {
+  const [reload, setReload] = useState(0);
+  const [problem, setProblem] = useState<string | null>(null);
+  const { data, error } = useJson<MapView>(`/api/v1/billing/map?r=${reload}`);
+  const save = async (invoice_item: string, counted: { source: string; item: string }[]) => {
+    try {
+      const res = await authFetch("/api/v1/billing/map", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_item, counted }) });
+      if (!res.ok) throw new Error(`The API answered ${res.status}`);
+      setProblem(null);
+      setReload((n) => n + 1);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Could not save");
+    }
+  };
+  const remove = async (invoice_item: string) => {
+    try {
+      const res = await authFetch(`/api/v1/billing/map?invoice_item=${encodeURIComponent(invoice_item)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`The API answered ${res.status}`);
+      setProblem(null);
+      setReload((n) => n + 1);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Could not remove");
+    }
+  };
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-400">Say which tool counts each invoice line should equal. A suggestion is a guess from the line&apos;s name: use it only if it is right.</p>
+      {(error || problem) && <p role="alert" className="text-sm text-red-300">{error ?? problem}</p>}
+      {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
+      {data && (
+        <>
+          <section>
+            <h3 className="mb-1 text-sm uppercase text-slate-500">Mapped</h3>
+            {(data.mapped ?? []).length === 0 ? (
+              <p className="text-sm text-slate-400">Nothing is mapped yet.</p>
+            ) : (
+              <table className="w-full text-left text-sm" data-testid="mapped-lines">
+                <tbody>
+                  {(data.mapped ?? []).map((m) => (
+                    <tr key={m.invoice_item} className="border-t border-slate-800 text-slate-300">
+                      <td className="py-1 pr-3">{m.invoice_item}</td>
+                      <td className="pr-3 text-xs text-slate-400">{m.counted.map((c) => `${toolName(c.source)} ${c.item}`).join(" + ")}</td>
+                      <td>
+                        <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300" onClick={() => void remove(m.invoice_item)}>
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+          <section>
+            <h3 className="mb-1 text-sm uppercase text-slate-500">Billed lines still to map</h3>
+            {(data.unmapped ?? []).length === 0 ? (
+              <p className="text-sm text-slate-400">Every billed line is mapped.</p>
+            ) : (
+              <table className="w-full text-left text-sm" data-testid="unmapped-lines">
+                <tbody>
+                  {(data.unmapped ?? []).map((u) => (
+                    <tr key={u.invoice_item} className="border-t border-slate-800 text-slate-300">
+                      <td className="py-1 pr-3">{u.invoice_item}</td>
+                      <td className="pr-3 text-xs text-slate-500">{u.clients} clients</td>
+                      <td className="pr-3 text-xs text-slate-400">{u.suggestion.length > 0 ? u.suggestion.map((c) => `${toolName(c.source)} ${c.item}`).join(" + ") : "no suggestion"}</td>
+                      <td>
+                        {u.suggestion.length > 0 ? (
+                          <button type="button" className="text-xs text-sky-300 underline hover:text-sky-200" onClick={() => void save(u.invoice_item, u.suggestion)}>
+                            Use suggestion
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Changes() {
   const [days, setDays] = useState(30);
   const { data, error } = useJson<ChangeRow[]>(`/api/v1/billing/changes?days=${days}`);
@@ -305,8 +451,8 @@ function Changes() {
 }
 
 export function Billing() {
-  const [tab, setTab] = useState<"totals" | "client" | "changes">("totals");
-  const tabs: [typeof tab, string][] = [["totals", "Totals by tool"], ["client", "By client"], ["changes", "Changes"]];
+  const [tab, setTab] = useState<"totals" | "client" | "changes" | "reconcile" | "mapping">("totals");
+  const tabs: [typeof tab, string][] = [["totals", "Totals by tool"], ["client", "By client"], ["changes", "Changes"], ["reconcile", "Billed vs counted"], ["mapping", "Invoice mapping"]];
   return (
     <div className="space-y-4 p-6">
       <div>
@@ -320,7 +466,7 @@ export function Billing() {
           </button>
         ))}
       </div>
-      {tab === "totals" ? <Totals /> : tab === "client" ? <ByClient /> : <Changes />}
+      {tab === "totals" ? <Totals /> : tab === "client" ? <ByClient /> : tab === "reconcile" ? <Reconcile /> : tab === "mapping" ? <Mapping /> : <Changes />}
     </div>
   );
 }

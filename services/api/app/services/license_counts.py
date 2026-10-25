@@ -86,3 +86,48 @@ def totals(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def window_start(now: datetime, days: int) -> datetime:
     return now - timedelta(days=max(1, min(days, 400)))
+
+
+# What an invoice line most likely counts, matched on its description (lower case). A suggestion is only offered for a line nobody has mapped; a person confirms it.
+SUGGESTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
+    ("huntress sat", (("huntress", "Awareness training learners"),)),
+    ("huntress", (("huntress", "Agents"),)),
+    ("ninjaone", (("ninjaone", "Windows workstations"), ("ninjaone", "Windows servers"), ("ninjaone", "Macs"))),
+    ("threatmate", (("threatmate", "Internal assets"),)),
+    ("datto saas", (("datto-saas", "Billable seats"),)),
+    ("autoelevate", (("autoelevate", "Computers"),)),
+    ("dnsfilter", (("dnsfilter", "Roaming agents"),)),
+    ("slide", (("slide", "Protected systems"),)),
+    ("field effect", (("fieldeffect", "Endpoint devices"),)),
+)
+
+
+def suggest(invoice_item: str) -> list[dict[str, str]]:
+    """The tool counts an invoice line probably equals, or none. The first rule that matches wins, so more specific words come first ("huntress sat" before "huntress")."""
+    low = invoice_item.lower()
+    for needle, counted in SUGGESTIONS:
+        if needle in low:
+            return [{"source": s, "item": i} for s, i in counted]
+    return []
+
+
+def reconcile(billed: list[dict[str, Any]], held: list[dict[str, Any]], mapping: dict[str, list[dict[str, str]]]) -> dict[str, Any]:
+    """One client's invoice lines against the tool counts they are mapped to.
+
+    ``billed`` is [{item, count}] (what HaloPSA bills); ``held`` is [{source, item, count}] (what the tools count); ``mapping`` is {invoice item: [{source, item}]}. Returns ``rows`` (one per mapped invoice
+    line: billed, counted (the mapped items added up), difference = counted - billed, and the parts) and ``unmapped`` (billed lines nobody has mapped).
+    """
+    have = {(h["source"], h["item"]): int(h["count"]) for h in held}
+    rows: list[dict[str, Any]] = []
+    unmapped: list[dict[str, Any]] = []
+    for b in billed:
+        item = str(b["item"])
+        parts = mapping.get(item)
+        if not parts:
+            unmapped.append({"item": item, "billed": int(b["count"])})
+            continue
+        shown = [{"source": p["source"], "item": p["item"], "count": have.get((p["source"], p["item"]), 0)} for p in parts]
+        counted = sum(p["count"] for p in shown)
+        rows.append({"invoice_item": item, "billed": int(b["count"]), "counted": counted, "difference": counted - int(b["count"]), "parts": shown})
+    rows.sort(key=lambda r: (-abs(r["difference"]), r["invoice_item"]))
+    return {"rows": rows, "unmapped": unmapped}

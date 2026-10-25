@@ -194,6 +194,18 @@ class ClientLicenseHistory(Base):
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
 
 
+class BillingItemMap(Base):
+    """Which tool counts an invoice line is checked against, for the account that owns the feed (migration 105)."""
+
+    __tablename__ = "billing_item_map"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    invoice_item: Mapped[str] = mapped_column(String(120), primary_key=True)
+    counted: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
 class ClientVcioProposal(Base):
     """Something AiSOC suggests adding to a client's vCIO Toolbox, and what a person decided about it (migration 096)."""
 

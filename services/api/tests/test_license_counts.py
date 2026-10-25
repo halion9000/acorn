@@ -68,3 +68,31 @@ def test_the_window_is_at_least_a_day_and_at_most_400():
     now = datetime(2026, 10, 25, tzinfo=UTC)
     assert window_start(now, 0) == now - timedelta(days=1)
     assert window_start(now, 9999) == now - timedelta(days=400)
+
+
+from app.services.license_counts import reconcile, suggest  # noqa: E402
+
+
+def test_suggestions_match_the_specific_words_first():
+    assert suggest("Huntress SAT (Security Awareness Training) (Included)") == [{"source": "huntress", "item": "Awareness training learners"}]
+    assert suggest("Huntress for Workstations (Included)") == [{"source": "huntress", "item": "Agents"}]
+    assert [s["item"] for s in suggest("NinjaOne RMM (Included)")] == ["Windows workstations", "Windows servers", "Macs"]
+    assert suggest("Datto SaaS (PassThru)") == [{"source": "datto-saas", "item": "Billable seats"}]
+    assert suggest("Managed Service - taxable portion") == []
+
+
+def test_reconcile_compares_each_mapped_line_with_the_added_up_counts_and_lists_the_unmapped():
+    billed = [{"item": "Huntress for Workstations (Included)", "count": 35}, {"item": "NinjaOne RMM (Included)", "count": 16}, {"item": "Liongard (Included)", "count": 1}]
+    held = [{"source": "huntress", "item": "Agents", "count": 40}, {"source": "ninjaone", "item": "Windows workstations", "count": 12}, {"source": "ninjaone", "item": "Macs", "count": 4}]
+    mapping = {"Huntress for Workstations (Included)": [{"source": "huntress", "item": "Agents"}], "NinjaOne RMM (Included)": [{"source": "ninjaone", "item": "Windows workstations"}, {"source": "ninjaone", "item": "Macs"}, {"source": "ninjaone", "item": "Windows servers"}]}
+    r = reconcile(billed, held, mapping)
+    assert [(x["invoice_item"], x["billed"], x["counted"], x["difference"]) for x in r["rows"]] == [("Huntress for Workstations (Included)", 35, 40, 5), ("NinjaOne RMM (Included)", 16, 16, 0)]
+    assert r["rows"][1]["parts"][2] == {"source": "ninjaone", "item": "Windows servers", "count": 0}, "a mapped item the tool does not count is shown as 0"
+    assert r["unmapped"] == [{"item": "Liongard (Included)", "billed": 1}]
+
+
+def test_the_biggest_difference_comes_first_whichever_way_it_goes():
+    billed = [{"item": "A", "count": 10}, {"item": "B", "count": 10}]
+    held = [{"source": "t", "item": "a", "count": 9}, {"source": "t", "item": "b", "count": 25}]
+    r = reconcile(billed, held, {"A": [{"source": "t", "item": "a"}], "B": [{"source": "t", "item": "b"}]})
+    assert [x["invoice_item"] for x in r["rows"]] == ["B", "A"]
