@@ -288,6 +288,11 @@ const navSections: NavSection[] = [
         icon: <ShieldIcon />,
       },
       {
+        label: 'Fleet Posture',
+        href: '/settings/fleet-posture',
+        icon: <ShieldIcon />,
+      },
+      {
         label: 'Multi-Factor',
         href: '/settings/mfa',
         icon: <EyeIcon />,

@@ -1,0 +1,76 @@
+"""Putting every client's tool checks side by side: one score per client, and the boards that gather a few related checks across all of them. Pure: no database, no clock."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
+
+STATUS_WEIGHT = {"met": 1.0, "partly": 0.5, "not_met": 0.0}
+STATUS_ORDER = {"not_met": 0, "partly": 1, "met": 2}
+
+# A few related checks gathered across all clients, so one page can answer "which clients are about to lose something", "who has Windows 10" and so on.
+BOARDS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "renewals": (
+        "Renewals and expiries",
+        ("itglue_domain_expiry", "itglue_certificate_expiry", "liongard_iis_certificates", "cipp_subscriptions", "meraki_licence", "halopsa_agreement", "slide_appliance"),
+    ),
+    "licences": ("Licence waste and unused accounts", ("cipp_unused_licences", "cipp_inactive_accounts", "liongard_stale_licensed_users")),
+    "windows": ("Windows support and updates", ("ninjaone_unsupported_os", "ninjaone_patching", "threatmate_end_of_life", "threatmate_patching")),
+    "backups": (
+        "Backups",
+        ("slide_alerts", "slide_appliance", "slide_verification", "saas_backup_microsoft", "saas_backup_google", "saas_backup_email", "datto_saas_seats", "liongard_datto_bcdr"),
+    ),
+    "network": ("Network", ("meraki_wan", "meraki_licence", "meraki_admin_2fa")),
+    "admins": (
+        "Administrator accounts",
+        ("meraki_admin_2fa", "dnsfilter_org_mfa", "autoelevate_enforcing", "cipp_inactive_accounts", "liongard_ad_bad_logins", "fieldeffect_account_risk"),
+    ),
+    "endpoints": (
+        "Endpoint protection",
+        ("ninjaone_antivirus", "huntress_protection", "huntress_quiet_agents", "liongard_edr_coverage", "autoelevate_enforcing", "threatmate_hardening"),
+    ),
+}
+
+
+@dataclass(frozen=True)
+class FleetCheck:
+    client_id: str
+    client_name: str
+    source: str
+    key: str
+    status: str
+    evidence: str
+    refreshed_at: datetime | None = None
+    since: datetime | None = None
+    accepted: bool = False
+
+
+def summarize(checks: list[FleetCheck]) -> dict[str, Any]:
+    """One client's counts and score. The score is the share of its checks that are fine (a check that is only partly fine counts half), over the checks nobody has accepted; None when there are none."""
+    counted = [c for c in checks if not c.accepted and c.status in STATUS_WEIGHT]
+    score = int(100 * sum(STATUS_WEIGHT[c.status] for c in counted) / len(counted) + 0.5) if counted else None
+    return {
+        "score": score,
+        "met": sum(1 for c in counted if c.status == "met"),
+        "partly": sum(1 for c in counted if c.status == "partly"),
+        "not_met": sum(1 for c in counted if c.status == "not_met"),
+        "accepted": sum(1 for c in checks if c.accepted),
+    }
+
+
+def rank_clients(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Worst first: lowest score, then most problems, then name. A client with no score goes last."""
+    return sorted(summaries, key=lambda s: (s["score"] is None, s["score"] if s["score"] is not None else 0, -s["not_met"], str(s.get("client_name") or "").lower()))
+
+
+def board_rows(checks: list[FleetCheck], keys: tuple[str, ...] | list[str], include_met: bool = False) -> list[FleetCheck]:
+    """The rows of a board: the checks named, worst first (accepted ones after the rest of their status), then by client name. Fine checks only when asked for."""
+    wanted = set(keys)
+    rows = [c for c in checks if c.key in wanted and (include_met or c.status != "met")]
+    return sorted(rows, key=lambda c: (c.accepted, STATUS_ORDER.get(c.status, 3), c.client_name.lower(), c.key))
+
+
+def stale_sources(refreshed: dict[str, datetime], now: datetime, hours: int = 48) -> list[str]:
+    """The sources whose latest rows for a client are older than ``hours``, for a client that should be getting them daily."""
+    return sorted(s for s, t in refreshed.items() if now - t > timedelta(hours=hours))

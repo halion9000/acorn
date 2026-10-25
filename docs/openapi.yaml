@@ -11239,6 +11239,123 @@ paths:
                 title: Response Sweep Runs Api V1 Client Posture Sweeps Runs Get
       security:
       - HTTPBearer: []
+  /api/v1/client-posture/fleet/summary:
+    get:
+      tags:
+      - posture
+      summary: Every client's check score, worst first
+      operationId: fleet_summary_api_v1_client_posture_fleet_summary_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FleetOut'
+      security:
+      - HTTPBearer: []
+  /api/v1/client-posture/fleet/boards:
+    get:
+      tags:
+      - posture
+      summary: The boards that gather related checks across all clients
+      operationId: fleet_boards_api_v1_client_posture_fleet_boards_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  additionalProperties: true
+                  type: object
+                type: object
+                title: Response Fleet Boards Api V1 Client Posture Fleet Boards Get
+      security:
+      - HTTPBearer: []
+  /api/v1/client-posture/fleet/boards/{board}:
+    get:
+      tags:
+      - posture
+      summary: 'One board: the clients whose related checks are not fine'
+      operationId: fleet_board_api_v1_client_posture_fleet_boards__board__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: board
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Board
+      - name: include_met
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Include Met
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 500
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FleetBoardOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/fleet/changes:
+    get:
+      tags:
+      - posture
+      summary: Checks that appeared or changed status across all clients in the last
+        days
+      operationId: fleet_changes_api_v1_client_posture_fleet_changes_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 1
+          title: Days
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 300
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FleetChange'
+                title: Response Fleet Changes Api V1 Client Posture Fleet Changes
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/vcio-reviews:
     post:
       tags:
@@ -26432,6 +26549,168 @@ components:
       - credential
       - challenge
       title: FinishRequest
+    FleetBoardOut:
+      properties:
+        board:
+          type: string
+          title: Board
+        title:
+          type: string
+          title: Title
+        keys:
+          items:
+            type: string
+          type: array
+          title: Keys
+        rows:
+          items:
+            $ref: '#/components/schemas/FleetBoardRow'
+          type: array
+          title: Rows
+      type: object
+      required:
+      - board
+      - title
+      - keys
+      - rows
+      title: FleetBoardOut
+    FleetBoardRow:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        source:
+          type: string
+          title: Source
+        key:
+          type: string
+          title: Key
+        status:
+          type: string
+          title: Status
+        evidence:
+          type: string
+          title: Evidence
+        since:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Since
+        accepted:
+          type: boolean
+          title: Accepted
+          default: false
+      type: object
+      required:
+      - client_id
+      - client_name
+      - source
+      - key
+      - status
+      - evidence
+      title: FleetBoardRow
+    FleetChange:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        key:
+          type: string
+          title: Key
+        source:
+          type: string
+          title: Source
+        status:
+          type: string
+          title: Status
+        previous_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Previous Status
+        observed_at:
+          type: string
+          format: date-time
+          title: Observed At
+      type: object
+      required:
+      - client_id
+      - client_name
+      - key
+      - source
+      - status
+      - previous_status
+      - observed_at
+      title: FleetChange
+    FleetClient:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Score
+        met:
+          type: integer
+          title: Met
+        partly:
+          type: integer
+          title: Partly
+        not_met:
+          type: integer
+          title: Not Met
+        accepted:
+          type: integer
+          title: Accepted
+        stale_tools:
+          items:
+            type: string
+          type: array
+          title: Stale Tools
+          default: []
+      type: object
+      required:
+      - client_id
+      - client_name
+      - score
+      - met
+      - partly
+      - not_met
+      - accepted
+      title: FleetClient
+    FleetOut:
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        clients:
+          items:
+            $ref: '#/components/schemas/FleetClient'
+          type: array
+          title: Clients
+      type: object
+      required:
+      - generated_at
+      - clients
+      title: FleetOut
     FormatsResponse:
       properties:
         formats:

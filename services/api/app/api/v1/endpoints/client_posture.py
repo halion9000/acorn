@@ -18,7 +18,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.alerts import FINISHED_STATUSES, has_ticket_expr
-from app.api.v1.endpoints.devices import ClientRollup, _load_cached, _master_of, _scope, rollup_of
+from app.api.v1.endpoints.devices import ClientRollup, _as, _load_cached, _master_of, _scope, rollup_of
 from app.api.v1.endpoints.identity import counts_for_mfa
 from app.db.rls_scope import acting_as_tenant
 from app.models.alert import Alert
@@ -28,6 +28,7 @@ from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
+from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
@@ -411,3 +412,129 @@ async def sweep_runs(current_user: Annotated[AuthUser, Depends(require_permissio
         )
         for r in rows
     ]
+
+
+# ---- every client side by side --------------------------------------------------------------------------------------------------------------------------------------
+
+
+async def _fleet_checks(db: Any, owner: uuid.UUID) -> tuple[list[FleetCheck], dict[uuid.UUID, str], dict[uuid.UUID, dict[str, datetime]]]:
+    """The latest tool checks of every shown client, with since-when and whether each is accepted. One read per client (each under that client's own scope)."""
+    _ids, clients = await _scope(db, owner, None)
+    shown, names = _ids[1:], clients
+    sources = list(TOOL_CHECK_SOURCES)
+    now = datetime.now(UTC)
+    out: list[FleetCheck] = []
+    refreshed: dict[uuid.UUID, dict[str, datetime]] = {}
+    for cid in shown:
+        async with _as(db, owner, cid):
+            rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == cid, ClientM365Check.source.in_(sources)))).scalars().all()
+            if not rows:
+                continue
+            since = {k: t for k, t in (await db.execute(select(ClientCheckHistory.key, func.max(ClientCheckHistory.observed_at)).where(ClientCheckHistory.tenant_id == cid).group_by(ClientCheckHistory.key))).all()}
+            accepted = {a.key for a in (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == cid))).scalars().all() if a.expires_at is None or a.expires_at > now}
+        refreshed[cid] = {r.source: r.refreshed_at for r in rows}
+        for r in rows:
+            for c in r.checks or []:
+                if isinstance(c, dict) and c.get("key") and c.get("status"):
+                    key = str(c["key"])
+                    out.append(
+                        FleetCheck(client_id=str(cid), client_name=names.get(cid) or str(cid), source=r.source, key=key, status=str(c["status"]), evidence=str(c.get("evidence", "")), refreshed_at=r.refreshed_at, since=since.get(key), accepted=key in accepted)
+                    )
+    return out, names, refreshed
+
+
+class FleetClient(BaseModel):
+    client_id: uuid.UUID
+    client_name: str | None
+    score: int | None
+    met: int
+    partly: int
+    not_met: int
+    accepted: int
+    # Tools whose rows for this client are older than 48 hours.
+    stale_tools: list[str] = []
+
+
+class FleetOut(BaseModel):
+    generated_at: datetime
+    clients: list[FleetClient]
+
+
+@router.get("/fleet/summary", response_model=FleetOut, summary="Every client's check score, worst first")
+async def fleet_summary(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> FleetOut:
+    owner = current_user.tenant_id
+    checks, names, refreshed = await _fleet_checks(db, owner)
+    now = datetime.now(UTC)
+    by_client: dict[str, list[FleetCheck]] = {}
+    for c in checks:
+        by_client.setdefault(c.client_id, []).append(c)
+    summaries = [
+        {"client_id": uuid.UUID(cid), "client_name": names.get(uuid.UUID(cid)), "stale_tools": stale_sources(refreshed.get(uuid.UUID(cid), {}), now), **summarize(rows)} for cid, rows in by_client.items()
+    ]
+    return FleetOut(generated_at=now, clients=[FleetClient(**s) for s in rank_clients(summaries)])
+
+
+class FleetBoardRow(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    source: str
+    key: str
+    status: str
+    evidence: str
+    since: datetime | None = None
+    accepted: bool = False
+
+
+class FleetBoardOut(BaseModel):
+    board: str
+    title: str
+    keys: list[str]
+    rows: list[FleetBoardRow]
+
+
+@router.get("/fleet/boards", summary="The boards that gather related checks across all clients")
+async def fleet_boards(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))]) -> dict[str, dict[str, Any]]:
+    return {name: {"title": title, "keys": list(keys)} for name, (title, keys) in BOARDS.items()}
+
+
+@router.get("/fleet/boards/{board}", response_model=FleetBoardOut, summary="One board: the clients whose related checks are not fine")
+async def fleet_board(
+    board: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, include_met: bool = False, limit: int = 500
+) -> FleetBoardOut:
+    if board not in BOARDS:
+        raise HTTPException(status_code=404, detail="No such board")
+    title, keys = BOARDS[board]
+    checks, _names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
+    rows = board_rows(checks, keys, include_met=include_met)[: max(1, min(limit, 2000))]
+    return FleetBoardOut(
+        board=board,
+        title=title,
+        keys=list(keys),
+        rows=[FleetBoardRow(client_id=uuid.UUID(r.client_id), client_name=r.client_name, source=r.source, key=r.key, status=r.status, evidence=r.evidence, since=r.since, accepted=r.accepted) for r in rows],
+    )
+
+
+class FleetChange(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    key: str
+    source: str
+    status: str
+    previous_status: str | None
+    observed_at: datetime
+
+
+@router.get("/fleet/changes", response_model=list[FleetChange], summary="Checks that appeared or changed status across all clients in the last days")
+async def fleet_changes(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 1, limit: int = 300) -> list[FleetChange]:
+    owner = current_user.tenant_id
+    days = max(1, min(days, 90))
+    ids, names = await _scope(db, owner, None)
+    since = datetime.now(UTC) - timedelta(days=days)
+    out: list[FleetChange] = []
+    for cid in ids[1:]:
+        async with _as(db, owner, cid):
+            rows = (await db.execute(select(ClientCheckHistory).where(ClientCheckHistory.tenant_id == cid, ClientCheckHistory.observed_at >= since))).scalars().all()
+        out += [FleetChange(client_id=cid, client_name=names.get(cid) or str(cid), key=r.key, source=r.source, status=r.status, previous_status=r.previous_status, observed_at=r.observed_at) for r in rows]
+    # Worsening first (a check that became not met), then the newest.
+    out.sort(key=lambda c: (c.status != "not_met", -c.observed_at.timestamp()))
+    return out[: max(1, min(limit, 1000))]

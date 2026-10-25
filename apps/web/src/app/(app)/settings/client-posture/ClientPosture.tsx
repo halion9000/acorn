@@ -160,6 +160,12 @@ export function ClientPosture() {
     };
   }, []);
 
+  // Opened from the fleet page with ?client=<id>: start on that client.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("client");
+    if (wanted) setClientId(wanted);
+  }, []);
+
   useEffect(() => {
     if (!clientId) return;
     let live = true;

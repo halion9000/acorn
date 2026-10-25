@@ -310,3 +310,50 @@ async def test_history_records_only_changes_acceptances_expire_and_sweep_runs_ar
     await run(world["msp"], lambda db: ep.apply_sweep_runs(db, world["msp"], report2))
     runs = await run(world["msp"], lambda db: cp.sweep_runs(NS(tenant_id=world["msp"]), db))
     assert [(r.source, r.sent, r.failed, r.health) for r in runs] == [("ninjaone", 10, 0, "ok")], "the latest pass replaces the previous one"
+
+
+async def test_the_fleet_views_rank_clients_list_a_board_and_show_the_days_changes(world):
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'cipp', 'f-1', 'f-1', 'f-1', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+    checks = [
+        {"key": "cipp_inactive_accounts", "status": "not_met", "evidence": "4 licensed accounts have not signed in"},
+        {"key": "cipp_subscriptions", "status": "met", "evidence": "3 subscriptions, none lapsed"},
+        {"key": "cipp_unused_licences", "status": "partly", "evidence": "9 of 20 unused"},
+    ]
+    report = ep.M365ChecksReport(vendor="cipp", vendor_client_id="f-1", source="cipp-health", checks=checks)
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report))
+    user = NS(tenant_id=world["msp"], user_id=uuid.uuid4())
+
+    summary = await run(world["msp"], lambda db: cp.fleet_summary(user, db))
+    mine = [c for c in summary.clients if c.client_id == world["client"]]
+    assert len(mine) == 1 and (mine[0].score, mine[0].met, mine[0].partly, mine[0].not_met) == (50, 1, 1, 1)
+    assert mine[0].stale_tools == []
+
+    board = await run(world["msp"], lambda db: cp.fleet_board("licences", user, db))
+    rows = [(r.key, r.status) for r in board.rows if r.client_id == world["client"]]
+    assert rows == [("cipp_inactive_accounts", "not_met"), ("cipp_unused_licences", "partly")], "worst first, and the fine check is left out"
+    with_met = await run(world["msp"], lambda db: cp.fleet_board("backups", user, db, include_met=True))
+    assert [r for r in with_met.rows if r.client_id == world["client"]] == [], "a board only holds its own checks"
+    with pytest.raises(HTTPException) as e:
+        await run(world["msp"], lambda db: cp.fleet_board("nope", user, db))
+    assert e.value.status_code == 404
+
+    await run(world["msp"], lambda db: cp.accept_check(world["client"], "cipp_inactive_accounts", cp.AcceptIn(reason="Staff on leave"), user, db))
+    again = await run(world["msp"], lambda db: cp.fleet_summary(user, db))
+    mine = [c for c in again.clients if c.client_id == world["client"]][0]
+    assert (mine.not_met, mine.accepted, mine.score) == (0, 1, 75), "an accepted check leaves the score"
+
+    changes = await run(world["msp"], lambda db: cp.fleet_changes(user, db, days=1))
+    mine_changes = [(c.key, c.status) for c in changes if c.client_id == world["client"]]
+    assert mine_changes[0] == ("cipp_inactive_accounts", "not_met"), "what got worse comes first"
+    assert len(mine_changes) == 3
