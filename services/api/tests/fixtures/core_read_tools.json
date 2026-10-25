@@ -529,5 +529,140 @@
         "max": 200
       }
     }
+  },
+  {
+    "tool": "aisoc_fleet_summary",
+    "method": "GET",
+    "path": "/client-posture/fleet/summary",
+    "query": [],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_fleet_boards",
+    "method": "GET",
+    "path": "/client-posture/fleet/boards",
+    "query": [],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_fleet_board",
+    "method": "GET",
+    "path": "/client-posture/fleet/boards/{board}",
+    "query": [
+      "include_met",
+      "limit"
+    ],
+    "enums": {},
+    "numbers": {
+      "limit": {
+        "min": 1,
+        "max": 200
+      }
+    }
+  },
+  {
+    "tool": "aisoc_fleet_changes",
+    "method": "GET",
+    "path": "/client-posture/fleet/changes",
+    "query": [
+      "days",
+      "limit"
+    ],
+    "enums": {},
+    "numbers": {
+      "days": {
+        "min": 1,
+        "max": 90
+      },
+      "limit": {
+        "min": 1,
+        "max": 200
+      }
+    }
+  },
+  {
+    "tool": "aisoc_fleet_coverage",
+    "method": "GET",
+    "path": "/client-posture/fleet/coverage",
+    "query": [],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_check_history",
+    "method": "GET",
+    "path": "/client-posture/{client_id}/check-history",
+    "query": [
+      "key",
+      "limit"
+    ],
+    "enums": {},
+    "numbers": {
+      "limit": {
+        "min": 1,
+        "max": 200
+      }
+    }
+  },
+  {
+    "tool": "aisoc_sweep_runs",
+    "method": "GET",
+    "path": "/client-posture/sweeps/latest",
+    "query": [],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_billing_summary",
+    "method": "GET",
+    "path": "/billing/summary",
+    "query": [
+      "days"
+    ],
+    "enums": {},
+    "numbers": {
+      "days": {
+        "min": 1,
+        "max": 400
+      }
+    }
+  },
+  {
+    "tool": "aisoc_billing_client",
+    "method": "GET",
+    "path": "/billing/clients/{client_id}",
+    "query": [
+      "days"
+    ],
+    "enums": {},
+    "numbers": {
+      "days": {
+        "min": 1,
+        "max": 400
+      }
+    }
+  },
+  {
+    "tool": "aisoc_billing_changes",
+    "method": "GET",
+    "path": "/billing/changes",
+    "query": [
+      "days",
+      "limit",
+      "client_id"
+    ],
+    "enums": {},
+    "numbers": {
+      "days": {
+        "min": 1,
+        "max": 400
+      },
+      "limit": {
+        "min": 1,
+        "max": 200
+      }
+    }
   }
 ]

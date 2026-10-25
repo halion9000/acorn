@@ -11220,13 +11220,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-  /api/v1/client-posture/sweeps/runs:
+  /api/v1/client-posture/sweeps/latest:
     get:
       tags:
       - posture
       summary: The latest pass of each of CORE's per-client sweeps, and whether it
         reached A.C.O.R.N
-      operationId: sweep_runs_api_v1_client_posture_sweeps_runs_get
+      operationId: sweep_runs_api_v1_client_posture_sweeps_latest_get
       responses:
         '200':
           description: Successful Response
@@ -11236,7 +11236,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/SweepRunOut'
                 type: array
-                title: Response Sweep Runs Api V1 Client Posture Sweeps Runs Get
+                title: Response Sweep Runs Api V1 Client Posture Sweeps Latest Get
       security:
       - HTTPBearer: []
   /api/v1/client-posture/fleet/summary:

@@ -107,6 +107,16 @@ CIPHER_CALLS = [
     ("aisoc_device_rollup", "GET", "/devices/rollup", [], None, False),
     ("aisoc_client_posture", "GET", "/client-posture/{client_id}", [], None, False),
     ("aisoc_mfa_summary", "GET", "/identity/mfa-summary", [], None, False),
+    ("aisoc_fleet_summary", "GET", "/client-posture/fleet/summary", [], None, False),
+    ("aisoc_fleet_boards", "GET", "/client-posture/fleet/boards", [], None, False),
+    ("aisoc_fleet_board", "GET", "/client-posture/fleet/boards/{board}", ["include_met", "limit"], None, False),
+    ("aisoc_fleet_changes", "GET", "/client-posture/fleet/changes", ["days", "limit"], None, False),
+    ("aisoc_fleet_coverage", "GET", "/client-posture/fleet/coverage", [], None, False),
+    ("aisoc_check_history", "GET", "/client-posture/{client_id}/check-history", ["key", "limit"], None, False),
+    ("aisoc_sweep_runs", "GET", "/client-posture/sweeps/latest", [], None, False),
+    ("aisoc_billing_summary", "GET", "/billing/summary", ["days"], None, False),
+    ("aisoc_billing_client", "GET", "/billing/clients/{client_id}", ["days"], None, False),
+    ("aisoc_billing_changes", "GET", "/billing/changes", ["days", "limit", "client_id"], None, False),
     ("aisoc_secure_scores", "GET", "/identity/secure-scores/brief", [], None, False),
     ("aisoc_client_review", "GET", "/client-review/{client_id}", [], None, False),
     ("aisoc_list_assets", "GET", "/assets", ["asset_type", "criticality", "limit", "offset"], None, False),
@@ -255,7 +265,7 @@ def test_the_page_size_cap_is_at_least_what_core_sends(path):
 
 def test_the_table_covers_all_fifty_three_tools():
     tools = {re.sub(r" \(.*\)$", "", name) for name in CALL_IDS}
-    assert len(tools) == 58, sorted(tools)
+    assert len(tools) == 68, sorted(tools)
 
 
 READ_ONLY_TOOLS = [c for c in CIPHER_CALLS if c[1] == "GET"]
@@ -326,7 +336,7 @@ def test_every_tool_in_the_contract_is_a_get():
 
 def test_the_contract_has_no_tool_listed_twice():
     names = [r["tool"] for r in CONTRACT]
-    assert len(names) == len(set(names)) == 41
+    assert len(names) == len(set(names)) == 51
 
 
 def test_the_copy_is_the_same_as_the_file_in_the_core_checkout_when_one_is_next_to_this_repo():
@@ -496,6 +506,16 @@ ESTATE_TOOLS = [
     "aisoc_device_rollup",
     "aisoc_client_posture",
     "aisoc_mfa_summary",
+    "aisoc_fleet_summary",
+    "aisoc_fleet_boards",
+    "aisoc_fleet_board",
+    "aisoc_fleet_changes",
+    "aisoc_fleet_coverage",
+    "aisoc_check_history",
+    "aisoc_sweep_runs",
+    "aisoc_billing_summary",
+    "aisoc_billing_client",
+    "aisoc_billing_changes",
 ]
 
 

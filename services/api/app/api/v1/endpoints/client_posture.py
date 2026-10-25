@@ -400,7 +400,7 @@ def sweep_health(sent: int, failed: int, ran_at: datetime, now: datetime) -> str
     return "ok"
 
 
-@router.get("/sweeps/runs", response_model=list[SweepRunOut], summary="The latest pass of each of CORE's per-client sweeps, and whether it reached A.C.O.R.N")
+@router.get("/sweeps/latest", response_model=list[SweepRunOut], summary="The latest pass of each of CORE's per-client sweeps, and whether it reached A.C.O.R.N")
 async def sweep_runs(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> list[SweepRunOut]:
     owner = current_user.tenant_id
     rows = (await db.execute(select(CoreSweepRun).where(CoreSweepRun.tenant_id == owner).order_by(CoreSweepRun.source))).scalars().all()

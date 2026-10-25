@@ -21,7 +21,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | [audit](#audit) | 2 | 0 | `audit_log:read` |
 | [auth](#auth) | 8 | 6 | 4 signed-in with no permission declared; 10 with no sign-in required |
 | [autonomy-policy](#autonomy-policy) | 1 | 2 | 3 signed-in with no permission declared |
-| [billing](#billing) | 3 | 0 | `mssp:manage` |
+| [billing](#billing) | 3 | 0 | `alerts:read` |
 | [business-context](#business-context) | 1 | 4 | 5 signed-in with no permission declared |
 | [canary](#canary) | 1 | 0 | 1 with no sign-in required |
 | [cases](#cases) | 16 | 9 | `cases:read`, `cases:work`, `cases:write` |
@@ -220,9 +220,9 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 
 | Method | Path | What it does | Permission |
 | --- | --- | --- | --- |
-| GET | `/billing/changes` | Every change to a count across all clients in the last days, newest first | `mssp:manage` |
-| GET | `/billing/clients/{client_id}` | What each tool counts for one client, and how each count moved | `mssp:manage` |
-| GET | `/billing/summary` | Each tool's counts added across all clients, with the change over the window | `mssp:manage` |
+| GET | `/billing/changes` | Every change to a count across all clients in the last days, newest first | `alerts:read` |
+| GET | `/billing/clients/{client_id}` | What each tool counts for one client, and how each count moved | `alerts:read` |
+| GET | `/billing/summary` | Each tool's counts added across all clients, with the change over the window | `alerts:read` |
 
 ## business-context
 
@@ -279,7 +279,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | GET | `/client-posture/fleet/changes` | Checks that appeared or changed status across all clients in the last days | `alerts:read` |
 | GET | `/client-posture/fleet/coverage` | Which tool each client is mapped to, and which tools it is missing | `alerts:read` |
 | GET | `/client-posture/fleet/summary` | Every client's check score, worst first | `alerts:read` |
-| GET | `/client-posture/sweeps/runs` | The latest pass of each of CORE's per-client sweeps, and whether it reached A.C.O.R.N | `alerts:read` |
+| GET | `/client-posture/sweeps/latest` | The latest pass of each of CORE's per-client sweeps, and whether it reached A.C.O.R.N | `alerts:read` |
 | GET | `/client-posture/{client_id}` | One client's devices, Multi-Factor coverage, open alerts and cases side by side | `alerts:read` |
 | DELETE | `/client-posture/{client_id}/acceptances/{key}` | Stop accepting a check for a client | `mssp:manage` |
 | PUT | `/client-posture/{client_id}/acceptances/{key}` | Accept a failing check for a client, with a reason and an optional end date | `mssp:manage` |

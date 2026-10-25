@@ -15,7 +15,7 @@ AiSOC has **573** operations in **87** areas. This is a MAP, not a list of tools
 - **audit**: 2 reads, 0 changes; protection: `audit_log:read`; e.g. List audit events; Export the (filtered) audit trail as CSV or print-ready HTML
 - **auth**: 8 reads, 6 changes; protection: 4 signed-in with no permission declared; 10 with no sign-in required; e.g. Authorize; Login
 - **autonomy-policy**: 1 reads, 2 changes; protection: 3 signed-in with no permission declared; e.g. Get autonomy policy; Reset action threshold
-- **billing**: 3 reads, 0 changes; protection: `mssp:manage`; e.g. Every change to a count across all clients in the last days, newest first; What each tool counts for one client, and how each count moved
+- **billing**: 3 reads, 0 changes; protection: `alerts:read`; e.g. Every change to a count across all clients in the last days, newest first; What each tool counts for one client, and how each count moved
 - **business-context**: 1 reads, 4 changes; protection: 5 signed-in with no permission declared; e.g. Get rules; Replace rules
 - **canary**: 1 reads, 0 changes; protection: 1 with no sign-in required; e.g. Honeytoken tripwire (public by design)
 - **cases**: 16 reads, 9 changes; protection: `cases:read`, `cases:work`, `cases:write`; e.g. List cases; Create case

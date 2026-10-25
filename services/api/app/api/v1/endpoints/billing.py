@@ -130,7 +130,7 @@ async def _client_rows(db: Any, owner: uuid.UUID, cid: uuid.UUID, days: int, now
 
 
 @router.get("/clients/{client_id}", response_model=ClientCounts, summary="What each tool counts for one client, and how each count moved")
-async def client_counts(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, days: int = 30) -> ClientCounts:
+async def client_counts(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 30) -> ClientCounts:
     owner = current_user.tenant_id
     if client_id != owner:
         found = (await db.execute(select(Tenant.id).where(Tenant.id == client_id, Tenant.parent_tenant_id == owner))).scalar_one_or_none()
@@ -158,7 +158,7 @@ class FleetTotals(BaseModel):
 
 
 @router.get("/summary", response_model=FleetTotals, summary="Each tool's counts added across all clients, with the change over the window")
-async def summary(current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, days: int = 30) -> FleetTotals:
+async def summary(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 30) -> FleetTotals:
     owner = current_user.tenant_id
     ids, _names = await _scope(db, owner, None)
     now = datetime.now(UTC)
@@ -181,7 +181,7 @@ class ChangeRow(BaseModel):
 
 @router.get("/changes", response_model=list[ChangeRow], summary="Every change to a count across all clients in the last days, newest first")
 async def changes_log(
-    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, days: int = 30, limit: int = 500, client_id: uuid.UUID | None = None
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 30, limit: int = 500, client_id: uuid.UUID | None = None
 ) -> list[ChangeRow]:
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, client_id)

@@ -2,7 +2,7 @@
 
 /**
  * How CORE's per-client sweeps are doing, from the last pass each one reported: when it ran, how many clients it reached, how many it could not, and why. A sweep that has not run for 48 hours is
- * marked stale whatever its last result was. Backed by GET /api/v1/client-posture/sweeps/runs.
+ * marked stale whatever its last result was. Backed by GET /api/v1/client-posture/sweeps/latest.
  */
 import { useEffect, useState } from 'react';
 
@@ -39,7 +39,7 @@ export function SourceHealth() {
   const [runs, setRuns] = useState<SweepRun[] | null>(null);
   useEffect(() => {
     let live = true;
-    authFetch('/api/v1/client-posture/sweeps/runs')
+    authFetch('/api/v1/client-posture/sweeps/latest')
       .then(async (res) => (res.ok ? ((await res.json()) as unknown) : null))
       .then((body) => {
         if (live) setRuns(Array.isArray(body) ? (body as SweepRun[]) : null);
