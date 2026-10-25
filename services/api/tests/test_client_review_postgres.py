@@ -407,6 +407,13 @@ async def test_license_counts_are_stored_diffed_into_history_and_totalled_across
     assert sorted(mine, key=str) == sorted([("Windows workstations", None, 10), ("Macs", None, 4), ("Windows workstations", 10, 13), ("Macs", 4, 0)], key=str), "an unchanged day adds nothing; a removal is a change to 0"
     assert log[0].observed_at >= log[-1].observed_at, "newest first"
 
+    series = await run(world["msp"], lambda db: bl.client_count_history(world["client"], "ninjaone", "Windows workstations", user, db, days=90))
+    assert [p.count for p in series.points] == [10, 13, 13], "10 forty days ago, 13 now, and the end point is now"
+    assert series.points[0].at < series.points[1].at <= series.points[2].at
+    with pytest.raises(HTTPException) as e0:
+        await run(world["msp"], lambda db: bl.client_count_history(world["client"], "ninjaone", "Nothing", user, db))
+    assert e0.value.status_code == 404
+
     fleet = await run(world["msp"], lambda db: bl.summary(user, db, days=30))
     row = [t for t in fleet.rows if t.source == "ninjaone" and t.item == "Windows workstations"][0]
     assert (row.total >= 13, row.clients >= 1) == (True, True)

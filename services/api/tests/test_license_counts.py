@@ -152,3 +152,29 @@ def test_a_tool_with_mapped_clients_and_no_count_is_listed_and_a_renamed_source_
 
     assert tools_without_counts({"ninjaone", "blumira", "datto-saas-seats", "cipp-health", "petra"}, {"ninjaone", "datto-saas", "cipp"}) == ["blumira", "petra"]
     assert tools_without_counts(set(), {"ninjaone"}) == []
+
+
+def test_a_count_series_starts_with_what_the_first_change_replaced_has_a_point_per_change_and_ends_now():
+    from app.services.license_counts import count_series
+
+    now = datetime(2026, 10, 25, tzinfo=UTC)
+    since = now - timedelta(days=30)
+    hist = [
+        {"observed_at": now - timedelta(days=40), "count": 10, "previous_count": None},
+        {"observed_at": now - timedelta(days=20), "count": 12, "previous_count": 10},
+        {"observed_at": now - timedelta(days=5), "count": 9, "previous_count": 12},
+    ]
+    out = count_series(hist, 9, now, since)
+    assert [(p["at"], p["count"]) for p in out] == [(since, 10), (now - timedelta(days=20), 12), (now - timedelta(days=5), 9), (now, 9)]
+
+
+def test_a_series_with_no_change_in_the_window_is_flat_at_the_count_it_had_and_a_new_item_starts_at_its_first_row():
+    from app.services.license_counts import count_series
+
+    now = datetime(2026, 10, 25, tzinfo=UTC)
+    since = now - timedelta(days=30)
+    old = [{"observed_at": now - timedelta(days=60), "count": 7, "previous_count": None}]
+    assert [(p["at"], p["count"]) for p in count_series(old, 7, now, since)] == [(since, 7), (now, 7)]
+    assert [p["count"] for p in count_series([], 4, now, since)] == [4, 4]
+    fresh = [{"observed_at": now - timedelta(days=3), "count": 5, "previous_count": None}]
+    assert [(p["at"], p["count"]) for p in count_series(fresh, 5, now, since)] == [(now - timedelta(days=3), 5), (now, 5)]

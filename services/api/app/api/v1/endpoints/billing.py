@@ -23,7 +23,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.client_alias import ClientAlias
 from app.models.signin import BillingItemMap, ClientLicenseCount, ClientLicenseHistory
 from app.models.tenant import Tenant
-from app.services.license_counts import BASELINE_TOOL, changes, count_at, delta, endpoint_disagreements, last_reported, reconcile, tools_without_counts, suggest, totals, unusual, window_start
+from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, endpoint_disagreements, last_reported, reconcile, tools_without_counts, suggest, totals, unusual, window_start
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -140,6 +140,40 @@ async def client_counts(client_id: uuid.UUID, current_user: Annotated[AuthUser, 
     now = datetime.now(UTC)
     rows = await _client_rows(db, owner, client_id, days, now)
     return ClientCounts(client_id=client_id, days=max(1, min(days, 400)), rows=[CountRow(**{k: v for k, v in r.items() if k != "then"}) for r in rows])
+
+
+class SeriesPoint(BaseModel):
+    at: datetime
+    count: int
+
+
+class CountSeries(BaseModel):
+    client_id: uuid.UUID
+    source: str
+    item: str
+    days: int
+    points: list[SeriesPoint]
+
+
+@router.get("/clients/{client_id}/history", response_model=CountSeries, summary="One tool's count of one item for one client over time, as points for a chart")
+async def client_count_history(
+    client_id: uuid.UUID, source: str, item: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 90
+) -> CountSeries:
+    owner = current_user.tenant_id
+    if client_id != owner:
+        found = (await db.execute(select(Tenant.id).where(Tenant.id == client_id, Tenant.parent_tenant_id == owner))).scalar_one_or_none()
+        if found is None:
+            raise HTTPException(status_code=404, detail="Client not found")
+    now = datetime.now(UTC)
+    since = window_start(now, days)
+    async with _as(db, owner, client_id):
+        held = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == client_id, ClientLicenseCount.source == source, ClientLicenseCount.item == item))).scalar_one_or_none()
+        hist = (await db.execute(select(ClientLicenseHistory).where(ClientLicenseHistory.tenant_id == client_id, ClientLicenseHistory.source == source, ClientLicenseHistory.item == item))).scalars().all()
+    if held is None and not hist:
+        raise HTTPException(status_code=404, detail="No such count for this client")
+    rows = [{"observed_at": h.observed_at, "count": h.count, "previous_count": h.previous_count} for h in hist]
+    points = count_series(rows, held.count if held is not None else 0, now, since)
+    return CountSeries(client_id=client_id, source=source, item=item, days=max(1, min(days, 400)), points=[SeriesPoint(**p) for p in points])
 
 
 class TotalRow(BaseModel):

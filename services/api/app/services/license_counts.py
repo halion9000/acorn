@@ -206,3 +206,21 @@ _COUNT_SOURCE_OF = {"datto-saas-seats": "datto-saas", "cipp-health": "cipp"}
 def tools_without_counts(mapped_vendors: set[str], count_sources: set[str]) -> list[str]:
     """Tools that have clients mapped to them but have never stored a count, sorted. Some tools count nothing by design (a detection feed); the page says so, this only lists them."""
     return sorted(v for v in mapped_vendors if _COUNT_SOURCE_OF.get(v, v) not in count_sources)
+
+
+def count_series(history: list[dict[str, Any]], current: int, now: datetime, since: datetime) -> list[dict[str, Any]]:
+    """One count over a window, oldest first, as points a chart can draw.
+
+    ``history`` is the item's change rows ({observed_at, count, previous_count}). The series starts at ``since`` with the count the first change in the window replaced (when that is known: an item
+    that first appeared inside the window has no earlier value, so the series starts at its first row), has one point per change, and ends at ``now`` with the current count.
+    """
+    inside = sorted((h for h in history if since <= h["observed_at"] <= now), key=lambda h: h["observed_at"])
+    points: list[dict[str, Any]] = []
+    if inside and inside[0].get("previous_count") is not None:
+        points.append({"at": since, "count": int(inside[0]["previous_count"])})
+    points += [{"at": h["observed_at"], "count": int(h["count"])} for h in inside]
+    if not inside:
+        earlier = sorted((h for h in history if h["observed_at"] < since), key=lambda h: h["observed_at"])
+        points.append({"at": since, "count": int(earlier[-1]["count"]) if earlier else current})
+    points.append({"at": now, "count": current})
+    return points

@@ -11523,6 +11523,55 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/clients/{client_id}/history:
+    get:
+      tags:
+      - billing
+      summary: One tool's count of one item for one client over time, as points for
+        a chart
+      operationId: client_count_history_api_v1_billing_clients__client_id__history_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: source
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Source
+      - name: item
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Item
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 90
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CountSeries'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/billing/summary:
     get:
       tags:
@@ -24072,6 +24121,34 @@ components:
       - first_seen_at
       - updated_at
       title: CountRow
+    CountSeries:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        source:
+          type: string
+          title: Source
+        item:
+          type: string
+          title: Item
+        days:
+          type: integer
+          title: Days
+        points:
+          items:
+            $ref: '#/components/schemas/SeriesPoint'
+          type: array
+          title: Points
+      type: object
+      required:
+      - client_id
+      - source
+      - item
+      - days
+      - points
+      title: CountSeries
     CountedRef:
       properties:
         source:
@@ -35983,6 +36060,20 @@ components:
       - batch_id
       - recipient_count
       title: SentAlert
+    SeriesPoint:
+      properties:
+        at:
+          type: string
+          format: date-time
+          title: At
+        count:
+          type: integer
+          title: Count
+      type: object
+      required:
+      - at
+      - count
+      title: SeriesPoint
     SetAutoClose:
       properties:
         threshold:

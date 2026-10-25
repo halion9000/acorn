@@ -680,6 +680,23 @@
     }
   },
   {
+    "tool": "aisoc_count_history",
+    "method": "GET",
+    "path": "/billing/clients/{client_id}/history",
+    "query": [
+      "source",
+      "item",
+      "days"
+    ],
+    "enums": {},
+    "numbers": {
+      "days": {
+        "min": 1,
+        "max": 400
+      }
+    }
+  },
+  {
     "tool": "aisoc_billing_changes",
     "method": "GET",
     "path": "/billing/changes",
