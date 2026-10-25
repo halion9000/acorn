@@ -583,6 +583,26 @@
     }
   },
   {
+    "tool": "aisoc_fleet_acceptances",
+    "method": "GET",
+    "path": "/client-posture/fleet/acceptances",
+    "query": [
+      "within_days",
+      "limit"
+    ],
+    "enums": {},
+    "numbers": {
+      "within_days": {
+        "min": 1,
+        "max": 400
+      },
+      "limit": {
+        "min": 1,
+        "max": 200
+      }
+    }
+  },
+  {
     "tool": "aisoc_fleet_coverage",
     "method": "GET",
     "path": "/client-posture/fleet/coverage",
