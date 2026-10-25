@@ -457,7 +457,7 @@ export function gapText(gap: number): string {
 }
 
 function DataQuality() {
-  const quality = useJson<{ rows: { client_id: string; client_name: string; tool: string; tool_count: number; baseline_count: number; gap: number }[] }>("/api/v1/billing/data-quality");
+  const quality = useJson<{ no_counts?: string[]; rows: { client_id: string; client_name: string; tool: string; tool_count: number; baseline_count: number; gap: number }[] }>("/api/v1/billing/data-quality");
   const silent = useJson<{ client_id: string; client_name: string; source: string; last_reported_at: string; days_ago: number; silent: boolean }[]>("/api/v1/billing/last-reported?only_silent=true");
   const error = quality.error ?? silent.error;
   return (
@@ -492,6 +492,12 @@ function DataQuality() {
             </tbody>
           </table>
         )}
+      </section>
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-slate-200">Tools with clients but no counts</h2>
+        <p className="text-sm text-slate-400">These tools have clients mapped to them but have never stored a count. Some count nothing by design (a detection feed); a tool that should count and is listed here needs a look.</p>
+        {quality.data && (quality.data.no_counts ?? []).length === 0 && <p className="text-sm text-slate-400">Every mapped tool has stored counts.</p>}
+        {quality.data && (quality.data.no_counts ?? []).length > 0 && <p className="text-sm text-slate-300" data-testid="billing-no-counts">{(quality.data.no_counts ?? []).map(toolName).join(', ')}</p>}
       </section>
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-slate-200">Tools that stopped reporting</h2>

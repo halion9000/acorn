@@ -26,7 +26,7 @@ beforeEach(() => {
       return json({ mapped: [{ invoice_item: 'Datto SaaS (Included)', counted: [{ source: 'datto-saas', item: 'Billable seats' }] }], unmapped: [{ invoice_item: 'Huntress for Workstations (Included)', clients: 120, suggestion: [{ source: 'huntress', item: 'Agents' }] }, { invoice_item: 'Liongard (Included)', clients: 150, suggestion: [] }], counted_items: [] });
     if (url.startsWith('/api/v1/billing/map')) return json({});
     if (url.startsWith('/api/v1/billing/data-quality'))
-      return json({ generated_at: '', baseline_tool: 'ninjaone', rows: [{ client_id: 'c1', client_name: 'Acme', tool: 'huntress', tool_count: 30, baseline_count: 50, gap: -20 }] });
+      return json({ generated_at: '', baseline_tool: 'ninjaone', no_counts: ['blumira', 'petra'], rows: [{ client_id: 'c1', client_name: 'Acme', tool: 'huntress', tool_count: 30, baseline_count: 50, gap: -20 }] });
     if (url.startsWith('/api/v1/billing/last-reported'))
       return json([{ client_id: 'c2', client_name: 'Beta', source: 'dnsfilter', last_reported_at: '2026-10-19T00:00:00Z', days_ago: 6, silent: true }]);
     if (url.startsWith('/api/v1/billing/changes'))
@@ -136,6 +136,7 @@ describe('Billing', () => {
     const silent = await screen.findByTestId('billing-silent');
     expect(within(silent).getByText('6 days ago')).toBeInTheDocument();
     expect(authFetch.mock.calls.some((c) => String(c[0]).includes('last-reported?only_silent=true'))).toBe(true);
+    expect((await screen.findByTestId('billing-no-counts')).textContent).toMatch(/blumira/i);
   });
 
   it('says so when nothing has been counted yet', async () => {

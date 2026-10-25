@@ -197,3 +197,12 @@ def last_reported(rows: list[dict[str, Any]], now: datetime, silent_after_days: 
         out.append({"client": client, "source": source, "last_reported_at": at, "days_ago": days, "silent": days > silent_after_days})
     out.sort(key=lambda r: (not r["silent"], -r["days_ago"], str(r["client"]), r["source"]))
     return out
+
+
+# Tools whose clients are mapped but whose count lives under another name (the tool and the source of its counts differ).
+_COUNT_SOURCE_OF = {"datto-saas-seats": "datto-saas", "cipp-health": "cipp"}
+
+
+def tools_without_counts(mapped_vendors: set[str], count_sources: set[str]) -> list[str]:
+    """Tools that have clients mapped to them but have never stored a count, sorted. Some tools count nothing by design (a detection feed); the page says so, this only lists them."""
+    return sorted(v for v in mapped_vendors if _COUNT_SOURCE_OF.get(v, v) not in count_sources)

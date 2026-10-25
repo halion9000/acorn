@@ -145,3 +145,10 @@ def test_last_reported_takes_the_newest_count_per_client_and_tool_and_marks_the_
     ]
     out = last_reported(rows, now)
     assert [(r["client"], r["source"], r["days_ago"], r["silent"]) for r in out] == [("a", "huntress", 5, True), ("b", "slide", 3, True), ("b", "huntress", 2, False), ("a", "ninjaone", 0, False)]
+
+
+def test_a_tool_with_mapped_clients_and_no_count_is_listed_and_a_renamed_source_is_matched():
+    from app.services.license_counts import tools_without_counts
+
+    assert tools_without_counts({"ninjaone", "blumira", "datto-saas-seats", "cipp-health", "petra"}, {"ninjaone", "datto-saas", "cipp"}) == ["blumira", "petra"]
+    assert tools_without_counts(set(), {"ninjaone"}) == []

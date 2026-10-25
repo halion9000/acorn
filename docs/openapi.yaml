@@ -24816,6 +24816,12 @@ components:
             $ref: '#/components/schemas/DisagreementRow'
           type: array
           title: Rows
+        no_counts:
+          items:
+            type: string
+          type: array
+          title: No Counts
+          default: []
       type: object
       required:
       - generated_at
