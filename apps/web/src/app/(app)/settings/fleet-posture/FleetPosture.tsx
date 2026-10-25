@@ -101,7 +101,7 @@ function useJson<T>(url: string | null, reload = 0): { data: T | null; error: st
 function Worst() {
   const [reload, setReload] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
-  const { data, error } = useJson<{ clients: FleetClient[] }>("/api/v1/client-posture/fleet/summary", reload);
+  const { data, error } = useJson<{ clients: FleetClient[]; average_score?: number | null }>("/api/v1/client-posture/fleet/summary", reload);
   const setTarget = async (c: FleetClient) => {
     const answer = window.prompt(`Target score for ${c.client_name ?? "this client"} (1 to 100). Leave empty to remove it.`, c.target ? String(c.target) : "");
     if (answer === null) return;
@@ -125,6 +125,7 @@ function Worst() {
   return (
     <>
     {problem && <p role="alert" className="mb-2 text-sm text-red-300">{problem}</p>}
+    {data.average_score != null && <p className="mb-2 text-sm text-slate-400" data-testid="fleet-average">Fleet average: {data.average_score}% across {data.clients.filter((c) => c.score !== null).length} clients with a score.</p>}
     <table className="w-full text-left text-sm" data-testid="fleet-worst">
       <thead className="text-xs uppercase text-slate-500">
         <tr>

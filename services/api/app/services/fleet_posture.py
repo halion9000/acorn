@@ -65,6 +65,12 @@ def rank_clients(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(summaries, key=lambda s: (s["score"] is None, s["score"] if s["score"] is not None else 0, -s["not_met"], str(s.get("client_name") or "").lower()))
 
 
+def average_score(scores: list[int | None]) -> int | None:
+    """The mean of the clients' scores, rounded, leaving out clients with no score. None when nobody has one."""
+    have = [s for s in scores if s is not None]
+    return int(sum(have) / len(have) + 0.5) if have else None
+
+
 def below_target(score: int | None, target: int | None) -> bool:
     """True when a client has both a score and a target and the score is under it. No score (no checks) is not below anything."""
     return score is not None and target is not None and score < target

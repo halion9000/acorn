@@ -27396,6 +27396,11 @@ components:
             $ref: '#/components/schemas/FleetClient'
           type: array
           title: Clients
+        average_score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Average Score
       type: object
       required:
       - generated_at

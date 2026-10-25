@@ -31,7 +31,7 @@ from app.services.domain_posture import DohResolver, DomainPosture, Resolver, ca
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
 from app.services import fleet_cache
 from app.services.score_history import trend as score_trend
-from app.services.fleet_posture import below_target, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import average_score, below_target, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
@@ -569,6 +569,8 @@ class FleetClient(BaseModel):
 class FleetOut(BaseModel):
     generated_at: datetime
     clients: list[FleetClient]
+    # The mean score of the clients that have one.
+    average_score: int | None = None
 
 
 @router.get("/fleet/summary", response_model=FleetOut, summary="Every client's check score, worst first")
@@ -589,7 +591,8 @@ async def fleet_summary(current_user: Annotated[AuthUser, Depends(require_permis
         s = summarize(rows)
         target = targets.get(uuid.UUID(cid))
         summaries.append({"client_id": uuid.UUID(cid), "client_name": names.get(uuid.UUID(cid)), "stale_tools": stale_sources(refreshed.get(uuid.UUID(cid), {}), now), "target": target, "below_target": below_target(s["score"], target), **s})
-    return FleetOut(generated_at=now, clients=[FleetClient(**s) for s in rank_clients(summaries)])
+    ranked = rank_clients(summaries)
+    return FleetOut(generated_at=now, clients=[FleetClient(**s) for s in ranked], average_score=average_score([s["score"] for s in ranked]))
 
 
 class FleetBoardRow(BaseModel):

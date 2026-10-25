@@ -16,6 +16,7 @@ beforeEach(() => {
     if (url.endsWith('/fleet/summary'))
       return json({
         generated_at: '2026-10-25T00:00:00Z',
+        average_score: 40,
         clients: [
           { client_id: 'c1', client_name: 'Acme', score: 40, met: 1, partly: 1, not_met: 3, accepted: 0, stale_tools: ['ninjaone'], target: 80, below_target: true },
           { client_id: 'c2', client_name: 'Beta', score: null, met: 0, partly: 0, not_met: 0, accepted: 2, stale_tools: [] },
@@ -47,6 +48,13 @@ describe('endsText', () => {
   const now = Date.parse('2026-10-25T12:00:00Z');
   it('says how long an acceptance has left', () => {
     expect([endsText(null, now), endsText('2026-10-26T01:00:00Z', now), endsText('2026-10-30T12:00:00Z', now), endsText('2026-10-25T09:00:00Z', now)]).toEqual(['no end date', 'ends in 1 day', 'ends in 5 days', 'ends today']);
+  });
+});
+
+describe('FleetPosture average', () => {
+  it('says the fleet average and how many clients it covers', async () => {
+    render(<FleetPosture />);
+    expect(await screen.findByTestId('fleet-average')).toHaveTextContent('Fleet average: 40% across 1 clients with a score.');
   });
 });
 

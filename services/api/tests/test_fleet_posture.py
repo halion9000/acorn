@@ -94,3 +94,12 @@ def test_a_client_is_below_target_only_when_it_has_both_a_score_and_a_target_and
     assert below_target(95, 80) is False
     assert below_target(None, 80) is False, "no checks, no score, nothing to miss"
     assert below_target(50, None) is False
+
+
+def test_the_fleet_average_leaves_out_clients_with_no_score_and_rounds():
+    from app.services.fleet_posture import average_score
+
+    assert average_score([80, 60, None, 71]) == 70, "(80 + 60 + 71) / 3 = 70.33"
+    assert average_score([None, None]) is None
+    assert average_score([]) is None
+    assert average_score([50, 51]) == 51, "50.5 rounds up"
