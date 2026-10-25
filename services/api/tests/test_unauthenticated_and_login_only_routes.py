@@ -106,6 +106,10 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's Microsoft 365 baseline checks per client: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only write under that feed's own mapped client tenants",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/sweep-runs",
+    ): "CORE's latest pass of each per-client sweep: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only write that feed's own run records",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/vcio-reviews",
     ): "CORE's vCIO Toolbox summary per client: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only write under that feed's own mapped client tenants",
     (

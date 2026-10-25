@@ -69,6 +69,10 @@ def test_the_posture_of_a_client_in_datto_saas_still_reports_its_alert_counts_an
                     return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
                 row = SimpleNamespace(checks=[{"key": "saas_backup_google", "status": "met", "evidence": "e"}])
                 return SimpleNamespace(scalars=lambda: SimpleNamespace(first=lambda: row))
+            if "client_check_history" in text:
+                return SimpleNamespace(all=lambda: [])
+            if "client_check_acceptances" in text:
+                return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
             if "FROM cases" in text:
                 return SimpleNamespace(scalar_one=lambda: 4)
             return SimpleNamespace(one=lambda: (3, 1, 2, 5))
@@ -82,7 +86,7 @@ def test_the_posture_of_a_client_in_datto_saas_still_reports_its_alert_counts_an
 # ---- the checks each tool sent for a client mapped to it --------------------------------------------------------------------------------------------------
 
 
-def _posture_with(monkeypatch, aliases, rows):
+def _posture_with(monkeypatch, aliases, rows, history=None, accepted=None):
     """The whole posture endpoint for a client mapped as ``aliases``, where ``rows`` are the checks rows the database holds: [(source, checks)]. Returns the posture and the number of check-row queries made."""
     import asyncio
     import contextlib
@@ -121,6 +125,10 @@ def _posture_with(monkeypatch, aliases, rows):
                 asked = [src for src, _ in rows if f"'{src}'" in text]
                 got = [SimpleNamespace(source=src, checks=checks, refreshed_at=datetime(2026, 10, 24, tzinfo=UTC)) for src, checks in rows if src in asked]
                 return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: got, first=lambda: got[0] if got else None))
+            if "client_check_history" in text:
+                return SimpleNamespace(all=lambda: history or [])
+            if "client_check_acceptances" in text:
+                return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: accepted or []))
             if "FROM cases" in text:
                 return SimpleNamespace(scalar_one=lambda: 0)
             return SimpleNamespace(one=lambda: (0, 0, 0, 0))
@@ -151,5 +159,60 @@ def test_cipps_extra_checks_are_read_from_their_own_source_when_the_client_is_ma
 
 
 def test_a_client_mapped_to_no_checking_tool_reads_no_check_rows_at_all(monkeypatch):
-    out, queries = _posture_with(monkeypatch, [("dnsfilter", "5", "Acme")], [("threatmate", [{"key": "k", "status": "met", "evidence": "x"}])])
+    out, queries = _posture_with(monkeypatch, [("screenconnect", "5", "Acme")], [("threatmate", [{"key": "k", "status": "met", "evidence": "x"}])])
     assert out.tool_checks == {} and queries == []
+
+
+# ---- since when, accepted checks, and how the sweeps are doing -----------------------------------------------------------------------------------------------
+
+
+def test_each_check_says_since_when_it_has_had_its_status_and_whether_a_person_accepted_it(monkeypatch):
+    from datetime import UTC, datetime, timedelta
+    from types import SimpleNamespace
+
+    changed = datetime(2026, 10, 20, tzinfo=UTC)
+    live = SimpleNamespace(key="threatmate_patching", reason="Client will replace the machines in January", accepted_at=datetime(2026, 10, 21, tzinfo=UTC), expires_at=datetime.now(UTC) + timedelta(days=30))
+    gone = SimpleNamespace(key="threatmate_security_score", reason="old", accepted_at=datetime(2026, 1, 1, tzinfo=UTC), expires_at=datetime(2026, 2, 1, tzinfo=UTC))
+    rows = [("threatmate", [{"key": "threatmate_patching", "status": "not_met", "evidence": "x"}, {"key": "threatmate_security_score", "status": "not_met", "evidence": "y"}, {"key": "threatmate_end_of_life", "status": "met", "evidence": "z"}])]
+    out, _ = _posture_with(monkeypatch, [("threatmate", "11", "Acme")], rows, history=[("threatmate_patching", changed)], accepted=[live, gone])
+    by = {c.key: c for c in out.tool_checks["threatmate"].checks}
+    assert by["threatmate_patching"].since == changed
+    assert by["threatmate_patching"].accepted is not None and by["threatmate_patching"].accepted.reason.startswith("Client will replace")
+    assert by["threatmate_security_score"].accepted is None, "an acceptance that has run out no longer counts"
+    assert by["threatmate_end_of_life"].since is None and by["threatmate_end_of_life"].accepted is None
+
+
+def test_a_sweeps_health_is_stale_after_48_hours_then_failed_partly_or_ok():
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime(2026, 10, 25, 12, tzinfo=UTC)
+    recent, old = now - timedelta(hours=2), now - timedelta(hours=49)
+    assert ep.sweep_health(10, 0, recent, now) == "ok"
+    assert ep.sweep_health(10, 2, recent, now) == "partly"
+    assert ep.sweep_health(0, 3, recent, now) == "failed"
+    assert ep.sweep_health(0, 0, recent, now) == "ok", "a pass with nothing due is not a failure"
+    assert ep.sweep_health(10, 0, old, now) == "stale", "an old pass is stale even if it went well"
+
+
+def test_accepting_a_check_needs_a_reason_a_sensible_key_and_a_bounded_end_date(monkeypatch):
+    import asyncio
+    import uuid as _uuid
+    from types import SimpleNamespace
+
+    import pytest
+    from fastapi import HTTPException
+
+    owner = _uuid.uuid4()
+    user = SimpleNamespace(tenant_id=owner, user_id=_uuid.uuid4())
+
+    class DB:
+        async def execute(self, *a, **k):  # never reached: every case below is refused first
+            raise AssertionError("the database was touched")
+
+    def call(key, reason, days=None):
+        return asyncio.run(ep.accept_check(owner, key, ep.AcceptIn(reason=reason, expires_in_days=days), user, DB()))
+
+    for key, reason, days in (("k", "  ", None), ("k", "x" * 401, None), ("bad key!", "fine reason", None), ("k", "fine reason", 0), ("k", "fine reason", ep.MAX_ACCEPT_DAYS + 1)):
+        with pytest.raises(HTTPException) as e:
+            call(key, reason, days)
+        assert e.value.status_code == 422, (key, reason, days)

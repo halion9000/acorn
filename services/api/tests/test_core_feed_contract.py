@@ -49,6 +49,7 @@ MODELS = {
     "vcio-proposals-approved": None,
     "vcio-proposals-result": vp.ProposalResult,
     "m365-checks": cr.M365ChecksReport,
+    "sweep-runs": cr.SweepRunsReport,
     "identities": idn.IdentitiesReport,
 }
 

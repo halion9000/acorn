@@ -1,0 +1,18 @@
+{
+  "route": "sweep-runs",
+  "method": "POST",
+  "body": {
+    "runs": [
+      {
+        "source": "ninjaone",
+        "title": "NinjaOne client checks",
+        "accounts": 226,
+        "sent": 170,
+        "failed": 0,
+        "waiting": 56,
+        "skipped": 0,
+        "first_error": ""
+      }
+    ]
+  }
+}

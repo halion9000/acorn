@@ -29,8 +29,9 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.client_review_answer import ClientReviewAnswer
-from app.models.signin import ClientM365Check, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
+from app.models.signin import ClientCheckHistory, ClientM365Check, CoreSweepRun, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
+from app.services.check_history import changes as check_changes
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
 from app.services.infra_review import CIPP_BASELINE_SOURCE, SAAS_SOURCES, TOOL_CHECK_SOURCES
 from app.services.m365_review import M365Answer, m365_answers
@@ -187,7 +188,13 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
     accepted = 0
     for tid in by_tenant:
         async with acting_as_tenant(db, tid):
-            values = {"tenant_id": tid, "source": report.source or report.vendor, "checks": [c.model_dump() for c in report.checks], "refreshed_at": now}
+            source = report.source or report.vendor
+            new_checks = [c.model_dump() for c in report.checks]
+            # What changed since the last report goes into the history (a check appearing, or its status moving), so the page can say since when and show a trend.
+            previous = (await db.execute(select(ClientM365Check.checks).where(ClientM365Check.tenant_id == tid, ClientM365Check.source == source))).scalar_one_or_none()
+            for change in check_changes(previous, new_checks, source):
+                db.add(ClientCheckHistory(tenant_id=tid, observed_at=now, **change))
+            values = {"tenant_id": tid, "source": source, "checks": new_checks, "refreshed_at": now}
             stmt = pg_insert(ClientM365Check).values(values)
             update = {c: stmt.excluded[c] for c in values if c not in ("tenant_id", "source")}
             await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source"], set_=update))
@@ -260,6 +267,45 @@ async def report_core_feed_m365_checks(tenant_token: str, body: M365ChecksReport
     result = await apply_m365_checks(db, owner, body)
     await db.commit()
     return result
+
+
+class SweepRunIn(BaseModel):
+    source: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
+    title: str = Field(min_length=1, max_length=120)
+    accounts: int = Field(ge=0, le=100000)
+    sent: int = Field(ge=0, le=100000)
+    failed: int = Field(ge=0, le=100000)
+    waiting: int = Field(ge=0, le=100000)
+    skipped: int = Field(ge=0, le=100000)
+    first_error: str = Field(default="", max_length=300)
+
+
+class SweepRunsReport(BaseModel):
+    runs: list[SweepRunIn] = Field(min_length=1, max_length=60)
+
+
+class SweepRunsResponse(BaseModel):
+    updated: int
+
+
+async def apply_sweep_runs(db: Any, owner: uuid.UUID, report: SweepRunsReport, now: datetime | None = None) -> int:
+    """Keep the latest pass of each sweep CORE ran. The caller owns the transaction."""
+    now = now or datetime.now(UTC)
+    for run in report.runs:
+        values = {"tenant_id": owner, "ran_at": now, **run.model_dump()}
+        stmt = pg_insert(CoreSweepRun).values(values)
+        await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "source")}))
+    return len(report.runs)
+
+
+@ingest_router.post("/core-feed/{tenant_token}/sweep-runs", response_model=SweepRunsResponse)
+async def report_core_feed_sweep_runs(tenant_token: str, body: SweepRunsReport, db: DBSession) -> SweepRunsResponse:
+    """Record the latest pass of each of CORE's per-client sweeps (how many clients it reached, and why some did not)."""
+    owner = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, owner)
+    updated = await apply_sweep_runs(db, owner, body)
+    await db.commit()
+    return SweepRunsResponse(updated=updated)
 
 
 class ReviewVcio(BaseModel):

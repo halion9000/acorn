@@ -13,6 +13,7 @@ import { vendorLabel } from "@/components/mssp/ClientMapping";
 import { vendorClientUrl } from "@/lib/vendor-links";
 import { DomainChecks } from "./DomainChecks";
 import { ToolChecks, type PostureCheck } from "./ToolChecks";
+import { SourceHealth } from "./SourceHealth";
 
 export interface Posture {
   client_id: string;
@@ -140,6 +141,8 @@ export function ClientPosture() {
   const [clientId, setClientId] = useState("");
   const [posture, setPosture] = useState<Posture | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [onlyProblems, setOnlyProblems] = useState(false);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -175,7 +178,7 @@ export function ClientPosture() {
     return () => {
       live = false;
     };
-  }, [clientId]);
+  }, [clientId, reload]);
 
   const shown = posture && posture.client_id === clientId ? posture : null;
   const links = postureLinks(clientId);
@@ -204,6 +207,7 @@ export function ClientPosture() {
           ))}
         </select>
       </label>
+      <SourceHealth />
       {error && (
         <p role="alert" className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
           {error}
@@ -241,8 +245,12 @@ export function ClientPosture() {
               </p>
             )}
           </section>
+          <label className="flex items-center gap-2 text-sm text-slate-300 print:hidden">
+            <input type="checkbox" checked={onlyProblems} onChange={(e) => setOnlyProblems(e.target.checked)} aria-label="Only checks that need attention" />
+            Only checks that need attention
+          </label>
           {toolCheckEntries(shown.tool_checks).map(([source, v]) => (
-            <ToolChecks key={source} tool={source} label={TOOL_CHECK_LABELS[source] ?? source} checks={v.checks} refreshedAt={v.refreshed_at} />
+            <ToolChecks key={source} tool={source} label={TOOL_CHECK_LABELS[source] ?? source} checks={v.checks} refreshedAt={v.refreshed_at} clientId={shown.client_id} onChanged={() => setReload((n) => n + 1)} onlyProblems={onlyProblems} />
           ))}
           <DomainChecks clientId={shown.client_id} />
           <section>

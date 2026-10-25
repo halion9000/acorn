@@ -11104,6 +11104,141 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/{client_id}/check-history:
+    get:
+      tags:
+      - posture
+      summary: When each of a client's tool checks appeared or changed status
+      operationId: check_history_api_v1_client_posture__client_id__check_history_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: key
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Key
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 200
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckHistoryOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/{client_id}/acceptances/{key}:
+    put:
+      tags:
+      - posture
+      summary: Accept a failing check for a client, with a reason and an optional
+        end date
+      operationId: accept_check_api_v1_client_posture__client_id__acceptances__key__put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckAcceptanceOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - posture
+      summary: Stop accepting a check for a client
+      operationId: remove_acceptance_api_v1_client_posture__client_id__acceptances__key__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Key
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/sweeps/runs:
+    get:
+      tags:
+      - posture
+      summary: The latest pass of each of CORE's per-client sweeps, and whether it
+        reached A.C.O.R.N
+      operationId: sweep_runs_api_v1_client_posture_sweeps_runs_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SweepRunOut'
+                type: array
+                title: Response Sweep Runs Api V1 Client Posture Sweeps Runs Get
+      security:
+      - HTTPBearer: []
   /api/v1/inbox/core-feed/{tenant_token}/vcio-reviews:
     post:
       tags:
@@ -11166,6 +11301,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VcioReviewResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/sweep-runs:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Sweep Runs
+      description: Record the latest pass of each of CORE's per-client sweeps (how
+        many clients it reached, and why some did not).
+      operationId: report_core_feed_sweep_runs_api_v1_inbox_core_feed__tenant_token__sweep_runs_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SweepRunsReport'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SweepRunsResponse'
         '422':
           description: Validation Error
           content:
@@ -18578,6 +18747,20 @@ paths:
       - HTTPBearer: []
 components:
   schemas:
+    AcceptIn:
+      properties:
+        reason:
+          type: string
+          title: Reason
+        expires_in_days:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Expires In Days
+      type: object
+      required:
+      - reason
+      title: AcceptIn
     AccessGrantResponse:
       properties:
         tenant_id:
@@ -21754,6 +21937,74 @@ components:
       - tags
       - sla_due_at
       title: CaseResponse
+    CheckAcceptanceOut:
+      properties:
+        reason:
+          type: string
+          title: Reason
+        accepted_at:
+          type: string
+          format: date-time
+          title: Accepted At
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Expires At
+      type: object
+      required:
+      - reason
+      - accepted_at
+      title: CheckAcceptanceOut
+    CheckHistoryOut:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        rows:
+          items:
+            $ref: '#/components/schemas/CheckHistoryRow'
+          type: array
+          title: Rows
+      type: object
+      required:
+      - client_id
+      - rows
+      title: CheckHistoryOut
+    CheckHistoryRow:
+      properties:
+        key:
+          type: string
+          title: Key
+        source:
+          type: string
+          title: Source
+        status:
+          type: string
+          title: Status
+        previous_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Previous Status
+        evidence:
+          type: string
+          title: Evidence
+        observed_at:
+          type: string
+          format: date-time
+          title: Observed At
+      type: object
+      required:
+      - key
+      - source
+      - status
+      - previous_status
+      - evidence
+      - observed_at
+      title: CheckHistoryRow
     ChildTenantOut:
       properties:
         id:
@@ -30709,6 +30960,16 @@ components:
         evidence:
           type: string
           title: Evidence
+        since:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Since
+        accepted:
+          anyOf:
+          - $ref: '#/components/schemas/CheckAcceptanceOut'
+          - type: 'null'
       type: object
       required:
       - key
@@ -35322,6 +35583,125 @@ components:
       - created_at
       - active
       title: SuppressionOut
+    SweepRunIn:
+      properties:
+        source:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          title: Source
+        title:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Title
+        accounts:
+          type: integer
+          maximum: 100000.0
+          minimum: 0.0
+          title: Accounts
+        sent:
+          type: integer
+          maximum: 100000.0
+          minimum: 0.0
+          title: Sent
+        failed:
+          type: integer
+          maximum: 100000.0
+          minimum: 0.0
+          title: Failed
+        waiting:
+          type: integer
+          maximum: 100000.0
+          minimum: 0.0
+          title: Waiting
+        skipped:
+          type: integer
+          maximum: 100000.0
+          minimum: 0.0
+          title: Skipped
+        first_error:
+          type: string
+          maxLength: 300
+          title: First Error
+          default: ''
+      type: object
+      required:
+      - source
+      - title
+      - accounts
+      - sent
+      - failed
+      - waiting
+      - skipped
+      title: SweepRunIn
+    SweepRunOut:
+      properties:
+        source:
+          type: string
+          title: Source
+        title:
+          type: string
+          title: Title
+        ran_at:
+          type: string
+          format: date-time
+          title: Ran At
+        accounts:
+          type: integer
+          title: Accounts
+        sent:
+          type: integer
+          title: Sent
+        failed:
+          type: integer
+          title: Failed
+        waiting:
+          type: integer
+          title: Waiting
+        skipped:
+          type: integer
+          title: Skipped
+        first_error:
+          type: string
+          title: First Error
+        health:
+          type: string
+          title: Health
+      type: object
+      required:
+      - source
+      - title
+      - ran_at
+      - accounts
+      - sent
+      - failed
+      - waiting
+      - skipped
+      - first_error
+      - health
+      title: SweepRunOut
+    SweepRunsReport:
+      properties:
+        runs:
+          items:
+            $ref: '#/components/schemas/SweepRunIn'
+          type: array
+          maxItems: 60
+          minItems: 1
+          title: Runs
+      type: object
+      required:
+      - runs
+      title: SweepRunsReport
+    SweepRunsResponse:
+      properties:
+        updated:
+          type: integer
+          title: Updated
+      type: object
+      required:
+      - updated
+      title: SweepRunsResponse
     SyncClaimResponse:
       properties:
         vendors:

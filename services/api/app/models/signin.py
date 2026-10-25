@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -115,6 +115,52 @@ class ClientM365Check(Base):
     source: Mapped[str] = mapped_column(String(40), primary_key=True)
     checks: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     refreshed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class ClientCheckHistory(Base):
+    """A client's tool check appearing, or changing status (migration 103). The newest row per check says since when it has had its current status."""
+
+    __tablename__ = "client_check_history"
+    __table_args__ = (Index("ix_client_check_history_tenant_key", "tenant_id", "key", "observed_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    source: Mapped[str] = mapped_column(String(40), nullable=False)
+    key: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False)
+    previous_status: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    evidence: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class ClientCheckAcceptance(Base):
+    """A person accepting a failing check for a client, with a reason and an optional end date (migration 103)."""
+
+    __tablename__ = "client_check_acceptances"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    reason: Mapped[str] = mapped_column(String(400), nullable=False)
+    accepted_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CoreSweepRun(Base):
+    """The latest pass of one of CORE's per-client sweeps, as CORE reported it (migration 103)."""
+
+    __tablename__ = "core_sweep_runs"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    source: Mapped[str] = mapped_column(String(40), primary_key=True)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    ran_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    accounts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    waiting: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    first_error: Mapped[str] = mapped_column(String(300), nullable=False, default="")
 
 
 class ClientVcioProposal(Base):

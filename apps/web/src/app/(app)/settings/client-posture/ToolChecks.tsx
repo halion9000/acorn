@@ -1,5 +1,9 @@
 "use client";
 
+import { useEffect, useState } from 'react';
+
+import { authFetch } from '@/lib/auth-session';
+
 /**
  * What one tool says about the client as plain checks CORE reads once a day and sends for a client that is mapped to that tool: ThreatMate (security score, patching, end-of-life software) and
  * Liongard (disk encryption, EDR coverage, e-mail domain records, stale licensed users). Nothing is shown for a client with none (not mapped, or nothing sent yet).
@@ -9,6 +13,19 @@ export interface PostureCheck {
   key: string;
   status: 'met' | 'partly' | 'not_met' | string;
   evidence: string;
+  /** Since when the check has had this status, when A.C.O.R.N has seen it change. */
+  since?: string | null;
+  /** Set when a person accepted this check for the client and it has not run out. */
+  accepted?: { reason: string; accepted_at: string; expires_at?: string | null } | null;
+}
+
+export interface CheckHistoryRow {
+  key: string;
+  source: string;
+  status: string;
+  previous_status: string | null;
+  evidence: string;
+  observed_at: string;
 }
 
 const TITLE: Record<string, string> = {
@@ -64,21 +81,153 @@ const STATUS: Record<string, { text: string; className: string }> = {
   not_met: { text: 'Problem', className: 'border-red-500/40 text-red-300' },
 };
 
-export function ToolChecks({ tool, label, checks, refreshedAt }: { tool: string; label: string; checks: PostureCheck[]; refreshedAt?: string | null }) {
+/** A tool whose checks are older than this has probably stopped reaching A.C.O.R.N. */
+export const STALE_HOURS = 48;
+
+export function isStale(refreshedAt: string | null | undefined, now: number = Date.now()): boolean {
+  if (!refreshedAt) return false;
+  const t = Date.parse(refreshedAt);
+  return !Number.isNaN(t) && now - t > STALE_HOURS * 3_600_000;
+}
+
+const day = (iso: string): string => new Date(iso).toLocaleDateString();
+
+function History({ clientId, check }: { clientId: string; check: string }) {
+  const [rows, setRows] = useState<CheckHistoryRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    authFetch(`/api/v1/client-posture/${encodeURIComponent(clientId)}/check-history?key=${encodeURIComponent(check)}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`The API answered ${res.status}`);
+        const body = (await res.json()) as { rows: CheckHistoryRow[] };
+        if (live) setRows(body.rows);
+      })
+      .catch((e: unknown) => {
+        if (live) setError(e instanceof Error ? e.message : 'Could not load the history');
+      });
+    return () => {
+      live = false;
+    };
+  }, [clientId, check]);
+  if (error) return <p className="mt-1 text-xs text-red-300">{error}</p>;
+  if (!rows) return <p className="mt-1 text-xs text-slate-500">Loading history…</p>;
+  if (rows.length === 0) return <p className="mt-1 text-xs text-slate-500">No history yet: A.C.O.R.N has seen this check only once.</p>;
+  return (
+    <ul className="mt-1 space-y-0.5 text-xs text-slate-400" data-testid={`history-${check}`}>
+      {rows.map((r, i) => (
+        <li key={`${r.observed_at}-${i}`}>
+          {day(r.observed_at)}: {r.previous_status ? `${STATUS[r.previous_status]?.text ?? r.previous_status} → ` : 'first seen as '}
+          {STATUS[r.status]?.text ?? r.status}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function ToolChecks({
+  tool,
+  label,
+  checks,
+  refreshedAt,
+  clientId,
+  onChanged,
+  onlyProblems,
+}: {
+  tool: string;
+  label: string;
+  checks: PostureCheck[];
+  refreshedAt?: string | null;
+  /** With a client, each check can show its history and be accepted. */
+  clientId?: string;
+  /** Called after an acceptance is saved or removed, so the page reloads. */
+  onChanged?: () => void;
+  /** Hide the checks that are fine. */
+  onlyProblems?: boolean;
+}) {
+  const [openHistory, setOpenHistory] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   if (checks.length === 0) return null;
+  const shown = onlyProblems ? checks.filter((c) => c.status !== 'met') : checks;
+  if (shown.length === 0) return null;
+  const stale = isStale(refreshedAt);
+
+  const accept = async (key: string) => {
+    if (!clientId) return;
+    const reason = window.prompt('Why is this accepted for this client?');
+    if (!reason || reason.trim().length < 3) return;
+    const days = window.prompt('For how many days? Leave empty to accept until you remove it.', '90');
+    const body: { reason: string; expires_in_days?: number } = { reason: reason.trim() };
+    if (days && days.trim() !== '') body.expires_in_days = Number(days);
+    try {
+      const res = await authFetch(`/api/v1/client-posture/${encodeURIComponent(clientId)}/acceptances/${encodeURIComponent(key)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) throw new Error(`The API answered ${res.status}`);
+      setProblem(null);
+      onChanged?.();
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : 'Could not save');
+    }
+  };
+  const unaccept = async (key: string) => {
+    if (!clientId) return;
+    try {
+      const res = await authFetch(`/api/v1/client-posture/${encodeURIComponent(clientId)}/acceptances/${encodeURIComponent(key)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`The API answered ${res.status}`);
+      setProblem(null);
+      onChanged?.();
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : 'Could not remove');
+    }
+  };
+
   return (
     <section data-testid={`${tool}-checks`}>
       <h3 className="mb-2 text-sm uppercase text-slate-500">
-        {label}{refreshedAt ? <span className="ml-2 text-xs normal-case text-slate-600">as of {new Date(refreshedAt).toLocaleDateString()}</span> : null}
+        {label}
+        {refreshedAt ? <span className="ml-2 text-xs normal-case text-slate-600">as of {new Date(refreshedAt).toLocaleDateString()}</span> : null}
+        {stale ? (
+          <span className="ml-2 rounded border border-amber-500/40 px-1.5 py-0.5 text-[11px] normal-case text-amber-300" data-testid={`${tool}-stale`}>
+            not updated for over {STALE_HOURS} hours
+          </span>
+        ) : null}
       </h3>
+      {problem && (
+        <p role="alert" className="mb-2 text-xs text-red-300">
+          {problem}
+        </p>
+      )}
       <div className="grid gap-2 md:grid-cols-3">
-        {checks.map((c) => {
+        {shown.map((c) => {
           const st = STATUS[c.status] ?? STATUS.partly;
           return (
-            <div key={c.key} className="rounded border border-slate-800 p-2" data-testid={`check-${c.key}`}>
+            <div key={c.key} className={`rounded border p-2 ${c.accepted ? 'border-slate-800 opacity-80' : 'border-slate-800'}`} data-testid={`check-${c.key}`}>
               <div className="text-xs uppercase text-slate-500">{TITLE[c.key] ?? c.key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp|ninjaone|halopsa|meraki|slide|autoelevate|huntress|dnsfilter|datto)_/, '').replace(/_/g, ' ')}</div>
               <span className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[11px] ${st.className}`}>{st.text}</span>
+              {c.accepted ? (
+                <span className="ml-1 inline-block rounded border border-sky-500/40 px-1.5 py-0.5 text-[11px] text-sky-300" data-testid={`accepted-${c.key}`}>
+                  Accepted{c.accepted.expires_at ? ` until ${day(c.accepted.expires_at)}` : ''}
+                </span>
+              ) : null}
+              {c.since ? <span className="ml-1 text-[11px] text-slate-600">since {day(c.since)}</span> : null}
               <div className="mt-1 text-xs text-slate-400">{c.evidence}</div>
+              {c.accepted ? <div className="mt-1 text-xs text-sky-200/80">Reason: {c.accepted.reason}</div> : null}
+              {clientId ? (
+                <div className="mt-1 flex gap-3 text-[11px] print:hidden">
+                  <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setOpenHistory(openHistory === c.key ? null : c.key)}>
+                    {openHistory === c.key ? 'Hide history' : 'History'}
+                  </button>
+                  {c.accepted ? (
+                    <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void unaccept(c.key)}>
+                      Stop accepting
+                    </button>
+                  ) : c.status !== 'met' ? (
+                    <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void accept(c.key)}>
+                      Accept this
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {clientId && openHistory === c.key ? <History clientId={clientId} check={c.key} /> : null}
             </div>
           );
         })}

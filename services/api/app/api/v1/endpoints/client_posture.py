@@ -8,12 +8,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import and_, bindparam, func, not_, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.alerts import FINISHED_STATUSES, has_ticket_expr
@@ -23,7 +24,7 @@ from app.db.rls_scope import acting_as_tenant
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.identity_source import IdentitySource
-from app.models.signin import ClientM365Check, IdentityMfaUser
+from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, CoreSweepRun, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
@@ -74,6 +75,16 @@ class PostureCheck(BaseModel):
     key: str
     status: str
     evidence: str
+    # Since when the check has had this status (the last time it changed), when A.C.O.R.N has seen it change; None for a check seen only once, before history was kept.
+    since: datetime | None = None
+    # Set when a person has accepted this check for the client (and it has not run out).
+    accepted: "CheckAcceptanceOut | None" = None
+
+
+class CheckAcceptanceOut(BaseModel):
+    reason: str
+    accepted_at: datetime
+    expires_at: datetime | None = None
 
 
 class ToolChecksOut(BaseModel):
@@ -118,10 +129,19 @@ async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, alia
         return {}
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
         rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_(sources)))).scalars().all()
+        since_rows = (
+            await db.execute(
+                select(ClientCheckHistory.key, func.max(ClientCheckHistory.observed_at)).where(ClientCheckHistory.tenant_id == client_id, ClientCheckHistory.source.in_(sources)).group_by(ClientCheckHistory.key)
+            )
+        ).all()
+        accepted_rows = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id))).scalars().all()
+    since = {k: t for k, t in since_rows}
+    now = datetime.now(UTC)
+    accepted = {a.key: CheckAcceptanceOut(reason=a.reason, accepted_at=a.accepted_at, expires_at=a.expires_at) for a in accepted_rows if a.expires_at is None or a.expires_at > now}
     out: dict[str, ToolChecksOut] = {}
     for row in rows:
         checks = [
-            PostureCheck(key=str(c["key"]), status=str(c["status"]), evidence=str(c.get("evidence", "")))
+            PostureCheck(key=str(c["key"]), status=str(c["status"]), evidence=str(c.get("evidence", "")), since=since.get(str(c["key"])), accepted=accepted.get(str(c["key"])))
             for c in (row.checks or [])
             if isinstance(c, dict) and c.get("key") and c.get("status")
         ]
@@ -249,3 +269,145 @@ async def client_domains(
     webs = await asyncio.gather(*(probe.probe(d.domain) for d in checked))
     domains = [DomainWithWeb(**d.model_dump(), web=web_posture(w, now)) for d, w in zip(checked, webs, strict=True)]
     return ClientDomains(client_id=client_id, domains=domains, generated_at=now)
+
+
+# ---- history, accepted risks, and how CORE's sweeps are doing -----------------------------------------------------------------------------------------------------------
+
+
+class CheckHistoryRow(BaseModel):
+    key: str
+    source: str
+    status: str
+    previous_status: str | None
+    evidence: str
+    observed_at: datetime
+
+
+class CheckHistoryOut(BaseModel):
+    client_id: uuid.UUID
+    rows: list[CheckHistoryRow]
+
+
+async def _client_of_owner(db: Any, owner: uuid.UUID, client_id: uuid.UUID) -> None:
+    if client_id != owner:
+        found = (await db.execute(select(Tenant.id).where(Tenant.id == client_id, Tenant.parent_tenant_id == owner))).scalar_one_or_none()
+        if found is None:
+            raise HTTPException(status_code=404, detail="Client not found")
+
+
+@router.get("/{client_id}/check-history", response_model=CheckHistoryOut, summary="When each of a client's tool checks appeared or changed status")
+async def check_history(
+    client_id: uuid.UUID,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    key: str | None = None,
+    limit: int = 200,
+) -> CheckHistoryOut:
+    owner = current_user.tenant_id
+    await _client_of_owner(db, owner, client_id)
+    limit = max(1, min(limit, 500))
+    stmt = select(ClientCheckHistory).where(ClientCheckHistory.tenant_id == client_id)
+    if key:
+        stmt = stmt.where(ClientCheckHistory.key == key)
+    async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
+        rows = (await db.execute(stmt.order_by(ClientCheckHistory.observed_at.desc(), ClientCheckHistory.id.desc()).limit(limit))).scalars().all()
+    return CheckHistoryOut(
+        client_id=client_id,
+        rows=[CheckHistoryRow(key=r.key, source=r.source, status=r.status, previous_status=r.previous_status, evidence=r.evidence, observed_at=r.observed_at) for r in rows],
+    )
+
+
+class AcceptIn(BaseModel):
+    reason: str
+    # Days from now until the acceptance runs out; none means until someone removes it.
+    expires_in_days: int | None = None
+
+
+MAX_ACCEPT_DAYS = 730
+MAX_ACCEPTANCES_PER_CLIENT = 200
+
+
+@router.put("/{client_id}/acceptances/{key}", response_model=CheckAcceptanceOut, summary="Accept a failing check for a client, with a reason and an optional end date")
+async def accept_check(
+    client_id: uuid.UUID, key: str, body: AcceptIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+) -> CheckAcceptanceOut:
+    owner = current_user.tenant_id
+    await _client_of_owner(db, owner, client_id)
+    reason = " ".join(body.reason.split())
+    if len(reason) < 3 or len(reason) > 400:
+        raise HTTPException(status_code=422, detail="Give a reason of 3 to 400 characters")
+    if not key or len(key) > 80 or not all(c.isalnum() or c in "_-" for c in key):
+        raise HTTPException(status_code=422, detail="That is not a check key")
+    if body.expires_in_days is not None and not 1 <= body.expires_in_days <= MAX_ACCEPT_DAYS:
+        raise HTTPException(status_code=422, detail=f"The end date must be 1 to {MAX_ACCEPT_DAYS} days away")
+    now = datetime.now(UTC)
+    expires = now + timedelta(days=body.expires_in_days) if body.expires_in_days else None
+    async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
+        existing = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id, ClientCheckAcceptance.key == key))).scalar_one_or_none()
+        if existing is None:
+            count = (await db.execute(select(func.count()).select_from(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id))).scalar_one()
+            if count >= MAX_ACCEPTANCES_PER_CLIENT:
+                raise HTTPException(status_code=422, detail=f"A client can have at most {MAX_ACCEPTANCES_PER_CLIENT} accepted checks")
+        values = {"tenant_id": client_id, "key": key, "reason": reason, "accepted_by": current_user.user_id, "accepted_at": now, "expires_at": expires}
+        stmt = pg_insert(ClientCheckAcceptance).values(values)
+        await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "key")}))
+        await db.commit()
+    return CheckAcceptanceOut(reason=reason, accepted_at=now, expires_at=expires)
+
+
+@router.delete("/{client_id}/acceptances/{key}", status_code=204, summary="Stop accepting a check for a client")
+async def remove_acceptance(client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> None:
+    owner = current_user.tenant_id
+    await _client_of_owner(db, owner, client_id)
+    async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
+        existing = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id, ClientCheckAcceptance.key == key))).scalar_one_or_none()
+        if existing is not None:
+            await db.delete(existing)
+            await db.commit()
+
+
+class SweepRunOut(BaseModel):
+    source: str
+    title: str
+    ran_at: datetime
+    accounts: int
+    sent: int
+    failed: int
+    waiting: int
+    skipped: int
+    first_error: str
+    # "ok", "failed" (clients failed and none was sent), "partly" (some failed) or "stale" (not run for 48 hours, whatever its last result).
+    health: str
+
+
+STALE_AFTER = timedelta(hours=48)
+
+
+def sweep_health(sent: int, failed: int, ran_at: datetime, now: datetime) -> str:
+    if now - ran_at > STALE_AFTER:
+        return "stale"
+    if failed > 0:
+        return "partly" if sent > 0 else "failed"
+    return "ok"
+
+
+@router.get("/sweeps/runs", response_model=list[SweepRunOut], summary="The latest pass of each of CORE's per-client sweeps, and whether it reached A.C.O.R.N")
+async def sweep_runs(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> list[SweepRunOut]:
+    owner = current_user.tenant_id
+    rows = (await db.execute(select(CoreSweepRun).where(CoreSweepRun.tenant_id == owner).order_by(CoreSweepRun.source))).scalars().all()
+    now = datetime.now(UTC)
+    return [
+        SweepRunOut(
+            source=r.source,
+            title=r.title,
+            ran_at=r.ran_at,
+            accounts=r.accounts,
+            sent=r.sent,
+            failed=r.failed,
+            waiting=r.waiting,
+            skipped=r.skipped,
+            first_error=r.first_error,
+            health=sweep_health(r.sent, r.failed, r.ran_at, now),
+        )
+        for r in rows
+    ]

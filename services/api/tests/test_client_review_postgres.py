@@ -267,3 +267,46 @@ async def test_a_review_of_the_owners_own_tenant_works_and_a_client_with_no_extr
     assert child.vcio is None and child.mfa is None and child.secure_score is None and child.m365_refreshed_at is None
     assert all(a.status == "needs_person" for a in child.m365)
     assert all(a.status in {"unknown", "seen", "not_seen"} for a in child.tech_stack)
+
+
+async def test_history_records_only_changes_acceptances_expire_and_sweep_runs_are_kept_once_per_source(world):
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'cipp', 'h-1', 'h-1', 'h-1', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+    first = [{"key": "a", "status": "met", "evidence": "one"}, {"key": "b", "status": "not_met", "evidence": "two"}]
+    second = [{"key": "a", "status": "met", "evidence": "same status, new words"}, {"key": "b", "status": "partly", "evidence": "better"}]
+    for checks in (first, first, second):
+        await run(world["msp"], lambda db, checks=checks: ep.apply_m365_checks(db, world["msp"], m365_report(client="h-1", checks=checks)))
+    hist = await run(world["msp"], lambda db: cp.check_history(world["client"], NS(tenant_id=world["msp"]), db))
+    got = [(r.key, r.previous_status, r.status) for r in hist.rows]
+    assert len(got) == 3 and set(got) == {("a", None, "met"), ("b", None, "not_met"), ("b", "not_met", "partly")}, "a repeat and a same-status refresh add nothing"
+    only_b = await run(world["msp"], lambda db: cp.check_history(world["client"], NS(tenant_id=world["msp"]), db, key="b"))
+    assert [r.status for r in only_b.rows] == ["partly", "not_met"], "newest first"
+
+    user = NS(tenant_id=world["msp"], user_id=uuid.uuid4())
+    out = await run(world["msp"], lambda db: cp.accept_check(world["client"], "b", cp.AcceptIn(reason="  Replace in January ", expires_in_days=30), user, db))
+    assert out.reason == "Replace in January" and out.expires_at is not None
+    again = await run(world["msp"], lambda db: cp.accept_check(world["client"], "b", cp.AcceptIn(reason="Still waiting"), user, db))
+    assert again.expires_at is None, "a second acceptance replaces the first"
+    with pytest.raises(HTTPException) as e:
+        await run(world["msp"], lambda db: cp.accept_check(world["stranger"], "b", cp.AcceptIn(reason="not mine"), user, db))
+    assert e.value.status_code == 404
+    await run(world["msp"], lambda db: cp.remove_acceptance(world["client"], "b", user, db))
+    left = (await run(world["msp"], lambda db: db.execute(text("select count(*) from client_check_acceptances where tenant_id = :t"), {"t": world["client"]}))).scalar_one()
+    assert left == 0
+
+    report = ep.SweepRunsReport(runs=[ep.SweepRunIn(source="ninjaone", title="NinjaOne client checks", accounts=10, sent=7, failed=1, waiting=2, skipped=0, first_error="Acme: boom")])
+    assert await run(world["msp"], lambda db: ep.apply_sweep_runs(db, world["msp"], report)) == 1
+    report2 = ep.SweepRunsReport(runs=[ep.SweepRunIn(source="ninjaone", title="NinjaOne client checks", accounts=10, sent=10, failed=0, waiting=0, skipped=0)])
+    await run(world["msp"], lambda db: ep.apply_sweep_runs(db, world["msp"], report2))
+    runs = await run(world["msp"], lambda db: cp.sweep_runs(NS(tenant_id=world["msp"]), db))
+    assert [(r.source, r.sent, r.failed, r.health) for r in runs] == [("ninjaone", 10, 0, "ok")], "the latest pass replaces the previous one"
