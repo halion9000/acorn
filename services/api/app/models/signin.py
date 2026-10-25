@@ -163,6 +163,37 @@ class CoreSweepRun(Base):
     first_error: Mapped[str] = mapped_column(String(300), nullable=False, default="")
 
 
+class ClientLicenseCount(Base):
+    """The latest count of one thing a tool counts for a client: licences bought, machines managed, people covered (migration 104)."""
+
+    __tablename__ = "client_license_counts"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    source: Mapped[str] = mapped_column(String(40), primary_key=True)
+    item: Mapped[str] = mapped_column(String(80), primary_key=True)
+    unit: Mapped[str] = mapped_column(String(12), nullable=False, default="other")
+    count: Mapped[int] = mapped_column(Integer, nullable=False)
+    available: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class ClientLicenseHistory(Base):
+    """One change to a client's count of something: it appeared, its count moved, or it went (count 0) (migration 104)."""
+
+    __tablename__ = "client_license_history"
+    __table_args__ = (Index("ix_client_license_history_tenant_item", "tenant_id", "source", "item", "observed_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    source: Mapped[str] = mapped_column(String(40), nullable=False)
+    item: Mapped[str] = mapped_column(String(80), nullable=False)
+    unit: Mapped[str] = mapped_column(String(12), nullable=False, default="other")
+    count: Mapped[int] = mapped_column(Integer, nullable=False)
+    previous_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
 class ClientVcioProposal(Base):
     """Something AiSOC suggests adding to a client's vCIO Toolbox, and what a person decided about it (migration 096)."""
 

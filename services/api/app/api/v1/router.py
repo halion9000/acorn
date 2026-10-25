@@ -21,6 +21,7 @@ from app.api.v1.endpoints import (
     business_context,
     canary,
     cases,
+    billing,
     client_posture,
     client_review,
     community,
@@ -212,6 +213,8 @@ api_router.include_router(identities.router)
 api_router.include_router(identities.ingest_router)
 api_router.include_router(identity.router)
 api_router.include_router(client_posture.router)
+api_router.include_router(billing.router)
+api_router.include_router(billing.ingest_router)
 api_router.include_router(client_review.ingest_router)
 api_router.include_router(client_review.router)
 api_router.include_router(vcio_proposals.ingest_router)

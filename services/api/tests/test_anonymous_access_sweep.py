@@ -87,6 +87,9 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/m365-checks"): (
         "CORE's Microsoft 365 baseline checks per client, read through CIPP: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only write under that feed's own client tenants",
     ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/license-counts"): (
+        "CORE's daily counts of what each tool covers for a client (licences, machines, people): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only write under that feed's own client tenants, and only for clients already mapped (the 422 here is the empty body)",
+    ),
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/sweep-runs"): (
         "CORE's latest pass of each per-client sweep (how many clients it reached): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only write that feed's own run records (the 422 here is the empty body)",
     ),

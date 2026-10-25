@@ -24,6 +24,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/detection/catalog': { title: 'Detection Catalog', description: 'Curated rule packs and templates' },
   '/settings/rbac': { title: 'Roles & Permissions', description: 'Access control and team management' },
   '/settings/client-posture': { title: 'Client Posture', description: 'Devices, Multi-Factor, alerts and cases for one client' },
+  '/settings/billing': { title: 'Licences & Counts', description: 'What each tool counts for each client, and every change, to check an invoice against' },
   '/settings/fleet-posture': { title: 'Fleet Posture', description: 'Every client\'s tool checks side by side, with what is about to lapse and what changed' },
   '/settings/mfa': { title: 'Multi-Factor', description: 'Who has Multi-Factor sign-in, per client' },
   '/reports/client-review': { title: 'Client Review', description: 'Coverage, identity, alerts and insurance readiness for one client' },

@@ -11374,6 +11374,155 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/clients/{client_id}:
+    get:
+      tags:
+      - billing
+      summary: What each tool counts for one client, and how each count moved
+      operationId: client_counts_api_v1_billing_clients__client_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 30
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientCounts'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/summary:
+    get:
+      tags:
+      - billing
+      summary: Each tool's counts added across all clients, with the change over the
+        window
+      operationId: summary_api_v1_billing_summary_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 30
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FleetTotals'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/changes:
+    get:
+      tags:
+      - billing
+      summary: Every change to a count across all clients in the last days, newest
+        first
+      operationId: changes_log_api_v1_billing_changes_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 30
+          title: Days
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 500
+          title: Limit
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChangeRow'
+                title: Response Changes Log Api V1 Billing Changes Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/license-counts:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed License Counts
+      description: Record one client's counts for one tool (replacing the last report),
+        and the changes since it.
+      operationId: report_core_feed_license_counts_api_v1_inbox_core_feed__tenant_token__license_counts_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LicenseCountsReport'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseCountsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/vcio-reviews:
     post:
       tags:
@@ -22072,6 +22221,47 @@ components:
       - tags
       - sla_due_at
       title: CaseResponse
+    ChangeRow:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        source:
+          type: string
+          title: Source
+        item:
+          type: string
+          title: Item
+        unit:
+          type: string
+          title: Unit
+        count:
+          type: integer
+          title: Count
+        previous_count:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Previous Count
+        observed_at:
+          type: string
+          format: date-time
+          title: Observed At
+      type: object
+      required:
+      - client_id
+      - client_name
+      - source
+      - item
+      - unit
+      - count
+      - previous_count
+      - observed_at
+      title: ChangeRow
     CheckAcceptanceOut:
       properties:
         reason:
@@ -22314,6 +22504,26 @@ components:
       - match_source
       - suggestions
       title: ClientAliasOut
+    ClientCounts:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        days:
+          type: integer
+          title: Days
+        rows:
+          items:
+            $ref: '#/components/schemas/CountRow'
+          type: array
+          title: Rows
+      type: object
+      required:
+      - client_id
+      - days
+      - rows
+      title: ClientCounts
     ClientDomains:
       properties:
         client_id:
@@ -23525,6 +23735,47 @@ components:
       - total_runs
       - avg_cost_per_run_usd
       title: CostHeadline
+    CountRow:
+      properties:
+        source:
+          type: string
+          title: Source
+        item:
+          type: string
+          title: Item
+        unit:
+          type: string
+          title: Unit
+        count:
+          type: integer
+          title: Count
+        available:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Available
+        change:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Change
+        first_seen_at:
+          type: string
+          format: date-time
+          title: First Seen At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - source
+      - item
+      - unit
+      - count
+      - first_seen_at
+      - updated_at
+      title: CountRow
     CoverageCell:
       properties:
         techniqueId:
@@ -26735,6 +26986,26 @@ components:
       - generated_at
       - clients
       title: FleetOut
+    FleetTotals:
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        days:
+          type: integer
+          title: Days
+        rows:
+          items:
+            $ref: '#/components/schemas/TotalRow'
+          type: array
+          title: Rows
+      type: object
+      required:
+      - generated_at
+      - days
+      - rows
+      title: FleetTotals
     FormatsResponse:
       properties:
         formats:
@@ -28560,6 +28831,82 @@ components:
         the first event to land. Keeping the shape minimal avoids paying
 
         the full ``ConnectorResponse`` cost on every poll tick.'
+    LicenseCountIn:
+      properties:
+        item:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Item
+        unit:
+          type: string
+          enum:
+          - licence
+          - device
+          - user
+          - seat
+          - mailbox
+          - other
+          title: Unit
+          default: other
+        count:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Count
+        available:
+          anyOf:
+          - type: integer
+            maximum: 10000000.0
+            minimum: 0.0
+          - type: 'null'
+          title: Available
+      type: object
+      required:
+      - item
+      - count
+      title: LicenseCountIn
+    LicenseCountsReport:
+      properties:
+        vendor:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          title: Vendor
+        vendor_client_id:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Vendor Client Id
+        counts:
+          items:
+            $ref: '#/components/schemas/LicenseCountIn'
+          type: array
+          maxItems: 60
+          minItems: 1
+          title: Counts
+      type: object
+      required:
+      - vendor
+      - vendor_client_id
+      - counts
+      title: LicenseCountsReport
+    LicenseCountsResponse:
+      properties:
+        accepted:
+          type: integer
+          title: Accepted
+        unmapped:
+          type: integer
+          title: Unmapped
+          default: 0
+        ignored:
+          type: integer
+          title: Ignored
+          default: 0
+      type: object
+      required:
+      - accepted
+      title: LicenseCountsResponse
     LinkedTicket:
       properties:
         id:
@@ -37142,6 +37489,41 @@ components:
         ``investigation_runs.case_id`` is the only stable join we can make
 
         between LLM cost and "what was this money spent on?".'
+    TotalRow:
+      properties:
+        source:
+          type: string
+          title: Source
+        item:
+          type: string
+          title: Item
+        unit:
+          type: string
+          title: Unit
+        clients:
+          type: integer
+          title: Clients
+        total:
+          type: integer
+          title: Total
+        available:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Available
+        change:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Change
+      type: object
+      required:
+      - source
+      - item
+      - unit
+      - clients
+      - total
+      title: TotalRow
     TranslateRequest:
       properties:
         source_format:

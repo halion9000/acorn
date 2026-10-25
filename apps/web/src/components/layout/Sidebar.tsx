@@ -293,6 +293,11 @@ const navSections: NavSection[] = [
         icon: <ShieldIcon />,
       },
       {
+        label: 'Licences & Counts',
+        href: '/settings/billing',
+        icon: <ShieldIcon />,
+      },
+      {
         label: 'Multi-Factor',
         href: '/settings/mfa',
         icon: <EyeIcon />,

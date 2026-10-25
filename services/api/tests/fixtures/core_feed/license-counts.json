@@ -1,0 +1,21 @@
+{
+  "route": "license-counts",
+  "method": "POST",
+  "body": {
+    "vendor": "ninjaone",
+    "vendor_client_id": "83",
+    "counts": [
+      {
+        "item": "Windows workstations",
+        "unit": "device",
+        "count": 42
+      },
+      {
+        "item": "Microsoft 365 Business Premium",
+        "unit": "licence",
+        "count": 25,
+        "available": 2
+      }
+    ]
+  }
+}

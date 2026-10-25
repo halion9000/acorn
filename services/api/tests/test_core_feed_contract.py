@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 import pytest
+from app.api.v1.endpoints import billing
 from app.api.v1.endpoints import client_review as cr
 from app.api.v1.endpoints import devices as dev
 from app.api.v1.endpoints import identities as idn
@@ -50,6 +51,7 @@ MODELS = {
     "vcio-proposals-result": vp.ProposalResult,
     "m365-checks": cr.M365ChecksReport,
     "sweep-runs": cr.SweepRunsReport,
+    "license-counts": billing.LicenseCountsReport,
     "identities": idn.IdentitiesReport,
 }
 

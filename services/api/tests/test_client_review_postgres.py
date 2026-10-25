@@ -359,3 +359,49 @@ async def test_the_fleet_views_rank_clients_list_a_board_and_show_the_days_chang
     mine_changes = [(c.key, c.status) for c in changes if c.client_id == world["client"]]
     assert mine_changes[0] == ("cipp_inactive_accounts", "not_met"), "what got worse comes first"
     assert len(mine_changes) == 3
+
+
+async def test_license_counts_are_stored_diffed_into_history_and_totalled_across_clients(world):
+    from datetime import timedelta
+
+    from app.api.v1.endpoints import billing as bl
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'ninjaone', 'n-1', 'n-1', 'n-1', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+
+    def report(client="n-1", **counts):
+        return bl.LicenseCountsReport(vendor="ninjaone", vendor_client_id=client, counts=[bl.LicenseCountIn(item=k.replace("_", " "), unit="device", count=v) for k, v in counts.items()])
+
+    waiting = await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], report("nobody", Macs=1)))
+    assert (waiting.accepted, waiting.unmapped) == (0, 1)
+    long_ago = datetime.now(UTC) - timedelta(days=40)
+    await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], report(Windows_workstations=10, Macs=4), now=long_ago))
+    await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], report(Windows_workstations=10, Macs=4), now=long_ago + timedelta(days=1)))
+    await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], report(Windows_workstations=13)))
+
+    user = NS(tenant_id=world["msp"], user_id=uuid.uuid4())
+    got = await run(world["msp"], lambda db: bl.client_counts(world["client"], user, db, days=30))
+    by = {r.item: r for r in got.rows}
+    assert set(by) == {"Windows workstations"}, "Macs is no longer reported, so it is gone"
+    assert (by["Windows workstations"].count, by["Windows workstations"].change) == (13, 3), "10 forty days ago, 13 now"
+
+    log = await run(world["msp"], lambda db: bl.changes_log(user, db, days=90))
+    mine = [(c.item, c.previous_count, c.count) for c in log if c.client_id == world["client"]]
+    assert sorted(mine, key=str) == sorted([("Windows workstations", None, 10), ("Macs", None, 4), ("Windows workstations", 10, 13), ("Macs", 4, 0)], key=str), "an unchanged day adds nothing; a removal is a change to 0"
+    assert log[0].observed_at >= log[-1].observed_at, "newest first"
+
+    fleet = await run(world["msp"], lambda db: bl.summary(user, db, days=30))
+    row = [t for t in fleet.rows if t.source == "ninjaone" and t.item == "Windows workstations"][0]
+    assert (row.total >= 13, row.clients >= 1) == (True, True)
+
+    with pytest.raises(HTTPException) as e:
+        await run(world["msp"], lambda db: bl.client_counts(world["stranger"], user, db))
+    assert e.value.status_code == 404
