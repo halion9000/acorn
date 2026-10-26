@@ -760,3 +760,24 @@ async def test_a_client_is_compared_with_the_fleet_and_with_clients_of_similar_s
     with pytest.raises(HTTPException) as e:
         await run(world["msp"], lambda db: cp.compare_client(world["stranger"], NS(tenant_id=world["msp"]), db))
     assert e.value.status_code == 404
+
+
+async def test_a_mapped_vendor_client_with_an_unrelated_name_and_no_shared_machine_is_listed_as_suspect(world):
+    from app.api.v1.endpoints import mssp_clients as mc
+
+    client_name = (await run(world["msp"], lambda db: db.execute(text("select name from tenants where id = :i"), {"i": world["client"]}))).scalar_one()
+
+    async def aliases(db):
+        for vendor_name, vid in (("Harbor Legal Partners", "s-1"), (client_name, "s-2")):
+            await db.execute(
+                text(
+                    "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                    "values (:t, 'ninjaone', :id, :nm, :nm, :c, false, 'manual')"
+                ),
+                {"t": world["msp"], "id": vid, "nm": vendor_name, "c": world["client"]},
+            )
+
+    await run(world["msp"], aliases)
+    out = await run(world["msp"], lambda db: mc.list_suspect_mappings(NS(tenant_id=world["msp"]), db))
+    assert [(s.vendor_client_name, s.client_id) for s in out] == [("Harbor Legal Partners", world["client"])], "the one with a like name is not listed"
+    assert 0.0 <= out[0].score < 0.35

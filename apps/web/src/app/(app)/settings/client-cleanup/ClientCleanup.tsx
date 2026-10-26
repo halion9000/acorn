@@ -17,6 +17,15 @@ export interface EmptyClient {
   tool_clients: number;
 }
 
+export interface SuspectMapping {
+  alias_id: string;
+  vendor: string;
+  vendor_client_name: string;
+  client_id: string;
+  client_name: string;
+  score: number;
+}
+
 interface Report {
   checked: number;
   empty: EmptyClient[];
@@ -27,6 +36,23 @@ export function ClientCleanup() {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [suspects, setSuspects] = useState<SuspectMapping[] | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    authFetch("/api/v1/mssp/clients/suspect-mappings")
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`The API answered ${res.status}`);
+        const body = (await res.json()) as unknown;
+        if (live) setSuspects(Array.isArray(body) ? (body as SuspectMapping[]) : []);
+      })
+      .catch(() => {
+        if (live) setSuspects([]);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -80,6 +106,22 @@ export function ClientCleanup() {
         <p data-testid="none" className="text-sm text-slate-400">
           Every client has something in it.
         </p>
+      )}
+      {suspects !== null && suspects.length > 0 && (
+        <section className="space-y-2" data-testid="suspect-mappings">
+          <h2 className="text-sm font-semibold text-slate-200">Mappings to double-check</h2>
+          <p className="max-w-2xl text-sm text-slate-400">
+            A tool&apos;s client mapped to a client whose name looks unrelated, with no machine in common. Most are fine (a trading name); a wrong one sends a client&apos;s alerts and counts to the wrong place. Fix it on the
+            MSSP page.
+          </p>
+          <ul className="divide-y divide-slate-800 rounded border border-slate-800">
+            {suspects.map((m) => (
+              <li key={m.alias_id} className="px-4 py-2 text-sm text-slate-300" data-testid="suspect-mapping">
+                {m.vendor}: <span className="text-slate-100">{m.vendor_client_name}</span> is mapped to <span className="text-slate-100">{m.client_name}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       {report !== null && report.empty.length > 0 && (
         <ul className="divide-y divide-slate-800 rounded border border-slate-800">

@@ -87,3 +87,21 @@ def test_a_floor_changes_nothing_at_or_above_it():
                 assert (quick >= floor) == (full >= floor), (a, b, floor, full, quick)
                 if full >= floor:
                     assert quick == full, (a, b, floor)
+
+
+def test_a_mapping_with_an_unrelated_name_and_no_machine_in_common_is_suspect_worst_first():
+    from app.services.client_matching import suspect_mappings
+
+    rows = [
+        {"vendor_client_name": "Acme Dental LLC", "client_name": "Acme Dental", "shared_devices": 0},
+        {"vendor_client_name": "Harbor Legal", "client_name": "Zephyr Hotels", "shared_devices": 0},
+        {"vendor_client_name": "Oak Partners", "client_name": "Birch Holdings", "shared_devices": 7},
+        {"vendor_client_name": "Blue Bay Cafe", "client_name": "Granite Works", "shared_devices": 0},
+        {"vendor_client_name": "!!!", "client_name": "Anything", "shared_devices": 0},
+        {"vendor_client_name": "Sunrise Clinic", "client_name": "Sunrise Clinic Group", "shared_devices": 0},
+    ]
+    out = suspect_mappings(rows)
+    assert {r["vendor_client_name"] for r in out} == {"Harbor Legal", "Blue Bay Cafe"}, "a like name, a shared machine, an empty name and a contained name are left alone"
+    assert all(0.0 <= r["score"] < 0.35 for r in out)
+    assert out == sorted(out, key=lambda r: (r["score"], r["client_name"].lower()))
+    assert suspect_mappings(rows, threshold=0.0) == [], "a threshold of zero flags nothing"

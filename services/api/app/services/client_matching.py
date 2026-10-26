@@ -74,6 +74,30 @@ def suggest(vendor_client_name: str, candidates: list[Candidate], limit: int = 3
     return kept[:limit]
 
 
+SUSPECT_BELOW = 0.35
+
+
+def suspect_mappings(rows: list[dict[str, object]], threshold: float = SUSPECT_BELOW) -> list[dict[str, object]]:
+    """Mapped vendor clients whose name looks unrelated to the client they are mapped to, worst first.
+
+    Each row has ``vendor_client_name``, ``client_name`` and ``shared_devices`` (how many of the vendor client's machines are also machines under that client). A mapping with at least one machine in common is
+    left alone however different the names look (a trading name, a parent company); one with none and a name score under ``threshold`` is listed with its score, for a person to look at. Names that
+    normalise to nothing are not judged.
+    """
+    out = []
+    for r in rows:
+        if int(r.get("shared_devices") or 0) > 0:
+            continue
+        a, b = str(r["vendor_client_name"]), str(r["client_name"])
+        if not normalize_name(a) or not normalize_name(b):
+            continue
+        sc = score(a, b)
+        if sc < threshold:
+            out.append({**r, "score": sc})
+    out.sort(key=lambda r: (float(r["score"]), str(r["client_name"]).lower()))
+    return out
+
+
 def is_confident(suggestions: list[Suggestion]) -> bool:
     """True when the top suggestion is an exact normalized match and no other tenant ties it (two tenants with the same normalized name must be chosen by a person)."""
     if not suggestions or suggestions[0].score < EXACT:

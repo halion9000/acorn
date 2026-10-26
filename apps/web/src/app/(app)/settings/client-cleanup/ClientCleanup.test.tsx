@@ -12,6 +12,27 @@ const empty = (id: string, name: string) => ({ id, name, devices: 0, alerts: 0, 
 
 beforeEach(() => authFetch.mockReset());
 
+describe('ClientCleanup suspect mappings', () => {
+  it('lists mapped tool clients whose names look unrelated, and shows nothing when there are none or the check fails', async () => {
+    authFetch.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.endsWith('/suspect-mappings')
+          ? reply([{ alias_id: 'x1', vendor: 'ninjaone', vendor_client_name: 'Harbor Legal', client_id: 'c1', client_name: 'Zephyr Hotels', score: 0.1 }])
+          : reply({ checked: 3, empty: [] }),
+      ),
+    );
+    const { unmount } = render(<ClientCleanup />);
+    const rows = await screen.findAllByTestId('suspect-mapping');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent('ninjaone: Harbor Legal is mapped to Zephyr Hotels');
+    unmount();
+    authFetch.mockImplementation((url: string) => Promise.resolve(String(url).endsWith('/suspect-mappings') ? reply({}, false) : reply({ checked: 3, empty: [] })));
+    render(<ClientCleanup />);
+    await screen.findByTestId('checked');
+    expect(screen.queryByTestId('suspect-mappings')).toBeNull();
+  });
+});
+
 describe('ClientCleanup', () => {
   it('lists the empty clients and how many were checked', async () => {
     authFetch.mockResolvedValue(reply({ checked: 12, empty: [empty('a', 'Old Dental'), empty('b', 'Test Co')] }));
@@ -45,7 +66,9 @@ describe('ClientCleanup', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Archive' }));
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.getByRole('button', { name: 'Archive' })).toBeInTheDocument();
-    expect(authFetch).toHaveBeenCalledTimes(1);
+    // The cleanup report and the mapping check were each read once, and nothing was archived.
+    expect(authFetch.mock.calls.map((c) => c[0]).sort()).toEqual(['/api/v1/mssp/clients/cleanup', '/api/v1/mssp/clients/suspect-mappings']);
+    expect(authFetch.mock.calls.some((c) => c[1]?.method === 'POST')).toBe(false);
   });
 
   it('says so when nothing is empty, and shows an error plainly', async () => {

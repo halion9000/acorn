@@ -13375,6 +13375,29 @@ paths:
                 $ref: '#/components/schemas/ClientsOut'
       security:
       - HTTPBearer: []
+  /api/v1/mssp/clients/suspect-mappings:
+    get:
+      tags:
+      - mssp
+      summary: Mapped vendor clients whose names look unrelated to the client they
+        are mapped to
+      description: 'A check on mappings a person made or accepted: a vendor client
+        called one thing mapped to a client called something else, with no machine
+        in common. Worst first.'
+      operationId: list_suspect_mappings_api_v1_mssp_clients_suspect_mappings_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SuspectMapping'
+                type: array
+                title: Response List Suspect Mappings Api V1 Mssp Clients Suspect
+                  Mappings Get
+      security:
+      - HTTPBearer: []
   /api/v1/mssp/clients/{alias_id}/map:
     post:
       tags:
@@ -37710,6 +37733,37 @@ components:
       - created_at
       - active
       title: SuppressionOut
+    SuspectMapping:
+      properties:
+        alias_id:
+          type: string
+          format: uuid
+          title: Alias Id
+        vendor:
+          type: string
+          title: Vendor
+        vendor_client_name:
+          type: string
+          title: Vendor Client Name
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        score:
+          type: number
+          title: Score
+      type: object
+      required:
+      - alias_id
+      - vendor
+      - vendor_client_name
+      - client_id
+      - client_name
+      - score
+      title: SuspectMapping
     SweepRunIn:
       properties:
         source:
