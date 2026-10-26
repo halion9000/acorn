@@ -52,6 +52,10 @@ export interface ReconcileRow {
   /** "accepted": a person said this difference is fine and it has not changed; "stale": a note exists but the difference moved; "none". */
   note_state?: string;
   note?: string | null;
+  /** Since when the line has not matched; days is the whole days that is; since_complete is false when that is only as far back as A.C.O.R.N has records. */
+  since?: string | null;
+  days?: number | null;
+  since_complete?: boolean;
 }
 
 export interface MapView {
@@ -340,6 +344,18 @@ export function differenceText(d: number): string {
   return d > 0 ? `uses ${d} more than billed` : `billed for ${-d} more than used`;
 }
 
+/** "for 20 days", "for at least 20 days" (the records start there) or "since today"; empty when the line matches or the API did not say. */
+export function disagreedText(r: Pick<ReconcileRow, "days" | "since_complete">): string {
+  if (r.days === null || r.days === undefined) return "";
+  if (r.days === 0) return r.since_complete === false ? "first seen today" : "since today";
+  return `for ${r.since_complete === false ? "at least " : ""}${r.days} day${r.days === 1 ? "" : "s"}`;
+}
+
+/** The lines that have disagreed for at least this many days (0: all of them; a line whose age is not known is kept only when no minimum is asked for). */
+export function disagreedAtLeast(rows: ReconcileRow[], minDays: number): ReconcileRow[] {
+  return minDays <= 0 ? rows : rows.filter((r) => (r.days ?? -1) >= minDays);
+}
+
 /** What to do to the invoice line to make it match what the tools count: "raise by 2", "lower by 3" or "no change". */
 export function trueUpAction(difference: number): string {
   if (difference === 0) return "no change";
@@ -360,7 +376,9 @@ export function trueUpCsv(rows: ReconcileRow[]): string {
 function Reconcile() {
   const [reload, setReload] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
-  const { data, error } = useJson<{ rows: ReconcileRow[]; unmapped_lines: number }>(`/api/v1/billing/reconcile?r=${reload}`);
+  const [minDays, setMinDays] = useState(0);
+  const { data: all, error } = useJson<{ rows: ReconcileRow[]; unmapped_lines: number }>(`/api/v1/billing/reconcile?r=${reload}`);
+  const data = all ? { ...all, rows: disagreedAtLeast(all.rows, minDays) } : all;
   const accept = async (r: ReconcileRow) => {
     const note = window.prompt(`Why is a difference of ${r.difference > 0 ? "+" : ""}${r.difference} fine for ${r.client_name}, ${r.invoice_item}? (for example: flat package, minimum quantity)`);
     if (!note || note.trim().length < 3) return;
@@ -390,7 +408,18 @@ function Reconcile() {
       {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
       {data && data.rows.some((r) => r.note_state === "accepted") && <p className="text-xs text-slate-500" data-testid="billing-accepted-count">{data.rows.filter((r) => r.note_state === "accepted").length} difference(s) accepted with a reason; {data.rows.filter((r) => r.note_state !== "accepted").length} still to look at.</p>}
       {data && data.unmapped_lines > 0 && <p className="text-xs text-amber-300">{data.unmapped_lines} billed line{data.unmapped_lines === 1 ? "" : "s"} left out because nobody has mapped {data.unmapped_lines === 1 ? "it" : "them"} yet.</p>}
-      {data && data.rows.length === 0 && <p className="text-sm text-slate-400">Nothing disagrees.</p>}
+      {all && all.rows.length > 0 && (
+        <label className="flex items-center gap-2 text-sm text-slate-300 print:hidden">
+          Show lines that have disagreed for
+          <select value={minDays} onChange={(e) => setMinDays(Number(e.target.value))} aria-label="Disagreed for at least" className="rounded border border-slate-700 bg-slate-900 px-2 py-1">
+            <option value={0}>any length of time</option>
+            <option value={7}>7 days or more</option>
+            <option value={14}>14 days or more</option>
+            <option value={30}>30 days or more</option>
+          </select>
+        </label>
+      )}
+      {data && data.rows.length === 0 && <p className="text-sm text-slate-400">{minDays > 0 ? "No line has disagreed that long." : "Nothing disagrees."}</p>}
       {data && data.rows.length > 0 && (
         <button type="button" className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 print:hidden" onClick={() => download("true-up.csv", trueUpCsv(data.rows))}>
           Download true-up list (CSV)
@@ -420,6 +449,7 @@ function Reconcile() {
                 <td className="pr-3">{r.counted}</td>
                 <td className={`pr-3 ${r.difference > 0 ? "text-amber-300" : "text-sky-300"}`}>
                   {differenceText(r.difference)}
+                  {disagreedText(r) ? <div className="text-xs text-slate-500" data-testid={`age-${r.client_id}-${r.invoice_item}`}>{disagreedText(r)}</div> : null}
                   {r.note_state === "accepted" ? <div className="text-xs text-slate-400" data-testid={`note-${r.client_id}-${r.invoice_item}`}>Accepted: {r.note}</div> : null}
                   {r.note_state === "stale" ? <div className="text-xs text-red-300">The note ("{r.note}") was for a different difference.</div> : null}
                 </td>

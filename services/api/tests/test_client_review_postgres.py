@@ -469,6 +469,22 @@ async def test_billed_lines_are_checked_against_the_tool_counts_they_are_mapped_
     assert [(r.invoice_item, r.billed, r.counted, r.difference) for r in mine] == [("NinjaOne RMM (Included)", 16, 18, 2)]
     assert [p["count"] for p in mine[0].parts] == [14, 4]
 
+    # How long it has disagreed: the line was only just recorded, so it is as old as the record and says so; with its records backdated 20 days it is 20 days old, and the filter keeps only older lines.
+    assert (mine[0].days, mine[0].since_complete) == (0, False)
+
+    async def backdate(db):
+        async with acting_as_tenant(db, world["client"]):
+            await db.execute(text("update client_license_history set observed_at = observed_at - interval '20 days' where tenant_id = :c"), {"c": world["client"]})
+            await db.execute(text("update client_license_counts set first_seen_at = first_seen_at - interval '20 days' where tenant_id = :c"), {"c": world["client"]})
+
+    await run(world["msp"], backdate)
+    old = [r for r in (await run(world["msp"], lambda db: bl.reconcile_billing(user, db))).rows if r.client_id == world["client"]]
+    assert (old[0].days, old[0].since_complete) == (20, False)
+    kept = await run(world["msp"], lambda db: bl.reconcile_billing(user, db, min_days=15))
+    assert [r.invoice_item for r in kept.rows if r.client_id == world["client"]] == ["NinjaOne RMM (Included)"]
+    dropped = await run(world["msp"], lambda db: bl.reconcile_billing(user, db, min_days=30))
+    assert [r for r in dropped.rows if r.client_id == world["client"]] == []
+
     # A person says this difference of 2 is fine: the line is accepted while it stays 2, stale when the count moves, and a stranger's client cannot be given a note.
     await run(world["msp"], lambda db: bl.save_note(bl.NoteIn(client_id=world["client"], invoice_item="NinjaOne RMM (Included)", note="  Flat  package, minimum of 18 ", difference=2), user, db))
     noted = [r for r in (await run(world["msp"], lambda db: bl.reconcile_billing(user, db))).rows if r.client_id == world["client"]]

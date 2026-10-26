@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
 
-import { Billing, changeText, clientCsv, differenceText, gapText, sparkPoints, totalsCsv, trueUpAction, trueUpCsv } from './Billing';
+import { Billing, changeText, clientCsv, differenceText, disagreedAtLeast, disagreedText, gapText, sparkPoints, totalsCsv, trueUpAction, trueUpCsv } from './Billing';
 
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 
@@ -23,7 +23,7 @@ beforeEach(() => {
     if (url.startsWith('/api/v1/billing/clients/c1'))
       return json({ client_id: 'c1', days: 30, rows: [{ source: 'ninjaone', item: 'Windows workstations', unit: 'device', count: 13, available: null, change: -2, first_seen_at: '2026-09-01T00:00:00Z', updated_at: '2026-10-25T00:00:00Z' }] });
     if (url.startsWith('/api/v1/billing/reconcile'))
-      return json({ generated_at: '', unmapped_lines: 2, rows: [{ client_id: 'c1', client_name: 'Acme', invoice_item: 'NinjaOne RMM (Included)', billed: 16, counted: 18, difference: 2, note_state: 'none', note: null, parts: [{ source: 'ninjaone', item: 'Macs', count: 4 }, { source: 'ninjaone', item: 'Windows workstations', count: 14 }] }, { client_id: 'c2', client_name: 'Beta', invoice_item: 'Huntress MDR', billed: 10, counted: 12, difference: 2, note_state: 'accepted', note: 'Flat package', parts: [] }, { client_id: 'c3', client_name: 'Gamma', invoice_item: 'DNS Filter', billed: 5, counted: 8, difference: 3, note_state: 'stale', note: 'Minimum of 7', parts: [] }] });
+      return json({ generated_at: '', unmapped_lines: 2, rows: [{ client_id: 'c1', client_name: 'Acme', invoice_item: 'NinjaOne RMM (Included)', billed: 16, counted: 18, difference: 2, note_state: 'none', note: null, days: 20, since_complete: true, parts: [{ source: 'ninjaone', item: 'Macs', count: 4 }, { source: 'ninjaone', item: 'Windows workstations', count: 14 }] }, { client_id: 'c2', client_name: 'Beta', invoice_item: 'Huntress MDR', billed: 10, counted: 12, difference: 2, note_state: 'accepted', note: 'Flat package', days: 3, since_complete: true, parts: [] }, { client_id: 'c3', client_name: 'Gamma', invoice_item: 'DNS Filter', billed: 5, counted: 8, difference: 3, note_state: 'stale', note: 'Minimum of 7', days: 40, since_complete: false, parts: [] }] });
     if (url.startsWith('/api/v1/billing/map') && !mapCalls.length)
       return json({ mapped: [{ invoice_item: 'Datto SaaS (Included)', counted: [{ source: 'datto-saas', item: 'Billable seats' }] }], unmapped: [{ invoice_item: 'Huntress for Workstations (Included)', clients: 120, suggestion: [{ source: 'huntress', item: 'Agents' }], confidence: 'high' }, { invoice_item: 'NinjaOne RMM (Included)', clients: 100, suggestion: [{ source: 'ninjaone', item: 'Macs' }], confidence: 'medium' }, { invoice_item: 'Liongard (Included)', clients: 150, suggestion: [] }], counted_items: [{ source: 'liongard', item: 'Systems' }, { source: 'ninjaone', item: 'Macs' }] });
     if (url.startsWith('/api/v1/billing/map')) return json({});
@@ -78,7 +78,40 @@ describe('differenceText', () => {
   it('says which way it differs', () => expect([differenceText(0), differenceText(2), differenceText(-3)]).toEqual(['matches', 'uses 2 more than billed', 'billed for 3 more than used']));
 });
 
+describe('how long a line has disagreed', () => {
+  it('says how many days, says so when the records start there, and says nothing for a line whose age is not known', () => {
+    expect(disagreedText({ days: 20, since_complete: true })).toBe('for 20 days');
+    expect(disagreedText({ days: 1, since_complete: true })).toBe('for 1 day');
+    expect(disagreedText({ days: 40, since_complete: false })).toBe('for at least 40 days');
+    expect(disagreedText({ days: 0, since_complete: true })).toBe('since today');
+    expect(disagreedText({ days: 0, since_complete: false })).toBe('first seen today');
+    expect(disagreedText({ days: null })).toBe('');
+    expect(disagreedText({})).toBe('');
+  });
+
+  it('keeps only the lines that have disagreed that long, and all of them for no minimum', () => {
+    const row = (days: number | null) => ({ client_id: 'c', client_name: 'C', invoice_item: 'i', billed: 1, counted: 2, difference: 1, parts: [], days });
+    const rows = [row(3), row(14), row(40), row(null)];
+    expect(disagreedAtLeast(rows, 0)).toHaveLength(4);
+    expect(disagreedAtLeast(rows, 14).map((r) => r.days)).toEqual([14, 40]);
+    expect(disagreedAtLeast(rows, 30).map((r) => r.days)).toEqual([40]);
+  });
+});
+
 describe('Billing reconcile and mapping', () => {
+  it('shows how long each line has disagreed and filters to the long ones', async () => {
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Billed vs counted' }));
+    const table = await screen.findByTestId('billing-reconcile');
+    expect(within(table).getByTestId('age-c1-NinjaOne RMM (Included)')).toHaveTextContent('for 20 days');
+    expect(within(table).getByTestId('age-c3-DNS Filter')).toHaveTextContent('for at least 40 days');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Disagreed for at least' }), '30');
+    expect(within(screen.getByTestId('billing-reconcile')).queryByText('NinjaOne RMM (Included)')).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('billing-reconcile')).getByText('DNS Filter')).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Disagreed for at least' }), '0');
+    expect(within(screen.getByTestId('billing-reconcile')).getByText('NinjaOne RMM (Included)')).toBeInTheDocument();
+  });
+
   it('lists where billed and counted disagree, with the parts, and says how many lines were left out', async () => {
     render(<Billing />);
     await userEvent.click(screen.getByRole('tab', { name: 'Billed vs counted' }));

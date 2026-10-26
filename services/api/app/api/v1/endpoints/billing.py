@@ -23,7 +23,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.client_alias import ClientAlias
 from app.models.signin import BillingDifferenceNote, BillingItemMap, ClientLicenseCount, ClientLicenseHistory
 from app.models.tenant import Tenant
-from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, forecast_next, note_state, endpoint_disagreements, last_reported, reconcile, tools_without_counts, unbilled_clients, suggestion_confidence, suggest, totals, unusual, window_start
+from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, forecast_next, note_state, endpoint_disagreements, last_reported, disagreement_since, reconcile, tools_without_counts, unbilled_clients, suggestion_confidence, suggest, totals, unusual, window_start
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -336,6 +336,11 @@ class ReconcileRow(BaseModel):
     # "accepted": a person said this difference is fine and it has not changed since; "stale": there is a note but the difference is no longer the one it was written for; "none".
     note_state: str = "none"
     note: str | None = None
+    # Since when the line has not matched, how many whole days that is, and whether that is the real start (False: only as far back as A.C.O.R.N has records, so it may be older).
+    # None when the line matches.
+    since: datetime | None = None
+    days: int | None = None
+    since_complete: bool = True
 
 
 class ReconcileOut(BaseModel):
@@ -387,11 +392,28 @@ async def delete_note(client_id: uuid.UUID, invoice_item: str, current_user: Ann
     await db.commit()
 
 
+async def _disagreement_starts(db: Any, owner: uuid.UUID, cid: uuid.UUID, lines: list[tuple[str, list[dict[str, str]]]], now: datetime) -> dict[str, tuple[datetime, bool]]:
+    """For one client, since when each of these invoice lines (name and mapped parts) has not matched. Read under that client's own scope."""
+    async with _as(db, owner, cid):
+        held = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == cid))).scalars().all()
+        hist = (await db.execute(select(ClientLicenseHistory).where(ClientLicenseHistory.tenant_id == cid))).scalars().all()
+    current = {(r.source, r.item): (r.count, r.first_seen_at) for r in held}
+    history: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    tracking: dict[str, datetime] = {}
+    for r in held:
+        tracking[r.source] = min(tracking.get(r.source, r.first_seen_at), r.first_seen_at)
+    for h in hist:
+        history.setdefault((h.source, h.item), []).append({"observed_at": h.observed_at, "count": h.count})
+        tracking[h.source] = min(tracking.get(h.source, h.observed_at), h.observed_at)
+    return {item: disagreement_since((BILLED_SOURCE, item), [(p["source"], p["item"]) for p in parts], history, current, tracking, now) for item, parts in lines}
+
+
 @router.get("/reconcile", response_model=ReconcileOut, summary="Where what is billed and what the tools count disagree, biggest difference first")
 async def reconcile_billing(
-    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, include_matches: bool = False, limit: int = 500
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, include_matches: bool = False, limit: int = 500, min_days: int | None = None
 ) -> ReconcileOut:
     owner = current_user.tenant_id
+    now = datetime.now(UTC)
     mapping = await _mapping(db, owner)
     per_client, names = await _all_client_counts(db, owner)
     notes = await _notes(db, owner)
@@ -402,10 +424,20 @@ async def reconcile_billing(
         held = [r for r in rows if r["source"] != BILLED_SOURCE]
         result = reconcile(billed, held, mapping)
         unmapped_lines += len(result["unmapped"])
-        for r in result["rows"]:
-            if include_matches or r["difference"] != 0:
-                n = notes.get((cid, r["invoice_item"]))
-                out.append(ReconcileRow(client_id=cid, client_name=names.get(cid) or str(cid), note_state=note_state(n, r["difference"]), note=n["note"] if n else None, **r))
+        shown = [r for r in result["rows"] if include_matches or r["difference"] != 0]
+        starts = await _disagreement_starts(db, owner, cid, [(r["invoice_item"], mapping[r["invoice_item"]]) for r in shown if r["difference"] != 0], now) if any(r["difference"] != 0 for r in shown) else {}
+        for r in shown:
+            n = notes.get((cid, r["invoice_item"]))
+            start = starts.get(r["invoice_item"])
+            days = max(0, (now - start[0]).days) if start else None
+            if min_days is not None and (days is None or days < min_days):
+                continue
+            out.append(
+                ReconcileRow(
+                    client_id=cid, client_name=names.get(cid) or str(cid), note_state=note_state(n, r["difference"]), note=n["note"] if n else None,
+                    since=start[0] if start else None, days=days, since_complete=start[1] if start else True, **r,
+                )
+            )
     out.sort(key=lambda r: (-abs(r.difference), r.client_name.lower(), r.invoice_item))
     return ReconcileOut(generated_at=datetime.now(UTC), rows=out[: max(1, min(limit, 2000))], unmapped_lines=unmapped_lines)
 

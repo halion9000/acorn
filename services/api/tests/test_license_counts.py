@@ -231,3 +231,70 @@ def test_every_suggestion_rule_has_a_confidence_and_a_line_with_no_suggestion_ha
     assert suggestion_confidence("ThreatMate (Included)") == "low"
     assert suggestion_confidence("DNS Filter (PassThru)") == "high"
     assert suggestion_confidence("Managed Service - taxable portion") is None
+
+
+# ---- how long an invoice line has disagreed ----
+
+from app.services.license_counts import disagreement_since  # noqa: E402
+
+_D0 = datetime(2026, 9, 1, tzinfo=UTC)
+
+
+def _day(n: int) -> datetime:
+    return _D0 + timedelta(days=n)
+
+
+_BILLED = ("halopsa", "Endpoint protection")
+_PART = ("huntress", "Agents")
+
+
+def test_a_line_disagrees_since_the_change_after_which_it_never_matched_again():
+    # day 0: billed 10, counted 10 (they match). day 10: the tool counts 14. day 20: billed is still 10.
+    history = {
+        _BILLED: [{"observed_at": _day(0), "count": 10}],
+        _PART: [{"observed_at": _day(0), "count": 10}, {"observed_at": _day(10), "count": 14}],
+    }
+    current = {_BILLED: (10, _day(0)), _PART: (14, _day(0))}
+    since, complete = disagreement_since(_BILLED, [_PART], history, current, {"halopsa": _day(0), "huntress": _day(0)}, _day(30))
+    assert (since, complete) == (_day(10), True)
+
+
+def test_a_difference_that_moved_but_never_matched_counts_from_the_first_change_that_started_it():
+    history = {
+        _BILLED: [{"observed_at": _day(0), "count": 10}],
+        _PART: [{"observed_at": _day(0), "count": 10}, {"observed_at": _day(5), "count": 12}, {"observed_at": _day(15), "count": 15}],
+    }
+    current = {_BILLED: (10, _day(0)), _PART: (15, _day(0))}
+    since, complete = disagreement_since(_BILLED, [_PART], history, current, {"halopsa": _day(0), "huntress": _day(0)}, _day(30))
+    assert (since, complete) == (_day(5), True), "the line went 10/12 then 10/15: it has not matched since day 5"
+
+
+def test_a_line_that_never_matched_since_it_was_first_recorded_says_it_is_only_as_old_as_the_record():
+    history = {_BILLED: [{"observed_at": _day(3), "count": 10}], _PART: [{"observed_at": _day(3), "count": 14}]}
+    current = {_BILLED: (10, _day(3)), _PART: (14, _day(3))}
+    since, complete = disagreement_since(_BILLED, [_PART], history, current, {"halopsa": _day(3), "huntress": _day(3)}, _day(30))
+    assert (since, complete) == (_day(3), False)
+
+
+def test_a_billed_change_that_ended_a_match_starts_the_disagreement_there():
+    # the tool counted 10 all along; the invoice was raised from 10 to 8 on day 7.
+    history = {_BILLED: [{"observed_at": _day(0), "count": 10}, {"observed_at": _day(7), "count": 8}], _PART: [{"observed_at": _day(0), "count": 10}]}
+    current = {_BILLED: (8, _day(0)), _PART: (10, _day(0))}
+    since, complete = disagreement_since(_BILLED, [_PART], history, current, {"halopsa": _day(0), "huntress": _day(0)}, _day(20))
+    assert (since, complete) == (_day(7), True)
+
+
+def test_several_parts_are_added_up_before_they_are_compared():
+    a, b = ("ninjaone", "Windows workstations"), ("ninjaone", "Windows servers")
+    history = {_BILLED: [{"observed_at": _day(0), "count": 20}], a: [{"observed_at": _day(0), "count": 15}, {"observed_at": _day(4), "count": 17}], b: [{"observed_at": _day(0), "count": 5}]}
+    current = {_BILLED: (20, _day(0)), a: (17, _day(0)), b: (5, _day(0))}
+    since, complete = disagreement_since(_BILLED, [a, b], history, current, {"halopsa": _day(0), "ninjaone": _day(0)}, _day(9))
+    assert (since, complete) == (_day(4), True), "15 + 5 matched 20; 17 + 5 does not"
+
+
+def test_a_part_that_was_not_yet_tracked_leaves_the_start_as_far_back_as_it_can_be_told():
+    # the tool was only tracked from day 10; before that nothing is known about it.
+    history = {_BILLED: [{"observed_at": _day(0), "count": 10}], _PART: [{"observed_at": _day(10), "count": 14}]}
+    current = {_BILLED: (10, _day(0)), _PART: (14, _day(10))}
+    since, complete = disagreement_since(_BILLED, [_PART], history, current, {"halopsa": _day(0), "huntress": _day(10)}, _day(30))
+    assert (since, complete) == (_day(10), False)

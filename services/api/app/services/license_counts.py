@@ -294,3 +294,44 @@ def forecast_next(points: list[dict[str, Any]], horizon_days: int = 30) -> int |
     slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / var
     at = max(xs) + horizon_days
     return max(0, int(round(my + slope * (at - mx))))
+
+
+def disagreement_since(
+    billed: tuple[str, str],
+    parts: list[tuple[str, str]],
+    history: dict[tuple[str, str], list[dict[str, Any]]],
+    current: dict[tuple[str, str], tuple[int, datetime]],
+    tracking: dict[str, datetime],
+    now: datetime,
+) -> tuple[datetime, bool]:
+    """Since when an invoice line has not matched the tools' added-up count, and whether that is the real start.
+
+    The counts of the billed line and of every part are known at each moment one of them changed (``history``: item -> rows of observed_at and count; ``current``: item -> latest count and when it was first
+    seen; ``tracking``: tool -> when A.C.O.R.N started keeping counts for the client). Walking back from now, the line has disagreed since the oldest change after which it never matched. The second value is
+    False when that is only as far back as A.C.O.R.N can see (the line has never matched since it was first recorded, or a count from before then is not known), so the true start may be earlier.
+    A line that is balanced right now has no start: call this only for a line whose difference is not zero.
+    """
+    keys = [billed, *parts]
+
+    def at(key: tuple[str, str], when: datetime) -> int | None:
+        if key not in current:
+            return 0 if any(h["observed_at"] <= when for h in history.get(key, [])) else None
+        count, first_seen = current[key]
+        return count_at(history.get(key, []), count, first_seen, when, tracking.get(key[0], first_seen))
+
+    def difference(when: datetime) -> int | None:
+        counts = [at(k, when) for k in keys]
+        if any(c is None for c in counts):
+            return None
+        return sum(c for c in counts[1:]) - counts[0]  # type: ignore[misc]
+
+    times = sorted({h["observed_at"] for k in keys for h in history.get(k, [])}, reverse=True)
+    start = now
+    for t in times:
+        d = difference(t)
+        if d is None:
+            return start, False
+        if d == 0:
+            return start, True
+        start = t
+    return start, False

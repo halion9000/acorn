@@ -815,13 +815,18 @@
     "path": "/billing/reconcile",
     "query": [
       "include_matches",
-      "limit"
+      "limit",
+      "min_days"
     ],
     "enums": {},
     "numbers": {
       "limit": {
         "min": 1,
         "max": 200
+      },
+      "min_days": {
+        "min": 0,
+        "max": 400
       }
     }
   },

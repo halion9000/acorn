@@ -128,7 +128,7 @@ CIPHER_CALLS = [
     ("aisoc_billing_client", "GET", "/billing/clients/{client_id}", ["days"], None, False),
     ("aisoc_count_history", "GET", "/billing/clients/{client_id}/history", ["source", "item", "days"], None, False),
     ("aisoc_billing_changes", "GET", "/billing/changes", ["days", "limit", "client_id", "source"], None, False),
-    ("aisoc_billing_reconcile", "GET", "/billing/reconcile", ["include_matches", "limit"], None, False),
+    ("aisoc_billing_reconcile", "GET", "/billing/reconcile", ["include_matches", "limit", "min_days"], None, False),
     ("aisoc_billing_map", "GET", "/billing/map", [], None, False),
     ("aisoc_data_quality", "GET", "/billing/data-quality", ["limit"], None, False),
     ("aisoc_last_reported", "GET", "/billing/last-reported", ["only_silent", "limit"], None, False),
