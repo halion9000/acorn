@@ -165,6 +165,15 @@ def similar_size_average(client_size: int, others: dict[str, tuple[int, int | No
     return {"average": average_score(scores), "clients": len(scores)}
 
 
+def classify_change(status: str, previous: str | None) -> str:
+    """How a check moved: ``new`` (first seen), ``worse``, ``better`` or ``same``, by the order not met, partly, met."""
+    if previous is None:
+        return "new"
+    rank = {"met": 0, "partly": 1, "not_met": 2}
+    a, b = rank.get(status, 1), rank.get(previous, 1)
+    return "worse" if a > b else "better" if a < b else "same"
+
+
 def is_overdue(status: str, due: date | None, today: date) -> bool:
     """A check is overdue when it has a due date that has passed and is still not fully met. A met check is never overdue, and the due day itself is not late."""
     return due is not None and due < today and status != "met"

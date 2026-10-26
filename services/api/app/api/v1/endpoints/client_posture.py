@@ -32,7 +32,7 @@ from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_postur
 from app.services import fleet_cache
 from app.services.score_history import load_weights
 from app.services.score_history import trend as score_trend
-from app.services.fleet_posture import MAX_WEIGHT, average_score, below_target, is_overdue, score_breakdown, search_checks, similar_size_average, tool_scorecards, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import MAX_WEIGHT, average_score, below_target, classify_change, is_overdue, score_breakdown, search_checks, similar_size_average, tool_scorecards, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
@@ -987,6 +987,52 @@ async def fleet_changes(current_user: Annotated[AuthUser, Depends(require_permis
     # Worsening first (a check that became not met), then the newest.
     out.sort(key=lambda c: (c.status != "not_met", -c.observed_at.timestamp()))
     return out[: max(1, min(limit, 1000))]
+
+
+class DigestItem(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    text: str
+
+
+class DigestOut(BaseModel):
+    generated_at: datetime
+    days: int
+    worse: list[DigestItem]
+    better: list[DigestItem]
+    overdue: list[DigestItem]
+    expiring: list[DigestItem]
+    below_target: list[DigestItem]
+    # How many there are in all when a list was cut to its first entries.
+    counts: dict[str, int]
+
+
+@router.get("/fleet/digest", response_model=DigestOut, summary="One digest for the owner: what got worse and better lately, what is overdue, what accepted risks end soon and who is below target")
+async def fleet_digest(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 1, limit: int = 15) -> DigestOut:
+    days = max(1, min(days, 30))
+    limit = max(1, min(limit, 50))
+    now = datetime.now(UTC)
+    changes = await fleet_changes(current_user, db, days=days, limit=1000)
+    worse, better = [], []
+    for c in changes:
+        how = classify_change(c.status, c.previous_status)
+        item = DigestItem(client_id=c.client_id, client_name=c.client_name, text=f"{c.key.replace('_', ' ')} is now {c.status.replace('_', ' ')}")
+        if how == "worse":
+            worse.append(item)
+        elif how == "better":
+            better.append(item)
+    checks, names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
+    today = now.date()
+    overdue = sorted(
+        (DigestItem(client_id=uuid.UUID(c.client_id), client_name=c.client_name, text=f"{c.key.replace('_', ' ')} is overdue ({c.owner or 'no owner'}, due {c.due_date})") for c in checks if not c.accepted and is_overdue(c.status, c.due_date, today)),
+        key=lambda i: (i.client_name.lower(), i.text),
+    )
+    ending = await fleet_acceptances(current_user, db, within_days=7, limit=1000)
+    expiring = [DigestItem(client_id=a.client_id, client_name=a.client_name, text=f"accepted risk {a.key.replace('_', ' ')} ends {a.expires_at.date() if a.expires_at else ''} ({a.reason})") for a in ending]
+    summary = await fleet_summary(current_user, db)
+    below = [DigestItem(client_id=c.client_id, client_name=c.client_name or str(c.client_id), text=f"score {c.score}% is under its target of {c.target}%") for c in summary.clients if c.below_target]
+    lists = {"worse": worse, "better": better, "overdue": overdue, "expiring": expiring, "below_target": below}
+    return DigestOut(generated_at=now, days=days, counts={k: len(v) for k, v in lists.items()}, **{k: v[:limit] for k, v in lists.items()})
 
 
 class FleetAcceptance(BaseModel):

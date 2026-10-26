@@ -11808,6 +11808,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/fleet/digest:
+    get:
+      tags:
+      - posture
+      summary: 'One digest for the owner: what got worse and better lately, what is
+        overdue, what accepted risks end soon and who is below target'
+      operationId: fleet_digest_api_v1_client_posture_fleet_digest_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 1
+          title: Days
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 15
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DigestOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/billing/clients/{client_id}:
     get:
       tags:
@@ -26193,6 +26230,74 @@ components:
       - total
       - not_in_master
       title: DeviceSummary
+    DigestItem:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        text:
+          type: string
+          title: Text
+      type: object
+      required:
+      - client_id
+      - client_name
+      - text
+      title: DigestItem
+    DigestOut:
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        days:
+          type: integer
+          title: Days
+        worse:
+          items:
+            $ref: '#/components/schemas/DigestItem'
+          type: array
+          title: Worse
+        better:
+          items:
+            $ref: '#/components/schemas/DigestItem'
+          type: array
+          title: Better
+        overdue:
+          items:
+            $ref: '#/components/schemas/DigestItem'
+          type: array
+          title: Overdue
+        expiring:
+          items:
+            $ref: '#/components/schemas/DigestItem'
+          type: array
+          title: Expiring
+        below_target:
+          items:
+            $ref: '#/components/schemas/DigestItem'
+          type: array
+          title: Below Target
+        counts:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Counts
+      type: object
+      required:
+      - generated_at
+      - days
+      - worse
+      - better
+      - overdue
+      - expiring
+      - below_target
+      - counts
+      title: DigestOut
     DirectoryAuditIn:
       properties:
         vendor_client_id:

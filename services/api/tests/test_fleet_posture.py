@@ -200,3 +200,15 @@ def test_similar_size_average_uses_only_clients_within_a_factor_of_two_and_with_
     assert out == {"average": 70, "clients": 3}, "a (60), b (45) and g (90) are within 25 to 100; c, d are not, e has no score, f has no machines"
     assert similar_size_average(0, others) == {"average": None, "clients": 0}
     assert similar_size_average(1000, others) == {"average": None, "clients": 0}
+
+
+def test_a_change_is_new_worse_better_or_the_same_by_the_order_not_met_partly_met():
+    from app.services.fleet_posture import classify_change
+
+    assert classify_change("met", None) == "new"
+    assert classify_change("not_met", "partly") == "worse"
+    assert classify_change("partly", "met") == "worse"
+    assert classify_change("met", "not_met") == "better"
+    assert classify_change("partly", "not_met") == "better"
+    assert classify_change("met", "met") == "same"
+    assert classify_change("odd", "met") == "worse", "an unknown status is read as needing attention"

@@ -781,3 +781,39 @@ async def test_a_mapped_vendor_client_with_an_unrelated_name_and_no_shared_machi
     out = await run(world["msp"], lambda db: mc.list_suspect_mappings(NS(tenant_id=world["msp"]), db))
     assert [(s.vendor_client_name, s.client_id) for s in out] == [("Harbor Legal Partners", world["client"])], "the one with a like name is not listed"
     assert 0.0 <= out[0].score < 0.35
+
+
+async def test_the_digest_gathers_what_got_worse_what_is_overdue_what_ends_soon_and_who_is_below_target(world):
+    from datetime import date, timedelta
+
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'ninjaone', 'n-15', 'n-15', 'n-15', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+    good = [{"key": "ninjaone_antivirus", "status": "met", "evidence": ""}, {"key": "ninjaone_patching", "status": "met", "evidence": ""}, {"key": "ninjaone_backup", "status": "partly", "evidence": ""}]
+    bad = [{"key": "ninjaone_antivirus", "status": "not_met", "evidence": ""}, {"key": "ninjaone_patching", "status": "met", "evidence": ""}, {"key": "ninjaone_backup", "status": "met", "evidence": ""}]
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-15", checks=good)))
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-15", checks=bad)))
+    user = NS(tenant_id=world["msp"], user_id=None)
+    await run(world["msp"], lambda db: cp.set_check_owner(world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="Dana", due_date=date.today() - timedelta(days=2)), user, db))
+    await run(world["msp"], lambda db: cp.accept_check(world["client"], "ninjaone_patching", cp.AcceptIn(reason="Replacing soon", expires_in_days=3), user, db))
+    await run(world["msp"], lambda db: cp.set_target(world["client"], cp.TargetIn(target=95), user, db))
+    cp.fleet_cache.clear()
+    d = await run(world["msp"], lambda db: cp.fleet_digest(NS(tenant_id=world["msp"]), db, days=1, limit=15))
+    mine = lambda items: [i.text for i in items if i.client_id == world["client"]]  # noqa: E731
+    assert any("ninjaone antivirus is now not met" in t for t in mine(d.worse))
+    assert any("ninjaone backup is now met" in t for t in mine(d.better))
+    assert any("ninjaone antivirus is overdue (Dana" in t for t in mine(d.overdue))
+    assert any("accepted risk ninjaone patching ends" in t for t in mine(d.expiring))
+    assert any("is under its target of 95%" in t for t in mine(d.below_target))
+    assert d.counts["worse"] >= 1 and set(d.counts) == {"worse", "better", "overdue", "expiring", "below_target"}
+    short = await run(world["msp"], lambda db: cp.fleet_digest(NS(tenant_id=world["msp"]), db, days=1, limit=1))
+    assert len(short.worse) <= 1 and short.counts["worse"] == d.counts["worse"], "a list is cut, its count is not"

@@ -555,6 +555,26 @@
     }
   },
   {
+    "tool": "aisoc_fleet_digest",
+    "method": "GET",
+    "path": "/client-posture/fleet/digest",
+    "query": [
+      "days",
+      "limit"
+    ],
+    "enums": {},
+    "numbers": {
+      "days": {
+        "min": 1,
+        "max": 30
+      },
+      "limit": {
+        "min": 1,
+        "max": 50
+      }
+    }
+  },
+  {
     "tool": "aisoc_fleet_tools",
     "method": "GET",
     "path": "/client-posture/fleet/tools",
