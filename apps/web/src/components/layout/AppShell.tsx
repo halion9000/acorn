@@ -79,12 +79,14 @@ export function AppShell({ children }: AppShellProps) {
           Wrapping them in ClientOnly defers their entire render to after mount
           so SSR ships nothing for these subtrees.
         */}
-        <ClientOnly>
-          <CopilotDock />
-        </ClientOnly>
-        <ClientOnly>
-          <CommandPalette />
-        </ClientOnly>
+        <div data-print-hide="true">
+          <ClientOnly>
+            <CopilotDock />
+          </ClientOnly>
+          <ClientOnly>
+            <CommandPalette />
+          </ClientOnly>
+        </div>
           </div>
         </TenantProvider>
       </TimeWindowProvider>

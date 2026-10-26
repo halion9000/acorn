@@ -400,3 +400,32 @@ code {
     box-shadow: none !important;
   }
 }
+
+/* Printing a page of the console (the licence and count pages, the fleet boards, a client's checks): only the page itself goes to paper, on a white background, without the sidebar, the top bar, the
+   copilot launcher or the command palette. Buttons and fields a page marks print:hidden stay off the paper too. */
+@media print {
+  aside,
+  header,
+  [data-print-hide] {
+    display: none !important;
+  }
+  .md\:ml-60 {
+    margin-left: 0 !important;
+  }
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+  body * {
+    color: #111111 !important;
+    border-color: #cccccc !important;
+    box-shadow: none !important;
+  }
+  main {
+    padding-top: 0 !important;
+  }
+  a {
+    text-decoration: none !important;
+  }
+}
