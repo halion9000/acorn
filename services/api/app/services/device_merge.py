@@ -14,7 +14,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.device import Device, DeviceMergeDismissal, DeviceMergeLog, DeviceSource
-from app.services.device_identity import could_be_same_machine, hostname_key, is_placeholder_name
+from app.services.device_identity import could_be_same_machine, hostname_key, is_placeholder_name, loose_name_key, mac_key
 
 
 class DeviceMergeError(ValueError):
@@ -255,6 +255,55 @@ async def drop_legacy_screenconnect(db: Any, tenant_id: uuid.UUID) -> int:
     return result.rowcount or 0
 
 
+async def auto_merge_by_mac(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> int:
+    """Merge a UniFi unit into the device whose serial is that unit's MAC address (Auvik holds a device's MAC as its serial when it has none). Returns how many merges were made.
+
+    UniFi reports each unit's MAC. A MAC is one network card, so a device with that MAC as its serial is the same unit, whatever either tool calls it. A pair merges only when exactly one other device
+    carries the MAC, no tool reports both, they are not a hardware unit and an agent's machine, and nobody said they differ. Each merge is the ordinary logged one."""
+    unifi_macs: dict[str, list[uuid.UUID]] = {}
+    for device_id, details in (await db.execute(select(DeviceSource.device_id, DeviceSource.details).where(DeviceSource.tenant_id == tenant_id, DeviceSource.vendor == "unifi"))).all():
+        mac = mac_key((details or {}).get("mac"))
+        if mac:
+            unifi_macs.setdefault(mac, []).append(device_id)
+    if not unifi_macs:
+        return 0
+    devices = {d.id: d for d in (await db.execute(select(Device).where(Device.tenant_id == tenant_id))).scalars().all()}
+    holders: dict[str, list[uuid.UUID]] = {}
+    for d in devices.values():
+        mac = mac_key(d.serial_number)
+        if mac in unifi_macs:
+            holders.setdefault(mac, []).append(d.id)
+    if not holders:
+        return 0
+    vendors: dict[uuid.UUID, set[str]] = {}
+    for device_id, vendor, external_id in (await db.execute(select(DeviceSource.device_id, DeviceSource.vendor, DeviceSource.external_id).where(DeviceSource.tenant_id == tenant_id))).all():
+        vendors.setdefault(device_id, set()).add(_tool_of(vendor, external_id))
+    dismissed = {(x.device_a, x.device_b) for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tenant_id))).scalars().all()}
+    gone: set[uuid.UUID] = set()
+    merged = 0
+    for mac, units in unifi_macs.items():
+        others = [h for h in holders.get(mac, []) if h not in units]
+        if len(units) != 1 or len(others) != 1:
+            continue
+        unit_id, other_id = units[0], others[0]
+        if unit_id in gone or other_id in gone or unit_id == other_id:
+            continue
+        unit, other = devices[unit_id], devices[other_id]
+        vu, vo = vendors.get(unit_id, set()), vendors.get(other_id, set())
+        if (vu & vo) - DUPLICATING_TOOLS or not could_be_same_machine(vu, vo):
+            continue
+        if unit.serial_number and other.serial_number and mac_key(unit.serial_number) != mac_key(other.serial_number):
+            continue
+        if _ordered(unit_id, other_id) in dismissed:
+            continue
+        keep, remove = sorted((unit, other), key=lambda d: (-len(vendors.get(d.id, set())), d.first_seen, str(d.id)))
+        await merge_devices(db, tenant_id, keep.id, remove.id, actor_id)
+        gone.add(remove.id)
+        vendors[keep.id] = vu | vo
+        merged += 1
+    return merged
+
+
 async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> int:
     """Merge, in one client, the devices that are plainly one machine seen by different tools. Returns how many merges were made.
 
@@ -267,12 +316,14 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
       * nobody said they are different machines (a pair marked "not a duplicate", or a merge that was undone).
     Each merge is the ordinary one: logged, and a person can undo it for two weeks."""
     await drop_legacy_screenconnect(db, tenant_id)
+    by_mac = await auto_merge_by_mac(db, tenant_id, actor_id)
     devices = (await db.execute(select(Device).where(Device.tenant_id == tenant_id))).scalars().all()
     by_name: dict[str, list[Device]] = {}
     for d in devices:
         key = hostname_key(d.hostname)
         if key and usable_for_merge(key) and not is_placeholder_name(key):
-            by_name.setdefault(key, []).append(d)
+            # Grouped by the name with punctuation ignored, so "Airport SP - Parking" (UniFi) and "Airport-SP-Parking" (Auvik) meet.
+            by_name.setdefault(loose_name_key(d.hostname) or key, []).append(d)
     vendors: dict[uuid.UUID, set[str]] = {}
     for device_id, vendor, external_id in (
         await db.execute(select(DeviceSource.device_id, DeviceSource.vendor, DeviceSource.external_id).where(DeviceSource.tenant_id == tenant_id))
@@ -286,7 +337,7 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
 
     groups = [g for g in by_name.values() if len(g) >= 2 and crowd(g) <= MAX_AUTO_MERGE_GROUP]
     if not groups:
-        return 0
+        return by_mac
     dismissed = {
         (x.device_a, x.device_b)
         for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tenant_id))).scalars().all()
@@ -318,4 +369,4 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
             held |= vo
             serial = serial or other.serial_number
             kind = kind or ko
-    return merged
+    return by_mac + merged

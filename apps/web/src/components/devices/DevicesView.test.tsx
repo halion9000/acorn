@@ -19,7 +19,7 @@ const routerParams = vi.hoisted(() => ({ current: new URLSearchParams('') }));
 vi.mock('next/navigation', () => ({ useSearchParams: () => routerParams.current }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
-import DevicesView, { filtersFromParams, attentionOf, devicesLoadError, facts, protectionLines, ransomwareLinked, specs } from './DevicesView';
+import DevicesView, { filtersFromParams, attentionOf, devicesLoadError, facts, flatDetails, detailRows, protectionLines, ransomwareLinked, specs } from './DevicesView';
 
 const NOW = '2026-10-15T15:00:00Z';
 function device(over: Partial<DeviceRow> & { hostname: string }): DeviceRow {
@@ -723,5 +723,22 @@ describe('BitLocker', () => {
   it('a link can ask for the machines that are not encrypted', () => {
     expect(filtersFromParams(new URLSearchParams('encryption=not_encrypted'))?.notEncryptedOnly).toBe(true);
     expect(filtersFromParams(new URLSearchParams('encryption=encrypted'))).toBeNull();
+  });
+});
+
+describe('flatDetails', () => {
+  const unifi = { vendor: 'unifi', name: 'Airport SP - Parking', last_seen: NOW, details: { mac: '1C6A1B49048D', product_line: 'network', is_console: true, is_managed: false, firmware_status: 'upToDate', adopted_at: '2026-10-23T07:03:40.000Z', note: null, update_available: '', url: 'https://unifi.ui.com/x', tags: ['a'] } };
+  it('lists a feed\'s flat fields with readable labels, Yes/No for flags, a date for timestamps, and leaves out blanks, lists and the link', () => {
+    const rows = flatDetails(unifi);
+    expect(rows.map(([k]) => k)).toEqual(['Mac', 'Product line', 'Is console', 'Is managed', 'Firmware status', 'Adopted at']);
+    expect(rows.find(([k]) => k === 'Mac')?.[1]).toBe('1C6A1B49048D');
+    expect(rows.find(([k]) => k === 'Is console')?.[1]).toBe('Yes');
+    expect(rows.find(([k]) => k === 'Is managed')?.[1]).toBe('No');
+    expect(rows.find(([k]) => k === 'Adopted at')?.[1]).not.toMatch(/T07:03/);
+  });
+  it('uses the facts when a feed sends them, and the flat fields when it does not', () => {
+    expect(detailRows({ vendor: 'ninjaone', name: 'x', last_seen: NOW, details: { facts: { offline: false }, mac: 'ignored' } })).toEqual([['Offline', 'false']]);
+    expect(detailRows(unifi)[0]).toEqual(['Mac', '1C6A1B49048D']);
+    expect(detailRows({ vendor: 'addigy', name: 'x', last_seen: NOW })).toEqual([]);
   });
 });

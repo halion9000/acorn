@@ -257,3 +257,46 @@ async def test_a_network_monitor_still_joins_a_unifi_unit_of_the_same_name(tenan
     await report(tenant, "unifi", "u1", "CORE-SWITCH-1")
     await report(tenant, "auvik", "a1", "CORE-SWITCH-1")
     assert await merge_pass(tenant) == 1
+
+
+async def test_a_unifi_gateway_and_auvik_spell_one_name_with_different_punctuation_and_are_one_machine(tenant):
+    await report(tenant, "unifi", "u1", "Airport SP - Parking", manufacturer="Ubiquiti", model="UCG Max")
+    await report(tenant, "auvik", "a1", "Airport-SP-Parking", manufacturer="Ubiquiti", model="UCG-Max")
+    assert await count(tenant) == 2
+    assert await merge_pass(tenant) == 1
+    assert await count(tenant) == 1
+    assert await count(tenant, "select count(*) from device_sources where tenant_id = :t") == 2
+
+
+async def test_two_units_of_one_hardware_tool_are_never_merged_however_alike_their_names(tenant):
+    await report(tenant, "unifi", "u1", "AP-HQ 1")
+    await report(tenant, "unifi", "u2", "AP-HQ-1")
+    assert await merge_pass(tenant) == 0
+    assert await count(tenant) == 2
+
+
+async def test_a_unifi_unit_joins_the_device_whose_serial_is_its_mac_whatever_the_names(tenant):
+    await report(tenant, "unifi", "u1", "Front Gateway", manufacturer="Ubiquiti", details={"mac": "1C6A1B49048D"})
+    await report(tenant, "auvik", "a1", "Device@10.0.0.1 something else", serial="1C:6A:1B:49:04:8D", manufacturer="Ubiquiti")
+    await report(tenant, "unifi", "u2", "Other Unit", details={"mac": "AABBCCDDEEFF"})
+    await report(tenant, "auvik", "a2", "Unrelated Switch", serial="112233445566")
+    assert await count(tenant) == 4
+    assert await merge_pass(tenant) == 1
+    assert await count(tenant) == 3
+    assert await count(tenant, "select count(*) from device_sources where tenant_id = :t") == 4
+    assert await merge_pass(tenant) == 0
+
+
+async def test_a_mac_that_two_other_devices_carry_is_not_guessed_between(tenant):
+    await report(tenant, "unifi", "u1", "Gateway", details={"mac": "1C6A1B49048D"})
+    await report(tenant, "auvik", "a1", "Box A", serial="1C6A1B49048D")
+    await report(tenant, "meraki", "m1", "Box B", serial="1C:6A:1B:49:04:8D")
+    assert await merge_pass(tenant) == 0
+    assert await count(tenant) == 3
+
+
+async def test_a_unifi_unit_is_not_merged_into_a_machine_an_agent_runs_on_even_when_the_mac_equals_its_serial(tenant):
+    await report(tenant, "unifi", "u1", "Gateway", details={"mac": "1C6A1B49048D"})
+    await report(tenant, "ninjaone", "n1", "A Windows PC", serial="1C6A1B49048D")
+    assert await merge_pass(tenant) == 0
+    assert await count(tenant) == 2

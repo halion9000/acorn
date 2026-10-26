@@ -65,6 +65,23 @@ def hostname_key(raw: object) -> str:
     return text.split(".", 1)[0].strip()
 
 
+def loose_name_key(raw: object) -> str:
+    """A hostname reduced further, for telling that two tools spell one name differently: ``Airport SP - Parking`` (UniFi) and ``Airport-SP-Parking`` (Auvik) are both ``airportspparking``.
+
+    Only letters and digits are kept. A name that ends in an IP address keeps its address form (the dots are numbers there), so it is returned as ``hostname_key`` gives it.
+    """
+    key = hostname_key(raw)
+    if _ENDS_IN_IPV4.search(key):
+        return key
+    return re.sub(r"[^a-z0-9]+", "", key)
+
+
+def mac_key(raw: object) -> str | None:
+    """A MAC address reduced for comparison (``1C:6A:1B:49:04:8D``, ``1c-6a-1b-49-04-8d`` and ``1C6A1B49048D`` agree), or None when the value is not twelve hex digits. Auvik keeps the MAC as the serial of a device with none."""
+    text = re.sub(r"[^0-9a-f]", "", str(raw or "").lower())
+    return text if len(text) == 12 and len(set(text)) > 1 else None
+
+
 def is_placeholder_name(key: str) -> bool:
     """True for the name a tool invents for a device it could not name (Auvik's ``Device@10.7.220.92``). Two of them say nothing about being the same machine."""
     return key.startswith("device@")

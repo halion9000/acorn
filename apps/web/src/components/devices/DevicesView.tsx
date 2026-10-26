@@ -725,11 +725,11 @@ function DeviceRowView({ d, master, open, onToggle, onHide }: { d: DeviceRow; ma
                     </a>
                   )}
                   <span className="ml-auto text-xs text-gray-500">seen {when(s.last_seen)}</span>
-                  {facts(s).length > 0 && (
+                  {detailRows(s).length > 0 && (
                     <details className="basis-full pl-8 text-xs text-gray-400">
                       <summary className="cursor-pointer text-gray-300">All details from {vendorLabel(s.vendor)}</summary>
                       <dl className="mt-1 grid gap-x-6 gap-y-0.5 sm:grid-cols-2">
-                        {facts(s).map(([k, v]) => (
+                        {detailRows(s).map(([k, v]) => (
                           <div key={k} className="flex gap-2">
                             <dt className="w-44 shrink-0 text-gray-500">{k}</dt>
                             <dd className="break-all">{v}</dd>
@@ -825,6 +825,24 @@ export function facts(s: DeviceRow['sources'][number]): [string, string][] {
       .toLowerCase();
     return [words.charAt(0).toUpperCase() + words.slice(1), String(v)];
   });
+}
+
+/** What a feed that sends flat fields (UniFi: MAC, product line, firmware, adoption time) reported, as label/value pairs: ``product_line`` becomes "Product line", true/false become Yes/No, a timestamp is shown as a date. Lists, nested values, blanks and the link are left out. */
+export function flatDetails(s: DeviceRow['sources'][number]): [string, string][] {
+  const out: [string, string][] = [];
+  for (const [k, v] of Object.entries(s.details ?? {})) {
+    if (k === 'url' || k === 'facts' || v === null || v === '' || !['string', 'number', 'boolean'].includes(typeof v)) continue;
+    const words = k.replace(/_/g, ' ').toLowerCase();
+    const text = typeof v === 'boolean' ? (v ? 'Yes' : 'No') : typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) ? when(v) : String(v);
+    out.push([words.charAt(0).toUpperCase() + words.slice(1), text]);
+  }
+  return out;
+}
+
+/** The rows behind "All details from <tool>": the feed's facts when it sends them (NinjaOne), else its flat fields. */
+export function detailRows(s: DeviceRow['sources'][number]): [string, string][] {
+  const f = facts(s);
+  return f.length > 0 ? f : flatDetails(s);
 }
 
 function Field({ label, value }: { label: string; value: string | null }) {

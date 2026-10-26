@@ -87,3 +87,22 @@ def test_two_different_serials_or_two_hardware_units_are_never_paired_by_address
 
 def test_device_that_is_not_made_up_is_not_matched_by_address_at_all():
     assert ip_brand_pairs([dev("a", "PC-A", ["10.0.0.5"]), dev("b", "PC-B", ["10.0.0.5"])], {}, set(), set()) == []
+
+
+def test_loose_name_key_ignores_punctuation_and_spacing_but_keeps_an_address_name_whole():
+    from app.services.device_identity import loose_name_key
+
+    assert loose_name_key("Airport SP - Parking") == loose_name_key("Airport-SP-Parking") == "airportspparking"
+    assert loose_name_key("PC-01.corp.local") == "pc01"
+    assert loose_name_key("Device@10.7.220.92") == "device@10.7.220.92"
+    assert loose_name_key("Device@10.7.220.92") != loose_name_key("Device@10.7.20.55")
+    assert loose_name_key("--- ") == ""
+
+
+def test_mac_key_agrees_across_spellings_and_rejects_anything_that_is_not_a_mac():
+    from app.services.device_identity import mac_key
+
+    assert mac_key("1C:6A:1B:49:04:8D") == mac_key("1c-6a-1b-49-04-8d") == mac_key("1C6A1B49048D") == "1c6a1b49048d"
+    assert mac_key("SN12345") is None
+    assert mac_key("000000000000") is None
+    assert mac_key(None) is None
