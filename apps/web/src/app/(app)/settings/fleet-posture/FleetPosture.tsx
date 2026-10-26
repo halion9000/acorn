@@ -418,10 +418,81 @@ function Accepted() {
   );
 }
 
+export interface SearchHit {
+  client_id: string;
+  client_name: string;
+  source: string;
+  key: string;
+  status: string;
+  evidence: string;
+  matched_items: string[];
+  matched_text: boolean;
+  accepted: boolean;
+}
+
+function Search() {
+  const [text, setText] = useState("");
+  const [asked, setAsked] = useState("");
+  const { data, error } = useJson<SearchHit[]>(asked.length >= 2 ? `/api/v1/client-posture/fleet/search?q=${encodeURIComponent(asked)}` : null);
+  return (
+    <div className="space-y-3">
+      <form
+        className="flex items-center gap-2 print:hidden"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setAsked(text.trim());
+        }}
+      >
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="A machine, an account or a word, for example SRV-02" aria-label="Search the checks" className="w-96 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-200" />
+        <button type="submit" className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200">
+          Search
+        </button>
+      </form>
+      <p className="text-sm text-slate-400">Looks in what every tool reported for every client: the evidence, the check name and the machines and accounts behind each check.</p>
+      {asked.length > 0 && asked.length < 2 && <p className="text-sm text-slate-500">Type at least two characters.</p>}
+      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+      {asked.length >= 2 && !data && !error && <p className="text-sm text-slate-500">Searching…</p>}
+      {data && data.length === 0 && <p className="text-sm text-slate-400">Nothing mentions that.</p>}
+      {data && data.length > 0 && (
+        <table className="w-full text-left text-sm" data-testid="fleet-search">
+          <thead className="text-xs uppercase text-slate-500">
+            <tr>
+              <th className="py-1 pr-3">Client</th>
+              <th className="pr-3">Tool</th>
+              <th className="pr-3">Status</th>
+              <th>Found in</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((h) => {
+              const st = STATUS_TEXT[h.status] ?? STATUS_TEXT.partly;
+              return (
+                <tr key={`${h.client_id}:${h.key}`} className="border-t border-slate-800 text-slate-300">
+                  <td className="py-1 pr-3">
+                    <Link href={clientHref(h.client_id)} className="text-sky-300 hover:underline">
+                      {h.client_name}
+                    </Link>
+                  </td>
+                  <td className="pr-3">{TOOL_CHECK_LABELS[h.source] ?? h.source}</td>
+                  <td className={`pr-3 ${st.className}`}>{st.text}{h.accepted ? " (accepted)" : ""}</td>
+                  <td className="text-xs text-slate-400">
+                    {h.key.replace(/_/g, " ")}
+                    {h.matched_items.length > 0 ? `: ${h.matched_items.join("; ")}` : h.matched_text ? `: ${h.evidence}` : ""}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export function FleetPosture() {
   const { data: boards } = useJson<BoardMeta>("/api/v1/client-posture/fleet/boards");
   const [tab, setTab] = useState<string>("worst");
-  const tabs: [string, string][] = [["worst", "Worst clients"], ["changes", "What changed"], ["coverage", "Coverage"], ["accepted", "Accepted risks"], ...Object.entries(boards ?? {}).map(([k, v]) => [k, v.title] as [string, string])];
+  const tabs: [string, string][] = [["worst", "Worst clients"], ["changes", "What changed"], ["coverage", "Coverage"], ["accepted", "Accepted risks"], ["search", "Search"], ...Object.entries(boards ?? {}).map(([k, v]) => [k, v.title] as [string, string])];
   return (
     <div className="space-y-4 p-6">
       <div>
@@ -440,7 +511,7 @@ export function FleetPosture() {
           </button>
         ))}
       </div>
-      {tab === "worst" ? <Worst /> : tab === "changes" ? <Changes /> : tab === "coverage" ? <CoverageTab /> : tab === "accepted" ? <Accepted /> : <Board key={tab} board={tab} title={boards?.[tab]?.title ?? tab} />}
+      {tab === "worst" ? <Worst /> : tab === "changes" ? <Changes /> : tab === "coverage" ? <CoverageTab /> : tab === "accepted" ? <Accepted /> : tab === "search" ? <Search /> : <Board key={tab} board={tab} title={boards?.[tab]?.title ?? tab} />}
     </div>
   );
 }

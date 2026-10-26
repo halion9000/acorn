@@ -31,7 +31,7 @@ from app.services.domain_posture import DohResolver, DomainPosture, Resolver, ca
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
 from app.services import fleet_cache
 from app.services.score_history import trend as score_trend
-from app.services.fleet_posture import average_score, below_target, is_overdue, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import average_score, below_target, is_overdue, search_checks, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
@@ -779,6 +779,25 @@ async def fleet_summary(current_user: Annotated[AuthUser, Depends(require_permis
         summaries.append({"client_id": uuid.UUID(cid), "client_name": names.get(uuid.UUID(cid)), "stale_tools": stale_sources(refreshed.get(uuid.UUID(cid), {}), now), "target": target, "below_target": below_target(s["score"], target), **s})
     ranked = rank_clients(summaries)
     return FleetOut(generated_at=now, clients=[FleetClient(**s) for s in ranked], average_score=average_score([s["score"] for s in ranked]))
+
+
+class SearchHit(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    source: str
+    key: str
+    status: str
+    evidence: str
+    matched_items: list[str] = []
+    matched_text: bool = False
+    accepted: bool = False
+
+
+@router.get("/fleet/search", response_model=list[SearchHit], summary="Find the checks of all clients that mention a machine, account or word")
+async def fleet_search(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, q: str, limit: int = 100) -> list[SearchHit]:
+    """Which client has host SRV-02, or an account called jsmith, or an expiring certificate: searches what every tool reported (evidence, check name and the machines or accounts behind each check)."""
+    checks, _names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
+    return [SearchHit(**{**h, "client_id": uuid.UUID(h["client_id"])}) for h in search_checks(checks, q, max(1, min(limit, 300)))]
 
 
 class FleetBoardRow(BaseModel):

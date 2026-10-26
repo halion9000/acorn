@@ -117,3 +117,33 @@ def test_a_check_is_overdue_only_when_its_date_has_passed_and_it_is_not_fully_me
     assert is_overdue("not_met", date(2026, 11, 1), today) is False
     assert is_overdue("met", date(2026, 10, 1), today) is False, "fixed, so not late"
     assert is_overdue("not_met", None, today) is False
+
+
+def _fc(client, key, status, evidence="", items=(), source="ninjaone", accepted=False):
+    from app.services.fleet_posture import FleetCheck
+
+    return FleetCheck(client_id=f"id-{client}", client_name=client, source=source, key=key, status=status, evidence=evidence, items=tuple(items), accepted=accepted)
+
+
+def test_a_search_finds_a_machine_or_word_in_the_evidence_the_key_or_the_items_and_puts_problems_first():
+    from app.services.fleet_posture import search_checks
+
+    checks = [
+        _fc("Aaa", "ninjaone_antivirus", "met", "All fine", ["SRV-02: protected"]),
+        _fc("Acme", "ninjaone_patching", "not_met", "3 behind", ["PC-1: behind", "srv-02: 40 days"]),
+        _fc("Beta", "huntress_quiet_agents", "partly", "Agent on SRV-02 quiet for 9 days"),
+        _fc("Gamma", "meraki_wan", "not_met", "WAN up", ["MX-1"]),
+    ]
+    out = search_checks(checks, "Srv-02")
+    assert [(r["client_name"], r["status"]) for r in out] == [("Acme", "not_met"), ("Beta", "partly"), ("Aaa", "met")], "problems first, not by name"
+    assert out[0]["matched_items"] == ["srv-02: 40 days"] and out[0]["matched_text"] is False
+    assert out[1]["matched_items"] == [] and out[1]["matched_text"] is True
+    assert [r["key"] for r in search_checks(checks, "quiet agents")] == ["huntress_quiet_agents"], "the check name matches with spaces"
+
+
+def test_a_search_needs_two_characters_and_respects_the_limit_and_extra_spaces():
+    from app.services.fleet_posture import search_checks
+
+    checks = [_fc(f"C{i}", "k", "not_met", "disk full on host") for i in range(5)]
+    assert search_checks(checks, "d") == [] and search_checks(checks, "  ") == []
+    assert len(search_checks(checks, "  DISK   full ", limit=3)) == 3

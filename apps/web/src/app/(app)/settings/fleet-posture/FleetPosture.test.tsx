@@ -24,6 +24,8 @@ beforeEach(() => {
         ],
       });
     if (url.includes('/fleet/boards/renewals')) return json({ board: 'renewals', title: 'Renewals', keys: [], rows: [{ client_id: 'c1', client_name: 'Acme', source: 'meraki', key: 'meraki_licence', status: 'not_met', evidence: 'The Meraki licence has expired', accepted: false, owner: 'Dana R', due_date: '2026-10-01', overdue: true }] });
+    if (url.includes('/fleet/search'))
+      return json([{ client_id: 'c1', client_name: 'Acme', source: 'ninjaone', key: 'ninjaone_patching', status: 'not_met', evidence: '3 behind', matched_items: ['srv-02: 40 days'], matched_text: false, accepted: false }]);
     if (url.endsWith('/fleet/acceptances'))
       return json([
         { client_id: 'c1', client_name: 'Acme', key: 'ninjaone_patching', reason: 'Replacing in January', accepted_at: '2026-10-01T00:00:00Z', expires_at: new Date(Date.now() + 5 * 86_400_000 + 3_600_000).toISOString() },
@@ -86,6 +88,21 @@ describe('accepting from a board', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('1 could not be done: Client not found');
     const body = JSON.parse(authFetch.mock.calls.find((c) => c[1]?.method === 'POST')![1].body);
     expect(body).toEqual({ key: 'meraki_licence', client_ids: ['c1'], reason: 'No firewall on site', not_applicable: true });
+  });
+});
+
+describe('FleetPosture search', () => {
+  it('asks the API only once two characters are typed and shows where each hit was found', async () => {
+    render(<FleetPosture />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Search' }));
+    await userEvent.type(screen.getByLabelText('Search the checks'), 'S{Enter}');
+    expect(await screen.findByText('Type at least two characters.')).toBeInTheDocument();
+    expect(authFetch.mock.calls.some((c) => String(c[0]).includes('/fleet/search'))).toBe(false);
+    await userEvent.type(screen.getByLabelText('Search the checks'), 'RV-02{Enter}');
+    const table = await screen.findByTestId('fleet-search');
+    expect(within(table).getByText('Acme')).toBeInTheDocument();
+    expect(within(table).getByText(/ninjaone patching: srv-02: 40 days/)).toBeInTheDocument();
+    expect(authFetch.mock.calls.some((c) => String(c[0]) === '/api/v1/client-posture/fleet/search?q=SRV-02')).toBe(true);
   });
 });
 

@@ -539,6 +539,22 @@
     "numbers": {}
   },
   {
+    "tool": "aisoc_fleet_search",
+    "method": "GET",
+    "path": "/client-posture/fleet/search",
+    "query": [
+      "q",
+      "limit"
+    ],
+    "enums": {},
+    "numbers": {
+      "limit": {
+        "min": 1,
+        "max": 200
+      }
+    }
+  },
+  {
     "tool": "aisoc_fleet_boards",
     "method": "GET",
     "path": "/client-posture/fleet/boards",

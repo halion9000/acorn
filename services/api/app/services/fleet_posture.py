@@ -73,6 +73,28 @@ def average_score(scores: list[int | None]) -> int | None:
     return int(sum(have) / len(have) + 0.5) if have else None
 
 
+def search_checks(checks: list[FleetCheck], query: str, limit: int = 100) -> list[dict[str, Any]]:
+    """The checks across all clients that mention ``query`` (case-insensitive) in what the tool saw, in the check's key or in the machines and accounts behind it.
+
+    Answers "which client has SRV-02" or "who has an account called jsmith". Each hit says which client, tool and check, its status, the items that matched (up to five) and whether the evidence text matched.
+    Fewer than two characters matches nothing. Problems first (not met, partly, met), then by client name.
+    """
+    needle = " ".join(query.lower().split())
+    if len(needle) < 2:
+        return []
+    out: list[dict[str, Any]] = []
+    for c in checks:
+        in_text = needle in c.evidence.lower() or needle in c.key.lower().replace("_", " ") or needle in c.key.lower()
+        matched = [i for i in c.items if needle in i.lower()]
+        if not in_text and not matched:
+            continue
+        out.append(
+            {"client_id": c.client_id, "client_name": c.client_name, "source": c.source, "key": c.key, "status": c.status, "evidence": c.evidence, "matched_items": matched[:5], "matched_text": in_text, "accepted": c.accepted}
+        )
+    out.sort(key=lambda r: (STATUS_ORDER.get(r["status"], 3), r["client_name"].lower(), r["key"]))
+    return out[: max(1, limit)]
+
+
 def is_overdue(status: str, due: date | None, today: date) -> bool:
     """A check is overdue when it has a due date that has passed and is still not fully met. A met check is never overdue, and the due day itself is not late."""
     return due is not None and due < today and status != "met"
