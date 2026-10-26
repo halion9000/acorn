@@ -572,7 +572,8 @@ function Mapping() {
 
 function Changes() {
   const [days, setDays] = useState(30);
-  const { data, error } = useJson<ChangeRow[]>(`/api/v1/billing/changes?days=${days}`);
+  const [only, setOnly] = useState("");
+  const { data, error } = useJson<ChangeRow[]>(`/api/v1/billing/changes?days=${days}${only ? `&source=${encodeURIComponent(only)}` : ""}`);
   return (
     <div className="space-y-3">
       <label className="flex items-center gap-2 text-sm text-slate-300 print:hidden">
@@ -581,6 +582,13 @@ function Changes() {
           <option value={7}>7 days</option>
           <option value={30}>30 days</option>
           <option value={90}>90 days</option>
+        </select>
+      </label>
+      <label className="flex items-center gap-2 text-sm text-slate-300 print:hidden">
+        Show
+        <select value={only} onChange={(e) => setOnly(e.target.value)} className="rounded border border-slate-700 bg-slate-900 px-2 py-1" aria-label="Which changes">
+          <option value="">Every tool</option>
+          <option value="halopsa">What was billed (invoice corrections)</option>
         </select>
       </label>
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}

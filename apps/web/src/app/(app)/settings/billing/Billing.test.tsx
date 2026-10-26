@@ -212,6 +212,14 @@ describe('Billing', () => {
     expect((await screen.findByTestId('billing-no-counts')).textContent).toMatch(/blumira/i);
   });
 
+  it('shows only what was billed when asked, as the history of invoice corrections', async () => {
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Changes' }));
+    await screen.findByTestId('billing-changes');
+    await userEvent.selectOptions(screen.getByLabelText('Which changes'), 'halopsa');
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]) === '/api/v1/billing/changes?days=30&source=halopsa')).toBe(true));
+  });
+
   it('says so when nothing has been counted yet', async () => {
     authFetch.mockImplementation(() => json({ generated_at: '', days: 30, rows: [] }));
     render(<Billing />);

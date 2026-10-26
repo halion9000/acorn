@@ -218,7 +218,7 @@ class ChangeRow(BaseModel):
 
 @router.get("/changes", response_model=list[ChangeRow], summary="Every change to a count across all clients in the last days, newest first")
 async def changes_log(
-    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 30, limit: int = 500, client_id: uuid.UUID | None = None
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 30, limit: int = 500, client_id: uuid.UUID | None = None, source: str | None = None
 ) -> list[ChangeRow]:
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, client_id)
@@ -226,7 +226,10 @@ async def changes_log(
     out: list[ChangeRow] = []
     for cid in ids if client_id is not None else ids[1:]:
         async with _as(db, owner, cid):
-            rows = (await db.execute(select(ClientLicenseHistory).where(ClientLicenseHistory.tenant_id == cid, ClientLicenseHistory.observed_at >= since))).scalars().all()
+            stmt = select(ClientLicenseHistory).where(ClientLicenseHistory.tenant_id == cid, ClientLicenseHistory.observed_at >= since)
+            if source:
+                stmt = stmt.where(ClientLicenseHistory.source == source)  # "halopsa" is the history of what was billed: each time an invoice quantity was corrected, and by how much
+            rows = (await db.execute(stmt)).scalars().all()
         out += [
             ChangeRow(client_id=cid, client_name=names.get(cid) or str(cid), source=r.source, item=r.item, unit=r.unit, count=r.count, previous_count=r.previous_count, observed_at=r.observed_at, unusual=unusual(r.count, r.previous_count)) for r in rows
         ]
