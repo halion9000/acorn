@@ -78,6 +78,7 @@ def test_suggestions_match_the_specific_words_first():
     assert suggest("Huntress for Workstations (Included)") == [{"source": "huntress", "item": "Agents"}]
     assert [s["item"] for s in suggest("NinjaOne RMM (Included)")] == ["Windows workstations", "Windows servers", "Macs"]
     assert suggest("Datto SaaS (PassThru)") == [{"source": "datto-saas", "item": "Billable seats"}]
+    assert suggest("DNS Filter (PassThru)") == [{"source": "dnsfilter", "item": "Roaming agents"}], "billed as two words"
     assert suggest("Managed Service - taxable portion") == []
 
 

@@ -25,7 +25,7 @@ beforeEach(() => {
     if (url.startsWith('/api/v1/billing/reconcile'))
       return json({ generated_at: '', unmapped_lines: 2, rows: [{ client_id: 'c1', client_name: 'Acme', invoice_item: 'NinjaOne RMM (Included)', billed: 16, counted: 18, difference: 2, parts: [{ source: 'ninjaone', item: 'Macs', count: 4 }, { source: 'ninjaone', item: 'Windows workstations', count: 14 }] }] });
     if (url.startsWith('/api/v1/billing/map') && !mapCalls.length)
-      return json({ mapped: [{ invoice_item: 'Datto SaaS (Included)', counted: [{ source: 'datto-saas', item: 'Billable seats' }] }], unmapped: [{ invoice_item: 'Huntress for Workstations (Included)', clients: 120, suggestion: [{ source: 'huntress', item: 'Agents' }] }, { invoice_item: 'Liongard (Included)', clients: 150, suggestion: [] }], counted_items: [] });
+      return json({ mapped: [{ invoice_item: 'Datto SaaS (Included)', counted: [{ source: 'datto-saas', item: 'Billable seats' }] }], unmapped: [{ invoice_item: 'Huntress for Workstations (Included)', clients: 120, suggestion: [{ source: 'huntress', item: 'Agents' }] }, { invoice_item: 'Liongard (Included)', clients: 150, suggestion: [] }], counted_items: [{ source: 'liongard', item: 'Systems' }, { source: 'ninjaone', item: 'Macs' }] });
     if (url.startsWith('/api/v1/billing/map')) return json({});
     if (url.startsWith('/api/v1/billing/data-quality'))
       return json({ generated_at: '', baseline_tool: 'ninjaone', no_counts: ['blumira', 'petra'], rows: [{ client_id: 'c1', client_name: 'Acme', tool: 'huntress', tool_count: 30, baseline_count: 50, gap: -20 }] });
@@ -100,6 +100,27 @@ describe('Billing reconcile and mapping', () => {
     const put = authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')!;
     expect(put[0]).toBe('/api/v1/billing/map');
     expect(JSON.parse(put[1].body)).toEqual({ invoice_item: 'Huntress for Workstations (Included)', counted: [{ source: 'huntress', item: 'Agents' }] });
+  });
+
+  it('maps a line that has no suggestion by picking the tool count', async () => {
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Invoice mapping' }));
+    await screen.findByTestId('unmapped-lines');
+    mapCalls.push(1);
+    await userEvent.selectOptions(screen.getByLabelText('Map Liongard (Included) to'), 'ninjaone|Macs');
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => c[1]?.method === 'PUT')).toBe(true));
+    const put = authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')!;
+    expect(JSON.parse(put[1].body)).toEqual({ invoice_item: 'Liongard (Included)', counted: [{ source: 'ninjaone', item: 'Macs' }] });
+  });
+
+  it('uses every suggestion at once, one save each, and says how many', async () => {
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Invoice mapping' }));
+    const button = await screen.findByText('Use all 1 suggestions');
+    mapCalls.push(1);
+    await userEvent.click(button);
+    await waitFor(() => expect(authFetch.mock.calls.filter((c) => c[1]?.method === 'PUT')).toHaveLength(1));
+    expect(JSON.parse(authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')![1].body).invoice_item).toBe('Huntress for Workstations (Included)');
   });
 
   it('removes a mapping', async () => {

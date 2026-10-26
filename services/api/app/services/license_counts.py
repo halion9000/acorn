@@ -108,6 +108,7 @@ SUGGESTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     ("datto saas", (("datto-saas", "Billable seats"),)),
     ("autoelevate", (("autoelevate", "Computers"),)),
     ("dnsfilter", (("dnsfilter", "Roaming agents"),)),
+    ("dns filter", (("dnsfilter", "Roaming agents"),)),
     ("slide", (("slide", "Protected systems"),)),
     ("field effect", (("fieldeffect", "Endpoint devices"),)),
 )

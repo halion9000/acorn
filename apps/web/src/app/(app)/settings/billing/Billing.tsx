@@ -412,6 +412,17 @@ function Mapping() {
       setProblem(e instanceof Error ? e.message : "Could not save");
     }
   };
+  const saveQuiet = async (invoice_item: string, counted: { source: string; item: string }[]): Promise<boolean> => {
+    try {
+      const res = await authFetch("/api/v1/billing/map", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_item, counted }) });
+      if (!res.ok) throw new Error(`The API answered ${res.status}`);
+      return true;
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Could not save");
+      setReload((n) => n + 1);
+      return false;
+    }
+  };
   const remove = async (invoice_item: string) => {
     try {
       const res = await authFetch(`/api/v1/billing/map?invoice_item=${encodeURIComponent(invoice_item)}`, { method: "DELETE" });
@@ -422,9 +433,18 @@ function Mapping() {
       setProblem(e instanceof Error ? e.message : "Could not remove");
     }
   };
+  const withSuggestion = (data?.unmapped ?? []).filter((u) => u.suggestion.length > 0);
+  const useAll = async () => {
+    for (const u of withSuggestion) {
+      const ok = await saveQuiet(u.invoice_item, u.suggestion);
+      if (!ok) return;
+    }
+    setProblem(null);
+    setReload((n) => n + 1);
+  };
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-400">Say which tool counts each invoice line should equal. A suggestion is a guess from the line&apos;s name: use it only if it is right.</p>
+      <p className="text-sm text-slate-400">Say which tool counts each invoice line should equal. A suggestion is a guess from the line&apos;s name: use it only if it is right. For a line with no suggestion, pick the tool count yourself.</p>
       {(error || problem) && <p role="alert" className="text-sm text-red-300">{error ?? problem}</p>}
       {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
       {data && (
@@ -452,7 +472,14 @@ function Mapping() {
             )}
           </section>
           <section>
-            <h3 className="mb-1 text-sm uppercase text-slate-500">Billed lines still to map</h3>
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <h3 className="text-sm uppercase text-slate-500">Billed lines still to map</h3>
+              {withSuggestion.length > 0 ? (
+                <button type="button" className="rounded border border-sky-500/50 px-2 py-0.5 text-xs text-sky-200 print:hidden" onClick={() => void useAll()}>
+                  Use all {withSuggestion.length} suggestions
+                </button>
+              ) : null}
+            </div>
             {(data.unmapped ?? []).length === 0 ? (
               <p className="text-sm text-slate-400">Every billed line is mapped.</p>
             ) : (
@@ -468,7 +495,24 @@ function Mapping() {
                           <button type="button" className="text-xs text-sky-300 underline hover:text-sky-200" onClick={() => void save(u.invoice_item, u.suggestion)}>
                             Use suggestion
                           </button>
-                        ) : null}
+                        ) : (
+                          <select
+                            aria-label={`Map ${u.invoice_item} to`}
+                            className="max-w-[16rem] rounded border border-slate-700 bg-slate-900 px-1 py-0.5 text-xs text-slate-300"
+                            value=""
+                            onChange={(e) => {
+                              const [source, ...rest] = e.target.value.split("|");
+                              if (source) void save(u.invoice_item, [{ source, item: rest.join("|") }]);
+                            }}
+                          >
+                            <option value="">Map to…</option>
+                            {(data.counted_items ?? []).map((c) => (
+                              <option key={`${c.source}|${c.item}`} value={`${c.source}|${c.item}`}>
+                                {toolName(c.source)}: {c.item}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </td>
                     </tr>
                   ))}
