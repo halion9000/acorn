@@ -90,6 +90,23 @@ describe('real tenants', () => {
   });
 });
 
+describe('the figures at the top', () => {
+  it('each opens the page that lists what it counts, with the matching filter', async () => {
+    overviewMock.mockResolvedValue({ ...none, total_tenants: 2, tenants_reporting: 1, total_open_alerts: 12, total_critical_alerts: 2, total_open_cases: 4, sla_breach_count: 1, avg_mttr_minutes: 30 });
+    tenantsMock.mockResolvedValue([reporting, quiet]);
+    render(<MSSPDashboardView />);
+    await screen.findByRole('table');
+    const href = (name: RegExp) => screen.getByRole('link', { name }).getAttribute('href');
+    expect(href(/^Open alerts/)).toBe('/alerts?status=open');
+    expect(href(/^Critical alerts/)).toBe('/alerts?status=open&severity=critical');
+    expect(href(/^Open cases/)).toBe('/cases?scope=all');
+    expect(href(/^SLA breaches/)).toBe('/sla');
+    expect(href(/^Avg MTTR/)).toBe('/sla');
+    expect(href(/^Managed tenants/)).toBe('#tenant-overview');
+    expect(document.getElementById('tenant-overview')).not.toBeNull();
+  });
+});
+
 describe('filters', () => {
   it('shows only tenants breaching their SLA, or only those with no data yet', async () => {
     overviewMock.mockResolvedValue({ ...none, total_tenants: 3 });

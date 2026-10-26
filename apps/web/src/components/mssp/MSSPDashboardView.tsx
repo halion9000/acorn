@@ -2,6 +2,7 @@
 
 import VendorBadge, { orderSources } from './VendorBadge';
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { EmptyState, EmptyStateIcons } from '@/components/ui/EmptyState';
@@ -53,14 +54,15 @@ export function tenantsToCsv(rows: ManagedTenantRow[]): string {
   return [header.join(','), ...lines].join('\n') + '\n';
 }
 
-function kpiCards(overview: MsspOverview) {
+/** Each tile opens the page that lists what it counts, with the filter that matches (alerts and cases cover this organisation and all its clients). */
+export function kpiCards(overview: MsspOverview) {
   return [
-    { label: 'Managed tenants', value: String(overview.total_tenants), hint: `${overview.tenants_reporting} reporting metrics` },
-    { label: 'Open alerts', value: figure(overview.total_open_alerts) },
-    { label: 'Critical alerts', value: figure(overview.total_critical_alerts) },
-    { label: 'Open cases', value: figure(overview.total_open_cases) },
-    { label: 'SLA breaches', value: figure(overview.sla_breach_count) },
-    { label: 'Avg MTTR', value: figure(overview.avg_mttr_minutes, { decimals: 0, suffix: ' min' }) },
+    { label: 'Managed tenants', value: String(overview.total_tenants), hint: `${overview.tenants_reporting} reporting metrics`, href: '#tenant-overview' },
+    { label: 'Open alerts', value: figure(overview.total_open_alerts), href: '/alerts?status=open' },
+    { label: 'Critical alerts', value: figure(overview.total_critical_alerts), href: '/alerts?status=open&severity=critical' },
+    { label: 'Open cases', value: figure(overview.total_open_cases), href: '/cases?scope=all' },
+    { label: 'SLA breaches', value: figure(overview.sla_breach_count), href: '/sla' },
+    { label: 'Avg MTTR', value: figure(overview.avg_mttr_minutes, { decimals: 0, suffix: ' min' }), href: '/sla' },
   ];
 }
 
@@ -199,15 +201,15 @@ export default function MSSPDashboardView() {
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {kpiCards(overview).map((c) => (
-              <div key={c.label} className="rounded-xl border border-gray-800/60 bg-gray-900/40 p-4">
+              <Link key={c.label} href={c.href} aria-label={`${c.label}: ${c.value}`} className="block rounded-xl border border-gray-800/60 bg-gray-900/40 p-4 transition-colors hover:border-blue-500/50 hover:bg-gray-900/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                 <p className="text-xs text-gray-400 uppercase tracking-wider">{c.label}</p>
                 <p className="mt-1 text-2xl font-semibold text-white">{c.value}</p>
                 {c.hint ? <p className="mt-1 text-xs text-gray-500">{c.hint}</p> : null}
-              </div>
+              </Link>
             ))}
           </div>
 
-          <div className="rounded-xl border border-gray-800/60 bg-gray-900/40 overflow-hidden">
+          <div id="tenant-overview" className="rounded-xl border border-gray-800/60 bg-gray-900/40 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-800/60 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-white">Tenant Overview</h2>
               <div className="flex items-center gap-3">
