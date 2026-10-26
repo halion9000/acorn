@@ -87,6 +87,7 @@ const TITLE: Record<string, string> = {
   threatmate_ai_tools: 'AI tools in use',
   threatmate_pentest: 'Vulnerability scans',
   threatmate_m365_controls: 'Microsoft 365 identity controls',
+  threatmate_cloud_identity: 'Cloud accounts without MFA',
 };
 
 const STATUS: Record<string, { text: string; className: string }> = {

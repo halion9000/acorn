@@ -20,6 +20,7 @@ from sqlalchemy.exc import DBAPIError
 
 from app.models.client_alias import ClientAlias
 from app.models.tenant import Tenant
+from app.services.domain_owner import domain_owners, registrable_domain
 
 # vendor -> the key in the record's context that holds that vendor's client id. Keep in step with services/fusion/app/services/client_routing.py.
 CLIENT_ID_FIELD: dict[str, str] = {
@@ -45,6 +46,18 @@ _MOVE_SQL = (
 # A case moves only when every alert in it moved: a case spanning clients stays where it is.
 _MOVE_CASES_SQL = "UPDATE aisoc_cases SET tenant_id = :child WHERE tenant_id = :parent AND cardinality(alert_ids) > 0 AND alert_ids <@ CAST(:ids AS uuid[])"
 _MOVE_ACTIONS_SQL = "UPDATE vendor_actions SET tenant_id = :child WHERE tenant_id = :parent AND alert_id = ANY(CAST(:ids AS uuid[]))"
+
+
+# ThreatMate files a client's public domain under the MSP's own segment, so its alerts name the MSP as their client. The asset they are about (a host or e-mail address of the client's domain) says whose they are.
+_DOMAIN_CANDIDATES_SQL = (
+    "SELECT a.id::text, a.raw_event #>> ARRAY['unmapped', 'context', 'device_name'] FROM alerts a "
+    "WHERE a.tenant_id = :parent AND a.raw_event->>'source' = 'threatmate' AND a.raw_event #>> ARRAY['unmapped', 'context', 'device_name'] IS NOT NULL"
+)
+_MOVE_IDS_SQL = (
+    "UPDATE alerts a SET tenant_id = :child WHERE a.tenant_id = :parent AND a.id = ANY(CAST(:ids AS uuid[])) "
+    "AND NOT EXISTS (SELECT 1 FROM alerts x WHERE x.tenant_id = :child AND x.dedup_hash IS NOT DISTINCT FROM a.dedup_hash AND x.id <> a.id) "
+    "RETURNING a.id"
+)
 
 
 class RerouteError(Exception):
@@ -76,6 +89,7 @@ async def reroute_alerts(db: Any, parent_id: uuid.UUID) -> RerouteResult:
 
     result = RerouteResult()
     try:
+        await _reroute_by_domain(db, parent_id, result)
         for vendor, vendor_client_id, child_id, child_name in aliases:
             params = {"parent": parent_id, "child": child_id, "vendor": vendor, "field": CLIENT_ID_FIELD[vendor], "vid": vendor_client_id}
             matching = (await db.execute(text(_COUNT_SQL), params)).scalar_one()
@@ -97,3 +111,27 @@ async def reroute_alerts(db: Any, parent_id: uuid.UUID) -> RerouteResult:
             "Nothing was changed. Run this as the database owner."
         ) from exc
     return result
+
+
+async def _reroute_by_domain(db: Any, parent_id: uuid.UUID, result: RerouteResult) -> None:
+    """Move the MSP's ThreatMate alerts about a client's own domain to that client (see ``domain_owner``). Adds to ``result``."""
+    owners = await domain_owners(db, parent_id)
+    if not owners:
+        return
+    names = {tid: name for tid, name in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == parent_id))).all()}
+    by_child: dict[uuid.UUID, list[str]] = {}
+    for alert_id, device in (await db.execute(text(_DOMAIN_CANDIDATES_SQL), {"parent": parent_id})).all():
+        child = owners.get(registrable_domain(device) or "")
+        if child is not None:
+            by_child.setdefault(child, []).append(alert_id)
+    for child_id, ids in by_child.items():
+        moved_ids = [str(r[0]) for r in (await db.execute(text(_MOVE_IDS_SQL), {"parent": parent_id, "child": child_id, "ids": ids})).all()]
+        result.left_duplicates += len(ids) - len(moved_ids)
+        if not moved_ids:
+            continue
+        label = names.get(child_id, str(child_id))
+        result.moved += len(moved_ids)
+        result.by_client[label] = result.by_client.get(label, 0) + len(moved_ids)
+        moved = {"parent": parent_id, "child": child_id, "ids": moved_ids}
+        result.cases_moved += (await db.execute(text(_MOVE_CASES_SQL), moved)).rowcount or 0
+        await db.execute(text(_MOVE_ACTIONS_SQL), moved)

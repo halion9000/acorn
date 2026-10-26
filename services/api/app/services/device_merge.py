@@ -77,15 +77,22 @@ async def merge_devices(
     """Fold ``remove_id`` into ``keep_id``: every tool that reported the removed device now reports the kept one, blanks on the kept device are filled from the removed one,
     and the removed device is deleted. Two devices with different serial numbers are different machines and are refused."""
     keep, remove = await _both(db, tenant_id, keep_id, remove_id)
-    if keep.serial_number and remove.serial_number and keep.serial_number != remove.serial_number:
+    # Auvik keeps a MAC as the serial of a device with none; that is not a serial, so it neither proves two devices differ nor beats a real serial.
+    real_keep = None if mac_key(keep.serial_number) else keep.serial_number
+    real_remove = None if mac_key(remove.serial_number) else remove.serial_number
+    if real_keep and real_remove and real_keep != real_remove:
         raise DeviceMergeError("These have different serial numbers, so they are different machines.")
+    replaced_serial = keep.serial_number if (keep.serial_number and not real_keep and real_remove) else None
+    if replaced_serial:
+        keep.serial_number = None
+        await db.flush()
 
     removed_snapshot = snapshot_of(remove)
     moved = (await db.execute(select(DeviceSource).where(DeviceSource.device_id == remove.id))).scalars().all()
     moved_ids = [str(s.id) for s in moved]
     for source in moved:
         source.device_id = keep.id
-    filled: dict[str, Any] = {"fields": [], "ip_addresses": False, "first_seen_was": None, "carried_serial": None}
+    filled: dict[str, Any] = {"fields": [], "ip_addresses": False, "first_seen_was": None, "carried_serial": None, "replaced_serial": replaced_serial}
     for name in _COPIED:
         if getattr(keep, name) is None and getattr(remove, name) is not None:
             setattr(keep, name, getattr(remove, name))
@@ -145,7 +152,7 @@ async def undo_merge(db: Any, tenant_id: uuid.UUID, merge_id: uuid.UUID, now: da
     # The serial is unique per client: if the kept device took the removed one's serial, give it back before the removed device is recreated.
     carried = filled.get("carried_serial")
     if carried and keep.serial_number == carried:
-        keep.serial_number = None
+        keep.serial_number = filled.get("replaced_serial")
         await db.flush()
     db.add(
         Device(
@@ -255,51 +262,124 @@ async def drop_legacy_screenconnect(db: Any, tenant_id: uuid.UUID) -> int:
     return result.rowcount or 0
 
 
-async def auto_merge_by_mac(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> int:
-    """Merge a UniFi unit into the device whose serial is that unit's MAC address (Auvik holds a device's MAC as its serial when it has none). Returns how many merges were made.
+# The tools that put a MAC address in a source's details (UniFi: ``mac``, Huntress: ``macs``).
+MAC_TOOLS = ("unifi", "huntress")
 
-    UniFi reports each unit's MAC. A MAC is one network card, so a device with that MAC as its serial is the same unit, whatever either tool calls it. A pair merges only when exactly one other device
-    carries the MAC, no tool reports both, they are not a hardware unit and an agent's machine, and nobody said they differ. Each merge is the ordinary logged one."""
-    unifi_macs: dict[str, list[uuid.UUID]] = {}
-    for device_id, details in (await db.execute(select(DeviceSource.device_id, DeviceSource.details).where(DeviceSource.tenant_id == tenant_id, DeviceSource.vendor == "unifi"))).all():
-        mac = mac_key((details or {}).get("mac"))
-        if mac:
-            unifi_macs.setdefault(mac, []).append(device_id)
-    if not unifi_macs:
-        return 0
+
+def macs_of(details: Any) -> set[str]:
+    """The MAC addresses a tool reported for a device: ``mac`` (UniFi) and ``macs`` (Huntress, a list), each reduced to twelve hex digits."""
+    det = details if isinstance(details, dict) else {}
+    raw = [det.get("mac"), *(det.get("macs") if isinstance(det.get("macs"), list) else [])]
+    return {m for m in (mac_key(x) for x in raw) if m}
+
+
+async def auto_merge_by_mac(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> int:
+    """Merge two devices of one client that hold the same MAC address. Returns how many merges were made.
+
+    A MAC is one network card. Tools report it differently: UniFi gives a unit's MAC, Huntress a machine's cards, and Auvik keeps a device's MAC as its serial when it has none. Two devices that hold
+    the same MAC are one machine seen twice. A pair merges only when exactly two devices hold the MAC (a MAC shared more widely, such as a virtual adapter, is left alone), no tool reports both,
+    a hardware unit is not paired with a machine an agent runs on, their serials do not differ, and nobody said they are different. Each merge is the ordinary logged one."""
     devices = {d.id: d for d in (await db.execute(select(Device).where(Device.tenant_id == tenant_id))).scalars().all()}
-    holders: dict[str, list[uuid.UUID]] = {}
+    holders: dict[str, set[uuid.UUID]] = {}
     for d in devices.values():
         mac = mac_key(d.serial_number)
-        if mac in unifi_macs:
-            holders.setdefault(mac, []).append(d.id)
-    if not holders:
-        return 0
+        if mac:
+            holders.setdefault(mac, set()).add(d.id)
     vendors: dict[uuid.UUID, set[str]] = {}
     for device_id, vendor, external_id in (await db.execute(select(DeviceSource.device_id, DeviceSource.vendor, DeviceSource.external_id).where(DeviceSource.tenant_id == tenant_id))).all():
         vendors.setdefault(device_id, set()).add(_tool_of(vendor, external_id))
+    # Only the tools that report MACs have their details read (a tool's details can be large), and only the two keys that hold them.
+    for device_id, mac, macs in (
+        await db.execute(select(DeviceSource.device_id, DeviceSource.details["mac"], DeviceSource.details["macs"]).where(DeviceSource.tenant_id == tenant_id, DeviceSource.vendor.in_(MAC_TOOLS)))
+    ).all():
+        for found in macs_of({"mac": mac, "macs": macs}):
+            holders.setdefault(found, set()).add(device_id)
+    pairs = [sorted(ids, key=str) for ids in holders.values() if len(ids) == 2]
+    if not pairs:
+        return 0
     dismissed = {(x.device_a, x.device_b) for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tenant_id))).scalars().all()}
     gone: set[uuid.UUID] = set()
     merged = 0
-    for mac, units in unifi_macs.items():
-        others = [h for h in holders.get(mac, []) if h not in units]
-        if len(units) != 1 or len(others) != 1:
+    for first, second in pairs:
+        if first in gone or second in gone or first not in devices or second not in devices:
             continue
-        unit_id, other_id = units[0], others[0]
-        if unit_id in gone or other_id in gone or unit_id == other_id:
+        a, b = devices[first], devices[second]
+        va, vb = vendors.get(first, set()), vendors.get(second, set())
+        if (va & vb) - DUPLICATING_TOOLS or not could_be_same_machine(va, vb):
             continue
-        unit, other = devices[unit_id], devices[other_id]
-        vu, vo = vendors.get(unit_id, set()), vendors.get(other_id, set())
-        if (vu & vo) - DUPLICATING_TOOLS or not could_be_same_machine(vu, vo):
+        # Auvik keeps a MAC as the serial of a device with none: that is not a serial, so only real serials can show two machines apart.
+        real_a = None if mac_key(a.serial_number) else a.serial_number
+        real_b = None if mac_key(b.serial_number) else b.serial_number
+        if real_a and real_b and real_a != real_b:
             continue
-        if unit.serial_number and other.serial_number and mac_key(unit.serial_number) != mac_key(other.serial_number):
+        if _ordered(first, second) in dismissed:
             continue
-        if _ordered(unit_id, other_id) in dismissed:
-            continue
-        keep, remove = sorted((unit, other), key=lambda d: (-len(vendors.get(d.id, set())), d.first_seen, str(d.id)))
+        # The device with a real serial is kept, so the machine does not end up identified by a MAC.
+        keep, remove = sorted((a, b), key=lambda d: (1 if mac_key(d.serial_number) else 0, -len(vendors.get(d.id, set())), d.first_seen, str(d.id)))
         await merge_devices(db, tenant_id, keep.id, remove.id, actor_id)
         gone.add(remove.id)
-        vendors[keep.id] = vu | vo
+        vendors[keep.id] = va | vb
+        merged += 1
+    return merged
+
+
+
+# What Auvik calls a computer (see ``device_kind`` in the devices endpoint): the types a person's workstation or a server can have.
+_AUVIK_COMPUTER_TYPES = frozenset({"workstation", "server", "hypervisor", "virtualmachine", "thinclient", "tablet", "handheld"})
+_NETWORK_TOOLS = frozenset({"auvik", "unifi", "meraki"})
+IP_MATCH_WINDOW = timedelta(days=3)
+
+
+async def auto_merge_by_ip(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> int:
+    """Merge an Auvik-discovered computer into the machine an agent runs on when the two share a private address. Returns how many merges were made.
+
+    Auvik lists every workstation and server it finds on the network, under whatever name DHCP or NetBIOS gave it, with no serial. Those show up as machines no agent covers although the agent's own record is
+    the same machine. A pair merges only when ALL hold: the address is held by exactly one such Auvik computer and exactly one device an agent runs on in the client; both were seen within
+    ``IP_MATCH_WINDOW`` of each other (an address is reused over time); no real serials differ; nobody said they are different. Each merge is the ordinary logged one."""
+    from app.services.device_identity import AGENT_TOOLS, usable_ips
+
+    vendors: dict[uuid.UUID, set[str]] = {}
+    for device_id, vendor, external_id in (await db.execute(select(DeviceSource.device_id, DeviceSource.vendor, DeviceSource.external_id).where(DeviceSource.tenant_id == tenant_id))).all():
+        vendors.setdefault(device_id, set()).add(_tool_of(vendor, external_id))
+    # Only Auvik's details are read, and only its device type.
+    auvik_computer: set[uuid.UUID] = set()
+    for device_id, device_type in (await db.execute(select(DeviceSource.device_id, DeviceSource.details["device_type"]).where(DeviceSource.tenant_id == tenant_id, DeviceSource.vendor == "auvik"))).all():
+        if str(device_type or "").strip().lower() in _AUVIK_COMPUTER_TYPES:
+            auvik_computer.add(device_id)
+    discovered = {d for d in auvik_computer if vendors[d] <= _NETWORK_TOOLS}
+    if not discovered:
+        return 0
+    devices = {d.id: d for d in (await db.execute(select(Device).where(Device.tenant_id == tenant_id))).scalars().all()}
+    agent_machines = {i for i, v in vendors.items() if v & AGENT_TOOLS and i in devices}
+    holders_found: dict[str, set[uuid.UUID]] = {}
+    holders_agent: dict[str, set[uuid.UUID]] = {}
+    for i in discovered:
+        for ip in usable_ips(devices[i].ip_addresses) if i in devices else ():
+            holders_found.setdefault(ip, set()).add(i)
+    for i in agent_machines:
+        for ip in usable_ips(devices[i].ip_addresses):
+            holders_agent.setdefault(ip, set()).add(i)
+    dismissed = {(x.device_a, x.device_b) for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tenant_id))).scalars().all()}
+    gone: set[uuid.UUID] = set()
+    merged = 0
+    for ip, found in holders_found.items():
+        agents = holders_agent.get(ip, set())
+        if len(found) != 1 or len(agents) != 1:
+            continue
+        (found_id,), (agent_id,) = tuple(found), tuple(agents)
+        if found_id in gone or agent_id in gone:
+            continue
+        found_dev, agent_dev = devices[found_id], devices[agent_id]
+        if abs(found_dev.last_seen - agent_dev.last_seen) > IP_MATCH_WINDOW:
+            continue
+        real_found = None if mac_key(found_dev.serial_number) else found_dev.serial_number
+        if real_found and agent_dev.serial_number and real_found != agent_dev.serial_number:
+            continue
+        if _ordered(found_id, agent_id) in dismissed or not could_be_same_machine(vendors[found_id], vendors[agent_id]):
+            continue
+        await merge_devices(db, tenant_id, agent_id, found_id, actor_id)
+        gone.add(found_id)
+        vendors[agent_id] = vendors[agent_id] | vendors[found_id]
         merged += 1
     return merged
 
@@ -316,7 +396,7 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
       * nobody said they are different machines (a pair marked "not a duplicate", or a merge that was undone).
     Each merge is the ordinary one: logged, and a person can undo it for two weeks."""
     await drop_legacy_screenconnect(db, tenant_id)
-    by_mac = await auto_merge_by_mac(db, tenant_id, actor_id)
+    by_mac = await auto_merge_by_mac(db, tenant_id, actor_id) + await auto_merge_by_ip(db, tenant_id, actor_id)
     devices = (await db.execute(select(Device).where(Device.tenant_id == tenant_id))).scalars().all()
     by_name: dict[str, list[Device]] = {}
     for d in devices:

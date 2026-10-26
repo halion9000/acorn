@@ -831,9 +831,10 @@ export function facts(s: DeviceRow['sources'][number]): [string, string][] {
 export function flatDetails(s: DeviceRow['sources'][number]): [string, string][] {
   const out: [string, string][] = [];
   for (const [k, v] of Object.entries(s.details ?? {})) {
-    if (k === 'url' || k === 'facts' || v === null || v === '' || !['string', 'number', 'boolean'].includes(typeof v)) continue;
+    const list = Array.isArray(v) && v.length > 0 && v.length <= 8 && v.every((x) => typeof x === 'string') ? (v as string[]).join(', ') : null;
+    if (k === 'url' || k === 'facts' || v === null || v === '' || (list === null && !['string', 'number', 'boolean'].includes(typeof v))) continue;
     const words = k.replace(/_/g, ' ').toLowerCase();
-    const text = typeof v === 'boolean' ? (v ? 'Yes' : 'No') : typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) ? when(v) : String(v);
+    const text = list !== null ? list : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) ? when(v) : String(v);
     out.push([words.charAt(0).toUpperCase() + words.slice(1), text]);
   }
   return out;

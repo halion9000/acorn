@@ -106,3 +106,11 @@ def test_mac_key_agrees_across_spellings_and_rejects_anything_that_is_not_a_mac(
     assert mac_key("SN12345") is None
     assert mac_key("000000000000") is None
     assert mac_key(None) is None
+
+
+def test_macs_of_reads_a_single_mac_and_a_list_and_ignores_anything_else():
+    from app.services.device_merge import macs_of
+
+    assert macs_of({"mac": "1C6A1B49048D", "macs": ["aa:bb:cc:dd:ee:01", "junk", None]}) == {"1c6a1b49048d", "aabbccddee01"}
+    assert macs_of({"macs": "not a list"}) == set()
+    assert macs_of(None) == set()

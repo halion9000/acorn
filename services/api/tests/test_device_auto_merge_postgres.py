@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 from app.db.rls import set_rls_context
-from app.services.device_merge import auto_merge_same_name, dismiss_pair, os_kind, undo_merge
+from app.services.device_merge import auto_merge_same_name, dismiss_pair, merge_devices, os_kind, undo_merge
 from app.services.device_upsert import DeviceReport, upsert_device
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -300,3 +300,78 @@ async def test_a_unifi_unit_is_not_merged_into_a_machine_an_agent_runs_on_even_w
     await report(tenant, "ninjaone", "n1", "A Windows PC", serial="1C6A1B49048D")
     assert await merge_pass(tenant) == 0
     assert await count(tenant) == 2
+
+
+async def test_a_huntress_machine_and_an_auvik_device_that_is_only_a_mac_are_one_workstation(tenant):
+    await report(tenant, "huntress", "h1", "FRONT-DESK-PC", serial="PF2ABC12", os="Windows 11", details={"macs": ["AABBCCDDEE01", "AABBCCDDEE02"]})
+    await report(tenant, "auvik", "a1", "dhcp-client-77", serial="aa:bb:cc:dd:ee:02")
+    assert await count(tenant) == 2
+    assert await merge_pass(tenant) == 1
+    assert await count(tenant) == 1
+    assert await count(tenant, "select count(*) from device_sources where tenant_id = :t") == 2
+    assert await count(tenant, "select serial_number from devices where tenant_id = :t") == "PF2ABC12", "the machine keeps its real serial, not the MAC"
+
+
+async def test_two_machines_with_different_real_serials_are_never_merged_on_a_shared_mac(tenant):
+    await report(tenant, "huntress", "h1", "PC-ONE", serial="SERIAL-ONE", details={"macs": ["AABBCCDDEE03"]})
+    await report(tenant, "ninjaone", "n1", "PC-TWO", serial="SERIAL-TWO", details={"macs": ["AABBCCDDEE03"]})
+    assert await merge_pass(tenant) == 0
+    assert await count(tenant) == 2
+
+
+async def test_a_mac_held_by_three_devices_is_left_alone(tenant):
+    for i, vendor in enumerate(["huntress", "auvik", "threatmate"]):
+        await report(tenant, vendor, f"x{i}", f"Box {i}", details={"macs": ["AABBCCDDEE04"]})
+    assert await merge_pass(tenant) == 0
+    assert await count(tenant) == 3
+
+
+async def age(tid, host, days):
+    await run(tid, lambda db: db.execute(text("update devices set last_seen = now() - make_interval(days => :d) where tenant_id = :t and hostname = :h"), {"d": days, "t": tid, "h": host}))
+
+
+async def test_an_auvik_workstation_is_the_agent_machine_that_holds_its_address(tenant):
+    await report(tenant, "ninjaone", "n1", "FRONT-DESK-PC", ip_addresses=["10.1.1.50"], os="Windows 11")
+    await report(tenant, "auvik", "a1", "dhcp-client-77", ip_addresses=["10.1.1.50"], details={"device_type": "Workstation"})
+    assert await count(tenant) == 2
+    assert await merge_pass(tenant) == 1
+    assert await count(tenant) == 1
+    assert await count(tenant, "select hostname from devices where tenant_id = :t") == "FRONT-DESK-PC", "the agent's name is kept"
+    assert await count(tenant, "select count(*) from device_sources where tenant_id = :t") == 2
+
+
+async def test_an_address_two_agent_machines_hold_is_not_guessed_between(tenant):
+    await report(tenant, "ninjaone", "n1", "PC-A", ip_addresses=["10.1.1.60"])
+    await report(tenant, "huntress", "h1", "PC-B", ip_addresses=["10.1.1.60"])
+    await report(tenant, "auvik", "a1", "dhcp-client-1", ip_addresses=["10.1.1.60"], details={"device_type": "Workstation"})
+    assert await merge_pass(tenant) == 0
+    assert await count(tenant) == 3
+
+
+async def test_an_old_agent_record_is_not_matched_on_an_address_that_has_since_been_reused(tenant):
+    await report(tenant, "ninjaone", "n1", "OLD-PC", ip_addresses=["10.1.1.70"])
+    await report(tenant, "auvik", "a1", "new-laptop", ip_addresses=["10.1.1.70"], details={"device_type": "Workstation"})
+    await age(tenant, "OLD-PC", 30)
+    assert await merge_pass(tenant) == 0
+    assert await count(tenant) == 2
+
+
+async def test_an_auvik_printer_or_switch_is_never_taken_for_a_machine_that_shares_its_address(tenant):
+    await report(tenant, "ninjaone", "n1", "PC-C", ip_addresses=["10.1.1.80"])
+    await report(tenant, "auvik", "a1", "office-printer", ip_addresses=["10.1.1.80"], details={"device_type": "Printer"})
+    assert await merge_pass(tenant) == 0
+    assert await count(tenant) == 2
+
+
+async def test_merging_a_device_that_only_has_a_mac_serial_gives_the_machine_its_real_serial_and_undo_puts_the_mac_back(tenant):
+    await report(tenant, "auvik", "a1", "dhcp-client-9", serial="AA:BB:CC:DD:EE:09")
+    await report(tenant, "huntress", "h1", "REAL-PC", serial="PF2REAL9")
+    ids = {}
+    for host in ("dhcp-client-9", "REAL-PC"):
+        ids[host] = uuid.UUID(await count(tenant, "select id::text from devices where tenant_id = :t and hostname = :h", h=host))
+    await run(tenant, lambda db: merge_devices(db, tenant, ids["dhcp-client-9"], ids["REAL-PC"]))
+    assert await count(tenant, "select serial_number from devices where tenant_id = :t") == "PF2REAL9"
+    log_id = await count(tenant, "select id::text from device_merge_log where tenant_id = :t")
+    await run(tenant, lambda db: undo_merge(db, tenant, uuid.UUID(log_id)))
+    assert await count(tenant, "select serial_number from devices where tenant_id = :t and hostname = :h", h="dhcp-client-9") == "AA:BB:CC:DD:EE:09"
+    assert await count(tenant, "select serial_number from devices where tenant_id = :t and hostname = :h", h="REAL-PC") == "PF2REAL9"

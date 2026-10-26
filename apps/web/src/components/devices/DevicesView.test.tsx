@@ -727,7 +727,7 @@ describe('BitLocker', () => {
 });
 
 describe('flatDetails', () => {
-  const unifi = { vendor: 'unifi', name: 'Airport SP - Parking', last_seen: NOW, details: { mac: '1C6A1B49048D', product_line: 'network', is_console: true, is_managed: false, firmware_status: 'upToDate', adopted_at: '2026-10-23T07:03:40.000Z', note: null, update_available: '', url: 'https://unifi.ui.com/x', tags: ['a'] } };
+  const unifi = { vendor: 'unifi', name: 'Airport SP - Parking', last_seen: NOW, details: { mac: '1C6A1B49048D', product_line: 'network', is_console: true, is_managed: false, firmware_status: 'upToDate', adopted_at: '2026-10-23T07:03:40.000Z', note: null, update_available: '', url: 'https://unifi.ui.com/x', tags: [{ a: 1 }] } };
   it('lists a feed\'s flat fields with readable labels, Yes/No for flags, a date for timestamps, and leaves out blanks, lists and the link', () => {
     const rows = flatDetails(unifi);
     expect(rows.map(([k]) => k)).toEqual(['Mac', 'Product line', 'Is console', 'Is managed', 'Firmware status', 'Adopted at']);
@@ -735,6 +735,10 @@ describe('flatDetails', () => {
     expect(rows.find(([k]) => k === 'Is console')?.[1]).toBe('Yes');
     expect(rows.find(([k]) => k === 'Is managed')?.[1]).toBe('No');
     expect(rows.find(([k]) => k === 'Adopted at')?.[1]).not.toMatch(/T07:03/);
+  });
+  it('shows a short list of text values (a machine\'s MAC addresses) on one line, and not a long or mixed list', () => {
+    const rows = flatDetails({ vendor: 'huntress', name: 'x', last_seen: NOW, details: { macs: ['AABBCCDDEE01', 'AABBCCDDEE02'], tags: [1, 2], many: Array.from({ length: 9 }, (_, i) => `m${i}`) } });
+    expect(rows).toEqual([['Macs', 'AABBCCDDEE01, AABBCCDDEE02']]);
   });
   it('uses the facts when a feed sends them, and the flat fields when it does not', () => {
     expect(detailRows({ vendor: 'ninjaone', name: 'x', last_seen: NOW, details: { facts: { offline: false }, mac: 'ignored' } })).toEqual([['Offline', 'false']]);
