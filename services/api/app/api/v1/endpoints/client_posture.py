@@ -25,7 +25,7 @@ from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.identity_source import IdentitySource
 from app.services.audit import emit_audit
-from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, ClientCheckOwner, ClientScoreHistory, ClientScoreTarget, CoreSweepRun, IdentityMfaUser
+from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, ClientCheckComment, ClientCheckOwner, ClientScoreHistory, ClientScoreTarget, CoreSweepRun, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
@@ -89,6 +89,8 @@ class PostureCheck(BaseModel):
     owner: str | None = None
     due_date: date | None = None
     overdue: bool = False
+    # How many comments are in the thread on this check.
+    comments: int = 0
 
 
 class CheckAcceptanceOut(BaseModel):
@@ -148,6 +150,15 @@ async def _owners_of(db: Any, client_id: uuid.UUID) -> dict[str, tuple[str, date
         return {}
 
 
+async def _comment_counts(db: Any, client_id: uuid.UUID) -> dict[str, int]:
+    """{check key: number of comments} for one client, read inside that client's scope. An older database without the table gives none."""
+    try:
+        async with db.begin_nested():
+            return {k: n for k, n in (await db.execute(select(ClientCheckComment.key, func.count()).where(ClientCheckComment.tenant_id == client_id).group_by(ClientCheckComment.key))).all()}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, aliases: list[Any]) -> dict[str, ToolChecksOut]:
     """The checks each tool sent for this client. Only tools the client is mapped to are read (none at all, no query, for a client mapped to none of them); a tool that sent nothing is left out."""
     mapped = {v for v, _, _ in aliases}
@@ -163,6 +174,7 @@ async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, alia
         ).all()
         accepted_rows = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id))).scalars().all()
         owners = await _owners_of(db, client_id)
+        comment_counts = await _comment_counts(db, client_id)
     since = {k: t for k, t in since_rows}
     now = datetime.now(UTC)
     accepted = {a.key: CheckAcceptanceOut(reason=a.reason, accepted_at=a.accepted_at, expires_at=a.expires_at, not_applicable=a.not_applicable) for a in accepted_rows if a.expires_at is None or a.expires_at > now}
@@ -179,6 +191,7 @@ async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, alia
                 owner=owners.get(str(c["key"]), (None, None))[0],
                 due_date=owners.get(str(c["key"]), (None, None))[1],
                 overdue=is_overdue(str(c["status"]), owners.get(str(c["key"]), (None, None))[1], datetime.now(UTC).date()),
+                comments=comment_counts.get(str(c["key"]), 0),
             )
             for c in (row.checks or [])
             if isinstance(c, dict) and c.get("key") and c.get("status")
@@ -432,6 +445,60 @@ async def set_check_owner(
     await db.commit()
     fleet_cache.clear()
     return OwnerOut(key=key, owner=name or None, due_date=body.due_date if name else None)
+
+
+MAX_COMMENTS_PER_CHECK = 200
+
+
+class CommentIn(BaseModel):
+    body: str
+
+
+class CommentOut(BaseModel):
+    id: int
+    author: str
+    body: str
+    created_at: datetime
+
+
+class CommentsOut(BaseModel):
+    client_id: uuid.UUID
+    key: str
+    comments: list[CommentOut]
+
+
+def _check_key_ok(key: str) -> bool:
+    return bool(key) and len(key) <= 80 and all(c.isalnum() or c in "_-" for c in key)
+
+
+@router.get("/{client_id}/checks/{key}/comments", response_model=CommentsOut, summary="The comments on one of a client's checks, oldest first")
+async def check_comments(client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> CommentsOut:
+    owner = current_user.tenant_id
+    await _client_of_owner(db, owner, client_id)
+    async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
+        rows = (await db.execute(select(ClientCheckComment).where(ClientCheckComment.tenant_id == client_id, ClientCheckComment.key == key).order_by(ClientCheckComment.created_at, ClientCheckComment.id))).scalars().all()
+    return CommentsOut(client_id=client_id, key=key, comments=[CommentOut(id=r.id, author=r.author, body=r.body, created_at=r.created_at) for r in rows])
+
+
+@router.post("/{client_id}/checks/{key}/comments", response_model=CommentOut, status_code=201, summary="Add a comment to one of a client's checks")
+async def add_check_comment(client_id: uuid.UUID, key: str, body: CommentIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> CommentOut:
+    owner = current_user.tenant_id
+    await _client_of_owner(db, owner, client_id)
+    if not _check_key_ok(key):
+        raise HTTPException(status_code=422, detail="That is not a check key")
+    text_ = " ".join(body.body.split())
+    if not 1 <= len(text_) <= 1000:
+        raise HTTPException(status_code=422, detail="A comment is 1 to 1000 characters")
+    async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
+        count = (await db.execute(select(func.count()).select_from(ClientCheckComment).where(ClientCheckComment.tenant_id == client_id, ClientCheckComment.key == key))).scalar_one()
+        if count >= MAX_COMMENTS_PER_CHECK:
+            raise HTTPException(status_code=422, detail=f"A check can have at most {MAX_COMMENTS_PER_CHECK} comments")
+        row = ClientCheckComment(tenant_id=client_id, key=key, author=(getattr(current_user, "email", None) or str(current_user.user_id) or "unknown")[:200], body=text_)
+        db.add(row)
+        await db.flush()
+        out = CommentOut(id=row.id, author=row.author, body=row.body, created_at=row.created_at or datetime.now(UTC))
+        await db.commit()
+    return out
 
 
 class TargetIn(BaseModel):

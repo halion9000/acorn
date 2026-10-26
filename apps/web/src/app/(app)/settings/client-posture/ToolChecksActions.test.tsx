@@ -67,6 +67,26 @@ describe('ToolChecks with history and accepted risks', () => {
     expect(JSON.parse(init.body)).toEqual({ reason: 'Client is retiring them', expires_in_days: 60 });
   });
 
+  it('shows a check\'s comment count, loads the thread on request, and adds a comment then reloads', async () => {
+    vi.spyOn(window, 'prompt').mockImplementation(() => 'Licence ordered');
+    authFetch.mockImplementation((url: string, init?: { method?: string }) =>
+      init?.method === 'POST' ? json({ id: 2, author: 'a@b.c', body: 'Licence ordered', created_at: '2026-10-26T00:00:00Z' }, 201) : json({ client_id: 'c1', key: 'ninjaone_antivirus', comments: [{ id: 1, author: 'dana@example.com', body: 'Waiting on the client', created_at: '2026-10-25T00:00:00Z' }] }),
+    );
+    const onChanged = vi.fn();
+    const withCount = [{ ...checks[0], comments: 1 }, checks[1], checks[2]];
+    render(<ToolChecks tool="ninjaone" label="NinjaOne" checks={withCount} clientId="c1" onChanged={onChanged} />);
+    await userEvent.click(within(screen.getByTestId('check-ninjaone_antivirus')).getByText('Comments (1)'));
+    const thread = await screen.findByTestId('comments-ninjaone_antivirus');
+    expect(thread).toHaveTextContent('dana@example.com');
+    expect(thread).toHaveTextContent('Waiting on the client');
+    expect(authFetch.mock.calls[0][0]).toBe('/api/v1/client-posture/c1/checks/ninjaone_antivirus/comments');
+    await userEvent.click(within(screen.getByTestId('check-ninjaone_antivirus')).getByText('Add comment'));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    const post = authFetch.mock.calls.find((c) => c[1]?.method === 'POST')!;
+    expect(JSON.parse(post[1].body)).toEqual({ body: 'Licence ordered' });
+    expect(screen.queryByTestId('comments-ninjaone_antivirus')).toBeNull();
+  });
+
   it('assigns an owner and a due date, shows an overdue one in red text, and refuses a date that is not a date without calling the API', async () => {
     const answers = ['Dana R', '2026-11-30', 'Dana R', 'next week'];
     vi.spyOn(window, 'prompt').mockImplementation(() => answers.shift() ?? null);

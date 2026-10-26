@@ -11226,6 +11226,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/{client_id}/checks/{key}/comments:
+    get:
+      tags:
+      - posture
+      summary: The comments on one of a client's checks, oldest first
+      operationId: check_comments_api_v1_client_posture__client_id__checks__key__comments_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - posture
+      summary: Add a comment to one of a client's checks
+      operationId: add_check_comment_api_v1_client_posture__client_id__checks__key__comments_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/client-posture/{client_id}/target:
     put:
       tags:
@@ -23421,6 +23496,37 @@ components:
       - status
       - queued_at
       title: CollectJobResponse
+    CommentIn:
+      properties:
+        body:
+          type: string
+          title: Body
+      type: object
+      required:
+      - body
+      title: CommentIn
+    CommentOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        author:
+          type: string
+          title: Author
+        body:
+          type: string
+          title: Body
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - author
+      - body
+      - created_at
+      title: CommentOut
     CommentResponse:
       properties:
         id:
@@ -23455,6 +23561,26 @@ components:
       - is_system
       - created_at
       title: CommentResponse
+    CommentsOut:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        key:
+          type: string
+          title: Key
+        comments:
+          items:
+            $ref: '#/components/schemas/CommentOut'
+          type: array
+          title: Comments
+      type: object
+      required:
+      - client_id
+      - key
+      - comments
+      title: CommentsOut
     CommunityPluginListOut:
       properties:
         total:
@@ -32415,6 +32541,10 @@ components:
           type: boolean
           title: Overdue
           default: false
+        comments:
+          type: integer
+          title: Comments
+          default: 0
       type: object
       required:
       - key

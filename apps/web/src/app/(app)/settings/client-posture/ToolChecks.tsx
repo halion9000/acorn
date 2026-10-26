@@ -24,6 +24,8 @@ export interface PostureCheck {
   owner?: string | null;
   due_date?: string | null;
   overdue?: boolean;
+  /** How many comments are in the thread on this check. */
+  comments?: number;
 }
 
 export interface CheckHistoryRow {
@@ -99,6 +101,48 @@ export function isStale(refreshedAt: string | null | undefined, now: number = Da
 
 const day = (iso: string): string => new Date(iso).toLocaleDateString();
 
+interface CheckComment {
+  id: number;
+  author: string;
+  body: string;
+  created_at: string;
+}
+
+function Comments({ clientId, check }: { clientId: string; check: string }) {
+  const [rows, setRows] = useState<CheckComment[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    authFetch(`/api/v1/client-posture/${encodeURIComponent(clientId)}/checks/${encodeURIComponent(check)}/comments`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`The API answered ${res.status}`);
+        const body = (await res.json()) as { comments: CheckComment[] };
+        if (live) setRows(body.comments);
+      })
+      .catch((e: unknown) => {
+        if (live) setError(e instanceof Error ? e.message : 'Could not load the comments');
+      });
+    return () => {
+      live = false;
+    };
+  }, [clientId, check]);
+  if (error) return <p className="mt-1 text-xs text-red-300">{error}</p>;
+  if (!rows) return <p className="mt-1 text-xs text-slate-500">Loading comments…</p>;
+  if (rows.length === 0) return <p className="mt-1 text-xs text-slate-500">No comments yet.</p>;
+  return (
+    <ul className="mt-1 space-y-1 text-xs text-slate-300" data-testid={`comments-${check}`}>
+      {rows.map((c) => (
+        <li key={c.id}>
+          <span className="text-slate-500">
+            {day(c.created_at)} {c.author}:
+          </span>{' '}
+          {c.body}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function History({ clientId, check }: { clientId: string; check: string }) {
   const [rows, setRows] = useState<CheckHistoryRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -153,6 +197,7 @@ export function ToolChecks({
   onlyProblems?: boolean;
 }) {
   const [openHistory, setOpenHistory] = useState<string | null>(null);
+  const [commentsOf, setCommentsOf] = useState<string | null>(null);
   const [openItems, setOpenItems] = useState<string | null>(null);
   const [openHelp, setOpenHelp] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -175,6 +220,20 @@ export function ToolChecks({
       const res = await authFetch(`/api/v1/client-posture/${encodeURIComponent(clientId)}/acceptances/${encodeURIComponent(key)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!res.ok) throw new Error(`The API answered ${res.status}`);
       setProblem(null);
+      onChanged?.();
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : 'Could not save');
+    }
+  };
+  const addComment = async (key: string) => {
+    if (!clientId) return;
+    const text = window.prompt('Comment on this check:');
+    if (!text || text.trim() === '') return;
+    try {
+      const res = await authFetch(`/api/v1/client-posture/${encodeURIComponent(clientId)}/checks/${encodeURIComponent(key)}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: text.trim() }) });
+      if (!res.ok) throw new Error(`The API answered ${res.status}`);
+      setProblem(null);
+      setCommentsOf(null);
       onChanged?.();
     } catch (e) {
       setProblem(e instanceof Error ? e.message : 'Could not save');
@@ -286,6 +345,12 @@ export function ToolChecks({
                       {c.owner ? 'Change owner' : 'Assign'}
                     </button>
                   ) : null}
+                  <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setCommentsOf(commentsOf === c.key ? null : c.key)}>
+                    {commentsOf === c.key ? 'Hide comments' : `Comments${c.comments ? ` (${c.comments})` : ''}`}
+                  </button>
+                  <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void addComment(c.key)}>
+                    Add comment
+                  </button>
                   <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setOpenHistory(openHistory === c.key ? null : c.key)}>
                     {openHistory === c.key ? 'Hide history' : 'History'}
                   </button>
@@ -306,6 +371,7 @@ export function ToolChecks({
                 </div>
               ) : null}
               {clientId && openHistory === c.key ? <History clientId={clientId} check={c.key} /> : null}
+              {clientId && commentsOf === c.key ? <Comments clientId={clientId} check={c.key} /> : null}
             </div>
           );
         })}

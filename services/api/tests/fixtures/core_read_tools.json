@@ -627,6 +627,14 @@
     }
   },
   {
+    "tool": "aisoc_check_comments",
+    "method": "GET",
+    "path": "/client-posture/{client_id}/checks/{key}/comments",
+    "query": [],
+    "enums": {},
+    "numbers": {}
+  },
+  {
     "tool": "aisoc_score_history",
     "method": "GET",
     "path": "/client-posture/{client_id}/score-history",

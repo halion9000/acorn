@@ -625,3 +625,39 @@ async def test_the_same_check_is_accepted_for_several_clients_at_once_and_a_stra
         with pytest.raises(HTTPException) as e:
             await run(world["msp"], lambda db: cp.accept_check_for_many(body, user, db))
         assert e.value.status_code == code
+
+
+async def test_comments_on_a_check_are_added_in_order_counted_on_the_check_and_kept_to_the_client(world):
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'ninjaone', 'n-12', 'n-12', 'n-12', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-12", checks=[{"key": "ninjaone_antivirus", "status": "not_met", "evidence": ""}])))
+    user = NS(tenant_id=world["msp"], user_id=uuid.uuid4(), email="dana@example.com")
+    a = await run(world["msp"], lambda db: cp.add_check_comment(world["client"], "ninjaone_antivirus", cp.CommentIn(body="  Waiting on   the client\nto reply "), user, db))
+    assert (a.author, a.body) == ("dana@example.com", "Waiting on the client to reply")
+    await run(world["msp"], lambda db: cp.add_check_comment(world["client"], "ninjaone_antivirus", cp.CommentIn(body="Licence ordered"), user, db))
+    thread = await run(world["msp"], lambda db: cp.check_comments(world["client"], "ninjaone_antivirus", NS(tenant_id=world["msp"]), db))
+    assert [c.body for c in thread.comments] == ["Waiting on the client to reply", "Licence ordered"], "oldest first"
+    other = await run(world["msp"], lambda db: cp.check_comments(world["client"], "ninjaone_patching", NS(tenant_id=world["msp"]), db))
+    assert other.comments == []
+    posture = await run(world["msp"], lambda db: cp.client_posture(world["client"], NS(tenant_id=world["msp"]), db))
+    assert {c.key: c.comments for t in posture.tool_checks.values() for c in t.checks}["ninjaone_antivirus"] == 2
+    for bad, code in ((cp.CommentIn(body="   "), 422), (cp.CommentIn(body="x" * 1001), 422)):
+        with pytest.raises(HTTPException) as e:
+            await run(world["msp"], lambda db: cp.add_check_comment(world["client"], "ninjaone_antivirus", bad, user, db))
+        assert e.value.status_code == code
+    with pytest.raises(HTTPException) as e2:
+        await run(world["msp"], lambda db: cp.add_check_comment(world["stranger"], "ninjaone_antivirus", cp.CommentIn(body="hello"), user, db))
+    assert e2.value.status_code == 404
+    with pytest.raises(HTTPException) as e3:
+        await run(world["msp"], lambda db: cp.add_check_comment(world["client"], "bad key!", cp.CommentIn(body="hello"), user, db))
+    assert e3.value.status_code == 422
