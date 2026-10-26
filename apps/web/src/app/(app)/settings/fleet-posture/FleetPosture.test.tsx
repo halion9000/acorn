@@ -302,3 +302,34 @@ describe('FleetPosture saved views', () => {
     expect(JSON.parse(window.localStorage.getItem('fleet-posture-views') ?? 'null')).toEqual([]);
   });
 });
+
+describe('FleetPosture downloads', () => {
+  const capture = () => {
+    const blobs: Blob[] = [];
+    Object.assign(URL, { createObjectURL: (b: Blob) => (blobs.push(b), 'blob:x'), revokeObjectURL: () => undefined });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    return blobs;
+  };
+
+  it('downloads the worst-clients table as a CSV', async () => {
+    const blobs = capture();
+    render(<FleetPosture />);
+    await screen.findByTestId('fleet-client-c1');
+    await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
+    expect(blobs).toHaveLength(1);
+    const text = await blobs[0].text();
+    expect(text.split('\n')[0]).toBe('Client,Score %,Target %,Below target,Fine,Needs attention,Problems,Accepted,Tools not updating');
+    expect(text).toContain('Acme,40,80,yes,1,1,3,0,ninjaone');
+  });
+
+  it('downloads the board that is open as a CSV', async () => {
+    const blobs = capture();
+    render(<FleetPosture />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Renewals and expiries' }));
+    await screen.findByTestId('fleet-board-renewals');
+    await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
+    const text = await blobs[0].text();
+    expect(text).toContain('Acme,meraki,meraki_licence,not_met,The Meraki licence has expired');
+    expect(text).toContain('Dana R,2026-10-01,yes');
+  });
+});

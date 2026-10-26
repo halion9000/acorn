@@ -5,6 +5,7 @@
  * changed lately. Read only. Backed by GET /api/v1/client-posture/fleet/summary, /fleet/boards/{board} and /fleet/changes.
  */
 import { useEffect, useState } from "react";
+import { boardCsv, downloadCsv, worstCsv } from "./exportCsv";
 import { addView, loadViews, removeView, storeViews, type SavedView } from "./savedViews";
 import Link from "next/link";
 
@@ -166,6 +167,9 @@ function Worst() {
   return (
     <>
     {problem && <p role="alert" className="mb-2 text-sm text-red-300">{problem}</p>}
+    <button type="button" className="mb-2 rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 print:hidden" onClick={() => downloadCsv("fleet-posture.csv", worstCsv(data.clients))}>
+      Download CSV
+    </button>
     {data.average_score != null && <p className="mb-2 text-sm text-slate-400" data-testid="fleet-average">Fleet average: {data.average_score}% across {data.clients.filter((c) => c.score !== null).length} clients with a score.</p>}
     <table className="w-full text-left text-sm" data-testid="fleet-worst">
       <thead className="text-xs uppercase text-slate-500">
@@ -271,6 +275,9 @@ function Board({ board, title }: { board: string; title: string }) {
     <>
     {problem && <p role="alert" className="mb-2 text-sm text-red-300">{problem}</p>}
     <div className="mb-2 flex items-center gap-3 text-xs print:hidden">
+      <button type="button" className="rounded border border-slate-600 px-2 py-0.5 text-slate-200" onClick={() => downloadCsv(`fleet-${board}.csv`, boardCsv(data.rows))}>
+        Download CSV
+      </button>
       <span className="text-slate-500">{picked.size} picked</span>
       <button type="button" disabled={picked.size === 0} className="rounded border border-slate-600 px-2 py-0.5 text-slate-200 disabled:opacity-40" onClick={() => void acceptPicked(false)}>
         Accept picked

@@ -274,3 +274,12 @@ describe('Billing', () => {
     expect(await screen.findByText(/No counts yet/)).toBeInTheDocument();
   });
 });
+
+describe('spreadsheet safety', () => {
+  it('keeps text from other systems from running as a formula in either CSV, and leaves numbers alone', () => {
+    const row = { client_id: 'c', client_name: '=cmd()', invoice_item: '+Huntress', billed: 1, counted: 3, difference: 2, parts: [{ source: 'huntress', item: '@Agents', count: 3 }] };
+    const line = trueUpCsv([row]).split('\n')[1];
+    expect(line.startsWith('"\'=cmd()","\'+Huntress","1","3"')).toBe(true);
+    expect(clientCsv([{ source: 'ninjaone', item: '-Macs', unit: 'device', count: 4, available: null, change: -2, first_seen_at: '', updated_at: '' }], '=Acme', 30).split('\n')[1]).toBe("'=Acme,NinjaOne,'-Macs,device,4,,-2");
+  });
+});

@@ -92,8 +92,10 @@ export function changeText(change: number | null | undefined): string {
   return change > 0 ? `+${change}` : `${change}`;
 }
 
-const csvCell = (v: string | number | null | undefined): string => {
-  const s = v === null || v === undefined ? "" : String(v);
+/** A cell for a spreadsheet. Names come from other systems, so text that would run as a formula (it starts with =, +, - or @) gets a leading apostrophe; a number is left alone. */
+export const csvCell = (v: string | number | null | undefined): string => {
+  let s = v === null || v === undefined ? "" : String(v);
+  if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
@@ -364,7 +366,11 @@ export function trueUpAction(difference: number): string {
 
 /** A print-ready true-up list: one row per invoice line that disagrees, grouped by client name, with the quantity to change it to. Quantities only. */
 export function trueUpCsv(rows: ReconcileRow[]): string {
-  const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const cell = (v: string | number) => {
+    let s = String(v);
+    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return `"${s.replace(/"/g, '""')}"`;
+  };
   const lines = [["Client", "Invoice line", "Billed now", "Change to", "Action", "Counted from"].map(cell).join(",")];
   const sorted = [...rows].filter((r) => r.difference !== 0).sort((a, b) => a.client_name.localeCompare(b.client_name) || a.invoice_item.localeCompare(b.invoice_item));
   for (const r of sorted) {
