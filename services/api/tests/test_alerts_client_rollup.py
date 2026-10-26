@@ -344,3 +344,30 @@ def test_ticket_filter_and_the_count_of_open_alerts_without_a_halo_ticket():
         assert linked.summary.no_ticket == 5, "the tile does not change with the filters"
 
     run(go)
+
+
+def test_a_client_with_no_alerts_adds_nothing_and_is_not_asked_for_a_list_but_the_counts_still_cover_the_rest():
+    async def go(s):
+        parent, a, b, _other = await seed(s)
+        empty = tenant("Quiet Dental", parent.id)
+        s.add(empty)
+        await s.commit()
+        scoped.clear()
+        out = await call(s, parent.id, severity="critical")
+        assert (out.total, out.items) == (0, []), "the filter matches nothing"
+        assert out.summary.total == 4, "but the counts still cover every client with alerts"
+        assert empty.id in scoped, "every client is still looked at once for its counts"
+        full = await call(s, parent.id)
+        assert full.total == 4 and out.summary.total == full.summary.total
+
+    run(go)
+
+
+def test_the_counts_and_the_list_see_each_client_in_one_scope_not_two():
+    async def go(s):
+        parent, a, b, _other = await seed(s)
+        scoped.clear()
+        await call(s, parent.id)
+        assert sorted(map(str, scoped)) == sorted(map(str, [parent.id, a.id, b.id])), "each tenant entered once"
+
+    run(go)

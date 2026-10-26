@@ -807,8 +807,25 @@ async def list_alerts(
         plain = (search or "").strip().lower()
         client_hits.update(tid for tid, name in clients.items() if plain in name.lower())
 
+    tally = {"total": 0, "critical": 0, "high": 0, "unresolved": 0, "no_ticket": 0}
+
+    async def add_tally(tid: uuid.UUID) -> int:
+        """Add one tenant's counts to the tally and return how many alerts it has (under the ``source`` filter). The caller has the session scoped to that tenant."""
+        base = and_(Alert.tenant_id == tid, Alert.raw_event["source"].astext == source) if source else Alert.tenant_id == tid
+        grouped = (await db.execute(select(Alert.severity, Alert.status, func.count()).where(base).group_by(Alert.severity, Alert.status))).all()
+        if not grouped:
+            return 0  # nothing here, so nothing without a ticket either: one query instead of two
+        tally["no_ticket"] += (await db.execute(select(func.count()).select_from(Alert).where(and_(base, Alert.status.notin_(FINISHED_STATUSES), not_(has_ticket_expr()))))).scalar_one() or 0
+        for sev, st, n in grouped:
+            tally["total"] += n
+            tally["critical"] += n if sev == "critical" else 0
+            tally["high"] += n if sev == "high" else 0
+            tally["unresolved"] += n if st in _UNRESOLVED else 0
+        return sum(n for _sev, _st, n in grouped)
+
     offset = (page - 1) * page_size
     repeats: dict[uuid.UUID, int] = {}
+    tallied: set[uuid.UUID] = set()
     if len(scope) == 1 and scope[0] == current_user.tenant_id and collapse:
         flt = and_(*filters_for(scope[0]))
         total, found = await _newest_of_each_repeat(db, flt, page_size, offset)
@@ -828,6 +845,10 @@ async def list_alerts(
         for tid in scope:
             flt = and_(*filters_for(tid))
             async with acting_as_tenant(db, tid):
+                held = await add_tally(tid)  # read in the same scope, so a tenant is entered once for the list and its counts
+                tallied.add(tid)
+                if held == 0:
+                    continue  # no alerts at all, so none match whatever the filters say
                 if collapse:
                     groups, found = await _newest_of_each_repeat(db, flt, offset + page_size, 0)
                     total += groups
@@ -842,25 +863,14 @@ async def list_alerts(
         rows = merged[offset : offset + page_size]
 
     # The tally covers the whole scope, so it doesn't change as the severity / status buttons are used.
-    tally = {"total": 0, "critical": 0, "high": 0, "unresolved": 0, "no_ticket": 0}
     for tid in scope:
-        base = and_(Alert.tenant_id == tid, Alert.raw_event["source"].astext == source) if source else Alert.tenant_id == tid
-        query = select(Alert.severity, Alert.status, func.count()).where(base).group_by(Alert.severity, Alert.status)
-        open_without_ticket = (
-            select(func.count()).select_from(Alert).where(and_(base, Alert.status.notin_(FINISHED_STATUSES), not_(has_ticket_expr())))
-        )
+        if tid in tallied:
+            continue
         if len(scope) == 1 and scope[0] == current_user.tenant_id:
-            grouped = (await db.execute(query)).all()
-            tally["no_ticket"] += (await db.execute(open_without_ticket)).scalar_one() or 0
+            await add_tally(tid)
         else:
             async with acting_as_tenant(db, tid):
-                grouped = (await db.execute(query)).all()
-                tally["no_ticket"] += (await db.execute(open_without_ticket)).scalar_one() or 0
-        for sev, st, n in grouped:
-            tally["total"] += n
-            tally["critical"] += n if sev == "critical" else 0
-            tally["high"] += n if sev == "high" else 0
-            tally["unresolved"] += n if st in _UNRESOLVED else 0
+                await add_tally(tid)
 
     items = []
     for a in rows:
