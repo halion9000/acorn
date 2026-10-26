@@ -380,8 +380,8 @@ def is_missing_from(d: DeviceOut, tool: str) -> bool:
     ThreatMate covers every machine."""
     if any(s.vendor == tool for s in d.sources):
         return False
-    # An agent-based tool is not expected on a switch, access point or camera.
-    if d.kind in ("network", "camera"):
+    # An agent-based tool is expected on computers only, not on a switch, access point, camera, printer or anything a tool cannot name.
+    if d.kind != "computer":
         return False
     if tool != "addigy" and is_mobile(d):
         return False
@@ -533,8 +533,8 @@ async def _load(db: Any, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[
                         DeviceSourceOut(vendor=s.vendor, name=s.name, last_seen=s.last_seen, details=s.details or {}, last_checkin=checkin_of(s), stale=source_stale(checkin_of(s)))
                         for s in srcs
                     ],
-                    # Network devices and cameras are not machines the master tool is expected to manage, so they are never a coverage gap.
-                    in_master=master is None or any(s.vendor == master for s in srcs) or is_mobile(d) or device_kind(srcs) in ("network", "camera"),
+                    # Only computers are machines the master tool is expected to manage: network gear, cameras, printers and unnamed things are never a coverage gap.
+                    in_master=master is None or any(s.vendor == master for s in srcs) or is_mobile(d) or device_kind(srcs) != "computer",
                     last_online=(online := last_online_of(srcs)),
                     online=online_now_of(srcs),
                     offline_days=offline_days_of(online),

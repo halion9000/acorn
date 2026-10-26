@@ -121,3 +121,11 @@ def test_a_meraki_camera_is_a_camera_and_a_sensor_is_other():
 
 def test_a_meraki_managed_device_is_a_computer():
     assert device([("meraki", {"product_type": "systemsManager"})]).kind == "computer"
+
+
+def test_printers_and_things_no_tool_can_name_are_never_a_coverage_gap_either():
+    for sources in ([("auvik", {"device_type": "printer"})], [("auvik", {"device_type": "ups"})], [("ninjaone", {"node_class": "NMS_PRINTER"})], []):
+        d = device(sources)
+        assert d.kind == "other"
+        for tool in ("huntress", "threatmate", "screenconnect", "fieldeffect", "addigy"):
+            assert not is_missing_from(d, tool), (sources, tool)
