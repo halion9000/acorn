@@ -204,3 +204,17 @@ def test_a_forecast_reads_a_straight_line_thirty_days_past_the_last_point_and_ha
     assert forecast_next(falling) == 0, "never below zero"
     assert forecast_next(rising[:2]) is None, "two points are not a trend"
     assert forecast_next([{"at": t0, "count": 1}, {"at": t0, "count": 2}, {"at": t0, "count": 3}]) is None, "no time between them"
+
+
+def test_a_client_with_machines_and_no_billed_line_is_listed_largest_first_and_tickets_do_not_count_as_billed():
+    from app.services.license_counts import unbilled_clients
+
+    per = {
+        "a": [{"source": "ninjaone", "item": "Windows workstations", "count": 12}, {"source": "halopsa", "item": "NinjaOne RMM (Included)", "count": 12, "unit": "other"}],
+        "b": [{"source": "ninjaone", "item": "Windows workstations", "count": 30}],
+        "c": [{"source": "ninjaone", "item": "Macs", "count": 4}, {"source": "halopsa", "item": "Tickets opened in the last 30 days", "count": 9, "unit": "ticket"}],
+        "d": [{"source": "halopsa", "item": "Managed Service", "count": 1, "unit": "other"}],
+        "e": [{"source": "ninjaone", "item": "Windows workstations", "count": 0}],
+        "f": [{"source": "huntress", "item": "Agents", "count": 50}],
+    }
+    assert unbilled_clients(per) == [{"client": "b", "machines": 30}, {"client": "c", "machines": 4}]

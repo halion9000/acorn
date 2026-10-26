@@ -186,6 +186,22 @@ def endpoint_disagreements(per_client: dict[Any, list[dict[str, Any]]]) -> list[
     return out
 
 
+def unbilled_clients(per_client: dict[Any, list[dict[str, Any]]], billed_source: str = "halopsa") -> list[dict[str, Any]]:
+    """Clients the RMM manages machines for but that have no billed line at all: counted, never billed.
+
+    ``per_client`` is {client: [{source, item, count, unit?}]}. A client qualifies when its RMM endpoint total is above zero and it holds no count from ``billed_source`` other than tickets (a ticket count is not
+    something billed). A client with no billing data AT ALL looks the same as one that is not billed: the caller says so. Largest machine count first.
+    """
+    out = []
+    for client, rows in per_client.items():
+        machines = sum(int(r["count"]) for r in rows if r["source"] == BASELINE_TOOL and r["item"] in BASELINE_ITEMS)
+        has_billed = any(r["source"] == billed_source and r.get("unit") != "ticket" for r in rows)
+        if machines > 0 and not has_billed:
+            out.append({"client": client, "machines": machines})
+    out.sort(key=lambda r: (-r["machines"], str(r["client"])))
+    return out
+
+
 SILENT_AFTER_DAYS = 2
 
 

@@ -25570,6 +25570,12 @@ components:
           type: array
           title: No Counts
           default: []
+        unbilled:
+          items:
+            $ref: '#/components/schemas/DisagreementRow'
+          type: array
+          title: Unbilled
+          default: []
       type: object
       required:
       - generated_at

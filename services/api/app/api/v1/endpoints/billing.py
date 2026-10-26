@@ -23,7 +23,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.client_alias import ClientAlias
 from app.models.signin import BillingDifferenceNote, BillingItemMap, ClientLicenseCount, ClientLicenseHistory
 from app.models.tenant import Tenant
-from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, forecast_next, note_state, endpoint_disagreements, last_reported, reconcile, tools_without_counts, suggest, totals, unusual, window_start
+from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, forecast_next, note_state, endpoint_disagreements, last_reported, reconcile, tools_without_counts, unbilled_clients, suggest, totals, unusual, window_start
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -427,6 +427,8 @@ class DataQualityOut(BaseModel):
     rows: list[DisagreementRow]
     # Tools that have clients mapped to them but have never stored a count (some count nothing by design).
     no_counts: list[str] = []
+    # Clients the RMM manages machines for that have no billed line at all (counted, never billed), most machines first. Empty when no client has any billing data yet.
+    unbilled: list[DisagreementRow] = []
 
 
 @router.get("/data-quality", response_model=DataQualityOut, summary="Clients where a security tool counts noticeably fewer or more machines than the RMM manages, biggest gap first")
@@ -436,7 +438,13 @@ async def data_quality(current_user: Annotated[AuthUser, Depends(require_permiss
     rows = [DisagreementRow(client_id=d["client"], client_name=names.get(d["client"]) or str(d["client"]), tool=d["tool"], tool_count=d["tool_count"], baseline_count=d["baseline_count"], gap=d["gap"]) for d in endpoint_disagreements(per_client)]
     mapped = {v for (v,) in (await db.execute(select(ClientAlias.vendor).where(ClientAlias.tenant_id == owner, ClientAlias.child_tenant_id.is_not(None), ClientAlias.ignored.is_(False)).distinct())).all()}
     counted = {r["source"] for rs in per_client.values() for r in rs}
-    return DataQualityOut(generated_at=datetime.now(UTC), baseline_tool=BASELINE_TOOL, rows=rows[: max(1, min(limit, 2000))], no_counts=tools_without_counts(mapped, counted))
+    # Only meaningful once billing data exists at all: otherwise every client would look unbilled.
+    unbilled = (
+        [DisagreementRow(client_id=u["client"], client_name=names.get(u["client"]) or str(u["client"]), tool=BILLED_SOURCE, tool_count=0, baseline_count=u["machines"], gap=-u["machines"]) for u in unbilled_clients(per_client, BILLED_SOURCE)]
+        if BILLED_SOURCE in counted
+        else []
+    )
+    return DataQualityOut(generated_at=datetime.now(UTC), baseline_tool=BASELINE_TOOL, rows=rows[: max(1, min(limit, 2000))], no_counts=tools_without_counts(mapped, counted), unbilled=unbilled[: max(1, min(limit, 2000))])
 
 
 class LastReportedRow(BaseModel):

@@ -631,7 +631,7 @@ export function gapText(gap: number): string {
 }
 
 function DataQuality() {
-  const quality = useJson<{ no_counts?: string[]; rows: { client_id: string; client_name: string; tool: string; tool_count: number; baseline_count: number; gap: number }[] }>("/api/v1/billing/data-quality");
+  const quality = useJson<{ no_counts?: string[]; unbilled?: { client_id: string; client_name: string; baseline_count: number }[]; rows: { client_id: string; client_name: string; tool: string; tool_count: number; baseline_count: number; gap: number }[] }>("/api/v1/billing/data-quality");
   const silent = useJson<{ client_id: string; client_name: string; source: string; last_reported_at: string; days_ago: number; silent: boolean }[]>("/api/v1/billing/last-reported?only_silent=true");
   const error = quality.error ?? silent.error;
   return (
@@ -667,6 +667,19 @@ function DataQuality() {
           </table>
         )}
       </section>
+      {quality.data && (quality.data.unbilled ?? []).length > 0 && (
+        <section className="space-y-2" data-testid="billing-unbilled">
+          <h2 className="text-sm font-semibold text-slate-200">Counted but never billed</h2>
+          <p className="text-sm text-slate-400">NinjaOne manages machines for these clients, but HaloPSA has no billed line for them at all.</p>
+          <ul className="space-y-1 text-sm text-slate-300">
+            {(quality.data.unbilled ?? []).map((u) => (
+              <li key={u.client_id}>
+                {u.client_name}: {u.baseline_count} machine{u.baseline_count === 1 ? "" : "s"}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-slate-200">Tools with clients but no counts</h2>
         <p className="text-sm text-slate-400">These tools have clients mapped to them but have never stored a count. Some count nothing by design (a detection feed); a tool that should count and is listed here needs a look.</p>

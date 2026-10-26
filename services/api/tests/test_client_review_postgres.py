@@ -463,6 +463,8 @@ async def test_billed_lines_are_checked_against_the_tool_counts_they_are_mapped_
     assert saved.invoice_item == "NinjaOne RMM (Included)"
     after = await run(world["msp"], lambda db: bl.reconcile_billing(user, db))
     assert all("Tickets" not in r.invoice_item for r in after.rows) and after.unmapped_lines >= 1
+    dq = await run(world["msp"], lambda db: bl.data_quality(user, db))
+    assert world["client"] not in [u.client_id for u in dq.unbilled], "this client is both counted by the RMM and billed, so it is not unbilled"
     mine = [r for r in after.rows if r.client_id == world["client"]]
     assert [(r.invoice_item, r.billed, r.counted, r.difference) for r in mine] == [("NinjaOne RMM (Included)", 16, 18, 2)]
     assert [p["count"] for p in mine[0].parts] == [14, 4]
