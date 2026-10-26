@@ -266,3 +266,39 @@ describe('FleetPosture', () => {
     await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]).endsWith('changes?days=7'))).toBe(true));
   });
 });
+
+describe('FleetPosture saved views', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it('saves the tab and its days under a name, and opens it again after a reload of the page', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('Last month');
+    const first = render(<FleetPosture />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'What changed' }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Days' }), '30');
+    await userEvent.click(screen.getByRole('button', { name: 'Save this view' }));
+    first.unmount();
+
+    render(<FleetPosture />);
+    await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Saved views' }), 'Last month');
+    expect(await screen.findByRole('combobox', { name: 'Days' })).toHaveValue('30');
+    expect(screen.getByRole('tab', { name: 'What changed' })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => expect(authFetch).toHaveBeenCalledWith(expect.stringContaining('/fleet/changes?days=30')));
+  });
+
+  it('saves nothing when the name is left blank, and removes a view by name', async () => {
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValueOnce('').mockReturnValueOnce('Mine').mockReturnValueOnce('Mine');
+    render(<FleetPosture />);
+    await screen.findByRole('tab', { name: 'Search' });
+    await userEvent.click(screen.getByRole('button', { name: 'Save this view' }));
+    expect(screen.getByRole('option', { name: 'None saved yet' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save this view' }));
+    expect(await screen.findByRole('option', { name: 'Mine' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Remove a view' }));
+    await waitFor(() => expect(screen.queryByRole('option', { name: 'Mine' })).not.toBeInTheDocument());
+    expect(prompt).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(window.localStorage.getItem('fleet-posture-views') ?? 'null')).toEqual([]);
+  });
+});

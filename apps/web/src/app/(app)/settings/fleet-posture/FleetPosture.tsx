@@ -5,6 +5,7 @@
  * changed lately. Read only. Backed by GET /api/v1/client-posture/fleet/summary, /fleet/boards/{board} and /fleet/changes.
  */
 import { useEffect, useState } from "react";
+import { addView, loadViews, removeView, storeViews, type SavedView } from "./savedViews";
 import Link from "next/link";
 
 import { authFetch } from "@/lib/auth-session";
@@ -374,14 +375,17 @@ function CoverageTab() {
   );
 }
 
-function Changes() {
-  const [days, setDays] = useState(1);
+function Changes({ initialDays = 1, onDays }: { initialDays?: number; onDays?: (d: number) => void }) {
+  const [days, setDays] = useState(initialDays);
   const { data, error } = useJson<FleetChange[]>(`/api/v1/client-posture/fleet/changes?days=${days}`);
   return (
     <div className="space-y-2">
       <label className="flex items-center gap-2 text-sm text-slate-300">
         Last
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="rounded border border-slate-700 bg-slate-900 px-2 py-1" aria-label="Days">
+        <select value={days} onChange={(e) => {
+            setDays(Number(e.target.value));
+            onDays?.(Number(e.target.value));
+          }} className="rounded border border-slate-700 bg-slate-900 px-2 py-1" aria-label="Days">
           <option value={1}>day</option>
           <option value={7}>7 days</option>
           <option value={30}>30 days</option>
@@ -475,9 +479,9 @@ export interface SearchHit {
   accepted: boolean;
 }
 
-function Search() {
-  const [text, setText] = useState("");
-  const [asked, setAsked] = useState("");
+function Search({ initialQ = "", onAsked }: { initialQ?: string; onAsked?: (q: string) => void }) {
+  const [text, setText] = useState(initialQ);
+  const [asked, setAsked] = useState(initialQ);
   const { data, error } = useJson<SearchHit[]>(asked.length >= 2 ? `/api/v1/client-posture/fleet/search?q=${encodeURIComponent(asked)}` : null);
   return (
     <div className="space-y-3">
@@ -486,6 +490,7 @@ function Search() {
         onSubmit={(e) => {
           e.preventDefault();
           setAsked(text.trim());
+          onAsked?.(text.trim());
         }}
       >
         <input value={text} onChange={(e) => setText(e.target.value)} placeholder="A machine, an account or a word, for example SRV-02" aria-label="Search the checks" className="w-96 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-200" />
@@ -648,6 +653,28 @@ function Tools() {
 export function FleetPosture() {
   const { data: boards } = useJson<BoardMeta>("/api/v1/client-posture/fleet/boards");
   const [tab, setTab] = useState<string>("worst");
+  const [days, setDays] = useState(1);
+  const [q, setQ] = useState("");
+  const [views, setViews] = useState<SavedView[]>([]);
+  const [applied, setApplied] = useState(0);
+  useEffect(() => setViews(loadViews()), []);
+  const change = (next: SavedView[]) => {
+    setViews(next);
+    storeViews(next);
+  };
+  const apply = (name: string) => {
+    const v = views.find((x) => x.name === name);
+    if (!v) return;
+    setTab(v.tab);
+    setDays(v.days ?? 1);
+    setQ(v.q ?? "");
+    setApplied((n) => n + 1);
+  };
+  const saveCurrent = () => {
+    const name = window.prompt("Name this view");
+    if (name === null || !name.trim()) return;
+    change(addView(views, { name, tab, ...(tab === "changes" ? { days } : {}), ...(tab === "search" && q ? { q } : {}) }));
+  };
   const tabs: [string, string][] = [["worst", "Worst clients"], ["changes", "What changed"], ["coverage", "Coverage"], ["accepted", "Accepted risks"], ["search", "Search"], ["tools", "Tools"], ...Object.entries(boards ?? {}).map(([k, v]) => [k, v.title] as [string, string])];
   return (
     <div className="space-y-4 p-6">
@@ -667,7 +694,36 @@ export function FleetPosture() {
           </button>
         ))}
       </div>
-      {tab === "worst" ? <Worst /> : tab === "changes" ? <Changes /> : tab === "coverage" ? <CoverageTab /> : tab === "accepted" ? <Accepted /> : tab === "search" ? <Search /> : tab === "tools" ? <Tools /> : <Board key={tab} board={tab} title={boards?.[tab]?.title ?? tab} />}
+      <div className="flex flex-wrap items-center gap-2 text-sm print:hidden">
+        <label className="flex items-center gap-2 text-slate-300">
+          Saved views
+          <select value="" onChange={(e) => apply(e.target.value)} aria-label="Saved views" className="rounded border border-slate-700 bg-slate-900 px-2 py-1">
+            <option value="">{views.length === 0 ? "None saved yet" : "Open a view…"}</option>
+            {views.map((v) => (
+              <option key={v.name} value={v.name}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={saveCurrent} className="rounded border border-slate-600 px-3 py-1 text-slate-200">
+          Save this view
+        </button>
+        {views.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              const name = window.prompt(`Remove which view? (${views.map((v) => v.name).join(", ")})`);
+              if (name && views.some((v) => v.name === name.trim())) change(removeView(views, name.trim()));
+            }}
+            className="rounded border border-slate-700 px-3 py-1 text-slate-400"
+          >
+            Remove a view
+          </button>
+        )}
+        <span className="text-xs text-slate-500">Kept in this browser only.</span>
+      </div>
+      {tab === "worst" ? <Worst /> : tab === "changes" ? <Changes key={`c${applied}`} initialDays={days} onDays={setDays} /> : tab === "coverage" ? <CoverageTab /> : tab === "accepted" ? <Accepted /> : tab === "search" ? <Search key={`s${applied}`} initialQ={q} onAsked={setQ} /> : tab === "tools" ? <Tools /> : <Board key={tab} board={tab} title={boards?.[tab]?.title ?? tab} />}
     </div>
   );
 }
