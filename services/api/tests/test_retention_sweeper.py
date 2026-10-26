@@ -19,6 +19,7 @@ from app.db.database import Base
 from app.models.copilot_conversation import CopilotConversation
 from app.models.data_lifecycle import RetentionPolicyRow
 from app.models.detection_suggestion import DetectionSuggestion
+from app.models.signin import ClientCheckHistory, ClientLicenseHistory, ClientM365Check, ClientScoreHistory
 from app.models.tenant import Tenant
 from app.services.retention import TERMINAL_ACTION_STATUSES
 from app.workers import retention_sweeper as rs
@@ -59,7 +60,8 @@ def database(tmp_path):
     DB.path = tmp_path / "retention.db"
     DB.sync = create_engine(f"sqlite:///{DB.path}")
     Base.metadata.create_all(
-        DB.sync, tables=[Tenant.__table__, CopilotConversation.__table__, DetectionSuggestion.__table__, RetentionPolicyRow.__table__]
+        DB.sync,
+        tables=[Tenant.__table__, CopilotConversation.__table__, DetectionSuggestion.__table__, RetentionPolicyRow.__table__, ClientCheckHistory.__table__, ClientLicenseHistory.__table__, ClientScoreHistory.__table__, ClientM365Check.__table__],
     )
     rs._meta.create_all(DB.sync)
     engine = create_async_engine(f"sqlite+aiosqlite:///{DB.path}", poolclass=NullPool)
@@ -419,7 +421,7 @@ class TestConfiguration:
         src = (Path(__file__).resolve().parent.parent / "app" / "workers" / "retention_sweeper.py").read_text(encoding="utf-8")
         code = re.sub(r'""".*?"""', "", src, flags=re.S)  # the docstring may mention the lake; the code must not touch it
         assert "raw_events" not in code and "clickhouse" not in code.lower(), "the raw-event lake has its own TTL and is not swept here"
-        assert rs.CLASSES == ("copilot_conversations", "detection_suggestions", "response_actions", "alerts")
+        assert rs.CLASSES == ("copilot_conversations", "detection_suggestions", "response_actions", "alerts", "posture_history")
 
 
 # ── alerts: opt-in, finished and case-less only ─────────────────────────────────────────────────────────────────────────
@@ -476,3 +478,68 @@ class TestAlertRetentionIsOptIn:
         today, old = alert("resolved", 0.1), alert("resolved", 3)
         sweep(RETENTION_ALERTS_DAYS=1)
         assert today in remaining_alerts() and old not in remaining_alerts()
+
+
+# ── posture history: opt-in; only the history, never the current checks and counts ──────────────────────────────────────
+
+_next_id = [1]
+
+
+def history_rows(age_days, tenant=A):
+    """One check-history, one count-history and one score-history row, each `age_days` old. Returns their keys."""
+    _next_id[0] += 2
+    cid, lid = _next_id[0], _next_id[0] + 1
+    with Session(DB.sync) as s:
+        s.add(ClientCheckHistory(id=cid, tenant_id=tenant, source="ninjaone", key="k", status="met", previous_status=None, evidence="", observed_at=ago(age_days)))
+        s.add(ClientLicenseHistory(id=lid, tenant_id=tenant, source="ninjaone", item="Macs", unit="device", count=1, previous_count=None, observed_at=ago(age_days)))
+        s.add(ClientScoreHistory(tenant_id=tenant, day=ago(age_days).date(), score=80, met=1, partly=0, not_met=0, accepted=0))
+        s.commit()
+    return cid, lid, ago(age_days).date()
+
+
+def remaining_history(tenant=A):
+    with Session(DB.sync) as s:
+        return (
+            {r[0] for r in s.execute(select(ClientCheckHistory.id).where(ClientCheckHistory.tenant_id == tenant)).all()},
+            {r[0] for r in s.execute(select(ClientLicenseHistory.id).where(ClientLicenseHistory.tenant_id == tenant)).all()},
+            {r[0] for r in s.execute(select(ClientScoreHistory.day).where(ClientScoreHistory.tenant_id == tenant)).all()},
+        )
+
+
+class TestPostureHistoryRetentionIsOptIn:
+    def test_by_default_no_history_is_ever_deleted_however_old(self):
+        history_rows(5000)
+        result = sweep()
+        assert "posture_history" not in result.counts
+        assert all(len(part) == 1 for part in remaining_history())
+        assert "posture_history" not in sweep(RETENTION_POSTURE_HISTORY_DAYS=0).counts
+
+    def test_old_history_goes_from_all_three_tables_and_recent_history_stays(self):
+        old, recent = history_rows(400), history_rows(30)
+        assert sweep(RETENTION_POSTURE_HISTORY_DAYS=365).counts["posture_history"] == 3
+        checks, licences, days = remaining_history()
+        assert checks == {recent[0]} and licences == {recent[1]} and days == {recent[2]}
+        assert old[0] not in checks
+
+    def test_it_sweeps_every_tenants_history_and_a_dry_run_counts_without_deleting(self):
+        history_rows(400, tenant=A)
+        history_rows(400, tenant=B)
+        dry = sweep(RETENTION_POSTURE_HISTORY_DAYS=365, dry_run=True)
+        assert dry.counts["posture_history"] == 6 and all(len(part) == 1 for part in remaining_history(A))
+        sweep(RETENTION_POSTURE_HISTORY_DAYS=365)
+        assert all(len(part) == 0 for part in remaining_history(A) + remaining_history(B))
+
+    def test_the_current_checks_are_never_touched_only_their_history(self):
+        with Session(DB.sync) as s:
+            s.execute(insert(ClientM365Check.__table__).values(tenant_id=A, source="ninjaone", checks=[], refreshed_at=ago(5000)))
+            s.commit()
+        history_rows(5000)
+        sweep(RETENTION_POSTURE_HISTORY_DAYS=1)
+        with Session(DB.sync) as s:
+            assert s.execute(select(ClientM365Check.source)).all() == [("ninjaone",)]
+
+    def test_the_window_is_clamped_to_a_day(self):
+        today, old = history_rows(0.1), history_rows(3)
+        sweep(RETENTION_POSTURE_HISTORY_DAYS=1)
+        checks, _l, _d = remaining_history()
+        assert checks == {today[0]}

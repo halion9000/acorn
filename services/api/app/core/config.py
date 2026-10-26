@@ -313,6 +313,8 @@ class Settings(BaseSettings):
     RETENTION_RESPONSE_ACTIONS_DEFAULT_DAYS: int = 730
     # Opt in to deleting FINISHED, case-less alerts older than this many days. 0 (the default) keeps every alert forever.
     RETENTION_ALERTS_DAYS: int = 0
+    # Opt in to deleting the posture and count history (each check's status changes, each count's changes and the daily score) older than this many days. 0 (the default) keeps it all.
+    RETENTION_POSTURE_HISTORY_DAYS: int = 0
 
     # ------------------------------------------------------------------
     # Event-warehouse credentials — one block per provider in
