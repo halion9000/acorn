@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 STATUS_WEIGHT = {"met": 1.0, "partly": 0.5, "not_met": 0.0}
@@ -45,6 +45,8 @@ class FleetCheck:
     since: datetime | None = None
     accepted: bool = False
     items: tuple[str, ...] = ()
+    owner: str | None = None
+    due_date: date | None = None
 
 
 def summarize(checks: list[FleetCheck]) -> dict[str, Any]:
@@ -69,6 +71,11 @@ def average_score(scores: list[int | None]) -> int | None:
     """The mean of the clients' scores, rounded, leaving out clients with no score. None when nobody has one."""
     have = [s for s in scores if s is not None]
     return int(sum(have) / len(have) + 0.5) if have else None
+
+
+def is_overdue(status: str, due: date | None, today: date) -> bool:
+    """A check is overdue when it has a due date that has passed and is still not fully met. A met check is never overdue, and the due day itself is not late."""
+    return due is not None and due < today and status != "met"
 
 
 def below_target(score: int | None, target: int | None) -> bool:

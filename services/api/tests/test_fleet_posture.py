@@ -103,3 +103,17 @@ def test_the_fleet_average_leaves_out_clients_with_no_score_and_rounds():
     assert average_score([None, None]) is None
     assert average_score([]) is None
     assert average_score([50, 51]) == 51, "50.5 rounds up"
+
+
+def test_a_check_is_overdue_only_when_its_date_has_passed_and_it_is_not_fully_met():
+    from datetime import date
+
+    from app.services.fleet_posture import is_overdue
+
+    today = date(2026, 10, 26)
+    assert is_overdue("not_met", date(2026, 10, 25), today) is True
+    assert is_overdue("partly", date(2026, 10, 1), today) is True
+    assert is_overdue("not_met", date(2026, 10, 26), today) is False, "the due day itself is not late"
+    assert is_overdue("not_met", date(2026, 11, 1), today) is False
+    assert is_overdue("met", date(2026, 10, 1), today) is False, "fixed, so not late"
+    assert is_overdue("not_met", None, today) is False

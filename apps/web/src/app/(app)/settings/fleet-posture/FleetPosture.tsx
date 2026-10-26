@@ -33,6 +33,9 @@ export interface BoardRow {
   since?: string | null;
   accepted: boolean;
   items?: string[];
+  owner?: string | null;
+  due_date?: string | null;
+  overdue?: boolean;
 }
 
 export interface FleetChange {
@@ -197,6 +200,13 @@ function Board({ board, title }: { board: string; title: string }) {
               </td>
               <td className="text-xs text-slate-400">
                 {r.evidence}
+                {r.owner ? (
+                  <div className={r.overdue ? "text-red-300" : "text-slate-500"} data-testid={`board-owner-${r.client_id}-${r.key}`}>
+                    Owner: {r.owner}
+                    {r.due_date ? `, due ${r.due_date}` : ""}
+                    {r.overdue ? " (overdue)" : ""}
+                  </div>
+                ) : null}
                 {r.items && r.items.length > 0 ? (
                   <details className="mt-0.5">
                     <summary className="cursor-pointer text-slate-500">Which ones ({r.items.length})</summary>

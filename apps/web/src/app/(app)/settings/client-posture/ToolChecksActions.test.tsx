@@ -67,6 +67,25 @@ describe('ToolChecks with history and accepted risks', () => {
     expect(JSON.parse(init.body)).toEqual({ reason: 'Client is retiring them', expires_in_days: 60 });
   });
 
+  it('assigns an owner and a due date, shows an overdue one in red text, and refuses a date that is not a date without calling the API', async () => {
+    const answers = ['Dana R', '2026-11-30', 'Dana R', 'next week'];
+    vi.spyOn(window, 'prompt').mockImplementation(() => answers.shift() ?? null);
+    authFetch.mockImplementation(() => json({}));
+    const onChanged = vi.fn();
+    const { rerender } = render(<ToolChecks tool="ninjaone" label="NinjaOne" checks={checks} clientId="c1" onChanged={onChanged} />);
+    await userEvent.click(within(screen.getByTestId('check-ninjaone_antivirus')).getByText('Assign'));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(authFetch.mock.calls[0][0]).toBe('/api/v1/client-posture/c1/owners/ninjaone_antivirus');
+    expect(JSON.parse(authFetch.mock.calls[0][1].body)).toEqual({ owner: 'Dana R', due_date: '2026-11-30' });
+    authFetch.mockClear();
+    await userEvent.click(within(screen.getByTestId('check-ninjaone_antivirus')).getByText('Assign'));
+    expect(await screen.findByText(/looks like 2026-11-30/)).toBeInTheDocument();
+    expect(authFetch).not.toHaveBeenCalled();
+    rerender(<ToolChecks tool="ninjaone" label="NinjaOne" checks={[{ ...checks[0], owner: 'Dana R', due_date: '2026-10-01', overdue: true }]} clientId="c1" />);
+    expect(screen.getByTestId('owner-ninjaone_antivirus')).toHaveTextContent('Owner: Dana R, due 2026-10-01 (overdue)');
+    expect(screen.getByText('Change owner')).toBeInTheDocument();
+  });
+
   it('marks a check not applicable with a reason and no end date, and shows it as such', async () => {
     const prompt = vi.spyOn(window, 'prompt').mockImplementation(() => 'No firewall on site');
     authFetch.mockImplementation(() => json({}));

@@ -11184,6 +11184,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/{client_id}/owners/{key}:
+    put:
+      tags:
+      - posture
+      summary: Say who is looking after a check for a client and by when, or clear
+        it
+      operationId: set_check_owner_api_v1_client_posture__client_id__owners__key__put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnerIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/client-posture/{client_id}/target:
     put:
       tags:
@@ -27363,6 +27405,21 @@ components:
           type: array
           title: Items
           default: []
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        overdue:
+          type: boolean
+          title: Overdue
+          default: false
       type: object
       required:
       - client_id
@@ -31661,6 +31718,43 @@ components:
       - benign_corrections
       - escalate_corrections
       title: OverrideSummaryResponse
+    OwnerIn:
+      properties:
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+      type: object
+      title: OwnerIn
+    OwnerOut:
+      properties:
+        key:
+          type: string
+          title: Key
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+      type: object
+      required:
+      - key
+      - owner
+      - due_date
+      title: OwnerOut
     PackAssignmentCreate:
       properties:
         child_tenant_id:
@@ -32218,6 +32312,21 @@ components:
           anyOf:
           - $ref: '#/components/schemas/CheckAcceptanceOut'
           - type: 'null'
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        overdue:
+          type: boolean
+          title: Overdue
+          default: false
       type: object
       required:
       - key

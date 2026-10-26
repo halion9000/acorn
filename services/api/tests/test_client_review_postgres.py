@@ -559,3 +559,47 @@ async def test_a_target_is_set_replaced_and_removed_and_the_fleet_flags_a_client
     assert e2.value.status_code == 404
     await run(world["msp"], lambda db: cp.set_target(world["client"], cp.TargetIn(target=None), user, db))
     assert mine(await run(world["msp"], lambda db: cp.fleet_summary(NS(tenant_id=world["msp"]), db))).target is None
+
+
+async def test_an_owner_and_due_date_are_set_cleared_and_show_on_the_client_and_on_the_board(world):
+    from datetime import date, timedelta
+
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'ninjaone', 'n-11', 'n-11', 'n-11', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+    checks = [{"key": "ninjaone_antivirus", "status": "not_met", "evidence": ""}, {"key": "ninjaone_patching", "status": "met", "evidence": ""}]
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-11", checks=checks)))
+    user = NS(tenant_id=world["msp"], user_id=None)
+    yesterday = date.today() - timedelta(days=1)
+    out = await run(world["msp"], lambda db: cp.set_check_owner(world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="  Dana   R ", due_date=yesterday), user, db))
+    assert (out.owner, out.due_date) == ("Dana R", yesterday)
+    await run(world["msp"], lambda db: cp.set_check_owner(world["client"], "ninjaone_patching", cp.OwnerIn(owner="Sam", due_date=yesterday), user, db))
+
+    cp.fleet_cache.clear()
+    board = await run(world["msp"], lambda db: cp.fleet_board("endpoints", NS(tenant_id=world["msp"]), db, include_met=True))
+    mine = {r.key: r for r in board.rows if r.client_id == world["client"]}
+    assert (mine["ninjaone_antivirus"].owner, mine["ninjaone_antivirus"].overdue) == ("Dana R", True)
+
+    posture = await run(world["msp"], lambda db: cp.client_posture(world["client"], NS(tenant_id=world["msp"]), db))
+    by_key = {c.key: c for t in posture.tool_checks.values() for c in t.checks}
+    assert (by_key["ninjaone_antivirus"].owner, by_key["ninjaone_antivirus"].overdue) == ("Dana R", True)
+    assert (by_key["ninjaone_patching"].owner, by_key["ninjaone_patching"].overdue) == ("Sam", False), "a met check is not overdue"
+
+    cleared = await run(world["msp"], lambda db: cp.set_check_owner(world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="  "), user, db))
+    assert (cleared.owner, cleared.due_date) == (None, None)
+    cp.fleet_cache.clear()
+    board2 = await run(world["msp"], lambda db: cp.fleet_board("endpoints", NS(tenant_id=world["msp"]), db, include_met=True))
+    assert {r.key: r.owner for r in board2.rows if r.client_id == world["client"]}["ninjaone_antivirus"] is None
+    for bad_client, bad_key, bad_body, code in ((world["stranger"], "ninjaone_antivirus", cp.OwnerIn(owner="x"), 404), (world["client"], "bad key!", cp.OwnerIn(owner="x"), 422), (world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="x" * 81), 422)):
+        with pytest.raises(HTTPException) as e:
+            await run(world["msp"], lambda db: cp.set_check_owner(bad_client, bad_key, bad_body, user, db))
+        assert e.value.status_code == code

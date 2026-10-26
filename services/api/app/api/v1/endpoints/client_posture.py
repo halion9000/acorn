@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -25,13 +25,13 @@ from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.identity_source import IdentitySource
 from app.services.audit import emit_audit
-from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, ClientScoreHistory, ClientScoreTarget, CoreSweepRun, IdentityMfaUser
+from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, ClientCheckOwner, ClientScoreHistory, ClientScoreTarget, CoreSweepRun, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
 from app.services import fleet_cache
 from app.services.score_history import trend as score_trend
-from app.services.fleet_posture import average_score, below_target, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import average_score, below_target, is_overdue, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
@@ -85,6 +85,10 @@ class PostureCheck(BaseModel):
     items: list[str] = []
     # Set when a person has accepted this check for the client (and it has not run out).
     accepted: "CheckAcceptanceOut | None" = None
+    # Who is looking after this check and by when; overdue is true once the date has passed and the check is still not met.
+    owner: str | None = None
+    due_date: date | None = None
+    overdue: bool = False
 
 
 class CheckAcceptanceOut(BaseModel):
@@ -135,6 +139,15 @@ def _items_of(check: dict) -> list[str]:
     return [i[:120] for i in raw if isinstance(i, str) and i.strip()][:40] if isinstance(raw, list) else []
 
 
+async def _owners_of(db: Any, client_id: uuid.UUID) -> dict[str, tuple[str, date | None]]:
+    """{check key: (owner, due date)} for one client. Read inside that client's scope. An older database without the table gives none."""
+    try:
+        async with db.begin_nested():
+            return {r.key: (r.owner, r.due_date) for r in (await db.execute(select(ClientCheckOwner).where(ClientCheckOwner.tenant_id == client_id))).scalars().all()}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, aliases: list[Any]) -> dict[str, ToolChecksOut]:
     """The checks each tool sent for this client. Only tools the client is mapped to are read (none at all, no query, for a client mapped to none of them); a tool that sent nothing is left out."""
     mapped = {v for v, _, _ in aliases}
@@ -149,13 +162,24 @@ async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, alia
             )
         ).all()
         accepted_rows = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id))).scalars().all()
+        owners = await _owners_of(db, client_id)
     since = {k: t for k, t in since_rows}
     now = datetime.now(UTC)
     accepted = {a.key: CheckAcceptanceOut(reason=a.reason, accepted_at=a.accepted_at, expires_at=a.expires_at, not_applicable=a.not_applicable) for a in accepted_rows if a.expires_at is None or a.expires_at > now}
     out: dict[str, ToolChecksOut] = {}
     for row in rows:
         checks = [
-            PostureCheck(key=str(c["key"]), status=str(c["status"]), evidence=str(c.get("evidence", "")), since=since.get(str(c["key"])), accepted=accepted.get(str(c["key"])), items=_items_of(c))
+            PostureCheck(
+                key=str(c["key"]),
+                status=str(c["status"]),
+                evidence=str(c.get("evidence", "")),
+                since=since.get(str(c["key"])),
+                accepted=accepted.get(str(c["key"])),
+                items=_items_of(c),
+                owner=owners.get(str(c["key"]), (None, None))[0],
+                due_date=owners.get(str(c["key"]), (None, None))[1],
+                overdue=is_overdue(str(c["status"]), owners.get(str(c["key"]), (None, None))[1], datetime.now(UTC).date()),
+            )
             for c in (row.checks or [])
             if isinstance(c, dict) and c.get("key") and c.get("status")
         ]
@@ -364,6 +388,52 @@ async def score_history(client_id: uuid.UUID, current_user: Annotated[AuthUser, 
     return ScoreHistoryOut(client_id=client_id, days=days, rows=[ScoreDay(**r) for r in shown], first=t["first"], last=t["last"], change=t["change"], direction=t["direction"])
 
 
+class OwnerIn(BaseModel):
+    # A person's name; none (or blank) removes the owner and the date.
+    owner: str | None = None
+    due_date: date | None = None
+
+
+class OwnerOut(BaseModel):
+    key: str
+    owner: str | None
+    due_date: date | None
+
+
+@router.put("/{client_id}/owners/{key}", response_model=OwnerOut, summary="Say who is looking after a check for a client and by when, or clear it")
+async def set_check_owner(
+    client_id: uuid.UUID, key: str, body: OwnerIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, request: Request = None  # type: ignore[assignment]
+) -> OwnerOut:
+    owner = current_user.tenant_id
+    await _client_of_owner(db, owner, client_id)
+    if not key or len(key) > 80 or not all(c.isalnum() or c in "_-" for c in key):
+        raise HTTPException(status_code=422, detail="That is not a check key")
+    name = " ".join((body.owner or "").split())
+    if len(name) > 80:
+        raise HTTPException(status_code=422, detail="A name is at most 80 characters")
+    async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
+        if not name:
+            await db.execute(delete(ClientCheckOwner).where(ClientCheckOwner.tenant_id == client_id, ClientCheckOwner.key == key))
+        else:
+            values = {"tenant_id": client_id, "key": key, "owner": name, "due_date": body.due_date, "updated_by": current_user.user_id, "updated_at": datetime.now(UTC)}
+            stmt = pg_insert(ClientCheckOwner).values(values)
+            await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "key")}))
+        await db.commit()
+    await emit_audit(
+        db=db,
+        tenant_id=owner,
+        actor_id=current_user.user_id,
+        action="posture:check_owner_set" if name else "posture:check_owner_cleared",
+        resource="client_check",
+        resource_id=f"{client_id}:{key}",
+        changes={"client": str(client_id), "key": key, "owner": name or None, "due_date": body.due_date.isoformat() if body.due_date and name else None},
+        request=request,
+    )
+    await db.commit()
+    fleet_cache.clear()
+    return OwnerOut(key=key, owner=name or None, due_date=body.due_date if name else None)
+
+
 class TargetIn(BaseModel):
     # 1 to 100; none removes the target.
     target: int | None = None
@@ -540,13 +610,14 @@ async def _read_fleet_checks(db: Any, owner: uuid.UUID) -> tuple[list[FleetCheck
                 continue
             since = {k: t for k, t in (await db.execute(select(ClientCheckHistory.key, func.max(ClientCheckHistory.observed_at)).where(ClientCheckHistory.tenant_id == cid).group_by(ClientCheckHistory.key))).all()}
             accepted = {a.key for a in (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == cid))).scalars().all() if a.expires_at is None or a.expires_at > now}
+            owners = await _owners_of(db, cid)
         refreshed[cid] = {r.source: r.refreshed_at for r in rows}
         for r in rows:
             for c in r.checks or []:
                 if isinstance(c, dict) and c.get("key") and c.get("status"):
                     key = str(c["key"])
                     out.append(
-                        FleetCheck(client_id=str(cid), client_name=names.get(cid) or str(cid), source=r.source, key=key, status=str(c["status"]), evidence=str(c.get("evidence", "")), refreshed_at=r.refreshed_at, since=since.get(key), accepted=key in accepted, items=tuple(_items_of(c)))
+                        FleetCheck(client_id=str(cid), client_name=names.get(cid) or str(cid), source=r.source, key=key, status=str(c["status"]), evidence=str(c.get("evidence", "")), refreshed_at=r.refreshed_at, since=since.get(key), accepted=key in accepted, items=tuple(_items_of(c)), owner=owners.get(key, (None, None))[0], due_date=owners.get(key, (None, None))[1])
                     )
     return out, names, refreshed
 
@@ -605,6 +676,9 @@ class FleetBoardRow(BaseModel):
     since: datetime | None = None
     accepted: bool = False
     items: list[str] = []
+    owner: str | None = None
+    due_date: date | None = None
+    overdue: bool = False
 
 
 class FleetBoardOut(BaseModel):
@@ -632,7 +706,7 @@ async def fleet_board(
         board=board,
         title=title,
         keys=list(keys),
-        rows=[FleetBoardRow(client_id=uuid.UUID(r.client_id), client_name=r.client_name, source=r.source, key=r.key, status=r.status, evidence=r.evidence, since=r.since, accepted=r.accepted, items=list(r.items)) for r in rows],
+        rows=[FleetBoardRow(client_id=uuid.UUID(r.client_id), client_name=r.client_name, source=r.source, key=r.key, status=r.status, evidence=r.evidence, since=r.since, accepted=r.accepted, items=list(r.items), owner=r.owner, due_date=r.due_date, overdue=is_overdue(r.status, r.due_date, datetime.now(UTC).date())) for r in rows],
     )
 
 

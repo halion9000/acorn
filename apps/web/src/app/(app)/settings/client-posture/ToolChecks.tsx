@@ -20,6 +20,10 @@ export interface PostureCheck {
   items?: string[];
   /** Set when a person accepted this check for the client and it has not run out. */
   accepted?: { reason: string; accepted_at: string; expires_at?: string | null; not_applicable?: boolean } | null;
+  /** Who is looking after the check and by when (YYYY-MM-DD); overdue once the date has passed and it is still not met. */
+  owner?: string | null;
+  due_date?: string | null;
+  overdue?: boolean;
 }
 
 export interface CheckHistoryRow {
@@ -176,6 +180,30 @@ export function ToolChecks({
       setProblem(e instanceof Error ? e.message : 'Could not save');
     }
   };
+  const assign = async (key: string, current?: string | null) => {
+    if (!clientId) return;
+    const owner = window.prompt("Who is looking after this? Leave empty to clear it.", current ?? "");
+    if (owner === null) return;
+    const body: { owner: string; due_date?: string } = { owner: owner.trim() };
+    if (owner.trim() !== "") {
+      const due = window.prompt("Due date (YYYY-MM-DD)? Leave empty for none.", "");
+      if (due && due.trim() !== "") {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(due.trim())) {
+          setProblem("A due date looks like 2026-11-30.");
+          return;
+        }
+        body.due_date = due.trim();
+      }
+    }
+    try {
+      const res = await authFetch(`/api/v1/client-posture/${encodeURIComponent(clientId)}/owners/${encodeURIComponent(key)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!res.ok) throw new Error(`The API answered ${res.status}`);
+      setProblem(null);
+      onChanged?.();
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Could not save");
+    }
+  };
   const unaccept = async (key: string) => {
     if (!clientId) return;
     try {
@@ -219,6 +247,13 @@ export function ToolChecks({
               {c.since ? <span className="ml-1 text-[11px] text-slate-600">since {day(c.since)}</span> : null}
               <div className="mt-1 text-xs text-slate-400">{c.evidence}</div>
               {c.accepted ? <div className="mt-1 text-xs text-sky-200/80">Reason: {c.accepted.reason}</div> : null}
+              {c.owner ? (
+                <div className={`mt-1 text-xs ${c.overdue ? "text-red-300" : "text-slate-400"}`} data-testid={`owner-${c.key}`}>
+                  Owner: {c.owner}
+                  {c.due_date ? `, due ${c.due_date}` : ""}
+                  {c.overdue ? " (overdue)" : ""}
+                </div>
+              ) : null}
               <div className="mt-1 flex gap-3 text-[11px] print:hidden">
                 {c.items && c.items.length > 0 ? (
                   <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setOpenItems(openItems === c.key ? null : c.key)}>
@@ -246,6 +281,11 @@ export function ToolChecks({
               ) : null}
               {clientId ? (
                 <div className="mt-1 flex gap-3 text-[11px] print:hidden">
+                  {c.status !== 'met' || c.owner ? (
+                    <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void assign(c.key, c.owner)}>
+                      {c.owner ? 'Change owner' : 'Assign'}
+                    </button>
+                  ) : null}
                   <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setOpenHistory(openHistory === c.key ? null : c.key)}>
                     {openHistory === c.key ? 'Hide history' : 'History'}
                   </button>

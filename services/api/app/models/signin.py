@@ -274,3 +274,16 @@ class ClientScoreTarget(Base):
     target: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class ClientCheckOwner(Base):
+    """Who is looking after a check for a client, and by when (migration 109)."""
+
+    __tablename__ = "client_check_owners"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    owner: Mapped[str] = mapped_column(String(80), nullable=False)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

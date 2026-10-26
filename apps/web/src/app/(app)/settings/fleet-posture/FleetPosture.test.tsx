@@ -22,7 +22,7 @@ beforeEach(() => {
           { client_id: 'c2', client_name: 'Beta', score: null, met: 0, partly: 0, not_met: 0, accepted: 2, stale_tools: [] },
         ],
       });
-    if (url.includes('/fleet/boards/renewals')) return json({ board: 'renewals', title: 'Renewals', keys: [], rows: [{ client_id: 'c1', client_name: 'Acme', source: 'meraki', key: 'meraki_licence', status: 'not_met', evidence: 'The Meraki licence has expired', accepted: false }] });
+    if (url.includes('/fleet/boards/renewals')) return json({ board: 'renewals', title: 'Renewals', keys: [], rows: [{ client_id: 'c1', client_name: 'Acme', source: 'meraki', key: 'meraki_licence', status: 'not_met', evidence: 'The Meraki licence has expired', accepted: false, owner: 'Dana R', due_date: '2026-10-01', overdue: true }] });
     if (url.endsWith('/fleet/acceptances'))
       return json([
         { client_id: 'c1', client_name: 'Acme', key: 'ninjaone_patching', reason: 'Replacing in January', accepted_at: '2026-10-01T00:00:00Z', expires_at: new Date(Date.now() + 5 * 86_400_000 + 3_600_000).toISOString() },
@@ -121,6 +121,12 @@ describe('FleetPosture', () => {
     const table = await screen.findByTestId('fleet-board-renewals');
     expect(within(table).getByText('The Meraki licence has expired')).toBeInTheDocument();
     expect(within(table).getByText('Problem')).toBeInTheDocument();
+  });
+
+  it('shows who owns a check on a board and marks an overdue one', async () => {
+    render(<FleetPosture />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Renewals and expiries' }));
+    expect(await screen.findByTestId('board-owner-c1-meraki_licence')).toHaveTextContent('Owner: Dana R, due 2026-10-01 (overdue)');
   });
 
   it('says so when a board has nothing that needs attention', async () => {
