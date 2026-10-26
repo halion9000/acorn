@@ -817,3 +817,33 @@ async def test_the_digest_gathers_what_got_worse_what_is_overdue_what_ends_soon_
     assert d.counts["worse"] >= 1 and set(d.counts) == {"worse", "better", "overdue", "expiring", "below_target"}
     short = await run(world["msp"], lambda db: cp.fleet_digest(NS(tenant_id=world["msp"]), db, days=1, limit=1))
     assert len(short.worse) <= 1 and short.counts["worse"] == d.counts["worse"], "a list is cut, its count is not"
+
+
+async def test_machines_joining_and_leaving_a_checks_list_are_kept_and_the_first_report_adds_nothing(world):
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'ninjaone', 'n-16', 'n-16', 'n-16', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+
+    def report(items):
+        return ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-16", checks=[{"key": "ninjaone_antivirus", "status": "not_met", "evidence": "", "items": items}])
+
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report(["PC-1", "PC-2"])))
+    first = await run(world["msp"], lambda db: cp.check_item_history(world["client"], "ninjaone_antivirus", NS(tenant_id=world["msp"]), db))
+    assert first.events == [], "the first list is not a join of every machine"
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report(["PC-2", "PC-3"])))
+    out = await run(world["msp"], lambda db: cp.check_item_history(world["client"], "ninjaone_antivirus", NS(tenant_id=world["msp"]), db))
+    assert sorted((e.item, e.event) for e in out.events) == [("PC-1", "left"), ("PC-3", "joined")]
+    other = await run(world["msp"], lambda db: cp.check_item_history(world["client"], "ninjaone_patching", NS(tenant_id=world["msp"]), db))
+    assert other.events == []
+    with pytest.raises(HTTPException) as e:
+        await run(world["msp"], lambda db: cp.check_item_history(world["stranger"], "ninjaone_antivirus", NS(tenant_id=world["msp"]), db))
+    assert e.value.status_code == 404

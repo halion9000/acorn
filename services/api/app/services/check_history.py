@@ -24,6 +24,31 @@ def changes(previous: list[dict[str, Any]] | None, new: list[dict[str, Any]], so
     return out
 
 
+MAX_ITEM_EVENTS_PER_CHECK = 200
+
+
+def item_changes(previous: list[dict[str, Any]] | None, new: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Items that joined or left the list behind each check since the last report: ``{key, item, event}``, joined first, each list in the order it was given.
+
+    Nothing is reported for the first report of a client (``previous`` is None: every item would "join"), for a check that was not in the last report, or for a check with no list. A check that
+    has more than ``MAX_ITEM_EVENTS_PER_CHECK`` changes at once keeps the first that many (a tool replaced wholesale is not a hundred stories).
+    """
+    if previous is None:
+        return []
+    before = {str(c["key"]): [str(i) for i in (c.get("items") or [])] for c in previous if isinstance(c, dict) and c.get("key")}
+    out: list[dict[str, Any]] = []
+    for c in new:
+        if not isinstance(c, dict) or not c.get("key") or str(c["key"]) not in before:
+            continue
+        key = str(c["key"])
+        now_items = [str(i) for i in (c.get("items") or [])]
+        was, is_ = set(before[key]), set(now_items)
+        events = [{"key": key[:80], "item": i[:120], "event": "joined"} for i in dict.fromkeys(now_items) if i not in was]
+        events += [{"key": key[:80], "item": i[:120], "event": "left"} for i in dict.fromkeys(before[key]) if i not in is_]
+        out += events[:MAX_ITEM_EVENTS_PER_CHECK]
+    return out
+
+
 def trend(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """From a check's history (newest first): how many times it has changed, the longest it has stayed not met in the rows given, and whether it is better or worse than before."""
     if not rows:

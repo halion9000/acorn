@@ -25,7 +25,7 @@ from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.identity_source import IdentitySource
 from app.services.audit import emit_audit
-from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, CheckWeight, ClientCheckComment, ClientCheckOwner, ClientScoreHistory, ClientScoreTarget, CoreSweepRun, IdentityMfaUser
+from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, CheckWeight, ClientCheckComment, ClientCheckItemHistory, ClientCheckOwner, ClientScoreHistory, ClientScoreTarget, CoreSweepRun, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
@@ -446,6 +446,34 @@ async def set_check_owner(
     await db.commit()
     fleet_cache.clear()
     return OwnerOut(key=key, owner=name or None, due_date=body.due_date if name else None)
+
+
+class ItemEventOut(BaseModel):
+    item: str
+    event: str
+    observed_at: datetime
+
+
+class ItemHistoryOut(BaseModel):
+    client_id: uuid.UUID
+    key: str
+    events: list[ItemEventOut]
+
+
+@router.get("/{client_id}/checks/{key}/item-history", response_model=ItemHistoryOut, summary="When machines or accounts joined or left the list behind one of a client's checks, newest first")
+async def check_item_history(client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, limit: int = 200) -> ItemHistoryOut:
+    owner = current_user.tenant_id
+    await _client_of_owner(db, owner, client_id)
+    async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
+        rows = (
+            await db.execute(
+                select(ClientCheckItemHistory)
+                .where(ClientCheckItemHistory.tenant_id == client_id, ClientCheckItemHistory.key == key)
+                .order_by(ClientCheckItemHistory.observed_at.desc(), ClientCheckItemHistory.id.desc())
+                .limit(max(1, min(limit, 500)))
+            )
+        ).scalars().all()
+    return ItemHistoryOut(client_id=client_id, key=key, events=[ItemEventOut(item=r.item, event=r.event, observed_at=r.observed_at) for r in rows])
 
 
 MAX_COMMENTS_PER_CHECK = 200

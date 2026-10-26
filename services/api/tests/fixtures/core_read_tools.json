@@ -695,6 +695,21 @@
     }
   },
   {
+    "tool": "aisoc_check_item_history",
+    "method": "GET",
+    "path": "/client-posture/{client_id}/checks/{key}/item-history",
+    "query": [
+      "limit"
+    ],
+    "enums": {},
+    "numbers": {
+      "limit": {
+        "min": 1,
+        "max": 200
+      }
+    }
+  },
+  {
     "tool": "aisoc_check_comments",
     "method": "GET",
     "path": "/client-posture/{client_id}/checks/{key}/comments",

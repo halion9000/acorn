@@ -11226,6 +11226,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/{client_id}/checks/{key}/item-history:
+    get:
+      tags:
+      - posture
+      summary: When machines or accounts joined or left the list behind one of a client's
+        checks, newest first
+      operationId: check_item_history_api_v1_client_posture__client_id__checks__key__item_history_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Key
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 200
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemHistoryOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/client-posture/{client_id}/checks/{key}/comments:
     get:
       tags:
@@ -29655,6 +29698,44 @@ components:
           default: ''
       type: object
       title: InvestigateRequest
+    ItemEventOut:
+      properties:
+        item:
+          type: string
+          title: Item
+        event:
+          type: string
+          title: Event
+        observed_at:
+          type: string
+          format: date-time
+          title: Observed At
+      type: object
+      required:
+      - item
+      - event
+      - observed_at
+      title: ItemEventOut
+    ItemHistoryOut:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        key:
+          type: string
+          title: Key
+        events:
+          items:
+            $ref: '#/components/schemas/ItemEventOut'
+          type: array
+          title: Events
+      type: object
+      required:
+      - client_id
+      - key
+      - events
+      title: ItemHistoryOut
     KBChunk:
       properties:
         doc_id:

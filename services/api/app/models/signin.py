@@ -327,3 +327,17 @@ class CheckWeight(Base):
     weight: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class ClientCheckItemHistory(Base):
+    """An item joining or leaving the list behind a client's check (migration 114)."""
+
+    __tablename__ = "client_check_item_history"
+    __table_args__ = (Index("ix_client_check_item_history_tenant_key", "tenant_id", "key", "observed_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    key: Mapped[str] = mapped_column(String(80), nullable=False)
+    item: Mapped[str] = mapped_column(String(120), nullable=False)
+    event: Mapped[str] = mapped_column(String(8), nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

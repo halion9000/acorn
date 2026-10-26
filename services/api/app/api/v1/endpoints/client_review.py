@@ -30,10 +30,11 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.client_review_answer import ClientReviewAnswer
-from app.models.signin import ClientCheckHistory, ClientM365Check, CoreSweepRun, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
+from app.models.signin import ClientCheckHistory, ClientCheckItemHistory, ClientM365Check, CoreSweepRun, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
 from app.services import fleet_cache
 from app.services.check_history import changes as check_changes
+from app.services.check_history import item_changes
 from app.services.score_history import load_weights, record_today
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
 from app.services.infra_review import CIPP_BASELINE_SOURCE, SAAS_SOURCES, TOOL_CHECK_SOURCES
@@ -202,6 +203,12 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
             previous = (await db.execute(select(ClientM365Check.checks).where(ClientM365Check.tenant_id == tid, ClientM365Check.source == source))).scalar_one_or_none()
             for change in check_changes(previous, new_checks, source):
                 db.add(ClientCheckHistory(tenant_id=tid, observed_at=now, **change))
+            try:
+                async with db.begin_nested():  # an older database without the table must not lose the checks
+                    for event in item_changes(previous, new_checks):
+                        db.add(ClientCheckItemHistory(tenant_id=tid, observed_at=now, **event))
+            except Exception:  # noqa: BLE001
+                logger.warning("item history not recorded for %s", tid, exc_info=True)
             values = {"tenant_id": tid, "source": source, "checks": new_checks, "refreshed_at": now}
             stmt = pg_insert(ClientM365Check).values(values)
             update = {c: stmt.excluded[c] for c in values if c not in ("tenant_id", "source")}

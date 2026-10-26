@@ -34,3 +34,21 @@ def test_trend_says_worse_better_same_new():
     assert trend([row("met"), row("partly")])["direction"] == "better"
     assert trend([row("met"), row("met")])["direction"] == "same"
     assert trend([row("met"), row("partly"), row("met")])["changes"] == 3
+
+
+def test_items_that_join_or_leave_a_checks_list_are_reported_and_a_first_report_or_a_new_check_is_not():
+    from app.services.check_history import item_changes
+
+    prev = [{"key": "av", "items": ["PC-1", "PC-2"]}, {"key": "gone", "items": ["X"]}]
+    new = [{"key": "av", "items": ["PC-2", "PC-3", "PC-3"]}, {"key": "fresh", "items": ["A", "B"]}, {"key": "nolist"}]
+    assert item_changes(prev, new) == [{"key": "av", "item": "PC-3", "event": "joined"}, {"key": "av", "item": "PC-1", "event": "left"}]
+    assert item_changes(None, new) == [], "the first report would otherwise make every item join"
+    assert item_changes(prev, [{"key": "av", "items": ["PC-1", "PC-2"]}]) == [], "an unchanged list says nothing"
+    assert item_changes(prev, [{"key": "av"}]) == [{"key": "av", "item": "PC-1", "event": "left"}, {"key": "av", "item": "PC-2", "event": "left"}], "an emptied list means everything left"
+
+
+def test_a_wholesale_replacement_keeps_only_the_first_events_of_that_check():
+    from app.services.check_history import MAX_ITEM_EVENTS_PER_CHECK, item_changes
+
+    out = item_changes([{"key": "k", "items": [f"old{i}" for i in range(300)]}], [{"key": "k", "items": [f"new{i}" for i in range(300)]}])
+    assert len(out) == MAX_ITEM_EVENTS_PER_CHECK and all(e["event"] == "joined" for e in out)
