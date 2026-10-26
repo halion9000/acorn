@@ -25,7 +25,7 @@ beforeEach(() => {
     if (url.startsWith('/api/v1/billing/reconcile'))
       return json({ generated_at: '', unmapped_lines: 2, rows: [{ client_id: 'c1', client_name: 'Acme', invoice_item: 'NinjaOne RMM (Included)', billed: 16, counted: 18, difference: 2, note_state: 'none', note: null, parts: [{ source: 'ninjaone', item: 'Macs', count: 4 }, { source: 'ninjaone', item: 'Windows workstations', count: 14 }] }, { client_id: 'c2', client_name: 'Beta', invoice_item: 'Huntress MDR', billed: 10, counted: 12, difference: 2, note_state: 'accepted', note: 'Flat package', parts: [] }, { client_id: 'c3', client_name: 'Gamma', invoice_item: 'DNS Filter', billed: 5, counted: 8, difference: 3, note_state: 'stale', note: 'Minimum of 7', parts: [] }] });
     if (url.startsWith('/api/v1/billing/map') && !mapCalls.length)
-      return json({ mapped: [{ invoice_item: 'Datto SaaS (Included)', counted: [{ source: 'datto-saas', item: 'Billable seats' }] }], unmapped: [{ invoice_item: 'Huntress for Workstations (Included)', clients: 120, suggestion: [{ source: 'huntress', item: 'Agents' }] }, { invoice_item: 'Liongard (Included)', clients: 150, suggestion: [] }], counted_items: [{ source: 'liongard', item: 'Systems' }, { source: 'ninjaone', item: 'Macs' }] });
+      return json({ mapped: [{ invoice_item: 'Datto SaaS (Included)', counted: [{ source: 'datto-saas', item: 'Billable seats' }] }], unmapped: [{ invoice_item: 'Huntress for Workstations (Included)', clients: 120, suggestion: [{ source: 'huntress', item: 'Agents' }], confidence: 'high' }, { invoice_item: 'NinjaOne RMM (Included)', clients: 100, suggestion: [{ source: 'ninjaone', item: 'Macs' }], confidence: 'medium' }, { invoice_item: 'Liongard (Included)', clients: 150, suggestion: [] }], counted_items: [{ source: 'liongard', item: 'Systems' }, { source: 'ninjaone', item: 'Macs' }] });
     if (url.startsWith('/api/v1/billing/map')) return json({});
     if (url.startsWith('/api/v1/billing/data-quality'))
       return json({ generated_at: '', baseline_tool: 'ninjaone', no_counts: ['blumira', 'petra'], unbilled: [{ client_id: 'c9', client_name: 'Gamma', tool: 'halopsa', tool_count: 0, baseline_count: 30, gap: -30 }, { client_id: 'c8', client_name: 'Delta', tool: 'halopsa', tool_count: 0, baseline_count: 1, gap: -1 }], rows: [{ client_id: 'c1', client_name: 'Acme', tool: 'huntress', tool_count: 30, baseline_count: 50, gap: -20 }] });
@@ -111,7 +111,7 @@ describe('Billing reconcile and mapping', () => {
     const unmapped = screen.getByTestId('unmapped-lines');
     expect(within(unmapped).getByText('no suggestion')).toBeInTheDocument();
     mapCalls.push(1);
-    await userEvent.click(within(unmapped).getByText('Use suggestion'));
+    await userEvent.click(within(unmapped).getAllByText('Use suggestion')[0]);
     await waitFor(() => expect(authFetch.mock.calls.some((c) => c[1]?.method === 'PUT')).toBe(true));
     const put = authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')!;
     expect(put[0]).toBe('/api/v1/billing/map');
@@ -132,9 +132,21 @@ describe('Billing reconcile and mapping', () => {
   it('uses every suggestion at once, one save each, and says how many', async () => {
     render(<Billing />);
     await userEvent.click(screen.getByRole('tab', { name: 'Invoice mapping' }));
-    const button = await screen.findByText('Use all 1 suggestions');
+    const button = await screen.findByText('Use all 2 suggestions');
     mapCalls.push(1);
     await userEvent.click(button);
+    await waitFor(() => expect(authFetch.mock.calls.filter((c) => c[1]?.method === 'PUT')).toHaveLength(2));
+    expect(authFetch.mock.calls.filter((c) => c[1]?.method === 'PUT').map((c) => JSON.parse(c[1].body).invoice_item)).toEqual(['Huntress for Workstations (Included)', 'NinjaOne RMM (Included)']);
+  });
+
+  it('marks how sure each suggestion is and can use only the high-confidence ones', async () => {
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Invoice mapping' }));
+    const unmapped = await screen.findByTestId('unmapped-lines');
+    expect(within(unmapped.querySelectorAll('tr')[0] as HTMLElement).getByText('high')).toBeInTheDocument();
+    expect(within(unmapped.querySelectorAll('tr')[1] as HTMLElement).getByText('medium')).toBeInTheDocument();
+    mapCalls.push(1);
+    await userEvent.click(screen.getByText('Use the 1 high-confidence suggestions'));
     await waitFor(() => expect(authFetch.mock.calls.filter((c) => c[1]?.method === 'PUT')).toHaveLength(1));
     expect(JSON.parse(authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')![1].body).invoice_item).toBe('Huntress for Workstations (Included)');
   });

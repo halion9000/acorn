@@ -114,6 +114,31 @@ SUGGESTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
 )
 
 
+# How sure a suggestion is. A rule is "high" when its tool counts exactly what the invoice line names (one agent, one seat, one machine); "medium" when the count is made of several items or can include
+# things that are not billed (NinjaOne's workstations, servers and Macs, Slide's protected systems, Field Effect's devices); "low" when the line may be priced on something else (ThreatMate's assets).
+SUGGESTION_CONFIDENCE: dict[str, str] = {
+    "huntress sat": "high",
+    "huntress": "high",
+    "ninjaone": "medium",
+    "threatmate": "low",
+    "datto saas": "high",
+    "autoelevate": "high",
+    "dnsfilter": "high",
+    "dns filter": "high",
+    "slide": "medium",
+    "field effect": "medium",
+}
+
+
+def suggestion_confidence(invoice_item: str) -> str | None:
+    """How sure the suggestion for an invoice line is (``high``, ``medium`` or ``low``), or None when there is no suggestion."""
+    low = invoice_item.lower()
+    for needle, _counted in SUGGESTIONS:
+        if needle in low:
+            return SUGGESTION_CONFIDENCE[needle]
+    return None
+
+
 def suggest(invoice_item: str) -> list[dict[str, str]]:
     """The tool counts an invoice line probably equals, or none. The first rule that matches wins, so more specific words come first ("huntress sat" before "huntress")."""
     low = invoice_item.lower()

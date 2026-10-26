@@ -23,7 +23,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.client_alias import ClientAlias
 from app.models.signin import BillingDifferenceNote, BillingItemMap, ClientLicenseCount, ClientLicenseHistory
 from app.models.tenant import Tenant
-from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, forecast_next, note_state, endpoint_disagreements, last_reported, reconcile, tools_without_counts, unbilled_clients, suggest, totals, unusual, window_start
+from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, forecast_next, note_state, endpoint_disagreements, last_reported, reconcile, tools_without_counts, unbilled_clients, suggestion_confidence, suggest, totals, unusual, window_start
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -296,7 +296,7 @@ async def billing_map(current_user: Annotated[AuthUser, Depends(require_permissi
                     billed_clients[r["item"]] = billed_clients.get(r["item"], 0) + 1
             else:
                 tool_items.update([(r["source"], r["item"])])
-    unmapped = [{"invoice_item": i, "clients": n, "suggestion": suggest(i)} for i, n in sorted(billed_clients.items(), key=lambda kv: (-kv[1], kv[0])) if i not in mapping]
+    unmapped = [{"invoice_item": i, "clients": n, "suggestion": suggest(i), "confidence": suggestion_confidence(i)} for i, n in sorted(billed_clients.items(), key=lambda kv: (-kv[1], kv[0])) if i not in mapping]
     return MapOut(
         mapped=[MapRow(invoice_item=i, counted=[CountedRef(**c) for c in cs]) for i, cs in sorted(mapping.items())],
         unmapped=unmapped,

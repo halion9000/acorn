@@ -56,7 +56,7 @@ export interface ReconcileRow {
 
 export interface MapView {
   mapped: { invoice_item: string; counted: { source: string; item: string }[] }[];
-  unmapped: { invoice_item: string; clients: number; suggestion: { source: string; item: string }[] }[];
+  unmapped: { invoice_item: string; clients: number; suggestion: { source: string; item: string }[]; confidence?: "high" | "medium" | "low" | null }[];
   counted_items: { source: string; item: string }[];
 }
 
@@ -479,8 +479,9 @@ function Mapping() {
     }
   };
   const withSuggestion = (data?.unmapped ?? []).filter((u) => u.suggestion.length > 0);
-  const useAll = async () => {
-    for (const u of withSuggestion) {
+  const sure = withSuggestion.filter((u) => u.confidence === "high");
+  const useAll = async (only: typeof withSuggestion = withSuggestion) => {
+    for (const u of only) {
       const ok = await saveQuiet(u.invoice_item, u.suggestion);
       if (!ok) return;
     }
@@ -519,11 +520,18 @@ function Mapping() {
           <section>
             <div className="mb-1 flex items-center justify-between gap-3">
               <h3 className="text-sm uppercase text-slate-500">Billed lines still to map</h3>
-              {withSuggestion.length > 0 ? (
-                <button type="button" className="rounded border border-sky-500/50 px-2 py-0.5 text-xs text-sky-200 print:hidden" onClick={() => void useAll()}>
-                  Use all {withSuggestion.length} suggestions
-                </button>
-              ) : null}
+              <span className="flex gap-2 print:hidden">
+                {sure.length > 0 ? (
+                  <button type="button" className="rounded border border-emerald-500/50 px-2 py-0.5 text-xs text-emerald-200" onClick={() => void useAll(sure)}>
+                    Use the {sure.length} high-confidence suggestions
+                  </button>
+                ) : null}
+                {withSuggestion.length > 0 ? (
+                  <button type="button" className="rounded border border-sky-500/50 px-2 py-0.5 text-xs text-sky-200" onClick={() => void useAll()}>
+                    Use all {withSuggestion.length} suggestions
+                  </button>
+                ) : null}
+              </span>
             </div>
             {(data.unmapped ?? []).length === 0 ? (
               <p className="text-sm text-slate-400">Every billed line is mapped.</p>
@@ -534,7 +542,10 @@ function Mapping() {
                     <tr key={u.invoice_item} className="border-t border-slate-800 text-slate-300">
                       <td className="py-1 pr-3">{u.invoice_item}</td>
                       <td className="pr-3 text-xs text-slate-500">{u.clients} clients</td>
-                      <td className="pr-3 text-xs text-slate-400">{u.suggestion.length > 0 ? u.suggestion.map((c) => `${toolName(c.source)} ${c.item}`).join(" + ") : "no suggestion"}</td>
+                      <td className="pr-3 text-xs text-slate-400">
+                        {u.suggestion.length > 0 ? u.suggestion.map((c) => `${toolName(c.source)} ${c.item}`).join(" + ") : "no suggestion"}
+                        {u.suggestion.length > 0 && u.confidence ? <span className={`ml-2 rounded border px-1 ${u.confidence === "high" ? "border-emerald-500/40 text-emerald-300" : u.confidence === "medium" ? "border-amber-500/40 text-amber-300" : "border-red-500/40 text-red-300"}`}>{u.confidence}</span> : null}
+                      </td>
                       <td>
                         {u.suggestion.length > 0 ? (
                           <button type="button" className="text-xs text-sky-300 underline hover:text-sky-200" onClick={() => void save(u.invoice_item, u.suggestion)}>
