@@ -723,3 +723,36 @@ async def test_a_check_weight_changes_the_score_in_the_fleet_the_daily_history_a
     assert e2.value.status_code == 404
     await run(world["msp"], lambda db: cp.set_weight("backup", cp.WeightIn(weight=1), user, db))
     assert await run(world["msp"], lambda db: cp.fleet_weights(NS(tenant_id=world["msp"]), db)) == [], "a weight of 1 is the default and is removed"
+
+
+async def test_a_client_is_compared_with_the_fleet_and_with_clients_of_similar_size_and_a_count_has_a_forecast(world):
+    from datetime import timedelta
+
+    from app.api.v1.endpoints import billing as bl
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        for vendor in ("ninjaone",):
+            await db.execute(
+                text(
+                    "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                    "values (:t, :v, 'n-14', 'n-14', 'n-14', :c, false, 'manual')"
+                ),
+                {"t": world["msp"], "v": vendor, "c": world["client"]},
+            )
+
+    await run(world["msp"], alias)
+    for day, n in ((60, 10), (30, 13), (0, 16)):
+        counts = bl.LicenseCountsReport(vendor="ninjaone", vendor_client_id="n-14", counts=[bl.LicenseCountIn(item="Windows workstations", unit="device", count=n)])
+        await run(world["msp"], lambda db, c=counts, d=day: bl.apply_license_counts(db, world["msp"], c, now=datetime.now(UTC) - timedelta(days=d)))
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-14", checks=[{"key": "a", "status": "met", "evidence": ""}, {"key": "b", "status": "not_met", "evidence": ""}])))
+    cp.fleet_cache.clear()
+    out = await run(world["msp"], lambda db: cp.compare_client(world["client"], NS(tenant_id=world["msp"]), db))
+    assert (out.score, out.size) == (50, 16)
+    assert out.fleet_average is not None and out.similar_clients >= 0
+    user = NS(tenant_id=world["msp"], user_id=None)
+    series = await run(world["msp"], lambda db: bl.client_count_history(world["client"], "ninjaone", "Windows workstations", user, db, days=90))
+    assert series.forecast_30d is not None and series.forecast_30d >= 16, "10, 13, 16 over two months keeps rising"
+    with pytest.raises(HTTPException) as e:
+        await run(world["msp"], lambda db: cp.compare_client(world["stranger"], NS(tenant_id=world["msp"]), db))
+    assert e.value.status_code == 404

@@ -32,7 +32,7 @@ from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_postur
 from app.services import fleet_cache
 from app.services.score_history import load_weights
 from app.services.score_history import trend as score_trend
-from app.services.fleet_posture import MAX_WEIGHT, average_score, below_target, is_overdue, score_breakdown, search_checks, tool_scorecards, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import MAX_WEIGHT, average_score, below_target, is_overdue, score_breakdown, search_checks, similar_size_average, tool_scorecards, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
@@ -838,6 +838,37 @@ async def client_score_breakdown(client_id: uuid.UUID, current_user: Annotated[A
     mine = [c for c in checks if c.client_id == str(client_id)]
     b = score_breakdown(mine, await load_weights(db, owner))
     return ScoreBreakdownOut(client_id=client_id, score=b["score"], lost=b["lost"], rows=[ScoreBreakdownRow(**r) for r in b["rows"]])
+
+
+class CompareOut(BaseModel):
+    client_id: uuid.UUID
+    score: int | None
+    fleet_average: int | None
+    # Machines the RMM manages for this client; 0 when it has no RMM count (then there is no size comparison).
+    size: int
+    similar_average: int | None
+    similar_clients: int
+
+
+@router.get("/{client_id}/compare", response_model=CompareOut, summary="A client's score next to the fleet average and the average of clients about the same size")
+async def compare_client(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> CompareOut:
+    from app.api.v1.endpoints.billing import _all_client_counts  # noqa: PLC0415 - billing reads sizes; imported here to keep the modules apart
+    from app.services.license_counts import BASELINE_ITEMS, BASELINE_TOOL  # noqa: PLC0415
+
+    owner = current_user.tenant_id
+    await _client_of_owner(db, owner, client_id)
+    checks, _names, _refreshed = await _fleet_checks(db, owner)
+    weights = await load_weights(db, owner)
+    by_client: dict[str, list[FleetCheck]] = {}
+    for c in checks:
+        by_client.setdefault(c.client_id, []).append(c)
+    scores = {cid: summarize(rows, weights)["score"] for cid, rows in by_client.items()}
+    per_client, _n = await _all_client_counts(db, owner)
+    sizes = {str(cid): sum(int(r["count"]) for r in rows if r["source"] == BASELINE_TOOL and r["item"] in BASELINE_ITEMS) for cid, rows in per_client.items()}
+    mine = str(client_id)
+    others = {cid: (sizes.get(cid, 0), sc) for cid, sc in scores.items() if cid != mine}
+    similar = similar_size_average(sizes.get(mine, 0), others)
+    return CompareOut(client_id=client_id, score=scores.get(mine), fleet_average=average_score(list(scores.values())), size=sizes.get(mine, 0), similar_average=similar["average"], similar_clients=similar["clients"])
 
 
 class ToolScorecard(BaseModel):

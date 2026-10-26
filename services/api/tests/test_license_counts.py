@@ -190,3 +190,17 @@ def test_a_note_accepts_a_difference_only_while_it_is_still_that_difference():
     assert note_state(note, -2) == "stale", "the opposite way is a different difference"
     assert note_state(note, 0) == "none", "a line that now matches needs no note"
     assert note_state(None, 2) == "none"
+
+
+def test_a_forecast_reads_a_straight_line_thirty_days_past_the_last_point_and_has_no_forecast_without_a_trend():
+    from app.services.license_counts import forecast_next
+
+    t0 = datetime(2026, 8, 1, tzinfo=UTC)
+    rising = [{"at": t0 + timedelta(days=d), "count": 10 + d // 10} for d in (0, 30, 60, 90)]  # 10, 13, 16, 19: +1 every 10 days
+    assert forecast_next(rising) == 22, "19 at day 90 and 3 more by day 120"
+    flat = [{"at": t0 + timedelta(days=d), "count": 7} for d in (0, 45, 90)]
+    assert forecast_next(flat) == 7
+    falling = [{"at": t0 + timedelta(days=d), "count": 5 - d // 30 * 2} for d in (0, 30, 60)]
+    assert forecast_next(falling) == 0, "never below zero"
+    assert forecast_next(rising[:2]) is None, "two points are not a trend"
+    assert forecast_next([{"at": t0, "count": 1}, {"at": t0, "count": 2}, {"at": t0, "count": 3}]) is None, "no time between them"

@@ -101,12 +101,30 @@ function useJson<T>(url: string | null, reload = 0): { data: T | null; error: st
   return { data, error };
 }
 
+export interface Compare {
+  score: number | null;
+  fleet_average: number | null;
+  size: number;
+  similar_average: number | null;
+  similar_clients: number;
+}
+
+/** "Fleet average 72%; 14 clients of a similar size average 65%." */
+export function compareText(c: Compare): string {
+  const fleet = c.fleet_average === null ? "" : `Fleet average ${c.fleet_average}%`;
+  const similar = c.similar_average === null ? (c.size > 0 ? "no clients of a similar size to compare with" : "") : `${c.similar_clients} client${c.similar_clients === 1 ? "" : "s"} of a similar size average ${c.similar_average}%`;
+  return [fleet, similar].filter(Boolean).join("; ") + (fleet || similar ? "." : "");
+}
+
 function WhyRow({ clientId }: { clientId: string }) {
   const { data, error } = useJson<Breakdown>(`/api/v1/client-posture/${encodeURIComponent(clientId)}/score-breakdown`);
+  const compare = useJson<Compare>(`/api/v1/client-posture/${encodeURIComponent(clientId)}/compare`);
   if (error) return <span className="text-xs text-red-300">{error}</span>;
   if (!data) return <span className="text-xs text-slate-500">Loading…</span>;
   if (data.rows.length === 0) return <span className="text-xs text-slate-400">Nothing is costing this client points.</span>;
   return (
+    <div>
+    {compare.data ? <p className="text-xs text-slate-500" data-testid={`compare-${clientId}`}>{compareText(compare.data)}</p> : null}
     <ul className="text-xs text-slate-400" data-testid={`why-${clientId}`}>
       {data.rows.map((r) => (
         <li key={r.key}>
@@ -115,6 +133,7 @@ function WhyRow({ clientId }: { clientId: string }) {
         </li>
       ))}
     </ul>
+    </div>
   );
 }
 

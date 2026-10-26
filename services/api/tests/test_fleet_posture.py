@@ -190,3 +190,13 @@ def test_tool_scorecards_rank_the_tool_with_most_problems_first_and_count_client
     assert [(t["source"], t["checks"], t["percent_fine"], t["clients_with_problems"]) for t in out] == [("slide", 3, 33, 1), ("ninjaone", 2, 75, 1)]
     assert (out[0]["met"], out[0]["partly"], out[0]["not_met"]) == (1, 0, 2)
     assert tool_scorecards([]) == []
+
+
+def test_similar_size_average_uses_only_clients_within_a_factor_of_two_and_with_a_score():
+    from app.services.fleet_posture import similar_size_average
+
+    others = {"a": (60, 80), "b": (45, 60), "c": (200, 10), "d": (10, 5), "e": (100, None), "f": (0, 99), "g": (90, 70)}
+    out = similar_size_average(50, others)
+    assert out == {"average": 70, "clients": 3}, "a (60), b (45) and g (90) are within 25 to 100; c, d are not, e has no score, f has no machines"
+    assert similar_size_average(0, others) == {"average": None, "clients": 0}
+    assert similar_size_average(1000, others) == {"average": None, "clients": 0}

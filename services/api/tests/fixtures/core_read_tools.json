@@ -571,6 +571,14 @@
     "numbers": {}
   },
   {
+    "tool": "aisoc_client_compare",
+    "method": "GET",
+    "path": "/client-posture/{client_id}/compare",
+    "query": [],
+    "enums": {},
+    "numbers": {}
+  },
+  {
     "tool": "aisoc_check_weights",
     "method": "GET",
     "path": "/client-posture/fleet/weights",

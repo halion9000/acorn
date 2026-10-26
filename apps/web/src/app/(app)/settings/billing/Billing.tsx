@@ -223,7 +223,7 @@ export function sparkPoints(points: SeriesPoint[], width: number, height: number
 }
 
 function Trend({ clientId, source, item, days }: { clientId: string; source: string; item: string; days: number }) {
-  const { data, error } = useJson<{ points: SeriesPoint[] }>(`/api/v1/billing/clients/${encodeURIComponent(clientId)}/history?source=${encodeURIComponent(source)}&item=${encodeURIComponent(item)}&days=${Math.max(days, 90)}`);
+  const { data, error } = useJson<{ points: SeriesPoint[]; forecast_30d?: number | null }>(`/api/v1/billing/clients/${encodeURIComponent(clientId)}/history?source=${encodeURIComponent(source)}&item=${encodeURIComponent(item)}&days=${Math.max(days, 90)}`);
   if (error) return <span role="alert" className="text-xs text-red-300">{error}</span>;
   if (!data) return <span className="text-xs text-slate-500">Loading…</span>;
   const counts = data.points.map((p) => p.count);
@@ -234,6 +234,7 @@ function Trend({ clientId, source, item, days }: { clientId: string; source: str
       </svg>
       <span className="text-xs text-slate-400">
         {Math.min(...counts)} to {Math.max(...counts)} over {Math.max(days, 90)} days
+        {data.forecast_30d != null ? `; heading for about ${data.forecast_30d} in 30 days` : ""}
       </span>
     </div>
   );

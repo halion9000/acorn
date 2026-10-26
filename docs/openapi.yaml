@@ -11598,6 +11598,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/{client_id}/compare:
+    get:
+      tags:
+      - posture
+      summary: A client's score next to the fleet average and the average of clients
+        about the same size
+      operationId: compare_client_api_v1_client_posture__client_id__compare_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompareOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/client-posture/fleet/tools:
     get:
       tags:
@@ -23865,6 +23895,42 @@ components:
       - author
       - submitted_at
       title: CommunityPluginOut
+    CompareOut:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Score
+        fleet_average:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Fleet Average
+        size:
+          type: integer
+          title: Size
+        similar_average:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Similar Average
+        similar_clients:
+          type: integer
+          title: Similar Clients
+      type: object
+      required:
+      - client_id
+      - score
+      - fleet_average
+      - size
+      - similar_average
+      - similar_clients
+      title: CompareOut
     CompliancePosture:
       properties:
         framework:
@@ -24603,6 +24669,11 @@ components:
             $ref: '#/components/schemas/SeriesPoint'
           type: array
           title: Points
+        forecast_30d:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Forecast 30D
       type: object
       required:
       - client_id

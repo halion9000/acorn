@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
 
-import { FleetPosture, changeWord, clientHref, endsText, groupSelection, pointsText } from './FleetPosture';
+import { FleetPosture, changeWord, clientHref, endsText, groupSelection, pointsText, compareText } from './FleetPosture';
 
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 
@@ -26,6 +26,7 @@ beforeEach(() => {
     if (url.includes('/fleet/boards/renewals')) return json({ board: 'renewals', title: 'Renewals', keys: [], rows: [{ client_id: 'c1', client_name: 'Acme', source: 'meraki', key: 'meraki_licence', status: 'not_met', evidence: 'The Meraki licence has expired', accepted: false, owner: 'Dana R', due_date: '2026-10-01', overdue: true }] });
     if (url.endsWith('/c1/score-breakdown'))
       return json({ client_id: 'c1', score: 40, lost: 60, rows: [{ source: 'ninjaone', key: 'ninjaone_antivirus', status: 'not_met', weight: 3, points_lost: 45 }, { source: 'ninjaone', key: 'ninjaone_patching', status: 'partly', weight: 1, points_lost: 7.5 }] });
+    if (url.endsWith('/c1/compare')) return json({ client_id: 'c1', score: 40, fleet_average: 72, size: 50, similar_average: 65, similar_clients: 14 });
     if (url.endsWith('/fleet/tools'))
       return json([{ source: 'slide', checks: 3, met: 1, partly: 0, not_met: 2, clients_with_problems: 2, percent_fine: 33 }, { source: 'ninjaone', checks: 8, met: 6, partly: 1, not_met: 1, clients_with_problems: 2, percent_fine: 81 }]);
     if (url.endsWith('/fleet/weights'))
@@ -101,6 +102,14 @@ describe('accepting from a board', () => {
 describe('why a score is what it is', () => {
   it('formats the points a check cost', () => expect(pointsText(33.333)).toBe('-33.3 points'));
 
+  it('says how a client compares with the fleet and with clients of its size', () => {
+    expect(compareText({ score: 40, fleet_average: 72, size: 50, similar_average: 65, similar_clients: 14 })).toBe('Fleet average 72%; 14 clients of a similar size average 65%.');
+    expect(compareText({ score: 40, fleet_average: 72, size: 50, similar_average: 60, similar_clients: 1 })).toBe('Fleet average 72%; 1 client of a similar size average 60%.');
+    expect(compareText({ score: 40, fleet_average: 72, size: 50, similar_average: null, similar_clients: 0 })).toBe('Fleet average 72%; no clients of a similar size to compare with.');
+    expect(compareText({ score: 40, fleet_average: 72, size: 0, similar_average: null, similar_clients: 0 })).toBe('Fleet average 72%.');
+    expect(compareText({ score: null, fleet_average: null, size: 0, similar_average: null, similar_clients: 0 })).toBe('');
+  });
+
   it('lists what cost a client its points, biggest first, with the weight of a heavy check', async () => {
     render(<FleetPosture />);
     const row = await screen.findByTestId('fleet-client-c1');
@@ -111,6 +120,7 @@ describe('why a score is what it is', () => {
     expect(items[0]).toContain('counts 3 times');
     expect(items[0]).toContain('-45.0 points');
     expect(items[1]).toContain('-7.5 points');
+    expect(await screen.findByTestId('compare-c1')).toHaveTextContent('Fleet average 72%; 14 clients of a similar size average 65%.');
     await userEvent.click(within(row).getByText('Hide'));
     expect(screen.queryByTestId('why-c1')).toBeNull();
   });

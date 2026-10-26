@@ -23,7 +23,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.client_alias import ClientAlias
 from app.models.signin import BillingDifferenceNote, BillingItemMap, ClientLicenseCount, ClientLicenseHistory
 from app.models.tenant import Tenant
-from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, note_state, endpoint_disagreements, last_reported, reconcile, tools_without_counts, suggest, totals, unusual, window_start
+from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, forecast_next, note_state, endpoint_disagreements, last_reported, reconcile, tools_without_counts, suggest, totals, unusual, window_start
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -153,6 +153,8 @@ class CountSeries(BaseModel):
     item: str
     days: int
     points: list[SeriesPoint]
+    # Where the count is heading: a straight line through the points read 30 days after the last one; None when there are fewer than three points or no trend.
+    forecast_30d: int | None = None
 
 
 @router.get("/clients/{client_id}/history", response_model=CountSeries, summary="One tool's count of one item for one client over time, as points for a chart")
@@ -173,7 +175,7 @@ async def client_count_history(
         raise HTTPException(status_code=404, detail="No such count for this client")
     rows = [{"observed_at": h.observed_at, "count": h.count, "previous_count": h.previous_count} for h in hist]
     points = count_series(rows, held.count if held is not None else 0, now, since)
-    return CountSeries(client_id=client_id, source=source, item=item, days=max(1, min(days, 400)), points=[SeriesPoint(**p) for p in points])
+    return CountSeries(client_id=client_id, source=source, item=item, days=max(1, min(days, 400)), points=[SeriesPoint(**p) for p in points], forecast_30d=forecast_next(points))
 
 
 class TotalRow(BaseModel):

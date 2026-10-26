@@ -149,6 +149,22 @@ def tool_scorecards(checks: list[FleetCheck]) -> list[dict[str, Any]]:
     return out
 
 
+SIMILAR_FACTOR = 2.0
+
+
+def similar_size_average(client_size: int, others: dict[str, tuple[int, int | None]], factor: float = SIMILAR_FACTOR) -> dict[str, Any]:
+    """The average score of the other clients about the same size as this one.
+
+    ``others`` is {client: (size, score)} (size is how many machines the RMM manages; score may be None). A client is "similar" when its size is between ``client_size / factor`` and ``client_size * factor``.
+    A size of 0 is not comparable. Returns the average (rounded, None when nobody similar has a score) and how many clients it is over.
+    """
+    if client_size <= 0:
+        return {"average": None, "clients": 0}
+    lo, hi = client_size / factor, client_size * factor
+    scores = [sc for size, sc in others.values() if size > 0 and lo <= size <= hi and sc is not None]
+    return {"average": average_score(scores), "clients": len(scores)}
+
+
 def is_overdue(status: str, due: date | None, today: date) -> bool:
     """A check is overdue when it has a due date that has passed and is still not fully met. A met check is never overdue, and the due day itself is not late."""
     return due is not None and due < today and status != "met"

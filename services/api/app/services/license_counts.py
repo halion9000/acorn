@@ -233,3 +233,23 @@ def count_series(history: list[dict[str, Any]], current: int, now: datetime, sin
         points.append({"at": since, "count": int(earlier[-1]["count"]) if earlier else current})
     points.append({"at": now, "count": current})
     return points
+
+
+def forecast_next(points: list[dict[str, Any]], horizon_days: int = 30) -> int | None:
+    """Where a count is heading: a straight line through the series' points (least squares over time), read ``horizon_days`` after the last point, never below 0 and rounded.
+
+    ``points`` is the output of ``count_series`` (each has ``at`` and ``count``). Fewer than three points, or no time between them, gives None: there is no trend to project. A flat series forecasts itself.
+    """
+    if len(points) < 3:
+        return None
+    t0 = min(p["at"] for p in points)
+    xs = [(p["at"] - t0).total_seconds() / 86400 for p in points]
+    ys = [float(p["count"]) for p in points]
+    n = len(points)
+    mx, my = sum(xs) / n, sum(ys) / n
+    var = sum((x - mx) ** 2 for x in xs)
+    if var == 0:
+        return None
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / var
+    at = max(xs) + horizon_days
+    return max(0, int(round(my + slope * (at - mx))))
