@@ -11904,6 +11904,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/notes:
+    put:
+      tags:
+      - billing
+      summary: Accept a difference between billed and counted for one client's invoice
+        line, with a reason
+      operationId: save_note_api_v1_billing_notes_put
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteIn'
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - billing
+      summary: Stop accepting a difference for one client's invoice line
+      operationId: delete_note_api_v1_billing_notes_delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: invoice_item
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Invoice Item
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/billing/reconcile:
     get:
       tags:
@@ -31669,6 +31723,32 @@ components:
       - created_at
       - updated_at
       title: NodeOut
+    NoteIn:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        invoice_item:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Invoice Item
+        note:
+          type: string
+          maxLength: 400
+          minLength: 1
+          title: Note
+        difference:
+          type: integer
+          title: Difference
+      type: object
+      required:
+      - client_id
+      - invoice_item
+      - note
+      - difference
+      title: NoteIn
     OAuthAppRegistration:
       properties:
         client_id:
@@ -33654,6 +33734,15 @@ components:
             type: object
           type: array
           title: Parts
+        note_state:
+          type: string
+          title: Note State
+          default: none
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
       type: object
       required:
       - client_id

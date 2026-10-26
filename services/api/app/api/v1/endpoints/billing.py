@@ -21,9 +21,9 @@ from app.api.v1.endpoints.signins import targets_by_tenant
 from app.db.rls_scope import acting_as_tenant
 from app.db.rls_sessions import adopt_tenant
 from app.models.client_alias import ClientAlias
-from app.models.signin import BillingItemMap, ClientLicenseCount, ClientLicenseHistory
+from app.models.signin import BillingDifferenceNote, BillingItemMap, ClientLicenseCount, ClientLicenseHistory
 from app.models.tenant import Tenant
-from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, endpoint_disagreements, last_reported, reconcile, tools_without_counts, suggest, totals, unusual, window_start
+from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, note_state, endpoint_disagreements, last_reported, reconcile, tools_without_counts, suggest, totals, unusual, window_start
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -327,6 +327,9 @@ class ReconcileRow(BaseModel):
     counted: int
     difference: int
     parts: list[dict[str, Any]]
+    # "accepted": a person said this difference is fine and it has not changed since; "stale": there is a note but the difference is no longer the one it was written for; "none".
+    note_state: str = "none"
+    note: str | None = None
 
 
 class ReconcileOut(BaseModel):
@@ -336,6 +339,48 @@ class ReconcileOut(BaseModel):
     unmapped_lines: int
 
 
+async def _notes(db: Any, owner: uuid.UUID) -> dict[tuple[uuid.UUID, str], dict[str, Any]]:
+    """{(client, invoice line): {note, difference}}. An older database without the table gives none."""
+    try:
+        async with db.begin_nested():
+            rows = (await db.execute(select(BillingDifferenceNote).where(BillingDifferenceNote.tenant_id == owner))).scalars().all()
+    except Exception:  # noqa: BLE001
+        return {}
+    return {(r.client_id, r.invoice_item): {"note": r.note, "difference": r.difference} for r in rows}
+
+
+class NoteIn(BaseModel):
+    client_id: uuid.UUID
+    invoice_item: str = Field(min_length=1, max_length=120)
+    note: str = Field(min_length=1, max_length=400)
+    # The difference (counted minus billed) the note is written for: the line is accepted only while it stays this number.
+    difference: int
+
+
+@router.put("/notes", status_code=204, summary="Accept a difference between billed and counted for one client's invoice line, with a reason")
+async def save_note(body: NoteIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> None:
+    owner = current_user.tenant_id
+    if body.client_id != owner:
+        found = (await db.execute(select(Tenant.id).where(Tenant.id == body.client_id, Tenant.parent_tenant_id == owner))).scalar_one_or_none()
+        if found is None:
+            raise HTTPException(status_code=404, detail="Client not found")
+    note = " ".join(body.note.split())
+    item = " ".join(body.invoice_item.split())
+    if len(note) < 3 or not item:
+        raise HTTPException(status_code=422, detail="Give a reason of at least 3 characters")
+    values = {"tenant_id": owner, "client_id": body.client_id, "invoice_item": item, "note": note, "difference": body.difference, "updated_by": current_user.user_id, "updated_at": datetime.now(UTC)}
+    stmt = pg_insert(BillingDifferenceNote).values(values)
+    await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "client_id", "invoice_item"], set_={c: stmt.excluded[c] for c in ("note", "difference", "updated_by", "updated_at")}))
+    await db.commit()
+
+
+@router.delete("/notes", status_code=204, summary="Stop accepting a difference for one client's invoice line")
+async def delete_note(client_id: uuid.UUID, invoice_item: str, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> None:
+    owner = current_user.tenant_id
+    await db.execute(delete(BillingDifferenceNote).where(BillingDifferenceNote.tenant_id == owner, BillingDifferenceNote.client_id == client_id, BillingDifferenceNote.invoice_item == " ".join(invoice_item.split())))
+    await db.commit()
+
+
 @router.get("/reconcile", response_model=ReconcileOut, summary="Where what is billed and what the tools count disagree, biggest difference first")
 async def reconcile_billing(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, include_matches: bool = False, limit: int = 500
@@ -343,6 +388,7 @@ async def reconcile_billing(
     owner = current_user.tenant_id
     mapping = await _mapping(db, owner)
     per_client, names = await _all_client_counts(db, owner)
+    notes = await _notes(db, owner)
     out: list[ReconcileRow] = []
     unmapped_lines = 0
     for cid, rows in per_client.items():
@@ -352,7 +398,8 @@ async def reconcile_billing(
         unmapped_lines += len(result["unmapped"])
         for r in result["rows"]:
             if include_matches or r["difference"] != 0:
-                out.append(ReconcileRow(client_id=cid, client_name=names.get(cid) or str(cid), **r))
+                n = notes.get((cid, r["invoice_item"]))
+                out.append(ReconcileRow(client_id=cid, client_name=names.get(cid) or str(cid), note_state=note_state(n, r["difference"]), note=n["note"] if n else None, **r))
     out.sort(key=lambda r: (-abs(r.difference), r.client_name.lower(), r.invoice_item))
     return ReconcileOut(generated_at=datetime.now(UTC), rows=out[: max(1, min(limit, 2000))], unmapped_lines=unmapped_lines)
 

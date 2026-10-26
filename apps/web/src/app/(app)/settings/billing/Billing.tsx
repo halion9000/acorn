@@ -49,6 +49,9 @@ export interface ReconcileRow {
   counted: number;
   difference: number;
   parts: { source: string; item: string; count: number }[];
+  /** "accepted": a person said this difference is fine and it has not changed; "stale": a note exists but the difference moved; "none". */
+  note_state?: string;
+  note?: string | null;
 }
 
 export interface MapView {
@@ -354,12 +357,37 @@ export function trueUpCsv(rows: ReconcileRow[]): string {
 }
 
 function Reconcile() {
-  const { data, error } = useJson<{ rows: ReconcileRow[]; unmapped_lines: number }>("/api/v1/billing/reconcile");
+  const [reload, setReload] = useState(0);
+  const [problem, setProblem] = useState<string | null>(null);
+  const { data, error } = useJson<{ rows: ReconcileRow[]; unmapped_lines: number }>(`/api/v1/billing/reconcile?r=${reload}`);
+  const accept = async (r: ReconcileRow) => {
+    const note = window.prompt(`Why is a difference of ${r.difference > 0 ? "+" : ""}${r.difference} fine for ${r.client_name}, ${r.invoice_item}? (for example: flat package, minimum quantity)`);
+    if (!note || note.trim().length < 3) return;
+    try {
+      const res = await authFetch("/api/v1/billing/notes", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client_id: r.client_id, invoice_item: r.invoice_item, note: note.trim(), difference: r.difference }) });
+      if (!res.ok) throw new Error(`The API answered ${res.status}`);
+      setProblem(null);
+      setReload((n) => n + 1);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Could not save");
+    }
+  };
+  const stopAccepting = async (r: ReconcileRow) => {
+    try {
+      const res = await authFetch(`/api/v1/billing/notes?client_id=${encodeURIComponent(r.client_id)}&invoice_item=${encodeURIComponent(r.invoice_item)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`The API answered ${res.status}`);
+      setProblem(null);
+      setReload((n) => n + 1);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Could not remove");
+    }
+  };
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-400">Each invoice line HaloPSA bills, against the tool counts it is mapped to. Only mapped lines are compared; map more under Invoice mapping.</p>
-      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+      {(error || problem) && <p role="alert" className="text-sm text-red-300">{error ?? problem}</p>}
       {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
+      {data && data.rows.some((r) => r.note_state === "accepted") && <p className="text-xs text-slate-500" data-testid="billing-accepted-count">{data.rows.filter((r) => r.note_state === "accepted").length} difference(s) accepted with a reason; {data.rows.filter((r) => r.note_state !== "accepted").length} still to look at.</p>}
       {data && data.unmapped_lines > 0 && <p className="text-xs text-amber-300">{data.unmapped_lines} billed line{data.unmapped_lines === 1 ? "" : "s"} left out because nobody has mapped {data.unmapped_lines === 1 ? "it" : "them"} yet.</p>}
       {data && data.rows.length === 0 && <p className="text-sm text-slate-400">Nothing disagrees.</p>}
       {data && data.rows.length > 0 && (
@@ -375,12 +403,13 @@ function Reconcile() {
               <th className="pr-3">Invoice line</th>
               <th className="pr-3">Billed</th>
               <th className="pr-3">Counted</th>
-              <th>Difference</th>
+              <th className="pr-3">Difference</th>
+              <th className="print:hidden" />
             </tr>
           </thead>
           <tbody>
             {data.rows.map((r) => (
-              <tr key={`${r.client_id}:${r.invoice_item}`} className="border-t border-slate-800 text-slate-300">
+              <tr key={`${r.client_id}:${r.invoice_item}`} className={`border-t border-slate-800 text-slate-300 ${r.note_state === "accepted" ? "opacity-60" : ""}`}>
                 <td className="py-1 pr-3">{r.client_name}</td>
                 <td className="pr-3">
                   {r.invoice_item}
@@ -388,7 +417,22 @@ function Reconcile() {
                 </td>
                 <td className="pr-3">{r.billed}</td>
                 <td className="pr-3">{r.counted}</td>
-                <td className={r.difference > 0 ? "text-amber-300" : "text-sky-300"}>{differenceText(r.difference)}</td>
+                <td className={`pr-3 ${r.difference > 0 ? "text-amber-300" : "text-sky-300"}`}>
+                  {differenceText(r.difference)}
+                  {r.note_state === "accepted" ? <div className="text-xs text-slate-400" data-testid={`note-${r.client_id}-${r.invoice_item}`}>Accepted: {r.note}</div> : null}
+                  {r.note_state === "stale" ? <div className="text-xs text-red-300">The note ("{r.note}") was for a different difference.</div> : null}
+                </td>
+                <td className="print:hidden">
+                  {r.note_state === "accepted" ? (
+                    <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300" onClick={() => void stopAccepting(r)}>
+                      Stop accepting
+                    </button>
+                  ) : (
+                    <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300" onClick={() => void accept(r)}>
+                      Accept
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

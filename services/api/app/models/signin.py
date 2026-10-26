@@ -301,3 +301,17 @@ class ClientCheckComment(Base):
     author: Mapped[str] = mapped_column(String(200), nullable=False)
     body: Mapped[str] = mapped_column(String(1000), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class BillingDifferenceNote(Base):
+    """Why a difference between billed and counted is accepted for one client's invoice line (migration 111)."""
+
+    __tablename__ = "billing_difference_notes"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    invoice_item: Mapped[str] = mapped_column(String(120), primary_key=True)
+    note: Mapped[str] = mapped_column(String(400), nullable=False)
+    difference: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

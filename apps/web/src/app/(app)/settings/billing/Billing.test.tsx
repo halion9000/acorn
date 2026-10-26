@@ -23,7 +23,7 @@ beforeEach(() => {
     if (url.startsWith('/api/v1/billing/clients/c1'))
       return json({ client_id: 'c1', days: 30, rows: [{ source: 'ninjaone', item: 'Windows workstations', unit: 'device', count: 13, available: null, change: -2, first_seen_at: '2026-09-01T00:00:00Z', updated_at: '2026-10-25T00:00:00Z' }] });
     if (url.startsWith('/api/v1/billing/reconcile'))
-      return json({ generated_at: '', unmapped_lines: 2, rows: [{ client_id: 'c1', client_name: 'Acme', invoice_item: 'NinjaOne RMM (Included)', billed: 16, counted: 18, difference: 2, parts: [{ source: 'ninjaone', item: 'Macs', count: 4 }, { source: 'ninjaone', item: 'Windows workstations', count: 14 }] }] });
+      return json({ generated_at: '', unmapped_lines: 2, rows: [{ client_id: 'c1', client_name: 'Acme', invoice_item: 'NinjaOne RMM (Included)', billed: 16, counted: 18, difference: 2, note_state: 'none', note: null, parts: [{ source: 'ninjaone', item: 'Macs', count: 4 }, { source: 'ninjaone', item: 'Windows workstations', count: 14 }] }, { client_id: 'c2', client_name: 'Beta', invoice_item: 'Huntress MDR', billed: 10, counted: 12, difference: 2, note_state: 'accepted', note: 'Flat package', parts: [] }, { client_id: 'c3', client_name: 'Gamma', invoice_item: 'DNS Filter', billed: 5, counted: 8, difference: 3, note_state: 'stale', note: 'Minimum of 7', parts: [] }] });
     if (url.startsWith('/api/v1/billing/map') && !mapCalls.length)
       return json({ mapped: [{ invoice_item: 'Datto SaaS (Included)', counted: [{ source: 'datto-saas', item: 'Billable seats' }] }], unmapped: [{ invoice_item: 'Huntress for Workstations (Included)', clients: 120, suggestion: [{ source: 'huntress', item: 'Agents' }] }, { invoice_item: 'Liongard (Included)', clients: 150, suggestion: [] }], counted_items: [{ source: 'liongard', item: 'Systems' }, { source: 'ninjaone', item: 'Macs' }] });
     if (url.startsWith('/api/v1/billing/map')) return json({});
@@ -83,9 +83,25 @@ describe('Billing reconcile and mapping', () => {
     render(<Billing />);
     await userEvent.click(screen.getByRole('tab', { name: 'Billed vs counted' }));
     const table = await screen.findByTestId('billing-reconcile');
-    expect(within(table).getByText('uses 2 more than billed')).toBeInTheDocument();
+    expect(within(table).getAllByText(/uses 2 more than billed/)).toHaveLength(2);
     expect(within(table).getByText(/Macs: 4/)).toBeInTheDocument();
     expect(screen.getByText(/2 billed lines left out/)).toBeInTheDocument();
+  });
+
+  it('accepts a difference with a reason, shows an accepted one muted with its note, and flags a note that went out of date', async () => {
+    vi.spyOn(window, 'prompt').mockImplementation(() => 'Minimum of 18 seats');
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Billed vs counted' }));
+    const table = await screen.findByTestId('billing-reconcile');
+    expect(within(table).getByText('Accepted: Flat package')).toBeInTheDocument();
+    expect(screen.getByTestId('billing-accepted-count')).toHaveTextContent('1 difference(s) accepted with a reason; 2 still to look at.');
+    expect(within(table).getByText(/was for a different difference/)).toBeInTheDocument();
+    await userEvent.click(within(within(table).getByText('NinjaOne RMM (Included)').closest('tr')!).getByText('Accept'));
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => c[1]?.method === 'PUT' && String(c[0]) === '/api/v1/billing/notes')).toBe(true));
+    const put = authFetch.mock.calls.find((c) => String(c[0]) === '/api/v1/billing/notes')!;
+    expect(JSON.parse(put[1].body)).toEqual({ client_id: 'c1', invoice_item: 'NinjaOne RMM (Included)', note: 'Minimum of 18 seats', difference: 2 });
+    await userEvent.click(within(within(table).getByText('Huntress MDR').closest('tr')!).getByText('Stop accepting'));
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => c[1]?.method === 'DELETE' && String(c[0]).startsWith('/api/v1/billing/notes?client_id=c2&invoice_item=Huntress%20MDR'))).toBe(true));
   });
 
   it('shows what is mapped and what is still to map, and uses a suggestion on request', async () => {

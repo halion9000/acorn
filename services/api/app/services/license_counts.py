@@ -154,6 +154,14 @@ DISAGREE_FRACTION = 0.2
 DISAGREE_MIN_GAP = 3
 
 
+def note_state(note: dict[str, Any] | None, difference: int) -> str:
+    """How a line's accepted-difference note stands: ``none`` (no note), ``accepted`` (the note was written for this very difference) or ``stale`` (the difference has changed since, so the note no longer
+    says anything about it and the line needs a look again). A line that now matches is ``none`` whatever its note says."""
+    if note is None or difference == 0:
+        return "none"
+    return "accepted" if int(note["difference"]) == difference else "stale"
+
+
 def endpoint_disagreements(per_client: dict[Any, list[dict[str, Any]]]) -> list[dict[str, Any]]:
     """Clients where a tool counts noticeably fewer or more machines than the RMM does.
 

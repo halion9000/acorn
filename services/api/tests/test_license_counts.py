@@ -179,3 +179,14 @@ def test_a_series_with_no_change_in_the_window_is_flat_at_the_count_it_had_and_a
     assert [p["count"] for p in count_series([], 4, now, since)] == [4, 4]
     fresh = [{"observed_at": now - timedelta(days=3), "count": 5, "previous_count": None}]
     assert [(p["at"], p["count"]) for p in count_series(fresh, 5, now, since)] == [(now - timedelta(days=3), 5), (now, 5)]
+
+
+def test_a_note_accepts_a_difference_only_while_it_is_still_that_difference():
+    from app.services.license_counts import note_state
+
+    note = {"note": "flat package", "difference": 2}
+    assert note_state(note, 2) == "accepted"
+    assert note_state(note, 3) == "stale", "the difference moved"
+    assert note_state(note, -2) == "stale", "the opposite way is a different difference"
+    assert note_state(note, 0) == "none", "a line that now matches needs no note"
+    assert note_state(None, 2) == "none"

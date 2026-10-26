@@ -460,6 +460,20 @@ async def test_billed_lines_are_checked_against_the_tool_counts_they_are_mapped_
     assert [(r.invoice_item, r.billed, r.counted, r.difference) for r in mine] == [("NinjaOne RMM (Included)", 16, 18, 2)]
     assert [p["count"] for p in mine[0].parts] == [14, 4]
 
+    # A person says this difference of 2 is fine: the line is accepted while it stays 2, stale when the count moves, and a stranger's client cannot be given a note.
+    await run(world["msp"], lambda db: bl.save_note(bl.NoteIn(client_id=world["client"], invoice_item="NinjaOne RMM (Included)", note="  Flat  package, minimum of 18 ", difference=2), user, db))
+    noted = [r for r in (await run(world["msp"], lambda db: bl.reconcile_billing(user, db))).rows if r.client_id == world["client"]]
+    assert (noted[0].note_state, noted[0].note) == ("accepted", "Flat package, minimum of 18")
+    await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], bl.LicenseCountsReport(vendor="ninjaone", vendor_client_id="r-ninjaone", counts=[bl.LicenseCountIn(item="Windows workstations", unit="device", count=15), bl.LicenseCountIn(item="Macs", unit="device", count=4)])))
+    moved = [r for r in (await run(world["msp"], lambda db: bl.reconcile_billing(user, db))).rows if r.client_id == world["client"]]
+    assert (moved[0].difference, moved[0].note_state) == (3, "stale"), "the difference is no longer the one the note was written for"
+    with pytest.raises(HTTPException) as e:
+        await run(world["msp"], lambda db: bl.save_note(bl.NoteIn(client_id=world["stranger"], invoice_item="x", note="not mine", difference=1), user, db))
+    assert e.value.status_code == 404
+    await run(world["msp"], lambda db: bl.delete_note(world["client"], "NinjaOne RMM (Included)", user, db))
+    cleared = [r for r in (await run(world["msp"], lambda db: bl.reconcile_billing(user, db))).rows if r.client_id == world["client"]]
+    assert (cleared[0].note_state, cleared[0].note) == ("none", None)
+
     again = await run(world["msp"], lambda db: bl.billing_map(user, db))
     assert [m.invoice_item for m in again.mapped] == ["NinjaOne RMM (Included)"] and "NinjaOne RMM (Included)" not in {u["invoice_item"] for u in again.unmapped}
 
