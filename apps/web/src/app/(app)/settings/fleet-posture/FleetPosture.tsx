@@ -168,15 +168,75 @@ function Worst() {
   );
 }
 
+/** The rows picked on a board, grouped by check: each check is accepted for its clients in one request. Keys are "client_id|check_key". */
+export function groupSelection(selected: Iterable<string>): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const k of selected) {
+    const at = k.indexOf("|");
+    const clientId = k.slice(0, at);
+    const key = k.slice(at + 1);
+    out.set(key, [...(out.get(key) ?? []), clientId]);
+  }
+  return out;
+}
+
 function Board({ board, title }: { board: string; title: string }) {
-  const { data, error } = useJson<{ rows: BoardRow[] }>(`/api/v1/client-posture/fleet/boards/${encodeURIComponent(board)}`);
+  const [reload, setReload] = useState(0);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [problem, setProblem] = useState<string | null>(null);
+  const { data, error } = useJson<{ rows: BoardRow[] }>(`/api/v1/client-posture/fleet/boards/${encodeURIComponent(board)}`, reload);
+  const toggle = (k: string) => setPicked((prev) => {
+    const next = new Set(prev);
+    if (next.has(k)) next.delete(k);
+    else next.add(k);
+    return next;
+  });
+  const acceptPicked = async (notApplicable: boolean) => {
+    const reason = window.prompt(notApplicable ? "Why do these checks not apply to these clients?" : "Why are these accepted for these clients?");
+    if (!reason || reason.trim().length < 3) return;
+    let days: number | undefined;
+    if (!notApplicable) {
+      const answer = window.prompt("For how many days? Leave empty to accept until you remove it.", "90");
+      if (answer && answer.trim() !== "") days = Number(answer);
+    }
+    try {
+      for (const [key, clientIds] of groupSelection(picked)) {
+        const res = await authFetch("/api/v1/client-posture/fleet/acceptances", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key, client_ids: clientIds, reason: reason.trim(), not_applicable: notApplicable, ...(days !== undefined ? { expires_in_days: days } : {}) }),
+        });
+        if (!res.ok) throw new Error(`The API answered ${res.status}`);
+        const body = (await res.json()) as { skipped?: { detail: string }[] };
+        if ((body.skipped ?? []).length > 0) throw new Error(`${body.skipped!.length} could not be done: ${body.skipped![0].detail}`);
+      }
+      setProblem(null);
+      setPicked(new Set());
+      setReload((n) => n + 1);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Could not save");
+      setReload((n) => n + 1);
+    }
+  };
   if (error) return <p role="alert" className="text-sm text-red-300">{error}</p>;
   if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
   if (data.rows.length === 0) return <p className="text-sm text-slate-400">Nothing on the {title.toLowerCase()} board needs attention.</p>;
   return (
+    <>
+    {problem && <p role="alert" className="mb-2 text-sm text-red-300">{problem}</p>}
+    <div className="mb-2 flex items-center gap-3 text-xs print:hidden">
+      <span className="text-slate-500">{picked.size} picked</span>
+      <button type="button" disabled={picked.size === 0} className="rounded border border-slate-600 px-2 py-0.5 text-slate-200 disabled:opacity-40" onClick={() => void acceptPicked(false)}>
+        Accept picked
+      </button>
+      <button type="button" disabled={picked.size === 0} className="rounded border border-slate-600 px-2 py-0.5 text-slate-200 disabled:opacity-40" onClick={() => void acceptPicked(true)}>
+        Not applicable for picked
+      </button>
+    </div>
     <table className="w-full text-left text-sm" data-testid={`fleet-board-${board}`}>
       <thead className="text-xs uppercase text-slate-500">
         <tr>
+          <th className="w-6 py-1 print:hidden" />
           <th className="py-1 pr-3">Client</th>
           <th className="pr-3">Tool</th>
           <th className="pr-3">Status</th>
@@ -188,6 +248,9 @@ function Board({ board, title }: { board: string; title: string }) {
           const st = STATUS_TEXT[r.status] ?? STATUS_TEXT.partly;
           return (
             <tr key={`${r.client_id}:${r.key}`} className={`border-t border-slate-800 text-slate-300 ${r.accepted ? "opacity-60" : ""}`}>
+              <td className="py-1 print:hidden">
+                <input type="checkbox" aria-label={`Pick ${r.client_name} ${r.key}`} checked={picked.has(`${r.client_id}|${r.key}`)} onChange={() => toggle(`${r.client_id}|${r.key}`)} />
+              </td>
               <td className="py-1 pr-3">
                 <Link href={clientHref(r.client_id)} className="text-sky-300 hover:underline">
                   {r.client_name}
@@ -223,6 +286,7 @@ function Board({ board, title }: { board: string; title: string }) {
         })}
       </tbody>
     </table>
+    </>
   );
 }
 

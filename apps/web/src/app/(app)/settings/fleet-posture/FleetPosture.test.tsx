@@ -5,10 +5,11 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
 
-import { FleetPosture, changeWord, clientHref, endsText } from './FleetPosture';
+import { FleetPosture, changeWord, clientHref, endsText, groupSelection } from './FleetPosture';
 
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 
+let originalFetch: (url: string) => Promise<Response>;
 beforeEach(() => {
   authFetch.mockReset();
   authFetch.mockImplementation((url: string) => {
@@ -32,6 +33,7 @@ beforeEach(() => {
     if (url.includes('/fleet/changes')) return json([{ client_id: 'c1', client_name: 'Acme', key: 'ninjaone_antivirus', source: 'ninjaone', status: 'not_met', previous_status: 'met', observed_at: '2026-10-25T00:00:00Z' }]);
     return json({});
   });
+  originalFetch = authFetch.getMockImplementation() as (url: string) => Promise<Response>;
 });
 
 describe('helpers', () => {
@@ -48,6 +50,42 @@ describe('endsText', () => {
   const now = Date.parse('2026-10-25T12:00:00Z');
   it('says how long an acceptance has left', () => {
     expect([endsText(null, now), endsText('2026-10-26T01:00:00Z', now), endsText('2026-10-30T12:00:00Z', now), endsText('2026-10-25T09:00:00Z', now)]).toEqual(['no end date', 'ends in 1 day', 'ends in 5 days', 'ends today']);
+  });
+});
+
+describe('accepting from a board', () => {
+  it('groups the picked rows by check', () => {
+    const g = groupSelection(['c1|meraki_wan', 'c2|meraki_wan', 'c3|meraki_licence']);
+    expect([...g.entries()]).toEqual([['meraki_wan', ['c1', 'c2']], ['meraki_licence', ['c3']]]);
+  });
+
+  it('accepts the picked rows with one reason and one request per check, then reloads', async () => {
+    const answers = ['Not in scope', '30'];
+    vi.spyOn(window, 'prompt').mockImplementation(() => answers.shift() ?? null);
+    authFetch.mockImplementation((url: string) => (url.endsWith('/fleet/acceptances') ? json({ accepted: 1, skipped: [] }) : originalFetch(url)));
+    render(<FleetPosture />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Renewals and expiries' }));
+    expect(await screen.findByText('0 picked')).toBeInTheDocument();
+    expect(screen.getByText('Accept picked')).toBeDisabled();
+    await userEvent.click(await screen.findByLabelText('Pick Acme meraki_licence'));
+    expect(screen.getByText('1 picked')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('Accept picked'));
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]).endsWith('/fleet/acceptances') && c[1]?.method === 'POST')).toBe(true));
+    const call = authFetch.mock.calls.find((c) => c[1]?.method === 'POST')!;
+    expect(JSON.parse(call[1].body)).toEqual({ key: 'meraki_licence', client_ids: ['c1'], reason: 'Not in scope', not_applicable: false, expires_in_days: 30 });
+    await waitFor(() => expect(authFetch.mock.calls.filter((c) => String(c[0]).includes('/fleet/boards/renewals')).length).toBe(2));
+  });
+
+  it('marks the picked rows not applicable with no end date, and says when some were skipped', async () => {
+    vi.spyOn(window, 'prompt').mockImplementation(() => 'No firewall on site');
+    authFetch.mockImplementation((url: string) => (url.endsWith('/fleet/acceptances') ? json({ accepted: 0, skipped: [{ client_id: 'c1', detail: 'Client not found' }] }) : originalFetch(url)));
+    render(<FleetPosture />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Renewals and expiries' }));
+    await userEvent.click(await screen.findByLabelText('Pick Acme meraki_licence'));
+    await userEvent.click(screen.getByText('Not applicable for picked'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('1 could not be done: Client not found');
+    const body = JSON.parse(authFetch.mock.calls.find((c) => c[1]?.method === 'POST')![1].body);
+    expect(body).toEqual({ key: 'meraki_licence', client_ids: ['c1'], reason: 'No firewall on site', not_applicable: true });
   });
 });
 

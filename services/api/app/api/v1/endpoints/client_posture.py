@@ -515,6 +515,54 @@ async def accept_check(
     return CheckAcceptanceOut(reason=reason, accepted_at=now, expires_at=expires, not_applicable=body.not_applicable)
 
 
+MAX_BULK_CLIENTS = 200
+
+
+class BulkAcceptIn(AcceptIn):
+    key: str
+    client_ids: list[uuid.UUID]
+
+
+class BulkSkipped(BaseModel):
+    client_id: uuid.UUID
+    detail: str
+
+
+class BulkAcceptOut(BaseModel):
+    accepted: int
+    skipped: list[BulkSkipped]
+
+
+@router.post("/fleet/acceptances", response_model=BulkAcceptOut, summary="Accept the same check for several clients at once with one reason, or mark it not applicable to them")
+async def accept_check_for_many(
+    body: BulkAcceptIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, request: Request = None  # type: ignore[assignment]
+) -> BulkAcceptOut:
+    """One reason, and one end date (or none), for the same check on each listed client. A client that is not yours, or that is over its limit, is skipped and named; the rest are done."""
+    ids = list(dict.fromkeys(body.client_ids))
+    if not ids or len(ids) > MAX_BULK_CLIENTS:
+        raise HTTPException(status_code=422, detail=f"Give 1 to {MAX_BULK_CLIENTS} clients")
+    # What is wrong for one client is wrong for all: say so once instead of skipping every client.
+    reason = " ".join(body.reason.split())
+    if len(reason) < 3 or len(reason) > 400:
+        raise HTTPException(status_code=422, detail="Give a reason of 3 to 400 characters")
+    if not body.key or len(body.key) > 80 or not all(c.isalnum() or c in "_-" for c in body.key):
+        raise HTTPException(status_code=422, detail="That is not a check key")
+    if body.expires_in_days is not None and not 1 <= body.expires_in_days <= MAX_ACCEPT_DAYS:
+        raise HTTPException(status_code=422, detail=f"The end date must be 1 to {MAX_ACCEPT_DAYS} days away")
+    if body.not_applicable and body.expires_in_days is not None:
+        raise HTTPException(status_code=422, detail="A check that does not apply has no end date")
+    single = AcceptIn(reason=reason, expires_in_days=body.expires_in_days, not_applicable=body.not_applicable)
+    accepted = 0
+    skipped: list[BulkSkipped] = []
+    for cid in ids:
+        try:
+            await accept_check(cid, body.key, single, current_user, db, request)
+            accepted += 1
+        except HTTPException as e:
+            skipped.append(BulkSkipped(client_id=cid, detail=str(e.detail)))
+    return BulkAcceptOut(accepted=accepted, skipped=skipped)
+
+
 @router.delete("/{client_id}/acceptances/{key}", status_code=204, summary="Stop accepting a check for a client")
 async def remove_acceptance(
     client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, request: Request = None  # type: ignore[assignment]

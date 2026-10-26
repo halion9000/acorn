@@ -603,3 +603,25 @@ async def test_an_owner_and_due_date_are_set_cleared_and_show_on_the_client_and_
         with pytest.raises(HTTPException) as e:
             await run(world["msp"], lambda db: cp.set_check_owner(bad_client, bad_key, bad_body, user, db))
         assert e.value.status_code == code
+
+
+async def test_the_same_check_is_accepted_for_several_clients_at_once_and_a_stranger_is_skipped_by_name(world):
+    from app.api.v1.endpoints import client_posture as cp
+
+    user = NS(tenant_id=world["msp"], user_id=None)
+    out = await run(world["msp"], lambda db: cp.accept_check_for_many(cp.BulkAcceptIn(key="meraki_wan", client_ids=[world["client"], world["stranger"], world["client"]], reason="  One site, no firewall ", not_applicable=True), user, db))
+    assert out.accepted == 1, "the repeated client is done once"
+    assert [(s.client_id, s.detail) for s in out.skipped] == [(world["stranger"], "Client not found")]
+    rows = (await run(world["msp"], lambda db: db.execute(text("select reason, not_applicable from client_check_acceptances where tenant_id = :t and key = 'meraki_wan'"), {"t": world["client"]}))).all()
+    assert [tuple(r) for r in rows] == [("One site, no firewall", True)]
+    actions = (await run(world["msp"], lambda db: db.execute(text("select count(*) from audit_log where tenant_id = :t and action = 'posture:check_not_applicable'"), {"t": world["msp"]}))).scalar_one()
+    assert actions >= 1
+    for body, code in (
+        (cp.BulkAcceptIn(key="meraki_wan", client_ids=[], reason="valid reason"), 422),
+        (cp.BulkAcceptIn(key="meraki_wan", client_ids=[world["client"]], reason="x"), 422),
+        (cp.BulkAcceptIn(key="bad key!", client_ids=[world["client"]], reason="valid reason"), 422),
+        (cp.BulkAcceptIn(key="meraki_wan", client_ids=[world["client"]], reason="valid reason", not_applicable=True, expires_in_days=5), 422),
+    ):
+        with pytest.raises(HTTPException) as e:
+            await run(world["msp"], lambda db: cp.accept_check_for_many(body, user, db))
+        assert e.value.status_code == code

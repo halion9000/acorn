@@ -11333,6 +11333,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/fleet/acceptances:
+    post:
+      tags:
+      - posture
+      summary: Accept the same check for several clients at once with one reason,
+        or mark it not applicable to them
+      description: One reason, and one end date (or none), for the same check on each
+        listed client. A client that is not yours, or that is over its limit, is skipped
+        and named; the rest are done.
+      operationId: accept_check_for_many_api_v1_client_posture_fleet_acceptances_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkAcceptIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkAcceptOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - posture
+      summary: Accepted risks across all clients that still stand, the ones about
+        to run out first
+      operationId: fleet_acceptances_api_v1_client_posture_fleet_acceptances_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: within_days
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Within Days
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 300
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FleetAcceptance'
+                title: Response Fleet Acceptances Api V1 Client Posture Fleet Acceptances
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/client-posture/sweeps/latest:
     get:
       tags:
@@ -11480,48 +11552,6 @@ paths:
                 items:
                   $ref: '#/components/schemas/FleetChange'
                 title: Response Fleet Changes Api V1 Client Posture Fleet Changes
-                  Get
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-  /api/v1/client-posture/fleet/acceptances:
-    get:
-      tags:
-      - posture
-      summary: Accepted risks across all clients that still stand, the ones about
-        to run out first
-      operationId: fleet_acceptances_api_v1_client_posture_fleet_acceptances_get
-      security:
-      - HTTPBearer: []
-      parameters:
-      - name: within_days
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: integer
-          - type: 'null'
-          title: Within Days
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          default: 300
-          title: Limit
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/FleetAcceptance'
-                title: Response Fleet Acceptances Api V1 Client Posture Fleet Acceptances
                   Get
         '422':
           description: Validation Error
@@ -22072,6 +22102,50 @@ components:
       - identity_kind
       - identity_value
       title: BuildTimelineRequest
+    BulkAcceptIn:
+      properties:
+        reason:
+          type: string
+          title: Reason
+        expires_in_days:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Expires In Days
+        not_applicable:
+          type: boolean
+          title: Not Applicable
+          default: false
+        key:
+          type: string
+          title: Key
+        client_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Client Ids
+      type: object
+      required:
+      - reason
+      - key
+      - client_ids
+      title: BulkAcceptIn
+    BulkAcceptOut:
+      properties:
+        accepted:
+          type: integer
+          title: Accepted
+        skipped:
+          items:
+            $ref: '#/components/schemas/BulkSkipped'
+          type: array
+          title: Skipped
+      type: object
+      required:
+      - accepted
+      - skipped
+      title: BulkAcceptOut
     BulkError:
       properties:
         ioc:
@@ -22208,6 +22282,20 @@ components:
       - skipped
       - items
       title: BulkRunResponse
+    BulkSkipped:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        detail:
+          type: string
+          title: Detail
+      type: object
+      required:
+      - client_id
+      - detail
+      title: BulkSkipped
     BulkToggleBody:
       properties:
         ruleIds:
