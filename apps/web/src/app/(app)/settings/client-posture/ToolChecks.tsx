@@ -37,6 +37,11 @@ export interface CheckHistoryRow {
   observed_at: string;
 }
 
+/** A check's plain name: its own title, or its key without the tool's prefix. */
+export function checkTitle(key: string): string {
+  return TITLE[key] ?? key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp|ninjaone|halopsa|meraki|slide|autoelevate|huntress|dnsfilter|datto)_/, '').replace(/_/g, ' ');
+}
+
 const TITLE: Record<string, string> = {
   threatmate_security_score: 'Security score',
   threatmate_patching: 'Patching',
@@ -296,7 +301,7 @@ export function ToolChecks({
           const st = STATUS[c.status] ?? STATUS.partly;
           return (
             <div key={c.key} className={`rounded border p-2 ${c.accepted ? 'border-slate-800 opacity-80' : 'border-slate-800'}`} data-testid={`check-${c.key}`}>
-              <div className="text-xs uppercase text-slate-500">{TITLE[c.key] ?? c.key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp|ninjaone|halopsa|meraki|slide|autoelevate|huntress|dnsfilter|datto)_/, '').replace(/_/g, ' ')}</div>
+              <div className="text-xs uppercase text-slate-500">{checkTitle(c.key)}</div>
               <span className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[11px] ${st.className}`}>{st.text}</span>
               {c.accepted ? (
                 <span className="ml-1 inline-block rounded border border-sky-500/40 px-1.5 py-0.5 text-[11px] text-sky-300" data-testid={`accepted-${c.key}`}>
