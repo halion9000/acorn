@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, coverage_matrix, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, tool_rows, coverage_matrix, rank_clients, stale_sources, summarize
 
 
 def chk(status, key="k", client="Acme", accepted=False):
@@ -212,3 +212,14 @@ def test_a_change_is_new_worse_better_or_the_same_by_the_order_not_met_partly_me
     assert classify_change("partly", "not_met") == "better"
     assert classify_change("met", "met") == "same"
     assert classify_change("odd", "met") == "worse", "an unknown status is read as needing attention"
+
+
+def test_a_tools_checks_are_only_that_tools_worst_first_without_fine_ones_unless_asked():
+    def of(source, status, client="Acme", key="k", accepted=False):
+        return FleetCheck(client_id=client.lower(), client_name=client, source=source, key=key, status=status, evidence="e", accepted=accepted)
+
+    rows = [of("huntress", "met"), of("huntress", "partly", "Beta"), of("huntress", "not_met", "Zed"), of("threatmate", "not_met"), of("huntress", "not_met", "Acme", "b", accepted=True)]
+    got = tool_rows(rows, "huntress")
+    assert [(r.client_name, r.status, r.accepted) for r in got] == [("Zed", "not_met", False), ("Beta", "partly", False), ("Acme", "not_met", True)]
+    assert len(tool_rows(rows, "huntress", include_met=True)) == 4
+    assert tool_rows(rows, "nothing") == []

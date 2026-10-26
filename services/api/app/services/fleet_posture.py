@@ -191,6 +191,12 @@ def board_rows(checks: list[FleetCheck], keys: tuple[str, ...] | list[str], incl
     return sorted(rows, key=lambda c: (c.accepted, STATUS_ORDER.get(c.status, 3), c.client_name.lower(), c.key))
 
 
+def tool_rows(checks: list[FleetCheck], source: str, include_met: bool = False) -> list[FleetCheck]:
+    """Every check one tool reported across clients, in the order of a board: worst first (accepted ones after the rest of their status), then by client name. Fine checks only when asked for."""
+    rows = [c for c in checks if c.source == source and (include_met or c.status != "met")]
+    return sorted(rows, key=lambda c: (c.accepted, STATUS_ORDER.get(c.status, 3), c.client_name.lower(), c.key))
+
+
 def coverage_matrix(aliases: list[tuple[str, str]], names: dict[str, str]) -> dict[str, Any]:
     """Which tool each client is mapped to. ``aliases`` is [(client id, vendor)]; tools are listed most-used first (ties by name), clients by name, each with the tools it has and the ones it is missing among
     those at least one other client has."""

@@ -32,7 +32,7 @@ from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_postur
 from app.services import fleet_cache
 from app.services.score_history import load_weights
 from app.services.score_history import trend as score_trend
-from app.services.fleet_posture import MAX_WEIGHT, average_score, below_target, classify_change, is_overdue, score_breakdown, search_checks, similar_size_average, tool_scorecards, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import MAX_WEIGHT, average_score, below_target, classify_change, is_overdue, score_breakdown, search_checks, similar_size_average, tool_rows, tool_scorecards, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
@@ -975,6 +975,21 @@ async def fleet_board(
         title=title,
         keys=list(keys),
         rows=[FleetBoardRow(client_id=uuid.UUID(r.client_id), client_name=r.client_name, source=r.source, key=r.key, status=r.status, evidence=r.evidence, since=r.since, accepted=r.accepted, items=list(r.items), owner=r.owner, due_date=r.due_date, overdue=is_overdue(r.status, r.due_date, datetime.now(UTC).date())) for r in rows],
+    )
+
+
+@router.get("/fleet/tools/{source}/checks", response_model=FleetBoardOut, summary="The checks one tool reported across clients that are not fine, to see what its problems are")
+async def fleet_tool_checks(
+    source: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, include_met: bool = False, limit: int = Query(2000, ge=1, le=5000)
+) -> FleetBoardOut:
+    checks, _names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
+    rows = tool_rows(checks, source, include_met=include_met)[:limit]
+    today = datetime.now(UTC).date()
+    return FleetBoardOut(
+        board=source,
+        title=source,
+        keys=sorted({c.key for c in rows}),
+        rows=[FleetBoardRow(client_id=uuid.UUID(r.client_id), client_name=r.client_name, source=r.source, key=r.key, status=r.status, evidence=r.evidence, since=r.since, accepted=r.accepted, items=list(r.items), owner=r.owner, due_date=r.due_date, overdue=is_overdue(r.status, r.due_date, today)) for r in rows],
     )
 
 

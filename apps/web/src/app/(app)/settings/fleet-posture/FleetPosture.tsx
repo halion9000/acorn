@@ -230,11 +230,12 @@ export function groupSelection(selected: Iterable<string>): Map<string, string[]
   return out;
 }
 
-function Board({ board, title }: { board: string; title: string }) {
+/** A board of related checks, or (with `source`) every check one tool reported, worst first, with the same accept and CSV tools. */
+function Board({ board, title, source }: { board: string; title: string; source?: string }) {
   const [reload, setReload] = useState(0);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [problem, setProblem] = useState<string | null>(null);
-  const { data, error } = useJson<{ rows: BoardRow[] }>(`/api/v1/client-posture/fleet/boards/${encodeURIComponent(board)}`, reload);
+  const { data, error } = useJson<{ rows: BoardRow[] }>(source ? `/api/v1/client-posture/fleet/tools/${encodeURIComponent(source)}/checks` : `/api/v1/client-posture/fleet/boards/${encodeURIComponent(board)}`, reload);
   const toggle = (k: string) => setPicked((prev) => {
     const next = new Set(prev);
     if (next.has(k)) next.delete(k);
@@ -572,6 +573,7 @@ function Tools() {
   const [problem, setProblem] = useState<string | null>(null);
   const [key, setKey] = useState("");
   const [weight, setWeight] = useState("2");
+  const [open, setOpen] = useState<string | null>(null);
   const cards = useJson<ToolCard[]>("/api/v1/client-posture/fleet/tools", reload);
   const weights = useJson<{ key: string; weight: number }[]>("/api/v1/client-posture/fleet/weights", reload);
   const save = async (k: string, w: number) => {
@@ -606,7 +608,11 @@ function Tools() {
             <tbody>
               {cards.data.map((t) => (
                 <tr key={t.source} className="border-t border-slate-800 text-slate-300">
-                  <td className="py-1 pr-3">{TOOL_CHECK_LABELS[t.source] ?? t.source}</td>
+                  <td className="py-1 pr-3">
+                    <button type="button" aria-expanded={open === t.source} aria-label={`Show the checks of ${TOOL_CHECK_LABELS[t.source] ?? t.source}`} className="text-sky-300 hover:underline" onClick={() => setOpen(open === t.source ? null : t.source)}>
+                      {TOOL_CHECK_LABELS[t.source] ?? t.source}
+                    </button>
+                  </td>
                   <td className="pr-3">{t.percent_fine === null ? "—" : `${t.percent_fine}%`}</td>
                   <td className={`pr-3 ${t.not_met > 0 ? "text-red-300" : ""}`}>{t.not_met}</td>
                   <td className={`pr-3 ${t.partly > 0 ? "text-amber-300" : ""}`}>{t.partly}</td>
@@ -616,6 +622,13 @@ function Tools() {
             </tbody>
           </table>
         )}
+        <p className="text-xs text-slate-500">Click a tool to see its checks that are not fine, client by client.</p>
+        {open ? (
+          <div className="space-y-2 rounded border border-slate-800 p-3" data-testid="tool-checks">
+            <h3 className="text-sm font-semibold text-slate-200">{TOOL_CHECK_LABELS[open] ?? open}: checks that are not fine</h3>
+            <Board key={open} board={open} title={TOOL_CHECK_LABELS[open] ?? open} source={open} />
+          </div>
+        ) : null}
       </section>
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-slate-200">How much each check counts</h2>

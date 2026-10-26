@@ -27,6 +27,7 @@ beforeEach(() => {
     if (url.endsWith('/c1/score-breakdown'))
       return json({ client_id: 'c1', score: 40, lost: 60, rows: [{ source: 'ninjaone', key: 'ninjaone_antivirus', status: 'not_met', weight: 3, points_lost: 45 }, { source: 'ninjaone', key: 'ninjaone_patching', status: 'partly', weight: 1, points_lost: 7.5 }] });
     if (url.endsWith('/c1/compare')) return json({ client_id: 'c1', score: 40, fleet_average: 72, size: 50, similar_average: 65, similar_clients: 14 });
+    if (url.includes('/fleet/tools/slide/checks')) return json({ board: 'slide', title: 'slide', keys: ['slide_verification'], rows: [{ client_id: 'c1', client_name: 'Acme', source: 'slide', key: 'slide_verification', status: 'not_met', evidence: 'Last restore test failed', accepted: false, items: [] }] });
     if (url.endsWith('/fleet/tools'))
       return json([{ source: 'slide', checks: 3, met: 1, partly: 0, not_met: 2, clients_with_problems: 2, percent_fine: 33 }, { source: 'ninjaone', checks: 8, met: 6, partly: 1, not_met: 1, clients_with_problems: 2, percent_fine: 81 }]);
     if (url.endsWith('/fleet/weights'))
@@ -135,6 +136,19 @@ describe('FleetPosture tools and weights', () => {
     expect(rows[0]).toHaveTextContent(/slide/i);
     expect(rows[0]).toHaveTextContent('33%');
     expect(await screen.findByTestId('fleet-weights')).toHaveTextContent('ninjaone antivirus: counts 3 times');
+  });
+
+  it('opens the checks behind the problems of a tool, client by client, when its name is clicked, and closes them on a second click', async () => {
+    render(<FleetPosture />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Tools' }));
+    await screen.findByTestId('fleet-tools');
+    await userEvent.click(screen.getByRole('button', { name: /Show the checks of slide/i }));
+    const panel = await screen.findByTestId('tool-checks');
+    expect(await within(panel).findByText('Last restore test failed')).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: 'Acme' })).toBeInTheDocument();
+    expect(authFetch.mock.calls.some((c) => String(c[0]).endsWith('/fleet/tools/slide/checks'))).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: /Show the checks of slide/i }));
+    expect(screen.queryByTestId('tool-checks')).toBeNull();
   });
 
   it('sets a weight for a check key and resets one', async () => {
