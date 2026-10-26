@@ -137,6 +137,12 @@ async def upsert_clients(db: Any, tenant_id: uuid.UUID, vendor: str, clients: li
     for c in clients:
         row = existing.get(c.client_id)
         if row is not None:
+            placeholder = row.vendor_client_name == row.vendor_client_id and row.child_tenant_id is None and not row.ignored and row.match_source != "manual"
+            if placeholder and c.name != c.client_id:  # a row made from device reports, now with the tool's real name
+                suggestions = suggest(c.name, candidates)
+                if is_confident(suggestions):
+                    row.child_tenant_id = uuid.UUID(suggestions[0].tenant_id)  # type: ignore[assignment]
+                    linked += 1
             if row.vendor_client_name != c.name:
                 row.vendor_client_name = c.name
                 row.normalized_name = normalize_name(c.name)

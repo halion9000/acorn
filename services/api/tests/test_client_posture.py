@@ -171,8 +171,8 @@ def test_each_check_says_since_when_it_has_had_its_status_and_whether_a_person_a
     from types import SimpleNamespace
 
     changed = datetime(2026, 10, 20, tzinfo=UTC)
-    live = SimpleNamespace(key="threatmate_patching", reason="Client will replace the machines in January", accepted_at=datetime(2026, 10, 21, tzinfo=UTC), expires_at=datetime.now(UTC) + timedelta(days=30))
-    gone = SimpleNamespace(key="threatmate_security_score", reason="old", accepted_at=datetime(2026, 1, 1, tzinfo=UTC), expires_at=datetime(2026, 2, 1, tzinfo=UTC))
+    live = SimpleNamespace(key="threatmate_patching", reason="Client will replace the machines in January", accepted_at=datetime(2026, 10, 21, tzinfo=UTC), expires_at=datetime.now(UTC) + timedelta(days=30), not_applicable=False)
+    gone = SimpleNamespace(key="threatmate_security_score", reason="old", accepted_at=datetime(2026, 1, 1, tzinfo=UTC), expires_at=datetime(2026, 2, 1, tzinfo=UTC), not_applicable=False)
     rows = [("threatmate", [{"key": "threatmate_patching", "status": "not_met", "evidence": "x"}, {"key": "threatmate_security_score", "status": "not_met", "evidence": "y"}, {"key": "threatmate_end_of_life", "status": "met", "evidence": "z"}])]
     out, _ = _posture_with(monkeypatch, [("threatmate", "11", "Acme")], rows, history=[("threatmate_patching", changed)], accepted=[live, gone])
     by = {c.key: c for c in out.tool_checks["threatmate"].checks}

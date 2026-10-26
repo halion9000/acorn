@@ -247,3 +247,23 @@ async def test_a_client_with_no_entry_yet_in_the_list_is_not_linked_but_its_name
     out = await run(msp, lambda db: ep.apply_devices(db, msp, report("ae-unlisted", HOSTS[:4])))
     assert out.auto_linked == 0
     assert await scalar("select count(*) from client_device_hints where tenant_id = :t and vendor_client_id = 'ae-unlisted'", t=msp) == 4
+
+
+async def test_a_client_a_tool_reports_machines_for_gets_a_row_to_map_even_if_the_tool_never_sent_its_client_list(world):
+    msp = world["msp"]
+    q = "select count(*) from client_aliases where tenant_id = :t and vendor = 'autoelevate' and vendor_client_id = 'ae-nolist' and child_tenant_id is null and not ignored"
+    assert await scalar(q, t=msp) == 0
+    await run(msp, lambda db: ep.apply_devices(db, msp, report("ae-nolist", ["NUC-1"])))
+    await run(msp, lambda db: ep.apply_devices(db, msp, report("ae-nolist", ["NUC-1"])))  # the next run adds no second row
+    assert await scalar(q, t=msp) == 1
+
+
+async def test_a_row_made_from_device_reports_is_linked_by_name_when_the_tools_client_list_arrives(world):
+    from app.services.client_mapping import IncomingClient, upsert_clients
+
+    msp = world["msp"]
+    await run(msp, lambda db: ep.apply_devices(db, msp, report("ae-late", ["NUC-2"])))
+    name = await scalar("select name from tenants where id = :t", t=world["acme"])
+    await run(msp, lambda db: upsert_clients(db, msp, "autoelevate", [IncomingClient(client_id="ae-late", name=name)]))
+    got = await scalar("select child_tenant_id from client_aliases where tenant_id = :t and vendor_client_id = 'ae-late'", t=msp)
+    assert got == world["acme"]

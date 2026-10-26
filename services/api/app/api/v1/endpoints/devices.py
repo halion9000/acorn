@@ -31,7 +31,7 @@ from app.models.alert import Alert
 from app.models.client_alias import ClientAlias, ClientDeviceHint
 from app.models.device import Device, DeviceMergeLog, DeviceSnooze, DeviceSource
 from app.models.tenant import Tenant
-from app.services.client_mapping import auto_link_by_devices, record_device_hints, tenant_hidden
+from app.services.client_mapping import IncomingClient, auto_link_by_devices, record_device_hints, tenant_hidden, upsert_clients
 from app.services.device_merge import DeviceMergeError, auto_merge_same_name, can_undo, dismiss_pair, merge_devices, undo_merge
 from app.services.device_upsert import DeviceReport, possible_duplicates, upsert_device
 from app.services.infra_review import encryption_state
@@ -1168,6 +1168,11 @@ async def apply_devices(db: Any, owner: uuid.UUID, report: DevicesReport) -> Dev
         await record_device_hints(db, owner, vendor, vid, hostnames)
     # A client whose machines are ALL (and at least three) machines already under one client is linked to it now, without asking; the rest stay suggestions. Its own devices arrive on the next run.
     auto_linked = await auto_link_by_devices(db, owner, set(waiting_names), lambda tid: acting_as_tenant(db, tid))
+    # After the auto-link above (an unlisted client is not linked on the run that first sees it), a tool that reports machines for a client but never sends its client list (so no row exists to map) still gets one: without it the client could not be found on the mapping page. The tool's own id
+    # stands in for the name until a client list arrives and replaces it.
+    for vendor, vid in waiting_names:
+        if (vendor, vid) not in known:
+            await upsert_clients(db, owner, vendor, [IncomingClient(client_id=vid, name=vid)])
     unmapped_clients = [
         UnmappedClient(vendor_client_id=vid, name=known[(vendor, vid)].vendor_client_name if (vendor, vid) in known else None, devices=n)
         for (vendor, vid), n in sorted(waiting.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
