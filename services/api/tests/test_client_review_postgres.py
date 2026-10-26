@@ -446,10 +446,13 @@ async def test_billed_lines_are_checked_against_the_tool_counts_they_are_mapped_
         await run(world["msp"], lambda db, r=r: bl.apply_license_counts(db, world["msp"], r))
     user = NS(tenant_id=world["msp"], user_id=None)
 
+    # A count of tickets that HaloPSA reports is not an invoice line: it never shows as a line to map or to compare.
+    await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], bl.LicenseCountsReport(vendor="halopsa", vendor_client_id="r-halopsa", counts=[bl.LicenseCountIn(item="NinjaOne RMM (Included)", unit="other", count=16), bl.LicenseCountIn(item="Liongard (Included)", unit="other", count=1), bl.LicenseCountIn(item="Tickets opened in the last 30 days", unit="ticket", count=42)])))
     before = await run(world["msp"], lambda db: bl.billing_map(user, db))
     un = {u["invoice_item"]: u for u in before.unmapped}
     assert "NinjaOne RMM (Included)" in un and un["NinjaOne RMM (Included)"]["suggestion"][0] == {"source": "ninjaone", "item": "Windows workstations"}
     assert un["Liongard (Included)"]["suggestion"] == []
+    assert "Tickets opened in the last 30 days" not in un and not any(c.item.startswith("Tickets opened") for c in before.counted_items), "tickets are not invoice lines and not something to map to"
     assert any(c.source == "ninjaone" and c.item == "Macs" for c in before.counted_items)
     assert not any(c.source == "halopsa" for c in before.counted_items), "what is billed is not something to map to"
 
@@ -459,6 +462,7 @@ async def test_billed_lines_are_checked_against_the_tool_counts_they_are_mapped_
     saved = await run(world["msp"], lambda db: bl.save_map(bl.MapIn(invoice_item=" NinjaOne RMM (Included) ", counted=[bl.CountedRef(source="ninjaone", item="Windows workstations"), bl.CountedRef(source="ninjaone", item="Macs")]), user, db))
     assert saved.invoice_item == "NinjaOne RMM (Included)"
     after = await run(world["msp"], lambda db: bl.reconcile_billing(user, db))
+    assert all("Tickets" not in r.invoice_item for r in after.rows) and after.unmapped_lines >= 1
     mine = [r for r in after.rows if r.client_id == world["client"]]
     assert [(r.invoice_item, r.billed, r.counted, r.difference) for r in mine] == [("NinjaOne RMM (Included)", 16, 18, 2)]
     assert [p["count"] for p in mine[0].parts] == [14, 4]

@@ -28,7 +28,7 @@ from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
 
-Unit = Literal["licence", "device", "user", "seat", "mailbox", "other"]
+Unit = Literal["licence", "device", "user", "seat", "mailbox", "ticket", "other"]
 
 
 class LicenseCountIn(BaseModel):
@@ -273,7 +273,7 @@ async def _all_client_counts(db: Any, owner: uuid.UUID) -> tuple[dict[uuid.UUID,
     for cid in ids[1:]:
         async with _as(db, owner, cid):
             held = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == cid))).scalars().all()
-        out[cid] = [{"source": r.source, "item": r.item, "count": r.count} for r in held]
+        out[cid] = [{"source": r.source, "item": r.item, "count": r.count, "unit": r.unit} for r in held]
     return out, names
 
 
@@ -292,7 +292,8 @@ async def billing_map(current_user: Annotated[AuthUser, Depends(require_permissi
     for rows in per_client.values():
         for r in rows:
             if r["source"] == BILLED_SOURCE:
-                billed_clients[r["item"]] = billed_clients.get(r["item"], 0) + 1
+                if r.get("unit") != "ticket":  # a count of tickets is not an invoice line
+                    billed_clients[r["item"]] = billed_clients.get(r["item"], 0) + 1
             else:
                 tool_items.update([(r["source"], r["item"])])
     unmapped = [{"invoice_item": i, "clients": n, "suggestion": suggest(i)} for i, n in sorted(billed_clients.items(), key=lambda kv: (-kv[1], kv[0])) if i not in mapping]
@@ -397,7 +398,7 @@ async def reconcile_billing(
     out: list[ReconcileRow] = []
     unmapped_lines = 0
     for cid, rows in per_client.items():
-        billed = [{"item": r["item"], "count": r["count"]} for r in rows if r["source"] == BILLED_SOURCE]
+        billed = [{"item": r["item"], "count": r["count"]} for r in rows if r["source"] == BILLED_SOURCE and r.get("unit") != "ticket"]
         held = [r for r in rows if r["source"] != BILLED_SOURCE]
         result = reconcile(billed, held, mapping)
         unmapped_lines += len(result["unmapped"])

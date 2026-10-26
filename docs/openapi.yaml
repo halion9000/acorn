@@ -29922,6 +29922,7 @@ components:
           - user
           - seat
           - mailbox
+          - ticket
           - other
           title: Unit
           default: other
