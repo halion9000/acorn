@@ -2,16 +2,22 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SWRConfig } from 'swr';
+
 import { FrameworkView } from './FrameworkView';
 
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
+const listChildren = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/api', () => ({ msspApi: { listChildren } }));
 
 const json = (body: unknown) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
 
 // Braces: a hook that RETURNS the mock would have vitest call it as a cleanup function, with no arguments.
 beforeEach(() => {
   authFetch.mockReset();
+  listChildren.mockReset();
+  listChildren.mockResolvedValue([]);
 });
 afterEach(() => cleanup());
 
@@ -76,5 +82,34 @@ describe('FrameworkView', () => {
     await user.click(await screen.findByRole('button', { name: 'Add evidence' }));
     await user.type(screen.getByLabelText('Evidence'), 'ok');
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+  });
+});
+
+describe('FrameworkView for a client', () => {
+  const answer = (url: string) => {
+    if (url.includes('/controls')) return json({ controls: [{ control_id: 'CC6.1', title: 'Access' }] });
+    if (url.includes('/report')) return json([{ total_evidence: 0, accepted: 0, pending: 0, rejected: 0, coverage_pct: 0, controls_covered: [], controls_missing: ['CC6.1'] }]);
+    return json([]);
+  };
+
+  it('reads and writes the own evidence of the organisation until a client is chosen, then only that of the client', async () => {
+    listChildren.mockResolvedValue([{ id: 'c1', name: 'Acme Dental', mssp_role: 'client' }]);
+    authFetch.mockImplementation((url: string) => answer(url));
+    render(
+      <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+        <FrameworkView framework="soc2" />
+      </SWRConfig>,
+    );
+    await waitFor(() => expect(screen.getByTestId('coverage')).toBeTruthy());
+    expect(authFetch.mock.calls.filter((c) => String(c[0]).includes('/evidence') || String(c[0]).includes('/report')).every((c) => !String(c[0]).includes('client_id'))).toBe(true);
+
+    authFetch.mockClear();
+    await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Client' }), 'c1');
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]).includes('/report?framework=SOC2&client_id=c1'))).toBe(true));
+    expect(authFetch.mock.calls.some((c) => String(c[0]).includes('/evidence?framework=SOC2&limit=200&client_id=c1'))).toBe(true);
+
+    authFetch.mockClear();
+    await userEvent.click(screen.getByRole('button', { name: /Collect platform evidence/ }));
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]).startsWith('/api/v1/compliance/evidence/collect?client_id=c1'))).toBe(true));
   });
 });

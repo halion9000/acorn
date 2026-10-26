@@ -22,17 +22,40 @@ import json
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Any, Literal
+from collections.abc import AsyncIterator
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
+from app.db.rls_scope import acting_as_tenant
+from app.models.tenant import Tenant
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
+
+
+async def compliance_tenant(
+    db: DBSession,
+    user: AuthUser,
+    client_id: uuid.UUID | None = Query(None, description="One of your clients, to read or record its compliance instead of your own. Omit for your own."),
+) -> AsyncIterator[uuid.UUID]:
+    """The tenant whose compliance evidence a request is about: the caller's own, or one of its clients when ``client_id`` names one. A tenant that is not the caller's own or one
+    of its clients is a 404, the same as an unknown one. The request then runs scoped to that client (row-level security included) until it ends."""
+    if client_id is None or client_id == user.tenant_id:
+        yield user.tenant_id
+        return
+    managed = (await db.execute(select(Tenant.id).where(Tenant.id == client_id, Tenant.parent_tenant_id == user.tenant_id))).scalar_one_or_none()
+    if managed is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    async with acting_as_tenant(db, client_id):
+        yield client_id
+
+
+ScopeTenant = Annotated[uuid.UUID, Depends(compliance_tenant)]
 
 # ────────────────────────────────────────────────────────────────────────────
 # Known frameworks + sampled controls (extendable via DB or config)
@@ -325,18 +348,18 @@ def system_evidence_for(framework: str, facts: dict[str, dict[str, Any]]) -> lis
     summary="Collect the evidence the platform itself can provide",
     dependencies=[Depends(require_permission("reports:write"))],
 )
-async def trigger_evidence_collection(body: CollectJobRequest, db: DBSession, user: AuthUser) -> CollectJobResponse:
+async def trigger_evidence_collection(body: CollectJobRequest, db: DBSession, user: AuthUser, tenant: ScopeTenant) -> CollectJobResponse:
     """Records evidence for the controls this platform's own data can speak to (account inventory, monitoring coverage, incident handling) as ``pending`` items a
     person must still review. It used to answer ``queued`` and queue nothing. ``status`` is ``completed`` with the count in ``collected``; controls that need an
     attestation or a document (policies, training) are never invented and stay missing in the posture report."""
     if body.framework not in FRAMEWORKS:
         raise HTTPException(status_code=404, detail=f"Framework '{body.framework}' not found.")
     try:
-        items = system_evidence_for(body.framework, await _system_facts(db, user.tenant_id))
+        items = system_evidence_for(body.framework, await _system_facts(db, tenant))
         for control_id, summary, payload in items:
             await _insert_evidence(
                 db,
-                tenant_id=user.tenant_id,
+                tenant_id=tenant,
                 framework=body.framework,
                 control_id=control_id,
                 control_title=None,
@@ -409,11 +432,11 @@ async def _insert_evidence(
     summary="Collect evidence item",
     dependencies=[Depends(require_permission("reports:write"))],
 )
-async def collect_evidence(body: CollectEvidenceRequest, db: DBSession, user: AuthUser) -> EvidenceResponse:
+async def collect_evidence(body: CollectEvidenceRequest, db: DBSession, user: AuthUser, tenant: ScopeTenant) -> EvidenceResponse:
     try:
         row = await _insert_evidence(
             db,
-            tenant_id=user.tenant_id,
+            tenant_id=tenant,
             framework=body.framework,
             control_id=body.control_id,
             control_title=body.control_title,
@@ -439,6 +462,7 @@ async def collect_evidence(body: CollectEvidenceRequest, db: DBSession, user: Au
 async def list_evidence(
     db: DBSession,
     user: AuthUser,
+    tenant: ScopeTenant,
     framework: str | None = Query(None),
     control_id: str | None = Query(None),
     case_id: uuid.UUID | None = Query(None),
@@ -447,7 +471,7 @@ async def list_evidence(
     offset: int = Query(0, ge=0, le=1_000_000),
 ) -> list[EvidenceResponse]:
     wheres = ["tenant_id = :tenant_id"]
-    params: dict[str, Any] = {"tenant_id": user.tenant_id, "limit": limit, "offset": offset}
+    params: dict[str, Any] = {"tenant_id": tenant, "limit": limit, "offset": offset}
     if framework:
         wheres.append("framework = :fw")
         params["fw"] = framework
@@ -478,11 +502,11 @@ async def list_evidence(
     summary="Get evidence item",
     dependencies=[Depends(require_permission("reports:read"))],
 )
-async def get_evidence(evidence_id: uuid.UUID, db: DBSession, user: AuthUser) -> EvidenceResponse:
+async def get_evidence(evidence_id: uuid.UUID, db: DBSession, user: AuthUser, tenant: ScopeTenant) -> EvidenceResponse:
     row = (
         await db.execute(
             text("SELECT * FROM aisoc_compliance_evidence WHERE id = :id AND tenant_id = :tenant_id").bindparams(
-                id=evidence_id, tenant_id=user.tenant_id
+                id=evidence_id, tenant_id=tenant
             )
         )
     ).fetchone()
@@ -497,13 +521,13 @@ async def get_evidence(evidence_id: uuid.UUID, db: DBSession, user: AuthUser) ->
     summary="Accept or reject evidence",
     dependencies=[Depends(require_permission("reports:write"))],
 )
-async def review_evidence(evidence_id: uuid.UUID, body: ReviewEvidenceRequest, db: DBSession, user: AuthUser) -> EvidenceResponse:
+async def review_evidence(evidence_id: uuid.UUID, body: ReviewEvidenceRequest, db: DBSession, user: AuthUser, tenant: ScopeTenant) -> EvidenceResponse:
     now = datetime.now(UTC)
     q = text("""
         UPDATE aisoc_compliance_evidence
         SET status = :decision, reviewed_by = :reviewer, reviewed_at = :now
         WHERE id = :id AND tenant_id = :tenant_id RETURNING *
-    """).bindparams(id=evidence_id, tenant_id=user.tenant_id, decision=body.decision, reviewer=user.label, now=now)
+    """).bindparams(id=evidence_id, tenant_id=tenant, decision=body.decision, reviewer=user.label, now=now)
     try:
         row = (await db.execute(q)).fetchone()
         if not row:
@@ -527,10 +551,11 @@ async def review_evidence(evidence_id: uuid.UUID, body: ReviewEvidenceRequest, d
 async def compliance_report(
     db: DBSession,
     user: AuthUser,
+    tenant: ScopeTenant,
     framework: str | None = Query(None, description="Filter to a single framework."),
 ) -> list[CompliancePosture]:
     wheres = ["tenant_id = :tenant_id"]
-    params: dict[str, Any] = {"tenant_id": user.tenant_id}
+    params: dict[str, Any] = {"tenant_id": tenant}
     if framework:
         wheres.append("framework = :fw")
         params["fw"] = framework

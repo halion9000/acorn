@@ -7,9 +7,10 @@
  * data can show (accounts, monitoring coverage, incident handling) as PENDING items; a person reviews each one here. Controls that need a document or an
  * attestation stay "No evidence" until someone adds one with "Add evidence" (an attestation, where a policy lives, a runbook): nothing is filled in on anyone's behalf.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 
 interface Props {
   framework: string;
@@ -64,8 +65,20 @@ async function getJson<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** Adds the client (when one is chosen) to an API path, so the evidence read or written is that client's and not the organisation's own. */
+export function forClient(path: string, clientId: string): string {
+  return clientId ? `${path}${path.includes('?') ? '&' : '?'}client_id=${encodeURIComponent(clientId)}` : path;
+}
+
 export function FrameworkView({ framework }: Props) {
   const key = API_KEYS[framework];
+  const [clientId, setClientId] = useState('');
+  const chosen = useRef('');
+  chosen.current = clientId;
+  // A link can open on one client (?client=<id>); read once, after the first paint so the server and browser markup agree.
+  useEffect(() => {
+    setClientId(clientFromAddress(window.location.search));
+  }, []);
   const [controls, setControls] = useState<Control[]>([]);
   const [posture, setPosture] = useState<Posture | null>(null);
   const [evidence, setEvidence] = useState<Evidence[]>([]);
@@ -81,9 +94,10 @@ export function FrameworkView({ framework }: Props) {
     try {
       const [c, r, e] = await Promise.all([
         getJson<{ controls: Control[] }>(`/api/v1/compliance/frameworks/${encodeURIComponent(key)}/controls`),
-        getJson<Posture[]>(`/api/v1/compliance/report?framework=${encodeURIComponent(key)}`),
-        getJson<Evidence[]>(`/api/v1/compliance/evidence?framework=${encodeURIComponent(key)}&limit=200`),
+        getJson<Posture[]>(forClient(`/api/v1/compliance/report?framework=${encodeURIComponent(key)}`, clientId)),
+        getJson<Evidence[]>(forClient(`/api/v1/compliance/evidence?framework=${encodeURIComponent(key)}&limit=200`, clientId)),
       ]);
+      if (chosen.current !== clientId) return; // the choice changed while this was loading: never show one client's evidence under another
       setControls(c.controls);
       setPosture(r[0] ?? null);
       setEvidence(e);
@@ -91,7 +105,7 @@ export function FrameworkView({ framework }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this framework');
     }
-  }, [key]);
+  }, [key, clientId]);
 
   useEffect(() => {
     void load();
@@ -110,7 +124,7 @@ export function FrameworkView({ framework }: Props) {
     setBusy(true);
     setNote(null);
     try {
-      const res = await authFetch('/api/v1/compliance/evidence/collect', {
+      const res = await authFetch(forClient('/api/v1/compliance/evidence/collect', clientId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ framework: key, scope: 'full' }),
@@ -130,7 +144,7 @@ export function FrameworkView({ framework }: Props) {
     setBusy(true);
     setNote(null);
     try {
-      const res = await authFetch('/api/v1/compliance/evidence', {
+      const res = await authFetch(forClient('/api/v1/compliance/evidence', clientId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ framework: key, control_id: controlId, evidence_kind: kind, summary: summary.trim(), raw_payload: { source: 'manual' } }),
@@ -149,7 +163,7 @@ export function FrameworkView({ framework }: Props) {
 
   async function review(id: string, decision: 'accepted' | 'rejected') {
     try {
-      const res = await authFetch(`/api/v1/compliance/evidence/${encodeURIComponent(id)}/review`, {
+      const res = await authFetch(forClient(`/api/v1/compliance/evidence/${encodeURIComponent(id)}/review`, clientId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision }),
@@ -175,6 +189,18 @@ export function FrameworkView({ framework }: Props) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-100">{key} compliance</h2>
+          <div className="mt-2">
+            <ClientPicker
+              value={clientId}
+              label="Whose compliance"
+              onChange={(id) => {
+                setPosture(null);
+                setEvidence([]);
+                setNote(null);
+                setClientId(id);
+              }}
+            />
+          </div>
           {posture && (
             <p className="text-sm text-gray-400 mt-1" data-testid="coverage">
               {posture.coverage_pct.toFixed(0)}% of controls have accepted evidence ({posture.accepted} accepted, {posture.pending} waiting for review, {posture.rejected} rejected)

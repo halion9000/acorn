@@ -11,8 +11,10 @@
  * PDF dependency required.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
+
+import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 
 import { reportsApi, type ExecutiveDigest as ExecutiveDigestPayload } from '@/lib/api';
 
@@ -103,10 +105,16 @@ export function ExecutiveDigest() {
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
 
-  const params = useMemo(() => periodWindow(days), [days]);
+  const [clientId, setClientId] = useState('');
+  // A link can open the digest of one client (?client=<id>).
+  useEffect(() => {
+    setClientId(clientFromAddress(window.location.search));
+  }, []);
+
+  const params = useMemo(() => ({ ...periodWindow(days), ...(clientId ? { client_id: clientId } : {}) }), [days, clientId]);
 
   const { data, error, isLoading, mutate } = useSWR<ExecutiveDigestPayload>(
-    ['executive-digest', params.period_start, params.period_end],
+    ['executive-digest', params.period_start, params.period_end, clientId],
     () => reportsApi.weeklyDigest(params),
     {
       revalidateOnFocus: false,
@@ -147,6 +155,7 @@ export function ExecutiveDigest() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ClientPicker value={clientId} onChange={setClientId} label="Digest for" ownLabel="My organisation (internal)" />
           <select
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
@@ -204,6 +213,7 @@ function DigestBody({ digest }: { digest: ExecutiveDigestPayload }) {
       {/* Period + headline */}
       <section className="rounded-xl border border-violet-500/30 bg-violet-950/20 p-5">
         <p className="text-xs uppercase tracking-wide text-violet-300">Reporting period</p>
+        {digest.client_name ? <p className="mt-1 text-sm text-violet-200">{digest.client_name}</p> : null}
         <p className="mt-1 text-lg font-semibold text-white">{digest.period.label}</p>
         <p className="mt-3 text-sm leading-relaxed text-gray-200">{digest.headline}</p>
         <p className="mt-2 text-xs text-gray-500">

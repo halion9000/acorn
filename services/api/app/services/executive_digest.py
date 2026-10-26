@@ -119,6 +119,8 @@ class ExecutiveDigest(BaseModel):
     """Top-level deterministic snapshot of one digest window."""
 
     tenant_id: uuid.UUID
+    # Set when the digest is for one of the caller's clients rather than the caller's own tenant.
+    client_name: str | None = None
     period: DigestPeriod
     headline: str
     alerts: AlertSummary

@@ -180,7 +180,7 @@ class TestComplianceTenantIsolation:
         user = _user()
         row = _evidence_row(user.tenant_id)
         db = _mk_db([[row]])
-        result = await list_evidence(db=db, user=user)
+        result = await list_evidence(db=db, user=user, tenant=user.tenant_id)
         assert len(result) == 1
         _assert_tenant_scoped(db.executed, user.tenant_id, "aisoc_compliance_evidence")
 
@@ -192,7 +192,7 @@ class TestComplianceTenantIsolation:
         user = _user()
         db = _mk_db([None])  # No row found for this tenant
         with pytest.raises(HTTPException) as exc:
-            await get_evidence(evidence_id=uuid.uuid4(), db=db, user=user)
+            await get_evidence(evidence_id=uuid.uuid4(), db=db, user=user, tenant=user.tenant_id)
         assert exc.value.status_code == 404
         _assert_tenant_scoped(db.executed, user.tenant_id, "aisoc_compliance_evidence")
 
@@ -210,7 +210,7 @@ class TestComplianceTenantIsolation:
         src = inspect.getsource(collect_evidence)
         # The INSERT column list and VALUES list must both mention tenant_id.
         assert "tenant_id" in src, "collect_evidence INSERT must include tenant_id"
-        assert "user.tenant_id" in src, "collect_evidence must bind user.tenant_id"
+        assert "tenant_id=tenant" in src, "collect_evidence must bind the scoped tenant"
 
     @pytest.mark.asyncio
     async def test_review_evidence_cross_tenant_returns_404(self) -> None:
@@ -221,7 +221,7 @@ class TestComplianceTenantIsolation:
         db = _mk_db([None])  # UPDATE returns no row
         body = ReviewEvidenceRequest(decision="accepted")
         with pytest.raises(HTTPException) as exc:
-            await review_evidence(evidence_id=uuid.uuid4(), body=body, db=db, user=user)
+            await review_evidence(evidence_id=uuid.uuid4(), body=body, db=db, user=user, tenant=user.tenant_id)
         assert exc.value.status_code == 404
         _assert_tenant_scoped(db.executed, user.tenant_id, "aisoc_compliance_evidence")
 
@@ -231,7 +231,7 @@ class TestComplianceTenantIsolation:
 
         user = _user()
         db = _mk_db([[]])  # Empty result set
-        result = await compliance_report(db=db, user=user, framework=None)
+        result = await compliance_report(db=db, user=user, tenant=user.tenant_id, framework=None)
         # Should still return framework entries from FRAMEWORKS dict
         assert isinstance(result, list)
         _assert_tenant_scoped(db.executed, user.tenant_id, "aisoc_compliance_evidence")

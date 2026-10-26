@@ -230,7 +230,7 @@ def render_digest_html(digest: ExecutiveDigest) -> str:
     <h1>{_esc(period.label)}</h1>
     <div style="color:#334155;font-size:14px;margin-top:6px;">{headline}</div>
     <div style="color:#94a3b8;font-size:11px;margin-top:6px;">
-      Tenant {_esc(digest.tenant_id)} · generated {_fmt_datetime(datetime.now(UTC))}
+      {('Client ' + _esc(digest.client_name)) if digest.client_name else 'Tenant ' + _esc(digest.tenant_id)} · generated {_fmt_datetime(datetime.now(UTC))}
     </div>
   </header>
 

@@ -32,7 +32,8 @@ def sql(statement) -> str:
 
 
 class FakeDB:
-    def __init__(self, got=None, rows=()):
+    def __init__(self, got=None, rows=(), client=None):
+        self.client = client
         self.got = got
         self.rows = list(rows)
         self.added = []
@@ -46,7 +47,7 @@ class FakeDB:
     async def execute(self, statement):
         self.executed.append(statement)
         rows = self.rows
-        return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: rows))
+        return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: rows), first=lambda: self.client)
 
     def add(self, obj):
         self.added.append(obj)
@@ -177,8 +178,8 @@ def digest(monkeypatch):
     return seen
 
 
-def digest_call(fmt="json", start=None, end=None, caller=None):
-    return run(rp.weekly_digest(fmt=fmt, period_start=start, period_end=end, db=FakeDB(), current_user=caller or user()))
+def digest_call(fmt="json", start=None, end=None, caller=None, client_id=None, client=None):
+    return run(rp.weekly_digest(fmt=fmt, period_start=start, period_end=end, client_id=client_id, db=FakeDB(client=client), current_user=caller or user()))
 
 
 def test_digest_json_is_the_built_digest_for_the_callers_tenant(digest):
@@ -227,3 +228,29 @@ def test_digest_pdf_is_503_when_weasyprint_is_missing(monkeypatch, digest):
 def test_digest_format_is_limited_to_json_html_pdf():
     param = next(p for p in __import__("inspect").signature(rp.weekly_digest).parameters.values() if p.name == "fmt")
     assert "json|html|pdf" in repr(param.default.metadata)
+
+
+def test_a_digest_for_one_of_the_callers_clients_is_built_for_that_client_and_names_it(digest):
+    child = uuid.uuid4()
+    got = digest_call(client_id=child, client=SimpleNamespace(id=child, name="Acme Dental"))
+    assert digest["tenant"] == child
+    assert got.client_name == "Acme Dental"
+
+
+def test_a_digest_for_a_tenant_that_is_not_one_of_the_callers_clients_is_not_found(digest):
+    with pytest.raises(HTTPException) as e:
+        digest_call(client_id=uuid.uuid4(), client=None)
+    assert e.value.status_code == 404
+    assert "tenant" not in digest
+
+
+def test_naming_the_callers_own_tenant_is_the_same_as_naming_none(digest):
+    digest_call(client_id=TENANT)
+    assert digest["tenant"] == TENANT
+
+
+def test_the_client_lookup_is_limited_to_the_callers_own_clients(digest):
+    child, db = uuid.uuid4(), FakeDB(client=SimpleNamespace(id=uuid.uuid4(), name="Acme"))
+    run(rp.weekly_digest(fmt="json", period_start=None, period_end=None, client_id=child, db=db, current_user=user()))
+    text = sql(db.executed[0])
+    assert "parenttenantid=" in text.replace("_", "").replace(" ", "").lower() and str(TENANT).replace("-", "") in text

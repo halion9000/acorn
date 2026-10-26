@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
 const api = vi.hoisted(() => ({ weeklyDigest: vi.fn(), weeklyDigestHtml: vi.fn() }));
-vi.mock('@/lib/api', () => ({ reportsApi: api }));
+const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
+vi.mock('@/lib/api', () => ({ reportsApi: api, msspApi: mssp }));
 
 import { ExecutiveDigest } from './ExecutiveDigest';
 
@@ -32,7 +33,7 @@ function renderIt() {
 
 const days = (p: { period_start: string; period_end: string }) => Math.round((Date.parse(p.period_end) - Date.parse(p.period_start)) / 86400_000);
 
-beforeEach(() => { api.weeklyDigest.mockReset(); api.weeklyDigestHtml.mockReset(); });
+beforeEach(() => { api.weeklyDigest.mockReset(); api.weeklyDigestHtml.mockReset(); mssp.listChildren.mockReset(); mssp.listChildren.mockResolvedValue([]); });
 afterEach(() => vi.unstubAllGlobals());
 
 describe('ExecutiveDigest', () => {
@@ -161,5 +162,30 @@ describe('ExecutiveDigest', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Print / Save as PDF' }));
     expect(await screen.findByText('render failed')).toBeInTheDocument();
     expect(screen.queryByText(/Pop-up blocked/)).toBeNull();
+  });
+});
+
+describe('ExecutiveDigest for a client', () => {
+  it('offers no client choice to an organisation with no clients, and asks for its own digest', async () => {
+    api.weeklyDigest.mockResolvedValue(digest());
+    renderIt();
+    await screen.findByText('Oct 1 to Oct 7');
+    expect(screen.queryByRole('combobox', { name: 'Client' })).toBeNull();
+    expect(api.weeklyDigest.mock.calls[0][0].client_id).toBeUndefined();
+  });
+
+  it('asks for the digest of one client, names the client, and prints that same digest', async () => {
+    mssp.listChildren.mockResolvedValue([{ id: 'c1', name: 'Acme Dental', mssp_role: 'client' }]);
+    api.weeklyDigest.mockImplementation(async (p: { client_id?: string }) => digest(p.client_id ? { client_name: 'Acme Dental' } : {}));
+    api.weeklyDigestHtml.mockResolvedValue('<html></html>');
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} }));
+    vi.stubGlobal('open', () => ({}));
+    renderIt();
+    await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Client' }), 'c1');
+    await screen.findByText('Acme Dental', { selector: 'p' });
+    expect(api.weeklyDigest.mock.calls.at(-1)![0].client_id).toBe('c1');
+    await userEvent.click(screen.getByRole('button', { name: /Print/ }));
+    await waitFor(() => expect(api.weeklyDigestHtml).toHaveBeenCalled());
+    expect(api.weeklyDigestHtml.mock.calls[0][0].client_id).toBe('c1');
   });
 });

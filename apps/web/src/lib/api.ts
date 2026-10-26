@@ -5768,6 +5768,8 @@ export interface DigestRecommendation {
 
 export interface ExecutiveDigest {
   tenant_id: string;
+  /** Set when the digest is for one of the caller's clients. */
+  client_name?: string | null;
   period: DigestPeriod;
   headline: string;
   alerts: AlertSummary;
@@ -5785,6 +5787,8 @@ export interface WeeklyDigestParams {
   period_start?: string;
   /** ISO timestamp for the end of the window. Defaults to now on the API. */
   period_end?: string;
+  /** One of the caller's clients, for a digest of that client alone. */
+  client_id?: string;
 }
 
 export const reportsApi = {
@@ -5811,6 +5815,7 @@ export const reportsApi = {
     const search = new URLSearchParams({ format: 'html' });
     if (params.period_start) search.set('period_start', params.period_start);
     if (params.period_end) search.set('period_end', params.period_end);
+    if (params.client_id) search.set('client_id', params.client_id);
 
     const headers: Record<string, string> = {
       Accept: 'text/html',

@@ -60,14 +60,14 @@ class TestTheEndpoints:
         db, u = RecordingDB(), user("real.reviewer@example.test")
         body = compliance.ReviewEvidenceRequest(decision="accepted", reviewer="ceo@victim-company.example")
         with pytest.raises(HTTPException):
-            await compliance.review_evidence(evidence_id=uuid.uuid4(), body=body, db=db, user=u)
+            await compliance.review_evidence(evidence_id=uuid.uuid4(), body=body, db=db, user=u, tenant=u.tenant_id)
         assert db.params[0]["reviewer"] == "real.reviewer@example.test"
 
     async def test_with_no_reviewer_named_it_is_still_the_user_and_not_an_object_repr(self):
         db, u = RecordingDB(), user("real.reviewer@example.test")
         with pytest.raises(HTTPException):
             await compliance.review_evidence(
-                evidence_id=uuid.uuid4(), body=compliance.ReviewEvidenceRequest(decision="accepted"), db=db, user=u
+                evidence_id=uuid.uuid4(), body=compliance.ReviewEvidenceRequest(decision="accepted"), db=db, user=u, tenant=u.tenant_id
             )
         assert db.params[0]["reviewer"] == "real.reviewer@example.test" and "object at" not in str(db.params[0]["reviewer"])
 
