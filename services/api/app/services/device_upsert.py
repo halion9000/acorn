@@ -18,7 +18,7 @@ from typing import Any
 from sqlalchemy import delete, func, select
 
 from app.models.device import Device, DeviceSource
-from app.services.device_identity import could_be_same_machine, hostname_key, ip_brand_pairs, is_placeholder_name, normalize_serial
+from app.services.device_identity import could_be_same_machine, hostname_key, ip_brand_pairs, is_placeholder_name, loose_name_key, normalize_serial
 
 
 @dataclass
@@ -141,7 +141,7 @@ async def possible_duplicates(db: Any, tenant_id: uuid.UUID) -> list[tuple[uuid.
         key = hostname_key(d.hostname)
         # A made-up name ("Device@10.7.220.92") is no evidence of anything; those devices are paired by address and maker below.
         if key and not is_placeholder_name(key) and not (d.id in only_screenconnect and not d.serial_number):
-            by_name.setdefault(key, []).append(d)
+            by_name.setdefault(loose_name_key(d.hostname) or key, []).append(d)
     pairs: list[tuple[uuid.UUID, uuid.UUID]] = []
     for group in by_name.values():
         for i, a in enumerate(group):
