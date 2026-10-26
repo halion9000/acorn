@@ -93,6 +93,7 @@ class TestTheImplication:
             "rules:view": ("rules:read",),
             "connectors:view": ("connectors:read",),
             "cases:work": ("cases:write",),
+            "billing:view": ("alerts:read",),
         }
 
     def test_no_implied_permission_is_a_platform_permission_and_nothing_implies_one(self):

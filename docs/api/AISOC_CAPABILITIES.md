@@ -21,7 +21,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | [audit](#audit) | 2 | 0 | `audit_log:read` |
 | [auth](#auth) | 8 | 6 | 4 signed-in with no permission declared; 10 with no sign-in required |
 | [autonomy-policy](#autonomy-policy) | 1 | 2 | 3 signed-in with no permission declared |
-| [billing](#billing) | 8 | 4 | `alerts:read`, `mssp:manage` |
+| [billing](#billing) | 8 | 4 | `billing:view`, `mssp:manage` |
 | [business-context](#business-context) | 1 | 4 | 5 signed-in with no permission declared |
 | [canary](#canary) | 1 | 0 | 1 with no sign-in required |
 | [cases](#cases) | 16 | 9 | `cases:read`, `cases:work`, `cases:write` |
@@ -220,18 +220,18 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 
 | Method | Path | What it does | Permission |
 | --- | --- | --- | --- |
-| GET | `/billing/changes` | Every change to a count across all clients in the last days, newest first | `alerts:read` |
-| GET | `/billing/clients/{client_id}` | What each tool counts for one client, and how each count moved | `alerts:read` |
-| GET | `/billing/clients/{client_id}/history` | One tool's count of one item for one client over time, as points for a chart | `alerts:read` |
-| GET | `/billing/data-quality` | Clients where a security tool counts noticeably fewer or more machines than the RMM manages, biggest gap first | `alerts:read` |
-| GET | `/billing/last-reported` | When each tool last reported a count for each client, silent ones first | `alerts:read` |
+| GET | `/billing/changes` | Every change to a count across all clients in the last days, newest first | `billing:view` |
+| GET | `/billing/clients/{client_id}` | What each tool counts for one client, and how each count moved | `billing:view` |
+| GET | `/billing/clients/{client_id}/history` | One tool's count of one item for one client over time, as points for a chart | `billing:view` |
+| GET | `/billing/data-quality` | Clients where a security tool counts noticeably fewer or more machines than the RMM manages, biggest gap first | `billing:view` |
+| GET | `/billing/last-reported` | When each tool last reported a count for each client, silent ones first | `billing:view` |
 | DELETE | `/billing/map` | Stop checking an invoice line against tool counts | `mssp:manage` |
-| GET | `/billing/map` | Which tool counts each invoice line is checked against, and the lines still to map | `alerts:read` |
+| GET | `/billing/map` | Which tool counts each invoice line is checked against, and the lines still to map | `billing:view` |
 | PUT | `/billing/map` | Say which tool counts an invoice line should equal | `mssp:manage` |
 | DELETE | `/billing/notes` | Stop accepting a difference for one client's invoice line | `mssp:manage` |
 | PUT | `/billing/notes` | Accept a difference between billed and counted for one client's invoice line, with a reason | `mssp:manage` |
-| GET | `/billing/reconcile` | Where what is billed and what the tools count disagree, biggest difference first | `alerts:read` |
-| GET | `/billing/summary` | Each tool's counts added across all clients, with the change over the window | `alerts:read` |
+| GET | `/billing/reconcile` | Where what is billed and what the tools count disagree, biggest difference first | `billing:view` |
+| GET | `/billing/summary` | Each tool's counts added across all clients, with the change over the window | `billing:view` |
 
 ## business-context
 

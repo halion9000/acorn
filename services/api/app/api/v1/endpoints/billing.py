@@ -131,7 +131,7 @@ async def _client_rows(db: Any, owner: uuid.UUID, cid: uuid.UUID, days: int, now
 
 
 @router.get("/clients/{client_id}", response_model=ClientCounts, summary="What each tool counts for one client, and how each count moved")
-async def client_counts(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 30) -> ClientCounts:
+async def client_counts(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, days: int = 30) -> ClientCounts:
     owner = current_user.tenant_id
     if client_id != owner:
         found = (await db.execute(select(Tenant.id).where(Tenant.id == client_id, Tenant.parent_tenant_id == owner))).scalar_one_or_none()
@@ -159,7 +159,7 @@ class CountSeries(BaseModel):
 
 @router.get("/clients/{client_id}/history", response_model=CountSeries, summary="One tool's count of one item for one client over time, as points for a chart")
 async def client_count_history(
-    client_id: uuid.UUID, source: str, item: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 90
+    client_id: uuid.UUID, source: str, item: str, current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, days: int = 90
 ) -> CountSeries:
     owner = current_user.tenant_id
     if client_id != owner:
@@ -195,7 +195,7 @@ class FleetTotals(BaseModel):
 
 
 @router.get("/summary", response_model=FleetTotals, summary="Each tool's counts added across all clients, with the change over the window")
-async def summary(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 30) -> FleetTotals:
+async def summary(current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, days: int = 30) -> FleetTotals:
     owner = current_user.tenant_id
     ids, _names = await _scope(db, owner, None)
     now = datetime.now(UTC)
@@ -220,7 +220,7 @@ class ChangeRow(BaseModel):
 
 @router.get("/changes", response_model=list[ChangeRow], summary="Every change to a count across all clients in the last days, newest first")
 async def changes_log(
-    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = 30, limit: int = 500, client_id: uuid.UUID | None = None, source: str | None = None
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, days: int = 30, limit: int = 500, client_id: uuid.UUID | None = None, source: str | None = None
 ) -> list[ChangeRow]:
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, client_id)
@@ -283,7 +283,7 @@ async def _mapping(db: Any, owner: uuid.UUID) -> dict[str, list[dict[str, str]]]
 
 
 @router.get("/map", response_model=MapOut, summary="Which tool counts each invoice line is checked against, and the lines still to map")
-async def billing_map(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> MapOut:
+async def billing_map(current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession) -> MapOut:
     owner = current_user.tenant_id
     mapping = await _mapping(db, owner)
     per_client, _names = await _all_client_counts(db, owner)
@@ -388,7 +388,7 @@ async def delete_note(client_id: uuid.UUID, invoice_item: str, current_user: Ann
 
 @router.get("/reconcile", response_model=ReconcileOut, summary="Where what is billed and what the tools count disagree, biggest difference first")
 async def reconcile_billing(
-    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, include_matches: bool = False, limit: int = 500
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, include_matches: bool = False, limit: int = 500
 ) -> ReconcileOut:
     owner = current_user.tenant_id
     mapping = await _mapping(db, owner)
@@ -429,7 +429,7 @@ class DataQualityOut(BaseModel):
 
 
 @router.get("/data-quality", response_model=DataQualityOut, summary="Clients where a security tool counts noticeably fewer or more machines than the RMM manages, biggest gap first")
-async def data_quality(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, limit: int = 500) -> DataQualityOut:
+async def data_quality(current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, limit: int = 500) -> DataQualityOut:
     owner = current_user.tenant_id
     per_client, names = await _all_client_counts(db, owner)
     rows = [DisagreementRow(client_id=d["client"], client_name=names.get(d["client"]) or str(d["client"]), tool=d["tool"], tool_count=d["tool_count"], baseline_count=d["baseline_count"], gap=d["gap"]) for d in endpoint_disagreements(per_client)]
@@ -450,7 +450,7 @@ class LastReportedRow(BaseModel):
 
 @router.get("/last-reported", response_model=list[LastReportedRow], summary="When each tool last reported a count for each client, silent ones first")
 async def last_reported_grid(
-    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, only_silent: bool = False, limit: int = 1000
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, only_silent: bool = False, limit: int = 1000
 ) -> list[LastReportedRow]:
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, None)

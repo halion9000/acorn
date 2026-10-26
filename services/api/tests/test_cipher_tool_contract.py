@@ -552,8 +552,12 @@ def test_an_estate_tool_is_a_get_that_needs_exactly_alerts_read_which_the_key_al
     """Assets, vulnerabilities, cloud posture and the identity graph are all alerts:read, so these fourteen tools add NO scope and NO width to
     CORE's key."""
     _tool, method, path, *_ = _case(name)
-    assert method == "GET" and set(required_permissions(_route(method, path))) == {"alerts:read"}, f"{name}: {method} {path}"
-    assert "alerts:read" in CORE_KEY_SCOPES
+    from app.core.security import permission_in
+
+    needed = set(required_permissions(_route(method, path)))
+    # The billing pages need billing:view, which alerts:read implies: the key still holds what they need and gains nothing.
+    assert method == "GET" and len(needed) == 1 and needed <= {"alerts:read", "billing:view"}, f"{name}: {method} {path}"
+    assert "alerts:read" in CORE_KEY_SCOPES and all(permission_in(CORE_KEY_SCOPES, p) for p in needed), f"{name}: the key must already hold {needed}"
 
 
 def test_the_estate_routes_are_gets_with_no_side_effects_in_their_handlers():

@@ -310,7 +310,7 @@ def verify_ed25519_signature(public_key_bytes: bytes, message: bytes, signature:
 # Names that are enforced somewhere in the code but are not (yet) granted to any role
 # beyond the "*" wildcard holders. They are valid permission names.
 _UNGRANTED_PERMISSIONS = frozenset(
-    {"sla:write", "mssp:onboard", "hunts:read", "intel:read", "alerts:triage", "rules:view", "connectors:view", "cases:work"}
+    {"sla:write", "mssp:onboard", "hunts:read", "intel:read", "alerts:triage", "rules:view", "connectors:view", "cases:work", "billing:view"}
 )  # hunts:read: held through lake:query (IMPLIED_BY below) or granted on its own  # noqa: E501
 
 
@@ -357,6 +357,9 @@ def known_permissions() -> frozenset[str]:
 # tasks, raising and deciding approvals (the human sign-off for destructive agent actions) and publishing or unpublishing investigation
 # replays: 14 routes. Everything that held `cases:write` still works on cases exactly as
 # before; a holder of `cases:work` alone can do those four things and nothing else in the API: CORE's key holds only this one.
+# `billing:view` (what each tool counts for each client, the changes, billed versus counted, the data quality and last-reported views: the GET routes under /billing) was
+# split out of `alerts:read`, so a role can be given the licence and count pages without the alerts, or the alerts without these pages once the owner removes the implication
+# for that role. Everything that held `alerts:read` still reads these pages exactly as before; a holder of `billing:view` alone can read them and nothing else.
 IMPLIED_BY: dict[str, tuple[str, ...]] = {
     "hunts:read": ("lake:query",),
     "intel:read": ("threat_intel:read",),
@@ -364,6 +367,7 @@ IMPLIED_BY: dict[str, tuple[str, ...]] = {
     "rules:view": ("rules:read",),
     "connectors:view": ("connectors:read",),
     "cases:work": ("cases:write",),
+    "billing:view": ("alerts:read",),
 }  # noqa: E501
 
 
