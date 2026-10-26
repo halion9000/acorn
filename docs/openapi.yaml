@@ -11514,6 +11514,109 @@ paths:
                 $ref: '#/components/schemas/FleetOut'
       security:
       - HTTPBearer: []
+  /api/v1/client-posture/fleet/weights:
+    get:
+      tags:
+      - posture
+      summary: The checks whose weight differs from the default of 1
+      operationId: fleet_weights_api_v1_client_posture_fleet_weights_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/WeightOut'
+                type: array
+                title: Response Fleet Weights Api V1 Client Posture Fleet Weights
+                  Get
+      security:
+      - HTTPBearer: []
+  /api/v1/client-posture/fleet/weights/{key}:
+    put:
+      tags:
+      - posture
+      summary: Make a check count more (2 to 5 times) towards every client's score,
+        or 1 for the default
+      operationId: set_weight_api_v1_client_posture_fleet_weights__key__put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WeightIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeightOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/{client_id}/score-breakdown:
+    get:
+      tags:
+      - posture
+      summary: 'Where a client''s lost points went: each check that is not met and
+        what it cost, biggest first'
+      operationId: client_score_breakdown_api_v1_client_posture__client_id__score_breakdown_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreBreakdownOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/fleet/tools:
+    get:
+      tags:
+      - posture
+      summary: 'Each tool''s checks across all clients: how many are fine and how
+        many clients have a problem from it, worst first'
+      operationId: fleet_tools_api_v1_client_posture_fleet_tools_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ToolScorecard'
+                type: array
+                title: Response Fleet Tools Api V1 Client Posture Fleet Tools Get
+      security:
+      - HTTPBearer: []
   /api/v1/client-posture/fleet/search:
     get:
       tags:
@@ -35726,6 +35829,57 @@ components:
       - findings_closed
       - error_message
       title: ScanRunOut
+    ScoreBreakdownOut:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Score
+        lost:
+          type: number
+          title: Lost
+        rows:
+          items:
+            $ref: '#/components/schemas/ScoreBreakdownRow'
+          type: array
+          title: Rows
+      type: object
+      required:
+      - client_id
+      - score
+      - lost
+      - rows
+      title: ScoreBreakdownOut
+    ScoreBreakdownRow:
+      properties:
+        source:
+          type: string
+          title: Source
+        key:
+          type: string
+          title: Key
+        status:
+          type: string
+          title: Status
+        weight:
+          type: integer
+          title: Weight
+        points_lost:
+          type: number
+          title: Points Lost
+      type: object
+      required:
+      - source
+      - key
+      - status
+      - weight
+      - points_lost
+      title: ScoreBreakdownRow
     ScoreDay:
       properties:
         day:
@@ -38721,6 +38875,41 @@ components:
       - of
       - percent
       title: ToolCoverage
+    ToolScorecard:
+      properties:
+        source:
+          type: string
+          title: Source
+        checks:
+          type: integer
+          title: Checks
+        met:
+          type: integer
+          title: Met
+        partly:
+          type: integer
+          title: Partly
+        not_met:
+          type: integer
+          title: Not Met
+        clients_with_problems:
+          type: integer
+          title: Clients With Problems
+        percent_fine:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Percent Fine
+      type: object
+      required:
+      - source
+      - checks
+      - met
+      - partly
+      - not_met
+      - clients_with_problems
+      - percent_fine
+      title: ToolScorecard
     TopCostCase:
       properties:
         case_id:
@@ -40622,6 +40811,28 @@ components:
       - https_redirect
       - headers
       title: WebPosture
+    WeightIn:
+      properties:
+        weight:
+          type: integer
+          title: Weight
+      type: object
+      required:
+      - weight
+      title: WeightIn
+    WeightOut:
+      properties:
+        key:
+          type: string
+          title: Key
+        weight:
+          type: integer
+          title: Weight
+      type: object
+      required:
+      - key
+      - weight
+      title: WeightOut
     WhitelistCreate:
       properties:
         action_type:

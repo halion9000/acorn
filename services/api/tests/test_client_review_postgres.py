@@ -678,3 +678,48 @@ async def test_comments_on_a_check_are_added_in_order_counted_on_the_check_and_k
     with pytest.raises(HTTPException) as e3:
         await run(world["msp"], lambda db: cp.add_check_comment(world["client"], "bad key!", cp.CommentIn(body="hello"), user, db))
     assert e3.value.status_code == 422
+
+
+async def test_a_check_weight_changes_the_score_in_the_fleet_the_daily_history_and_the_breakdown(world):
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'ninjaone', 'n-13', 'n-13', 'n-13', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+    checks = [{"key": "backup", "status": "not_met", "evidence": ""}, {"key": "patching", "status": "met", "evidence": ""}, {"key": "av", "status": "met", "evidence": ""}]
+    report = ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-13", checks=checks)
+    user = NS(tenant_id=world["msp"], user_id=None)
+
+    def mine(fleet):
+        return next(c for c in fleet.clients if c.client_id == world["client"])
+
+    cp.fleet_cache.clear()
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report))
+    assert mine(await run(world["msp"], lambda db: cp.fleet_summary(NS(tenant_id=world["msp"]), db))).score == 67
+    out = await run(world["msp"], lambda db: cp.set_weight("backup", cp.WeightIn(weight=3), user, db))
+    assert (out.key, out.weight) == ("backup", 3)
+    assert [(w.key, w.weight) for w in await run(world["msp"], lambda db: cp.fleet_weights(NS(tenant_id=world["msp"]), db))] == [("backup", 3)]
+    assert mine(await run(world["msp"], lambda db: cp.fleet_summary(NS(tenant_id=world["msp"]), db))).score == 40, "the fleet page uses the weight"
+    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report))
+    hist = await run(world["msp"], lambda db: cp.score_history(world["client"], NS(tenant_id=world["msp"]), db))
+    assert hist.rows[-1].score == 40, "the day's history row is recomputed with the weight at the next report"
+    b = await run(world["msp"], lambda db: cp.client_score_breakdown(world["client"], NS(tenant_id=world["msp"]), db))
+    assert (b.score, b.lost) == (40, 60.0) and [(r.key, r.points_lost) for r in b.rows] == [("backup", 60.0)]
+    tools = await run(world["msp"], lambda db: cp.fleet_tools(NS(tenant_id=world["msp"]), db))
+    assert any(t.source == "ninjaone" and t.not_met >= 1 for t in tools)
+    for bad_key, bad_weight in (("backup", 6), ("backup", 0), ("bad key!", 2)):
+        with pytest.raises(HTTPException) as e:
+            await run(world["msp"], lambda db: cp.set_weight(bad_key, cp.WeightIn(weight=bad_weight), user, db))
+        assert e.value.status_code == 422
+    with pytest.raises(HTTPException) as e2:
+        await run(world["msp"], lambda db: cp.client_score_breakdown(world["stranger"], NS(tenant_id=world["msp"]), db))
+    assert e2.value.status_code == 404
+    await run(world["msp"], lambda db: cp.set_weight("backup", cp.WeightIn(weight=1), user, db))
+    assert await run(world["msp"], lambda db: cp.fleet_weights(NS(tenant_id=world["msp"]), db)) == [], "a weight of 1 is the default and is removed"

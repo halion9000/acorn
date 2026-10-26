@@ -25,13 +25,14 @@ from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.identity_source import IdentitySource
 from app.services.audit import emit_audit
-from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, ClientCheckComment, ClientCheckOwner, ClientScoreHistory, ClientScoreTarget, CoreSweepRun, IdentityMfaUser
+from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, CheckWeight, ClientCheckComment, ClientCheckOwner, ClientScoreHistory, ClientScoreTarget, CoreSweepRun, IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
 from app.services import fleet_cache
+from app.services.score_history import load_weights
 from app.services.score_history import trend as score_trend
-from app.services.fleet_posture import average_score, below_target, is_overdue, search_checks, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import MAX_WEIGHT, average_score, below_target, is_overdue, score_breakdown, search_checks, tool_scorecards, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
@@ -773,12 +774,86 @@ async def fleet_summary(current_user: Annotated[AuthUser, Depends(require_permis
     except Exception:  # noqa: BLE001
         targets = {}
     summaries = []
+    weights = await load_weights(db, owner)
     for cid, rows in by_client.items():
-        s = summarize(rows)
+        s = summarize(rows, weights)
         target = targets.get(uuid.UUID(cid))
         summaries.append({"client_id": uuid.UUID(cid), "client_name": names.get(uuid.UUID(cid)), "stale_tools": stale_sources(refreshed.get(uuid.UUID(cid), {}), now), "target": target, "below_target": below_target(s["score"], target), **s})
     ranked = rank_clients(summaries)
     return FleetOut(generated_at=now, clients=[FleetClient(**s) for s in ranked], average_score=average_score([s["score"] for s in ranked]))
+
+
+class WeightOut(BaseModel):
+    key: str
+    weight: int
+
+
+class WeightIn(BaseModel):
+    weight: int
+
+
+@router.get("/fleet/weights", response_model=list[WeightOut], summary="The checks whose weight differs from the default of 1")
+async def fleet_weights(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> list[WeightOut]:
+    return [WeightOut(key=k, weight=w) for k, w in sorted((await load_weights(db, current_user.tenant_id)).items())]
+
+
+@router.put("/fleet/weights/{key}", response_model=WeightOut, summary="Make a check count more (2 to 5 times) towards every client's score, or 1 for the default")
+async def set_weight(key: str, body: WeightIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> WeightOut:
+    owner = current_user.tenant_id
+    if not _check_key_ok(key):
+        raise HTTPException(status_code=422, detail="That is not a check key")
+    if not 1 <= body.weight <= MAX_WEIGHT:
+        raise HTTPException(status_code=422, detail=f"A weight is 1 to {MAX_WEIGHT}")
+    if body.weight == 1:
+        await db.execute(delete(CheckWeight).where(CheckWeight.tenant_id == owner, CheckWeight.key == key))
+    else:
+        values = {"tenant_id": owner, "key": key, "weight": body.weight, "updated_by": current_user.user_id, "updated_at": datetime.now(UTC)}
+        stmt = pg_insert(CheckWeight).values(values)
+        await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in ("weight", "updated_by", "updated_at")}))
+    await db.commit()
+    fleet_cache.clear()
+    return WeightOut(key=key, weight=body.weight)
+
+
+class ScoreBreakdownRow(BaseModel):
+    source: str
+    key: str
+    status: str
+    weight: int
+    points_lost: float
+
+
+class ScoreBreakdownOut(BaseModel):
+    client_id: uuid.UUID
+    score: int | None
+    lost: float
+    rows: list[ScoreBreakdownRow]
+
+
+@router.get("/{client_id}/score-breakdown", response_model=ScoreBreakdownOut, summary="Where a client's lost points went: each check that is not met and what it cost, biggest first")
+async def client_score_breakdown(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> ScoreBreakdownOut:
+    owner = current_user.tenant_id
+    await _client_of_owner(db, owner, client_id)
+    checks, _names, _refreshed = await _fleet_checks(db, owner)
+    mine = [c for c in checks if c.client_id == str(client_id)]
+    b = score_breakdown(mine, await load_weights(db, owner))
+    return ScoreBreakdownOut(client_id=client_id, score=b["score"], lost=b["lost"], rows=[ScoreBreakdownRow(**r) for r in b["rows"]])
+
+
+class ToolScorecard(BaseModel):
+    source: str
+    checks: int
+    met: int
+    partly: int
+    not_met: int
+    clients_with_problems: int
+    percent_fine: int | None
+
+
+@router.get("/fleet/tools", response_model=list[ToolScorecard], summary="Each tool's checks across all clients: how many are fine and how many clients have a problem from it, worst first")
+async def fleet_tools(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> list[ToolScorecard]:
+    checks, _names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
+    return [ToolScorecard(**t) for t in tool_scorecards(checks)]
 
 
 class SearchHit(BaseModel):

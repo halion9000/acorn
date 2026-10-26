@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
 
-import { FleetPosture, changeWord, clientHref, endsText, groupSelection } from './FleetPosture';
+import { FleetPosture, changeWord, clientHref, endsText, groupSelection, pointsText } from './FleetPosture';
 
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 
@@ -24,6 +24,13 @@ beforeEach(() => {
         ],
       });
     if (url.includes('/fleet/boards/renewals')) return json({ board: 'renewals', title: 'Renewals', keys: [], rows: [{ client_id: 'c1', client_name: 'Acme', source: 'meraki', key: 'meraki_licence', status: 'not_met', evidence: 'The Meraki licence has expired', accepted: false, owner: 'Dana R', due_date: '2026-10-01', overdue: true }] });
+    if (url.endsWith('/c1/score-breakdown'))
+      return json({ client_id: 'c1', score: 40, lost: 60, rows: [{ source: 'ninjaone', key: 'ninjaone_antivirus', status: 'not_met', weight: 3, points_lost: 45 }, { source: 'ninjaone', key: 'ninjaone_patching', status: 'partly', weight: 1, points_lost: 7.5 }] });
+    if (url.endsWith('/fleet/tools'))
+      return json([{ source: 'slide', checks: 3, met: 1, partly: 0, not_met: 2, clients_with_problems: 2, percent_fine: 33 }, { source: 'ninjaone', checks: 8, met: 6, partly: 1, not_met: 1, clients_with_problems: 2, percent_fine: 81 }]);
+    if (url.endsWith('/fleet/weights'))
+      return json([{ key: 'ninjaone_antivirus', weight: 3 }]);
+    if (url.includes('/fleet/weights/')) return json({ key: 'x', weight: 2 });
     if (url.includes('/fleet/search'))
       return json([{ client_id: 'c1', client_name: 'Acme', source: 'ninjaone', key: 'ninjaone_patching', status: 'not_met', evidence: '3 behind', matched_items: ['srv-02: 40 days'], matched_text: false, accepted: false }]);
     if (url.endsWith('/fleet/acceptances'))
@@ -88,6 +95,50 @@ describe('accepting from a board', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('1 could not be done: Client not found');
     const body = JSON.parse(authFetch.mock.calls.find((c) => c[1]?.method === 'POST')![1].body);
     expect(body).toEqual({ key: 'meraki_licence', client_ids: ['c1'], reason: 'No firewall on site', not_applicable: true });
+  });
+});
+
+describe('why a score is what it is', () => {
+  it('formats the points a check cost', () => expect(pointsText(33.333)).toBe('-33.3 points'));
+
+  it('lists what cost a client its points, biggest first, with the weight of a heavy check', async () => {
+    render(<FleetPosture />);
+    const row = await screen.findByTestId('fleet-client-c1');
+    await userEvent.click(within(row).getByText('Why'));
+    const list = await screen.findByTestId('why-c1');
+    const items = within(list).getAllByRole('listitem').map((li) => li.textContent);
+    expect(items[0]).toContain('ninjaone antivirus');
+    expect(items[0]).toContain('counts 3 times');
+    expect(items[0]).toContain('-45.0 points');
+    expect(items[1]).toContain('-7.5 points');
+    await userEvent.click(within(row).getByText('Hide'));
+    expect(screen.queryByTestId('why-c1')).toBeNull();
+  });
+});
+
+describe('FleetPosture tools and weights', () => {
+  it('ranks the tools by how many of their checks are fine and lists the weights that are set', async () => {
+    render(<FleetPosture />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Tools' }));
+    const table = await screen.findByTestId('fleet-tools');
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(rows[0]).toHaveTextContent(/slide/i);
+    expect(rows[0]).toHaveTextContent('33%');
+    expect(await screen.findByTestId('fleet-weights')).toHaveTextContent('ninjaone antivirus: counts 3 times');
+  });
+
+  it('sets a weight for a check key and resets one', async () => {
+    render(<FleetPosture />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Tools' }));
+    await screen.findByTestId('fleet-weights');
+    await userEvent.type(screen.getByLabelText('Check key'), 'huntress_protection');
+    await userEvent.selectOptions(screen.getByLabelText('Weight'), '4');
+    await userEvent.click(screen.getByText('Set weight'));
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => c[1]?.method === 'PUT' && String(c[0]).endsWith('/fleet/weights/huntress_protection'))).toBe(true));
+    expect(JSON.parse(authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')![1].body)).toEqual({ weight: 4 });
+    await userEvent.click(screen.getByText('Reset'));
+    await waitFor(() => expect(authFetch.mock.calls.filter((c) => c[1]?.method === 'PUT' && String(c[0]).endsWith('/fleet/weights/ninjaone_antivirus')).length).toBe(1));
+    expect(JSON.parse(authFetch.mock.calls.filter((c) => c[1]?.method === 'PUT').at(-1)![1].body)).toEqual({ weight: 1 });
   });
 });
 

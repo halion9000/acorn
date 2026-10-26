@@ -34,7 +34,7 @@ from app.models.signin import ClientCheckHistory, ClientM365Check, CoreSweepRun,
 from app.models.tenant import Tenant
 from app.services import fleet_cache
 from app.services.check_history import changes as check_changes
-from app.services.score_history import record_today
+from app.services.score_history import load_weights, record_today
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
 from app.services.infra_review import CIPP_BASELINE_SOURCE, SAAS_SOURCES, TOOL_CHECK_SOURCES
 from app.services.m365_review import M365Answer, m365_answers
@@ -193,6 +193,7 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
     now = now or datetime.now(UTC)
     by_tenant, unmapped, ignored, waiting = await targets_by_tenant(db, owner, _M365View(report))
     accepted = 0
+    weights = await load_weights(db, owner)  # the owner's weights are read here, in the owner's scope: the client scope below cannot see them
     for tid in by_tenant:
         async with acting_as_tenant(db, tid):
             source = report.source or report.vendor
@@ -207,7 +208,7 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
             await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source"], set_=update))
             try:
                 async with db.begin_nested():  # a failure to keep the daily score (an older database without the table) must not lose the checks
-                    await record_today(db, tid, now)
+                    await record_today(db, tid, now, weights)
             except Exception:  # noqa: BLE001
                 logger.warning("score history not recorded for %s", tid, exc_info=True)
             accepted += 1

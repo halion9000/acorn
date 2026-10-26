@@ -147,3 +147,46 @@ def test_a_search_needs_two_characters_and_respects_the_limit_and_extra_spaces()
     checks = [_fc(f"C{i}", "k", "not_met", "disk full on host") for i in range(5)]
     assert search_checks(checks, "d") == [] and search_checks(checks, "  ") == []
     assert len(search_checks(checks, "  DISK   full ", limit=3)) == 3
+
+
+def test_a_heavier_check_moves_the_score_further_and_the_counts_stay_plain_counts():
+    from app.services.fleet_posture import summarize
+
+    checks = [_fc("A", "backup", "not_met"), _fc("A", "patching", "met"), _fc("A", "av", "met")]
+    assert summarize(checks)["score"] == 67, "(0 + 1 + 1) / 3"
+    heavy = summarize(checks, {"backup": 3})
+    assert heavy["score"] == 40, "(0*3 + 1 + 1) / (3 + 1 + 1)"
+    assert (heavy["met"], heavy["not_met"]) == (2, 1)
+    assert summarize(checks, {"backup": 99})["score"] == 29, "a weight above 5 counts as 5: 2 / 7"
+    assert summarize(checks, {"backup": 0})["score"] == 67, "a weight below 1 counts as 1"
+    assert summarize(checks, {"unrelated": 5})["score"] == 67
+
+
+def test_the_breakdown_adds_up_to_the_points_lost_biggest_first_and_leaves_out_accepted_checks():
+    from app.services.fleet_posture import score_breakdown
+
+    checks = [_fc("A", "backup", "not_met"), _fc("A", "patching", "partly"), _fc("A", "av", "met"), _fc("A", "wan", "not_met", accepted=True)]
+    b = score_breakdown(checks)
+    assert b["score"] == 50 and b["lost"] == 50.0, "(0 + .5 + 1) / 3 = 50%"
+    assert [(r["key"], r["points_lost"]) for r in b["rows"]] == [("backup", 33.3), ("patching", 16.7)]
+    heavy = score_breakdown(checks, {"backup": 3})
+    assert [(r["key"], r["points_lost"], r["weight"]) for r in heavy["rows"]] == [("backup", 60.0, 3), ("patching", 10.0, 1)]
+    assert round(sum(r["points_lost"] for r in heavy["rows"]), 1) == heavy["lost"] == 70.0
+    assert score_breakdown([_fc("A", "k", "not_met", accepted=True)]) == {"score": None, "lost": 0.0, "rows": []}
+
+
+def test_tool_scorecards_rank_the_tool_with_most_problems_first_and_count_clients_not_checks():
+    from app.services.fleet_posture import tool_scorecards
+
+    checks = [
+        _fc("A", "k1", "not_met", source="slide"),
+        _fc("A", "k2", "not_met", source="slide"),
+        _fc("B", "k1", "met", source="slide"),
+        _fc("A", "k3", "met", source="ninjaone"),
+        _fc("B", "k3", "partly", source="ninjaone"),
+        _fc("C", "k3", "not_met", source="ninjaone", accepted=True),
+    ]
+    out = tool_scorecards(checks)
+    assert [(t["source"], t["checks"], t["percent_fine"], t["clients_with_problems"]) for t in out] == [("slide", 3, 33, 1), ("ninjaone", 2, 75, 1)]
+    assert (out[0]["met"], out[0]["partly"], out[0]["not_met"]) == (1, 0, 2)
+    assert tool_scorecards([]) == []

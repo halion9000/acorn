@@ -49,10 +49,23 @@ class FleetCheck:
     due_date: date | None = None
 
 
-def summarize(checks: list[FleetCheck]) -> dict[str, Any]:
-    """One client's counts and score. The score is the share of its checks that are fine (a check that is only partly fine counts half), over the checks nobody has accepted; None when there are none."""
+DEFAULT_WEIGHT = 1
+MAX_WEIGHT = 5
+
+
+def weight_of(key: str, weights: dict[str, int] | None) -> int:
+    """How much a check counts: the owner's weight for it (1 to 5), else 1."""
+    w = (weights or {}).get(key, DEFAULT_WEIGHT)
+    return max(DEFAULT_WEIGHT, min(MAX_WEIGHT, int(w)))
+
+
+def summarize(checks: list[FleetCheck], weights: dict[str, int] | None = None) -> dict[str, Any]:
+    """One client's counts and score. The score is the share of its checks that are fine (a check that is only partly fine counts half), over the checks nobody has accepted; None when there are none.
+
+    A check counts as many times as its weight (1 unless the owner raised it, up to 5): the counts stay plain counts of checks, but a heavier check moves the score further."""
     counted = [c for c in checks if not c.accepted and c.status in STATUS_WEIGHT]
-    score = int(100 * sum(STATUS_WEIGHT[c.status] for c in counted) / len(counted) + 0.5) if counted else None
+    total = sum(weight_of(c.key, weights) for c in counted)
+    score = int(100 * sum(weight_of(c.key, weights) * STATUS_WEIGHT[c.status] for c in counted) / total + 0.5) if counted else None
     return {
         "score": score,
         "met": sum(1 for c in counted if c.status == "met"),
@@ -93,6 +106,47 @@ def search_checks(checks: list[FleetCheck], query: str, limit: int = 100) -> lis
         )
     out.sort(key=lambda r: (STATUS_ORDER.get(r["status"], 3), r["client_name"].lower(), r["key"]))
     return out[: max(1, limit)]
+
+
+def score_breakdown(checks: list[FleetCheck], weights: dict[str, int] | None = None) -> dict[str, Any]:
+    """Where a client's lost points went: for every counted check that is not fully met, how many points of the score it cost, biggest first.
+
+    The points of all rows add up to ``lost`` (100 minus the unrounded score), so the list explains the whole gap. Accepted checks are left out of both sides, as in the score. None for the score when no check counts.
+    """
+    counted = [c for c in checks if not c.accepted and c.status in STATUS_WEIGHT]
+    total = sum(weight_of(c.key, weights) for c in counted)
+    if not counted:
+        return {"score": None, "lost": 0.0, "rows": []}
+    rows = [
+        {"source": c.source, "key": c.key, "status": c.status, "weight": weight_of(c.key, weights), "points_lost": round(100 * weight_of(c.key, weights) * (1 - STATUS_WEIGHT[c.status]) / total, 1)}
+        for c in counted
+        if STATUS_WEIGHT[c.status] < 1
+    ]
+    rows.sort(key=lambda r: (-r["points_lost"], r["key"]))
+    lost = 100 * sum(weight_of(c.key, weights) * (1 - STATUS_WEIGHT[c.status]) for c in counted) / total
+    return {"score": int(100 - lost + 0.5), "lost": round(lost, 1), "rows": rows}
+
+
+def tool_scorecards(checks: list[FleetCheck]) -> list[dict[str, Any]]:
+    """For each tool: how many checks it reported across clients, how many are met, partly met and not met, how many clients have a problem from it, and the share of its checks that are fine.
+
+    Accepted checks are left out. Worst tool (lowest share fine) first; a tool with no counted checks goes last. Answers "which tool has the most problems across clients".
+    """
+    by: dict[str, dict[str, Any]] = {}
+    for c in checks:
+        if c.accepted or c.status not in STATUS_WEIGHT:
+            continue
+        t = by.setdefault(c.source, {"source": c.source, "checks": 0, "met": 0, "partly": 0, "not_met": 0, "clients_with_problems": set()})
+        t["checks"] += 1
+        t[c.status] += 1
+        if c.status != "met":
+            t["clients_with_problems"].add(c.client_id)
+    out = []
+    for t in by.values():
+        share = int(100 * (t["met"] + 0.5 * t["partly"]) / t["checks"] + 0.5) if t["checks"] else None
+        out.append({"source": t["source"], "checks": t["checks"], "met": t["met"], "partly": t["partly"], "not_met": t["not_met"], "clients_with_problems": len(t["clients_with_problems"]), "percent_fine": share})
+    out.sort(key=lambda r: (r["percent_fine"] is None, r["percent_fine"] if r["percent_fine"] is not None else 0, -r["not_met"], r["source"]))
+    return out
 
 
 def is_overdue(status: str, due: date | None, today: date) -> bool:

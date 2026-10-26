@@ -555,6 +555,30 @@
     }
   },
   {
+    "tool": "aisoc_fleet_tools",
+    "method": "GET",
+    "path": "/client-posture/fleet/tools",
+    "query": [],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_score_breakdown",
+    "method": "GET",
+    "path": "/client-posture/{client_id}/score-breakdown",
+    "query": [],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_check_weights",
+    "method": "GET",
+    "path": "/client-posture/fleet/weights",
+    "query": [],
+    "enums": {},
+    "numbers": {}
+  },
+  {
     "tool": "aisoc_fleet_boards",
     "method": "GET",
     "path": "/client-posture/fleet/boards",

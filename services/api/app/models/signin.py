@@ -315,3 +315,15 @@ class BillingDifferenceNote(Base):
     difference: Mapped[int] = mapped_column(Integer, nullable=False)
     updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class CheckWeight(Base):
+    """How much a check counts towards every client's score, 1 to 5 (migration 112)."""
+
+    __tablename__ = "check_weights"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    weight: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
