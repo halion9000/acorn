@@ -380,7 +380,7 @@ export function AlertRow({
 
 // ─── Main View ────────────────────────────────────────────────────────────────
 
-/** The list's starting filters from the address: ?device=HOST narrows to a machine, ?status=all|open|new|... picks a status tab (the default is Open all). */
+/** The list's starting filters from the address: ?device=HOST narrows to a machine, ?status=all|open|new|... picks a status tab (the default is Open all), ?source=huntress and ?q=text narrow to one tool's alerts or a title search (the Vendor detections rows use them). */
 export function filtersFromUrl(params: URLSearchParams | null): AlertFilters {
   const read = (name: string): string => {
     const fromRouter = params?.get(name);
@@ -391,19 +391,21 @@ export function filtersFromUrl(params: URLSearchParams | null): AlertFilters {
   const client = read('client').trim().slice(0, 64) || undefined;
   const severityWanted = read('severity');
   const severity = ['critical', 'high', 'medium', 'low', 'info'].includes(severityWanted) ? severityWanted : undefined;
+  const source = read('source').trim().slice(0, 64) || undefined;
+  const search = read('q').trim().slice(0, 300) || undefined;
   const ticketWanted = read('ticket');
   const ticket = ticketWanted === 'none' || ticketWanted === 'linked' ? ticketWanted : undefined;
   const wanted = read('status');
   let status: string | undefined = 'open';
   if (wanted === 'all') status = undefined;
   else if (['open', 'new', 'investigating', 'resolved', 'false_positive'].includes(wanted)) status = wanted;
-  return { page: 1, pageSize: 25, ...(status ? { status } : {}), ...(device ? { device } : {}), ...(client ? { clientId: client } : {}), ...(severity ? { severity } : {}), ...(ticket ? { ticket } : {}) };
+  return { page: 1, pageSize: 25, ...(status ? { status } : {}), ...(device ? { device } : {}), ...(client ? { clientId: client } : {}), ...(severity ? { severity } : {}), ...(ticket ? { ticket } : {}), ...(source ? { source } : {}), ...(search ? { search } : {}) };
 }
 
 export function AlertsView() {
   // Reading window.location during a client-side navigation gives the PREVIOUS page's address, so the router's parameters are used.
   const urlParams = useSearchParams();
-  const urlKey = `${urlParams?.get('device') ?? ''}|${urlParams?.get('status') ?? ''}|${urlParams?.get('client') ?? ''}|${urlParams?.get('severity') ?? ''}|${urlParams?.get('ticket') ?? ''}`;
+  const urlKey = `${urlParams?.get('device') ?? ''}|${urlParams?.get('status') ?? ''}|${urlParams?.get('client') ?? ''}|${urlParams?.get('severity') ?? ''}|${urlParams?.get('ticket') ?? ''}|${urlParams?.get('source') ?? ''}|${urlParams?.get('q') ?? ''}`;
   const [filters, setFilters] = useState<AlertFilters>(() => filtersFromUrl(urlParams));
   const [seenUrlKey, setSeenUrlKey] = useState(urlKey);
   if (seenUrlKey !== urlKey) {
@@ -412,7 +414,7 @@ export function AlertsView() {
     setFilters(filtersFromUrl(urlParams));
   }
   // The filters picked last time come back, unless this visit came from a link that names a device or a status (those links must open exactly what they say).
-  const deepLinked = !!(urlParams?.get('device') || urlParams?.get('status') || urlParams?.get('client') || urlParams?.get('severity') || urlParams?.get('ticket'));
+  const deepLinked = !!(urlParams?.get('device') || urlParams?.get('status') || urlParams?.get('client') || urlParams?.get('severity') || urlParams?.get('ticket') || urlParams?.get('source') || urlParams?.get('q'));
   const [filtersRestored, setFiltersRestored] = useState(false);
   useEffect(() => {
     if (!deepLinked) {

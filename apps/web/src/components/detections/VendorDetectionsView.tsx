@@ -22,6 +22,11 @@ type Detection = NonNullable<ReturnType<typeof detectionApi.vendorDetections> ex
 const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const;
 const RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
 
+/** The alerts behind a row: that tool's alerts whose title is the detection, every status (the row counts the last 30 days, open or not). */
+export function alertsHref(r: { source: string; name: string }): string {
+  return `/alerts?status=all&source=${encodeURIComponent(r.source)}&q=${encodeURIComponent(r.name)}`;
+}
+
 const COLUMNS: Column<Detection>[] = [
   { key: 'tool', label: 'Tool', value: (r) => vendorLabel(r.source), filter: 'none' },
   { key: 'detection', label: 'Detection', value: (r) => r.name, filter: 'text' },
@@ -165,11 +170,19 @@ export function VendorDetectionsView() {
                         <span className="text-gray-300">{vendorLabel(r.source)}</span>
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-gray-100">{r.name}</td>
+                    <td className="px-3 py-2 text-gray-100">
+                      <Link href={alertsHref(r)} className="hover:text-blue-300 hover:underline" title="Open these alerts">
+                        {r.name}
+                      </Link>
+                    </td>
                     <td className="px-3 py-2">
                       <span className={`rounded-full border px-2 py-0.5 text-xs ${SEVERITY_STYLE[r.severity] ?? SEVERITY_STYLE.info}`}>{r.severity}</span>
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-gray-200">{r.count}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-gray-200">
+                      <Link href={alertsHref(r)} className="hover:text-blue-300 hover:underline">
+                        {r.count}
+                      </Link>
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums text-gray-200">{r.open}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-gray-200">{r.clients}</td>
                     <td className="px-3 py-2 text-gray-400">

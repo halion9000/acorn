@@ -6,7 +6,7 @@ import { SWRConfig } from 'swr';
 const api = vi.hoisted(() => ({ vendorDetections: vi.fn() }));
 vi.mock('@/lib/api', () => ({ detectionApi: { vendorDetections: api.vendorDetections } }));
 
-import { VendorDetectionsView } from './VendorDetectionsView';
+import { VendorDetectionsView, alertsHref } from './VendorDetectionsView';
 
 const DATA = {
   window_days: 30,
@@ -103,5 +103,18 @@ describe('VendorDetectionsView', () => {
     show();
     expect(await screen.findByText(/Could not load vendor detections/i)).toBeInTheDocument();
     expect(screen.getByText(/boom/)).toBeInTheDocument();
+  });
+
+  it('opens the alerts behind a detection from its name or its count', async () => {
+    api.vendorDetections.mockResolvedValue(DATA);
+    show();
+    const table = await screen.findByRole('table');
+    const expected = '/alerts?status=all&source=huntress&q=Malicious%20Process';
+    expect(within(table).getByRole('link', { name: 'Malicious Process' })).toHaveAttribute('href', expected);
+    expect(within(table).getByRole('link', { name: '5' })).toHaveAttribute('href', expected);
+  });
+
+  it('builds the address safely for names with spaces, symbols and quotes', () => {
+    expect(alertsHref({ source: 'threatmate', name: 'A&B "x" = 100%?' })).toBe('/alerts?status=all&source=threatmate&q=A%26B%20%22x%22%20%3D%20100%25%3F');
   });
 });
