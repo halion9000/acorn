@@ -499,7 +499,7 @@ export default function DevicesView() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-gray-800">
+      <div className={`overflow-x-auto rounded-lg border border-gray-800 transition-opacity ${loading && data ? "opacity-50" : ""}`} aria-busy={loading} data-testid="devices-table">
         <table className="w-full text-left text-sm">
           <thead className="bg-gray-900 text-xs uppercase text-gray-400">
             <tr>
@@ -536,13 +536,22 @@ export default function DevicesView() {
 
       {data && data.pages > 1 && (
         <div className="flex items-center gap-3 text-sm text-gray-300">
-          <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded border border-gray-700 px-3 py-1 disabled:opacity-40">
+          <button type="button" disabled={page <= 1 || loading} onClick={() => setPage(page - 1)} className="rounded border border-gray-700 px-3 py-1 disabled:opacity-40">
             Previous
           </button>
-          <span>
-            Page {data.page} of {data.pages}
+          <span data-testid="devices-page" aria-live="polite">
+            {loading ? (
+              <span className="inline-flex items-center gap-2 text-blue-300">
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+                Loading page {page}...
+              </span>
+            ) : (
+              <>
+                Page {data.page} of {data.pages}
+              </>
+            )}
           </span>
-          <button type="button" disabled={page >= data.pages} onClick={() => setPage(page + 1)} className="rounded border border-gray-700 px-3 py-1 disabled:opacity-40">
+          <button type="button" disabled={page >= data.pages || loading} onClick={() => setPage(page + 1)} className="rounded border border-gray-700 px-3 py-1 disabled:opacity-40">
             Next
           </button>
         </div>
@@ -659,6 +668,7 @@ function DeviceRowView({ d, master, open, onToggle, onHide }: { d: DeviceRow; ma
               <Field label="Model" value={d.model} />
               <Field label="OS version" value={d.os_version} />
               <Field label="IP addresses" value={d.ip_addresses.join(', ')} />
+              <Field label="Last logged-in user" value={lastUserText(d)} />
               <Field label="First seen" value={when(d.first_seen)} />
               {specs(d).map(([label, value]) => (
                 <Field key={label} label={label} value={value} />
@@ -812,6 +822,31 @@ export function specs(d: DeviceRow): [string, string][] {
     ]);
   }
   return out;
+}
+
+/** The tools that know who last used a machine, best first, and where each keeps it. */
+const LAST_USER_SOURCES: { vendor: string; read: (details: Record<string, unknown>) => unknown }[] = [
+  { vendor: 'ninjaone', read: (d) => (d.facts as Record<string, unknown> | undefined)?.lastLoggedInUser },
+  { vendor: 'screenconnect', read: (d) => d.logged_on_user },
+  { vendor: 'dnsfilter', read: (d) => d.last_user },
+  { vendor: 'fieldeffect', read: (d) => d.last_user },
+];
+
+/** Who last logged in to the machine, as the first tool that reports one says (NinjaOne, then ScreenConnect, DNSFilter, Field Effect), with that tool's name. Null when none does. */
+export function lastUserOf(d: DeviceRow): { user: string; vendor: string } | null {
+  for (const { vendor, read } of LAST_USER_SOURCES) {
+    for (const s of d.sources) {
+      if (s.vendor !== vendor || !s.details) continue;
+      const v = read(s.details as Record<string, unknown>);
+      if (typeof v === 'string' && v.trim() !== '') return { user: v.trim(), vendor };
+    }
+  }
+  return null;
+}
+
+export function lastUserText(d: DeviceRow): string | null {
+  const found = lastUserOf(d);
+  return found ? `${found.user} (via ${vendorLabel(found.vendor)})` : null;
 }
 
 /** Every fact a feed reported, as label/value pairs: ``os.buildNumber`` becomes "Os build number". */

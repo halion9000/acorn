@@ -19,7 +19,7 @@ const routerParams = vi.hoisted(() => ({ current: new URLSearchParams('') }));
 vi.mock('next/navigation', () => ({ useSearchParams: () => routerParams.current }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
-import DevicesView, { filtersFromParams, attentionOf, devicesLoadError, facts, flatDetails, detailRows, protectionLines, ransomwareLinked, specs } from './DevicesView';
+import DevicesView, { lastUserOf, filtersFromParams, attentionOf, devicesLoadError, facts, flatDetails, detailRows, protectionLines, ransomwareLinked, specs } from './DevicesView';
 
 const NOW = '2026-10-15T15:00:00Z';
 function device(over: Partial<DeviceRow> & { hostname: string }): DeviceRow {
@@ -124,6 +124,45 @@ describe('a tool that has not seen the device for 10 days', () => {
     const row = (await screen.findByText('DRAWER-PC')).closest('tr') as HTMLElement;
     expect(within(row).getByTestId('auto-hidden')).toHaveTextContent('no tool has seen it for 10+ days');
     expect(within(row).queryByRole('button', { name: 'Show again' })).not.toBeInTheDocument();
+  });
+});
+
+describe('the last logged-in user', () => {
+  const src = (vendor: string, details: Record<string, unknown>) => ({ vendor, name: 'PC-1', last_seen: NOW, details });
+  it('is the first tool that knows it, NinjaOne before ScreenConnect before DNSFilter, with the tool named', () => {
+    const d = device({ hostname: 'PC-1', sources: [src('dnsfilter', { last_user: 'AzureAD\Dns' }), src('screenconnect', { logged_on_user: 'sc-user' }), src('ninjaone', { facts: { lastLoggedInUser: 'AzureAD\Ninja' } })] });
+    expect(lastUserOf(d)).toEqual({ user: 'AzureAD\Ninja', vendor: 'ninjaone' });
+    expect(lastUserOf({ ...d, sources: d.sources.slice(0, 2) })).toEqual({ user: 'sc-user', vendor: 'screenconnect' });
+    expect(lastUserOf({ ...d, sources: d.sources.slice(0, 1) })).toEqual({ user: 'AzureAD\Dns', vendor: 'dnsfilter' });
+  });
+  it('is null when no tool reports one (blank and non-text values do not count)', () => {
+    expect(lastUserOf(device({ hostname: 'PC-2', sources: [src('ninjaone', { facts: { lastLoggedInUser: '  ' } }), src('huntress', { last_user: 'x' }), src('screenconnect', { logged_on_user: 5 })] }))).toBeNull();
+  });
+  it('shows in the open device with the tool that reported it', async () => {
+    listMock.mockResolvedValue(list([device({ hostname: 'PC-3', sources: [src('ninjaone', { facts: { lastLoggedInUser: 'PC-3\Jon' } })] })]));
+    render(<DevicesView />);
+    await userEvent.click(await screen.findByText('PC-3'));
+    expect(await screen.findByText('Last logged-in user')).toBeInTheDocument();
+    expect(screen.getByText(/PC-3\Jon \(via NinjaOne\)/)).toBeInTheDocument();
+  });
+});
+
+describe('paging', () => {
+  it('shows that the next page is loading (dimmed rows, a spinner, buttons off) instead of looking dead until it arrives', async () => {
+    const first = list([device({ hostname: 'PAGE-ONE' })], { page: 1, pages: 3 });
+    let release: (v: DeviceList) => void = () => {};
+    listMock.mockResolvedValueOnce(first).mockImplementationOnce(() => new Promise<DeviceList>((resolve) => (release = resolve)));
+    render(<DevicesView />);
+    expect(await screen.findByText('PAGE-ONE')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByText(/Loading page 2/)).toBeInTheDocument();
+    expect(screen.getByTestId('devices-table').className).toContain('opacity-50');
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    release(list([device({ hostname: 'PAGE-TWO' })], { page: 2, pages: 3 }));
+    expect(await screen.findByText('PAGE-TWO')).toBeInTheDocument();
+    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
+    expect(screen.getByTestId('devices-table').className).not.toContain('opacity-50');
   });
 });
 
