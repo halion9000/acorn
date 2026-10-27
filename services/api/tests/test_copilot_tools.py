@@ -214,11 +214,13 @@ class TestSearchCases:
 class TestSearchAlertsEscaping:
     async def test_the_pattern_is_escaped_for_both_columns(self, session):
         await ct.search_alerts(tenant_id=str(TID), query="100%")
-        params = session.executed[0].compile().params
+        # The first statement reads the tenant's clients; the alert search is the one that carries the pattern.
+        search = next(e for e in session.executed if "ESCAPE" in str(e))
+        params = search.compile().params
         assert [v for k, v in params.items() if k.startswith("title") or k.startswith("description")] == [
             "%100\\%%",
             "%100\\%%",
-        ] and "ESCAPE" in str(session.executed[0])
+        ]
 
 
 @pytest.mark.asyncio

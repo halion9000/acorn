@@ -42,34 +42,100 @@ async def _get_session(tenant_id: uuid.UUID) -> AsyncSession:
     return session
 
 
-async def search_alerts(*, tenant_id: str, query: str = "", limit: int = 10) -> dict[str, Any]:
-    """Search alerts by title/description substring match."""
+_SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+_CLOSED_STATUSES = ("resolved", "closed", "false_positive")
+
+
+async def _scope_tenants(tid: uuid.UUID) -> list[tuple[uuid.UUID, str | None]]:
+    """The caller's own tenant and each of its client tenants, as ``(id, client name)`` (the name is None for the caller's own): an MSP's alerts live under its clients."""
+    from app.models.tenant import Tenant
+
+    async with await _get_session(tid) as db:
+        rows = (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == tid))).all()
+    return [(tid, None), *[(r.id, r.name) for r in rows]]
+
+
+async def search_alerts(
+    *,
+    tenant_id: str,
+    query: str = "",
+    limit: int = 10,
+    severity: str | None = None,
+    hours: int | None = None,
+    only_open: bool = False,
+) -> dict[str, Any]:
+    """Search alerts across this tenant and its clients, worst first then newest.
+
+    ``query`` is a title/description substring (may be empty), ``severity`` one level, ``hours`` how far back, ``only_open`` leaves out resolved, closed and false-positive ones.
+    """
+    from datetime import UTC, datetime, timedelta
+
     try:
         tid = uuid.UUID(tenant_id)
     except ValueError:
         return {"error": "invalid tenant_id"}
+    wanted = (severity or "").strip().lower() or None
+    if wanted is not None and wanted not in _SEVERITY_ORDER:
+        return {"error": f"severity must be one of {', '.join(_SEVERITY_ORDER)}"}
+    cap = max(1, min(int(limit or 10), 50))
+    since = datetime.now(UTC) - timedelta(hours=max(1, min(int(hours), 24 * 365))) if hours else None
 
-    async with await _get_session(tid) as db:
-        stmt = select(Alert).where(Alert.tenant_id == tid)
-        if query:
-            pattern = _like_pattern(query)
-            stmt = stmt.where(Alert.title.ilike(pattern, escape="\\") | Alert.description.ilike(pattern, escape="\\"))
-        stmt = stmt.order_by(Alert.created_at.desc()).limit(max(1, min(limit, 50)))
-        result = await db.execute(stmt)
-        alerts = result.scalars().all()
-        return {
-            "count": len(alerts),
-            "alerts": [
+    found: list[dict[str, Any]] = []
+    for scope_id, client in await _scope_tenants(tid):
+        async with await _get_session(scope_id) as db:
+            stmt = select(Alert).where(Alert.tenant_id == scope_id)
+            if query:
+                pattern = _like_pattern(query)
+                stmt = stmt.where(Alert.title.ilike(pattern, escape="\\") | Alert.description.ilike(pattern, escape="\\"))
+            if wanted:
+                stmt = stmt.where(Alert.severity == wanted)
+            if since is not None:
+                stmt = stmt.where(Alert.created_at >= since)
+            if only_open:
+                stmt = stmt.where(Alert.status.notin_(_CLOSED_STATUSES))
+            alerts = (await db.execute(stmt.order_by(Alert.created_at.desc()).limit(cap))).scalars().all()
+            found.extend(
                 {
                     "id": str(a.id),
                     "title": a.title,
                     "severity": a.severity,
                     "status": a.status,
                     "created_at": a.created_at.isoformat() if a.created_at else None,
+                    **({"client": client} if client else {}),
                 }
                 for a in alerts
-            ],
-        }
+            )
+    found.sort(key=lambda a: (_SEVERITY_ORDER.get(str(a["severity"]).lower(), 5), -(datetime.fromisoformat(a["created_at"]).timestamp() if a["created_at"] else 0)))
+    return {"count": len(found[:cap]), "alerts": found[:cap]}
+
+
+_ALERT_WORDS = ("alert", "critical", "high severity", "triage", "incident", "detection", "case", "escalat", "what happened", "summar", "last 24", "today", "this week", "investigate")
+
+
+def wants_alert_data(message: str) -> bool:
+    """True when a message is probably about the alerts themselves, so the live list is put in front of the model instead of hoping it calls a tool (a model that cannot call tools says it has no access)."""
+    text_ = (message or "").lower()
+    return any(w in text_ for w in _ALERT_WORDS)
+
+
+def format_alert_snapshot(result: dict[str, Any], hours: int) -> str:
+    """The alerts found, as lines a model can quote: id, severity, status, client, title. Nothing invented: an empty result says there are none."""
+    alerts = result.get("alerts") or []
+    if not alerts:
+        return f"[Live data] No open alerts were raised in the last {hours} hours."
+    lines = [f"[Live data] The {len(alerts)} most severe open alert(s) from the last {hours} hours, worst first (fetched just now from the platform):"]
+    for a in alerts:
+        client = f" | client: {a['client']}" if a.get("client") else ""
+        lines.append(f"- {a['id']} | {a['severity']} | {a['status']}{client} | {str(a['title'])[:140]}")
+    return "\n".join(lines)
+
+
+async def alert_snapshot(*, tenant_id: str, user: Any, hours: int = 24, limit: int = 10) -> str | None:
+    """The live open alerts of the last ``hours`` hours across the tenant and its clients, as text for the model, or None when the caller may not read alerts or the lookup failed."""
+    result = await execute_copilot_tool("search_alerts", {"hours": hours, "only_open": True, "limit": limit}, tenant_id, user=user)
+    if not isinstance(result, dict) or "error" in result:
+        return None
+    return format_alert_snapshot(result, hours)
 
 
 async def get_alert(*, tenant_id: str, alert_id: str) -> dict[str, Any]:
@@ -199,20 +265,33 @@ COPILOT_TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "search_alerts",
-            "description": "Search alerts by title or description keyword. Returns matching alerts with IDs.",
+            "description": "Search alerts across this organisation and its clients, worst first. Filter by severity, how many hours back, and open only. Returns alerts with IDs and the client each belongs to.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Search keyword to match against alert titles and descriptions.",
+                        "description": "Keyword to match against alert titles and descriptions. Leave empty to list alerts by severity and recency.",
+                    },
+                    "severity": {
+                        "type": "string",
+                        "enum": ["critical", "high", "medium", "low", "info"],
+                        "description": "Only alerts of this severity.",
+                    },
+                    "hours": {
+                        "type": "integer",
+                        "description": "Only alerts raised in the last this-many hours (for example 24).",
+                    },
+                    "only_open": {
+                        "type": "boolean",
+                        "description": "Leave out alerts that are resolved, closed or marked false positive.",
                     },
                     "limit": {
                         "type": "integer",
                         "description": "Maximum number of results to return (default 10, max 50).",
                     },
                 },
-                "required": ["query"],
+                "required": [],
             },
         },
     },

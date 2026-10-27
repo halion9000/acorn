@@ -28,9 +28,11 @@ from app.copilot_tools import (
     COPILOT_TOOL_SCHEMAS,
     TOOL_PERMISSIONS,
     ConfirmationError,
+    alert_snapshot,
     execute_copilot_tool,
     split_pending,
     verify_confirmation,
+    wants_alert_data,
 )
 from app.db.rls import TenantDBSession
 from app.llm.contract import safe_ainvoke
@@ -176,6 +178,12 @@ async def copilot_chat(
     ctx_line = _context_snippet(body.context)
     if ctx_line:
         messages.append(SystemMessage(content=f"[Analyst context]\n{ctx_line}"))
+    # A question about the alerts gets the live list up front. Many models behind the gateway cannot call tools (the gateway drops the tools for them), and one that cannot says it "has no access to your alert data".
+    if wants_alert_data(body.message):
+        snapshot = await alert_snapshot(tenant_id=str(user.tenant_id), user=user)
+        await db.rollback()
+        if snapshot:
+            messages.append(SystemMessage(content=snapshot))
     messages.extend(history)
     messages.append(HumanMessage(content=body.message))
 
