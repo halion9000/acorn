@@ -1,4 +1,4 @@
-"""Sign-in events: CORE posts the sign-ins it read through CIPP; AiSOC stores each once and has the UEBA service score it. COLLECTING AND SCORING ONLY: nothing here raises an alert.
+"""Sign-in events: CORE posts the sign-ins it read through CIPP; AiSOC stores each once and has the UEBA service score it. Each batch is also run through the identity rules (app/services/identity_detections.py), which raise alerts for a sign-in from a country the client rarely sees and for impossible travel.
 
 ``POST /api/v1/inbox/core-feed/{token}/signins`` (authenticated by the secret in the path, like the other core-feed endpoints). A sign-in is placed under the client its vendor client id
 (the CIPP customer id) is mapped to; one whose client is not mapped yet is counted and skipped, and arrives again after the mapping.
@@ -24,6 +24,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.signin import SigninEvent
 from app.models.tenant import Tenant
 from app.services.alias_view import alias_view
+from app.services.identity_detections import run_signin_detections
 from app.services.signin_scoring import HISTORY_DAYS, History, score_events, signin_features
 
 LOG = logging.getLogger(__name__)
@@ -223,6 +224,7 @@ async def apply_signins(db: Any, owner: uuid.UUID, report: SignInsReport, now: d
                 anomalies += outcome.anomalies
                 await _rescore_backlog(db, tid, report.vendor, now)
             await db.flush()
+            await run_signin_detections(db, tid, rows, now)
             await _prune(db, tid, now)
     status = "ok" if all(s == "ok" for s in statuses) else ("not_configured" if "not_configured" in statuses else "unavailable")
     return SignInsResponse(
@@ -375,7 +377,7 @@ class ScoredSignin(BaseModel):
 @router.get(
     "/top",
     response_model=list[ScoredSignin],
-    summary="The highest-scoring sign-ins of the last days, across clients (nothing alerts on these yet)",
+    summary="The highest-scoring sign-ins of the last days, across clients (the score alone does not alert; the identity rules do)",
 )
 async def top_signins(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],

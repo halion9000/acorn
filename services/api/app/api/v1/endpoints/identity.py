@@ -1,4 +1,4 @@
-"""Identity data CORE collects through CIPP: directory audit entries (scored for unusual behaviour) and each person's multi-factor state. COLLECTING AND SCORING ONLY: nothing here raises an alert.
+"""Identity data CORE collects through CIPP: directory audit entries (scored for unusual behaviour) and each person's multi-factor state. Each batch is also run through the identity rules (app/services/identity_detections.py), which raise alerts for mass deletion, role changes, Conditional Access changes and failed sign-ins after a revoke.
 
 - ``POST /api/v1/inbox/core-feed/{token}/directory-audits`` and ``.../mfa-users``: authenticated by the secret in the path, like the other core-feed endpoints; placed under the client the CIPP customer
   is mapped to (a customer not mapped yet is counted and skipped, and arrives again after the mapping).
@@ -29,6 +29,7 @@ from app.models.signin import DirectoryAuditEvent, IdentityMfaUser, IdentitySecu
 from app.models.tenant import Tenant
 from app.services.directory_scoring import directory_features, sensitivity_of
 from app.services.mfa_registration import has_second_factor, registration_known, required_of
+from app.services.identity_detections import run_audit_detections
 from app.services.signin_scoring import HISTORY_DAYS, score_events
 
 LOG = logging.getLogger(__name__)
@@ -164,6 +165,7 @@ async def apply_directory_audits(
                 anomalies += outcome.anomalies
                 await _rescore_backlog(db, tid, report.vendor, now)
             await db.flush()
+            await run_audit_detections(db, tid, rows, now)
             await _prune_audits(db, tid, now)
     status = "ok" if all(s == "ok" for s in statuses) else ("not_configured" if "not_configured" in statuses else "unavailable")
     return DirectoryAuditsResponse(
@@ -493,7 +495,7 @@ class ScoredChange(BaseModel):
 @router.get(
     "/top",
     response_model=list[ScoredChange],
-    summary="The highest-scoring identity changes of the last days, across clients (nothing alerts on these yet)",
+    summary="The highest-scoring identity changes of the last days, across clients (the score alone does not alert; the identity rules do)",
 )
 async def top_changes(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],

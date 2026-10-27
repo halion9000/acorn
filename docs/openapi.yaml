@@ -10591,8 +10591,8 @@ paths:
     get:
       tags:
       - signins
-      summary: The highest-scoring sign-ins of the last days, across clients (nothing
-        alerts on these yet)
+      summary: The highest-scoring sign-ins of the last days, across clients (the
+        score alone does not alert; the identity rules do)
       operationId: top_signins_api_v1_signins_top_get
       security:
       - HTTPBearer: []
@@ -11052,7 +11052,7 @@ paths:
       tags:
       - identity
       summary: The highest-scoring identity changes of the last days, across clients
-        (nothing alerts on these yet)
+        (the score alone does not alert; the identity rules do)
       operationId: top_changes_api_v1_identity_top_get
       security:
       - HTTPBearer: []
