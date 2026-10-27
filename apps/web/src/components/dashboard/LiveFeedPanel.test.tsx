@@ -79,6 +79,13 @@ describe('LiveFeedPanel', () => {
     expect(screen.queryByText('No events yet.')).not.toBeInTheDocument();
   });
 
+  it('does not show the service\'s own "connected" frame as a security event', () => {
+    setChannel('open', { type: 'connected', tenantId: 't1', channel: 'alerts' });
+    render(<LiveFeedPanel />);
+    expect(screen.queryByText('Security event received')).not.toBeInTheDocument();
+    expect(screen.getByText('No events yet.')).toBeInTheDocument();
+  });
+
   it('keeps the events it has, and says it is reconnecting, if the connection drops after events arrived', () => {
     setChannel('open', alert('a1', { title: 'First real event' }));
     const { rerender } = render(<LiveFeedPanel />);

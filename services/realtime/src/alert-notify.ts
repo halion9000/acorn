@@ -1,6 +1,16 @@
 /** Which fused alerts page a responder, and a connection rate limiter that cannot grow without bound. */
 
-export type Pushable = { severity: 'critical' | 'high'; alertId: string; title: string; body: string };
+/**
+ * The tenants whose live view shows a fused alert: the tenant it is stored under, plus the MSSP tenant that owns the feed when the alert was routed to a client
+ * (otherwise the MSSP's own dashboard never saw its clients' alerts).
+ */
+export function alertTenants(event: any): string[] {
+  const own = String(event?.alert?.tenant_id || event?.tenant_id || 'default');
+  const owner = event?.alert?.owner_tenant_id;
+  return typeof owner === 'string' && owner && owner !== own ? [own, owner] : [own];
+}
+
+export type Pushable ={ severity: 'critical' | 'high'; alertId: string; title: string; body: string };
 
 /**
  * The push notification for a fused-alert envelope, or null when none should be sent.

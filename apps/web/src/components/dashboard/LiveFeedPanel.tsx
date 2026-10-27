@@ -101,8 +101,14 @@ export function statusToLabel(status: RealtimeStatus, hasReal: boolean): { label
   return { label: 'Offline', tone: 'offline', hint: 'The realtime service is unreachable.' };
 }
 
+const NON_ALERT_FRAMES = new Set(['connected', 'insights_updated', 'case.updated', 'agent.event', 'graph.update']);
+
 function eventFromMessage(msg: RealtimeAlertMessage, fallbackId: number): LiveEvent | null {
   if (!msg) return null;
+  // The service's own frames ("connected" when the socket opens, pokes, other event kinds) are not alerts: the "connected" frame used to show up as the one
+  // generic "Security event received" row.
+  const kind = (msg as { type?: unknown }).type;
+  if (typeof kind === 'string' && NON_ALERT_FRAMES.has(kind)) return null;
   // The realtime service wraps payloads as { type: 'alert.fused', payload, timestamp }
   // but tests / older producers may send the alert directly.
   const payload = msg.payload ?? (msg as unknown as RealtimeAlertMessage['payload']);

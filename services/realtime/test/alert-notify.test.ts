@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createRateLimiter, pushableAlert } from '../src/alert-notify';
+import { createRateLimiter, pushableAlert, alertTenants } from '../src/alert-notify';
 
 const base = (over: Record<string, unknown> = {}) => ({
   fusion_decision: 'new_incident',
@@ -66,4 +66,11 @@ test('expired entries are pruned, so the map cannot grow without bound', () => {
   now += 5_000;
   limiter.prune();
   assert.equal(limiter.size(), 0);
+});
+
+test('an alert is shown to its own tenant, and to the MSSP that owns the feed when it was routed to a client', () => {
+assert.deepEqual(alertTenants({ alert: { tenant_id: 'client', owner_tenant_id: 'mssp' } }), ['client', 'mssp']);
+assert.deepEqual(alertTenants({ alert: { tenant_id: 'mssp' } }), ['mssp']);
+assert.deepEqual(alertTenants({ alert: { tenant_id: 'a', owner_tenant_id: 'a' } }), ['a']);
+assert.deepEqual(alertTenants({}), ['default']);
 });

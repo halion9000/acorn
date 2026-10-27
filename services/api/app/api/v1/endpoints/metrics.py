@@ -36,6 +36,7 @@ from app.models.connector import Connector
 from app.models.detection_rule import DetectionRule
 from app.models.remediation import RemediationGateLog
 from app.models.tenant import Tenant
+from app.services.tactic_inference import tactics_for
 from app.services import case_metrics as case_counts  # not `case_metrics`: get_dashboard_metrics has a local variable of that name
 
 logger = logging.getLogger(__name__)
@@ -344,17 +345,20 @@ async def _get_dashboard_metrics_impl(
     # (typically <10k alerts/tenant). Driver tests proved a SQL-level
     # jsonb_array_elements_text + GROUP BY in the same SELECT 500s on some
     # Postgres builds.
+    # Most vendor alerts name no tactic, so those are counted per distinct title and given the tactic their title clearly belongs to (app.services.tactic_inference); a tactic
+    # the source did name is always used as sent.
     tactic_rows = (
-        await db.execute(select(Alert.mitre_tactics).where(and_(Alert.tenant_id.in_(tenant_ids), Alert.mitre_tactics.isnot(None))))
+        await db.execute(
+            select(Alert.mitre_tactics, Alert.title, func.count().label("cnt"))
+            .where(and_(Alert.tenant_id.in_(tenant_ids), shown))
+            .group_by(Alert.mitre_tactics, Alert.title)
+        )
     ).all()
 
     tactic_counts: dict[str, int] = {}
-    for (tactics,) in tactic_rows:
-        if not tactics:
-            continue
-        for t in tactics:
-            if isinstance(t, str) and t:
-                tactic_counts[t] = tactic_counts.get(t, 0) + 1
+    for tactics, title, cnt in tactic_rows:
+        for t in tactics_for(tactics, title):
+            tactic_counts[t] = tactic_counts.get(t, 0) + cnt
 
     top_mitre = [
         MitreTactic(tactic=tactic, count=count) for tactic, count in sorted(tactic_counts.items(), key=lambda x: x[1], reverse=True)[:10]

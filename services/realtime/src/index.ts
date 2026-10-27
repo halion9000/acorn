@@ -10,7 +10,7 @@ import rateLimit from 'express-rate-limit';
 import { PushManager } from './push';
 import { resolveTicketSecret, verifyRealtimeTicket } from './auth';
 import { internalAuth } from './internal-auth';
-import { createRateLimiter, pushableAlert } from './alert-notify';
+import { alertTenants, createRateLimiter, pushableAlert } from './alert-notify';
 
 const log = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -424,11 +424,13 @@ async function startKafkaConsumer() {
         const event = JSON.parse(message.value.toString());
         const tenantId = event?.alert?.tenant_id || event?.tenant_id || 'default';
 
-        broadcastToTenant(tenantId, {
-          type: 'alert.fused',
-          payload: event,
-          timestamp: new Date().toISOString(),
-        });
+        for (const viewer of alertTenants(event)) {
+          broadcastToTenant(viewer, {
+            type: 'alert.fused',
+            payload: event,
+            timestamp: new Date().toISOString(),
+          });
+        }
 
         // Fan out P0/critical alerts to mobile responders. Lower-severity alerts stay WebSocket-only so we don't pager-storm on-call, and duplicates / alerts that were not
         // stored are not pushed again (see pushableAlert).

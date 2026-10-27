@@ -52,6 +52,8 @@ class RawAlert(BaseModel):
 
     id: UUID = Field(default_factory=uuid4)
     tenant_id: UUID
+    # Set when the alert was stored under a client tenant: the MSSP tenant that owns the feed, so its own live view can show the alert too.
+    owner_tenant_id: UUID | None = None
     source: str
     title: str
     description: str = ""
