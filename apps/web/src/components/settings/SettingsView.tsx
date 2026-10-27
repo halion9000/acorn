@@ -257,6 +257,9 @@ const TABS: { id: TabId; label: string; description: string; requires?: 'manage_
 
 /** Settings pages that are their own screens. They were reachable only by typing their address; this lists them. */
 export const MORE_SETTINGS: { href: string; label: string; description: string }[] = [
+  { href: '/settings/connectors', label: 'Connectors', description: 'The tools connected to A.C.O.R.N, and the ones CORE manages' },
+  { href: '/settings/client-mapping', label: 'Client mapping', description: 'Link the clients of each tool to your client tenants' },
+  { href: '/settings/audit', label: 'Audit log', description: 'Every administrative and security event, searchable' },
   { href: '/settings/triage', label: 'Auto-close', description: 'How sure AI triage must be to close an alert itself' },
   { href: '/settings/tickets', label: 'Tickets', description: 'The HaloPSA status a resolved incident moves its ticket to' },
 ];
@@ -690,7 +693,7 @@ function IntegrationsPanel() {
         description="Manage the connectors that stream telemetry into A.C.O.R.N."
         action={
           <Link
-            href="/connectors/new"
+            href="/settings/connectors/new"
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
           >
             + Add connector
@@ -725,7 +728,7 @@ function IntegrationsPanel() {
             description="Add your first integration to start streaming events into A.C.O.R.N."
             action={
               <Link
-                href="/connectors/new"
+                href="/settings/connectors/new"
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
               >
                 Add connector

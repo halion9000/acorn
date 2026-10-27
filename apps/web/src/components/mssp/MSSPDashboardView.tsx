@@ -7,7 +7,6 @@ import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { EmptyState, EmptyStateIcons } from '@/components/ui/EmptyState';
 import { msspApi, type ManagedTenantRow, type MsspOverview } from '@/lib/api';
-import ClientMapping from './ClientMapping';
 
 /**
  * Cross-tenant overview for an MSSP parent workspace.
@@ -133,6 +132,8 @@ export default function MSSPDashboardView() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [showHidden, setShowHidden] = useState(false);
+  // Tool clients not yet linked to one of your clients (and not ignored): the mapping itself lives in Settings, this only says there is work waiting.
+  const [unlinked, setUnlinked] = useState(0);
 
   const load = useCallback(async () => {
     setError(null);
@@ -140,6 +141,11 @@ export default function MSSPDashboardView() {
       const [nextOverview, nextTenants] = await Promise.all([msspApi.overview(), msspApi.tenants(showHidden)]);
       setOverview(nextOverview);
       setTenants(nextTenants);
+      try {
+        setUnlinked((await msspApi.clients()).unmapped ?? 0);
+      } catch {
+        setUnlinked(0); // the banner is a convenience: a failed count must not hide the dashboard
+      }
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : 'Could not load managed tenants.');
     }
@@ -181,8 +187,22 @@ export default function MSSPDashboardView() {
           <h1 className="text-2xl font-bold text-white">MSSP Executive Dashboard</h1>
           <p className="text-gray-400 mt-1">Cross-tenant security operations overview</p>
         </div>
-        <AddClient onAdded={() => void load()} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/settings/client-mapping" className="rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-200 hover:bg-gray-800 transition-colors">
+            Client mapping
+          </Link>
+          <AddClient onAdded={() => void load()} />
+        </div>
       </div>
+
+      {unlinked > 0 && (
+        <p role="status" data-testid="unlinked-banner" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+          {unlinked} tool client{unlinked === 1 ? ' is' : 's are'} not linked to one of your clients yet, so {unlinked === 1 ? 'its' : 'their'} alerts and counts are not under a client.{' '}
+          <Link href="/settings/client-mapping" className="font-medium underline">
+            Link them in Settings
+          </Link>
+        </p>
+      )}
 
       {error ? (
         <EmptyState
@@ -310,8 +330,6 @@ export default function MSSPDashboardView() {
               </div>
             )}
           </div>
-
-          <ClientMapping tenants={tenants.filter((t) => !t.hidden)} onChanged={() => void load()} />
         </>
       )}
     </div>

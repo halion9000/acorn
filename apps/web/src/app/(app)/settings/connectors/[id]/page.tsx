@@ -66,7 +66,7 @@ export default function ConnectorDetailPage() {
           <XCircle className="mx-auto mb-3 h-10 w-10 text-red-400" />
           <p className="text-lg font-semibold text-white">{error || 'Connector not found'}</p>
           <button
-            onClick={() => router.push('/connectors')}
+            onClick={() => router.push('/settings/connectors')}
             className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
           >
             View All Connectors
@@ -147,7 +147,7 @@ export default function ConnectorDetailPage() {
             {connector.enabled ? 'Disable Connector' : 'Enable Connector'}
           </button>
           <button
-            onClick={() => router.push('/connectors')}
+            onClick={() => router.push('/settings/connectors')}
             className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/10"
           >
             Cancel

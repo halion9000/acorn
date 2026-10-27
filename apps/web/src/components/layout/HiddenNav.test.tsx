@@ -48,7 +48,7 @@ describe('the sidebar for a role that hides things', () => {
     state.hidden = new Set(['section:Platform']);
     render(<Sidebar />);
     expect(screen.getByRole('link', { name: /Roles/ })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Connectors/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Compliance/ })).not.toBeInTheDocument();
   });
 });
 

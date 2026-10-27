@@ -50,6 +50,12 @@ export function pathIsHidden<I extends CatalogItem, S extends CatalogSection<I>>
 }
 
 /** The entries of a role's hidden list, from whatever the API sent (anything that is not text is ignored). */
+/** Pages that moved, by their old address. */
+const MOVED_PAGES: Record<string, string> = { '/connectors': '/settings/connectors', '/audit': '/settings/audit' };
+
 export function toHiddenSet(value: unknown): Set<string> {
-  return new Set(Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
+  const set = new Set(Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
+  // Roles saved before these pages moved into Settings hide them by their old address; keep hiding them at the new one.
+  for (const [old, now] of Object.entries(MOVED_PAGES)) if (set.has(old)) set.add(now);
+  return set;
 }

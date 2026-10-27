@@ -3,12 +3,13 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ManagedTenantRow, MsspOverview } from '@/lib/api';
 
+const unmapped = vi.hoisted(() => ({ n: 0 }));
 const overviewMock = vi.fn();
 const tenantsMock = vi.fn();
 const createClientMock = vi.fn();
 const hiddenMock = vi.fn();
 vi.mock('@/lib/api', () => ({
-  msspApi: { overview: () => overviewMock(), tenants: (h?: boolean) => tenantsMock(h), setClientHidden: (...a: unknown[]) => hiddenMock(...a), clients: async () => ({ clients: [], unmapped: 0 }), createClient: (n: string) => createClientMock(n) },
+  msspApi: { overview: () => overviewMock(), tenants: (h?: boolean) => tenantsMock(h), setClientHidden: (...a: unknown[]) => hiddenMock(...a), clients: async () => ({ clients: [], unmapped: unmapped.n }), createClient: (n: string) => createClientMock(n) },
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
@@ -40,6 +41,33 @@ beforeEach(() => {
   createClientMock.mockReset();
   hiddenMock.mockReset();
   hiddenMock.mockResolvedValue(undefined);
+  unmapped.n = 0;
+});
+
+describe('the client mapping (it moved to Settings)', () => {
+  it('has a button to the mapping page and no mapping section of its own', async () => {
+    overviewMock.mockResolvedValue(none);
+    tenantsMock.mockResolvedValue([reporting]);
+    render(<MSSPDashboardView />);
+    const link = await screen.findByRole('link', { name: 'Client mapping' });
+    expect(link).toHaveAttribute('href', '/settings/client-mapping');
+    expect(screen.queryByText(/Unmapped/i)).not.toBeInTheDocument();
+  });
+
+  it('warns at the top when tool clients are not linked yet, and says nothing when all are', async () => {
+    overviewMock.mockResolvedValue(none);
+    tenantsMock.mockResolvedValue([reporting]);
+    unmapped.n = 3;
+    const { unmount } = render(<MSSPDashboardView />);
+    const banner = await screen.findByTestId('unlinked-banner');
+    expect(banner).toHaveTextContent('3 tool clients are not linked');
+    expect(within(banner).getByRole('link', { name: /Link them in Settings/ })).toHaveAttribute('href', '/settings/client-mapping');
+    unmount();
+    unmapped.n = 0;
+    render(<MSSPDashboardView />);
+    await screen.findByText('Reporting Co');
+    expect(screen.queryByTestId('unlinked-banner')).not.toBeInTheDocument();
+  });
 });
 
 describe('a workspace with no child tenants (the reported case)', () => {

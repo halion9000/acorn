@@ -86,6 +86,12 @@ describe('isHidden and toHiddenSet', () => {
     expect(isHidden(new Set([sectionKey('Automation')]), '/fim', 'Automation')).toBe(true);
     expect(isHidden(new Set([sectionKey('Automation')]), '/fim', 'Platform')).toBe(false);
   });
+  it('keeps hiding a page that moved into Settings for a role saved with its old address', () => {
+    const set = toHiddenSet(['/connectors', '/audit', '/costs']);
+    expect(set.has('/settings/connectors')).toBe(true);
+    expect(set.has('/settings/audit')).toBe(true);
+    expect(set.has('/settings/costs')).toBe(false);
+  });
   it('ignores anything the API sent that is not text', () => {
     expect([...toHiddenSet(['/a', 3, null, 'section:X'])]).toEqual(['/a', 'section:X']);
     expect(toHiddenSet(undefined).size).toBe(0);

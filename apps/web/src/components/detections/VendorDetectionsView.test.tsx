@@ -95,7 +95,7 @@ describe('VendorDetectionsView', () => {
     api.vendorDetections.mockResolvedValue({ window_days: 30, detections: [] });
     show();
     expect(await screen.findByText(/No vendor detections yet/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Open Connectors/i })).toHaveAttribute('href', '/connectors');
+    expect(screen.getByRole('link', { name: /Open Connectors/i })).toHaveAttribute('href', '/settings/connectors');
   });
 
   it('shows an error with a retry instead of an empty table', async () => {

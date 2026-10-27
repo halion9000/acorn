@@ -86,7 +86,7 @@ export function VendorDetectionsView() {
           title="No vendor detections yet"
           description="Nothing from your connected tools has raised an alert in the last 30 days. Check that the CORE feed is running on the Connectors page."
           action={
-            <Link href="/connectors" className="rounded-md bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600">
+            <Link href="/settings/connectors" className="rounded-md bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600">
               Open Connectors
             </Link>
           }

@@ -325,6 +325,26 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: 'Setup',
+    items: [
+      {
+        label: 'Connectors',
+        href: '/settings/connectors',
+        icon: <PuzzleIcon />,
+      },
+      {
+        label: 'Client Mapping',
+        href: '/settings/client-mapping',
+        icon: <GlobeIcon />,
+      },
+      {
+        label: 'Audit Log',
+        href: '/settings/audit',
+        icon: <EyeIcon />,
+      },
+    ],
+  },
+  {
     title: 'Automation',
     items: [
       {
@@ -368,11 +388,6 @@ const navSections: NavSection[] = [
         icon: <SparklesIcon />,
       },
       {
-        label: 'Connectors',
-        href: '/connectors',
-        icon: <PuzzleIcon />,
-      },
-      {
         label: 'Roles & Permissions',
         href: '/settings/rbac',
         icon: <ShieldIcon />,
@@ -411,11 +426,6 @@ const navSections: NavSection[] = [
         label: 'Cost Dashboard',
         href: '/costs',
         icon: <CurrencyIcon />,
-      },
-      {
-        label: 'Audit Log',
-        href: '/audit',
-        icon: <EyeIcon />,
       },
       {
         label: 'Settings',

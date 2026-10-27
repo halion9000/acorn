@@ -106,6 +106,10 @@ const nextConfig = {
         destination: '/dashboard',
         permanent: true,
       },
+      // Connectors and the audit log moved into Settings; old links and bookmarks keep working.
+      { source: '/connectors', destination: '/settings/connectors', permanent: false },
+      { source: '/connectors/:path*', destination: '/settings/connectors/:path*', permanent: false },
+      { source: '/audit', destination: '/settings/audit', permanent: false },
     ];
   },
 

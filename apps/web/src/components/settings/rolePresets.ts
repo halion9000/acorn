@@ -24,7 +24,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     key: 'client-reviewer',
     label: 'Client reviewer (vCIO)',
     description: 'Works on client reviews and posture. Threat operations, intelligence, automation and platform settings are hidden.',
-    hidden: ['section:Threat Operations', 'section:Intelligence', 'section:Automation', '/connectors', '/costs', '/audit', '/settings', '/onboarding'],
+    hidden: ['section:Threat Operations', 'section:Intelligence', 'section:Automation', '/costs', '/settings', '/onboarding'],
     permissions: ['*:read'],
   },
   {
