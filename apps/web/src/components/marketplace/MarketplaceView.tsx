@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import { EmptyState, EmptyStateIcons } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import toast from 'react-hot-toast';
 import { authFetch } from '@/lib/auth-session';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -496,10 +497,20 @@ export function MarketplaceView() {
           body: JSON.stringify({ type: item.type, id: item.id }),
         });
         if (!res.ok && res.status !== 401 && res.status !== 404) {
-          throw new Error(`install: HTTP ${res.status}`);
+          // The server says why ("marketplace/index.json not found", "settings:write needed"...); show that rather than a bare status.
+          let why = '';
+          try {
+            const body = (await res.json()) as { detail?: unknown };
+            why = typeof body.detail === 'string' ? body.detail : '';
+          } catch {
+            /* no JSON body */
+          }
+          throw new Error(why || `install: HTTP ${res.status}`);
         }
         await refreshInstalled();
+        toast.success(`Installed ${item.name}.`);
       } catch (err) {
+        toast.error(err instanceof Error ? `Could not install ${item.name}: ${err.message}` : `Could not install ${item.name}.`);
         // Roll the optimistic flag back; surface a one-line toast.
         setLocalInstalled((prev) => {
           const next = new Set(prev);
