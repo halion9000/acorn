@@ -13,7 +13,7 @@ def test_a_request_over_the_threshold_is_logged_and_one_under_it_is_not(monkeypa
     monkeypatch.setattr(app_main.logger, "warning", lambda event, **kw: seen.append((event, kw)))
     assert app_main.log_if_slow("GET", "/api/v1/devices", 200, 4.2, threshold=3) is True
     assert app_main.log_if_slow("GET", "/api/v1/devices", 200, 0.4, threshold=3) is False
-    assert seen == [("slow_request", {"method": "GET", "endpoint": "/api/v1/devices", "status": 200, "seconds": 4.2})]
+    assert seen == [("slow_request", {"method": "GET", "endpoint": "/api/v1/devices", "status": 200, "seconds": 4.2, "request_id": None})]
 
 
 def test_a_zero_threshold_turns_the_log_off(monkeypatch):
