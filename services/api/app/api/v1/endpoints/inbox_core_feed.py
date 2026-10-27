@@ -685,10 +685,11 @@ class TicketsResponse(BaseModel):
 
 async def apply_tickets(db: Any, tenant_id: Any, report: TicketsReport) -> int:
     """Store the PSA tickets linked to each incident on its alert (``enrichment_data.tickets``), in ``tenant_id``. The caller owns the transaction."""
-    prefix = f"{report.vendor}:"
+    # A vendor's alert ids are "huntress:<id>" for an incident report but also "huntress-escalation:<id>" and "huntress-signal:<id>" for the other kinds of alert from the same tool.
+    prefixes = (f"{report.vendor}:", f"{report.vendor}-")
     updated = 0
     for item in report.items:
-        if not item.uid.startswith(prefix):
+        if not item.uid.startswith(prefixes):
             continue
         value = {"tickets": [t.model_dump(exclude_none=True) for t in item.tickets]}
         result = await db.execute(
@@ -723,8 +724,8 @@ async def report_core_feed_tickets(tenant_token: str, body: TicketsReport, db: D
         owner = await db.get(Tenant, tenant_id)
         if owner is not None and (owner.settings or {}).get("halopsa_base_url") != halo:
             owner.settings = {**(owner.settings or {}), "halopsa_base_url": halo}
-    prefix = f"{body.vendor}:"
-    holders = await _tenants_holding(db, tenant_id, [i.uid for i in body.items if i.uid.startswith(prefix)])
+    prefixes = (f"{body.vendor}:", f"{body.vendor}-")
+    holders = await _tenants_holding(db, tenant_id, [i.uid for i in body.items if i.uid.startswith(prefixes)])
     held = dict(holders)
     updated = sum(
         await _across(

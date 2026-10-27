@@ -106,18 +106,23 @@ def test_a_tickets_report_rejects_what_could_be_abused():
 
 @pytest.mark.asyncio
 async def test_tickets_are_stored_on_that_vendors_incident_only():
-    db = _db(rowcounts=[1])
+    db = _db(rowcounts=[1, 1, 1])
     rep = cf.TicketsReport(
         vendor="huntress",
         items=[
             cf.TicketsItem(uid="huntress:7", tickets=[cf.LinkedTicket(id="123", summary="S", status="Open")]),
             cf.TicketsItem(uid="petra:9", tickets=[cf.LinkedTicket(id="5")]),
+            cf.TicketsItem(uid="huntress-escalation:11", tickets=[cf.LinkedTicket(id="6")]),
+            cf.TicketsItem(uid="huntress-signal:12", tickets=[cf.LinkedTicket(id="7")]),
+            cf.TicketsItem(uid="huntressx:13", tickets=[cf.LinkedTicket(id="8")]),
+            cf.TicketsItem(uid="petra-escalation:14", tickets=[cf.LinkedTicket(id="9")]),
         ],
     )
-    assert await cf.apply_tickets(db, OWNER, rep) == 1
-    assert len(db.executed) == 1  # the petra uid is not this vendor's
+    assert await cf.apply_tickets(db, OWNER, rep) == 3
+    assert len(db.executed) == 3  # the incident report, the escalation and the signal; another vendor's uids (petra, a lookalike prefix) are not this vendor's
     sql, params = _sql(db.executed[0])
     assert sql.lower().startswith("update alerts") and OWNER in params.values() and "huntress:7" in params.values()
+    assert {"huntress-escalation:11", "huntress-signal:12"} <= {v for e in db.executed[1:] for v in _sql(e)[1].values() if isinstance(v, str)}
     stored = next(v for v in params.values() if isinstance(v, dict) and "tickets" in v)["tickets"]
     assert stored == [{"id": "123", "system": "halopsa", "summary": "S", "status": "Open"}]  # absent fields are left out, not null
 
