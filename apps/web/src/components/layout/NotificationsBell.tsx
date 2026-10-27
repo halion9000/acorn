@@ -5,10 +5,27 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { safeDistance } from '@/lib/safe-date';
 import { alertsApi, type Alert } from '@/lib/api';
+import { authFetch } from '@/lib/auth-session';
 
 /** The newest critical and high alerts nobody has picked up yet, newest first. */
 export function needsAttention(critical: Alert[], high: Alert[], limit = 6): Alert[] {
   return [...critical, ...high].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, limit);
+}
+
+/** A billed line counts when it disagrees with the tool counts and nobody has accepted that difference. */
+export interface BillingRow {
+  client_id: string;
+  difference: number;
+  note_state?: string;
+}
+
+/** How many days a line must have disagreed before it is worth a notification. */
+export const BILLING_DAYS = 14;
+
+/** The lines that disagree and are not accepted, and how many clients they are for. */
+export function billingLinesOff(rows: BillingRow[]): { lines: number; clients: number } {
+  const off = rows.filter((r) => r.difference !== 0 && r.note_state !== 'accepted');
+  return { lines: off.length, clients: new Set(off.map((r) => r.client_id)).size };
 }
 
 export function NotificationsBell() {
@@ -24,6 +41,18 @@ export function NotificationsBell() {
       return { criticalCount: critical.total, highCount: high.total, items: needsAttention(critical.alerts, high.alerts) };
     },
     { refreshInterval: 60_000, shouldRetryOnError: false },
+  );
+
+  // Billing lines that have disagreed with the tool counts for two weeks or more. A person without billing access, or a failed read, simply gets no billing line.
+  const { data: billing } = useSWR(
+    'topbar-billing',
+    async () => {
+      const res = await authFetch(`/api/v1/billing/reconcile?min_days=${BILLING_DAYS}&limit=1000`);
+      if (!res.ok) return null;
+      const body = (await res.json()) as { rows?: BillingRow[] };
+      return billingLinesOff(Array.isArray(body.rows) ? body.rows : []);
+    },
+    { refreshInterval: 300_000, shouldRetryOnError: false },
   );
 
   useEffect(() => {
@@ -44,6 +73,7 @@ export function NotificationsBell() {
 
   const criticalCount = data?.criticalCount ?? 0;
   const total = criticalCount + (data?.highCount ?? 0);
+  const billingLines = billing?.lines ?? 0;
 
   return (
     <div ref={box} className="relative">
@@ -59,6 +89,8 @@ export function NotificationsBell() {
         </svg>
         {criticalCount > 0 ? (
           <span aria-hidden data-testid="bell-dot" className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-surface-raised" />
+        ) : billingLines > 0 ? (
+          <span aria-hidden data-testid="bell-dot-billing" className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full ring-2 ring-surface-raised" />
         ) : null}
       </button>
 
@@ -84,6 +116,16 @@ export function NotificationsBell() {
                 </li>
               ))}
             </ul>
+          ) : null}
+          {billing && billing.lines > 0 ? (
+            <Link href="/settings/billing" onClick={() => setOpen(false)} data-testid="bell-billing" className="block px-4 py-2.5 border-t border-gray-800 hover:bg-gray-800/50">
+              <p className="text-sm text-amber-300">
+                {billing.lines} billed line{billing.lines === 1 ? '' : 's'} off for {BILLING_DAYS}+ days
+              </p>
+              <p className="text-xs text-gray-500">
+                across {billing.clients} client{billing.clients === 1 ? '' : 's'}; not accepted yet. Open Billed vs counted.
+              </p>
+            </Link>
           ) : null}
           <Link href="/alerts" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm text-blue-400 hover:bg-gray-800/50 border-t border-gray-800 rounded-b-xl">
             View all alerts
