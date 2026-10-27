@@ -3,7 +3,9 @@
 import asyncio
 import hmac
 import os
+import re
 import time
+import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
@@ -649,12 +651,21 @@ def slow_request_threshold() -> float:
         return 3.0
 
 
-def log_if_slow(method: str, endpoint: str, status: int, duration: float, threshold: float | None = None) -> bool:
+_REQUEST_ID_OK = re.compile(r"[A-Za-z0-9._-]{1,64}")
+
+
+def request_id_for(supplied: str | None) -> str:
+    """The id a request is known by: the caller's ``X-Request-ID`` when it is short and plain (letters, digits, ``.``, ``_``, ``-``), else a new one. It goes back on the answer and into the slow-request log, so "I got a 500" can be matched to one line."""
+    text = (supplied or "").strip()
+    return text if _REQUEST_ID_OK.fullmatch(text) else uuid.uuid4().hex
+
+
+def log_if_slow(method: str, endpoint: str, status: int, duration: float, threshold: float | None = None, request_id: str | None = None) -> bool:
     """Log a request that took longer than the threshold, with the route template (never the URL, which can carry ids or search text). Returns whether it logged."""
     limit = slow_request_threshold() if threshold is None else threshold
     if limit <= 0 or duration < limit:
         return False
-    logger.warning("slow_request", method=method, endpoint=endpoint, status=status, seconds=round(duration, 2))
+    logger.warning("slow_request", method=method, endpoint=endpoint, status=status, seconds=round(duration, 2), request_id=request_id)
     return True
 
 
@@ -662,16 +673,18 @@ def log_if_slow(method: str, endpoint: str, status: int, duration: float, thresh
 async def metrics_middleware(request: Request, call_next) -> Response:
     """Collect Prometheus metrics for each request."""
     start_time = time.time()
+    request_id = request_id_for(request.headers.get("x-request-id"))
     response = await call_next(request)
     duration = time.time() - start_time
 
     endpoint = _metrics_endpoint_label(request)
-    log_if_slow(request.method, endpoint, response.status_code, duration)
+    log_if_slow(request.method, endpoint, response.status_code, duration, request_id=request_id)
     sample_pool_now()
     REQUEST_COUNT.labels(request.method, endpoint, response.status_code).inc()
     REQUEST_LATENCY.labels(request.method, endpoint).observe(duration)
 
     response.headers["X-Request-Duration"] = f"{duration:.4f}"
+    response.headers["X-Request-ID"] = request_id
     return response
 
 
