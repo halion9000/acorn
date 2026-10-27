@@ -21,7 +21,7 @@ beforeEach(() => {
 async function openAndAsk(text: string) {
   const user = userEvent.setup();
   await user.click(screen.getByRole('button', { name: 'Open Leafy' }));
-  await user.type(screen.getByPlaceholderText(/Ask Copilot/), text);
+  await user.type(screen.getByPlaceholderText(/Ask Leafy/), text);
   await user.click(screen.getByRole('button', { name: 'Send' }));
 }
 

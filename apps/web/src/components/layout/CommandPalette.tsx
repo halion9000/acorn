@@ -146,7 +146,7 @@ export function CommandPalette() {
         {
           id: 'action:copilot',
           label: 'Ask Leafy',
-          hint: 'Open the floating Copilot dock',
+          hint: 'Open the floating Leafy dock',
           shortcut: ['⌘', 'J'],
           keywords: ['ai', 'copilot', 'assistant', 'investigate'],
           perform: () => {
@@ -259,7 +259,7 @@ export function CommandPalette() {
                 </svg>
                 <Command.Input
                   autoFocus
-                  placeholder="Type a command, search a page, or ask the Copilot…"
+                  placeholder="Type a command, search a page, or ask Leafy…"
                   className="flex-1 bg-transparent text-sm text-gray-200 placeholder-gray-500 outline-none"
                 />
                 <kbd className="rounded border border-gray-700 bg-gray-900/70 px-1.5 py-0.5 text-[10px] font-mono text-gray-500">

@@ -325,26 +325,6 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: 'Setup',
-    items: [
-      {
-        label: 'Connectors',
-        href: '/settings/connectors',
-        icon: <PuzzleIcon />,
-      },
-      {
-        label: 'Client Mapping',
-        href: '/settings/client-mapping',
-        icon: <GlobeIcon />,
-      },
-      {
-        label: 'Audit Log',
-        href: '/settings/audit',
-        icon: <EyeIcon />,
-      },
-    ],
-  },
-  {
     title: 'Automation',
     items: [
       {

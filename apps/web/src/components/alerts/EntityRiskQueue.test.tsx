@@ -60,6 +60,18 @@ describe('when the queue loads', () => {
     await waitFor(() => expect(api.get).toHaveBeenCalledWith('user', 'sp-pc', 'client-1'));
   });
 
+  it('offers more entities past the first 50, up to the 200 the server allows, and says how many exist', async () => {
+    const many = (n: number) => Array.from({ length: n }, (_, i) => record(`user-${i}`, 90 - i / 10, false));
+    api.queue.mockImplementation(async (p: { limit: number }) => ({ tenant_id: 't1', threshold: 80, entities: many(Math.min(p.limit, 120)) }));
+    api.stats.mockResolvedValue({ ...stats, total: 120 });
+    renderQueue();
+    expect(await screen.findByText('user-0')).toBeInTheDocument();
+    expect(screen.getByText(/50 of 120 shown/)).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Show 50 more' }));
+    await waitFor(() => expect(api.queue).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 100 })));
+    expect(await screen.findByText(/100 of 120 shown/)).toBeInTheDocument();
+  });
+
   it('still says so when there genuinely are no entities, and for the promoted-only filter', async () => {
     api.queue.mockResolvedValue({ tenant_id: 't1', threshold: 80, entities: [] });
     api.stats.mockResolvedValue({ ...stats, total: 0, promoted: 0, alert_count: 0 });

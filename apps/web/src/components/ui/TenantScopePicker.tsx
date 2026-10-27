@@ -8,6 +8,8 @@ interface TenantScopePickerProps {
   value: string | null;
   onChange: (tenantId: string | null) => void;
   label?: string;
+  /** What the caller's own tenant is called in the list. Default: its name plus "(your tenant)". A view that rolls the clients up under it passes a name that says so. */
+  ownLabel?: string;
   className?: string;
   /** `dark` for the dark console surfaces (default), `light` for the white ones. */
   tone?: 'dark' | 'light';
@@ -25,7 +27,7 @@ const TONES = {
  * pretend. Choosing your own tenant clears the selection (`null`) rather than naming it. While another tenant is selected a visible note says whose data this is, with a way back, so nobody mistakes
  * a child tenant's numbers for their own. The server decides what is allowed; this only offers what the server listed, and drops a selection the server no longer lists.
  */
-export function TenantScopePicker({ value, onChange, label = 'Tenant', className, tone = 'dark' }: TenantScopePickerProps) {
+export function TenantScopePicker({ value, onChange, label = 'Tenant', ownLabel, className, tone = 'dark' }: TenantScopePickerProps) {
   const { data } = useSelectableTenants();
   const c = TONES[tone];
 
@@ -52,7 +54,7 @@ export function TenantScopePicker({ value, onChange, label = 'Tenant', className
         >
           {ordered.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.id === own ? `${t.name} (your tenant)` : t.name}
+              {t.id === own ? (ownLabel ?? `${t.name} (your tenant)`) : t.name}
             </option>
           ))}
         </select>

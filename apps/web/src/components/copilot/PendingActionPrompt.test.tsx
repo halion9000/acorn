@@ -64,10 +64,10 @@ describe('confirming', () => {
   });
 
   it("shows the server's own reason when it refuses (expired, not issued to you)", async () => {
-    copilotApi.confirmAction.mockRejectedValue(new ApiError('API 410', 410, JSON.stringify({ detail: 'That confirmation has expired. Ask the Copilot again.' })));
+    copilotApi.confirmAction.mockRejectedValue(new ApiError('API 410', 410, JSON.stringify({ detail: 'That confirmation has expired. Ask Leafy again.' })));
     render(<PendingActionPrompt action={pending()} />);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Delete' }));
-    expect(await screen.findByText('That confirmation has expired. Ask the Copilot again.')).toBeInTheDocument();
+    expect(await screen.findByText('That confirmation has expired. Ask Leafy again.')).toBeInTheDocument();
     expect(screen.queryByText('Deleted.')).not.toBeInTheDocument();
   });
 
@@ -110,7 +110,7 @@ describe('cancelling', () => {
 describe('expiry', () => {
   it('offers no way to confirm a prompt that has already expired', () => {
     render(<PendingActionPrompt action={pending({ expiresAt: inFuture(-5) })} />);
-    expect(screen.getByText(/This confirmation has expired\. Ask the Copilot again/)).toBeInTheDocument();
+    expect(screen.getByText(/This confirmation has expired\. Ask Leafy again/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
     expect(copilotApi.confirmAction).not.toHaveBeenCalled();
   });

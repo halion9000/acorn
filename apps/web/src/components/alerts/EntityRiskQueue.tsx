@@ -422,16 +422,21 @@ function EntityDetailDrawer({
 /** Shown instead of a number we do not know. */
 const UNKNOWN = '\u2014';
 
+const PAGE_SIZE = 50;
+const MAX_ENTITIES = 200;
+
 export function EntityRiskQueue() {
   const [promotedOnly, setPromotedOnly] = useState(false);
   const [sort, setSort] = useState<'score' | 'recent'>('score');
   const [selected, setSelected] = useState<EntityRiskRecord | null>(null);
   // null = my own tenant (the default; nothing is sent and the server resolves it). Set only when someone who may look at other tenants picks one.
   const [tenantId, setTenantId] = useState<string | null>(null);
+  // How many of the top entities to load; "Show more" raises it (the server allows 200).
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
   const { data: queue, error: queueError, isLoading: queueLoading, mutate: mutateQueue } = useSWR(
-    ['entity-risk-queue', tenantId, promotedOnly, sort],
-    () => entityRiskApi.queue({ limit: 50, promotedOnly, sort, tenantId: tenantId ?? undefined }),
+    ['entity-risk-queue', tenantId, promotedOnly, sort, limit],
+    () => entityRiskApi.queue({ limit, promotedOnly, sort, tenantId: tenantId ?? undefined }),
     { refreshInterval: 30000 },
   );
   const { data: stats } = useSWR<EntityRiskStats>(
@@ -495,9 +500,11 @@ export function EntityRiskQueue() {
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap py-3 px-4 bg-gray-900/40 border border-gray-800/60 rounded-xl">
         <TenantScopePicker
+          ownLabel="All clients"
           value={tenantId}
           onChange={(next) => {
             setTenantId(next);
+            setLimit(PAGE_SIZE);
             setSelected(null); // an open drawer belongs to the tenant that was on screen
           }}
         />
@@ -543,7 +550,7 @@ export function EntityRiskQueue() {
           </button>
         </div>
         <span className="ml-auto text-xs text-gray-600">
-          {queueFailed ? UNKNOWN : entities.length} shown
+          {queueFailed ? UNKNOWN : entities.length}{!promotedOnly && !unknown && total > entities.length ? ` of ${total}` : ''} shown
         </span>
       </div>
 
@@ -600,6 +607,21 @@ export function EntityRiskQueue() {
                 onSelect={() => setSelected(record)}
               />
             ))}
+            {entities.length >= limit && (
+              <div className="flex items-center justify-center gap-3 border-t border-gray-800/60 px-4 py-3 text-xs text-gray-500">
+                {limit < MAX_ENTITIES ? (
+                  <button
+                    type="button"
+                    onClick={() => setLimit((n) => Math.min(MAX_ENTITIES, n + PAGE_SIZE))}
+                    className="rounded-lg bg-gray-800 px-3 py-1.5 text-gray-200 hover:bg-gray-700"
+                  >
+                    Show {Math.min(PAGE_SIZE, MAX_ENTITIES - limit)} more
+                  </button>
+                ) : (
+                  <span>Showing the top {MAX_ENTITIES}. Pick a client, or Promoted only, to narrow it.</span>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

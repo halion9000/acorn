@@ -1094,7 +1094,7 @@ function NotificationsPanel() {
           onChange={(v) => update('alertSoundsEnabled', v)}
         />
         <Toggle
-          label="Auto-open Copilot for high-severity alerts"
+          label="Auto-open Leafy for high-severity alerts"
           description="Surfaces an investigation suggestion as soon as a critical alert lands."
           checked={prefs.copilotAutoOpen}
           onChange={(v) => update('copilotAutoOpen', v)}

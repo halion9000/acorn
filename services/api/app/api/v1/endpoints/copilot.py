@@ -278,7 +278,7 @@ _CONFIRM_ERRORS = {
     "malformed": (400, "That confirmation is not valid."),
     "signature": (400, "That confirmation is not valid."),
     "unknown_action": (400, "That confirmation is not valid."),
-    "expired": (410, "That confirmation has expired. Ask the Copilot again."),
+    "expired": (410, "That confirmation has expired. Ask Leafy again."),
     "wrong_tenant": (403, "That confirmation was not issued to you."),
     "wrong_user": (403, "That confirmation was not issued to you."),
 }

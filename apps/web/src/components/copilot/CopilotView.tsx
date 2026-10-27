@@ -460,7 +460,7 @@ export function CopilotView() {
           {empty ? (
             <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center text-center">
               <h2 className="text-lg font-semibold text-white">
-                Copilot
+                Leafy
               </h2>
               <p className="mt-1 max-w-md text-sm text-slate-400">
                 Ask about alerts, hosts, MITRE techniques, or detection

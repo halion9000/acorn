@@ -72,7 +72,7 @@ export function PendingActionPrompt({ action }: { action: CopilotPendingAction }
         </p>
       ) : expired ? (
         <p role="status" className="mt-2 text-xs text-amber-100/80">
-          This confirmation has expired. Ask the Copilot again if you still want to do this.
+          This confirmation has expired. Ask Leafy again if you still want to do this.
         </p>
       ) : (
         <div className="mt-2 flex gap-2">

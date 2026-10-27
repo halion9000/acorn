@@ -155,7 +155,7 @@ export function CopilotDock() {
                 d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"
               />
             </svg>
-            Ask Copilot
+            Ask Leafy
             <kbd className="rounded bg-emerald-900/30 px-1.5 py-0.5 text-[10px] font-mono text-emerald-100">
               ⌘J
             </kbd>
@@ -194,7 +194,7 @@ export function CopilotDock() {
                   href="/copilot"
                   className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
                   title="Open full page"
-                  aria-label="Open Copilot full page"
+                  aria-label="Open Leafy full page"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
@@ -203,7 +203,7 @@ export function CopilotDock() {
                 <button
                   onClick={() => setOpen(false)}
                   className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
-                  aria-label="Close Copilot"
+                  aria-label="Close Leafy"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
@@ -318,7 +318,7 @@ export function CopilotDock() {
                     }
                   }}
                   rows={1}
-                  placeholder="Ask Copilot…"
+                  placeholder="Ask Leafy…"
                   className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-slate-100 placeholder-slate-500 outline-none"
                 />
                 <button
