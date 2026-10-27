@@ -126,6 +126,42 @@ def could_be_same_machine(a: set[str], b: set[str]) -> bool:
     return not ((hw_a and b & AGENT_TOOLS) or (hw_b and a & AGENT_TOOLS))
 
 
+# Windows (NetBIOS) cuts a computer's name to 15 characters, and some tools report the cut name while others report the full one ("NUC-GCR-BBQ1-HO" and "NUC-GCR-BBQ1-HOUSTON").
+_NETBIOS_LENGTHS = (15, 16)
+
+
+def netbios_truncated_pairs(devices: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], taken: set[tuple[Any, Any]]) -> list[tuple[Any, Any]]:
+    """Pairs of one client's devices where one name is the other cut to the NetBIOS length (15 or 16 characters) and the other is longer.
+
+    Two devices that the same tool reports are two machines (a tool lists each machine once), so a pair needs tools that do not overlap. Two different serial numbers, a hardware unit against a machine an agent runs on,
+    made-up names, dismissed pairs and pairs already ``taken`` are left out. Each pair is ordered by id text.
+    """
+    keyed = [(d, hostname_key(d.hostname)) for d in devices]
+    by_prefix: dict[str, list[tuple[Any, str]]] = {}
+    for d, key in keyed:
+        if len(key) > _NETBIOS_LENGTHS[0] and not is_placeholder_name(key):
+            by_prefix.setdefault(key[: _NETBIOS_LENGTHS[0]], []).append((d, key))
+    out: list[tuple[Any, Any]] = []
+    seen = set(taken)
+    for a, key_a in keyed:
+        if len(key_a) not in _NETBIOS_LENGTHS or is_placeholder_name(key_a):
+            continue
+        for b, key_b in by_prefix.get(key_a[: _NETBIOS_LENGTHS[0]], ()):
+            if b.id == a.id or len(key_b) <= len(key_a) or not key_b.startswith(key_a):
+                continue
+            if getattr(a, "serial_number", None) and getattr(b, "serial_number", None):
+                continue
+            ta, tb = tools.get(a.id, set()), tools.get(b.id, set())
+            if ta & tb or not could_be_same_machine(ta, tb):
+                continue
+            pair = tuple(sorted((a.id, b.id), key=str))
+            if pair in dismissed or pair in seen:
+                continue
+            seen.add(pair)
+            out.append(pair)  # type: ignore[arg-type]
+    return out
+
+
 def ip_brand_pairs(devices: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], taken: set[tuple[Any, Any]]) -> list[tuple[Any, Any]]:
     """Pairs of one client's devices where one has a made-up name (Auvik's ``Device@10.7.220.92``) and the other holds one of its addresses without disagreeing about the maker.
 

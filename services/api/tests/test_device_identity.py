@@ -114,3 +114,46 @@ def test_macs_of_reads_a_single_mac_and_a_list_and_ignores_anything_else():
     assert macs_of({"mac": "1C6A1B49048D", "macs": ["aa:bb:cc:dd:ee:01", "junk", None]}) == {"1c6a1b49048d", "aabbccddee01"}
     assert macs_of({"macs": "not a list"}) == set()
     assert macs_of(None) == set()
+
+
+# ---- NetBIOS-truncated names -------------------------------------------------------------------------------------------------------------------------------
+
+
+def _dev(i, hostname, serial=None):
+    import uuid
+    from types import SimpleNamespace
+
+    return SimpleNamespace(id=uuid.UUID(int=i), hostname=hostname, serial_number=serial, ip_addresses=[], manufacturer=None)
+
+
+def test_a_name_cut_to_15_characters_is_paired_with_the_full_name_from_other_tools():
+    from app.services.device_identity import netbios_truncated_pairs
+
+    cut, full = _dev(1, "NUC-GCR-BBQ1-HO"), _dev(2, "NUC-GCR-BBQ1-HOUSTON", "7V2B8R2")
+    tools = {cut.id: {"liongard", "screenconnect"}, full.id: {"ninjaone", "huntress"}}
+    assert netbios_truncated_pairs([cut, full], tools, set(), set()) == [(cut.id, full.id)]
+    sixteen = _dev(3, "NUC-GCR-SEA2-HOU.local.")  # the first label is 16 characters
+    other = _dev(4, "NUC-GCR-SEA2-HOUSTON")
+    assert netbios_truncated_pairs([sixteen, other], {sixteen.id: {"auvik"}, other.id: {"ninjaone"}}, set(), set()) == [(sixteen.id, other.id)]
+
+
+def test_only_the_cut_length_pairs_and_only_across_different_tools_and_serials():
+    from app.services.device_identity import netbios_truncated_pairs
+
+    short, full = _dev(1, "NUC-GCR-BBQ1"), _dev(2, "NUC-GCR-BBQ1-HOUSTON")  # 12 characters is just a shorter name
+    assert netbios_truncated_pairs([short, full], {short.id: {"auvik"}, full.id: {"ninjaone"}}, set(), set()) == []
+    a, b = _dev(3, "WS-ACCOUNTING-1"), _dev(4, "WS-ACCOUNTING-10")  # both in the one tool: two machines
+    assert netbios_truncated_pairs([a, b], {a.id: {"ninjaone"}, b.id: {"ninjaone", "huntress"}}, set(), set()) == []
+    s1, s2 = _dev(5, "NUC-GCR-BBQ1-HO", "AAAAAAA1"), _dev(6, "NUC-GCR-BBQ1-HOUSTON", "BBBBBBB2")
+    assert netbios_truncated_pairs([s1, s2], {s1.id: {"auvik"}, s2.id: {"ninjaone"}}, set(), set()) == []
+    c, d = _dev(7, "NUC-GCR-BBQ1-HO"), _dev(8, "NUC-GCR-BBQ1-HOUSTON")
+    tools = {c.id: {"auvik"}, d.id: {"ninjaone"}}
+    assert netbios_truncated_pairs([c, d], tools, {(c.id, d.id)}, set()) == [], "a dismissed pair stays dismissed"
+    assert netbios_truncated_pairs([c, d], tools, set(), {(c.id, d.id)}) == [], "a pair already offered is not offered twice"
+
+
+def test_duplicate_pairs_offers_the_truncated_pair_alongside_the_exact_ones():
+    from app.services.device_upsert import duplicate_pairs
+
+    cut, full = _dev(1, "NUC-GCR-BBQ1-HO"), _dev(2, "NUC-GCR-BBQ1-HOUSTON")
+    assert duplicate_pairs([cut, full], {cut.id: {"liongard"}, full.id: {"ninjaone"}}, set(), set()) == [(cut.id, full.id)]

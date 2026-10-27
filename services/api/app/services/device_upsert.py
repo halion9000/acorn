@@ -18,7 +18,7 @@ from typing import Any
 from sqlalchemy import delete, func, select, tuple_
 
 from app.models.device import Device, DeviceSource
-from app.services.device_identity import could_be_same_machine, hostname_key, ip_brand_pairs, is_placeholder_name, loose_name_key, normalize_serial
+from app.services.device_identity import could_be_same_machine, hostname_key, ip_brand_pairs, is_placeholder_name, loose_name_key, netbios_truncated_pairs, normalize_serial
 
 
 @dataclass
@@ -217,4 +217,6 @@ def duplicate_pairs(rows: list[Any], tools: dict[Any, set[str]], dismissed: set[
                 pairs.append((lo, hi))
     # A device with a made-up name is offered next to another device in the client that has one of its addresses and does not disagree about the maker.
     pairs += ip_brand_pairs(rows, tools, dismissed, set(pairs))
+    # The same machine under its full name in one tool and its 15-character NetBIOS name in another.
+    pairs += netbios_truncated_pairs(rows, tools, dismissed, set(pairs))
     return pairs
