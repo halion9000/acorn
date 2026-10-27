@@ -117,3 +117,38 @@ def test_every_status_the_application_assigns_to_a_report_artefact_is_one_the_da
     assert any(f[0].endswith("weekly_digest_task.py") for f in found), "the scan no longer sees the digest worker: it would pass vacuously"
     bad = [f for f in found if f[2] not in ALLOWED]
     assert not bad, f"statuses the database would refuse: {bad}"
+
+
+@pytest.mark.asyncio
+async def test_a_clients_stored_digest_is_headed_with_the_clients_name_and_the_organisations_own_is_not(monkeypatch):
+    seen = []
+
+    def render(digest):
+        seen.append(getattr(digest, "client_name", None))
+        return b"%PDF-1.4 test"
+
+    monkeypatch.setattr(wdt, "AsyncSessionLocal", _Factory(_Session()))
+    monkeypatch.setattr(wdt, "_artefact_exists", AsyncMock(return_value=False))
+    monkeypatch.setattr(wdt, "build_weekly_digest", AsyncMock(side_effect=lambda *a, **k: SimpleNamespace(client_name=None, model_dump=lambda mode="python": {"ok": True})))
+    monkeypatch.setattr(wdt, "render_digest_pdf", render)
+    start, end = datetime(2026, 10, 5, tzinfo=UTC), datetime(2026, 10, 11, 23, 59, 59, tzinfo=UTC)
+    await wdt._generate_for_tenant(uuid.uuid4(), start, end, client_name="Acme Dental")
+    await wdt._generate_for_tenant(uuid.uuid4(), start, end)
+    assert seen == ["Acme Dental", None]
+
+
+@pytest.mark.asyncio
+async def test_the_weekly_run_names_each_client_but_not_the_organisation_that_owns_them(monkeypatch):
+    own = SimpleNamespace(id=uuid.uuid4(), name="Live Oak IT Partners", parent_tenant_id=None)
+    child = SimpleNamespace(id=uuid.uuid4(), name="Acme Dental", parent_tenant_id=own.id)
+    calls = []
+
+    async def fake_generate(tenant_id, start, end, client_name=None):
+        calls.append((tenant_id, client_name))
+
+    monkeypatch.setattr(wdt, "AsyncSessionLocal", _Factory(_Session()))
+    monkeypatch.setattr(wdt, "_fetch_active_tenants", AsyncMock(return_value=[own, child]))
+    monkeypatch.setattr(wdt, "_generate_for_tenant", fake_generate)
+    stats = await wdt.run_once(datetime(2026, 10, 12, tzinfo=UTC).date())
+    assert stats == {"tenants": 2, "generated": 2, "failed": 0}
+    assert calls == [(own.id, None), (child.id, "Acme Dental")]

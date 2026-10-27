@@ -115,6 +115,7 @@ async def _generate_for_tenant(
     tenant_id: uuid.UUID,
     period_start: datetime,
     period_end: datetime,
+    client_name: str | None = None,
 ) -> None:
     """Build, render, and persist one weekly digest artefact for *tenant_id*.
 
@@ -137,6 +138,9 @@ async def _generate_for_tenant(
             period_start=period_start,
             period_end=period_end,
         )
+        if client_name:
+            # A client's stored digest is headed with the client's name, as the on-demand one is, not with its tenant id.
+            digest.client_name = client_name
 
         output_format = "pdf"
         try:
@@ -215,7 +219,7 @@ async def run_once(ref_date: date | None = None) -> dict[str, int]:
 
     for tenant in tenants:
         try:
-            await _generate_for_tenant(tenant.id, period_start, period_end)
+            await _generate_for_tenant(tenant.id, period_start, period_end, client_name=tenant.name if tenant.parent_tenant_id else None)
             stats["generated"] += 1
         except Exception as exc:  # noqa: BLE001
             stats["failed"] += 1
