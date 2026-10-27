@@ -99,7 +99,8 @@ def scan_plan(s: Any, ip_targets: list[str]) -> dict[str, Any]:
     shodan = bool(s.AISOC_EASM_SHODAN_API_KEY)
     censys = bool(s.AISOC_EASM_CENSYS_API_ID and s.AISOC_EASM_CENSYS_API_SECRET)
     active_on = bool(s.AISOC_EASM_ACTIVE_SCAN_ENABLED)
-    sources = [name for name, on in (("shodan", shodan), ("censys", censys), ("port check", active_on and bool(ip_targets))) if on]
+    internetdb_on = bool(getattr(s, "AISOC_EASM_INTERNETDB_ENABLED", True))
+    sources = [name for name, on in (("internetdb", internetdb_on and bool(ip_targets)), ("shodan", shodan), ("censys", censys), ("port check", active_on and bool(ip_targets))) if on]
     problem: str | None = None
     if not sources:
         if ip_targets and not active_on:
@@ -107,8 +108,8 @@ def scan_plan(s: Any, ip_targets: list[str]) -> dict[str, Any]:
                 "The port check is switched off on this server, so the addresses you entered would not be probed, and no Shodan or Censys key is set. "
                 "Set AISOC_EASM_ACTIVE_SCAN_ENABLED=true (it probes only the public addresses you enter), or add a Shodan or Censys key, in the API's environment and restart it."
             )
-        elif active_on:
-            problem = "The port check is on, but no IP addresses were entered, and no Shodan or Censys key is set. Enter the public IP addresses to check."
+        elif active_on or internetdb_on:
+            problem = "No IP addresses were entered, and no Shodan or Censys key is set. Enter the public IP addresses to look up."
         else:
             problem = (
                 "Nothing is set up to discover with. Add a Shodan key (AISOC_EASM_SHODAN_API_KEY) or a Censys key (AISOC_EASM_CENSYS_API_ID and AISOC_EASM_CENSYS_API_SECRET), "
@@ -118,6 +119,7 @@ def scan_plan(s: Any, ip_targets: list[str]) -> dict[str, Any]:
         "shodan": shodan,
         "censys": censys,
         "port_check": active_on,
+        "internetdb": internetdb_on,
         "sources": sources,
         "can_run": bool(sources),
         "problem": problem,

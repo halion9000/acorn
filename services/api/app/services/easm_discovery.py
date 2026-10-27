@@ -1,7 +1,8 @@
 """
 EASM discovery connectors (Tier 3.6).
 
-Three connector types:
+Four connector types (the first needs no key):
+  0. InternetDB — keyless Shodan lookup of the IP addresses entered (ports, CVEs, host names).
   1. Shodan  — passive search by org / domain / IP.
   2. Censys  — passive search via Censys Search 2.0 API.
   3. Active  — lightweight async TCP connect probe on a configurable port list.
@@ -27,6 +28,7 @@ from app.models.easm import ExternalAssetType
 logger = logging.getLogger("aisoc.easm.discovery")
 
 SHODAN_BASE = "https://api.shodan.io"
+INTERNETDB_BASE = "https://internetdb.shodan.io"
 CENSYS_HOSTS_BASE = "https://search.censys.io/api/v2"
 
 
@@ -133,6 +135,47 @@ async def _censys_search(query: str, api_id: str, api_secret: str) -> list[Disco
     return results
 
 
+async def _internetdb_lookup(ip: str, client: httpx.AsyncClient) -> list[DiscoveredAsset]:
+    """One address from Shodan's keyless InternetDB: its open ports, known CVEs, software (CPEs) and host names. A 404 means Shodan has nothing on it."""
+    try:
+        resp = await client.get(f"{INTERNETDB_BASE}/{ip}")
+        if resp.status_code == 404:
+            return []
+        resp.raise_for_status()
+        data = resp.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("InternetDB lookup failed for %s: %s", ip, exc)
+        return []
+    if not isinstance(data, dict):
+        return []
+    ports = sorted(p for p in data.get("ports") or [] if isinstance(p, int))
+    hostnames = [h for h in data.get("hostnames") or [] if isinstance(h, str) and h]
+    meta: dict[str, Any] = {
+        "source": "internetdb",
+        "ports": ports,
+        "vulns": [v for v in data.get("vulns") or [] if isinstance(v, str)],
+        "cpes": [c for c in data.get("cpes") or [] if isinstance(c, str)],
+        "tags": [t for t in data.get("tags") or [] if isinstance(t, str)],
+        "hostnames": hostnames,
+    }
+    out = [DiscoveredAsset(asset_type=ExternalAssetType.IP, value=ip, metadata=meta)]
+    out.extend(DiscoveredAsset(asset_type=ExternalAssetType.SUBDOMAIN, value=h, metadata={"source": "internetdb", "resolved_ip": ip}) for h in hostnames)
+    return out
+
+
+async def _internetdb_scan(targets: Sequence[str]) -> list[DiscoveredAsset]:
+    """InternetDB for each address typed on the page, a few at a time."""
+    gate = asyncio.Semaphore(5)
+    async with httpx.AsyncClient(timeout=15) as client:
+
+        async def one(ip: str) -> list[DiscoveredAsset]:
+            async with gate:
+                return await _internetdb_lookup(ip, client)
+
+        found = await asyncio.gather(*(one(t) for t in targets))
+    return [a for group in found for a in group]
+
+
 async def _probe_port(host: str, port: int, timeout: float = 3.0) -> bool:
     """Return True if a TCP connect succeeds within *timeout* seconds."""
     loop = asyncio.get_running_loop()
@@ -211,6 +254,9 @@ async def run_discovery(
                 all_assets.extend(res)
             elif isinstance(res, BaseException):
                 logger.error("Passive discovery connector error: %s", res)
+
+    if ip_targets and getattr(s, "AISOC_EASM_INTERNETDB_ENABLED", True):
+        all_assets.extend(await _internetdb_scan(ip_targets))
 
     if s.AISOC_EASM_ACTIVE_SCAN_ENABLED and ip_targets:
         active_assets = await _active_scan(ip_targets, s.AISOC_EASM_SCAN_PORTS)

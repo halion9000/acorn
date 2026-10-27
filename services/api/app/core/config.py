@@ -611,6 +611,8 @@ class Settings(BaseSettings):
     AISOC_EASM_CENSYS_API_ID: str = ""
     AISOC_EASM_CENSYS_API_SECRET: str = ""
     AISOC_EASM_ACTIVE_SCAN_ENABLED: bool = False  # lightweight port probe; off by default
+    # Shodan's keyless InternetDB lookup (open ports, known CVEs, host names for a public IP). Sends only the address you typed to internetdb.shodan.io; sends nothing to the address itself.
+    AISOC_EASM_INTERNETDB_ENABLED: bool = True
     AISOC_EASM_SCAN_PORTS: list[int] = [22, 80, 443, 8080, 8443, 3389]
 
     @field_validator("AISOC_EASM_SCAN_PORTS", mode="before")

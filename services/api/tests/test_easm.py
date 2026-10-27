@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from app.models.easm import ExternalAsset, ExternalAssetType
 from app.services.easm_discovery import (
@@ -228,6 +229,7 @@ async def test_run_discovery_runs_active_when_enabled():
     fake_settings.AISOC_EASM_CENSYS_API_ID = ""
     fake_settings.AISOC_EASM_CENSYS_API_SECRET = ""
     fake_settings.AISOC_EASM_ACTIVE_SCAN_ENABLED = True
+    fake_settings.AISOC_EASM_INTERNETDB_ENABLED = False
     fake_settings.AISOC_EASM_SCAN_PORTS = [22, 80]
 
     active_asset = DiscoveredAsset(
@@ -370,3 +372,20 @@ async def test_detect_drift_existing_asset_port_change():
     new_port_drifts = [r for r in records if r.drift_type == "new_port"]
     assert len(new_port_drifts) == 1
     assert 443 in new_port_drifts[0].details["ports"]
+
+
+@pytest.mark.asyncio
+async def test_internetdb_turns_a_lookup_into_an_ip_asset_with_its_ports_and_cves_and_hostnames_as_subdomains():
+    from app.services.easm_discovery import _internetdb_lookup
+
+    body = {"ip": "8.8.8.8", "ports": [443, 53, "x"], "hostnames": ["dns.google"], "vulns": ["CVE-2024-1"], "cpes": ["cpe:/a:x"], "tags": ["cloud"]}
+
+    def handler(request):
+        return httpx.Response(200, json=body) if request.url.path == "/8.8.8.8" else httpx.Response(404)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        found = await _internetdb_lookup("8.8.8.8", client)
+        assert await _internetdb_lookup("1.1.1.1", client) == []  # 404: Shodan has nothing on it
+    ip = found[0]
+    assert ip.value == "8.8.8.8" and ip.metadata["ports"] == [53, 443] and ip.metadata["vulns"] == ["CVE-2024-1"]
+    assert [(a.asset_type.value, a.value) for a in found[1:]] == [("subdomain", "dns.google")]

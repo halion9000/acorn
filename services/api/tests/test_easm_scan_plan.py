@@ -12,7 +12,7 @@ from fastapi import BackgroundTasks, HTTPException
 
 
 def settings(**over):
-    base = dict(AISOC_FEATURE_EASM=True, AISOC_EASM_SHODAN_API_KEY="", AISOC_EASM_CENSYS_API_ID="", AISOC_EASM_CENSYS_API_SECRET="", AISOC_EASM_ACTIVE_SCAN_ENABLED=False)
+    base = dict(AISOC_FEATURE_EASM=True, AISOC_EASM_SHODAN_API_KEY="", AISOC_EASM_CENSYS_API_ID="", AISOC_EASM_CENSYS_API_SECRET="", AISOC_EASM_ACTIVE_SCAN_ENABLED=False, AISOC_EASM_INTERNETDB_ENABLED=False)
     base.update(over)
     return NS(**base)
 
@@ -32,6 +32,13 @@ def test_addresses_typed_while_the_port_check_is_off_are_explained_not_silently_
 def test_the_port_check_on_with_no_addresses_asks_for_addresses():
     plan = easm.scan_plan(settings(AISOC_EASM_ACTIVE_SCAN_ENABLED=True), [])
     assert plan["can_run"] is False and "Enter the public IP addresses" in plan["problem"]
+
+
+def test_the_keyless_internetdb_lookup_needs_only_addresses():
+    plan = easm.scan_plan(settings(AISOC_EASM_INTERNETDB_ENABLED=True), ["8.8.8.8"])
+    assert plan["sources"] == ["internetdb"] and plan["can_run"] is True and plan["problem"] is None
+    empty = easm.scan_plan(settings(AISOC_EASM_INTERNETDB_ENABLED=True), [])
+    assert empty["can_run"] is False and "Enter the public IP addresses" in empty["problem"]
 
 
 def test_each_source_that_is_set_up_runs_and_a_half_set_up_censys_does_not():
