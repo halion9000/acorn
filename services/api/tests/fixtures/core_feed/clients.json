@@ -6,7 +6,8 @@
     "clients": [
       {
         "id": "7",
-        "name": "Acme Dental"
+        "name": "Acme Dental",
+        "microsoft_tenant_id": "11111111-1111-4111-8111-111111111111"
       },
       {
         "id": "9",
