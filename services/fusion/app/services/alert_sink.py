@@ -125,6 +125,18 @@ WHERE a.tenant_id = $1 AND a.vendor = $2 AND a.vendor_client_id = $3
 """
 
 
+# The client whose people use a domain (at least two enabled non-guest people, and no other client with as many): see services/api/app/services/domain_owner.py, the same rule.
+_DOMAIN_OWNERS_SQL = """
+SELECT lower(split_part(u.upn, '@', 2)) AS domain, u.tenant_id AS tenant_id, count(*) AS people
+FROM identity_mfa_users u
+JOIN tenants t ON t.id = u.tenant_id AND t.parent_tenant_id = $1
+WHERE position('@' in u.upn) > 0 AND u.enabled AND lower(coalesce(u.user_type, 'member')) <> 'guest'
+GROUP BY 1, 2
+HAVING count(*) >= 2
+"""
+_DOMAIN_OWNERS_TTL_SECONDS = 600.0
+
+
 def _finding_uid(alert: RawAlert) -> str | None:
     """The vendor incident id CORE forwarded (``raw_event.finding.uid``, e.g. ``huntress:123``), or None for an alert that carries none."""
     raw = alert.raw_event if isinstance(alert.raw_event, dict) else {}
@@ -222,6 +234,7 @@ class AlertSink:
         self._pool_size = pool_size
         self._pool: asyncpg.Pool | None = None
         self._connect_failed_logged = False
+        self._domain_owners: dict[uuid.UUID, tuple[float, dict[str, uuid.UUID]]] = {}
 
     async def start(self) -> None:
         """Open the pool (once: a second call keeps the open one). Failure is logged, not raised (fail-soft)."""
@@ -254,6 +267,26 @@ class AlertSink:
         async with pool.acquire() as conn:
             row = await conn.fetchrow(_CLIENT_TENANT_SQL, tenant_id, vendor, vendor_client_id)
         return row["child_tenant_id"] if row else None
+
+    async def child_tenant_for_domain(self, tenant_id: uuid.UUID, domain: str) -> uuid.UUID | None:
+        """The one client of ``tenant_id`` whose people use ``domain``, or None (nobody, several, the MSP's own domain, or the DB is unreachable). The table is read at most every ten minutes."""
+        import time
+
+        now = time.monotonic()
+        cached = self._domain_owners.get(tenant_id)
+        if cached is None or now - cached[0] > _DOMAIN_OWNERS_TTL_SECONDS:
+            pool = await self._ensure_pool()
+            if pool is None:
+                return cached[1].get(domain) if cached else None
+            async with pool.acquire() as conn:
+                rows = await conn.fetch(_DOMAIN_OWNERS_SQL, tenant_id)
+            holders: dict[str, set[uuid.UUID]] = {}
+            for row in rows:
+                if row["domain"] and not row["domain"].endswith("onmicrosoft.com"):
+                    holders.setdefault(row["domain"], set()).add(row["tenant_id"])
+            owners = {d: next(iter(ts)) for d, ts in holders.items() if len(ts) == 1}
+            self._domain_owners[tenant_id] = cached = (now, owners)
+        return cached[1].get(domain)
 
     async def _touch_existing(self, pool: asyncpg.Pool, alert: RawAlert) -> None:
         """Move the stored alert's last_seen forward. Best effort: the alert is already safe, so a failure here is only logged."""

@@ -302,7 +302,7 @@ class FusionWorker:
             _METRICS["promoted"] += 1
             # A client the MSSP has mapped gets its own alerts (see app/services/client_routing.py); anything else stays with the tenant that owns the feed.
             if self._sink is not None:
-                routed = await route_to_client_tenant(alert.tenant_id, alert.raw_event, self._sink.child_tenant_for_client)
+                routed = await route_to_client_tenant(alert.tenant_id, alert.raw_event, self._sink.child_tenant_for_client, self._sink.child_tenant_for_domain)
                 if routed != alert.tenant_id:
                     alert.tenant_id = routed
                     _METRICS["routed_to_client"] += 1

@@ -49,9 +49,11 @@ _MOVE_ACTIONS_SQL = "UPDATE vendor_actions SET tenant_id = :child WHERE tenant_i
 
 
 # ThreatMate files a client's public domain under the MSP's own segment, so its alerts name the MSP as their client. The asset they are about (a host or e-mail address of the client's domain) says whose they are.
+# They sit under the MSP itself, or under a client tenant the MSP's own ThreatMate segments are mapped to ("Live Oak IT Partners" is a client tenant too), so both are looked at.
 _DOMAIN_CANDIDATES_SQL = (
-    "SELECT a.id::text, a.raw_event #>> ARRAY['unmapped', 'context', 'device_name'] FROM alerts a "
-    "WHERE a.tenant_id = :parent AND a.raw_event->>'source' = 'threatmate' AND a.raw_event #>> ARRAY['unmapped', 'context', 'device_name'] IS NOT NULL"
+    "SELECT a.tenant_id, a.id::text, a.raw_event #>> ARRAY['unmapped', 'context', 'device_name'] FROM alerts a "
+    "WHERE (a.tenant_id = :parent OR a.tenant_id IN (SELECT t.id FROM tenants t WHERE t.parent_tenant_id = :parent)) "
+    "AND a.raw_event->>'source' = 'threatmate' AND a.raw_event #>> ARRAY['unmapped', 'context', 'device_name'] IS NOT NULL"
 )
 _MOVE_IDS_SQL = (
     "UPDATE alerts a SET tenant_id = :child WHERE a.tenant_id = :parent AND a.id = ANY(CAST(:ids AS uuid[])) "
@@ -119,19 +121,20 @@ async def _reroute_by_domain(db: Any, parent_id: uuid.UUID, result: RerouteResul
     if not owners:
         return
     names = {tid: name for tid, name in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == parent_id))).all()}
-    by_child: dict[uuid.UUID, list[str]] = {}
-    for alert_id, device in (await db.execute(text(_DOMAIN_CANDIDATES_SQL), {"parent": parent_id})).all():
+    by_route: dict[tuple[uuid.UUID, uuid.UUID], list[str]] = {}
+    for source_id, alert_id, device in (await db.execute(text(_DOMAIN_CANDIDATES_SQL), {"parent": parent_id})).all():
         child = owners.get(registrable_domain(device) or "")
-        if child is not None:
-            by_child.setdefault(child, []).append(alert_id)
-    for child_id, ids in by_child.items():
-        moved_ids = [str(r[0]) for r in (await db.execute(text(_MOVE_IDS_SQL), {"parent": parent_id, "child": child_id, "ids": ids})).all()]
+        if child is not None and child != source_id:  # an alert already under the client the domain belongs to stays
+            by_route.setdefault((source_id, child), []).append(alert_id)
+    for (source_id, child_id), ids in by_route.items():
+        # ``parent`` in these statements is the tenant the alerts are in now: the MSP itself, or the client tenant its own segments are mapped to.
+        moved_ids = [str(r[0]) for r in (await db.execute(text(_MOVE_IDS_SQL), {"parent": source_id, "child": child_id, "ids": ids})).all()]
         result.left_duplicates += len(ids) - len(moved_ids)
         if not moved_ids:
             continue
         label = names.get(child_id, str(child_id))
         result.moved += len(moved_ids)
         result.by_client[label] = result.by_client.get(label, 0) + len(moved_ids)
-        moved = {"parent": parent_id, "child": child_id, "ids": moved_ids}
+        moved = {"parent": source_id, "child": child_id, "ids": moved_ids}
         result.cases_moved += (await db.execute(text(_MOVE_CASES_SQL), moved)).rowcount or 0
         await db.execute(text(_MOVE_ACTIONS_SQL), moved)

@@ -24,7 +24,7 @@ def tm(device, source="threatmate"):
 @pytest.fixture
 async def world():
     tag = uuid.uuid4().hex[:10]
-    ids = {k: uuid.uuid4() for k in ("parent", "acme", "birch", "other_parent", "other_child")}
+    ids = {k: uuid.uuid4() for k in ("parent", "acme", "birch", "other_parent", "other_child", "msp_child")}
     a: dict[str, uuid.UUID] = {}
     owner = create_async_engine(PG_URL)
     snap = uuid.uuid4()
@@ -32,7 +32,7 @@ async def world():
         async with owner.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
             for key, tid in ids.items():
-                parent = ids["parent"] if key in ("acme", "birch") else ids["other_parent"] if key == "other_child" else None
+                parent = ids["parent"] if key in ("acme", "birch", "msp_child") else ids["other_parent"] if key == "other_child" else None
                 await conn.execute(
                     text("insert into tenants (id, name, slug, parent_tenant_id, mssp_role) values (:i, :n, :s, :p, :r)"),
                     {"i": tid, "n": f"{key}-{tag}", "s": f"{key}-{tag}", "p": parent, "r": "child" if parent else "parent"},
@@ -68,6 +68,10 @@ async def world():
                 ("dup_parent", "parent", tm("ftp.acme-clinic.org"), "dup"),
                 ("dup_child", "acme", tm("ftp.acme-clinic.org"), "dup"),
                 ("other_parents", "other_parent", tm("webdisk.acme-clinic.org"), "d10"),
+                # ThreatMate's MSP segments are mapped to a CLIENT tenant of the MSP, so the alerts sit there, not under the MSP itself
+                ("seg_host", "msp_child", tm("vpn.acme-clinic.org"), "e1"),
+                ("seg_own_domain", "msp_child", tm("www.msp-own.com"), "e2"),
+                ("seg_ip", "msp_child", tm("203.0.113.9"), "e3"),
             ]
             for name, owner_key, rawj, h in rows:
                 a[name] = uuid.uuid4()
@@ -110,10 +114,11 @@ async def test_threatmate_alerts_filed_under_the_msp_move_to_the_client_that_own
         await s.execute(text("select set_config('app.rls_fail_closed', 'off', false)"))
         result = await reroute_alerts(s, ids["parent"])
         await s.commit()
-    assert result.moved == 2 and result.left_duplicates == 1
-    assert {k.split("-")[0]: v for k, v in result.by_client.items()} == {"acme": 2}
+    assert result.moved == 3 and result.left_duplicates == 1
+    assert {k.split("-")[0]: v for k, v in result.by_client.items()} == {"acme": 3}
     moved = {n: await where(owner, a[n]) for n in a}
-    assert moved["host"] == moved["mail_address"] == ids["acme"]
+    assert moved["host"] == moved["mail_address"] == moved["seg_host"] == ids["acme"], "including the one filed under the client tenant the MSP's own segments map to"
     for stays in ("ambiguous", "lone_user", "guests", "disabled", "own_domain", "not_a_host", "other_vendor", "dup_parent"):
         assert moved[stays] == ids["parent"], stays
+    assert moved["seg_own_domain"] == moved["seg_ip"] == ids["msp_child"], "the MSP's own domain and a bare address belong to nobody, so they stay"
     assert moved["dup_child"] == ids["acme"] and moved["other_parents"] == ids["other_parent"]
