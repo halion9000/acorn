@@ -46,6 +46,15 @@ export function agoLabel(minutes: number | null): string {
   return `${Math.floor(minutes / 1440)} days ago`;
 }
 
+interface SlowRoute {
+  route: string;
+  calls: number;
+  total_seconds: number;
+  typical_seconds: number;
+  p95_seconds: number;
+  worst_seconds: number;
+}
+
 interface Snapshot {
   overall: "ok" | "degraded";
   down: string[];
@@ -55,6 +64,7 @@ interface Snapshot {
   core_feed?: { sources: number; last_report: string | null; minutes_ago: number | null; silent: boolean } | null;
   warnings?: { key: string; level: "error" | "warn"; text: string }[];
   database?: DatabaseSecurity;
+  runtime?: { loop?: { samples: number; max_seconds?: number; typical_seconds?: number; window_seconds: number }; slow_routes?: SlowRoute[] };
   generated_at: string;
 }
 
@@ -110,6 +120,38 @@ export function PlatformHealth() {
               The database connection pool is {snapshot.database.pool.percent}% full ({snapshot.database.pool.in_use} of {snapshot.database.pool.limit} in use). When it is full, pages start failing with 500
               errors until requests finish.
             </p>
+          )}
+          {snapshot.runtime?.loop && snapshot.runtime.loop.samples > 0 && (
+            <p data-testid="loop-lag" className="text-sm text-slate-400">
+              The API's wake-up delay over the last {Math.round(snapshot.runtime.loop.window_seconds / 60)} minutes: typically {snapshot.runtime.loop.typical_seconds} s, worst {snapshot.runtime.loop.max_seconds} s.
+            </p>
+          )}
+          {(snapshot.runtime?.slow_routes ?? []).length > 0 && (
+            <table data-testid="slow-routes" className="w-full text-left text-xs text-slate-300">
+              <caption className="pb-1 text-left text-sm text-slate-400">Routes that have taken the most time since the API started</caption>
+              <thead>
+                <tr className="text-slate-500">
+                  <th scope="col">Route</th>
+                  <th scope="col">Calls</th>
+                  <th scope="col">Total (s)</th>
+                  <th scope="col">Typical (s)</th>
+                  <th scope="col">Slowest 5% (s)</th>
+                  <th scope="col">Worst (s)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(snapshot.runtime?.slow_routes ?? []).map((r) => (
+                  <tr key={r.route}>
+                    <td className="font-mono">{r.route}</td>
+                    <td>{r.calls}</td>
+                    <td>{r.total_seconds}</td>
+                    <td>{r.typical_seconds}</td>
+                    <td>{r.p95_seconds}</td>
+                    <td>{r.worst_seconds}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
           {(snapshot.warnings ?? []).filter((w) => w.key !== "services" && w.key !== "core").length > 0 && (
             <ul data-testid="warnings" className="space-y-1 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">

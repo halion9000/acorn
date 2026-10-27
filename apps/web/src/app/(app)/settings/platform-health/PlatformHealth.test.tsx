@@ -118,6 +118,34 @@ describe('pool history', () => {
   });
 });
 
+describe('runtime speed', () => {
+  const withRuntime = (runtime: unknown) => ({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ overall: 'ok', down: [], services: [{ service: 'fusion', status: 'up', latency_ms: 20, detail: '' }], runtime, generated_at: '2026-10-19T02:00:00Z' }),
+  });
+
+  it('shows the wake-up delay and the routes that took the most time', async () => {
+    authFetch.mockResolvedValue(
+      withRuntime({
+        loop: { window_seconds: 300, samples: 290, max_seconds: 2.5, typical_seconds: 0.01 },
+        slow_routes: [{ route: 'GET /api/v1/devices', calls: 20, total_seconds: 7.8, typical_seconds: 0.1, p95_seconds: 5, worst_seconds: 5 }],
+      }),
+    );
+    render(<PlatformHealth />);
+    expect(await screen.findByTestId('loop-lag')).toHaveTextContent('typically 0.01 s, worst 2.5 s');
+    expect(screen.getByTestId('slow-routes')).toHaveTextContent('GET /api/v1/devices');
+  });
+
+  it('shows nothing before there are readings', async () => {
+    authFetch.mockResolvedValue(withRuntime({ loop: { window_seconds: 300, samples: 0 }, slow_routes: [] }));
+    render(<PlatformHealth />);
+    await waitFor(() => expect(screen.getByTestId('overall')).toBeInTheDocument());
+    expect(screen.queryByTestId('loop-lag')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('slow-routes')).not.toBeInTheDocument();
+  });
+});
+
 describe('CORE feed silence', () => {
   const withFeed = (core_feed: unknown) => ({
     ok: true,

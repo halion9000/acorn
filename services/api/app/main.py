@@ -304,6 +304,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Say whether row-level security actually applies to the role this service connects as (it does not for a superuser). Background and best-effort: never delays startup.
     schedule_role_check(engine)
 
+    # How late the event loop wakes up, for Platform health: one busy request shows as a delay for everyone.
+    start_loop_sampler()
+
     # Create all database tables (dev only; use Alembic migrations in prod).
     # We keep this narrowly scoped to the canonical ``"development"`` label
     # so demo / test / local don't quietly run ``create_all`` on top of a
@@ -457,6 +460,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.mark_ready()
 
     yield
+    stop_loop_sampler()
 
     # Phase 2.6 — flip /readyz to 503 the instant we begin
     # shutdown, so the orchestrator drains in-flight requests
@@ -641,6 +645,7 @@ def _metrics_endpoint_label(request: Request) -> str:
 
 
 from app.api.v1.endpoints.health import sample_pool_now  # noqa: E402
+from app.services.runtime_stats import note_route, start_loop_sampler, stop_loop_sampler  # noqa: E402
 
 
 def slow_request_threshold() -> float:
@@ -679,6 +684,7 @@ async def metrics_middleware(request: Request, call_next) -> Response:
 
     endpoint = _metrics_endpoint_label(request)
     log_if_slow(request.method, endpoint, response.status_code, duration, request_id=request_id)
+    note_route(request.method, endpoint, duration)
     sample_pool_now()
     REQUEST_COUNT.labels(request.method, endpoint, response.status_code).inc()
     REQUEST_LATENCY.labels(request.method, endpoint).observe(duration)

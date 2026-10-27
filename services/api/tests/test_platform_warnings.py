@@ -61,3 +61,9 @@ def test_a_large_scoring_backlog_is_reported_but_a_small_one_is_not():
 def test_nothing_scored_at_all_is_the_louder_message_and_not_reported_twice():
     out = _w(signins={"unscored": 5000, "scored_last_24h": 0})
     assert [w["key"] for w in out] == ["signins"]
+
+
+def test_a_loop_that_stalled_is_a_warning_and_a_quiet_one_is_not():
+    assert _w(loop={"window_seconds": 300, "samples": 290, "max_seconds": 0.2, "slow": False}) == []
+    out = _w(loop={"window_seconds": 300, "samples": 290, "max_seconds": 4.1, "slow": True})
+    assert [w["key"] for w in out] == ["loop"] and "4.1 s" in out[0]["text"] and "5 minutes" in out[0]["text"]

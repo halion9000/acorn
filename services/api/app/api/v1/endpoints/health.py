@@ -82,6 +82,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlalchemy import and_, func, select
 
+from app.services.runtime_stats import loop_lag, slow_routes
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.metrics import PipelineHealth, PipelineStage
 from app.core.config import settings
@@ -826,6 +827,7 @@ def platform_warnings(
     core_feed: dict[str, Any] | None,
     device_feeds: list[dict[str, Any]],
     signins: dict[str, Any] | None,
+    loop: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     """Plain-language problems worth a person's attention, worst first, built only from what the page already knows (pure; unit-tested)."""
     out: list[dict[str, str]] = []
@@ -847,6 +849,8 @@ def platform_warnings(
                 "text": "CORE has not reported for over 15 minutes: no alerts, devices or links arrive while it is silent",
             }
         )
+    if loop and loop.get("slow"):
+        out.append({"key": "loop", "level": "warn", "text": f"The API stopped answering for up to {loop['max_seconds']} s in the last {loop['window_seconds'] // 60} minutes: something heavy is blocking it (see the slowest routes below)"})
     if disk and disk["used_percent"] >= DISK_WARN_PERCENT:
         out.append({"key": "disk", "level": "warn", "text": f"Disk is {disk['used_percent']}% full ({disk['free_gb']} GB free)"})
     stalled = [f["vendor"] for f in device_feeds if f.get("stalled")]
@@ -895,6 +899,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
     signins = await _signins_or_none(db, user)
     disk = disk_row()
     pending = await pending_migrations(db)
+    loop = loop_lag(time.time())
     return {
         "overall": "degraded" if down else "ok",
         "down": down,
@@ -905,6 +910,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
         "signins": signins,
         "disk": disk,
         "pending_migrations": pending or [],
-        "warnings": platform_warnings(down=down, disk=disk, pending=pending, core_feed=core_feed, device_feeds=feeds, signins=signins),
+        "runtime": {"loop": loop, "slow_routes": slow_routes()},
+        "warnings": platform_warnings(down=down, disk=disk, pending=pending, core_feed=core_feed, device_feeds=feeds, signins=signins, loop=loop),
         "generated_at": datetime.now(UTC),
     }
