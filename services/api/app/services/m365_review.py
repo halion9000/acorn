@@ -192,6 +192,10 @@ CHECK_QUESTIONS: dict[str, str] = {
     "access_reviews_privileged": "Ensure 'Access reviews' for privileged roles are configured",
     "pim_ga_approval": "Ensure approval is required for Global Administrator role activation",
     "pim_privileged_approval": "Ensure approval is required for Privileged Role",
+    # CIPP reads these (ListDlpCompliancePolicy, ListSensitivityLabel); earlier notes wrongly said they were not readable.
+    "dlp_enabled": "Ensure DLP policies are enabled",
+    "dlp_teams": "Ensure DLP policies are enabled for Microsoft Teams",
+    "sensitivity_label_policies": "Ensure Information Protection sensitivity label policies are published",
 }
 
 # Questions answered from the multi-factor list A.C.O.R.N already holds.

@@ -70,8 +70,11 @@ Keep this table in step with `CHECK_QUESTIONS` in `services/api/app/services/m36
 | `emergency_access_accounts` | two emergency access accounts are defined | Guessed: cloud-only Global Administrators that every enabled Conditional Access policy excludes. Said only when there are two or more, and only as "partly" |
 | `access_reviews_guests` | access reviews are configured for guest users | Graph `subscribedSkus`. Needs Entra ID P2 (or Entra ID Governance): a tenant without it is "not met: not possible on this plan"; one with it is left to a person (CIPP's app cannot read access reviews yet) |
 | `access_reviews_privileged` | access reviews are configured for privileged roles | As above |
-| `pim_ga_approval` | approval is required to activate Global Administrator | As above (Privileged Identity Management needs Entra ID P2) |
-| `pim_privileged_approval` | approval is required to activate privileged roles | As above |
+| `pim_ga_approval` | approval is required to activate Global Administrator | Without Entra ID P2: "not met, not possible on this plan". With it: CIPP `ListPIMRoles`, the role's activation policy (`activationRequiresApproval`) |
+| `pim_privileged_approval` | approval is required to activate Privileged Role Administrator | As above |
+| `dlp_enabled` | data loss prevention policies are enabled | CIPP `ListDlpCompliancePolicy`: enforcing is met, test mode only is partly, none is not met |
+| `dlp_teams` | data loss prevention covers Microsoft Teams | Same list; a policy with a Teams location |
+| `sensitivity_label_policies` | sensitivity label policies are published | CIPP `ListSensitivityLabel`. Labels that are on are "partly": publication to users is not in the data |
 
 From the multi-factor list (no CIPP read needed): multifactor authentication for administrative roles, for all users, per-user MFA disabled, and all member users MFA capable.
 
@@ -79,7 +82,7 @@ From the multi-factor list (no CIPP read needed): multifactor authentication for
 `POST /api/v1/inbox/core-feed/{token}/m365-checks`, with a body like `docs/api/m365-checks-example.json` (a test checks that file against the real request model). A repeat replaces the client's last list.
 
 ## What a pass costs CIPP
-Each client takes 36 reads (the table above) plus one lookup per administrator (at most 25), made six at a time and at most four clients at once, and only once a day per client (a failed or empty pass counts as done, so an unreachable client is not hammered every hour). For about 118 clients that is roughly 4,250 reads plus the administrator lookups per day. CORE's tests pin the 36 (`hud/src/aisoc-m365-reads.test.ts`), the six-at-once and four-clients limits, and the once-a-day rule.
+Each client takes 39 reads (the table above) plus one lookup per administrator (at most 25), made six at a time and at most four clients at once, and only once a day per client (a failed or empty pass counts as done, so an unreachable client is not hammered every hour). For about 118 clients that is roughly 4,600 reads plus the administrator lookups per day. CORE's tests pin the 39 (`hud/src/aisoc-m365-reads.test.ts`), the six-at-once and four-clients limits, and the once-a-day rule.
 
 ## Known gaps
 - **Not readable through CIPP**: Purview DLP and sensitivity labels, every Teams policy, most SharePoint link and guest settings, some admin-centre settings. These stay "Needs a person".

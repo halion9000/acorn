@@ -142,12 +142,15 @@ CORE_CHECK_KEYS = [
     "access_reviews_privileged",
     "pim_ga_approval",
     "pim_privileged_approval",
+    "dlp_enabled",
+    "dlp_teams",
+    "sensitivity_label_policies",
 ]
 
 
 def test_every_check_key_core_can_emit_has_a_template_question_and_nothing_else_is_mapped():
     assert sorted(m.CHECK_QUESTIONS) == sorted(CORE_CHECK_KEYS)
-    assert len(set(CORE_CHECK_KEYS)) == len(CORE_CHECK_KEYS) == 69
+    assert len(set(CORE_CHECK_KEYS)) == len(CORE_CHECK_KEYS) == 72
     # each key answers a different question
     questions = [m.question_for(q) for q in m.CHECK_QUESTIONS.values()]
     assert len(set(questions)) == len(questions)

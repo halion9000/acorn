@@ -329,6 +329,31 @@
         "key": "emergency_access_accounts",
         "status": "partly",
         "evidence": "2 cloud-only Global Administrators are left out of every Conditional Access policy, which is how emergency access accounts look. Confirm they are the break-glass accounts."
+      },
+      {
+        "key": "pim_ga_approval",
+        "status": "met",
+        "evidence": "Activating Global Administrator needs approval."
+      },
+      {
+        "key": "pim_privileged_approval",
+        "status": "met",
+        "evidence": "Activating Privileged Role Administrator needs approval."
+      },
+      {
+        "key": "dlp_enabled",
+        "status": "met",
+        "evidence": "1 data loss prevention policy enforcing."
+      },
+      {
+        "key": "dlp_teams",
+        "status": "met",
+        "evidence": "A data loss prevention policy that is enforcing covers Microsoft Teams."
+      },
+      {
+        "key": "sensitivity_label_policies",
+        "status": "partly",
+        "evidence": "1 sensitivity label set up. Whether a label policy publishes them to users is not readable, so confirm that."
       }
     ]
   }
