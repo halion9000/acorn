@@ -64,6 +64,14 @@ Keep this table in step with `CHECK_QUESTIONS` in `services/api/app/services/m36
 | `zap_teams` | Zero-hour auto purge for Microsoft Teams | Exchange `Get-TeamsProtectionPolicy` |
 | `calendar_external_sharing` | External sharing of calendars | Exchange `Get-SharingPolicy` |
 | `admin_license_footprint` | administrative accounts use licenses with a reduced application footprint | `ListLicenses` and each administrator's licences |
+| `sspr_enabled` | self-service password reset is set to All | Graph `policies/authorizationPolicy` (`allowedToUseSSPR`). Microsoft does not report the scope, so on is "partly" |
+| `mailbox_audit_actions` | mailbox audit actions are configured | Exchange `Get-Mailbox` (`AuditEnabled`, `AuditAdmin`, `AuditDelegate`, `AuditOwner`) against Microsoft's default actions |
+| `priority_strict_preset` | priority accounts have the Strict preset applied | Exchange `Get-EOPProtectionPolicyRule`. The preset being on is "partly": whether it covers the priority accounts is not readable |
+| `emergency_access_accounts` | two emergency access accounts are defined | Guessed: cloud-only Global Administrators that every enabled Conditional Access policy excludes. Said only when there are two or more, and only as "partly" |
+| `access_reviews_guests` | access reviews are configured for guest users | Graph `subscribedSkus`. Needs Entra ID P2 (or Entra ID Governance): a tenant without it is "not met: not possible on this plan"; one with it is left to a person (CIPP's app cannot read access reviews yet) |
+| `access_reviews_privileged` | access reviews are configured for privileged roles | As above |
+| `pim_ga_approval` | approval is required to activate Global Administrator | As above (Privileged Identity Management needs Entra ID P2) |
+| `pim_privileged_approval` | approval is required to activate privileged roles | As above |
 
 From the multi-factor list (no CIPP read needed): multifactor authentication for administrative roles, for all users, per-user MFA disabled, and all member users MFA capable.
 
@@ -71,7 +79,7 @@ From the multi-factor list (no CIPP read needed): multifactor authentication for
 `POST /api/v1/inbox/core-feed/{token}/m365-checks`, with a body like `docs/api/m365-checks-example.json` (a test checks that file against the real request model). A repeat replaces the client's last list.
 
 ## What a pass costs CIPP
-Each client takes 33 reads (the table above) plus one lookup per administrator (at most 25), made six at a time and at most four clients at once, and only once a day per client (a failed or empty pass counts as done, so an unreachable client is not hammered every hour). For about 118 clients that is roughly 3,900 reads plus the administrator lookups per day. CORE's tests pin the 33 (`hud/src/aisoc-m365-reads.test.ts`), the six-at-once and four-clients limits, and the once-a-day rule.
+Each client takes 36 reads (the table above) plus one lookup per administrator (at most 25), made six at a time and at most four clients at once, and only once a day per client (a failed or empty pass counts as done, so an unreachable client is not hammered every hour). For about 118 clients that is roughly 4,250 reads plus the administrator lookups per day. CORE's tests pin the 36 (`hud/src/aisoc-m365-reads.test.ts`), the six-at-once and four-clients limits, and the once-a-day rule.
 
 ## Known gaps
 - **Not readable through CIPP**: Purview DLP and sensitivity labels, every Teams policy, most SharePoint link and guest settings, some admin-centre settings. These stay "Needs a person".

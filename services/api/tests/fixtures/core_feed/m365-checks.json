@@ -8,7 +8,7 @@
       {
         "key": "ga_count",
         "status": "met",
-        "evidence": "2 Global Administrators; the baseline is two to four."
+        "evidence": "4 Global Administrators; the baseline is two to four."
       },
       {
         "key": "safe_attachments",
@@ -243,7 +243,7 @@
       {
         "key": "cloud_only_admins",
         "status": "met",
-        "evidence": "All 2 administrators are cloud-only accounts."
+        "evidence": "All 4 administrators are cloud-only accounts."
       },
       {
         "key": "inbound_allowed_domains",
@@ -309,6 +309,26 @@
         "key": "admin_license_footprint",
         "status": "met",
         "evidence": "Administrators hold no licence, or only an identity one."
+      },
+      {
+        "key": "sspr_enabled",
+        "status": "partly",
+        "evidence": "Self-service password reset is on. Microsoft does not report whether it covers everyone or only a selected group, so confirm the scope."
+      },
+      {
+        "key": "mailbox_audit_actions",
+        "status": "met",
+        "evidence": "All 1 mailbox audit the default administrator, delegate and owner actions."
+      },
+      {
+        "key": "priority_strict_preset",
+        "status": "partly",
+        "evidence": "The Strict preset security policy is on. Whether it is applied to the priority accounts is not readable here, so confirm it."
+      },
+      {
+        "key": "emergency_access_accounts",
+        "status": "partly",
+        "evidence": "2 cloud-only Global Administrators are left out of every Conditional Access policy, which is how emergency access accounts look. Confirm they are the break-glass accounts."
       }
     ]
   }

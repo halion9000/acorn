@@ -134,12 +134,20 @@ CORE_CHECK_KEYS = [
     "calendar_external_sharing",
     "bookings_restricted",
     "admin_license_footprint",
+    "sspr_enabled",
+    "mailbox_audit_actions",
+    "priority_strict_preset",
+    "emergency_access_accounts",
+    "access_reviews_guests",
+    "access_reviews_privileged",
+    "pim_ga_approval",
+    "pim_privileged_approval",
 ]
 
 
 def test_every_check_key_core_can_emit_has_a_template_question_and_nothing_else_is_mapped():
     assert sorted(m.CHECK_QUESTIONS) == sorted(CORE_CHECK_KEYS)
-    assert len(set(CORE_CHECK_KEYS)) == len(CORE_CHECK_KEYS) == 61
+    assert len(set(CORE_CHECK_KEYS)) == len(CORE_CHECK_KEYS) == 69
     # each key answers a different question
     questions = [m.question_for(q) for q in m.CHECK_QUESTIONS.values()]
     assert len(set(questions)) == len(questions)

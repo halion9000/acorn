@@ -183,6 +183,15 @@ CHECK_QUESTIONS: dict[str, str] = {
     "calendar_external_sharing": "Ensure `External sharing` of calendars is not available",
     "bookings_restricted": "Ensure shared bookings paged are restricted to select users",
     "admin_license_footprint": "Ensure administrative accounts use licenses with a reduced application footprint",
+    "sspr_enabled": "Ensure `Self service password reset enabled` is set to `All`",
+    "mailbox_audit_actions": "Ensure mailbox audit actions are configured",
+    "priority_strict_preset": "Ensure Priority accounts have 'Strict protection' presets applied",
+    "emergency_access_accounts": "Ensure two emergency access accounts have been defined",
+    # These four need Entra ID P2 (or Entra ID Governance): a tenant without it gets "not possible on this plan"; one with it is left to a person.
+    "access_reviews_guests": "Ensure 'Access reviews' for Guest Users are configured",
+    "access_reviews_privileged": "Ensure 'Access reviews' for privileged roles are configured",
+    "pim_ga_approval": "Ensure approval is required for Global Administrator role activation",
+    "pim_privileged_approval": "Ensure approval is required for Privileged Role",
 }
 
 # Questions answered from the multi-factor list A.C.O.R.N already holds.
