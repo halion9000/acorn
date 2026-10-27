@@ -218,3 +218,17 @@ def test_leading_zeros_are_dropped_from_a_numeric_ticket_number_everywhere():
         {"tickets": [{"system": "halopsa", "id": "555871", "summary": "S"}], "manual_tickets": [{"system": "halopsa", "id": "0555871"}]}
     )
     assert [t["id"] for t in both] == ["555871"]
+
+
+def test_an_older_alert_gets_its_tools_link_built_from_the_ids_it_carries():
+    from app.api.v1.endpoints.alerts import _source_url_of
+
+    tm = SimpleNamespace(raw_event={"source": "threatmate", "unmapped": {"context": {"threatmate_client_id": "11085", "threatmate_alert_id": "894119459"}}})
+    assert _source_url_of(tm) == "https://app.threatmate.com/alerts?tenantId=11085&finding=894119459"
+    hu = SimpleNamespace(raw_event={"source": "huntress", "unmapped": {"context": {"huntress_escalation_id": "1100116"}}})
+    base = "https://acme.huntress.io/account/escalations"
+    assert _source_url_of(hu, base) == f"{base}/1100116"
+    assert _source_url_of(hu) is None  # no account address known: no guess
+    assert _source_url_of(SimpleNamespace(raw_event={"source": "threatmate", "unmapped": {"context": {"threatmate_client_id": "x/../", "threatmate_alert_id": "1"}}})) is None
+    sent = SimpleNamespace(raw_event={"url": "https://x.example/a", "source": "huntress"})
+    assert _source_url_of(sent, base) == "https://x.example/a"

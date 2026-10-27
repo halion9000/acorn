@@ -3,7 +3,7 @@
 import { RefreshStatusButton } from './RefreshStatusButton';
 import { RunScriptButton } from './RunScriptButton';
 import { ScriptRunsSection } from './ScriptRunsSection';
-import { AlertContext } from './AlertContext';
+import { AlertContext, sourceLink } from './AlertContext';
 import { useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
@@ -862,6 +862,17 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
             </svg>
             Explain
           </button>
+          {sourceLink(alert) && (
+            <a
+              href={sourceLink(alert)!.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="open-in-tool"
+              className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 text-sm px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {sourceLink(alert)!.label} &#8599;
+            </a>
+          )}
           <button
             type="button"
             onClick={() => setHideOpen(true)}

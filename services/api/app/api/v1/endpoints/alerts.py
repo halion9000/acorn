@@ -1025,7 +1025,7 @@ async def get_alert(
         return payload.model_copy(
             update={
                 "source": _tool_of(alert),
-                "source_url": _source_url_of(alert),
+                "source_url": _source_url_of(alert, await _huntress_base(db, {tid, current_user.tenant_id})),
                 "links": _links_of(alert),
                 "client_name": client_name,
                 "narrative": alert.narrative,
@@ -1049,11 +1049,50 @@ def _links_of(alert: Any) -> dict[str, str]:
     }
 
 
-def _source_url_of(alert: Any) -> str | None:
-    """The tool's own link to this alert (``raw_event.url``), kept only when it is a plain https address."""
+_HTTPS = re.compile(r"^https://[^\s]+$", re.IGNORECASE)
+_THREATMATE_ALERTS = "https://app.threatmate.com/alerts"
+
+
+def _source_url_of(alert: Any, huntress_base: str | None = None) -> str | None:
+    """The tool's own link to this alert: the one it sent (``raw_event.url``), kept only when it is a plain https address; else one built from the ids the alert carries.
+
+    Alerts stored before the forwarder sent a link have none, so ThreatMate's is built from its client and finding ids, and a Huntress escalation's from its id and the account address
+    ``huntress_base`` that the tool's other escalations show (see ``_huntress_base``).
+    """
     raw = alert.raw_event if isinstance(getattr(alert, "raw_event", None), dict) else {}
     url = raw.get("url")
-    return url if isinstance(url, str) and len(url) <= 1000 and re.match(r"^https://[^\s]+$", url, re.IGNORECASE) else None
+    if isinstance(url, str) and len(url) <= 1000 and _HTTPS.match(url):
+        return url
+    unmapped = raw.get("unmapped")
+    context = unmapped.get("context") if isinstance(unmapped, dict) else None
+    context = context if isinstance(context, dict) else {}
+    source = raw.get("source")
+    if source == "threatmate":
+        client, finding = str(context.get("threatmate_client_id") or ""), str(context.get("threatmate_alert_id") or "")
+        if client.isdigit() and finding.isdigit():
+            return f"{_THREATMATE_ALERTS}?tenantId={client}&finding={finding}"
+    if source == "huntress" and huntress_base:
+        escalation = str(context.get("huntress_escalation_id") or "")
+        if escalation.isdigit():
+            return f"{huntress_base}/{escalation}"
+    return None
+
+
+async def _huntress_base(db: Any, tenant_ids: set) -> str | None:
+    """``https://<account>.huntress.io/account/escalations`` as the tenant's other Huntress alerts spell it, or None when none has a link."""
+    try:
+        found = (
+            await db.execute(
+                select(Alert.raw_event["url"].astext)
+                .where(Alert.tenant_id.in_(tenant_ids), Alert.raw_event["source"].astext == "huntress", Alert.raw_event["url"].astext.like("https://%/account/escalations/%"))
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+    except Exception:  # noqa: BLE001 - a missing convenience link must never fail the alert
+        return None
+    if not isinstance(found, str) or not _HTTPS.match(found):
+        return None
+    return found.rsplit("/", 1)[0]
 
 
 @router.patch("/{alert_id}", response_model=AlertResponse)
