@@ -36,7 +36,8 @@ from app.copilot_tools import (
 )
 from app.db.rls import TenantDBSession
 from app.llm.contract import safe_ainvoke
-from app.llm.factory import make_chat_model
+from app.llm.factory import llm_override, make_chat_model
+from app.services.llm_resolver import LlmConfig, resolve_llm_config
 from app.services import copilot_history
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,19 @@ class CopilotMessageOut(BaseModel):
     content: str
     createdAt: str
     suggestions: list[str] | None = None
+
+
+def tenant_llm_override(config: LlmConfig) -> dict[str, str]:
+    """The tenant's own model settings, for ``llm_override``; empty when the tenant has none, so the gateway alias applies as for the agents.
+
+    The resolver keeps base URLs without the ``/v1`` the OpenAI client wants.
+    """
+    if not config.allowed or config.source not in ("tenant", "mixed") or not config.api_key:
+        return {}
+    base = config.base_url.rstrip("/")
+    if not base.endswith("/v1"):
+        base += "/v1"
+    return {"api_key": config.api_key, "base_url": base, "model": config.model}
 
 
 class PendingActionOut(BaseModel):
@@ -169,6 +183,8 @@ async def copilot_chat(
     owner = copilot_history.owner_key(user)
     # History is looked up by (tenant, owner, conversation), never by the client-supplied id alone.
     history = await copilot_history.load_history(db, user.tenant_id, owner, conversation_id)
+    # The model the rest of the platform uses for this tenant: its own key/model from Settings when it has one, else the gateway alias.
+    llm_config = await resolve_llm_config(db, user.tenant_id)
     await db.rollback()  # release the connection: the model call below can take many seconds
 
     # Build the full message list: system prompt + context + stored history
@@ -191,7 +207,8 @@ async def copilot_chat(
     content = ""
     pending_actions: list[PendingActionOut] = []
     try:
-        llm = make_chat_model("copilot", temperature=0.3, max_tokens=1024)
+        with llm_override(**tenant_llm_override(llm_config)):
+            llm = make_chat_model("copilot", temperature=0.3, max_tokens=1024)
         bound = llm.bind_tools(COPILOT_TOOL_SCHEMAS)
         tenant_id = str(user.tenant_id)
         max_tool_iters = 6
