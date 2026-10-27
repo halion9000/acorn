@@ -320,10 +320,20 @@ async def test_two_machines_with_different_real_serials_are_never_merged_on_a_sh
 
 
 async def test_a_mac_held_by_three_devices_is_left_alone(tenant):
-    for i, vendor in enumerate(["huntress", "auvik", "threatmate"]):
-        await report(tenant, vendor, f"x{i}", f"Box {i}", details={"macs": ["AABBCCDDEE04"]})
+    # Three tools that report MACs (Huntress and Auvik a list, NinjaOne a fact) all hold one: that is a shared adapter, not one machine.
+    await report(tenant, "huntress", "x0", "Box 0", details={"macs": ["AABBCCDDEE04"]})
+    await report(tenant, "auvik", "x1", "Box 1", details={"macs": ["aabbccddee04"]})
+    await report(tenant, "ninjaone", "x2", "Box 2", details={"facts": {"macAddresses": "AA:BB:CC:DD:EE:04"}})
     assert await merge_pass(tenant) == 0
     assert await count(tenant) == 3
+
+
+async def test_an_auvik_device_and_a_ninjaone_machine_that_hold_the_same_mac_are_one_machine(tenant):
+    await report(tenant, "ninjaone", "n1", "FRONT-DESK-PC", details={"facts": {"macAddresses": "C8:53:09:75:E0:4F"}})
+    await report(tenant, "auvik", "a1", "Device@10.1.1.77", details={"macs": ["c8530975e04f"]})
+    assert await count(tenant) == 2
+    assert await merge_pass(tenant) == 1
+    assert await count(tenant) == 1
 
 
 async def age(tid, host, days):

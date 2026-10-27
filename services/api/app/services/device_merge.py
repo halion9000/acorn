@@ -263,13 +263,20 @@ async def drop_legacy_screenconnect(db: Any, tenant_id: uuid.UUID) -> int:
 
 
 # The tools that put a MAC address in a source's details (UniFi: ``mac``, Huntress: ``macs``).
-MAC_TOOLS = ("unifi", "huntress")
+MAC_TOOLS = ("unifi", "huntress", "auvik", "ninjaone")
 
 
 def macs_of(details: Any) -> set[str]:
-    """The MAC addresses a tool reported for a device: ``mac`` (UniFi) and ``macs`` (Huntress, a list), each reduced to twelve hex digits."""
+    """The MAC addresses a tool reported for a device, each reduced to twelve hex digits: ``mac`` (UniFi), ``macs`` (Huntress and Auvik, a list; Auvik's come from the device's interfaces), and NinjaOne's
+    ``facts.macAddresses`` (one MAC, or several separated by commas, semicolons or spaces)."""
     det = details if isinstance(details, dict) else {}
-    raw = [det.get("mac"), *(det.get("macs") if isinstance(det.get("macs"), list) else [])]
+    raw: list[Any] = [det.get("mac"), *(det.get("macs") if isinstance(det.get("macs"), list) else [])]
+    facts = det.get("facts") if isinstance(det.get("facts"), dict) else {}
+    ninja = facts.get("macAddresses")
+    if isinstance(ninja, str):
+        raw.extend(ninja.replace(";", ",").replace(" ", ",").split(","))
+    elif isinstance(ninja, list):
+        raw.extend(ninja)
     return {m for m in (mac_key(x) for x in raw) if m}
 
 
@@ -289,10 +296,14 @@ async def auto_merge_by_mac(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID |
     for device_id, vendor, external_id in (await db.execute(select(DeviceSource.device_id, DeviceSource.vendor, DeviceSource.external_id).where(DeviceSource.tenant_id == tenant_id))).all():
         vendors.setdefault(device_id, set()).add(_tool_of(vendor, external_id))
     # Only the tools that report MACs have their details read (a tool's details can be large), and only the two keys that hold them.
-    for device_id, mac, macs in (
-        await db.execute(select(DeviceSource.device_id, DeviceSource.details["mac"], DeviceSource.details["macs"]).where(DeviceSource.tenant_id == tenant_id, DeviceSource.vendor.in_(MAC_TOOLS)))
+    for device_id, mac, macs, ninja in (
+        await db.execute(
+            select(DeviceSource.device_id, DeviceSource.details["mac"], DeviceSource.details["macs"], DeviceSource.details["facts"]["macAddresses"]).where(
+                DeviceSource.tenant_id == tenant_id, DeviceSource.vendor.in_(MAC_TOOLS)
+            )
+        )
     ).all():
-        for found in macs_of({"mac": mac, "macs": macs}):
+        for found in macs_of({"mac": mac, "macs": macs, "facts": {"macAddresses": ninja}}):
             holders.setdefault(found, set()).add(device_id)
     pairs = [sorted(ids, key=str) for ids in holders.values() if len(ids) == 2]
     if not pairs:

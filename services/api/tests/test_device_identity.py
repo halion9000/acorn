@@ -157,3 +157,14 @@ def test_duplicate_pairs_offers_the_truncated_pair_alongside_the_exact_ones():
 
     cut, full = _dev(1, "NUC-GCR-BBQ1-HO"), _dev(2, "NUC-GCR-BBQ1-HOUSTON")
     assert duplicate_pairs([cut, full], {cut.id: {"liongard"}, full.id: {"ninjaone"}}, set(), set()) == [(cut.id, full.id)]
+
+
+def test_macs_of_also_reads_ninjaones_mac_addresses_fact_as_one_string_several_or_a_list():
+    from app.services.device_merge import macs_of
+
+    assert macs_of({"facts": {"macAddresses": "C8:53:09:75:E0:4F"}}) == {"c85309 75e04f".replace(" ", "")}
+    assert macs_of({"facts": {"macAddresses": "C8:53:09:75:E0:4F, F8:89:D2:9E:DF:43;aa-bb-cc-dd-ee-01"}}) == {"c85309 75e04f".replace(" ", ""), "f889d29edf43", "aabbccddee01"}
+    assert macs_of({"facts": {"macAddresses": ["C8:53:09:75:E0:4F", "bad"]}}) == {"c8530975e04f"}
+    assert macs_of({"facts": "nope"}) == set()
+    assert macs_of({"facts": {"macAddresses": 5}}) == set()
+    assert macs_of({"macs": ["1c6a1b49048d"], "facts": {"macAddresses": "1C:6A:1B:49:04:8D"}}) == {"1c6a1b49048d"}, "one MAC from two tools is one MAC"
