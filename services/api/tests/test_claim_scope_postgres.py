@@ -7,6 +7,7 @@ expires, an unanswered claim fails.
 
 import json
 import os
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -80,8 +81,12 @@ async def status_of(engine, w, client):
         return (await conn.execute(text("select status, result_message from vendor_actions where tenant_id = :t"), {"t": w[client]})).all()
 
 
-async def poll(engine, w, vendor="huntress"):
-    """One CORE poll, with the number of UPDATE statements on vendor_actions it ran."""
+async def poll(engine, w, vendor="huntress", everywhere=False):
+    """One CORE poll, with the number of UPDATE statements on vendor_actions it ran. Normally the once-a-minute pass over every tenant is not due (set so here); ``everywhere`` makes it due."""
+    if everywhere:
+        feed._last_full_claim.clear()
+    else:
+        feed._last_full_claim[w["parent"]] = time.monotonic()
     updates: list[str] = []
 
     def count(conn, cursor, statement, parameters, context, executemany):  # noqa: ANN001
@@ -136,3 +141,14 @@ async def test_another_vendors_action_is_not_handed_out_but_the_tenant_is_still_
     assert [r.status for r in await status_of(engine, w, "acme")] == ["pending"]
     blumira, _ = await poll(engine, w, vendor="blumira")
     assert [a.incident_uid for a in blumira.actions] == ["blumira:acme"]
+
+
+async def test_once_a_minute_every_tenant_is_worked_on_anyway_so_a_blind_lookup_only_delays(world):
+    w, engine = world
+    await add_action(engine, w, "cyan")
+    out, updates = await poll(engine, w, everywhere=True)
+    assert [a.incident_uid for a in out.actions] == ["huntress:cyan"]
+    assert updates == 12, "the three statements in each of the four tenants: the safety-net pass"
+    await add_action(engine, w, "acme")
+    narrow, narrow_updates = await poll(engine, w)
+    assert [a.incident_uid for a in narrow.actions] == ["huntress:acme"] and narrow_updates == 6, "the next polls are narrow again (acme and the claimed cyan one hold something)"

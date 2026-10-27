@@ -131,19 +131,25 @@ def ip_brand_pairs(devices: list[Any], tools: dict[Any, set[str]], dismissed: se
 
     Names say nothing for such a device, so it is matched on what Auvik does know: an address and, when both sides state one, the brand. Two different serial numbers, a hardware unit against a machine an agent
     runs on, dismissed pairs and pairs already ``taken`` are left out. Two made-up names are looked at once, from the one whose id sorts first. Each pair is ordered by id text.
+
+    Each device's name key and addresses are worked out once and the devices are indexed by address, so a made-up-name device looks only at the devices that share one of its addresses (it used to scan the
+    whole client again for every one: 1.8 million address reads for 187 clients). The pairs and their order are exactly what the full scan gave.
     """
     out: list[tuple[Any, Any]] = []
     seen = set(taken)
-    for a in devices:
-        if not is_placeholder_name(hostname_key(a.hostname)):
+    keyed = [(d, hostname_key(d.hostname), usable_ips(d.ip_addresses)) for d in devices]
+    by_ip: dict[str, list[int]] = {}
+    for i, (_d, _k, ips) in enumerate(keyed):
+        for ip in ips:
+            by_ip.setdefault(ip, []).append(i)
+    for a, key_a, ips in keyed:
+        if not is_placeholder_name(key_a) or not ips:
             continue
-        ips = usable_ips(a.ip_addresses)
-        if not ips:
-            continue
-        for b in devices:
-            if b.id == a.id or (is_placeholder_name(hostname_key(b.hostname)) and str(b.id) < str(a.id)):
+        for j in sorted({j for ip in ips for j in by_ip.get(ip, ())}):
+            b, key_b, _ips_b = keyed[j]
+            if b.id == a.id or (is_placeholder_name(key_b) and str(b.id) < str(a.id)):
                 continue
-            if not (ips & usable_ips(b.ip_addresses)) or not same_brand(a.manufacturer, b.manufacturer):
+            if not same_brand(a.manufacturer, b.manufacturer):
                 continue
             if a.serial_number and b.serial_number:
                 continue

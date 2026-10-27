@@ -25,15 +25,16 @@ from sqlalchemy import func, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
+from app.db.database import AsyncSessionLocal
 from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
-from app.db.rls_sessions import adopt_tenant
+from app.db.rls_sessions import adopt_tenant, mark_tenant
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias, ClientDeviceHint
-from app.models.device import Device, DeviceMergeLog, DeviceSnooze, DeviceSource
+from app.models.device import Device, DeviceMergeDismissal, DeviceMergeLog, DeviceSnooze, DeviceSource
 from app.models.tenant import Tenant
 from app.services.client_mapping import IncomingClient, auto_link_by_devices, record_device_hints, tenant_hidden, upsert_clients
 from app.services.device_merge import DeviceMergeError, auto_merge_same_name, can_undo, dismiss_pair, merge_devices, undo_merge
-from app.services.device_upsert import DeviceReport, possible_duplicates, preload_known, upsert_device
+from app.services.device_upsert import DeviceReport, duplicate_pairs, possible_duplicates, preload_known, upsert_device
 from app.services.infra_review import encryption_state
 
 logger = logging.getLogger(__name__)
@@ -466,9 +467,18 @@ SYNC_BURST_SECONDS = 90.0
 _loaded: dict[tuple, tuple[float, list[DeviceOut]]] = {}
 _load_locks: dict[tuple, asyncio.Lock] = {}
 _last_sync = -1e12
+# After the list has been built once, a page never waits for a rebuild: a list older than the time above but younger than this is handed out at once while ONE refresh builds the next in the
+# background. (A cold build takes about seven seconds, and the web proxy gives up on a request after thirty.) Anything older than this is rebuilt before it is served.
+STALE_SERVE_SECONDS = 600.0
+_generation = 0
+_refreshing: set[tuple] = set()
+_background: set[asyncio.Task] = set()
 
 
 def forget_loaded() -> None:
+    """A person's own change: drop every kept list at once, and make any refresh that is already running discard what it builds (it started before the change)."""
+    global _generation
+    _generation += 1
     _loaded.clear()
 
 
@@ -482,6 +492,20 @@ def _cache_seconds() -> float:
     return SYNC_CACHE_SECONDS if time.monotonic() - _last_sync < SYNC_BURST_SECONDS else LOAD_CACHE_SECONDS
 
 
+async def _refresh_in_background(key: tuple, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[uuid.UUID, str], master: str | None, generation: int) -> None:
+    """Build the list on a session of its own and keep it, unless a person changed something since this began (then it is stale and is dropped). A failure leaves the last list in place."""
+    try:
+        async with AsyncSessionLocal() as session:
+            mark_tenant(session, owner)  # works FOR the owner, as the request that asked did
+            devices = await _load(session, owner, tids, clients, master)
+        if generation == _generation:
+            _loaded[key] = (time.monotonic(), devices)
+    except Exception:  # noqa: BLE001 - a failed refresh must not break the page that is showing the last list
+        logger.exception("device list refresh failed; the last list stays")
+    finally:
+        _refreshing.discard(key)
+
+
 async def _load_cached(
     db: Any, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[uuid.UUID, str], master: str | None
 ) -> list[DeviceOut]:
@@ -489,7 +513,15 @@ async def _load_cached(
     lock = _load_locks.setdefault(key, asyncio.Lock())
     async with lock:
         hit = _loaded.get(key)
-        if hit is not None and time.monotonic() - hit[0] < _cache_seconds():
+        age = time.monotonic() - hit[0] if hit is not None else None
+        if hit is not None and age is not None and age < _cache_seconds():
+            return hit[1]
+        if hit is not None and age is not None and age < STALE_SERVE_SECONDS:
+            if key not in _refreshing:
+                _refreshing.add(key)
+                task = asyncio.create_task(_refresh_in_background(key, owner, list(tids), dict(clients), master, _generation))
+                _background.add(task)
+                task.add_done_callback(_background.discard)
             return hit[1]
         devices = await _load(db, owner, tids, clients, master)
         _loaded[key] = (time.monotonic(), devices)
@@ -904,15 +936,24 @@ async def list_duplicates(
     scope, clients = await _scope(db, owner, client_id)
     master = _master_of(await db.get(Tenant, owner))
     items: list[DuplicatePairOut] = []
-    by_id: dict[uuid.UUID, DeviceOut] | None = None
+    # The same load the device list uses, so the two requests share it. The pairs are worked out from it in memory; only what a person dismissed is read from the database, one small query per client
+    # (finding the pairs used to take three queries per client, 11.7 s for 187 clients).
+    loaded = await _load_cached(db, owner, scope, clients, master)
+    by_id = {d.id: d for d in loaded}
+    by_tenant: dict[uuid.UUID, list[DeviceOut]] = {}
+    for d in loaded:
+        by_tenant.setdefault(d.tenant_id, []).append(d)
     for tid in scope:
-        async with _as(db, owner, tid):
-            pairs = await possible_duplicates(db, tid)
-        if not pairs:
+        devices = by_tenant.get(tid)
+        if not devices or len(devices) < 2:
             continue
-        if by_id is None:
-            # The same load the device list uses, so the two requests share it (and a client with pairs no longer costs a load of its own).
-            by_id = {d.id: d for d in await _load_cached(db, owner, scope, clients, master)}
+        async with _as(db, owner, tid):
+            dismissed = {
+                (x.device_a, x.device_b) for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tid))).scalars().all()
+            }
+        tools = {d.id: {s.vendor for s in d.sources} for d in devices}
+        only_screenconnect = {d.id for d in devices if d.sources and all(s.vendor == "screenconnect" for s in d.sources)}
+        pairs = duplicate_pairs(devices, tools, dismissed, only_screenconnect)
         items.extend(DuplicatePairOut(a=by_id[a], b=by_id[b]) for a, b in pairs if a in by_id and b in by_id)
     items.sort(key=lambda p: ((p.a.client_name or ""), p.a.hostname.lower()))
     return DuplicatesOut(items=items)

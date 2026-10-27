@@ -77,6 +77,8 @@ def counted_load(monkeypatch):
         return [device("Windows 11", [("huntress", {})])]
 
     monkeypatch.setattr(devices_module, "_load", fake_load)
+    # These tests are about the plain keep-and-refresh; the stale-while-refreshing behaviour has its own tests below.
+    monkeypatch.setattr(devices_module, "STALE_SERVE_SECONDS", 0.0)
     devices_module.forget_loaded()
     yield calls
     devices_module.forget_loaded()
@@ -484,6 +486,9 @@ async def test_the_duplicates_list_loads_every_client_once_not_once_per_client_w
     owner = uuid.uuid4()
     tids = [uuid.uuid4() for _ in range(3)]
     made = {t: (device("Windows 11", [("ninjaone", {})]), device("Windows 11", [("huntress", {})])) for t in tids}
+    for t, pair in made.items():
+        for d in pair:
+            d.tenant_id = t
     loads = []
 
     async def scope(db, o, client_id):
@@ -493,17 +498,143 @@ async def test_the_duplicates_list_loads_every_client_once_not_once_per_client_w
         loads.append(tuple(scope_ids))
         return [d for pair in made.values() for d in pair]
 
-    async def pairs(db, tid):
-        return [(made[tid][0].id, made[tid][1].id)]
-
     class Db:
         async def get(self, model, key):
             return None
 
+        async def execute(self, statement):  # the dismissals of one client: none
+            return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
+
     monkeypatch.setattr(devices_module, "_scope", scope)
     monkeypatch.setattr(devices_module, "_load_cached", load)
-    monkeypatch.setattr(devices_module, "possible_duplicates", pairs)
     monkeypatch.setattr(devices_module, "_as", lambda db, o, t: __import__("contextlib").nullcontext())
     out = await devices_module.list_duplicates(current_user=SimpleNamespace(tenant_id=owner), db=Db(), client_id=None)
     assert len(out.items) == 3
     assert loads == [tuple(tids)], "one load of the whole scope, the same one the device list asks for"
+
+
+# ---- after the first build a page never waits for a rebuild: the last list is handed out while one refresh builds the next -------------------------------
+
+
+class _Session:
+    pass
+
+
+class _Factory:
+    def __call__(self):
+        return self
+
+    async def __aenter__(self):
+        return _Session()
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+@pytest.fixture
+def stale_ok(monkeypatch):
+    """A counted load, a database session that needs no database, an expired normal time and room to serve a stale list."""
+    calls = []
+    versions = iter(range(1, 100))
+
+    async def fake_load(db, owner, tids, clients, master):
+        calls.append(("session" if isinstance(db, _Session) else "request", next(versions)))
+        return [device("Windows 11", [("huntress", {})])]
+
+    monkeypatch.setattr(devices_module, "_load", fake_load)
+    monkeypatch.setattr(devices_module, "AsyncSessionLocal", _Factory())
+    monkeypatch.setattr(devices_module, "LOAD_CACHE_SECONDS", 0.0)
+    monkeypatch.setattr(devices_module, "STALE_SERVE_SECONDS", 600.0)
+    monkeypatch.setattr(devices_module, "_last_sync", -1e12)
+    devices_module.forget_loaded()
+    devices_module._refreshing.clear()
+    yield calls
+    devices_module.forget_loaded()
+    devices_module._refreshing.clear()
+
+
+async def _settle():
+    await asyncio.gather(*list(devices_module._background))
+
+
+@pytest.mark.asyncio
+async def test_an_old_list_is_handed_out_at_once_while_one_refresh_builds_the_next(stale_ok):
+    owner, tid = uuid.uuid4(), uuid.uuid4()
+    first = await devices_module._load_cached(object(), owner, [tid], {}, None)
+    assert stale_ok == [("request", 1)], "the first build is waited for"
+    again = await devices_module._load_cached(object(), owner, [tid], {}, None)
+    also = await devices_module._load_cached(object(), owner, [tid], {}, None)
+    assert again is first and also is first, "the old list is served at once"
+    assert stale_ok == [("request", 1)], "and nothing was built on the request"
+    assert len(devices_module._background) == 1, "one refresh, not one per request"
+    await _settle()
+    assert stale_ok == [("request", 1), ("session", 2)], "the refresh built the list on a session of its own"
+
+
+@pytest.mark.asyncio
+async def test_what_the_refresh_built_is_the_list_the_next_request_gets(stale_ok, monkeypatch):
+    owner, tid = uuid.uuid4(), uuid.uuid4()
+    first = await devices_module._load_cached(object(), owner, [tid], {}, None)
+    await devices_module._load_cached(object(), owner, [tid], {}, None)
+    await _settle()
+    monkeypatch.setattr(devices_module, "LOAD_CACHE_SECONDS", 60.0)
+    fresh = await devices_module._load_cached(object(), owner, [tid], {}, None)
+    assert fresh is not first, "the refreshed list replaced the old one"
+    assert await devices_module._load_cached(object(), owner, [tid], {}, None) is fresh
+
+
+@pytest.mark.asyncio
+async def test_a_list_older_than_the_stale_limit_is_rebuilt_before_it_is_served(stale_ok, monkeypatch):
+    owner, tid = uuid.uuid4(), uuid.uuid4()
+    await devices_module._load_cached(object(), owner, [tid], {}, None)
+    monkeypatch.setattr(devices_module, "STALE_SERVE_SECONDS", 0.0)
+    await devices_module._load_cached(object(), owner, [tid], {}, None)
+    assert [who for who, _n in stale_ok] == ["request", "request"] and not devices_module._background
+
+
+@pytest.mark.asyncio
+async def test_a_refresh_that_began_before_a_persons_change_is_thrown_away(stale_ok, monkeypatch):
+    owner, tid = uuid.uuid4(), uuid.uuid4()
+    gate = asyncio.Event()
+
+    async def slow_load(db, o, tids, clients, master):
+        if isinstance(db, _Session):
+            await gate.wait()
+        return [device("Windows 11", [("ninjaone", {})])]
+
+    monkeypatch.setattr(devices_module, "_load", slow_load)
+    await devices_module._load_cached(object(), owner, [tid], {}, None)  # the first build
+    await devices_module._load_cached(object(), owner, [tid], {}, None)  # starts a refresh, which waits at the gate
+    assert devices_module._background
+    devices_module.forget_loaded()  # a person merges two devices while it is building
+    gate.set()
+    await _settle()
+    monkeypatch.setattr(devices_module, "LOAD_CACHE_SECONDS", 60.0)
+    built = []
+
+    async def request_load(db, o, tids, clients, master):
+        built.append(1)
+        return [device("Windows 11", [("addigy", {})])]
+
+    monkeypatch.setattr(devices_module, "_load", request_load)
+    await devices_module._load_cached(object(), owner, [tid], {}, None)
+    assert built == [1], "the stale refresh was not kept, so the next request builds from the database"
+
+
+@pytest.mark.asyncio
+async def test_a_failed_refresh_leaves_the_last_list_and_lets_the_next_request_try_again(stale_ok, monkeypatch):
+    owner, tid = uuid.uuid4(), uuid.uuid4()
+    first = await devices_module._load_cached(object(), owner, [tid], {}, None)
+
+    async def broken(db, o, tids, clients, master):
+        if isinstance(db, _Session):
+            raise RuntimeError("database busy")
+        return []
+
+    monkeypatch.setattr(devices_module, "_load", broken)
+    assert await devices_module._load_cached(object(), owner, [tid], {}, None) is first
+    await _settle()
+    assert not devices_module._refreshing, "the failure freed the refresh slot"
+    assert await devices_module._load_cached(object(), owner, [tid], {}, None) is first, "the page keeps showing the last list"
+    assert len(devices_module._background) == 1, "and tries to refresh again"
+    await _settle()

@@ -191,7 +191,13 @@ async def possible_duplicates(db: Any, tenant_id: uuid.UUID) -> list[tuple[uuid.
     tools: dict[uuid.UUID, set[str]] = {}
     for device_id, vendor in (await db.execute(select(DeviceSource.device_id, DeviceSource.vendor).where(DeviceSource.tenant_id == tenant_id))).all():
         tools.setdefault(device_id, set()).add(vendor)
-    by_name: dict[str, list[Device]] = {}
+    return duplicate_pairs(rows, tools, dismissed, only_screenconnect)
+
+
+def duplicate_pairs(rows: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], only_screenconnect: set[Any]) -> list[tuple[Any, Any]]:
+    """The pairs of one client's devices a person might want to merge (see ``possible_duplicates``), from devices already in hand. ``rows`` need ``id``, ``hostname``, ``serial_number``, ``ip_addresses`` and
+    ``manufacturer``; ``tools`` maps a device id to the tools that report it; ``dismissed`` holds the pairs a person said are different (ordered by id text); ``only_screenconnect`` the devices only ScreenConnect lists."""
+    by_name: dict[str, list[Any]] = {}
     for d in rows:
         key = hostname_key(d.hostname)
         # A made-up name ("Device@10.7.220.92") is no evidence of anything; those devices are paired by address and maker below.

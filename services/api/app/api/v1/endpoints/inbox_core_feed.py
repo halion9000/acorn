@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
@@ -521,6 +522,12 @@ async def claim_actions(db: Any, tenant_id: Any, vendor: str, now: datetime | No
     return sorted(rows, key=lambda r: r.created_at)
 
 
+# The poll normally works only in the tenants that hold a pending or claimed action. As a safety net, once a minute it works in every tenant of the scope anyway: the lookup reads across tenants, which
+# row-level security may one day refuse (it then sees nothing), and an action must then be delayed a minute at worst, never lost.
+FULL_CLAIM_EVERY_SECONDS = 60.0
+_last_full_claim: dict[Any, float] = {}
+
+
 @router.post("/core-feed/{tenant_token}/actions/claim", response_model=ClaimResponse)
 async def claim_core_feed_actions(tenant_token: str, body: ClaimRequest, db: DBSession) -> ClaimResponse:
     """CORE collects the actions analysts have asked for. Each is handed out once."""
@@ -533,8 +540,12 @@ async def claim_core_feed_actions(tenant_token: str, body: ClaimRequest, db: DBS
         holding = set(
             (await db.execute(select(VendorAction.tenant_id).where(VendorAction.tenant_id.in_(scope), VendorAction.status.in_(("pending", "claimed"))).distinct())).scalars().all()
         )
+    moment = time.monotonic()
+    everywhere = moment - _last_full_claim.get(tenant_id, -1e12) >= FULL_CLAIM_EVERY_SECONDS
+    if everywhere:
+        _last_full_claim[tenant_id] = moment
     rows = sorted(
-        [r for got in await _across(db, tenant_id, lambda tid: claim_actions(db, tid, body.vendor), tenants=[t for t in scope if t in holding]) for r in got],
+        [r for got in await _across(db, tenant_id, lambda tid: claim_actions(db, tid, body.vendor), tenants=scope if everywhere else [t for t in scope if t in holding]) for r in got],
         key=lambda r: r.created_at,
     )
     await db.commit()
