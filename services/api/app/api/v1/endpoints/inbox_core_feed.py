@@ -526,8 +526,15 @@ async def claim_core_feed_actions(tenant_token: str, body: ClaimRequest, db: DBS
     """CORE collects the actions analysts have asked for. Each is handed out once."""
     tenant_id = await _verify_core_feed_token(db, tenant_token)
     await adopt_tenant(db, tenant_id)
+    # CORE asks every few seconds, for each vendor, and almost always there is nothing to hand out. Running three statements in every one of the owner's 200 or so client tenants made each ask take
+    # several seconds. So ask ONCE which tenants hold any pending or claimed action (the only ones the expiry housekeeping or the claim could touch) and do the work for those alone.
+    scope = await _scope_ids(db, tenant_id)
+    async with cross_tenant_reads(db):
+        holding = set(
+            (await db.execute(select(VendorAction.tenant_id).where(VendorAction.tenant_id.in_(scope), VendorAction.status.in_(("pending", "claimed"))).distinct())).scalars().all()
+        )
     rows = sorted(
-        [r for got in await _across(db, tenant_id, lambda tid: claim_actions(db, tid, body.vendor)) for r in got],
+        [r for got in await _across(db, tenant_id, lambda tid: claim_actions(db, tid, body.vendor), tenants=[t for t in scope if t in holding]) for r in got],
         key=lambda r: r.created_at,
     )
     await db.commit()

@@ -164,6 +164,20 @@ def mfa_state(user: Any, registration_is_known: bool) -> str:
     return "none"
 
 
+def _apply_directory(p: Person, s: Any) -> None:
+    """What a tool that reads the client's cloud directory (ThreatMate) says about a person, used only where Microsoft 365's own list (CIPP) says nothing: a Google Workspace user, or a Microsoft one CIPP
+    does not hold. Microsoft 365's row always wins. A second factor the tool sees registered is ``registered_not_required`` (it cannot tell whether one is required); none registered is ``none``."""
+    d = s.details or {}
+    if p.mfa == "unknown" and isinstance(d.get("mfa_enrolled"), bool):
+        p.mfa = "registered_not_required" if d["mfa_enrolled"] else "none"
+    if d.get("super_admin") is True:
+        p.admin = True
+    if p.licensed is None and isinstance(d.get("licensed"), bool):
+        p.licensed = d["licensed"]
+    if p.enabled is None and s.enabled is not None:
+        p.enabled = bool(s.enabled)
+
+
 def build_people(
     names: dict[uuid.UUID, str],
     microsoft_users: list[Any],
@@ -207,7 +221,10 @@ def build_people(
             continue
         if s.vendor in EXPOSURE_TOOLS:
             exposure_rows.setdefault(f"{s.tenant_id}:{email}", []).append(s)
-            continue
+            # ThreatMate also reads the client's cloud directory (Microsoft 365 and Google Workspace). A row that says it came from one is a person the tool really holds, so it makes the person (an exposed
+            # address no directory knows still does not).
+            if not (s.details or {}).get("directory"):
+                continue
         p = person(s.tenant_id, email)
         p.display_name = p.display_name or (s.display_name or None)
         if p.kind == "user" and s.kind in ("shared", "guest", "other"):
@@ -215,6 +232,8 @@ def build_people(
         if s.enabled is False and p.enabled is None:
             p.enabled = False
         p.sources.append(SourceRef(vendor=s.vendor, external_id=s.external_id, enabled=s.enabled, details=dict(s.details or {})))
+        if (s.details or {}).get("directory"):
+            _apply_directory(p, s)
     out = list(people.values())
     for p in out:
         p.sources.sort(key=lambda r: (r.vendor != MICROSOFT, r.vendor, r.external_id))

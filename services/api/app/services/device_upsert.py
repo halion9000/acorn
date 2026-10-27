@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, tuple_
 
 from app.models.device import Device, DeviceSource
 from app.services.device_identity import could_be_same_machine, hostname_key, ip_brand_pairs, is_placeholder_name, loose_name_key, normalize_serial
@@ -45,28 +45,72 @@ def _fill(device: Device, report: DeviceReport) -> None:
     device.last_seen = datetime.now(UTC)
 
 
-async def upsert_device(db: Any, tenant_id: uuid.UUID, report: DeviceReport) -> uuid.UUID:
-    """Apply one report inside ``tenant_id``'s scope. The caller owns the transaction. Returns the device id."""
+@dataclass
+class KnownDevices:
+    """What a client already holds for the reports of one batch, read in three queries instead of three per report (see ``preload_known``). It is kept up to date as the batch goes: a device or
+    source created or removed by one report is seen by the next."""
+
+    sources: dict[tuple[str, str], DeviceSource] = field(default_factory=dict)
+    devices: dict[uuid.UUID, Device] = field(default_factory=dict)
+    by_serial: dict[str, Device] = field(default_factory=dict)
+
+
+async def preload_known(db: Any, tenant_id: uuid.UUID, reports: list[DeviceReport]) -> KnownDevices:
+    """The sources, devices and serial owners the batch can touch, for ``upsert_device(known=...)``. Inside ``tenant_id``'s scope."""
+    known = KnownDevices()
+    keys = list({(r.vendor, r.external_id) for r in reports})
+    for i in range(0, len(keys), 500):
+        rows = (
+            await db.execute(select(DeviceSource).where(DeviceSource.tenant_id == tenant_id, tuple_(DeviceSource.vendor, DeviceSource.external_id).in_(keys[i : i + 500])))
+        ).scalars().all()
+        known.sources.update({(s.vendor, s.external_id): s for s in rows})
+    ids = list({s.device_id for s in known.sources.values()})
+    serials = list({n for n in (normalize_serial(r.serial) for r in reports) if n is not None})
+    wanted: dict[uuid.UUID, Device] = {}
+    for i in range(0, len(ids), 500):
+        for d in (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.id.in_(ids[i : i + 500])))).scalars().all():
+            wanted[d.id] = d
+    for i in range(0, len(serials), 500):
+        for d in (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.serial_number.in_(serials[i : i + 500])))).scalars().all():
+            wanted[d.id] = d
+    known.devices = wanted
+    known.by_serial = {d.serial_number: d for d in wanted.values() if d.serial_number}
+    return known
+
+
+async def upsert_device(db: Any, tenant_id: uuid.UUID, report: DeviceReport, known: KnownDevices | None = None) -> uuid.UUID:
+    """Apply one report inside ``tenant_id``'s scope. The caller owns the transaction. Returns the device id. With ``known`` (from ``preload_known``, for a whole batch of one client) the lookups are
+    answered from memory; the result is the same."""
     serial = normalize_serial(report.serial)
-    source = (
-        await db.execute(
-            select(DeviceSource).where(
-                DeviceSource.tenant_id == tenant_id, DeviceSource.vendor == report.vendor, DeviceSource.external_id == report.external_id
+    if known is not None:
+        source = known.sources.get((report.vendor, report.external_id))
+    else:
+        source = (
+            await db.execute(
+                select(DeviceSource).where(
+                    DeviceSource.tenant_id == tenant_id, DeviceSource.vendor == report.vendor, DeviceSource.external_id == report.external_id
+                )
             )
-        )
-    ).scalar_one_or_none()
+        ).scalar_one_or_none()
 
     device: Device | None = None
     if source is not None:
-        device = await db.get(Device, source.device_id)
+        device = known.devices.get(source.device_id) if known is not None else None
+        if device is None:
+            device = await db.get(Device, source.device_id)
     previous_id = device.id if device is not None else None
 
     if serial is not None:
-        owner = (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.serial_number == serial))).scalar_one_or_none()
+        if known is not None:
+            owner = known.by_serial.get(serial)
+        else:
+            owner = (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.serial_number == serial))).scalar_one_or_none()
         if owner is not None:
             device = owner
         elif device is not None and device.serial_number is None:
             device.serial_number = serial
+            if known is not None:
+                known.by_serial[serial] = device
         elif device is not None and device.serial_number != serial:
             device = None  # the tool now reports a different machine's serial under the same id: it gets a device of its own
 
@@ -83,20 +127,27 @@ async def upsert_device(db: Any, tenant_id: uuid.UUID, report: DeviceReport) -> 
         )
         db.add(device)
         await db.flush()
+        if known is not None:
+            known.devices[device.id] = device
+            if serial is not None:
+                known.by_serial[serial] = device
     else:
         _fill(device, report)
+        if known is not None:
+            known.devices[device.id] = device
 
     if source is None:
-        db.add(
-            DeviceSource(
-                tenant_id=tenant_id,
-                device_id=device.id,
-                vendor=report.vendor,
-                external_id=report.external_id,
-                name=(report.hostname or None),
-                details=report.details,
-            )
+        new_source = DeviceSource(
+            tenant_id=tenant_id,
+            device_id=device.id,
+            vendor=report.vendor,
+            external_id=report.external_id,
+            name=(report.hostname or None),
+            details=report.details,
         )
+        db.add(new_source)
+        if known is not None:
+            known.sources[(report.vendor, report.external_id)] = new_source
     else:
         source.device_id = device.id
         source.name = report.hostname or source.name
@@ -109,6 +160,10 @@ async def upsert_device(db: Any, tenant_id: uuid.UUID, report: DeviceReport) -> 
         ).scalar_one()
         if remaining == 0:
             await db.execute(delete(Device).where(Device.id == previous_id))
+            if known is not None:
+                gone = known.devices.pop(previous_id, None)
+                if gone is not None and gone.serial_number and known.by_serial.get(gone.serial_number) is gone:
+                    del known.by_serial[gone.serial_number]
     return device.id
 
 

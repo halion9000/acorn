@@ -56,3 +56,26 @@ async def test_a_failure_is_skipped_and_the_other_clients_are_still_checked(monk
 
     _patch(monkeypatch, behaviour)
     assert await ep._auto_merge_touched(FakeDb(), [bad, good], now=1.0) == 3
+
+
+async def test_one_report_checks_only_a_few_clients_and_the_rest_stay_due_for_the_next_one(monkeypatch):
+    calls = _patch(monkeypatch, lambda tid: 1)
+    tenants = [uuid.uuid4() for _ in range(ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT * 2 + 3)]
+    first = await ep._auto_merge_touched(FakeDb(), tenants, now=10.0)
+    assert first == ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT and calls == tenants[: ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT]
+    second = await ep._auto_merge_touched(FakeDb(), tenants, now=11.0)
+    assert second == ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT, "the next report carries on with the clients not reached"
+    assert calls[ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT : ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT * 2] == tenants[ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT : ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT * 2]
+    third = await ep._auto_merge_touched(FakeDb(), tenants, now=12.0)
+    assert third == 3 and sorted(calls) == sorted(tenants), "every client is reached, each once"
+    assert await ep._auto_merge_touched(FakeDb(), tenants, now=13.0) == 0
+
+
+async def test_clients_that_are_not_due_do_not_use_up_the_limit(monkeypatch):
+    calls = _patch(monkeypatch, lambda tid: 1)
+    recent = [uuid.uuid4() for _ in range(ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT + 2)]
+    fresh = [uuid.uuid4() for _ in range(3)]
+    for t in recent:
+        ep._auto_merge_last[t] = 9.0
+    assert await ep._auto_merge_touched(FakeDb(), [*recent, *fresh], now=10.0) == 3
+    assert calls == fresh

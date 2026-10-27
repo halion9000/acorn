@@ -21,9 +21,9 @@ from app.api.v1.endpoints.devices import UnmappedClient
 from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
 from app.db.rls_scope import acting_as_tenant
 from app.db.rls_sessions import adopt_tenant
-from app.models.client_alias import ClientAlias
 from app.models.signin import SigninEvent
 from app.models.tenant import Tenant
+from app.services.alias_view import alias_view
 from app.services.signin_scoring import HISTORY_DAYS, History, score_events, signin_features
 
 LOG = logging.getLogger(__name__)
@@ -86,9 +86,7 @@ async def targets_by_tenant(
     db: Any, owner: uuid.UUID, report: SignInsReport
 ) -> tuple[dict[uuid.UUID, list[SignInIn]], int, int, list[UnmappedClient]]:
     """The tenant each sign-in belongs to, with counts of the ones left out because their client is ignored or not mapped yet."""
-    rows = (await db.execute(select(ClientAlias).where(ClientAlias.tenant_id == owner))).scalars().all()
-    known = {(a.vendor, a.vendor_client_id): a for a in rows}
-    children = set((await db.execute(select(Tenant.id).where(Tenant.parent_tenant_id == owner))).scalars().all())
+    known, children = await alias_view(db, owner)  # the mapping, read once for a few seconds and shared by every report
     by_tenant: dict[uuid.UUID, list[SignInIn]] = {}
     waiting: dict[str, int] = {}
     unmapped = ignored = 0

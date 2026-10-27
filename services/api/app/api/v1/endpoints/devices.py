@@ -33,7 +33,7 @@ from app.models.device import Device, DeviceMergeLog, DeviceSnooze, DeviceSource
 from app.models.tenant import Tenant
 from app.services.client_mapping import IncomingClient, auto_link_by_devices, record_device_hints, tenant_hidden, upsert_clients
 from app.services.device_merge import DeviceMergeError, auto_merge_same_name, can_undo, dismiss_pair, merge_devices, undo_merge
-from app.services.device_upsert import DeviceReport, possible_duplicates, upsert_device
+from app.services.device_upsert import DeviceReport, possible_duplicates, preload_known, upsert_device
 from app.services.infra_review import encryption_state
 
 logger = logging.getLogger(__name__)
@@ -1133,6 +1133,9 @@ class DevicesResponse(BaseModel):
 
 # A client is checked for same-name pairs at most this often: the tools report in many small batches and the check reads the client's devices.
 AUTO_MERGE_EVERY_SECONDS = 600
+# One report checks at most this many clients. A check reads all of a client's devices (about a tenth of a second each), and right after the API starts every client is due: a report that touches
+# 90 of them used to spend over ten seconds on it and CORE timed out. The clients not reached stay due and are checked by the next reports.
+AUTO_MERGE_MAX_CLIENTS_PER_REPORT = 8
 _auto_merge_last: dict[uuid.UUID, float] = {}
 
 
@@ -1140,9 +1143,13 @@ async def _auto_merge_touched(db: Any, tenants: list[uuid.UUID], now: float | No
     """Merge the plainly-the-same machines of each client a report just touched. Never lets a problem here spoil the report: it runs in its own savepoint and any error is logged and skipped."""
     moment = time.monotonic() if now is None else now
     merged = 0
+    checked = 0
     for tid in tenants:
         if moment - _auto_merge_last.get(tid, -1e12) < AUTO_MERGE_EVERY_SECONDS:
             continue
+        if checked >= AUTO_MERGE_MAX_CLIENTS_PER_REPORT:
+            break
+        checked += 1
         _auto_merge_last[tid] = moment
         try:
             async with db.begin_nested():
@@ -1199,6 +1206,12 @@ async def apply_devices(db: Any, owner: uuid.UUID, report: DevicesReport) -> Dev
     accepted = 0
     for tid, items in by_tenant.items():
         async with acting_as_tenant(db, tid):
+            # What the client already holds is read once for the whole batch, not three times per device.
+            known = await preload_known(
+                db,
+                tid,
+                [DeviceReport(vendor=it.vendor, external_id=it.external_id, hostname=it.hostname, serial=it.serial) for it in items],
+            )
             for it in items:
                 await upsert_device(
                     db,
@@ -1215,6 +1228,7 @@ async def apply_devices(db: Any, owner: uuid.UUID, report: DevicesReport) -> Dev
                         ip_addresses=it.ip_addresses,
                         details=it.details,
                     ),
+                    known,
                 )
                 accepted += 1
     merged = await _auto_merge_touched(db, list(by_tenant))

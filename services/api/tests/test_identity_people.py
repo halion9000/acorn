@@ -470,3 +470,78 @@ def test_liongard_breach_lines_are_exposure_too_and_the_worst_reading_wins():
     assert (amy.exposure.stealer_log, amy.exposure.count) == (True, 2), "a stealer-log reading is worse than a bigger count"
     bo = next(p for p in people if p.email == "bo@a.com")
     assert (bo.exposure.count, bo.exposure.latest) == (4, None)
+
+
+# ---- ThreatMate reads the client's cloud directory (Microsoft 365 and Google Workspace) -----------------------------------------------------------------
+
+
+def directory(tenant, email, **details):
+    base = {"directory": True, "platforms": ["google"], "mfa_enrolled": True, "super_admin": False, "licensed": True, "last_login_at": "2026-10-22T08:00:00Z"}
+    base.update(details)
+    return src(tenant, "threatmate", email, details=base, enabled=True)
+
+
+def person_of(people, email, tenant=A):
+    return next(p for p in people if p.email == email and p.tenant_id == tenant)
+
+
+def test_a_google_user_only_threatmate_reads_is_a_person_with_threatmate_as_a_tool():
+    people = ip.build_people(NAMES, [], [directory(A, "Gail@acme.com")], NOW)
+    gail = person_of(people, "gail@acme.com")
+    assert gail.vendors == ["threatmate"]
+    assert gail.client_name == "Acme"
+
+
+def test_threatmate_supplies_the_second_factor_admin_and_licence_of_a_person_no_other_tool_covers():
+    people = ip.build_people(
+        NAMES,
+        [],
+        [directory(A, "gail@acme.com", mfa_enrolled=True), directory(A, "gus@acme.com", mfa_enrolled=False, super_admin=True, licensed=False)],
+        NOW,
+    )
+    gail, gus = person_of(people, "gail@acme.com"), person_of(people, "gus@acme.com")
+    assert gail.mfa == "registered_not_required", "registered; whether one is required is not known"
+    assert gus.mfa == "none" and gus.admin is True and gus.licensed is False
+
+
+def test_microsofts_own_row_always_wins_over_threatmates_reading_of_the_same_person():
+    people = ip.build_people(
+        NAMES,
+        [ms(A, "amy@acme.com", admin=False, licensed=True, registered=True, capable=True, ca_enforced=True)],
+        [directory(A, "amy@acme.com", platforms=["microsoft"], mfa_enrolled=False, super_admin=False, licensed=False)],
+        NOW,
+    )
+    amy = person_of(people, "amy@acme.com")
+    assert amy.vendors == ["cipp", "threatmate"], "one person, both tools"
+    assert amy.mfa == "covered", "CIPP says a second factor is required and registered; ThreatMate's reading does not override it"
+    assert amy.licensed is True
+
+
+def test_a_super_admin_in_the_directory_is_an_admin_even_when_microsoft_says_no():
+    people = ip.build_people(NAMES, [ms(A, "amy@acme.com", admin=False)], [directory(A, "amy@acme.com", platforms=["microsoft"], super_admin=True)], NOW)
+    assert person_of(people, "amy@acme.com").admin is True
+
+
+def test_a_suspended_directory_user_is_disabled_and_an_unknown_state_is_left_unknown():
+    gone = directory(A, "gone@acme.com")
+    gone.enabled = False
+    unknown = directory(A, "who@acme.com")
+    unknown.enabled = None
+    people = ip.build_people(NAMES, [], [gone, unknown], NOW)
+    assert person_of(people, "gone@acme.com").enabled is False
+    assert person_of(people, "who@acme.com").enabled is None
+
+
+def test_an_exposed_address_no_directory_knows_is_still_not_made_into_a_person_but_one_in_the_directory_carries_its_exposure():
+    exposed_only = src(A, "threatmate", "ghost@acme.com", details={"exposed_in": 2, "password_exposed": True})
+    both = directory(A, "gail@acme.com", exposed_in=3, password_exposed=True, breaches=[{"name": "Leak", "date": "2025-01-01", "data": ["Passwords"]}])
+    people = ip.build_people(NAMES, [], [exposed_only, both], NOW)
+    assert [p.email for p in people] == ["gail@acme.com"]
+    gail = person_of(people, "gail@acme.com")
+    assert gail.exposure is not None and gail.exposure.count == 3 and gail.exposure.password is True
+
+
+def test_a_directory_row_not_refreshed_for_days_is_gone_like_any_other_tools_row():
+    old = directory(A, "gail@acme.com")
+    old.refreshed_at = NOW - timedelta(days=ip.STALE_DAYS + 1)
+    assert ip.build_people(NAMES, [], [old], NOW) == []
