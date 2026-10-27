@@ -83,6 +83,28 @@ export function m365Headline(items: M365Answer[]): string {
   return `${answered} of ${items.length} answered: ${n('met')} met, ${n('partly')} partly, ${n('not_met')} not met. ${n('needs_person')} need a person.`;
 }
 
+export interface AssessAnswer {
+  sheet: string;
+  group: string;
+  question: string;
+  /** From a check A.C.O.R.N runs, where one speaks to the question; needs_person otherwise; not_applicable when a person says it does not apply. */
+  status: 'met' | 'partly' | 'not_met' | 'needs_person' | 'not_applicable';
+  evidence: string;
+  manual?: boolean;
+  note?: string | null;
+  auto_status?: string | null;
+}
+
+const ASSESS_LABEL: Record<string, string> = { needs_person: 'Needs a person', not_applicable: 'Not applicable' };
+
+/** "12 of 145 answered: 7 met, 3 partly, 2 not met. 133 need a person." Not-applicable questions count as answered and are left out of the rest. */
+export function assessHeadline(items: AssessAnswer[]): string {
+  const n = (s: AssessAnswer['status']) => items.filter((i) => i.status === s).length;
+  const answered = items.length - n('needs_person');
+  const na = n('not_applicable');
+  return `${answered} of ${items.length} answered: ${n('met')} met, ${n('partly')} partly, ${n('not_met')} not met${na ? `, ${na} not applicable` : ''}. ${n('needs_person')} need a person.`;
+}
+
 export interface Review {
   client_id: string;
   client_name: string | null;
@@ -97,6 +119,7 @@ export interface Review {
   tech_stack?: TechAnswer[];
   m365?: M365Answer[];
   m365_refreshed_at?: string | null;
+  assess?: AssessAnswer[];
   vcio?: { recommendations: { total: number; pending: number; adopted: number; declined: number; top: VcioRecommendation[] }; risks: VcioRisk[]; refreshed_at: string } | null;
 }
 
@@ -344,6 +367,48 @@ export function ClientReview() {
                           {a.evidence}
                           <AnswerMarks manual={a.manual} note={a.note} suggested={a.auto_status ? (a.auto_status === 'needs_person' ? 'Needs a person' : STATUS[a.auto_status as ReadinessItem['status']]?.label) : null} />
                           <AnswerEditor clientId={review.client_id} section="m365" questionKey={a.question} status={a.status} note={a.note} manual={a.manual} onSaved={reload} />
+                        </td>
+                      </tr>
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          )}
+
+          {(review.assess ?? []).length > 0 && (
+            <Card title="Infrastructure and security assessment">
+              <p className="mb-1 text-sm text-slate-300" data-testid="assess-headline">
+                {assessHeadline(review.assess ?? [])}
+              </p>
+              <p className="mb-2 text-xs text-slate-500">
+                The vCIO Toolbox assessment template&apos;s network, server, workstation, security, backup and Google Workspace questions. An answer is suggested only where a check A.C.O.R.N already runs speaks to the question
+                (the evidence names it); the rest need a person, who can answer each one here or mark it not applicable. Nothing here is sent to vCIO Toolbox.
+              </p>
+              <table className="w-full text-left text-sm" data-testid="assess">
+                <tbody>
+                  {(review.assess ?? []).map((a, i, all) => (
+                    <Fragment key={a.question}>
+                      {(i === 0 || all[i - 1].sheet !== a.sheet || all[i - 1].group !== a.group) && (
+                        <tr>
+                          <th colSpan={3} className="pt-3 text-xs font-medium uppercase text-slate-500">
+                            {a.sheet} · {a.group}
+                          </th>
+                        </tr>
+                      )}
+                      <tr className="border-b border-slate-800 align-top">
+                        <td className="py-1.5 pr-3 text-slate-300">{a.question}</td>
+                        <td className="w-28 pr-3">
+                          {a.status === 'needs_person' || a.status === 'not_applicable' ? (
+                            <span className="text-slate-500">{ASSESS_LABEL[a.status]}</span>
+                          ) : (
+                            <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS[a.status].className}`}>{STATUS[a.status].label}</span>
+                          )}
+                        </td>
+                        <td className="text-xs text-slate-500">
+                          {a.evidence}
+                          <AnswerMarks manual={a.manual} note={a.note} suggested={a.auto_status ? (ASSESS_LABEL[a.auto_status] ?? STATUS[a.auto_status as ReadinessItem['status']]?.label) : null} />
+                          <AnswerEditor clientId={review.client_id} section="assess" questionKey={a.question} status={a.status} note={a.note} manual={a.manual} onSaved={reload} />
                         </td>
                       </tr>
                     </Fragment>

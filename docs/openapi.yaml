@@ -22044,6 +22044,51 @@ components:
       - event_id
       - created_at
       title: ArtifactSummary
+    AssessAnswer:
+      properties:
+        sheet:
+          type: string
+          title: Sheet
+        group:
+          type: string
+          title: Group
+        question:
+          type: string
+          title: Question
+        status:
+          type: string
+          title: Status
+        evidence:
+          type: string
+          title: Evidence
+          default: ''
+        manual:
+          type: boolean
+          title: Manual
+          default: false
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+        auto_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Auto Status
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Updated At
+      type: object
+      required:
+      - sheet
+      - group
+      - question
+      - status
+      title: AssessAnswer
     AssetCreate:
       properties:
         asset_type:
@@ -23842,6 +23887,11 @@ components:
             format: date-time
           - type: 'null'
           title: M365 Refreshed At
+        assess:
+          items:
+            $ref: '#/components/schemas/AssessAnswer'
+          type: array
+          title: Assess
       type: object
       required:
       - client_id

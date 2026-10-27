@@ -33,13 +33,14 @@ from app.models.client_review_answer import ClientReviewAnswer
 from app.models.signin import ClientCheckHistory, ClientCheckItemHistory, ClientM365Check, CoreSweepRun, CoreTool, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
 from app.services import fleet_cache
+from app.services.assessment_review import AssessAnswer, assessment_answers
 from app.services.check_history import changes as check_changes
 from app.services.check_history import item_changes
 from app.services.score_history import load_weights, record_today
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
 from app.services.infra_review import CIPP_BASELINE_SOURCE, SAAS_SOURCES, TOOL_CHECK_SOURCES
 from app.services.m365_review import M365Answer, m365_answers
-from app.services.review_overrides import MAX_PER_CLIENT, clean_answer, merge_m365, merge_readiness, merge_tech, readiness_counts
+from app.services.review_overrides import MAX_PER_CLIENT, clean_answer, merge_assess, merge_m365, merge_readiness, merge_tech, readiness_counts
 from app.services.sat_review import SAT_SOURCE
 from app.services.tech_stack import TechAnswer, tech_stack
 
@@ -354,6 +355,8 @@ class ClientReview(BaseModel):
     # Suggested answers to the template's Microsoft 365 questions (checks CORE read through CIPP, plus the multi-factor list); the rest are needs_person.
     m365: list[M365Answer] = Field(default_factory=list)
     m365_refreshed_at: datetime | None = None
+    # Suggested answers to the template's infrastructure, workstation, backup and Google Workspace questions, only where a check A.C.O.R.N runs speaks to one; the rest are needs_person.
+    assess: list[AssessAnswer] = Field(default_factory=list)
 
 
 @router.get(
@@ -468,6 +471,7 @@ async def client_review(
         ),
         m365=merge_m365(m365_answers([c for c in (m365_row.checks if m365_row is not None else []) if isinstance(c, dict)], list(users)), typed),
         m365_refreshed_at=m365_row.refreshed_at if m365_row is not None else None,
+        assess=merge_assess(assessment_answers({**tool_checks, **{c["key"]: c for c in sat_checks if isinstance(c.get("key"), str)}}), typed),
         vcio=(
             ReviewVcio(
                 recommendations=VcioRecommendations(**(vcio_row.recommendations or {})),

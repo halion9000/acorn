@@ -7,7 +7,7 @@ vi.mock('@/lib/auth-session', () => ({ authFetch }));
 const routerParams = vi.hoisted(() => ({ current: new URLSearchParams('') }));
 vi.mock('next/navigation', () => ({ useSearchParams: () => routerParams.current }));
 
-import { ClientReview, dueText, readinessHeadline, visibleCoverage, type Review, type TechAnswer, type M365Answer, m365Headline } from './ClientReview';
+import { ClientReview, dueText, readinessHeadline, visibleCoverage, type Review, type TechAnswer, type M365Answer, m365Headline, type AssessAnswer, assessHeadline } from './ClientReview';
 
 const reply = (body: unknown, ok = true, status = 200) => ({ ok, status: ok ? 200 : status, json: () => Promise.resolve(body) });
 
@@ -189,5 +189,34 @@ describe('the Microsoft 365 card colours and headings', () => {
     const chip = (text: string) => within(table).getByText(text).className;
     expect(new Set([chip('Met'), chip('Partly'), chip('Not met')]).size).toBe(3);
     expect(within(table).getByText('Needs a person').className).not.toBe(chip('Met'));
+  });
+});
+
+describe('the infrastructure and security assessment card', () => {
+  it('lists the template questions under their sheet and group, with the check behind a suggested answer and Needs a person for the rest', async () => {
+    routerParams.current = new URLSearchParams('client=c1');
+    const assess: AssessAnswer[] = [
+      { sheet: 'Workstations', group: 'Endpoint security', question: 'Has a managed endpoint security been deployed?', status: 'met', evidence: 'From huntress_protection. All 40 agents protected.' },
+      { sheet: 'Workstations', group: 'Endpoint security', question: 'Another workstation question', status: 'needs_person', evidence: '' },
+      { sheet: 'Backup and disaster recovery', group: 'Datacenter/Server Room Power', question: 'Is there UPS onsite?', status: 'not_applicable', evidence: '' },
+    ];
+    authFetch.mockImplementation((url?: string) => Promise.resolve(String(url).startsWith('/api/v1/client-review/') ? reply(review({ assess })) : reply([{ id: 'c1', name: 'Acme Dental' }])));
+    render(<ClientReview />);
+    const table = await screen.findByTestId('assess');
+    expect(screen.getByTestId('assess-headline')).toHaveTextContent('2 of 3 answered: 1 met, 0 partly, 0 not met, 1 not applicable. 1 need a person.');
+    expect(table).toHaveTextContent('Workstations · Endpoint security');
+    expect(table).toHaveTextContent('From huntress_protection. All 40 agents protected.');
+    expect(table).toHaveTextContent('Needs a person');
+    expect(table).toHaveTextContent('Not applicable');
+    expect(table.textContent?.match(/Workstations · Endpoint security/g)?.length).toBe(1);
+    expect(assessHeadline([])).toBe('0 of 0 answered: 0 met, 0 partly, 0 not met. 0 need a person.');
+  });
+
+  it('is not drawn for an API that sends no assessment', async () => {
+    routerParams.current = new URLSearchParams('client=c1');
+    authFetch.mockImplementation((url?: string) => Promise.resolve(String(url).startsWith('/api/v1/client-review/') ? reply(review({})) : reply([{ id: 'c1', name: 'Acme Dental' }])));
+    render(<ClientReview />);
+    await screen.findByTestId('coverage');
+    expect(screen.queryByTestId('assess')).toBeNull();
   });
 });

@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
 
-export type Section = "readiness" | "tech" | "m365";
+export type Section = "readiness" | "tech" | "m365" | "assess";
 
 const OPTIONS: Record<Section, { value: string; label: string }[]> = {
   readiness: [
@@ -27,6 +27,13 @@ const OPTIONS: Record<Section, { value: string; label: string }[]> = {
     { value: "partly", label: "Partly" },
     { value: "not_met", label: "Not met" },
     { value: "needs_person", label: "Needs a person" },
+  ],
+  assess: [
+    { value: "met", label: "Met" },
+    { value: "partly", label: "Partly" },
+    { value: "not_met", label: "Not met" },
+    { value: "needs_person", label: "Needs a person" },
+    { value: "not_applicable", label: "Not applicable" },
   ],
 };
 
