@@ -148,13 +148,16 @@ export class ApiError extends Error {
   body: string;
   /** Set when the refusal came from viewing another tenant: invalid | forbidden | read_only | session_only (the API's X-View-As-Error). */
   viewAsError?: string;
+  /** The API's X-Request-ID for this call: quote it to support, and it finds the exact request in the API log. */
+  requestId?: string;
 
-  constructor(message: string, status: number, body: string, viewAsError?: string) {
+  constructor(message: string, status: number, body: string, viewAsError?: string, requestId?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.body = body;
     if (viewAsError) this.viewAsError = viewAsError;
+    if (requestId) this.requestId = requestId;
   }
 }
 
@@ -237,7 +240,8 @@ async function request<T>(path: string, options: FetchOptions = {}): Promise<T> 
       viewAsError === 'read_only'
         ? (detailOf(errorText) ?? 'This tenant is read-only while you are viewing it. Switch back to your own tenant to make changes.')
         : `API ${response.status} ${response.statusText} — ${path}`;
-    throw new ApiError(message, response.status, errorText, viewAsError);
+    const requestId = response.headers?.get?.('X-Request-ID') ?? undefined;
+    throw new ApiError(message, response.status, errorText, viewAsError, requestId && /^[A-Za-z0-9._:-]{1,80}$/.test(requestId) ? requestId : undefined);
   }
 
   if (response.status === 204) return {} as T;

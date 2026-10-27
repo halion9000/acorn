@@ -36,6 +36,9 @@ export function ErrorState({
   className,
 }: ErrorStateProps) {
   const detail = formatError(error);
+  // A failed API call carries the id the API logged it under (ApiError.requestId); showing it lets someone report the exact request.
+  const rawId = error && typeof error === 'object' ? (error as { requestId?: unknown }).requestId : undefined;
+  const requestId = typeof rawId === 'string' && rawId !== '' ? rawId : undefined;
 
   return (
     <div
@@ -61,6 +64,11 @@ export function ErrorState({
         <pre className="mx-auto mt-4 max-w-xl overflow-x-auto rounded-md bg-black/30 px-3 py-2 text-left font-mono text-xs text-red-300/80">
           {detail}
         </pre>
+      )}
+      {requestId && (
+        <p className="mt-2 text-xs text-red-300/60" data-testid="request-id">
+          Reference: <code className="select-all font-mono">{requestId}</code>
+        </p>
       )}
       <div className="mt-5 flex items-center justify-center gap-3">
         {onRetry && (
