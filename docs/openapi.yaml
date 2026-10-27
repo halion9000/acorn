@@ -16787,6 +16787,25 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/easm/status:
+    get:
+      tags:
+      - easm
+      summary: Easm Status
+      description: Which discovery sources are set up on this server, and how this
+        tenant's last scan went (found, changes, or the failure).
+      operationId: easm_status_api_v1_easm_status_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Easm Status Api V1 Easm Status Get
+      security:
+      - HTTPBearer: []
   /api/v1/easm/scan:
     post:
       tags:

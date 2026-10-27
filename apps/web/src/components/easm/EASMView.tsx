@@ -30,6 +30,23 @@ export function parseTargets(text: string): string[] {
   return [...new Set(text.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean))];
 }
 
+interface ScanStatus {
+  plan: { shodan: boolean; censys: boolean; port_check: boolean; sources: string[]; can_run: boolean; problem: string | null };
+  last_scan: { started_at?: string; finished_at?: string; found?: number; changes?: number; error?: string | null; sources?: string[] } | null;
+}
+
+/** One sentence on how the last scan went, for under the Run button. */
+export function lastScanText(last: ScanStatus['last_scan']): string | null {
+  if (!last) return null;
+  const when = last.finished_at ? new Date(last.finished_at).toLocaleString() : 'recently';
+  if (last.error) return `The last scan (${when}) failed: ${last.error}`;
+  const using = last.sources && last.sources.length > 0 ? ` using ${last.sources.join(' and ')}` : '';
+  const found = last.found ?? 0;
+  return found === 0
+    ? `The last scan (${when})${using} finished and found nothing.`
+    : `The last scan (${when})${using} found ${found} asset${found === 1 ? '' : 's'} and ${last.changes ?? 0} change${last.changes === 1 ? '' : 's'}.`;
+}
+
 async function refusal(res: Response): Promise<string> {
   try {
     const body = (await res.json()) as { detail?: unknown };
@@ -54,6 +71,7 @@ export function EASMView() {
   const [note, setNote] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [targets, setTargets] = useState('');
+  const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -61,6 +79,12 @@ export function EASMView() {
       setAssets(a);
       setDrift(d);
       setError(null);
+      try {
+        const st = await getJson<ScanStatus>('/api/v1/easm/status');
+        setScanStatus(st && typeof st === 'object' && 'plan' in st ? st : null);
+      } catch {
+        setScanStatus(null); // an older API has no status: the page works without it
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load the attack surface');
     }
@@ -77,8 +101,21 @@ export function EASMView() {
       const res = await authFetch('/api/v1/easm/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip_targets: parseTargets(targets) }) });
       if (res.status === 422) throw new Error(await refusal(res));
       if (res.status === 403) throw new Error('EASM is disabled for this deployment, or your role cannot start a scan.');
+      if (res.status === 409) throw new Error(await refusal(res));
       if (!res.ok) throw new Error(`The API answered ${res.status}`);
-      setNote('Scan started. Discovery runs in the background; reload in a minute to see what it found.');
+      setNote('Scan started. The result appears below when it finishes.');
+      // The scan runs in the background: check back until it records its outcome.
+      const before = scanStatus?.last_scan?.finished_at ?? null;
+      for (let i = 0; i < 20; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const fresh = await getJson<ScanStatus>('/api/v1/easm/status').catch(() => null);
+        if (fresh?.last_scan?.finished_at && fresh.last_scan.finished_at !== before) {
+          setScanStatus(fresh);
+          setNote(null);
+          await load();
+          break;
+        }
+      }
     } catch (err) {
       setNote(err instanceof Error ? err.message : 'Could not start the scan');
     } finally {
@@ -116,6 +153,17 @@ export function EASMView() {
           Separate with commas, spaces or new lines. Public addresses only. These are only probed for open ports when the server has <span className="font-mono">AISOC_EASM_ACTIVE_SCAN_ENABLED=true</span> (off by default).
         </p>
       </div>
+
+      {scanStatus && (
+        <div className="rounded border border-gray-800 bg-gray-900/50 p-3 text-sm text-gray-300" data-testid="scan-status">
+          <p>
+            Discovery sources set up on this server:{' '}
+            {[scanStatus.plan.shodan ? 'Shodan' : null, scanStatus.plan.censys ? 'Censys' : null, scanStatus.plan.port_check ? 'port check (for the addresses you enter)' : null].filter(Boolean).join(', ') || 'none'}
+          </p>
+          {!scanStatus.plan.can_run && scanStatus.plan.problem && <p className="mt-1 text-amber-300">{scanStatus.plan.problem}</p>}
+          {lastScanText(scanStatus.last_scan) && <p className="mt-1 text-gray-400">{lastScanText(scanStatus.last_scan)}</p>}
+        </div>
+      )}
 
       {note && <p className="text-sm text-gray-300">{note}</p>}
       {error && (

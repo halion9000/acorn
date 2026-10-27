@@ -325,6 +325,11 @@ services:
       CLICKHOUSE_USER: aisoc
       CLICKHOUSE_PASSWORD: clickhouse_dev_secret
       OPENSEARCH_URL: http://opensearch:9200
+      # External attack surface discovery (Explore, EASM). Set these in .env; with none set a scan says what is missing.
+      AISOC_EASM_SHODAN_API_KEY: ${AISOC_EASM_SHODAN_API_KEY:-}
+      AISOC_EASM_CENSYS_API_ID: ${AISOC_EASM_CENSYS_API_ID:-}
+      AISOC_EASM_CENSYS_API_SECRET: ${AISOC_EASM_CENSYS_API_SECRET:-}
+      AISOC_EASM_ACTIVE_SCAN_ENABLED: ${AISOC_EASM_ACTIVE_SCAN_ENABLED:-false}
       QDRANT_URL: http://qdrant:6333
       NEO4J_URI: bolt://neo4j:7687
       NEO4J_USER: neo4j

@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import logging
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import ARRAY, Text, cast, func, select, update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import CurrentUser, get_current_user, require_permission
@@ -56,23 +59,77 @@ async def _run_scan_job(
     org_query: str,
     ip_targets: list[str],
 ) -> None:
-    """Background task that runs discovery + drift detection."""
+    """Background task that runs discovery + drift detection, and records how it went (``Tenant.settings['easm_last_scan']``) so the page can say, instead of leaving "Scan started" hanging."""
     from app.db.database import AsyncSessionLocal as async_session_factory
 
+    started = datetime.now(UTC)
+    summary: dict[str, Any] = {"started_at": started.isoformat(), "sources": scan_plan(get_settings(), ip_targets)["sources"], "found": 0, "changes": 0, "error": None}
     try:
         discovered = await run_discovery(org_query, ip_targets=ip_targets or None)
         async with async_session_factory() as db:
             mark_tenant(db, tenant_id)  # a background job for one tenant (step 4b)
             drift_records = await detect_drift(db, tenant_id, discovered)
             await db.commit()
+            summary.update(found=len(discovered), changes=len(drift_records))
             logger.info(
                 "EASM scan complete: tenant=%s discovered=%d drifts=%d",
                 tenant_id,
                 len(discovered),
                 len(drift_records),
             )
-    except Exception:
+    except Exception as exc:
         logger.exception("EASM scan failed for tenant=%s", tenant_id)
+        summary["error"] = f"The scan failed ({type(exc).__name__}); the API log has the detail."
+    summary["finished_at"] = datetime.now(UTC).isoformat()
+    try:
+        async with async_session_factory() as db:
+            mark_tenant(db, tenant_id)
+            await db.execute(
+                update(Tenant)
+                .where(Tenant.id == tenant_id)
+                .values(settings=func.jsonb_set(func.coalesce(Tenant.settings, cast({}, JSONB)), cast(["easm_last_scan"], ARRAY(Text)), cast(json.dumps(summary), JSONB), True))
+            )
+            await db.commit()
+    except Exception:
+        logger.exception("EASM scan result could not be recorded for tenant=%s", tenant_id)
+
+
+def scan_plan(s: Any, ip_targets: list[str]) -> dict[str, Any]:
+    """What a scan could do with the current settings and the addresses entered: which sources would run, and, when none would, the one thing to change (pure; unit-tested)."""
+    shodan = bool(s.AISOC_EASM_SHODAN_API_KEY)
+    censys = bool(s.AISOC_EASM_CENSYS_API_ID and s.AISOC_EASM_CENSYS_API_SECRET)
+    active_on = bool(s.AISOC_EASM_ACTIVE_SCAN_ENABLED)
+    sources = [name for name, on in (("shodan", shodan), ("censys", censys), ("port check", active_on and bool(ip_targets))) if on]
+    problem: str | None = None
+    if not sources:
+        if ip_targets and not active_on:
+            problem = (
+                "The port check is switched off on this server, so the addresses you entered would not be probed, and no Shodan or Censys key is set. "
+                "Set AISOC_EASM_ACTIVE_SCAN_ENABLED=true (it probes only the public addresses you enter), or add a Shodan or Censys key, in the API's environment and restart it."
+            )
+        elif active_on:
+            problem = "The port check is on, but no IP addresses were entered, and no Shodan or Censys key is set. Enter the public IP addresses to check."
+        else:
+            problem = (
+                "Nothing is set up to discover with. Add a Shodan key (AISOC_EASM_SHODAN_API_KEY) or a Censys key (AISOC_EASM_CENSYS_API_ID and AISOC_EASM_CENSYS_API_SECRET), "
+                "or turn on the port check (AISOC_EASM_ACTIVE_SCAN_ENABLED=true) and enter public IP addresses, in the API's environment, then restart it."
+            )
+    return {
+        "shodan": shodan,
+        "censys": censys,
+        "port_check": active_on,
+        "sources": sources,
+        "can_run": bool(sources),
+        "problem": problem,
+    }
+
+
+@router.get("/status", dependencies=[Depends(require_permission("alerts:read"))])
+async def easm_status(db: AsyncSession = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> dict[str, Any]:
+    """Which discovery sources are set up on this server, and how this tenant's last scan went (found, changes, or the failure)."""
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    last = (tenant.settings or {}).get("easm_last_scan") if tenant is not None else None
+    return {"plan": scan_plan(get_settings(), []), "last_scan": last if isinstance(last, dict) else None}
 
 
 @router.post("/scan", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(require_permission("settings:write"))])
@@ -106,6 +163,11 @@ async def trigger_easm_scan(
 
     org_query = body.org_query or tenant.name
 
+    plan = scan_plan(s, body.ip_targets)
+    if not plan["can_run"]:
+        # Said plainly instead of "Scan started" followed by nothing: a scan with no source would finish at once with no assets.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=plan["problem"])
+
     background_tasks.add_task(
         _run_scan_job,
         scan_tenant,
@@ -117,6 +179,7 @@ async def trigger_easm_scan(
         "status": "accepted",
         "tenant_id": str(scan_tenant),
         "org_query": org_query,
+        "sources": plan["sources"],
         "message": "EASM scan enqueued.",
     }
 
