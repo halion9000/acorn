@@ -72,7 +72,7 @@ const NAV_ITEMS: { label: string; href: string; keywords: string[] }[] = [
   { label: 'Detection Rules', href: '/detection',    keywords: ['rules', 'detections', 'sigma'] },
   { label: 'Threat Intel',    href: '/threat-intel', keywords: ['ioc', 'feeds', 'cti'] },
   { label: 'Attack Graph',    href: '/graph',        keywords: ['graph', 'paths', 'cytoscape'] },
-  { label: 'AI Copilot',      href: '/copilot',      keywords: ['assistant', 'chat', 'ai'] },
+  { label: 'Leafy',           href: '/copilot',      keywords: ['copilot', 'assistant', 'chat', 'ai'] },
   { label: 'Connectors',      href: '/connectors',   keywords: ['integrations', 'sources'] },
   { label: 'Settings',        href: '/settings',     keywords: ['preferences', 'profile', 'tenant'] },
   { label: 'User guide',      href: '/guide',        keywords: ['help', 'how to', 'docs', 'documentation', 'manual'] },
@@ -143,7 +143,7 @@ export function CommandPalette() {
       items: [
         {
           id: 'action:copilot',
-          label: 'Ask A.C.O.R.N Copilot',
+          label: 'Ask Leafy',
           hint: 'Open the floating Copilot dock',
           shortcut: ['⌘', 'J'],
           keywords: ['ai', 'copilot', 'assistant', 'investigate'],
@@ -155,7 +155,7 @@ export function CommandPalette() {
         },
         {
           id: 'action:full-copilot',
-          label: 'Open AI Copilot page',
+          label: 'Open Leafy page',
           hint: 'Full conversation view',
           keywords: ['copilot', 'ai', 'chat'],
           perform: () => navigate('/copilot'),

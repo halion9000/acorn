@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Floating AI Copilot dock.
+ * Floating Leafy dock.
  *
  * A persistent bottom-right launcher that opens a compact chat panel without
  * leaving the current page. Reuses `copilotApi` for real calls and says
@@ -145,7 +145,7 @@ export function CopilotDock() {
             exit={{ opacity: 0, scale: 0.9, y: 12 }}
             onClick={() => setOpen(true)}
             className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-3 text-sm font-semibold text-emerald-950 shadow-lg shadow-emerald-900/30 transition-colors hover:bg-emerald-400"
-            aria-label="Open AI Copilot"
+            aria-label="Open Leafy"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -174,7 +174,7 @@ export function CopilotDock() {
             transition={{ duration: 0.18 }}
             className="fixed bottom-5 right-5 z-40 flex h-[32rem] w-[24rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/95 shadow-2xl shadow-black/40 backdrop-blur"
             role="dialog"
-            aria-label="AI Copilot"
+            aria-label="Leafy"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800/80 px-3 py-2">
@@ -183,7 +183,7 @@ export function CopilotDock() {
                   ai
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-white">AI Copilot</p>
+                  <p className="text-sm font-semibold text-white">Leafy</p>
                   <p className="text-[11px] text-slate-400">
                     {connectionStatus === 'checking' ? 'Connecting…' : connectionStatus === 'connected' ? 'Connected' : 'Offline'}
                   </p>
@@ -258,7 +258,7 @@ export function CopilotDock() {
                         {m.suggestions && m.suggestions.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             {m.suggestions.map((s, idx) =>
-                              s.startsWith('Open AI Copilot') ? (
+                              s.startsWith('Open Leafy') ? (
                                 <Link
                                   key={idx}
                                   href="/copilot"

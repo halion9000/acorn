@@ -39,7 +39,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/detection': { title: 'Detection Rules', description: 'SIEM detection rules and tuning' },
   '/threat-intel': { title: 'Threat Intelligence', description: 'IOC lookup and threat feeds' },
   '/graph': { title: 'Attack Graph', description: 'Visualize relationships across alerts and assets' },
-  '/copilot': { title: 'AI Copilot', description: 'AI-assisted investigation and triage' },
+  '/copilot': { title: 'Leafy', description: 'AI-assisted investigation and triage' },
   '/playbooks': { title: 'Playbooks', description: 'Automated response and SOAR workflows' },
   '/marketplace': { title: 'Marketplace', description: 'Plugins, integrations, and content packs' },
   '/honeytokens': { title: 'Honeytokens', description: 'Deception assets and trip-wire alerts' },

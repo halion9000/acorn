@@ -258,7 +258,7 @@ const navSections: NavSection[] = [
         icon: <GraphIcon />,
       },
       {
-        label: 'AI Copilot',
+        label: 'Leafy',
         href: '/copilot',
         icon: <SparklesIcon />,
       },

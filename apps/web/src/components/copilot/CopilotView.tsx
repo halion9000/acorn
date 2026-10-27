@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * AI Copilot — full-page experience.
+ * Leafy — full-page experience.
  *
  * Two-column layout:
  *   left  — recent conversations + suggested prompts
@@ -438,7 +438,7 @@ export function CopilotView() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800/80 px-4 py-3">
           <div>
-            <h1 className="text-base font-semibold text-white">AI Copilot</h1>
+            <h1 className="text-base font-semibold text-white">Leafy</h1>
             <p className="text-xs text-slate-400">
               Ask about alerts, hosts, MITRE techniques, or your detection
               coverage.

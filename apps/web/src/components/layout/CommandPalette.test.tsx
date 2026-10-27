@@ -64,7 +64,7 @@ describe('CommandPalette', () => {
   it('lists the pages and the quick actions', () => {
     openIt();
     for (const label of ['Dashboard', 'Alerts', 'Cases', 'Hunt', 'Detection Rules', 'Threat Intel', 'Connectors', 'Settings', 'User guide']) expect(screen.getByText(label)).toBeInTheDocument();
-    for (const label of ['Ask A.C.O.R.N Copilot', 'Open AI Copilot page', 'Refresh data', 'Copy current URL']) expect(screen.getByText(label)).toBeInTheDocument();
+    for (const label of ['Ask Leafy', 'Open Leafy page', 'Refresh data', 'Copy current URL']) expect(screen.getByText(label)).toBeInTheDocument();
     expect(screen.getByText('Navigation')).toBeInTheDocument();
     expect(screen.getByText('Quick actions')).toBeInTheDocument();
   });
@@ -93,7 +93,7 @@ describe('CommandPalette', () => {
     const heard = vi.fn();
     window.addEventListener('aisoc:open-copilot', heard);
     openIt();
-    await userEvent.click(screen.getByText('Ask A.C.O.R.N Copilot'));
+    await userEvent.click(screen.getByText('Ask Leafy'));
     expect(heard).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
     window.removeEventListener('aisoc:open-copilot', heard);

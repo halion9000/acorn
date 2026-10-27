@@ -26,7 +26,7 @@ The left sidebar groups the console:
 |---|---|
 | Work | Dashboard, SOC Insights, **Alerts**, **Devices**, Investigation Queue, **Cases**, Hunt, Explore |
 | Detection | Detection Rules, Detection Catalog, Vendor Detections, MITRE Coverage, Detection Tuning, Shifts |
-| Intelligence | Threat Intel, Attack Graph, AI Copilot, Investigation Chat, Coverage Advisor, EASM |
+| Intelligence | Threat Intel, Attack Graph, Leafy, Investigation Chat, Coverage Advisor, EASM |
 | Client Security | **Client Posture**, **Multi-Factor**, **Secure Score**, **Sign-in Scores**, **Client Cleanup**, **Platform Health** |
 | Response and testing | Playbooks, Marketplace, File Integrity, Honeytokens, Purple Team |
 | Admin | Get started, **Connectors**, Roles & Permissions, Compliance, **MSSP Dashboard**, Team Analytics, SLA Tracking, Executive Digest, Cost Dashboard, Audit Log, **Settings** |

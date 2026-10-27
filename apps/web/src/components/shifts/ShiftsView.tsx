@@ -5,10 +5,8 @@ import useSWR from 'swr';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { EmptyState, EmptyStateIcons } from '@/components/ui/EmptyState';
+import Link from 'next/link';
 import { shiftsApi } from '@/lib/api';
-
-const SHIFT_START = '2026-05-07T06:00:00Z';
-const SHIFT_END = '2026-05-07T18:00:00Z';
 
 interface HandoffItem {
   id: string;
@@ -40,12 +38,20 @@ export function priorityStyle(priority: string) {
 // (_MOCK_SHIFTS) — flagged as a distinct, bigger gap in that file's own
 // comments, not fixed here.
 
-const EMPTY_SHIFT_SUMMARY = {
-  alertsTriaged: 0,
-  casesOpened: 0,
-  escalations: 0,
-  autoResolved: 0,
-};
+/** The handoff as plain text a person can paste into a message or ticket: what is open, worst first, who has it. */
+export function handoffReport(items: HandoffItem[], generatedAt: Date): string {
+  const order = ['critical', 'high', 'medium', 'low', 'info'];
+  const sorted = [...items].sort((a, b) => order.indexOf(a.priority) - order.indexOf(b.priority));
+  const lines = [`Shift handoff, ${generatedAt.toLocaleString()}`, `${items.length} open item${items.length === 1 ? '' : 's'}`, ''];
+  for (const i of sorted) {
+    lines.push(`[${i.priority.toUpperCase()}] ${i.type} ${i.id}: ${i.title}`);
+    lines.push(`    status: ${i.status}; assigned to: ${i.assignedTo}${i.notes ? `; notes: ${i.notes}` : ''}`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+/** Where an item opens: its alert or its case. */
+const hrefOf = (i: HandoffItem) => (i.type === 'case' ? `/cases/${i.id}` : `/alerts/${i.id}`);
 
 type PriorityFilter = HandoffItem['priority'] | 'all';
 
@@ -70,7 +76,18 @@ export function ShiftsView() {
     : items.filter((item) => item.priority === priorityFilter);
 
   const handleGenerateReport = () => {
-    toast.success('Handoff report generated');
+    if (items.length === 0) {
+      toast('Nothing is open, so there is nothing to hand off.');
+      return;
+    }
+    const blob = new Blob([handoffReport(items, new Date())], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shift-handoff-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Handoff report downloaded');
   };
 
   return (
@@ -92,39 +109,13 @@ export function ShiftsView() {
         </button>
       </div>
 
-      {/* Current Shift Status */}
-      <div className="bg-gray-900/60 border border-gray-800/60 rounded-xl p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
-          <h2 className="text-sm font-semibold text-gray-200">Active Shift</h2>
-        </div>
-        <div className="grid grid-cols-4 gap-4">
-          <div>
-            <p className="text-xs text-gray-500">Analyst On Duty</p>
-            <p className="text-sm font-medium text-gray-200 mt-0.5">Alice Chen</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Shift Start</p>
-            <p className="text-sm font-medium text-gray-200 mt-0.5">{new Date(SHIFT_START).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Shift End</p>
-            <p className="text-sm font-medium text-gray-200 mt-0.5">{new Date(SHIFT_END).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Hours Remaining</p>
-            <p className="text-sm font-medium text-amber-400 mt-0.5">4h 12m</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Shift Summary */}
-      <div className="grid grid-cols-4 gap-3">
+      {/* What is open right now (counted from the items below) */}
+      <div className="grid grid-cols-4 gap-3" data-testid="handoff-summary">
         {[
-          { label: 'Alerts Triaged', value: EMPTY_SHIFT_SUMMARY.alertsTriaged, color: 'text-blue-400' },
-          { label: 'Cases Opened', value: EMPTY_SHIFT_SUMMARY.casesOpened, color: 'text-orange-400' },
-          { label: 'Escalations', value: EMPTY_SHIFT_SUMMARY.escalations, color: 'text-red-400' },
-          { label: 'Auto-Resolved', value: EMPTY_SHIFT_SUMMARY.autoResolved, color: 'text-green-400' },
+          { label: 'Open items', value: items.length, color: 'text-blue-400' },
+          { label: 'Critical', value: items.filter((i) => i.priority === 'critical').length, color: 'text-red-400' },
+          { label: 'High', value: items.filter((i) => i.priority === 'high').length, color: 'text-orange-400' },
+          { label: 'Unassigned', value: items.filter((i) => i.assignedTo === 'unassigned').length, color: 'text-amber-400' },
         ].map((stat) => (
           <div key={stat.label} className="bg-gray-900/60 border border-gray-800/60 rounded-xl p-4">
             <p className={clsx('text-2xl font-bold', stat.color)}>{stat.value}</p>
@@ -214,7 +205,9 @@ export function ShiftsView() {
                       </td>
                       <td className="px-5 py-3">
                         <div>
-                          <span className="text-gray-200 font-medium">{item.id}</span>
+                          <Link href={hrefOf(item)} className="text-blue-300 hover:underline font-medium">
+                            {item.id}
+                          </Link>
                           <span className="text-gray-500 ml-2 text-xs">({item.type})</span>
                         </div>
                         <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{item.title}</p>
