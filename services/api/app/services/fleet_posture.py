@@ -21,7 +21,7 @@ BOARDS: dict[str, tuple[str, tuple[str, ...]]] = {
         "Backups",
         ("slide_alerts", "slide_appliance", "slide_verification", "saas_backup_microsoft", "saas_backup_google", "saas_backup_email", "datto_saas_seats", "liongard_datto_bcdr"),
     ),
-    "network": ("Network", ("meraki_wan", "meraki_licence", "meraki_admin_2fa")),
+    "network": ("Network", ("meraki_wan", "meraki_dual_wan", "meraki_licence", "meraki_admin_2fa")),
     "admins": (
         "Administrator accounts",
         ("meraki_admin_2fa", "dnsfilter_org_mfa", "autoelevate_enforcing", "cipp_inactive_accounts", "liongard_ad_bad_logins", "fieldeffect_account_risk"),

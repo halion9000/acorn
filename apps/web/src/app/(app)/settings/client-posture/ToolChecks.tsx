@@ -74,6 +74,7 @@ const TITLE: Record<string, string> = {
   meraki_licence: 'Meraki licence',
   meraki_admin_2fa: 'Meraki administrators',
   meraki_wan: 'Internet connections',
+  meraki_dual_wan: 'Second internet line',
   slide_alerts: 'Backup alerts',
   slide_appliance: 'Backup appliance',
   slide_verification: 'Backup test boots',

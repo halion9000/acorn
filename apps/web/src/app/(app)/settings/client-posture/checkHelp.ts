@@ -41,6 +41,7 @@ export const CHECK_HELP: Record<string, CheckHelp> = {
   halopsa_agreement: { why: "Without a live agreement the work is not covered or billed, and renewals slip.", fix: "Renew the agreement, or confirm the client has left." },
   meraki_licence: { why: "An expired Meraki licence limits the dashboard and can stop the network from being managed.", fix: "Renew the licence in the Meraki dashboard." },
   meraki_admin_2fa: { why: "A network administrator with only a password can have the whole network changed if it is stolen.", fix: "Require two-step verification for each administrator listed." },
+  meraki_dual_wan: { why: "A site with one internet connection goes offline when it fails; a second line keeps it running.", fix: "Add a second internet line (another provider, or cellular) to each firewall listed that should have one, or confirm the site is meant to have only one." },
   meraki_wan: { why: "A firewall with no internet connection up means the site is offline or running on a backup line.", fix: "Check the line, the modem and the firewall's uplink for each one listed." },
   slide_alerts: { why: "Open backup alerts mean a protected system may not be backing up.", fix: "Open each alert in Slide and fix the system, or resolve it if it is retired." },
   slide_appliance: { why: "A backup appliance out of service, out of warranty or nearly full stops protecting the client.", fix: "Renew the service or warranty, or add storage." },
