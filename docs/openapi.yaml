@@ -4998,6 +4998,19 @@ paths:
           title: Depth
         description: Accepted for compatibility; the overview is always one hop (entity
           to technique).
+      - name: client
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: 'Only this client''s alerts (the caller''s own tenant or one
+            of its clients). Default: all of them.'
+          title: Client
+        description: 'Only this client''s alerts (the caller''s own tenant or one
+          of its clients). Default: all of them.'
       responses:
         '200':
           description: Successful Response
@@ -24694,6 +24707,11 @@ components:
         so an operator can tweak them without re-pasting credentials.'
     ControlItem:
       properties:
+        group:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Group
         control_id:
           type: string
           title: Control Id

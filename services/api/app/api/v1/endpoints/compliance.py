@@ -29,6 +29,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 
+from app.services.compliance_catalog import CATALOGS
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.db.rls_scope import acting_as_tenant
 from app.models.tenant import Tenant
@@ -61,51 +62,9 @@ ScopeTenant = Annotated[uuid.UUID, Depends(compliance_tenant)]
 # Known frameworks + sampled controls (extendable via DB or config)
 # ────────────────────────────────────────────────────────────────────────────
 
-FRAMEWORKS: dict[str, dict[str, str]] = {
-    "SOC2": {
-        "CC1.1": "Common Criteria — Commitment to Competence",
-        "CC6.1": "Logical and Physical Access Controls",
-        "CC6.2": "Access Provisioning",
-        "CC6.3": "Access Removal",
-        "CC7.2": "System Monitoring",
-        "CC8.1": "Change Management",
-        "A1.1": "Availability — Capacity Management",
-    },
-    "PCI-DSS": {
-        "Req-1": "Install and maintain network security controls",
-        "Req-6": "Develop and maintain secure systems",
-        "Req-8": "Identify users and authenticate access",
-        "Req-10": "Log and monitor all access to system components",
-        "Req-11": "Test security of systems and networks regularly",
-    },
-    "HIPAA": {
-        "164.308(a)(1)": "Security Management Process",
-        "164.308(a)(5)": "Security Awareness and Training",
-        "164.312(b)": "Audit Controls",
-        "164.312(d)": "Person or Entity Authentication",
-    },
-    "ISO27001": {
-        "A.12.4.1": "Event Logging",
-        "A.12.4.2": "Protection of Log Information",
-        "A.16.1.2": "Reporting Information Security Events",
-        "A.9.2.1": "User Registration and De-Registration",
-    },
-    # EU Digital Operational Resilience Act (Regulation 2022/2554). Article numbers are the regulation's own; titles are shortened.
-    "DORA": {
-        "Art.6": "ICT risk management framework",
-        "Art.10": "Detection of anomalous activities",
-        "Art.17": "ICT-related incident management process",
-        "Art.19": "Reporting of major ICT-related incidents",
-        "Art.24": "General requirements for digital operational resilience testing",
-        "Art.28": "General principles for managing ICT third-party risk",
-    },
-    "NIST-CSF": {
-        "DE.AE-1": "Baseline of network operations established",
-        "DE.CM-1": "Network monitored for potential events",
-        "RS.AN-1": "Investigations are performed",
-        "RS.MI-2": "Incidents are mitigated",
-    },
-}
+# The full control list of each framework (app/services/compliance_catalog.py), as framework to {control id: title} and framework to {control id: group}.
+FRAMEWORKS: dict[str, dict[str, str]] = {fw: {cid: title for _g, cid, title in rows} for fw, rows in CATALOGS.items()}
+FRAMEWORK_GROUPS: dict[str, dict[str, str]] = {fw: {cid: group for group, cid, _t in rows} for fw, rows in CATALOGS.items()}
 
 # ────────────────────────────────────────────────────────────────────────────
 # Pydantic schemas
@@ -153,6 +112,7 @@ class FrameworksResponse(BaseModel):
 
 
 class ControlItem(BaseModel):
+    group: str | None = None
     control_id: str
     title: str
 
@@ -258,21 +218,53 @@ async def list_framework_controls(framework_id: str) -> ControlsResponse:
         raise HTTPException(status_code=404, detail=f"Framework '{framework_id}' not found.")
     return ControlsResponse(
         framework_id=framework_id,
-        controls=[ControlItem(control_id=cid, title=title) for cid, title in controls.items()],
+        controls=[ControlItem(control_id=cid, title=title, group=FRAMEWORK_GROUPS[framework_id].get(cid)) for cid, title in controls.items()],
     )
 
 
 # Which platform facts evidence which controls. Only controls the platform can really speak to are listed: nobody can prove "Commitment to Competence" from a database.
-_USER_CONTROLS = {("SOC2", "CC6.1"), ("SOC2", "CC6.3"), ("PCI-DSS", "Req-8"), ("HIPAA", "164.312(d)"), ("ISO27001", "A.9.2.1")}
+_USER_CONTROLS = {
+    ("SOC2", "CC6.1"),
+    ("SOC2", "CC6.2"),
+    ("SOC2", "CC6.3"),
+    ("PCI-DSS", "Req-7"),
+    ("PCI-DSS", "Req-8"),
+    ("PCI-DSS", "Req-8.2"),
+    ("HIPAA", "164.308(a)(3)"),
+    ("HIPAA", "164.308(a)(4)"),
+    ("HIPAA", "164.312(a)(1)"),
+    ("HIPAA", "164.312(d)"),
+    ("ISO27001", "A.5.15"),
+    ("ISO27001", "A.5.16"),
+    ("ISO27001", "A.5.18"),
+    ("NIST-CSF", "PR.AA-01"),
+    ("NIST-CSF", "PR.AA-05"),
+}
 _MONITORING_CONTROLS = {
     ("SOC2", "CC7.2"),
     ("PCI-DSS", "Req-10"),
+    ("PCI-DSS", "Req-10.2"),
     ("HIPAA", "164.312(b)"),
-    ("ISO27001", "A.12.4.1"),
-    ("NIST-CSF", "DE.CM-1"),
-    ("DORA", "Art.10"),
+    ("HIPAA", "164.308(a)(1)(ii)(D)"),
+    ("ISO27001", "A.8.15"),
+    ("ISO27001", "A.8.16"),
+    ("NIST-CSF", "DE.CM-01"),
+    ("NIST-CSF", "DE.CM-09"),
+    ("NIST-CSF", "DE.AE-02"),
 }
-_RESPONSE_CONTROLS = {("NIST-CSF", "RS.AN-1"), ("ISO27001", "A.16.1.2"), ("DORA", "Art.17")}
+_RESPONSE_CONTROLS = {
+    ("SOC2", "CC7.3"),
+    ("SOC2", "CC7.4"),
+    ("PCI-DSS", "Req-12.10"),
+    ("HIPAA", "164.308(a)(6)"),
+    ("HIPAA", "164.308(a)(6)(ii)"),
+    ("ISO27001", "A.5.24"),
+    ("ISO27001", "A.5.25"),
+    ("ISO27001", "A.5.26"),
+    ("ISO27001", "A.6.8"),
+    ("NIST-CSF", "RS.MA-02"),
+    ("NIST-CSF", "RS.AN-03"),
+}
 
 
 async def _system_facts(db: DBSession, tenant_id: uuid.UUID) -> dict[str, dict[str, Any]]:

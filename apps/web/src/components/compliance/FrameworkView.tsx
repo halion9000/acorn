@@ -23,12 +23,31 @@ const API_KEYS: Record<string, string> = {
   nist_csf: 'NIST-CSF',
   pci_dss: 'PCI-DSS',
   hipaa: 'HIPAA',
-  dora: 'DORA',
 };
 
 interface Control {
   control_id: string;
   title: string;
+  group?: string | null;
+}
+
+/** The controls under the headings the framework itself uses (SOC 2 criteria, ISO Annex A themes, NIST functions, PCI requirements, HIPAA safeguards), in the order the API sent them. A control with no heading goes under "Controls". */
+export function groupControls(controls: Control[]): { name: string; controls: Control[] }[] {
+  const groups = new Map<string, Control[]>();
+  for (const c of controls) {
+    const name = c.group?.trim() || 'Controls';
+    const list = groups.get(name);
+    if (list) list.push(c);
+    else groups.set(name, [c]);
+  }
+  return [...groups].map(([name, list]) => ({ name, controls: list }));
+}
+
+/** The controls whose id, title or heading contains the text (all of them for empty text). */
+export function matchControls(controls: Control[], text: string): Control[] {
+  const needle = text.trim().toLowerCase();
+  if (!needle) return controls;
+  return controls.filter((c) => `${c.control_id} ${c.title} ${c.group ?? ''}`.toLowerCase().includes(needle));
 }
 interface Posture {
   total_evidence: number;
@@ -88,6 +107,7 @@ export function FrameworkView({ framework }: Props) {
   const [adding, setAdding] = useState<string | null>(null);
   const [kind, setKind] = useState<EvidenceKind>('attestation');
   const [summary, setSummary] = useState('');
+  const [filter, setFilter] = useState('');
 
   const load = useCallback(async () => {
     if (!key) return;
@@ -224,8 +244,26 @@ export function FrameworkView({ framework }: Props) {
         </p>
       )}
 
-      <div className="space-y-3">
-        {controls.map((c) => {
+      <div className="space-y-4">
+        {controls.length > 12 && (
+          <input
+            type="search"
+            aria-label="Filter controls"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder={`Filter the ${controls.length} controls by id, title or section`}
+            className="w-full max-w-md rounded border border-gray-700 bg-gray-900 px-3 py-1.5 text-sm text-gray-100"
+          />
+        )}
+        {groupControls(matchControls(controls, filter)).map((g) => {
+          const withEvidence = g.controls.filter((c) => controlState(c.control_id) === 'accepted').length;
+          return (
+            <details key={g.name} open={controls.length <= 20 || filter.trim() !== ''} className="rounded-xl border border-gray-800 bg-gray-900/40 p-3" data-testid={`group-${g.name}`}>
+              <summary className="cursor-pointer select-none text-sm font-medium text-gray-200">
+                {g.name} <span className="ml-2 text-xs font-normal text-gray-500">{withEvidence} of {g.controls.length} with accepted evidence</span>
+              </summary>
+              <div className="mt-3 space-y-3">
+        {g.controls.map((c) => {
           const state = controlState(c.control_id);
           return (
             <div key={c.control_id} className="rounded-lg border border-gray-700 bg-gray-800/60 p-4">
@@ -302,6 +340,11 @@ export function FrameworkView({ framework }: Props) {
             </div>
           );
         })}
+              </div>
+            </details>
+          );
+        })}
+        {controls.length > 0 && matchControls(controls, filter).length === 0 && <p className="text-sm text-gray-500">No control matches that text.</p>}
       </div>
     </div>
   );

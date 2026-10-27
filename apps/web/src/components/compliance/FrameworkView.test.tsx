@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -111,5 +111,60 @@ describe('FrameworkView for a client', () => {
     authFetch.mockClear();
     await userEvent.click(screen.getByRole('button', { name: /Collect platform evidence/ }));
     await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]).startsWith('/api/v1/compliance/evidence/collect?client_id=c1'))).toBe(true));
+  });
+});
+
+describe('a framework with many controls', () => {
+  const many = [
+    { control_id: 'A.5.1', title: 'Policies for information security', group: 'A.5 Organizational controls' },
+    { control_id: 'A.5.2', title: 'Information security roles and responsibilities', group: 'A.5 Organizational controls' },
+    ...Array.from({ length: 12 }, (_, i) => ({ control_id: `A.8.${i + 1}`, title: `Technological ${i + 1}`, group: 'A.8 Technological controls' })),
+    { control_id: 'A.6.8', title: 'Information security event reporting', group: 'A.6 People controls' },
+  ];
+  const setup = () =>
+    authFetch.mockImplementation((url: string) => {
+      if (url.includes('/controls')) return json({ controls: many });
+      if (url.includes('/report')) return json([{ total_evidence: 1, accepted: 1, pending: 0, rejected: 0, coverage_pct: 7, controls_covered: ['A.5.1'], controls_missing: [] }]);
+      return json([{ id: 'e1', control_id: 'A.5.1', summary: 'Policy exists', status: 'accepted', collected_at: '2026-10-01T00:00:00Z', reviewed_by: 'sam' }]);
+    });
+
+  it('groups the controls under the headings of the framework and counts the accepted ones in each', async () => {
+    setup();
+    render(<FrameworkView framework="iso27001" />);
+    const group = await screen.findByTestId('group-A.5 Organizational controls');
+    expect(group.textContent).toContain('1 of 2 with accepted evidence');
+    expect(screen.getByTestId('group-A.8 Technological controls').textContent).toContain('0 of 12 with accepted evidence');
+    expect(screen.getByTestId('group-A.6 People controls')).toBeTruthy();
+  });
+
+  it('filters by id, title or heading, and says so when nothing matches', async () => {
+    setup();
+    render(<FrameworkView framework="iso27001" />);
+    const box = await screen.findByRole('searchbox', { name: 'Filter controls' });
+    fireEvent.change(box, { target: { value: 'event reporting' } });
+    expect(screen.getByText('Information security event reporting')).toBeTruthy();
+    expect(screen.queryByText('Technological 1')).toBeNull();
+    fireEvent.change(box, { target: { value: 'zzzz nothing' } });
+    expect(screen.getByText('No control matches that text.')).toBeTruthy();
+  });
+
+  it('has no DORA page any more', () => {
+    render(<FrameworkView framework="dora" />);
+    expect(screen.getByText(/no control list in this A.C.O.R.N build/)).toBeTruthy();
+  });
+});
+
+describe('groupControls and matchControls', () => {
+  it('keeps the API order, puts an ungrouped control under Controls, and matches case-insensitively', async () => {
+    const { groupControls, matchControls } = await import('./FrameworkView');
+    const list = [
+      { control_id: 'x', title: 'Zed' },
+      { control_id: 'a', title: 'Alpha', group: 'G1' },
+      { control_id: 'b', title: 'Beta', group: 'G1' },
+    ];
+    expect(groupControls(list).map((g) => [g.name, g.controls.length])).toEqual([['Controls', 1], ['G1', 2]]);
+    expect(matchControls(list, 'ALPHA').map((c) => c.control_id)).toEqual(['a']);
+    expect(matchControls(list, 'g1').length).toBe(2);
+    expect(matchControls(list, '  ').length).toBe(3);
   });
 });

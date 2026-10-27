@@ -36,12 +36,6 @@ const FRAMEWORKS = [
     description: 'Administrative, physical, and technical safeguards for protected health information.',
     badge: 'Healthcare',
   },
-  {
-    id: 'dora',
-    name: 'DORA',
-    description: 'EU Digital Operational Resilience Act for financial sector ICT risk management.',
-    badge: 'EU Regulation',
-  },
 ];
 
 export default function CompliancePage() {

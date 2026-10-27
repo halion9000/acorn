@@ -126,7 +126,6 @@ export const DISCOVERY_KEYWORDS: readonly string[] = [
   "NIST CSF",
   "PCI-DSS",
   "HIPAA",
-  "DORA",
   "compliance monitoring",
   "audit logging",
   "security reporting",
