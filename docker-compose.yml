@@ -318,6 +318,12 @@ services:
       REDIS_URL: redis://:redis_dev_secret@redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       CLICKHOUSE_URL: http://aisoc:clickhouse_dev_secret@clickhouse:8123/aisoc
+      # The event-lake queries (Explore, Hunt) use the native protocol; without these the API dials localhost:9000 and the page says the lake is not connected.
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "9000"
+      CLICKHOUSE_DATABASE: aisoc
+      CLICKHOUSE_USER: aisoc
+      CLICKHOUSE_PASSWORD: clickhouse_dev_secret
       OPENSEARCH_URL: http://opensearch:9200
       QDRANT_URL: http://qdrant:6333
       NEO4J_URI: bolt://neo4j:7687
