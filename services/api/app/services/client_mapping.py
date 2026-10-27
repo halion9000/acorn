@@ -114,10 +114,37 @@ async def child_candidates(db: Any, parent_id: uuid.UUID, include_hidden: bool =
     return [Candidate(tenant_id=str(t.id), name=t.name) for t in rows if include_hidden or not tenant_hidden(t)]
 
 
+_GUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+def normalize_microsoft_tenant_id(raw: object) -> str | None:
+    """A Microsoft tenant id in its comparable form (lower-case GUID), or None when the value is empty, not a GUID or the all-zero id."""
+    text_ = str(raw or "").strip().lower()
+    return text_ if _GUID.match(text_) and text_ != "00000000-0000-0000-0000-000000000000" else None
+
+
 @dataclass(frozen=True)
 class IncomingClient:
     client_id: str
     name: str
+    microsoft_tenant_id: str | None = None
+
+
+async def _children_by_microsoft_tenant(db: Any, tenant_id: uuid.UUID, visible: set[str]) -> dict[str, uuid.UUID]:
+    """The client tenant each Microsoft tenant id is already mapped to, from every tool's aliases. An id that two different tenants hold (a mapping mistake) or one that maps to a hidden tenant is left out."""
+    rows = (
+        await db.execute(
+            select(ClientAlias.microsoft_tenant_id, ClientAlias.child_tenant_id).where(
+                ClientAlias.tenant_id == tenant_id, ClientAlias.microsoft_tenant_id.isnot(None), ClientAlias.child_tenant_id.isnot(None), ClientAlias.ignored.is_(False)
+            )
+        )
+    ).all()
+    seen: dict[str, set[uuid.UUID]] = {}
+    for ms, child in rows:
+        key = normalize_microsoft_tenant_id(ms)
+        if key:
+            seen.setdefault(key, set()).add(child)
+    return {k: next(iter(v)) for k, v in seen.items() if len(v) == 1 and str(next(iter(v))) in visible}
 
 
 async def upsert_clients(db: Any, tenant_id: uuid.UUID, vendor: str, clients: list[IncomingClient]) -> tuple[int, int]:
@@ -133,9 +160,13 @@ async def upsert_clients(db: Any, tenant_id: uuid.UUID, vendor: str, clients: li
         .scalars()
         .all()
     }
+    visible = {c.tenant_id for c in candidates}
+    # Read only when this report carries ids: a tool that reports none costs no extra query.
+    by_ms = await _children_by_microsoft_tenant(db, tenant_id, visible) if any(normalize_microsoft_tenant_id(c.microsoft_tenant_id) for c in clients) else {}
     created = linked = 0
     for c in clients:
         row = existing.get(c.client_id)
+        ms = normalize_microsoft_tenant_id(c.microsoft_tenant_id)
         if row is not None:
             placeholder = row.vendor_client_name == row.vendor_client_id and row.child_tenant_id is None and not row.ignored and row.match_source != "manual"
             if placeholder and c.name != c.client_id:  # a row made from device reports, now with the tool's real name
@@ -146,9 +177,20 @@ async def upsert_clients(db: Any, tenant_id: uuid.UUID, vendor: str, clients: li
             if row.vendor_client_name != c.name:
                 row.vendor_client_name = c.name
                 row.normalized_name = normalize_name(c.name)
+            if ms and row.microsoft_tenant_id != ms:
+                row.microsoft_tenant_id = ms  # type: ignore[assignment]
+            if ms and row.child_tenant_id is None and not row.ignored and row.match_source != "manual" and ms in by_ms:
+                row.child_tenant_id = by_ms[ms]  # type: ignore[assignment]
+                linked += 1
+            elif ms and row.child_tenant_id is not None and ms not in by_ms and str(row.child_tenant_id) in visible and not row.ignored:
+                by_ms[ms] = row.child_tenant_id  # type: ignore[assignment]
             continue
         suggestions = suggest(c.name, candidates)
         child_id = uuid.UUID(suggestions[0].tenant_id) if is_confident(suggestions) else None
+        if child_id is None and ms:
+            child_id = by_ms.get(ms)  # the same Microsoft tenant another tool already mapped
+        if child_id is not None and ms and ms not in by_ms:
+            by_ms[ms] = child_id
         db.add(
             ClientAlias(
                 id=uuid.uuid4(),
@@ -157,6 +199,7 @@ async def upsert_clients(db: Any, tenant_id: uuid.UUID, vendor: str, clients: li
                 vendor_client_id=c.client_id,
                 vendor_client_name=c.name,
                 normalized_name=normalize_name(c.name),
+                microsoft_tenant_id=ms,
                 child_tenant_id=child_id,
                 ignored=False,
                 match_source="suggested",

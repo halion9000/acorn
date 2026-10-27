@@ -267,3 +267,72 @@ async def test_a_row_made_from_device_reports_is_linked_by_name_when_the_tools_c
     await run(msp, lambda db: upsert_clients(db, msp, "autoelevate", [IncomingClient(client_id="ae-late", name=name)]))
     got = await scalar("select child_tenant_id from client_aliases where tenant_id = :t and vendor_client_id = 'ae-late'", t=msp)
     assert got == world["acme"]
+
+
+MS_A = "11111111-1111-4111-8111-111111111111"
+MS_B = "22222222-2222-4222-8222-222222222222"
+
+
+async def alias_child(msp, vendor, client_id):
+    return await scalar("select child_tenant_id from client_aliases where tenant_id = :t and vendor = :v and vendor_client_id = :c", t=msp, v=vendor, c=client_id)
+
+
+async def map_by_hand(msp, vendor, client_id, child):
+    from sqlalchemy import text
+
+    async def work(db):
+        await db.execute(
+            text("update client_aliases set child_tenant_id = :c, match_source = 'manual' where tenant_id = :t and vendor = :v and vendor_client_id = :i"),
+            {"c": child, "t": msp, "v": vendor, "i": client_id},
+        )
+
+    await run(msp, work)
+
+
+async def test_a_client_is_linked_to_the_tenant_another_tool_mapped_for_the_same_microsoft_tenant(world):
+    from app.services.client_mapping import IncomingClient, upsert_clients
+
+    msp = world["msp"]
+    await run(msp, lambda db: upsert_clients(db, msp, "cipp", [IncomingClient("cipp-1", "Zzz Unlike Name", MS_A.upper())]))
+    await map_by_hand(msp, "cipp", "cipp-1", world["acme"])
+    await run(msp, lambda db: upsert_clients(db, msp, "petra", [IncomingClient("p-1", "Totally Different", MS_A), IncomingClient("p-2", "Other One", MS_B), IncomingClient("p-3", "No Id At All")]))
+    assert await alias_child(msp, "petra", "p-1") == world["acme"], "same Microsoft tenant id (case does not matter)"
+    assert await alias_child(msp, "petra", "p-2") is None, "an id nobody mapped waits for a person"
+    assert await alias_child(msp, "petra", "p-3") is None
+
+
+async def test_a_client_already_listed_and_unmapped_is_linked_when_it_later_reports_the_id_but_a_manual_or_ignored_one_is_left(world):
+    from sqlalchemy import text
+
+    from app.services.client_mapping import IncomingClient, upsert_clients
+
+    msp = world["msp"]
+    await run(msp, lambda db: upsert_clients(db, msp, "cipp", [IncomingClient("cipp-2", "Qqq Odd", MS_A)]))
+    await map_by_hand(msp, "cipp", "cipp-2", world["acme"])
+    await run(msp, lambda db: upsert_clients(db, msp, "huntress", [IncomingClient("h-1", "Aaa One"), IncomingClient("h-2", "Bbb Two"), IncomingClient("h-3", "Ccc Three")]))
+    await map_by_hand(msp, "huntress", "h-2", world["pirkey"])
+
+    async def ignore(db):
+        await db.execute(text("update client_aliases set ignored = true where tenant_id = :t and vendor = 'huntress' and vendor_client_id = 'h-3'"), {"t": msp})
+
+    await run(msp, ignore)
+    await run(msp, lambda db: upsert_clients(db, msp, "huntress", [IncomingClient("h-1", "Aaa One", MS_A), IncomingClient("h-2", "Bbb Two", MS_A), IncomingClient("h-3", "Ccc Three", MS_A)]))
+    assert await alias_child(msp, "huntress", "h-1") == world["acme"]
+    assert await alias_child(msp, "huntress", "h-2") == world["pirkey"], "a person's choice is never overwritten"
+    assert await alias_child(msp, "huntress", "h-3") is None, "an ignored client stays ignored"
+    assert await scalar("select microsoft_tenant_id from client_aliases where tenant_id = :t and vendor = 'huntress' and vendor_client_id = 'h-1'", t=msp) == MS_A
+
+
+async def test_an_id_two_tenants_hold_links_nothing_and_a_malformed_id_is_ignored(world):
+    from app.services.client_mapping import IncomingClient, normalize_microsoft_tenant_id, upsert_clients
+
+    msp = world["msp"]
+    await run(msp, lambda db: upsert_clients(db, msp, "cipp", [IncomingClient("c-x", "Xx One", MS_B), IncomingClient("c-y", "Yy Two", MS_B)]))
+    await map_by_hand(msp, "cipp", "c-x", world["acme"])
+    await map_by_hand(msp, "cipp", "c-y", world["pirkey"])
+    await run(msp, lambda db: upsert_clients(db, msp, "petra", [IncomingClient("p-amb", "Whatever", MS_B), IncomingClient("p-bad", "Whoever", "not-a-guid")]))
+    assert await alias_child(msp, "petra", "p-amb") is None, "two tenants claim this id, so it proves nothing"
+    assert await alias_child(msp, "petra", "p-bad") is None
+    assert normalize_microsoft_tenant_id("00000000-0000-0000-0000-000000000000") is None
+    assert normalize_microsoft_tenant_id(None) is None
+    assert normalize_microsoft_tenant_id(f"  {MS_A.upper()} ") == MS_A

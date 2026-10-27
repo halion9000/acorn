@@ -27,6 +27,7 @@ class ClientAlias(Base):
     child_tenant_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    microsoft_tenant_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     ignored: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     match_source: Mapped[str] = mapped_column(String(16), default="suggested", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)

@@ -635,6 +635,7 @@ async def report_core_feed_scripts(tenant_token: str, body: ScriptsReport, db: D
 class ClientItem(BaseModel):
     id: str = Field(min_length=1, max_length=200, description="The vendor's own id for the client.")
     name: str = Field(min_length=1, max_length=300)
+    microsoft_tenant_id: str | None = Field(default=None, max_length=64, description="The Microsoft 365 tenant id the tool reports for the client, when it does: it links the client to the one another tool already mapped.")
 
 
 class ClientsReport(BaseModel):
@@ -653,7 +654,7 @@ async def report_core_feed_clients(tenant_token: str, body: ClientsReport, db: D
     tenant_id = await _verify_core_feed_token(db, tenant_token)
     await adopt_tenant(db, tenant_id)
     created, linked = await upsert_clients(
-        db, tenant_id, body.vendor, [IncomingClient(c.id, c.name.strip()) for c in body.clients if c.name.strip()]
+        db, tenant_id, body.vendor, [IncomingClient(c.id, c.name.strip(), c.microsoft_tenant_id) for c in body.clients if c.name.strip()]
     )
     await db.commit()
     return ClientsResponse(new=created, linked=linked)

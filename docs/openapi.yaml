@@ -23692,6 +23692,14 @@ components:
           maxLength: 300
           minLength: 1
           title: Name
+        microsoft_tenant_id:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Microsoft Tenant Id
+          description: 'The Microsoft 365 tenant id the tool reports for the client,
+            when it does: it links the client to the one another tool already mapped.'
       type: object
       required:
       - id
