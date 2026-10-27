@@ -67,6 +67,8 @@ const TITLE: Record<string, string> = {
   cipp_unused_licences: 'Unused licences',
   ninjaone_unsupported_os: 'Windows support status',
   ninjaone_antivirus: 'Antivirus',
+  ninjaone_reboot: 'Restarts',
+  ninjaone_disk_space: 'System drive space',
   ninjaone_patching: 'Windows updates',
   halopsa_agreement: 'Support agreement',
   meraki_licence: 'Meraki licence',

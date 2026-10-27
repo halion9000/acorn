@@ -35,6 +35,8 @@ export const CHECK_HELP: Record<string, CheckHelp> = {
   cipp_unused_licences: { why: "Licences bought but not assigned are money wasted every month.", fix: "Reduce the seat count at the next renewal, or assign the spare ones." },
   ninjaone_unsupported_os: { why: "Windows versions past end of support get no security fixes.", fix: "Upgrade or replace the machines listed (Windows 11 or a supported server version)." },
   ninjaone_antivirus: { why: "A machine with no working, up-to-date antivirus is unprotected.", fix: "Install or switch on antivirus on the machines listed, and update definitions." },
+  ninjaone_reboot: { why: "Machines that never restart miss the updates that need one, and keep running old code.", fix: "Schedule a restart outside working hours for the machines listed, or turn on a restart policy in NinjaOne." },
+  ninjaone_disk_space: { why: "A system drive that is nearly full stops updates and backups and can crash the machine.", fix: "Clear space on the machines listed (temp files, old profiles, large downloads) or add storage." },
   ninjaone_patching: { why: "Critical and important updates waiting a month leave known holes open.", fix: "Approve and install the updates on the machines listed, and check the client's patch policy window." },
   halopsa_agreement: { why: "Without a live agreement the work is not covered or billed, and renewals slip.", fix: "Renew the agreement, or confirm the client has left." },
   meraki_licence: { why: "An expired Meraki licence limits the dashboard and can stop the network from being managed.", fix: "Renew the licence in the Meraki dashboard." },
