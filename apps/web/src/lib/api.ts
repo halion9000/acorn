@@ -4270,7 +4270,7 @@ interface BackendAttackChainResponse {
 }
 
 export const graphApi = {
-  getOverview: (filters: { entity?: string; depth?: number } = {}) =>
+  getOverview: (filters: { entity?: string; depth?: number; client?: string } = {}) =>
     request<AttackGraph>('/api/v1/graph', {
       params: filters as Record<string, string | number>,
     }),

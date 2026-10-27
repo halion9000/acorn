@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
@@ -9,7 +9,12 @@ vi.mock('cytoscape-fcose', () => ({ __esModule: true, default: vi.fn() }));
 
 const getOverview = vi.hoisted(() => vi.fn());
 const getMitreCoverage = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/api', () => ({ __esModule: true, graphApi: { getOverview: () => getOverview(), getMitreCoverage: () => getMitreCoverage() } }));
+const children = vi.hoisted(() => ({ list: [] as { id: string; name: string }[] }));
+vi.mock('@/lib/api', () => ({
+  __esModule: true,
+  graphApi: { getOverview: (f?: unknown) => getOverview(f), getMitreCoverage: () => getMitreCoverage() },
+  msspApi: { listChildren: async () => children.list },
+}));
 
 import { AttackGraphView } from './AttackGraphView';
 
@@ -79,5 +84,31 @@ describe('the graph panel', () => {
     getMitreCoverage.mockResolvedValue(coverage);
     renderView();
     expect(await screen.findByText('Attack Graph Unavailable')).toBeInTheDocument();
+  });
+});
+
+describe('the client picker', () => {
+  it('shows every client together by default and one client when picked, asking the API for just that client', async () => {
+    children.list = [{ id: 'c-2', name: 'Birch Law' }, { id: 'c-1', name: 'Acme Dental' }];
+    getOverview.mockResolvedValue({ nodes: [], edges: [], generatedAt: '2026-10-08T12:00:00Z' });
+    getMitreCoverage.mockResolvedValue(coverage);
+    const user = userEvent.setup();
+    renderView();
+    const select = await screen.findByRole('combobox', { name: 'Client' });
+    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['All clients', 'Acme Dental', 'Birch Law']);
+    expect(getOverview).toHaveBeenLastCalledWith({ depth: 3 });
+    await user.selectOptions(select, 'c-1');
+    await waitFor(() => expect(getOverview).toHaveBeenLastCalledWith({ depth: 3, client: 'c-1' }));
+    await user.selectOptions(select, '');
+    await waitFor(() => expect(getOverview).toHaveBeenLastCalledWith({ depth: 3 }));
+  });
+
+  it('is not drawn for an organisation with no clients', async () => {
+    children.list = [];
+    getOverview.mockResolvedValue({ nodes: [], edges: [], generatedAt: '2026-10-08T12:00:00Z' });
+    getMitreCoverage.mockResolvedValue(coverage);
+    renderView();
+    await screen.findByText('No graph yet');
+    expect(screen.queryByRole('combobox', { name: 'Client' })).not.toBeInTheDocument();
   });
 });

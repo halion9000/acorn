@@ -134,3 +134,19 @@ def test_an_alert_never_points_at_an_entity_or_technique_that_was_cut():
 def test_rows_without_an_id_or_anything_to_draw_get_no_alert_node():
     g = build_overview([alert("high", hosts=["h"]), row(2, "high")])
     assert not [n for n in g["nodes"] if n["kind"] == "alert"]
+
+
+def test_the_overview_scope_is_everything_or_one_tenant_of_the_callers_and_nothing_else():
+    import uuid
+
+    import pytest
+    from app.api.v1.endpoints.graph import overview_scope
+    from fastapi import HTTPException
+
+    owner, a, b, stranger = (uuid.uuid4() for _ in range(4))
+    assert overview_scope(owner, [a, b], None) == [owner, a, b]
+    assert overview_scope(owner, [a, b], a) == [a]
+    assert overview_scope(owner, [a, b], owner) == [owner]
+    with pytest.raises(HTTPException) as e:
+        overview_scope(owner, [a, b], stranger)
+    assert e.value.status_code == 404

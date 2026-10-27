@@ -34,6 +34,7 @@ import {
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ClientPicker } from '@/components/mssp/ClientPicker';
 
 // Register fcose once on the client.
 if (typeof window !== 'undefined') {
@@ -264,12 +265,14 @@ function MitreHeatmap({ coverage }: { coverage: MitreCoverage }) {
 
 export function AttackGraphView() {
   const [selected, setSelected] = useState<GraphNode | null>(null);
+  // '' is the whole organisation (every client together); an id is one client.
+  const [client, setClient] = useState('');
 
   const graphState = useSWR<AttackGraph | null>(
-    'attack-graph',
+    ['attack-graph', client],
     async (): Promise<AttackGraph | null> => {
       try {
-        return await graphApi.getOverview({ depth: 3 });
+        return await graphApi.getOverview({ depth: 3, ...(client ? { client } : {}) });
       } catch (err) {
         // The overview is built from alerts (GET /api/v1/graph). If the call fails, return null so the view says so instead of swallowing the error or inventing nodes.
         return null;
@@ -300,6 +303,7 @@ export function AttackGraphView() {
               telemetry.
             </p>
           </div>
+          <ClientPicker value={client} onChange={(id) => { setSelected(null); setClient(id); }} ownLabel="All clients" label="Client" />
           <div className="text-xs text-slate-500" suppressHydrationWarning>
             {graph
               ? `Generated ${new Date(graph.generatedAt).toLocaleTimeString()}`

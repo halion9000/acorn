@@ -424,6 +424,15 @@ def build_overview(alerts: list[dict[str, Any]], *, entity: str | None = None) -
     return {"nodes": nodes, "edges": edges}
 
 
+def overview_scope(owner: uuid.UUID, clients: list[uuid.UUID], wanted: uuid.UUID | None) -> list[uuid.UUID]:
+    """The tenants an overview reads: the caller's own and all its clients, or just the one asked for. A tenant that is neither the caller's own nor one of its clients is refused as if it did not exist."""
+    if wanted is None:
+        return [owner, *clients]
+    if wanted != owner and wanted not in clients:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+    return [wanted]
+
+
 @router.get(
     "",
     summary="Overview graph: entities and ATT&CK techniques seen on recent alerts",
@@ -436,12 +445,13 @@ async def get_overview(
     depth: Annotated[
         int, Query(ge=1, le=6, description="Accepted for compatibility; the overview is always one hop (entity to technique).")
     ] = 3,
+    client: Annotated[uuid.UUID | None, Query(description="Only this client's alerts (the caller's own tenant or one of its clients). Default: all of them.")] = None,
 ) -> dict[str, Any]:
     """The graph the Attack Graph page draws, from the last 30 days of alerts across the caller's tenant and its client tenants (see the note above)."""
     since = datetime.now(UTC) - timedelta(days=_OVERVIEW_WINDOW_DAYS)
     clients = [row.id for row in (await db.execute(select(Tenant.id).where(Tenant.parent_tenant_id == current_user.tenant_id))).all()]
     rows: list[dict[str, Any]] = []
-    for tenant_id in [current_user.tenant_id, *clients]:
+    for tenant_id in overview_scope(current_user.tenant_id, clients, client):
         async with acting_as_tenant(db, tenant_id):
             result = await db.execute(
                 select(
