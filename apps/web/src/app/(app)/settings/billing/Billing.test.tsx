@@ -184,6 +184,41 @@ describe('Billing reconcile and mapping', () => {
     expect(JSON.parse(authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')![1].body).invoice_item).toBe('Huntress for Workstations (Included)');
   });
 
+  it('marks a line as one no tool counts, from the list or beside a suggestion, and shows it that way once saved', async () => {
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Invoice mapping' }));
+    await screen.findByTestId('unmapped-lines');
+    mapCalls.push(1);
+    await userEvent.selectOptions(screen.getByLabelText('Map Liongard (Included) to'), '__none__');
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => c[1]?.method === 'PUT')).toBe(true));
+    expect(JSON.parse(authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')![1].body)).toEqual({ invoice_item: 'Liongard (Included)', counted: [] });
+  });
+
+  it('offers "No tool counts this" beside a suggestion too', async () => {
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Invoice mapping' }));
+    const unmapped = await screen.findByTestId('unmapped-lines');
+    mapCalls.push(1);
+    await userEvent.click(within(unmapped).getAllByText('No tool counts this')[0]);
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => c[1]?.method === 'PUT')).toBe(true));
+    const put = JSON.parse(authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')![1].body);
+    expect(put.invoice_item).toBe('Huntress for Workstations (Included)');
+    expect(put.counted).toEqual([]);
+  });
+
+  it('finds a tool count by typing part of its tool or item name, and groups the list by tool', async () => {
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Invoice mapping' }));
+    const select = (await screen.findByLabelText('Map Liongard (Included) to')) as HTMLSelectElement;
+    const optionsOf = () => Array.from(select.querySelectorAll('option')).map((o) => o.textContent);
+    expect(select.querySelectorAll('optgroup').length).toBeGreaterThan(1);
+    await userEvent.type(screen.getByLabelText('Find a tool count'), 'macs');
+    expect(optionsOf().filter((t) => t && t !== 'Map to…' && t !== 'No tool counts this')).toEqual(['NinjaOne: Macs']);
+    await userEvent.clear(screen.getByLabelText('Find a tool count'));
+    await userEvent.type(screen.getByLabelText('Find a tool count'), 'zzz-nothing');
+    expect(optionsOf()).toEqual(['Map to…', 'No tool counts this']);
+  });
+
   it('removes a mapping', async () => {
     render(<Billing />);
     await userEvent.click(screen.getByRole('tab', { name: 'Invoice mapping' }));

@@ -29,6 +29,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { AddConnectorModal } from './AddConnectorModal';
 import { ConnectorInstanceList } from './ConnectorInstanceList';
 import { EditConnectorModal } from './EditConnectorModal';
+import { CoreToolsPanel } from './CoreToolsPanel';
 import { InboxTokensPanel } from './InboxTokensPanel';
 
 /** Shown instead of a number we do not know. */
@@ -275,6 +276,9 @@ export function ConnectorsView() {
           />
         </>
       )}
+
+      {/* The owner's tools that are already connected in CORE: listed as connected, with nothing to set up here. */}
+      <CoreToolsPanel />
 
       {/* Universal capture (push) — collapsed by default. Sits below the
           poll-based connector list so the catalog stays the primary path

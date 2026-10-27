@@ -81,6 +81,11 @@ const TOOL_NAMES: Record<string, string> = {
   fieldeffect: "Field Effect",
   threatmate: "ThreatMate",
   "datto-saas": "Datto SaaS Protection",
+  petra: "Petra MDR",
+  screenconnect: "ScreenConnect",
+  unifi: "UniFi",
+  auvik: "Auvik",
+  dropsuite: "Dropsuite",
 };
 
 const toolName = (source: string): string => TOOL_NAMES[source] ?? source.replace(/[-_]/g, " ").replace(/^./, (c) => c.toUpperCase());
@@ -479,9 +484,25 @@ function Reconcile() {
   );
 }
 
+/** The tool counts that match the search text (in the tool's name or the item's), grouped by tool name, in alphabetical order. An empty search keeps everything. */
+export function groupedCounts(items: { source: string; item: string }[], find: string): [string, { source: string; item: string }[]][] {
+  const needle = find.trim().toLowerCase();
+  const groups = new Map<string, { source: string; item: string }[]>();
+  for (const c of items) {
+    if (needle && !`${toolName(c.source)} ${c.item}`.toLowerCase().includes(needle)) continue;
+    const tool = toolName(c.source);
+    (groups.get(tool) ?? groups.set(tool, []).get(tool)!).push(c);
+  }
+  return [...groups].sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" }));
+}
+
+/** The value of the "No tool counts this" choice in the Map to list. */
+const NO_TOOL = "__none__";
+
 function Mapping() {
   const [reload, setReload] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
+  const [find, setFind] = useState("");
   const { data, error } = useJson<MapView>(`/api/v1/billing/map?r=${reload}`);
   const save = async (invoice_item: string, counted: { source: string; item: string }[]) => {
     try {
@@ -526,7 +547,11 @@ function Mapping() {
   };
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-400">Say which tool counts each invoice line should equal. A suggestion is a guess from the line&apos;s name: use it only if it is right. For a line with no suggestion, pick the tool count yourself.</p>
+      <p className="text-sm text-slate-400">Say which tool counts each invoice line should equal. A suggestion is a guess from the line&apos;s name: use it only if it is right. For a line with no suggestion, pick the tool count yourself. A flat fee or a service no tool here reads can be marked &quot;No tool counts this&quot;, so it stops waiting to be mapped.</p>
+      <label className="flex items-center gap-2 text-xs text-slate-400 print:hidden">
+        Find a tool count
+        <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="for example Meraki or Huntress" aria-label="Find a tool count" className="w-64 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-200" />
+      </label>
       {(error || problem) && <p role="alert" className="text-sm text-red-300">{error ?? problem}</p>}
       {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
       {data && (
@@ -541,7 +566,7 @@ function Mapping() {
                   {(data.mapped ?? []).map((m) => (
                     <tr key={m.invoice_item} className="border-t border-slate-800 text-slate-300">
                       <td className="py-1 pr-3">{m.invoice_item}</td>
-                      <td className="pr-3 text-xs text-slate-400">{m.counted.map((c) => `${toolName(c.source)} ${c.item}`).join(" + ")}</td>
+                      <td className="pr-3 text-xs text-slate-400">{m.counted.length === 0 ? <span className="italic text-slate-500">No tool counts this</span> : m.counted.map((c) => `${toolName(c.source)} ${c.item}`).join(" + ")}</td>
                       <td>
                         <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300" onClick={() => void remove(m.invoice_item)}>
                           Remove
@@ -584,24 +609,35 @@ function Mapping() {
                       </td>
                       <td>
                         {u.suggestion.length > 0 ? (
-                          <button type="button" className="text-xs text-sky-300 underline hover:text-sky-200" onClick={() => void save(u.invoice_item, u.suggestion)}>
-                            Use suggestion
-                          </button>
+                          <span className="flex items-center gap-3">
+                            <button type="button" className="text-xs text-sky-300 underline hover:text-sky-200" onClick={() => void save(u.invoice_item, u.suggestion)}>
+                              Use suggestion
+                            </button>
+                            <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300" onClick={() => void save(u.invoice_item, [])}>
+                              No tool counts this
+                            </button>
+                          </span>
                         ) : (
                           <select
                             aria-label={`Map ${u.invoice_item} to`}
                             className="max-w-[16rem] rounded border border-slate-700 bg-slate-900 px-1 py-0.5 text-xs text-slate-300"
                             value=""
                             onChange={(e) => {
+                              if (e.target.value === NO_TOOL) return void save(u.invoice_item, []);
                               const [source, ...rest] = e.target.value.split("|");
                               if (source) void save(u.invoice_item, [{ source, item: rest.join("|") }]);
                             }}
                           >
                             <option value="">Map to…</option>
-                            {(data.counted_items ?? []).map((c) => (
-                              <option key={`${c.source}|${c.item}`} value={`${c.source}|${c.item}`}>
-                                {toolName(c.source)}: {c.item}
-                              </option>
+                            <option value={NO_TOOL}>No tool counts this</option>
+                            {groupedCounts(data.counted_items ?? [], find).map(([tool, items]) => (
+                              <optgroup key={tool} label={tool}>
+                                {items.map((c) => (
+                                  <option key={`${c.source}|${c.item}`} value={`${c.source}|${c.item}`}>
+                                    {toolName(c.source)}: {c.item}
+                                  </option>
+                                ))}
+                              </optgroup>
                             ))}
                           </select>
                         )}

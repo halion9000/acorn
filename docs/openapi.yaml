@@ -2340,6 +2340,30 @@ paths:
                 title: Response List Catalog Api V1 Connectors Catalog Get
       security:
       - HTTPBearer: []
+  /api/v1/connectors/core-tools:
+    get:
+      tags:
+      - connectors
+      summary: The tools set up in CORE, as CORE last reported them
+      description: 'The owner''s tools that are connected in CORE (Huntress, NinjaOne,
+        Petra...), so they show as connected here without being set up twice. CORE
+        holds their credentials and
+
+        reports only the name, one line about the tool and whether it is connected;
+        this lists what it last said, connected ones first.'
+      operationId: list_core_tools_api_v1_connectors_core_tools_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/CoreToolOut'
+                type: array
+                title: Response List Core Tools Api V1 Connectors Core Tools Get
+      security:
+      - HTTPBearer: []
   /api/v1/connectors/health:
     get:
       tags:
@@ -7276,12 +7300,28 @@ paths:
         attestation or a document (policies, training) are never invented and stay
         missing in the posture report.'
       operationId: trigger_evidence_collection_api_v1_compliance_evidence_collect_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CollectJobRequest'
-        required: true
       responses:
         '202':
           description: Successful Response
@@ -7295,8 +7335,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-      security:
-      - HTTPBearer: []
   /api/v1/compliance/evidence:
     post:
       tags:
@@ -7305,6 +7343,20 @@ paths:
       operationId: collect_evidence_api_v1_compliance_evidence_post
       security:
       - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       requestBody:
         required: true
         content:
@@ -7383,6 +7435,19 @@ paths:
           minimum: 0
           default: 0
           title: Offset
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       responses:
         '200':
           description: Successful Response
@@ -7415,6 +7480,19 @@ paths:
           type: string
           format: uuid
           title: Evidence Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       responses:
         '200':
           description: Successful Response
@@ -7444,6 +7522,19 @@ paths:
           type: string
           format: uuid
           title: Evidence Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       requestBody:
         required: true
         content:
@@ -7482,6 +7573,19 @@ paths:
           description: Filter to a single framework.
           title: Framework
         description: Filter to a single framework.
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       responses:
         '200':
           description: Successful Response
@@ -11133,6 +11237,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 5000
+          minimum: 1
           default: 200
           title: Limit
       responses:
@@ -11169,6 +11275,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 730
+          minimum: 1
           default: 90
           title: Days
       responses:
@@ -11254,6 +11362,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 5000
+          minimum: 1
           default: 200
           title: Limit
       responses:
@@ -11497,6 +11607,8 @@ paths:
         schema:
           anyOf:
           - type: integer
+            maximum: 3650
+            minimum: 1
           - type: 'null'
           title: Within Days
       - name: limit
@@ -11504,6 +11616,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 5000
+          minimum: 1
           default: 300
           title: Limit
       responses:
@@ -11713,6 +11827,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 5000
+          minimum: 1
           default: 100
           title: Limit
       responses:
@@ -11777,7 +11893,54 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 5000
+          minimum: 1
           default: 500
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FleetBoardOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/fleet/tools/{source}/checks:
+    get:
+      tags:
+      - posture
+      summary: The checks one tool reported across clients that are not fine, to see
+        what its problems are
+      operationId: fleet_tool_checks_api_v1_client_posture_fleet_tools__source__checks_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: source
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Source
+      - name: include_met
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Include Met
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 5000
+          minimum: 1
+          default: 2000
           title: Limit
       responses:
         '200':
@@ -11825,6 +11988,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 400
+          minimum: 1
           default: 1
           title: Days
       - name: limit
@@ -11832,6 +11997,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 5000
+          minimum: 1
           default: 300
           title: Limit
       responses:
@@ -11866,6 +12033,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 400
+          minimum: 1
           default: 1
           title: Days
       - name: limit
@@ -11873,6 +12042,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 5000
+          minimum: 1
           default: 15
           title: Limit
       responses:
@@ -11909,6 +12080,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 400
+          minimum: 1
           default: 30
           title: Days
       responses:
@@ -11958,6 +12131,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 400
+          minimum: 1
           default: 90
           title: Days
       responses:
@@ -11988,6 +12163,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 400
+          minimum: 1
           default: 30
           title: Days
       responses:
@@ -12018,6 +12195,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 400
+          minimum: 1
           default: 30
           title: Days
       - name: limit
@@ -12025,6 +12204,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 5000
+          minimum: 1
           default: 500
           title: Limit
       - name: client_id
@@ -12201,8 +12382,20 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 5000
+          minimum: 1
           default: 500
           title: Limit
+      - name: min_days
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 400
+            minimum: 0
+          - type: 'null'
+          title: Min Days
       responses:
         '200':
           description: Successful Response
@@ -12231,6 +12424,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 5000
+          minimum: 1
           default: 500
           title: Limit
       responses:
@@ -12267,6 +12462,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 5000
+          minimum: 1
           default: 1000
           title: Limit
       responses:
@@ -12415,6 +12612,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SweepRunsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/tools:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Tools
+      description: Record which of the owner's tools are connected in CORE, so the
+        Connectors page can list them (only the name, one line about it and whether
+        it is connected; never a credential).
+      operationId: report_core_feed_tools_api_v1_inbox_core_feed__tenant_token__tools_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreToolsReport'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreToolsResponse'
         '422':
           description: Validation Error
           content:
@@ -17250,6 +17482,19 @@ paths:
           description: ISO timestamp; defaults to now
           title: Period End
         description: ISO timestamp; defaults to now
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, for a digest of that client alone. Omit
+            for your own tenant.
+          title: Client Id
+        description: One of your clients, for a digest of that client alone. Omit
+          for your own tenant.
       responses:
         '200':
           description: Successful Response
@@ -24559,6 +24804,78 @@ components:
       - content
       - createdAt
       title: CopilotMessageOut
+    CoreToolIn:
+      properties:
+        tool_id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,59}$
+          title: Tool Id
+        title:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Title
+        description:
+          type: string
+          maxLength: 300
+          title: Description
+          default: ''
+        connected:
+          type: boolean
+          title: Connected
+      type: object
+      required:
+      - tool_id
+      - title
+      - connected
+      title: CoreToolIn
+    CoreToolOut:
+      properties:
+        tool_id:
+          type: string
+          title: Tool Id
+        title:
+          type: string
+          title: Title
+        description:
+          type: string
+          title: Description
+        connected:
+          type: boolean
+          title: Connected
+        reported_at:
+          type: string
+          format: date-time
+          title: Reported At
+      type: object
+      required:
+      - tool_id
+      - title
+      - description
+      - connected
+      - reported_at
+      title: CoreToolOut
+    CoreToolsReport:
+      properties:
+        tools:
+          items:
+            $ref: '#/components/schemas/CoreToolIn'
+          type: array
+          maxItems: 200
+          title: Tools
+      type: object
+      required:
+      - tools
+      title: CoreToolsReport
+    CoreToolsResponse:
+      properties:
+        updated:
+          type: integer
+          title: Updated
+      type: object
+      required:
+      - updated
+      title: CoreToolsResponse
     CostAggregateResponse:
       properties:
         window_days:
@@ -34141,6 +34458,21 @@ components:
           - type: string
           - type: 'null'
           title: Note
+        since:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Since
+        days:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Days
+        since_complete:
+          type: boolean
+          title: Since Complete
+          default: true
       type: object
       required:
       - client_id

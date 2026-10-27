@@ -34,6 +34,7 @@ MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations"
 VIEW_ROUTES = {
     ("GET", "/connectors"),
     ("GET", "/connectors/catalog"),
+    ("GET", "/connectors/core-tools"),
     ("GET", "/connectors/health"),
     ("GET", "/connectors/{connector_id}"),
     ("GET", "/connectors/{connector_id}/last_event_at"),

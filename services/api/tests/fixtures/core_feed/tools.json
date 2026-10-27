@@ -1,0 +1,26 @@
+{
+  "route": "tools",
+  "method": "POST",
+  "body": {
+    "tools": [
+      {
+        "tool_id": "huntress",
+        "title": "Huntress",
+        "description": "Managed EDR",
+        "connected": true
+      },
+      {
+        "tool_id": "petra-mdr",
+        "title": "Petra MDR",
+        "description": "Identity threat detection for Microsoft 365",
+        "connected": true
+      },
+      {
+        "tool_id": "hudu",
+        "title": "Hudu",
+        "description": "Documentation",
+        "connected": false
+      }
+    ]
+  }
+}

@@ -353,7 +353,7 @@ async def check_history(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
     db: DBSession,
     key: str | None = None,
-    limit: int = Query(200, ge=1, le=5000),
+    limit: Annotated[int, Query(ge=1, le=5000)] = 200,
 ) -> CheckHistoryOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
@@ -390,7 +390,7 @@ class ScoreHistoryOut(BaseModel):
 
 
 @router.get("/{client_id}/score-history", response_model=ScoreHistoryOut, summary="A client's check score day by day, and whether it got better or worse")
-async def score_history(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = Query(90, ge=1, le=730)) -> ScoreHistoryOut:
+async def score_history(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: Annotated[int, Query(ge=1, le=730)] = 90) -> ScoreHistoryOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
     days = max(2, min(days, 730))
@@ -461,7 +461,7 @@ class ItemHistoryOut(BaseModel):
 
 
 @router.get("/{client_id}/checks/{key}/item-history", response_model=ItemHistoryOut, summary="When machines or accounts joined or left the list behind one of a client's checks, newest first")
-async def check_item_history(client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, limit: int = Query(200, ge=1, le=5000)) -> ItemHistoryOut:
+async def check_item_history(client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, limit: Annotated[int, Query(ge=1, le=5000)] = 200) -> ItemHistoryOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
@@ -928,7 +928,7 @@ class SearchHit(BaseModel):
 
 
 @router.get("/fleet/search", response_model=list[SearchHit], summary="Find the checks of all clients that mention a machine, account or word")
-async def fleet_search(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, q: str, limit: int = Query(100, ge=1, le=5000)) -> list[SearchHit]:
+async def fleet_search(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, q: str, limit: Annotated[int, Query(ge=1, le=5000)] = 100) -> list[SearchHit]:
     """Which client has host SRV-02, or an account called jsmith, or an expiring certificate: searches what every tool reported (evidence, check name and the machines or accounts behind each check)."""
     checks, _names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
     return [SearchHit(**{**h, "client_id": uuid.UUID(h["client_id"])}) for h in search_checks(checks, q, max(1, min(limit, 300)))]
@@ -963,7 +963,7 @@ async def fleet_boards(current_user: Annotated[AuthUser, Depends(require_permiss
 
 @router.get("/fleet/boards/{board}", response_model=FleetBoardOut, summary="One board: the clients whose related checks are not fine")
 async def fleet_board(
-    board: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, include_met: bool = False, limit: int = Query(500, ge=1, le=5000)
+    board: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, include_met: bool = False, limit: Annotated[int, Query(ge=1, le=5000)] = 500
 ) -> FleetBoardOut:
     if board not in BOARDS:
         raise HTTPException(status_code=404, detail="No such board")
@@ -980,7 +980,7 @@ async def fleet_board(
 
 @router.get("/fleet/tools/{source}/checks", response_model=FleetBoardOut, summary="The checks one tool reported across clients that are not fine, to see what its problems are")
 async def fleet_tool_checks(
-    source: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, include_met: bool = False, limit: int = Query(2000, ge=1, le=5000)
+    source: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, include_met: bool = False, limit: Annotated[int, Query(ge=1, le=5000)] = 2000
 ) -> FleetBoardOut:
     checks, _names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
     rows = tool_rows(checks, source, include_met=include_met)[:limit]
@@ -1017,7 +1017,7 @@ class FleetChange(BaseModel):
 
 
 @router.get("/fleet/changes", response_model=list[FleetChange], summary="Checks that appeared or changed status across all clients in the last days")
-async def fleet_changes(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = Query(1, ge=1, le=400), limit: int = Query(300, ge=1, le=5000)) -> list[FleetChange]:
+async def fleet_changes(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: Annotated[int, Query(ge=1, le=400)] = 1, limit: Annotated[int, Query(ge=1, le=5000)] = 300) -> list[FleetChange]:
     owner = current_user.tenant_id
     days = max(1, min(days, 90))
     ids, names = await _scope(db, owner, None)
@@ -1051,7 +1051,7 @@ class DigestOut(BaseModel):
 
 
 @router.get("/fleet/digest", response_model=DigestOut, summary="One digest for the owner: what got worse and better lately, what is overdue, what accepted risks end soon and who is below target")
-async def fleet_digest(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = Query(1, ge=1, le=400), limit: int = Query(15, ge=1, le=5000)) -> DigestOut:
+async def fleet_digest(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: Annotated[int, Query(ge=1, le=400)] = 1, limit: Annotated[int, Query(ge=1, le=5000)] = 15) -> DigestOut:
     days = max(1, min(days, 30))
     limit = max(1, min(limit, 50))
     now = datetime.now(UTC)
@@ -1090,7 +1090,7 @@ class FleetAcceptance(BaseModel):
 
 
 @router.get("/fleet/acceptances", response_model=list[FleetAcceptance], summary="Accepted risks across all clients that still stand, the ones about to run out first")
-async def fleet_acceptances(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, within_days: int | None = Query(None, ge=1, le=3650), limit: int = Query(300, ge=1, le=5000)) -> list[FleetAcceptance]:
+async def fleet_acceptances(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, within_days: Annotated[int | None, Query(ge=1, le=3650)] = None, limit: Annotated[int, Query(ge=1, le=5000)] = 300) -> list[FleetAcceptance]:
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, None)
     now = datetime.now(UTC)

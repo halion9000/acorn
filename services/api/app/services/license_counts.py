@@ -160,6 +160,8 @@ def reconcile(billed: list[dict[str, Any]], held: list[dict[str, Any]], mapping:
     for b in billed:
         item = str(b["item"])
         parts = mapping.get(item)
+        if item in mapping and not parts:
+            continue  # saved as "no tool counts this" (a flat fee, a service nothing here reads): not compared and not waiting to be mapped
         if not parts:
             unmapped.append({"item": item, "billed": int(b["count"])})
             continue

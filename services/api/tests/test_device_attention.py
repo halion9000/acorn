@@ -410,3 +410,100 @@ def test_the_kind_of_operating_system_is_read_from_what_the_tools_report():
     devices = [device("Windows 11", [("ninjaone", {})]), device("macOS 14", [("ninjaone", {})]), device("iPadOS 17", [("addigy", {})])]
     assert [os_family(d) for d in filter_devices(devices, os="mac")] == ["mac"]
     assert len(filter_devices(devices)) == 3
+
+
+# ---- while a sync is posting, a loaded list is kept longer; a person's own change still clears it at once --------------------------------------------
+
+
+@pytest.fixture
+def quiet_sync(monkeypatch):
+    monkeypatch.setattr(devices_module, "_last_sync", -1e12)
+    yield
+    monkeypatch.setattr(devices_module, "_last_sync", -1e12)
+
+
+@pytest.mark.asyncio
+async def test_while_posts_are_arriving_a_list_older_than_the_normal_time_is_still_served(counted_load, monkeypatch, quiet_sync):
+    owner, tid = uuid.uuid4(), uuid.uuid4()
+    monkeypatch.setattr(devices_module, "LOAD_CACHE_SECONDS", 0.0)  # the normal time has run out
+    await devices_module._load_cached(None, owner, [tid], {}, None)
+    await devices_module._load_cached(None, owner, [tid], {}, None)
+    assert len(counted_load) == 2, "with no sync going on, an old list is loaded again"
+    devices_module.note_sync()
+    await devices_module._load_cached(None, owner, [tid], {}, None)
+    assert len(counted_load) == 2, "with posts arriving, the list loaded a moment ago is reused"
+
+
+@pytest.mark.asyncio
+async def test_the_longer_time_ends_when_posts_stop_and_is_capped(counted_load, monkeypatch, quiet_sync):
+    owner, tid = uuid.uuid4(), uuid.uuid4()
+    monkeypatch.setattr(devices_module, "LOAD_CACHE_SECONDS", 0.0)
+    devices_module.note_sync()
+    await devices_module._load_cached(None, owner, [tid], {}, None)
+    monkeypatch.setattr(devices_module, "SYNC_BURST_SECONDS", 0.0)  # no post for longer than the burst window
+    await devices_module._load_cached(None, owner, [tid], {}, None)
+    assert len(counted_load) == 2
+    monkeypatch.setattr(devices_module, "SYNC_BURST_SECONDS", 90.0)
+    monkeypatch.setattr(devices_module, "SYNC_CACHE_SECONDS", 0.0)  # even during a burst the list is not kept past its own limit
+    await devices_module._load_cached(None, owner, [tid], {}, None)
+    assert len(counted_load) == 3
+
+
+@pytest.mark.asyncio
+async def test_a_device_post_does_not_throw_the_list_away_but_a_person_forgetting_it_does(counted_load, monkeypatch, quiet_sync):
+    owner, tid = uuid.uuid4(), uuid.uuid4()
+    await devices_module._load_cached(None, owner, [tid], {}, None)
+
+    async def verify(db, token):
+        return owner
+
+    async def adopt(db, tenant):
+        return None
+
+    async def apply(db, o, body):
+        return "applied"
+
+    async def commit():
+        return None
+
+    monkeypatch.setattr(devices_module, "_verify_core_feed_token", verify)
+    monkeypatch.setattr(devices_module, "adopt_tenant", adopt)
+    monkeypatch.setattr(devices_module, "apply_devices", apply)
+    out = await devices_module.report_core_feed_devices("tok", None, SimpleNamespace(commit=commit))
+    assert out == "applied"
+    assert devices_module._last_sync > -1e11, "the post was noted"
+    await devices_module._load_cached(None, owner, [tid], {}, None)
+    assert len(counted_load) == 1, "and the list loaded before it is still served"
+    devices_module.forget_loaded()
+    await devices_module._load_cached(None, owner, [tid], {}, None)
+    assert len(counted_load) == 2
+
+
+@pytest.mark.asyncio
+async def test_the_duplicates_list_loads_every_client_once_not_once_per_client_with_pairs(monkeypatch):
+    owner = uuid.uuid4()
+    tids = [uuid.uuid4() for _ in range(3)]
+    made = {t: (device("Windows 11", [("ninjaone", {})]), device("Windows 11", [("huntress", {})])) for t in tids}
+    loads = []
+
+    async def scope(db, o, client_id):
+        return tids, {}
+
+    async def load(db, o, scope_ids, clients, master):
+        loads.append(tuple(scope_ids))
+        return [d for pair in made.values() for d in pair]
+
+    async def pairs(db, tid):
+        return [(made[tid][0].id, made[tid][1].id)]
+
+    class Db:
+        async def get(self, model, key):
+            return None
+
+    monkeypatch.setattr(devices_module, "_scope", scope)
+    monkeypatch.setattr(devices_module, "_load_cached", load)
+    monkeypatch.setattr(devices_module, "possible_duplicates", pairs)
+    monkeypatch.setattr(devices_module, "_as", lambda db, o, t: __import__("contextlib").nullcontext())
+    out = await devices_module.list_duplicates(current_user=SimpleNamespace(tenant_id=owner), db=Db(), client_id=None)
+    assert len(out.items) == 3
+    assert loads == [tuple(tids)], "one load of the whole scope, the same one the device list asks for"

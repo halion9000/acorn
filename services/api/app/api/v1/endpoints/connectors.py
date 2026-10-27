@@ -77,6 +77,7 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission  # noqa: E40
 from app.core.config import settings  # noqa: E402
 from app.models.connector import Connector  # noqa: E402
 from app.models.connector_run_log import ConnectorRunLog  # noqa: E402
+from app.models.signin import CoreTool  # noqa: E402
 from app.security.credential_vault import CredentialVaultError, get_vault  # noqa: E402
 from app.services.connector_freshness import compute_freshness  # noqa: E402
 
@@ -494,6 +495,24 @@ async def _proxy_test_connection(
 
 # ---------------------------------------------------------------------- catalog
 
+# Connectors this deployment does not offer in the Add connector picker. The owner's tools are connected in CORE and forwarded (``core_feed``), so these generic SIEM, EDR, cloud, identity
+# and SaaS audit connectors are not wanted. They are only hidden: the code stays, an instance that already exists keeps working, and removing an id here brings its card back.
+HIDDEN_CATALOG_IDS = frozenset(
+    {
+        # EDR / endpoint
+        "crowdstrike", "sentinelone", "cortex_xdr", "trend_vision_one", "carbon_black", "auditd", "osctrl", "fleetdm", "falco", "wazuh", "sysdig", "darktrace", "zeek_suricata",
+        # SIEM
+        "chronicle", "cortex_xsiam", "datadog", "datadog_cloud_siem", "devo", "elastic", "exabeam", "microsoft_sentinel", "qradar", "rapid7_insightidr", "securonix", "splunk", "sumo_logic", "trellix_helix",
+        # cloud
+        "aws_cloudtrail", "aws_guardduty", "aws_security_hub", "aws_vpc_flow", "azure_activity", "gcp_cloud_audit", "gcp_scc", "kubernetes_audit", "lacework", "oci", "orca", "prisma_cloud", "qualys", "tenable_io", "wiz",
+        # identity
+        "okta", "auth0", "jumpcloud", "vault", "duo_security", "onepassword",
+        # SaaS, email, network
+        "abnormal_security", "box", "cloudflare", "cloudflare_zt", "confluence_audit", "dropbox", "email_inbox", "greynoise", "jira", "opsgenie", "pagerduty", "salesforce", "servicenow", "snowflake",
+        "sublime_security", "github", "gitlab", "snyk", "cisco_umbrella", "imperva",
+    }
+)
+
 
 @router.get("/catalog")
 async def list_catalog(
@@ -506,8 +525,27 @@ async def list_catalog(
     — every tenant in this build sees the same catalog — but still gated
     behind authentication.
     """
-    schemas = await _fetch_catalog()
+    schemas = [s for s in await _fetch_catalog() if s.get("connector_id") not in HIDDEN_CATALOG_IDS]
     return {"connectors": schemas}
+
+
+class CoreToolOut(BaseModel):
+    tool_id: str
+    title: str
+    description: str
+    connected: bool
+    reported_at: datetime
+
+
+@router.get("/core-tools", response_model=list[CoreToolOut], summary="The tools set up in CORE, as CORE last reported them")
+async def list_core_tools(
+    current_user: Annotated[AuthUser, Depends(require_permission("connectors:view"))],
+    db: DBSession,
+) -> list[CoreToolOut]:
+    """The owner's tools that are connected in CORE (Huntress, NinjaOne, Petra...), so they show as connected here without being set up twice. CORE holds their credentials and
+    reports only the name, one line about the tool and whether it is connected; this lists what it last said, connected ones first."""
+    rows = (await db.execute(select(CoreTool).where(CoreTool.tenant_id == current_user.tenant_id).order_by(CoreTool.connected.desc(), func.lower(CoreTool.title)))).scalars().all()
+    return [CoreToolOut(tool_id=r.tool_id, title=r.title, description=r.description, connected=r.connected, reported_at=r.reported_at) for r in rows]
 
 
 # ------------------------------------------------------------------ health summary

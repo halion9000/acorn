@@ -51,6 +51,7 @@ MODELS = {
     "vcio-proposals-result": vp.ProposalResult,
     "m365-checks": cr.M365ChecksReport,
     "sweep-runs": cr.SweepRunsReport,
+    "tools": cr.CoreToolsReport,
     "license-counts": billing.LicenseCountsReport,
     "identities": idn.IdentitiesReport,
 }

@@ -10,6 +10,7 @@ vi.mock('react-hot-toast', () => ({ __esModule: true, default: Object.assign(vi.
 vi.mock('./AddConnectorModal', () => ({ AddConnectorModal: ({ onCreated }: { onCreated: () => void }) => <button onClick={onCreated}>trigger-refresh</button> }));
 vi.mock('./EditConnectorModal', () => ({ EditConnectorModal: () => null }));
 vi.mock('./InboxTokensPanel', () => ({ InboxTokensPanel: () => null }));
+vi.mock('./CoreToolsPanel', () => ({ CoreToolsPanel: () => <div data-testid="core-tools" /> }));
 vi.mock('./ConnectorInstanceList', () => ({
   ConnectorInstanceList: ({ connectors, onTest }: { connectors: { id: string; name: string }[]; onTest: (id: string) => void }) => (
     <div data-testid="instance-list">

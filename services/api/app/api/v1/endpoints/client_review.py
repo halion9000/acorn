@@ -15,7 +15,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, StringConstraints, model_validator
-from sqlalchemy import and_, bindparam, func, select, text
+from sqlalchemy import and_, bindparam, delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -30,7 +30,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.client_review_answer import ClientReviewAnswer
-from app.models.signin import ClientCheckHistory, ClientCheckItemHistory, ClientM365Check, CoreSweepRun, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
+from app.models.signin import ClientCheckHistory, ClientCheckItemHistory, ClientM365Check, CoreSweepRun, CoreTool, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
 from app.services import fleet_cache
 from app.services.check_history import changes as check_changes
@@ -478,3 +478,40 @@ async def client_review(
             else None
         ),
     )
+
+
+class CoreToolIn(BaseModel):
+    tool_id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,59}$")
+    title: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=300)
+    connected: bool
+
+
+class CoreToolsReport(BaseModel):
+    tools: list[CoreToolIn] = Field(max_length=200)
+
+
+class CoreToolsResponse(BaseModel):
+    updated: int
+
+
+async def apply_core_tools(db: Any, owner: uuid.UUID, report: CoreToolsReport, now: datetime | None = None) -> int:
+    """Keep exactly the tools CORE listed (a tool CORE no longer lists is dropped). The caller owns the transaction."""
+    now = now or datetime.now(UTC)
+    seen: dict[str, CoreToolIn] = {t.tool_id: t for t in report.tools}
+    await db.execute(delete(CoreTool).where(CoreTool.tenant_id == owner, CoreTool.tool_id.not_in(list(seen))) if seen else delete(CoreTool).where(CoreTool.tenant_id == owner))
+    for tool in seen.values():
+        values = {"tenant_id": owner, "reported_at": now, **tool.model_dump()}
+        stmt = pg_insert(CoreTool).values(values)
+        await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "tool_id"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "tool_id")}))
+    return len(seen)
+
+
+@ingest_router.post("/core-feed/{tenant_token}/tools", response_model=CoreToolsResponse)
+async def report_core_feed_tools(tenant_token: str, body: CoreToolsReport, db: DBSession) -> CoreToolsResponse:
+    """Record which of the owner's tools are connected in CORE, so the Connectors page can list them (only the name, one line about it and whether it is connected; never a credential)."""
+    owner = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, owner)
+    updated = await apply_core_tools(db, owner, body)
+    await db.commit()
+    return CoreToolsResponse(updated=updated)

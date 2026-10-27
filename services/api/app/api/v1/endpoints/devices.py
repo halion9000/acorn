@@ -458,12 +458,28 @@ async def _alerts_by_host(db: Any, tid: uuid.UUID) -> dict[str, list[DeviceAlert
 # requests queue up in one worker, each holding a connection, until the pool runs dry and the API answers 500. So concurrent loads of the same scope share one, and the result is kept for a few
 # seconds. Anything that changes devices (a sync, a merge, a dismissal, the master setting) clears it, so a change is never hidden behind it.
 LOAD_CACHE_SECONDS = 20.0
+# CORE posts devices every few seconds for a while after it starts. If each post threw the list away, every page load during that time would build it again (7 s of queries, more under load) and
+# the page would time out. So while posts are arriving the list is kept longer: a synced device shows up within a minute. A person's own change (a merge, a dismissal, hiding a device) still clears it
+# at once.
+SYNC_CACHE_SECONDS = 60.0
+SYNC_BURST_SECONDS = 90.0
 _loaded: dict[tuple, tuple[float, list[DeviceOut]]] = {}
 _load_locks: dict[tuple, asyncio.Lock] = {}
+_last_sync = -1e12
 
 
 def forget_loaded() -> None:
     _loaded.clear()
+
+
+def note_sync() -> None:
+    """A sync posted devices: lengthen how long a loaded list is kept, for as long as posts keep arriving."""
+    global _last_sync
+    _last_sync = time.monotonic()
+
+
+def _cache_seconds() -> float:
+    return SYNC_CACHE_SECONDS if time.monotonic() - _last_sync < SYNC_BURST_SECONDS else LOAD_CACHE_SECONDS
 
 
 async def _load_cached(
@@ -473,7 +489,7 @@ async def _load_cached(
     lock = _load_locks.setdefault(key, asyncio.Lock())
     async with lock:
         hit = _loaded.get(key)
-        if hit is not None and time.monotonic() - hit[0] < LOAD_CACHE_SECONDS:
+        if hit is not None and time.monotonic() - hit[0] < _cache_seconds():
             return hit[1]
         devices = await _load(db, owner, tids, clients, master)
         _loaded[key] = (time.monotonic(), devices)
@@ -888,12 +904,15 @@ async def list_duplicates(
     scope, clients = await _scope(db, owner, client_id)
     master = _master_of(await db.get(Tenant, owner))
     items: list[DuplicatePairOut] = []
+    by_id: dict[uuid.UUID, DeviceOut] | None = None
     for tid in scope:
         async with _as(db, owner, tid):
             pairs = await possible_duplicates(db, tid)
         if not pairs:
             continue
-        by_id = {d.id: d for d in await _load_cached(db, owner, [tid], clients, master)}
+        if by_id is None:
+            # The same load the device list uses, so the two requests share it (and a client with pairs no longer costs a load of its own).
+            by_id = {d.id: d for d in await _load_cached(db, owner, scope, clients, master)}
         items.extend(DuplicatePairOut(a=by_id[a], b=by_id[b]) for a, b in pairs if a in by_id and b in by_id)
     items.sort(key=lambda p: ((p.a.client_name or ""), p.a.hostname.lower()))
     return DuplicatesOut(items=items)
@@ -1210,6 +1229,6 @@ async def report_core_feed_devices(tenant_token: str, body: DevicesReport, db: D
     owner = await _verify_core_feed_token(db, tenant_token)
     await adopt_tenant(db, owner)
     result = await apply_devices(db, owner, body)
-    forget_loaded()
+    note_sync()
     await db.commit()
     return result

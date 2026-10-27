@@ -3101,8 +3101,20 @@ export interface ConnectorLogEntry {
   sent: number;
 }
 
+/** A tool the owner has set up in CORE, as CORE last reported it. CORE holds its credentials; this is only its name and whether it is connected. */
+export interface CoreTool {
+  tool_id: string;
+  title: string;
+  description: string;
+  connected: boolean;
+  reported_at: string;
+}
+
 export const connectorsApi = {
   /** The connector's running log, newest first. */
+  /** The tools set up in CORE (connected ones first). Empty until CORE has reported once. */
+  coreTools: () => request<CoreTool[]>('/api/v1/connectors/core-tools'),
+
   log: (id: string) => request<ConnectorLogEntry[]>(`/api/v1/connectors/${id}/log`),
 
   /**

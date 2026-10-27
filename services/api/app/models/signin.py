@@ -148,6 +148,19 @@ class ClientCheckAcceptance(Base):
     not_applicable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
 
+class CoreTool(Base):
+    """One of the owner's tools, as CORE reported it: its name and whether it is connected in CORE (migration 115)."""
+
+    __tablename__ = "core_tools"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    tool_id: Mapped[str] = mapped_column(String(60), primary_key=True)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    connected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    reported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
 class CoreSweepRun(Base):
     """The latest pass of one of CORE's per-client sweeps, as CORE reported it (migration 103)."""
 

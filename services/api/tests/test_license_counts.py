@@ -92,6 +92,14 @@ def test_reconcile_compares_each_mapped_line_with_the_added_up_counts_and_lists_
     assert r["unmapped"] == [{"item": "Liongard (Included)", "billed": 1}]
 
 
+def test_a_line_saved_as_no_tool_counts_this_is_neither_compared_nor_left_to_map():
+    billed = [{"item": "Managed Service", "count": 1}, {"item": "Huntress MDR", "count": 5}, {"item": "Inky", "count": 40}]
+    held = [{"source": "huntress", "item": "Agents", "count": 5}]
+    r = reconcile(billed, held, {"Managed Service": [], "Huntress MDR": [{"source": "huntress", "item": "Agents"}]})
+    assert [x["invoice_item"] for x in r["rows"]] == ["Huntress MDR"], "the flat fee is not a row with a difference"
+    assert r["unmapped"] == [{"item": "Inky", "billed": 40}], "and it is not waiting to be mapped, while a line nobody has dealt with still is"
+
+
 def test_the_biggest_difference_comes_first_whichever_way_it_goes():
     billed = [{"item": "A", "count": 10}, {"item": "B", "count": 10}]
     held = [{"source": "t", "item": "a", "count": 9}, {"source": "t", "item": "b", "count": 25}]
