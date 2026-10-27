@@ -79,6 +79,7 @@ const TITLE: Record<string, string> = {
   autoelevate_requests: 'Elevation requests',
   huntress_protection: 'Endpoint protection health',
   huntress_quiet_agents: 'Agents gone quiet',
+  huntress_old_agents: 'Agents out of date',
   huntress_extra_coverage: 'Huntress identity and SIEM',
   dnsfilter_threat_blocking: 'Threat blocking (DNS)',
   dnsfilter_org_mfa: 'DNS filtering sign-in',

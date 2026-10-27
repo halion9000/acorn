@@ -47,6 +47,7 @@ export const CHECK_HELP: Record<string, CheckHelp> = {
   autoelevate_requests: { why: "Requests waiting for days mean people are blocked or working around the control.", fix: "Approve or deny the waiting requests, and add a rule for the ones that repeat." },
   huntress_protection: { why: "Defender unhealthy or tamper protection off means the agent can be switched off by an attacker.", fix: "Fix Defender or turn tamper protection on for the machines listed." },
   huntress_quiet_agents: { why: "An agent that has stopped checking in is a machine nobody is watching.", fix: "Find out whether the machine is gone; if not, restart or reinstall the agent." },
+  huntress_old_agents: { why: "An agent far behind the current version is not updating itself, so it misses detections and fixes.", fix: "Find out why the machine is not updating (offline for long stretches, blocked from Huntress, a broken install) and reinstall the agent." },
   huntress_extra_coverage: { why: "This notes that Huntress also watches identity or logs for the client.", fix: "Nothing to do." },
   dnsfilter_threat_blocking: { why: "DNS filtering only protects if malware, phishing and botnet categories are blocked.", fix: "Add the missing categories to each policy in DNSFilter." },
   dnsfilter_org_mfa: { why: "DNSFilter logins without two-step verification can be used to switch the filtering off.", fix: "Turn on the organization's MFA requirement in DNSFilter." },
