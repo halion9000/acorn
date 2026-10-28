@@ -248,6 +248,7 @@ export const MORE_SETTINGS: { href: string; label: string; description: string }
   { href: '/settings/audit', label: 'Audit log', description: 'Every administrative and security event, searchable' },
   { href: '/settings/client-cleanup', label: 'Client cleanup', description: 'Clients with nothing in them, and tool clients mapped to the wrong one' },
   { href: '/settings/platform-health', label: 'Platform health', description: 'Whether every service is answering' },
+  { href: '/settings/costs', label: 'Cost dashboard', description: 'AI spend, automation activity and savings from bringing your own key' },
   { href: '/settings/triage', label: 'Auto-close', description: 'How sure AI triage must be to close an alert itself' },
   { href: '/settings/tickets', label: 'Tickets', description: 'The HaloPSA status a resolved incident moves its ticket to' },
 ];

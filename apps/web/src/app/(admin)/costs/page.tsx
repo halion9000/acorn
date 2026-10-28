@@ -1,7 +1,6 @@
-import { CostDashboardView } from '@/components/admin/CostDashboardView';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Cost Dashboard' };
-
-export default function CostDashboardPage() {
-  return <CostDashboardView />;
+/** The cost dashboard lives under Settings now; this keeps old bookmarks and links working. */
+export default function CostDashboardMoved(): never {
+  redirect('/settings/costs');
 }
