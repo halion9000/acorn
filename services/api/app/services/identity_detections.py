@@ -9,6 +9,9 @@ Until now these were stored and scored for unusual behaviour but nothing alerted
 - ``mfa_fatigue``: five or more failed or unanswered multi-factor prompts for one person within an hour.
 - ``guessed_password``: a success right after five or more wrong passwords for the same person within an hour.
 - ``legacy_protocol``: a successful sign-in over IMAP, POP, SMTP, ActiveSync or "other clients", which cannot ask for multi-factor.
+- ``admin_security_info``: an administrator registered, changed or removed a person's sign-in methods.
+- ``app_consent``: consent or a delegated permission was given to an application.
+- ``app_credentials``: a secret or certificate was added to an application.
 - ``mass_deletion``: ten or more users or groups deleted by one actor within fifteen minutes.
 - ``privileged_role_change``: someone was added to a directory role.
 - ``ca_policy_change``: a Conditional Access policy was added, changed or deleted.
@@ -476,6 +479,105 @@ def detect_privileged_role_change(audits: list[Any]) -> list[Finding]:
     return out
 
 
+_SECURITY_INFO_BY_ADMIN = re.compile(r"^admin (registered|deleted|updated) security info", re.IGNORECASE)
+_CONSENT = re.compile(r"^(consent to application|add delegated permission grant)", re.IGNORECASE)
+_APP_CREDENTIAL = re.compile(r"(certificates and secrets management|add service principal credentials)", re.IGNORECASE)
+
+
+def _audit_finding(a: Any, *, rule_id: str, rule_name: str, title: str, severity: str, tactic: str, technique: str, key: str, summary: str, target_label: str) -> Finding:
+    return Finding(
+        rule_id=rule_id,
+        rule_name=rule_name,
+        title=title,
+        severity=severity,
+        tactic=tactic,
+        technique=technique,
+        key=key,
+        occurred_at=a.occurred_at,
+        summary=summary,
+        fields=[
+            ("Actor", a.actor + (" (an app)" if a.actor_is_app else "")),
+            (target_label, a.target or "unknown"),
+            ("Activity", a.activity),
+            ("Time", _stamp(a.occurred_at)),
+            ("Address", a.actor_ip or "unknown"),
+        ],
+        users=[u for u in (a.actor, a.target) if u and "@" in u],
+        ips=[a.actor_ip] if a.actor_ip else [],
+        source_ids=[a.source_id],
+    )
+
+
+def detect_security_info_changed_by_admin(audits: list[Any]) -> list[Finding]:
+    """An administrator registered, changed or removed a person's sign-in methods (their phone, authenticator app...). Help desks do this when a phone is lost; an attacker with an admin account does it to keep a way in."""
+    out: list[Finding] = []
+    for a in audits:
+        if not a.success or not _SECURITY_INFO_BY_ADMIN.search(a.activity or ""):
+            continue
+        verb = (a.activity or "").split()[1].lower()
+        out.append(
+            _audit_finding(
+                a,
+                rule_id="aisoc-id-admin-security-info",
+                rule_name="An administrator changed a person's sign-in methods",
+                title=f"Sign-in methods {verb} by an administrator - {a.target or 'unknown'}",
+                severity="medium",
+                tactic="Persistence",
+                technique="T1556.006",
+                key=f"secinfo:{a.source_id}",
+                summary=f"{a.actor} {verb} sign-in methods ({a.activity}) for {a.target or 'an account'}. Expected when someone lost a phone; confirm there was a request.",
+                target_label="Person",
+            )
+        )
+    return out
+
+
+def detect_app_consent(audits: list[Any]) -> list[Finding]:
+    """Consent was given to an application, or a delegated permission was granted to one: the usual way a phishing app gets lasting access to mail and files."""
+    out: list[Finding] = []
+    for a in audits:
+        if not a.success or not _CONSENT.search(a.activity or ""):
+            continue
+        out.append(
+            _audit_finding(
+                a,
+                rule_id="aisoc-id-app-consent",
+                rule_name="Consent was given to an application",
+                title=f"Consent given to an application - {a.target or 'unknown'}",
+                severity="medium",
+                tactic="Persistence",
+                technique="T1528",
+                key=f"consent:{a.source_id}",
+                summary=f"{a.actor} gave an application consent ({a.activity}). Check that the application is one the client uses; a phishing app asks for exactly this.",
+                target_label="Application",
+            )
+        )
+    return out
+
+
+def detect_app_credentials_added(audits: list[Any]) -> list[Finding]:
+    """A secret or certificate was added to an application or service principal: a way to keep signing in as the app after the person who added it is gone."""
+    out: list[Finding] = []
+    for a in audits:
+        if not a.success or not _APP_CREDENTIAL.search(a.activity or "") or (a.activity or "").lower().startswith(("delete", "remove")):
+            continue
+        out.append(
+            _audit_finding(
+                a,
+                rule_id="aisoc-id-app-credentials",
+                rule_name="A credential was added to an application",
+                title=f"Credential added to an application - {a.target or 'unknown'}",
+                severity="medium",
+                tactic="Persistence",
+                technique="T1098.001",
+                key=f"appcred:{a.source_id}",
+                summary=f"{a.actor} added a secret or certificate to an application ({a.activity}). Confirm it was planned.",
+                target_label="Application",
+            )
+        )
+    return out
+
+
 def detect_ca_policy_change(audits: list[Any]) -> list[Finding]:
     """A Conditional Access policy was added, changed or deleted."""
     out: list[Finding] = []
@@ -644,7 +746,14 @@ async def run_audit_detections(db: Any, tenant_id: uuid.UUID, rows: list[Any], n
 
     now = now or datetime.now(UTC)
     try:
-        findings = detect_mass_deletion(rows) + detect_privileged_role_change(rows) + detect_ca_policy_change(rows)
+        findings = (
+            detect_mass_deletion(rows)
+            + detect_privileged_role_change(rows)
+            + detect_ca_policy_change(rows)
+            + detect_security_info_changed_by_admin(rows)
+            + detect_app_consent(rows)
+            + detect_app_credentials_added(rows)
+        )
         revokes = [r for r in rows if r.success and r.target and _REVOKE.search(r.activity or "")]
         if revokes:
             people = {r.target.lower() for r in revokes}
