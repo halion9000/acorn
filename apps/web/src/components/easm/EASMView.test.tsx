@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EASMView, lastScanText } from './EASMView';
+import { EASMView, findingsOf, lastScanText } from './EASMView';
 import userEvent from '@testing-library/user-event';
 
 const authFetch = vi.fn();
@@ -28,6 +28,32 @@ describe('EASMView', () => {
     await waitFor(() => expect(screen.getByTestId('asset-summary').textContent).toBe('2 external asset(s): 1 domain, 1 ip'));
     expect(screen.getByText('new_open_port')).toBeTruthy();
     expect(screen.getAllByText('8.8.8.8').length).toBe(2); // the asset row and the drift line
+  });
+
+  it('shows what the scan found for each asset: open ports, vulnerabilities, tags, hostnames and where a domain points', async () => {
+    authFetch.mockImplementation((url: string) =>
+      url.includes('/assets')
+        ? ok([
+            { id: 'a1', asset_type: 'domain', value: 'example.com', first_seen: '2026-10-01T00:00:00Z', last_seen: '2026-10-17T00:00:00Z', metadata: { source: 'dns', resolved_ips: ['203.0.113.10', '203.0.113.11'] } },
+            { id: 'a2', asset_type: 'ip', value: '203.0.113.10', first_seen: '2026-10-01T00:00:00Z', last_seen: '2026-10-17T00:00:00Z', metadata: { ports: [443, 80], vulns: ['CVE-2024-0001'], tags: ['vpn'], hostnames: ['a.test', 'b.test', 'c.test', 'd.test', 'e.test'] } },
+            { id: 'a3', asset_type: 'ip', value: '203.0.113.11', first_seen: '2026-10-01T00:00:00Z', last_seen: '2026-10-17T00:00:00Z', metadata: {} },
+          ])
+        : ok([]),
+    );
+    render(<EASMView />);
+    const cells = await screen.findAllByTestId('asset-findings');
+    expect(cells[0]).toHaveTextContent('Resolves to: 203.0.113.10, 203.0.113.11');
+    expect(cells[1]).toHaveTextContent('Open ports: 80, 443');
+    expect(cells[1]).toHaveTextContent('Known vulnerabilities: CVE-2024-0001');
+    expect(cells[1]).toHaveTextContent('Tags: vpn');
+    expect(cells[1]).toHaveTextContent('Hostnames: a.test, b.test, c.test and 2 more');
+    expect(screen.getByText('Nothing listed for this address')).toBeTruthy();
+  });
+
+  it('reads findings defensively: anything missing or the wrong shape is empty', () => {
+    expect(findingsOf(null)).toEqual({ resolvesTo: [], ports: [], vulns: [], tags: [], hostnames: [] });
+    expect(findingsOf({ ports: [8080, 'x', 22], vulns: 'CVE', tags: [1, 'ok', ' '], hostnames: null }).ports).toEqual([22, 8080]);
+    expect(findingsOf({ ports: [8080, 'x', 22], vulns: 'CVE', tags: [1, 'ok', ' '], hostnames: null })).toMatchObject({ vulns: [], tags: ['ok'], hostnames: [] });
   });
 
   it('says there is nothing yet, rather than pretending, when no asset was discovered', async () => {

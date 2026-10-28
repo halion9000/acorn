@@ -25,6 +25,51 @@ interface Drift {
   detected_at: string;
 }
 
+export interface AssetFindings {
+  /** The addresses a domain resolves to. */
+  resolvesTo: string[];
+  ports: number[];
+  /** Known vulnerabilities (CVE ids) the lookup lists for the address. */
+  vulns: string[];
+  tags: string[];
+  hostnames: string[];
+}
+
+const textList = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : []);
+
+/** What a scan recorded about one asset (the lookup's open ports, vulnerabilities, tags and hostnames; the addresses a domain resolves to), read defensively: anything missing is empty. */
+export function findingsOf(metadata: Record<string, unknown> | null | undefined): AssetFindings {
+  const m = metadata ?? {};
+  const ports = Array.isArray(m.ports) ? m.ports.filter((p): p is number => typeof p === 'number').sort((a, b) => a - b) : [];
+  return { resolvesTo: textList(m.resolved_ips), ports, vulns: textList(m.vulns), tags: textList(m.tags), hostnames: textList(m.hostnames) };
+}
+
+const HOSTNAMES_SHOWN = 3;
+
+function Findings({ asset }: { asset: Asset }) {
+  const f = findingsOf(asset.metadata);
+  const rows: { label: string; value: string; tone?: string }[] = [];
+  if (f.resolvesTo.length) rows.push({ label: 'Resolves to', value: f.resolvesTo.join(', ') });
+  if (f.ports.length) rows.push({ label: 'Open ports', value: f.ports.join(', ') });
+  if (f.vulns.length) rows.push({ label: 'Known vulnerabilities', value: f.vulns.join(', '), tone: 'text-red-400' });
+  if (f.tags.length) rows.push({ label: 'Tags', value: f.tags.join(', ') });
+  if (f.hostnames.length) {
+    const more = f.hostnames.length - HOSTNAMES_SHOWN;
+    rows.push({ label: 'Hostnames', value: f.hostnames.slice(0, HOSTNAMES_SHOWN).join(', ') + (more > 0 ? ` and ${more} more` : '') });
+  }
+  if (rows.length === 0) return <span className="text-gray-600">{asset.asset_type === 'ip' ? 'Nothing listed for this address' : '—'}</span>;
+  return (
+    <ul className="space-y-0.5" data-testid="asset-findings">
+      {rows.map((r) => (
+        <li key={r.label} className="text-xs">
+          <span className="text-gray-500">{r.label}: </span>
+          <span className={r.tone ?? 'text-gray-300'}>{r.value}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** The public IP addresses and domain names typed in the box: separated by commas, spaces or new lines, blanks and repeats dropped. */
 export function parseTargets(text: string): string[] {
   return [...new Set(text.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean))];
@@ -189,6 +234,7 @@ export function EASMView() {
                 <tr className="border-b border-gray-700 text-gray-500">
                   <th className="py-2">Type</th>
                   <th>Asset</th>
+                  <th>What we found</th>
                   <th>First seen</th>
                   <th>Last seen</th>
                 </tr>
@@ -198,6 +244,9 @@ export function EASMView() {
                   <tr key={a.id} className="border-b border-gray-800">
                     <td className="py-2 text-gray-400">{a.asset_type}</td>
                     <td className="font-mono text-gray-200">{a.value}</td>
+                    <td className="py-2 pr-3">
+                      <Findings asset={a} />
+                    </td>
                     <td className="text-gray-500">{new Date(a.first_seen).toLocaleDateString()}</td>
                     <td className="text-gray-500">{new Date(a.last_seen).toLocaleDateString()}</td>
                   </tr>

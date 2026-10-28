@@ -28,6 +28,32 @@ export function matchingClients(clients: ManagedTenantRow[], search: string): Ma
   return clients.filter((c) => !needle || c.name.toLowerCase().includes(needle)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export interface ClientPackTotals {
+  clientId: string;
+  name: string;
+  packs: number;
+  /** Distinct rules the client gets from its packs (a rule in two of its packs counts once). */
+  rules: number;
+}
+
+/** What each client gets from the packs applied to it: how many packs and how many distinct rules. Only clients with at least one pack, most rules first, then by name. */
+export function clientPackTotals(packs: RulePackOverview[], appliedByPack: Map<string, Set<string>>, clients: ManagedTenantRow[]): ClientPackTotals[] {
+  const rulesOf = new Map<string, Set<string>>();
+  const packCount = new Map<string, number>();
+  for (const pack of packs) {
+    for (const clientId of appliedByPack.get(pack.id) ?? []) {
+      packCount.set(clientId, (packCount.get(clientId) ?? 0) + 1);
+      const set = rulesOf.get(clientId) ?? new Set<string>();
+      for (const r of pack.rules) set.add(r.id);
+      rulesOf.set(clientId, set);
+    }
+  }
+  const names = new Map(clients.map((c) => [c.tenant_id, c.name]));
+  return [...packCount.entries()]
+    .map(([clientId, n]) => ({ clientId, name: names.get(clientId) ?? clientId, packs: n, rules: rulesOf.get(clientId)?.size ?? 0 }))
+    .sort((a, b) => b.rules - a.rules || a.name.localeCompare(b.name));
+}
+
 function PackCard({
   pack,
   clients,
@@ -146,21 +172,46 @@ export function RulePacksView() {
     return <EmptyState title="No rule packs yet" description="The imported Sigma rules are loaded into packs when the API starts. Restart the API if this stays empty." />;
   }
   const clients = clientList.data;
+  // Each pack's applied clients with the ticks that are still being saved laid over them, so the cards and the summary agree.
+  const appliedByPack = new Map<string, Set<string>>();
+  for (const pack of packs.data) {
+    const applied = new Set(pack.applied_to);
+    for (const [key, value] of Object.entries(choice)) {
+      const [packId, clientId] = key.split(':');
+      if (packId !== pack.id) continue;
+      if (value) applied.add(clientId);
+      else applied.delete(clientId);
+    }
+    appliedByPack.set(pack.id, applied);
+  }
+  const totals = clientPackTotals(packs.data, appliedByPack, clients);
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-400">
         A pack is a bucket of detection rules. It does nothing for a client until you tick that client here; ticking makes the pack&rsquo;s rules part of that client&rsquo;s detections.
       </p>
-      {packs.data.map((pack) => {
-        const applied = new Set(pack.applied_to);
-        for (const [key, value] of Object.entries(choice)) {
-          const [packId, clientId] = key.split(':');
-          if (packId !== pack.id) continue;
-          if (value) applied.add(clientId);
-          else applied.delete(clientId);
-        }
-        return <PackCard key={pack.id} pack={pack} clients={clients} applied={applied} onToggle={(clientId, enabled) => void toggle(pack.id, clientId, enabled)} />;
-      })}
+      <section aria-label="What clients get from packs" className="rounded-xl border border-gray-800/60 bg-gray-900/40 p-5" data-testid="pack-totals">
+        <h3 className="text-base font-semibold text-white">What clients get from packs</h3>
+        {totals.length === 0 ? (
+          <p className="mt-1 text-sm text-gray-500">No pack is applied to any client yet. Open a pack, choose clients, and each client you tick shows up here with the rules it gains.</p>
+        ) : (
+          <ul className="mt-2 divide-y divide-gray-800/40">
+            {totals.slice(0, 15).map((t) => (
+              <li key={t.clientId} className="flex items-center justify-between gap-3 py-1.5 text-sm" data-testid="client-pack-total">
+                <span className="min-w-0 truncate text-gray-200">{t.name}</span>
+                <span className="shrink-0 tabular-nums text-gray-300">
+                  +{t.rules} rule{t.rules === 1 ? '' : 's'} from {t.packs} pack{t.packs === 1 ? '' : 's'}
+                </span>
+              </li>
+            ))}
+            {totals.length > 15 ? <li className="py-1.5 text-sm text-gray-500">and {totals.length - 15} more clients</li> : null}
+          </ul>
+        )}
+        <p className="mt-2 text-xs text-gray-500">These rules are added to what each client already has; the built-in rules apply to every client as before.</p>
+      </section>
+      {packs.data.map((pack) => (
+        <PackCard key={pack.id} pack={pack} clients={clients} applied={appliedByPack.get(pack.id) ?? new Set()} onToggle={(clientId, enabled) => void toggle(pack.id, clientId, enabled)} />
+      ))}
     </div>
   );
 }

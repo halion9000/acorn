@@ -9,7 +9,7 @@ vi.mock('@/lib/api', () => ({ msspApi: api }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 import toast from 'react-hot-toast';
-import { RulePacksView, matchingClients } from './RulePacksView';
+import { RulePacksView, clientPackTotals, matchingClients } from './RulePacksView';
 
 const client = (name: string): ManagedTenantRow => ({ tenant_id: `id-${name}`, name, has_metrics: false, snapshot_at: null, health_score: null, open_alerts: null, critical_alerts: null, open_cases: null, mttr_minutes: null, sla_breaches: null, connector_count: null });
 const windows: RulePackOverview = {
@@ -48,6 +48,20 @@ describe('matchingClients', () => {
   });
 });
 
+describe('clientPackTotals', () => {
+  const both: RulePackOverview = { ...linux, rules: [windows.rules[0], { id: 'r9', name: 'Extra', severity: 'low', category: 'endpoint' }] };
+  it('counts the packs and distinct rules of each client, most rules first, and leaves out clients with none', () => {
+    const clients = [client('Acme'), client('Birch'), client('Cedar')];
+    const applied = new Map([
+      ['p-win', new Set(['id-Acme', 'id-Birch'])],
+      ['p-lin', new Set(['id-Acme'])],
+    ]);
+    // Acme holds Windows (r1, r2) and the second pack (r1, r9): r1 is in both and counts once.
+    const out = clientPackTotals([windows, { ...both, id: 'p-lin' }], applied, clients);
+    expect(out.map((t) => [t.name, t.packs, t.rules])).toEqual([['Acme', 2, 3], ['Birch', 1, 2]]);
+  });
+});
+
 describe('the rule packs tab', () => {
   it('lists each pack with how many clients it is applied to, and its rules on request', async () => {
     const user = userEvent.setup();
@@ -59,6 +73,23 @@ describe('the rule packs tab', () => {
     await user.click(within(pack).getByRole('button', { name: /Show the 2 rules/ }));
     expect(within(pack).getByText('Zerologon exploitation')).toBeInTheDocument();
     expect(within(pack).getByText('critical')).toBeInTheDocument();
+  });
+
+  it('shows what each client gets from packs, updating as ticks are made, and says so when none is applied', async () => {
+    api.rulePacks.mockResolvedValue([{ ...windows, applied_to: [] }, linux]);
+    const user = userEvent.setup();
+    show();
+    const totals = await screen.findByTestId('pack-totals');
+    expect(totals).toHaveTextContent('No pack is applied to any client yet');
+    const pack = screen.getByRole('region', { name: 'Sigma: Windows' });
+    await user.click(within(pack).getByRole('button', { name: 'Choose clients' }));
+    await user.click(within(pack).getByRole('checkbox', { name: 'Apply Sigma: Windows to Birch' }));
+    const rows = await screen.findAllByTestId('client-pack-total');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent('Birch');
+    expect(rows[0]).toHaveTextContent('+2 rules from 1 pack');
+    await user.click(within(pack).getByRole('checkbox', { name: 'Apply Sigma: Windows to Birch' }));
+    expect(screen.getByTestId('pack-totals')).toHaveTextContent('No pack is applied to any client yet');
   });
 
   it('ticks a client for a pack, saves it, and updates the count at once', async () => {
