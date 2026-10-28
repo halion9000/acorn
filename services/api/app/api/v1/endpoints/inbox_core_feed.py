@@ -329,8 +329,9 @@ async def apply_closed(db: Any, tenant_id: Any, report: ClosedReport, now: datet
     reopen; and an alert is matched on the incident id the inbox template keeps at ``raw_event.finding.uid``, within this tenant. Alerts imported before that was kept have no id and are not matched. The vendor's state is kept on the alert (and as a tag).
     """
     now = now or datetime.now(UTC)
-    prefix = f"{report.vendor}:"
-    by_uid = {item.uid: item.state for item in report.closed if item.uid.startswith(prefix)}
+    # A vendor's uids are ``huntress:4821`` (incident reports) but also ``huntress-escalation:9`` and ``huntress-signal:3``: all of them are the vendor's own, so all can be closed.
+    prefixes = (f"{report.vendor}:", f"{report.vendor}-")
+    by_uid = {item.uid: item.state for item in report.closed if item.uid.startswith(prefixes)}
     uids = sorted(by_uid)
     changed = 0
     for i in range(0, len(uids), _CLOSED_CHUNK):
@@ -366,8 +367,8 @@ async def report_core_feed_closed(tenant_token: str, body: ClosedReport, db: DBS
     tenant_id = await _verify_core_feed_token(db, tenant_token)
     await adopt_tenant(db, tenant_id)
     now = datetime.now(UTC)
-    prefix = f"{body.vendor}:"
-    holders = await _tenants_holding(db, tenant_id, [i.uid for i in body.closed if i.uid.startswith(prefix)])
+    prefixes = (f"{body.vendor}:", f"{body.vendor}-")
+    holders = await _tenants_holding(db, tenant_id, [i.uid for i in body.closed if i.uid.startswith(prefixes)])
     held = dict(holders)
     changed = await _across(
         db,

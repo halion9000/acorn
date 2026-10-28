@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ipaddress
 import json
 import logging
 from datetime import UTC, datetime
@@ -21,7 +20,10 @@ from app.db.database import get_db
 from app.db.rls_sessions import mark_tenant
 from app.models.easm import ExternalAsset, ExternalAssetDrift, ExternalAssetType
 from app.models.tenant import Tenant
+from app.models.signin import IdentityMfaUser
+from app.services.domain_posture import DohResolver, candidate_domains
 from app.services.easm_discovery import run_discovery
+from app.services.easm_targets import resolve_domains, split_targets
 from app.services.easm_drift import detect_drift
 
 logger = logging.getLogger("aisoc.easm")
@@ -36,36 +38,32 @@ class ScanRequest(BaseModel):
     # Defaults to the signed-in user's own tenant (the console does not need to know its tenant id); naming a different tenant is refused.
     tenant_id: UUID | None = None
     org_query: str | None = None
-    # PUBLIC IP addresses only (an external attack surface scan): an internal address, a hostname or a CIDR would turn this into a port scanner of the API host's own network,
-    # with the open ports then readable from /easm/assets.
+    # PUBLIC IP addresses and domain names only (an external attack surface scan): an internal address, an internal name or a CIDR would turn this into a port scanner of the API host's own network,
+    # with the open ports then readable from /easm/assets. A domain is resolved through public DNS and its addresses are only looked up (never port-probed).
     ip_targets: list[str] = Field(default_factory=list, max_length=MAX_IP_TARGETS)
     asset_type: ExternalAssetType | None = None
 
     @field_validator("ip_targets")
     @classmethod
-    def _public_ips_only(cls, targets: list[str]) -> list[str]:
-        for target in targets:
-            try:
-                ip = ipaddress.ip_address(target.strip())
-            except ValueError as exc:
-                raise ValueError(f"{target!r} is not an IP address (hostnames and CIDR ranges are not accepted)") from exc
-            if not ip.is_global:
-                raise ValueError(f"{target!r} is not a public IP address")
-        return [t.strip() for t in targets]
+    def _public_ips_and_domains_only(cls, targets: list[str]) -> list[str]:
+        ips, domains = split_targets(targets)  # raises ValueError naming the first entry that is neither
+        return [*ips, *domains]
 
 
 async def _run_scan_job(
     tenant_id: UUID,
     org_query: str,
     ip_targets: list[str],
+    lookup_targets: list[str] | None = None,
+    domains: dict[str, list[str]] | None = None,
 ) -> None:
     """Background task that runs discovery + drift detection, and records how it went (``Tenant.settings['easm_last_scan']``) so the page can say, instead of leaving "Scan started" hanging."""
     from app.db.database import AsyncSessionLocal as async_session_factory
 
     started = datetime.now(UTC)
-    summary: dict[str, Any] = {"started_at": started.isoformat(), "sources": scan_plan(get_settings(), ip_targets)["sources"], "found": 0, "changes": 0, "error": None}
+    summary: dict[str, Any] = {"started_at": started.isoformat(), "sources": scan_plan(get_settings(), ip_targets, lookup_targets)["sources"], "found": 0, "changes": 0, "error": None}
     try:
-        discovered = await run_discovery(org_query, ip_targets=ip_targets or None)
+        discovered = await run_discovery(org_query, ip_targets=ip_targets or None, lookup_targets=lookup_targets, domains=domains)
         async with async_session_factory() as db:
             mark_tenant(db, tenant_id)  # a background job for one tenant (step 4b)
             drift_records = await detect_drift(db, tenant_id, discovered)
@@ -94,13 +92,17 @@ async def _run_scan_job(
         logger.exception("EASM scan result could not be recorded for tenant=%s", tenant_id)
 
 
-def scan_plan(s: Any, ip_targets: list[str]) -> dict[str, Any]:
-    """What a scan could do with the current settings and the addresses entered: which sources would run, and, when none would, the one thing to change (pure; unit-tested)."""
+def scan_plan(s: Any, ip_targets: list[str], lookup_targets: list[str] | None = None, *, targets_expected: bool = False) -> dict[str, Any]:
+    """What a scan could do with the current settings and the addresses entered: which sources would run, and, when none would, the one thing to change (pure; unit-tested).
+
+    ``ip_targets`` are the addresses typed in (the only ones the port check probes); ``lookup_targets`` are every address the keyless lookup will ask about (those plus what the entered domains resolve to; default: the same).
+    ``targets_expected`` is for the status page, which has nothing entered yet: the lookup is then counted as available, because it will find its own addresses from the client's domains."""
+    lookup = ip_targets if lookup_targets is None else lookup_targets
     shodan = bool(s.AISOC_EASM_SHODAN_API_KEY)
     censys = bool(s.AISOC_EASM_CENSYS_API_ID and s.AISOC_EASM_CENSYS_API_SECRET)
     active_on = bool(s.AISOC_EASM_ACTIVE_SCAN_ENABLED)
     internetdb_on = bool(getattr(s, "AISOC_EASM_INTERNETDB_ENABLED", True))
-    sources = [name for name, on in (("internetdb", internetdb_on and bool(ip_targets)), ("shodan", shodan), ("censys", censys), ("port check", active_on and bool(ip_targets))) if on]
+    sources = [name for name, on in (("internetdb", internetdb_on and (bool(lookup) or targets_expected)), ("shodan", shodan), ("censys", censys), ("port check", active_on and bool(ip_targets))) if on]
     problem: str | None = None
     if not sources:
         if ip_targets and not active_on:
@@ -131,7 +133,7 @@ async def easm_status(db: AsyncSession = Depends(get_db), current_user: CurrentU
     """Which discovery sources are set up on this server, and how this tenant's last scan went (found, changes, or the failure)."""
     tenant = await db.get(Tenant, current_user.tenant_id)
     last = (tenant.settings or {}).get("easm_last_scan") if tenant is not None else None
-    return {"plan": scan_plan(get_settings(), []), "last_scan": last if isinstance(last, dict) else None}
+    return {"plan": scan_plan(get_settings(), [], targets_expected=True), "last_scan": last if isinstance(last, dict) else None}
 
 
 @router.post("/scan", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(require_permission("settings:write"))])
@@ -165,16 +167,29 @@ async def trigger_easm_scan(
 
     org_query = body.org_query or tenant.name
 
-    plan = scan_plan(s, body.ip_targets)
+    ips, domains = split_targets(body.ip_targets)
+    if not ips and not domains:
+        # Nothing typed: the domains of the people held for this tenant (the same ones the client posture page looks at).
+        upns = (await db.execute(select(IdentityMfaUser.upn).where(IdentityMfaUser.tenant_id == scan_tenant))).scalars().all()
+        domains = candidate_domains(list(upns))
+    resolved = await resolve_domains(domains, DohResolver()) if domains else {}
+    lookup: list[str] = list(dict.fromkeys([*ips, *(ip for found in resolved.values() for ip in found)]))[:MAX_IP_TARGETS]
+
+    plan = scan_plan(s, ips, lookup)
     if not plan["can_run"]:
         # Said plainly instead of "Scan started" followed by nothing: a scan with no source would finish at once with no assets.
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=plan["problem"])
+        problem = plan["problem"]
+        if domains and not lookup:
+            problem = f"No public IPv4 address could be found for {', '.join(domains[:3])}{' and more' if len(domains) > 3 else ''}. Enter the public IP addresses to look up instead."
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=problem)
 
     background_tasks.add_task(
         _run_scan_job,
         scan_tenant,
         org_query,
-        body.ip_targets,
+        ips,
+        lookup,
+        resolved,
     )
 
     return {

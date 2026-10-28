@@ -112,6 +112,7 @@ class Resolver(Protocol):
     async def txt(self, name: str) -> list[str]: ...
     async def cname(self, name: str) -> list[str]: ...
     async def mx(self, name: str) -> list[str]: ...
+    async def a(self, name: str) -> list[str]: ...
 
 
 class DohResolver:
@@ -145,6 +146,9 @@ class DohResolver:
 
     async def mx(self, name: str) -> list[str]:
         return [a.split()[-1].rstrip(".").lower() for a in await self._answers(name, "MX") if a.split()]
+
+    async def a(self, name: str) -> list[str]:
+        return [a.strip() for a in await self._answers(name, "A")]
 
 
 class DomainPosture(BaseModel):

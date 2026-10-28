@@ -233,6 +233,8 @@ async def run_discovery(
     org_query: str,
     *,
     ip_targets: Sequence[str] | None = None,
+    lookup_targets: Sequence[str] | None = None,
+    domains: dict[str, list[str]] | None = None,
 ) -> list[DiscoveredAsset]:
     """
     Run all enabled discovery connectors for *org_query* and return
@@ -255,8 +257,18 @@ async def run_discovery(
             elif isinstance(res, BaseException):
                 logger.error("Passive discovery connector error: %s", res)
 
-    if ip_targets and getattr(s, "AISOC_EASM_INTERNETDB_ENABLED", True):
-        all_assets.extend(await _internetdb_scan(ip_targets))
+    # The domains the scan was given or found, with the addresses they resolve to: assets in their own right.
+    for domain, found in (domains or {}).items():
+        all_assets.append(DiscoveredAsset(asset_type=ExternalAssetType.DOMAIN, value=domain, metadata={"source": "dns", "resolved_ips": found}))
+    looked_up = lookup_targets if lookup_targets is not None else ip_targets
+    if looked_up and getattr(s, "AISOC_EASM_INTERNETDB_ENABLED", True):
+        found = await _internetdb_scan(looked_up)
+        if domains:
+            # An address reached through a domain is often shared (a hosting or mail service): keep it, but only the host names that belong to the scanned domains, not every other customer's.
+            from app.services.easm_targets import within
+
+            found = [a for a in found if a.asset_type is not ExternalAssetType.SUBDOMAIN or within(a.value, list(domains))]
+        all_assets.extend(found)
 
     if s.AISOC_EASM_ACTIVE_SCAN_ENABLED and ip_targets:
         active_assets = await _active_scan(ip_targets, s.AISOC_EASM_SCAN_PORTS)

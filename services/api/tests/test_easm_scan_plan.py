@@ -68,7 +68,7 @@ async def test_the_scan_route_queues_the_job_when_a_source_is_set_up(monkeypatch
     db = MagicMock()
     db.get = AsyncMock(return_value=NS(id=tid, name="Acme"))
     tasks = BackgroundTasks()
-    out = await easm.trigger_easm_scan(easm.ScanRequest(), tasks, db, NS(tenant_id=tid))
+    out = await easm.trigger_easm_scan(easm.ScanRequest(ip_targets=["8.8.8.8"]), tasks, db, NS(tenant_id=tid))
     assert out["status"] == "accepted" and out["sources"] == ["shodan"] and len(tasks.tasks) == 1
 
 
@@ -83,3 +83,50 @@ async def test_the_status_route_returns_the_plan_and_the_last_scan(monkeypatch):
     assert out["plan"]["sources"] == ["shodan"] and out["last_scan"] == last
     db.get = AsyncMock(return_value=NS(id=tid, settings=None))
     assert (await easm.easm_status(db, NS(tenant_id=tid)))["last_scan"] is None
+
+
+class _Resolver:
+    def __init__(self, answers):
+        self.answers = answers
+
+    async def mx(self, name):
+        return []
+
+    async def a(self, name):
+        return self.answers.get(name, [])
+
+
+@pytest.mark.asyncio
+async def test_with_nothing_typed_the_scan_uses_the_domains_of_the_tenants_people_and_looks_up_their_addresses(monkeypatch):
+    monkeypatch.setattr(easm, "get_settings", lambda: settings(AISOC_EASM_INTERNETDB_ENABLED=True))
+    monkeypatch.setattr(easm, "DohResolver", lambda: _Resolver({"acme.com": ["8.8.8.8"], "www.acme.com": ["8.8.8.8", "1.1.1.1"]}))
+    tid = uuid.uuid4()
+    db = MagicMock()
+    db.get = AsyncMock(return_value=NS(id=tid, name="Acme"))
+    db.execute = AsyncMock(return_value=MagicMock(scalars=lambda: NS(all=lambda: ["a@acme.com", "b@acme.com", "c@gmail.com"])))
+    tasks = BackgroundTasks()
+    out = await easm.trigger_easm_scan(easm.ScanRequest(), tasks, db, NS(tenant_id=tid))
+    assert out["sources"] == ["internetdb"]
+    (task,) = tasks.tasks
+    assert task.args[2] == [], "no typed addresses, so nothing is port-probed"
+    assert task.args[3] == ["8.8.8.8", "1.1.1.1"]
+    assert task.args[4] == {"acme.com": ["8.8.8.8", "1.1.1.1"]}
+
+
+@pytest.mark.asyncio
+async def test_domains_with_no_public_address_say_so_instead_of_starting_a_scan_that_finds_nothing(monkeypatch):
+    monkeypatch.setattr(easm, "get_settings", lambda: settings(AISOC_EASM_INTERNETDB_ENABLED=True))
+    monkeypatch.setattr(easm, "DohResolver", lambda: _Resolver({}))
+    tid = uuid.uuid4()
+    db = MagicMock()
+    db.get = AsyncMock(return_value=NS(id=tid, name="Acme"))
+    tasks = BackgroundTasks()
+    with pytest.raises(HTTPException) as e:
+        await easm.trigger_easm_scan(easm.ScanRequest(ip_targets=["gone.example.org"]), tasks, db, NS(tenant_id=tid))
+    assert e.value.status_code == 409 and "gone.example.org" in e.value.detail and tasks.tasks == []
+
+
+def test_the_status_page_counts_the_keyless_lookup_as_available_before_anything_is_typed():
+    plan = easm.scan_plan(settings(AISOC_EASM_INTERNETDB_ENABLED=True), [], targets_expected=True)
+    assert plan["sources"] == ["internetdb"] and plan["can_run"] is True
+    assert easm.scan_plan(settings(AISOC_EASM_INTERNETDB_ENABLED=True), [])["can_run"] is False

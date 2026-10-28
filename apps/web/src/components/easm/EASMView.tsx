@@ -25,7 +25,7 @@ interface Drift {
   detected_at: string;
 }
 
-/** The public IP addresses typed in the box: separated by commas, spaces or new lines, blanks and repeats dropped. */
+/** The public IP addresses and domain names typed in the box: separated by commas, spaces or new lines, blanks and repeats dropped. */
 export function parseTargets(text: string): string[] {
   return [...new Set(text.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean))];
 }
@@ -55,7 +55,7 @@ async function refusal(res: Response): Promise<string> {
   } catch {
     // no readable reason: fall through
   }
-  return 'The IP addresses were not accepted. Only public IP addresses are allowed (no names, ranges or internal addresses).';
+  return 'That was not accepted. Only public IP addresses and domain names are allowed (no ranges or internal addresses).';
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -139,18 +139,18 @@ export function EASMView() {
 
       <div>
         <label htmlFor="easm-targets" className="block text-sm text-gray-300">
-          Public IP addresses to check (optional)
+          Domain names or public IP addresses to check (optional)
         </label>
         <textarea
           id="easm-targets"
           value={targets}
           onChange={(e) => setTargets(e.target.value)}
           rows={2}
-          placeholder="203.0.113.10, 198.51.100.7"
+          placeholder="acme.com, 203.0.113.10"
           className="mt-1 w-full max-w-xl rounded border border-gray-700 bg-gray-900 px-2 py-1 font-mono text-sm text-gray-100"
         />
         <p className="mt-1 text-xs text-gray-500">
-          Separate with commas, spaces or new lines. Public addresses only. These are only probed for open ports when the server has <span className="font-mono">AISOC_EASM_ACTIVE_SCAN_ENABLED=true</span> (off by default).
+          Separate with commas, spaces or new lines. Leave it empty to use the domains of the people held for this tenant. A domain is looked up through its public addresses in Shodan&apos;s free InternetDB (open ports, known CVEs). Only IP addresses typed here are probed for open ports, and only when the server has <span className="font-mono">AISOC_EASM_ACTIVE_SCAN_ENABLED=true</span> (off by default).
         </p>
       </div>
 

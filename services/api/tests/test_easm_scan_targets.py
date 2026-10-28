@@ -33,7 +33,6 @@ def test_public_ip_targets_are_accepted():
         "::1",
         "redis",
         "aisoc-postgres",
-        "evil.example.test",
         "8.8.8.0/24",
         "8.8.8.8:80",
         "",
@@ -70,3 +69,49 @@ async def test_probes_run_with_bounded_concurrency(monkeypatch):
 def test_the_tenant_is_optional_so_the_console_can_scan_its_own_tenant():
     assert ScanRequest().tenant_id is None
     assert ScanRequest(ip_targets=["8.8.8.8"]).ip_targets == ["8.8.8.8"]
+
+
+# ---- domain names as targets -------------------------------------------------------------------------------------------------------------------------------
+
+
+def test_domain_names_are_accepted_tidied_and_listed_after_the_addresses():
+    assert ScanRequest(tenant_id=T, ip_targets=["Example.COM.", "8.8.8.8", "example.com", " www.Acme.org "]).ip_targets == ["8.8.8.8", "example.com", "www.acme.org"]
+
+
+def test_split_targets_separates_addresses_from_names():
+    from app.services.easm_targets import split_targets
+
+    assert split_targets(["8.8.8.8", "acme.com", "1.1.1.1", "acme.com"]) == (["8.8.8.8", "1.1.1.1"], ["acme.com"])
+    for bad in ("localhost", "10.1.1.1", "acme.com/path", "acme .com", "x"):
+        with pytest.raises(ValueError):
+            split_targets([bad])
+
+
+@pytest.mark.asyncio
+async def test_a_domain_resolves_to_its_public_ipv4_addresses_only_and_never_more_than_the_cap():
+    from app.services.easm_targets import MAX_RESOLVED_IPS, resolve_domains
+
+    class Fake:
+        async def mx(self, name):
+            return ["mail.acme.com"]
+
+        async def a(self, name):
+            return {"acme.com": ["8.8.8.8", "10.0.0.5", "not-an-ip"], "www.acme.com": ["8.8.8.8", "1.1.1.1"], "mail.acme.com": ["9.9.9.9", "169.254.169.254"]}.get(name, [])
+
+    assert await resolve_domains(["acme.com"], Fake()) == {"acme.com": ["8.8.8.8", "1.1.1.1", "9.9.9.9"]}
+
+    class Hosted(Fake):
+        async def mx(self, name):
+            return ["acme-com.mail.protection.outlook.com", "mx1.acme.com"]
+
+        async def a(self, name):
+            return {"acme.com": ["8.8.8.8"], "mx1.acme.com": ["1.1.1.1"], "acme-com.mail.protection.outlook.com": ["52.101.1.1"]}.get(name, [])
+
+    assert await resolve_domains(["acme.com"], Hosted()) == {"acme.com": ["8.8.8.8", "1.1.1.1"]}, "a hosted mail service is not the client's own server"
+
+    class Many(Fake):
+        async def a(self, name):
+            return [f"8.8.{i}.{j}" for i in range(1, 5) for j in range(1, 40)]
+
+    got = await resolve_domains(["a.com", "b.com"], Many())
+    assert sum(len(v) for v in got.values()) <= MAX_RESOLVED_IPS

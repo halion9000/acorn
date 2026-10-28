@@ -389,3 +389,24 @@ async def test_internetdb_turns_a_lookup_into_an_ip_asset_with_its_ports_and_cve
     ip = found[0]
     assert ip.value == "8.8.8.8" and ip.metadata["ports"] == [53, 443] and ip.metadata["vulns"] == ["CVE-2024-1"]
     assert [(a.asset_type.value, a.value) for a in found[1:]] == [("subdomain", "dns.google")]
+
+
+@pytest.mark.asyncio
+async def test_a_scan_for_domains_keeps_only_host_names_that_belong_to_them():
+    from app.services.easm_discovery import run_discovery
+
+    fake_settings = MagicMock()
+    fake_settings.AISOC_EASM_SHODAN_API_KEY = ""
+    fake_settings.AISOC_EASM_CENSYS_API_ID = ""
+    fake_settings.AISOC_EASM_CENSYS_API_SECRET = ""
+    fake_settings.AISOC_EASM_ACTIVE_SCAN_ENABLED = False
+    fake_settings.AISOC_EASM_INTERNETDB_ENABLED = True
+    looked = [
+        DiscoveredAsset(asset_type=ExternalAssetType.IP, value="8.8.8.8", metadata={"ports": [443]}),
+        DiscoveredAsset(asset_type=ExternalAssetType.SUBDOMAIN, value="www.acme.com", metadata={}),
+        DiscoveredAsset(asset_type=ExternalAssetType.SUBDOMAIN, value="someone-else.net", metadata={}),
+        DiscoveredAsset(asset_type=ExternalAssetType.SUBDOMAIN, value="notacme.com", metadata={}),
+    ]
+    with patch("app.services.easm_discovery.get_settings", return_value=fake_settings), patch("app.services.easm_discovery._internetdb_scan", return_value=looked):
+        out = await run_discovery("Acme", lookup_targets=["8.8.8.8"], domains={"acme.com": ["8.8.8.8"]})
+    assert [(a.asset_type.value, a.value) for a in out] == [("domain", "acme.com"), ("ip", "8.8.8.8"), ("subdomain", "www.acme.com")]
