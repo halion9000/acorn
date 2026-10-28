@@ -5,7 +5,7 @@ import useSWR, { mutate } from 'swr';
 import { EmptyState, EmptyStateIcons } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { authFetch } from '@/lib/auth-session';
-import { failureDetail } from '@/lib/communityInstall';
+import { failureDetail } from '@/lib/failure-detail';
 import { NAV_CATALOG } from '@/components/layout/Sidebar';
 import { RoleVisibilityPicker } from './RoleVisibilityPicker';
 import { ROLE_PRESETS, presetPermissionIds } from './rolePresets';

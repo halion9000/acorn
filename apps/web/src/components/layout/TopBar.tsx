@@ -15,13 +15,12 @@ import { useTenant } from './TenantProvider';
 import { NotificationsBell } from './NotificationsBell';
 
 // Order matters: longer/more specific paths first so startsWith() picks
-// the right label for nested routes (e.g. /detection/catalog before /detection).
+// the right label for nested routes (e.g. /detection/vendor-detections before /detection).
 // Words in a route that are initialisms, so a title derived from the URL reads "MSSP", not "Mssp".
 const ACRONYMS = new Set(['mssp', 'sla', 'siem', 'edr', 'soar', 'ueba', 'api', 'mttr', 'sso', 'ioc']);
 
 const routeLabels: Record<string, { title: string; description: string }> = {
   '/detection/vendor-detections': { title: 'Vendor Detections', description: 'What your connected tools have detected' },
-  '/detection/catalog': { title: 'Detection Catalog', description: 'Curated rule packs and templates' },
   '/settings/rbac': { title: 'Roles & Permissions', description: 'Access control and team management' },
   '/settings/client-posture': { title: 'Client Posture', description: 'Devices, Multi-Factor, alerts and cases for one client' },
   '/settings/billing': { title: 'Licences & Counts', description: 'What each tool counts for each client, and every change, to check an invoice against' },
@@ -41,7 +40,6 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/graph': { title: 'Attack Graph', description: 'Visualize relationships across alerts and assets' },
   '/copilot': { title: 'Leafy', description: 'AI-assisted investigation and triage' },
   '/playbooks': { title: 'Playbooks', description: 'Automated response and SOAR workflows' },
-  '/marketplace': { title: 'Marketplace', description: 'Plugins, integrations, and content packs' },
   '/honeytokens': { title: 'Honeytokens', description: 'Deception assets and trip-wire alerts' },
   '/purple-team': { title: 'Purple Team', description: 'Adversary emulation and detection coverage' },
   '/settings/connectors': { title: 'Connectors', description: 'Security tool integrations' },
@@ -127,7 +125,7 @@ export function TopBar({ demoOffset = false }: TopBarProps) {
   }, []);
 
   // Match the most specific path first. Object insertion order is preserved
-  // and routeLabels lists nested routes (e.g. /detection/catalog) before
+  // and routeLabels lists nested routes (e.g. /detection/vendor-detections) before
   // their parents so startsWith() picks the deepest match.
   const routeKey = Object.keys(routeLabels).find(
     (key) => key !== '/' && pathname.startsWith(key)

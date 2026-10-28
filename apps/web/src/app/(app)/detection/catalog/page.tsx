@@ -1,7 +1,6 @@
-import { DetectionCatalog } from '@/components/detections/DetectionCatalog';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Detection Catalog' };
-
-export default function DetectionCatalogPage() {
-  return <DetectionCatalog />;
+/** The Detection Catalog was folded into the Rules page: the imported Sigma rules are Rule packs there. */
+export default function DetectionCatalogMoved(): never {
+  redirect('/detection');
 }

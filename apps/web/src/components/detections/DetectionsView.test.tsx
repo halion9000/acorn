@@ -11,7 +11,6 @@ const toastSuccess = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/api', () => ({ __esModule: true, detectionApi: api }));
 vi.mock('react-hot-toast', () => ({ __esModule: true, default: Object.assign(toastFn, { error: toastError, success: toastSuccess }) }));
-vi.mock('./ContributorLeaderboard', () => ({ ContributorLeaderboard: () => null }));
 vi.mock('./MitreRuleHeatmap', () => ({ MitreRuleHeatmap: () => null }));
 vi.mock('./ConfidenceTrends', () => ({ ConfidenceTrends: () => null }));
 vi.mock('./DriftInbox', () => ({ DriftInbox: () => null }));

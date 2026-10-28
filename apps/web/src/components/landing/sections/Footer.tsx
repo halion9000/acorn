@@ -47,7 +47,6 @@ const COLUMNS: ReadonlyArray<LinkColumn> = [
       { label: 'Hunt agent', href: '/#solution' },
       { label: 'Respond agent', href: '/#solution' },
       { label: 'Connectors', href: docs('connectors') },
-      { label: 'Marketplace', href: '/marketplace' },
     ],
   },
   {

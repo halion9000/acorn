@@ -1,9 +1,6 @@
-import { MarketplaceView } from '@/components/marketplace/MarketplaceView';
+import { redirect } from 'next/navigation';
 
-export const metadata = {
-  title: 'Marketplace',
-};
-
-export default function MarketplacePage() {
-  return <MarketplaceView />;
+/** The Marketplace was folded into the Playbooks page, which lists the shared library of shipped playbooks. */
+export default function MarketplaceMoved(): never {
+  redirect('/playbooks');
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { authFetch } from '@/lib/auth-session';
-import { failureDetail } from '@/lib/communityInstall';
+import { failureDetail } from '@/lib/failure-detail';
 import type { CopilotPendingAction } from '@/lib/api';
 import { PendingActionPrompt } from './PendingActionPrompt';
 

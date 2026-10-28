@@ -26,10 +26,10 @@ The left sidebar groups the console:
 |---|---|
 | Platform (top) | SOC Dashboard, SOC Insights, Get started, User guide, **MSSP Dashboard**, Team Analytics, SLA Tracking |
 | Work | **Alerts**, **Devices**, Investigation Queue, **Cases**, Hunt, Explore |
-| Detection | Detection Rules, Detection Catalog, Vendor Detections, MITRE Coverage, Detection Tuning, Shifts |
+| Detection | Detection Rules (with Rule packs), Vendor Detections, MITRE Coverage, Detection Tuning, Shifts |
 | Intelligence | Threat Intel, Attack Graph, Leafy, Investigation Chat, Coverage Advisor, EASM |
 | Client Security | **Client Posture**, **Multi-Factor**, **Secure Score**, **Sign-in Scores**, **Client Cleanup**, **Platform Health** |
-| Response and testing | Playbooks, Marketplace, File Integrity, Honeytokens, Purple Team |
+| Response and testing | Playbooks (with Dry Runs), File Integrity, Honeytokens, Purple Team |
 | vCIO | Compliance, Executive Digest, Client Review |
 | Settings (bottom, on its own) | **Settings**, which holds Connectors, Roles & Permissions, Audit Log and the Cost Dashboard. A role can hide Platform and Settings separately. |
 

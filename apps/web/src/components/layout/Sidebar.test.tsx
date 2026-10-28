@@ -42,11 +42,11 @@ describe('Sidebar', () => {
     expect(screen.getByText('Platform')).toBeInTheDocument();
   });
 
-  it('exposes the marketplace and compliance entry points', () => {
+  it('exposes the compliance entry point, and no longer the Marketplace or the Detection Catalog', () => {
     render(<Sidebar />);
 
-    const marketplace = screen.getByRole('link', { name: /marketplace/i });
-    expect(marketplace).toHaveAttribute('href', '/marketplace');
+    expect(screen.queryByRole('link', { name: /marketplace/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /detection catalog/i })).not.toBeInTheDocument();
 
     const compliance = screen.getByRole('link', { name: /compliance/i });
     expect(compliance).toHaveAttribute('href', '/compliance');

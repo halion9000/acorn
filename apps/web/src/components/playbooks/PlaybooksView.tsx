@@ -4,7 +4,7 @@
  * PlaybooksView
  * =============
  * /playbooks page — lists all playbooks with quick-run/edit/delete,
- * a Run History tab, and a Community tab for browsing/installing community playbooks.
+ * a Run History tab and a Dry Runs tab.
  *
  * WS-F3: SavedViewsBar wired to the Playbooks tab so analysts can save and
  * recall filter presets (source, category, MITRE tactic, severity, integration,
@@ -24,7 +24,6 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { SavedViewsBar } from '@/components/saved-views/SavedViewsBar';
 import { DraftFromPromptDialog } from './DraftFromPromptDialog';
 import { authFetch } from '@/lib/auth-session';
-import { installCommunityItem } from '@/lib/communityInstall';
 import { DryRunsTab } from './DryRuns';
 
 /** Filter snapshot stored by the backend as a saved-view preset. */
@@ -111,293 +110,10 @@ function RunHistoryTab() {
   );
 }
 
-/* ─────────────────────────── Community Tab ─────────────────────────── */
-
-interface CommunityPlaybook {
-  id: string;
-  name: string;
-  description: string;
-  author: string;
-  tags: string[];
-  install_count: number;
-  rating: number;
-  rating_count: number;
-  status: string;
-  submitted_at: string;
-}
-
-function CommunityPlaybooksTab() {
-  const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'install_count' | 'rating' | 'name'>('install_count');
-  const [page, setPage] = useState(1);
-  const [items, setItems] = useState<CommunityPlaybook[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [submitOpen, setSubmitOpen] = useState(false);
-  const [submitJson, setSubmitJson] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitResult, setSubmitResult] = useState<string | null>(null);
-  const PAGE_SIZE = 12;
-
-  const load = useCallback(async (q: string, sort: string, p: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ page: String(p), page_size: String(PAGE_SIZE), sort_by: sort });
-      if (q) params.set('search', q);
-      const res = await authFetch(`/api/v1/community/playbooks?${params}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setItems(data.items ?? []);
-      setTotal(data.total ?? 0);
-    } catch {
-      setError('Failed to load community playbooks.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(search, sortBy, page); }, []);
-
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    setSubmitResult(null);
-    try {
-      let body: object;
-      try {
-        body = JSON.parse(submitJson);
-      } catch {
-        setSubmitResult('Invalid JSON. Please fix and retry.');
-        return;
-      }
-      const res = await authFetch('/api/v1/community/playbooks/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok && res.headers.get('content-type')?.includes('json')) {
-        const err = await res.json();
-        setSubmitResult(`Error: ${err.detail ?? res.statusText}`);
-        return;
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setSubmitResult(res.ok ? `Submitted! ID: ${data.id} — Status: ${data.status}` : `Error: ${data.detail}`);
-      if (res.ok) { setSubmitJson(''); load(search, sortBy, page); }
-    } catch {
-      setSubmitResult('Submission failed.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const totalPages = Math.ceil(total / PAGE_SIZE);
-
-  return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex flex-1 min-w-[220px] gap-2">
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && load(search, sortBy, 1)}
-            placeholder="Search community playbooks…"
-            className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
-          />
-          <button
-            onClick={() => load(search, sortBy, 1)}
-            className="rounded-lg bg-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-600 transition-colors"
-          >
-            Search
-          </button>
-        </div>
-
-        <div className="flex gap-1 rounded-lg border border-zinc-700 bg-zinc-800 p-1">
-          {(['install_count', 'rating', 'name'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => { setSortBy(s); load(search, s, 1); }}
-              className={clsx(
-                'rounded px-2.5 py-1.5 text-xs font-medium transition-colors',
-                sortBy === s ? 'bg-zinc-600 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'
-              )}
-            >
-              {s === 'install_count' ? 'Popular' : s === 'rating' ? 'Top Rated' : 'Name'}
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={() => setSubmitOpen(!submitOpen)}
-          className="rounded-lg border border-blue-700/60 bg-blue-900/30 px-3 py-2 text-sm text-blue-300 hover:bg-blue-900/50 transition-colors"
-        >
-          + Submit Playbook
-        </button>
-      </div>
-
-      {/* Submit panel */}
-      {submitOpen && (
-        <div className="rounded-xl border border-zinc-700/60 bg-zinc-800/60 p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-zinc-100">Submit a Community Playbook</h3>
-          <p className="text-xs text-zinc-400">Paste your playbook definition as JSON. It will be reviewed before appearing in the catalog.</p>
-          <textarea
-            value={submitJson}
-            onChange={(e) => setSubmitJson(e.target.value)}
-            rows={8}
-            placeholder={'{\n  "name": "My Playbook",\n  "description": "...",\n  "author": "you",\n  "steps": [...]\n}'}
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-mono text-zinc-200 focus:border-zinc-500 focus:outline-none resize-y"
-          />
-          {submitResult && (
-            <p className={clsx('text-xs', submitResult.startsWith('Error') || submitResult.startsWith('Invalid') || submitResult.startsWith('Submission') ? 'text-red-400' : 'text-emerald-400')}>
-              {submitResult}
-            </p>
-          )}
-          <div className="flex gap-2">
-            <button
-              onClick={handleSubmit}
-              disabled={submitting || !submitJson.trim()}
-              className="rounded px-3 py-1.5 text-xs font-medium bg-blue-700 text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
-            >
-              {submitting ? 'Submitting…' : 'Submit for Review'}
-            </button>
-            <button
-              onClick={() => { setSubmitOpen(false); setSubmitResult(null); }}
-              className="rounded px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {loading && <div className="py-12 text-center text-sm text-zinc-500">Loading community playbooks…</div>}
-      {error && (
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-200">
-            {error}
-          </div>
-        )}
-
-      {!loading && !error && items.length === 0 && (
-        // WS-F5 — community playbooks come from the marketplace index. If
-        // search is active we treat it as a filter-miss; otherwise it's an
-        // index-not-built state.
-        <EmptyState
-          icon={EmptyStateIcons.search}
-          title={search ? 'No community playbooks match your search' : 'No community playbooks indexed yet'}
-          description={
-            search
-              ? 'Try a different search term, or browse the full catalog by clearing the search.'
-              : 'Run `pnpm marketplace:build` to regenerate the community index, or check that /marketplace/index.json is being served.'
-          }
-          action={
-            search ? (
-              <button
-                onClick={() => { setSearch(''); load('', sortBy, 1); }}
-                className="text-xs px-3 py-1.5 rounded-md border border-blue-500/40 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 transition-colors"
-              >
-                Clear search
-              </button>
-            ) : undefined
-          }
-          className="bg-transparent py-12"
-        />
-      )}
-
-      {!loading && items.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((pb) => (
-            <CommunityPlaybookCard key={pb.id} playbook={pb} />
-          ))}
-        </div>
-      )}
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-2">
-          <button
-            onClick={() => { setPage(page - 1); load(search, sortBy, page - 1); }}
-            disabled={page <= 1}
-            className="rounded px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 disabled:opacity-30"
-          >
-            ← Prev
-          </button>
-          <span className="text-sm text-zinc-500">Page {page} of {totalPages}</span>
-          <button
-            onClick={() => { setPage(page + 1); load(search, sortBy, page + 1); }}
-            disabled={page >= totalPages}
-            className="rounded px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 disabled:opacity-30"
-          >
-            Next →
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CommunityPlaybookCard({ playbook }: { playbook: CommunityPlaybook }) {
-  const [installing, setInstalling] = useState(false);
-  const [installed, setInstalled] = useState(false);
-  const [installError, setInstallError] = useState<string | null>(null);
-
-  const handleInstall = async () => {
-    setInstalling(true);
-    setInstallError(null);
-    try {
-      // Marked installed only when the server says it is (or already was). It used to be marked installed whenever the request merely completed.
-      await installCommunityItem('playbooks', playbook.id);
-      setInstalled(true);
-    } catch (err) {
-      setInstallError(err instanceof Error ? err.message : 'Install failed');
-    } finally {
-      setInstalling(false);
-    }
-  };
-
-  return (
-    <div className="rounded-xl border border-zinc-700/60 bg-zinc-800/60 p-4 flex flex-col gap-3 hover:border-zinc-600 transition-colors">
-      <div>
-        <h3 className="text-sm font-semibold text-zinc-100 line-clamp-1">{playbook.name}</h3>
-        <p className="text-xs text-zinc-400 mt-1 line-clamp-2">{playbook.description || 'No description.'}</p>
-      </div>
-      {playbook.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {playbook.tags.slice(0, 4).map((t) => (
-            <span key={t} className="rounded bg-zinc-700/50 px-1.5 py-0.5 text-xs text-zinc-400">{t}</span>
-          ))}
-        </div>
-      )}
-      <div className="flex items-center justify-between text-xs text-zinc-500 mt-auto pt-2 border-t border-zinc-700/40">
-        <span>{playbook.install_count.toLocaleString()} installs</span>
-        {playbook.rating > 0 && (
-          <span className="text-yellow-400">{playbook.rating.toFixed(1)} rating</span>
-        )}
-        <button
-          onClick={handleInstall}
-          disabled={installing || installed}
-          className={clsx(
-            'rounded px-2.5 py-1 text-xs font-medium transition-colors',
-            installed ? 'bg-emerald-900/40 text-emerald-300 cursor-default' : 'bg-zinc-700 text-zinc-200 hover:bg-zinc-600'
-          )}
-        >
-          {installed ? 'Installed' : installing ? '…' : 'Install'}
-        </button>
-      </div>
-      {installError && (
-        <p role="alert" className="text-xs text-red-300">
-          Could not install: {installError}
-        </p>
-      )}
-    </div>
-  );
-}
-
 /* ─────────────────────────── Main ─────────────────────────── */
 
 export function PlaybooksView() {
-  const [tab, setTab] = useState<'playbooks' | 'runs' | 'dryruns' | 'community'>('playbooks');
+  const [tab, setTab] = useState<'playbooks' | 'runs' | 'dryruns'>('playbooks');
   const { data, isLoading, error, mutate } = useSWR<Playbook[]>('/api/v1/playbooks', fetcher, {
     refreshInterval: 30000,
   });
@@ -468,12 +184,6 @@ export function PlaybooksView() {
         >
           Dry Runs
         </button>
-        <button
-          onClick={() => setTab('community')}
-          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${tab === 'community' ? 'border-blue-500 text-blue-300' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
-        >
-          Community
-        </button>
       </div>
 
       {/* Run History */}
@@ -482,8 +192,6 @@ export function PlaybooksView() {
       {/* Dry runs: which playbooks would have run for which alerts (nothing is run) */}
       {tab === 'dryruns' && <DryRunsTab />}
 
-      {/* Community */}
-      {tab === 'community' && <CommunityPlaybooksTab />}
 
       {/* Playbooks list */}
       {tab === 'playbooks' && (
@@ -514,12 +222,12 @@ export function PlaybooksView() {
 
           {!isLoading && !error && (!data || data.length === 0) && (
             // WS-F5 — first-run experience. Push toward both "create your own"
-            // and "browse the community" so analysts don't have to start from
+            // and the shared library so analysts don't have to start from
             // a blank YAML file.
             <EmptyState
               icon={EmptyStateIcons.ledger}
               title="No playbooks yet"
-              description="Playbooks automate your SOC response — isolate hosts, enrich IOCs, page on-call, post to Slack. Start from a community template or write your own from scratch."
+              description="Playbooks automate your SOC response — isolate hosts, enrich IOCs, page on-call, post to Slack. Start from a shipped library playbook or write your own from scratch."
               action={
                 <div className="flex items-center gap-2">
                   <Link
@@ -528,12 +236,6 @@ export function PlaybooksView() {
                   >
                     Create your first playbook
                   </Link>
-                  <button
-                    onClick={() => setTab('community')}
-                    className="text-xs px-3 py-1.5 rounded-md border border-zinc-700 bg-zinc-800/40 text-zinc-300 hover:bg-zinc-800 transition-colors"
-                  >
-                    Browse community
-                  </button>
                 </div>
               }
               className="bg-transparent py-16"

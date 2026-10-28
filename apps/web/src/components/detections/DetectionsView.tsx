@@ -14,7 +14,6 @@ import {
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { ContributorLeaderboard } from './ContributorLeaderboard';
 import { MitreRuleHeatmap } from './MitreRuleHeatmap';
 import { ConfidenceTrends } from './ConfidenceTrends';
 import { DriftInbox } from './DriftInbox';
@@ -575,8 +574,6 @@ export function DetectionsView() {
             />
           )}
 
-          {/* Contributor leaderboard */}
-          <ContributorLeaderboard />
         </>
       )}
 

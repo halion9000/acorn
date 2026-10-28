@@ -74,11 +74,11 @@ describe('TopBar', () => {
   });
 
   it('matches the most specific nested route first', () => {
-    // /detection/catalog must win over /detection.
-    pathnameMock.mockReturnValue('/detection/catalog');
+    // /detection/vendor-detections must win over /detection.
+    pathnameMock.mockReturnValue('/detection/vendor-detections');
     renderTopBar();
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Detection Catalog');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Vendor Detections');
   });
 
   it('derives a sensible title for unknown routes from the path itself', () => {
