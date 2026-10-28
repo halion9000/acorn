@@ -10920,6 +10920,136 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/identities/export.csv:
+    get:
+      tags:
+      - identities
+      summary: The people the page is showing, as a CSV file
+      operationId: export_identities_api_v1_identities_export_csv_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Search
+      - name: source
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          - type: 'null'
+          title: Source
+      - name: only_in
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          - type: 'null'
+          title: Only In
+      - name: has_alerts
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Has Alerts
+      - name: backup
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(ok|problem|none)$
+          - type: 'null'
+          title: Backup
+      - name: alert_source
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          - type: 'null'
+          title: Alert Source
+      - name: exposed
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(any|serious)$
+          - type: 'null'
+          title: Exposed
+      - name: mfa
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(covered|registered_not_required|none|unknown)$
+          - type: 'null'
+          title: Mfa
+      - name: admin
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Admin
+      - name: disabled
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Disabled
+      - name: kind
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(user|guest|shared|other)$
+          - type: 'null'
+          title: Kind
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: alerts
+          title: Sort
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/identities/detail:
     get:
       tags:

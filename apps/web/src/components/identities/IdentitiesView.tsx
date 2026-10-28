@@ -244,6 +244,22 @@ export function IdentitiesView() {
   const { data, error, isLoading, mutate } = useSWR(['identities', query], () => identitiesApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
   const { data: clients } = useSWR('mssp-children', () => msspApi.listChildren().catch(() => []), { revalidateOnFocus: false });
 
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportCsv = async () => {
+    setExportError(null);
+    try {
+      const text = await identitiesApi.exportCsv(query);
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'identities.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Could not export the people.');
+    }
+  };
+
   const reset = (fn: () => void) => {
     fn();
     setPage(1);
@@ -341,7 +357,15 @@ export function IdentitiesView() {
           <option value="guest">Guests</option>
           <option value="shared">Shared mailboxes</option>
         </select>
+        <button type="button" onClick={() => void exportCsv()} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white hover:bg-gray-800">
+          Export CSV
+        </button>
       </div>
+      {exportError && (
+        <p role="alert" className="text-xs text-red-300">
+          {exportError}
+        </p>
+      )}
 
       {error ? (
         <p role="alert" className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">

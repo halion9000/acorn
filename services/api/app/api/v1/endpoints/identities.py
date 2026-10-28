@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -231,6 +231,65 @@ async def list_identities(
         page=page,
         page_size=page_size,
         pages=(total + page_size - 1) // page_size,
+    )
+
+
+def people_csv(rows: list[PersonOut]) -> str:
+    """The people as CSV: client, address, name, kind, state, multi-factor, tools and open alerts. A cell that would run as a formula is made text."""
+    import csv
+    import io
+
+    from app.api.v1.endpoints.devices import csv_cell
+
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["Client", "Address", "Name", "Kind", "Enabled", "Administrator", "Multi-factor", "Known to", "Open alerts"])
+    for p in rows:
+        writer.writerow(
+            [
+                csv_cell(p.client_name),
+                csv_cell(p.email),
+                csv_cell(p.display_name),
+                csv_cell(p.kind),
+                "" if p.enabled is None else ("yes" if p.enabled else "no"),
+                "yes" if p.admin else "no",
+                csv_cell(p.mfa),
+                csv_cell(", ".join(sorted(p.tools))),
+                p.open_alerts,
+            ]
+        )
+    return out.getvalue()
+
+
+@router.get("/export.csv", summary="The people the page is showing, as a CSV file", dependencies=[Depends(require_permission("alerts:read"))])
+async def export_identities(
+    user: AuthUser,
+    db: DBSession,
+    client_id: uuid.UUID | None = Query(default=None),
+    search: str | None = Query(default=None, max_length=100),
+    source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
+    only_in: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
+    has_alerts: bool = Query(default=False),
+    backup: str | None = Query(default=None, pattern="^(ok|problem|none)$"),
+    alert_source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
+    exposed: str | None = Query(default=None, pattern="^(any|serious)$"),
+    mfa: str | None = Query(default=None, pattern="^(covered|registered_not_required|none|unknown)$"),
+    admin: bool = Query(default=False),
+    disabled: bool = Query(default=False),
+    kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
+    sort: str = Query(default="alerts"),
+) -> Response:
+    if sort not in SORTS:
+        raise HTTPException(status_code=422, detail=f"sort must be one of: {', '.join(SORTS)}")
+    people, _ = await _people(db, user.tenant_id, client_id)
+    rows = sort_people(
+        filter_people(people, search=search, source=source, only_in=only_in, has_alerts=has_alerts, alert_source=alert_source, backup=backup, exposed=exposed, mfa=mfa, admin=admin, disabled=disabled, kind=kind),
+        sort,
+    )
+    return Response(
+        content=people_csv([_out(p) for p in rows]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="identities.csv"'},
     )
 
 

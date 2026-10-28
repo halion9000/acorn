@@ -744,6 +744,28 @@ export const identitiesApi = {
         sort: q.sort,
       } as unknown as Record<string, string>,
     }),
+  /** The people matching the filters (every page), as CSV text. */
+  async exportCsv(q: IdentityQuery = {}): Promise<string> {
+    const p = new URLSearchParams();
+    const set = (k: string, v: string | undefined) => v && p.set(k, v);
+    set('client_id', q.clientId);
+    set('search', q.search);
+    set('source', q.source);
+    set('only_in', q.onlyIn);
+    set('mfa', q.mfa);
+    set('kind', q.kind);
+    set('alert_source', q.alertSource);
+    set('backup', q.backup);
+    set('exposed', q.exposed);
+    set('sort', q.sort);
+    if (q.hasAlerts) p.set('has_alerts', 'true');
+    if (q.admin) p.set('admin', 'true');
+    if (q.disabled) p.set('disabled', 'true');
+    const qs = p.toString();
+    const response = await authFetch(`${API_BASE}/api/v1/identities/export.csv${qs ? `?${qs}` : ''}`);
+    if (!response.ok) throw new Error(`Export failed (${response.status})`);
+    return response.text();
+  },
   /** One person: every tool's record of them, their open alerts and a summary of their sign-ins. */
   detail: (clientId: string, email: string) => request<IdentityDetail>('/api/v1/identities/detail', { params: { client_id: clientId, email } }),
 };

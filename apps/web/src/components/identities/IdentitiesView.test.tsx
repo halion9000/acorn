@@ -3,8 +3,8 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), listChildren: vi.fn() }));
-vi.mock('@/lib/api', () => ({ identitiesApi: { list: api.list, detail: api.detail }, msspApi: { listChildren: api.listChildren } }));
+const api = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), listChildren: vi.fn(), exportCsv: vi.fn() }));
+vi.mock('@/lib/api', () => ({ identitiesApi: { list: api.list, detail: api.detail, exportCsv: api.exportCsv }, msspApi: { listChildren: api.listChildren } }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
 import { IdentitiesView } from './IdentitiesView';
@@ -325,5 +325,30 @@ describe('backups on a person', () => {
     expect(section).toHaveTextContent('Found in breaches (3)');
     expect(section).toHaveTextContent('Acme Forum');
     expect(section).toHaveTextContent('Leaked: Email addresses, Passwords');
+  });
+});
+
+describe('the export', () => {
+  it('asks for the CSV with the filters on screen, and hands the file to the browser', async () => {
+    api.exportCsv.mockResolvedValue('Client,Address');
+    const create = vi.fn(() => 'blob:x');
+    const revoke = vi.fn();
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke }));
+    show();
+    await screen.findAllByTestId('identity-row');
+    await userEvent.selectOptions(screen.getByLabelText('Multi-Factor'), 'none');
+    await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    expect(api.exportCsv).toHaveBeenCalledWith(expect.objectContaining({ mfa: 'none' }));
+    expect(revoke).toHaveBeenCalledWith('blob:x');
+    vi.unstubAllGlobals();
+  });
+
+  it('says so when the export fails', async () => {
+    api.exportCsv.mockRejectedValue(new Error('Export failed (500)'));
+    show();
+    await screen.findAllByTestId('identity-row');
+    await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Export failed (500)');
   });
 });

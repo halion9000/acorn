@@ -95,3 +95,26 @@ def test_the_latest_ten_sign_ins_come_newest_first_with_the_unusual_ones_marked(
 def test_the_detail_lists_default_to_empty_so_an_older_client_still_reads_it():
     d = ep.PersonDetail.model_fields
     assert d["recent_signins"].default_factory() == [] and d["changes"].default_factory() == []
+
+
+def person(**over):
+    base = {"key": "c:a@x.com", "client_id": uuid.uuid4(), "client_name": "Acme", "email": "a@x.com", "display_name": "Amy", "kind": "user", "enabled": True, "admin": False, "mfa": "covered", "tools": ["dropsuite", "cipp"], "open_alerts": 2}
+    return ep.PersonOut(**{**base, **over})
+
+
+def test_the_people_csv_has_a_header_a_row_per_person_and_sorted_tools():
+    import csv
+    import io
+
+    rows = list(csv.reader(io.StringIO(ep.people_csv([person(), person(email="b@x.com", enabled=None, admin=True, open_alerts=0)]))))
+    assert rows[0] == ["Client", "Address", "Name", "Kind", "Enabled", "Administrator", "Multi-factor", "Known to", "Open alerts"]
+    assert rows[1] == ["Acme", "a@x.com", "Amy", "user", "yes", "no", "covered", "cipp, dropsuite", "2"]
+    assert rows[2][4:6] == ["", "yes"]
+
+
+def test_a_name_that_would_run_as_a_spreadsheet_formula_is_made_text():
+    import csv
+    import io
+
+    rows = list(csv.reader(io.StringIO(ep.people_csv([person(display_name='=HYPERLINK("http://evil","x")', client_name="+cmd")]))))
+    assert rows[1][2].startswith("'=") and rows[1][0] == "'+cmd"
