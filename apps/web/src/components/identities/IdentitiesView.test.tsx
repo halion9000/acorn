@@ -7,7 +7,7 @@ const api = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), listChildren: vi
 vi.mock('@/lib/api', () => ({ identitiesApi: { list: api.list, detail: api.detail, exportCsv: api.exportCsv }, msspApi: { listChildren: api.listChildren } }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
-import { IdentitiesView } from './IdentitiesView';
+import { IdentitiesView, ticketAge } from './IdentitiesView';
 
 const person = (over: Record<string, unknown> = {}) => ({
   key: 'c1:amy@acme.com',
@@ -192,6 +192,26 @@ describe('the Identities page', () => {
     expect(screen.getByText(/Page 1 of 3 \(120 people\)/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => expect(lastQuery().page).toBe(2));
+  });
+});
+
+describe('tickets on the people list', () => {
+  it('shows how many tickets a person has and how long ago the newest was opened, and a dash for none', async () => {
+    const opened = new Date(Date.now() - 3 * 86_400_000 - 3_600_000).toISOString();
+    api.list.mockResolvedValue(list([person({ tickets: 12, last_ticket_at: opened }), person({ key: 'c1:bob@acme.com', email: 'bob@acme.com', display_name: null })]));
+    show();
+    const cells = await screen.findAllByTestId('tickets-cell');
+    expect(cells[0]).toHaveTextContent('12');
+    expect(cells[0]).toHaveTextContent('last 3 days ago');
+    expect(cells[1]).toHaveTextContent('—');
+  });
+
+  it('says today, 1 day ago and N days ago', () => {
+    const now = Date.parse('2026-10-28T12:00:00Z');
+    expect(ticketAge('2026-10-28T01:00:00Z', now)).toBe('today');
+    expect(ticketAge('2026-10-27T11:00:00Z', now)).toBe('1 day ago');
+    expect(ticketAge('2026-10-16T12:00:00Z', now)).toBe('12 days ago');
+    expect(ticketAge('2026-10-29T12:00:00Z', now)).toBe('today');
   });
 });
 

@@ -45,6 +45,12 @@ export const BACKUP_STYLE: Record<string, { label: string; className: string }> 
 
 const SORT_FOR_COLUMN: Record<string, IdentitySort> = { person: 'email', client: 'client', tools: 'tools', alerts: 'alerts', exposure: 'exposure' };
 
+/** How long ago a ticket was opened, in whole days ("today", "1 day ago", "12 days ago"). */
+export function ticketAge(openedAt: string, now: number = Date.now()): string {
+  const days = Math.max(0, Math.floor((now - new Date(openedAt).getTime()) / 86_400_000));
+  return days === 0 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`;
+}
+
 function SortHeader({ col, label, sort, onSort }: { col: keyof typeof SORT_FOR_COLUMN; label: string; sort: IdentitySort; onSort: (s: IdentitySort) => void }) {
   const mine = SORT_FOR_COLUMN[col];
   return (
@@ -386,19 +392,20 @@ export function IdentitiesView() {
                 <th scope="col" className="px-3 py-2">Backup</th>
                 <SortHeader col="exposure" label="Breaches" sort={sort} onSort={(s) => reset(() => setSort(s))} />
                 <SortHeader col="alerts" label="Alerts" sort={sort} onSort={(s) => reset(() => setSort(s))} />
+                <th scope="col" className="px-3 py-2">Tickets</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
               {isLoading && !data && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+                  <td colSpan={8} className="px-3 py-8 text-center text-gray-400">
                     Loading people…
                   </td>
                 </tr>
               )}
               {data && data.items.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+                  <td colSpan={8} className="px-3 py-8 text-center text-gray-400">
                     No people match.
                   </td>
                 </tr>
@@ -476,10 +483,20 @@ export function IdentitiesView() {
                           <span className="text-gray-600">0</span>
                         )}
                       </td>
+                      <td className="px-3 py-2" data-testid="tickets-cell">
+                        {p.tickets ? (
+                          <span className="flex flex-col">
+                            <span className="tabular-nums text-gray-100">{p.tickets}</span>
+                            {p.last_ticket_at && <span className="text-[11px] text-gray-500">last {ticketAge(p.last_ticket_at)}</span>}
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">—</span>
+                        )}
+                      </td>
                     </tr>
                     {isOpen && (
                       <tr className="bg-gray-900/30">
-                        <td colSpan={7} className="px-4 py-3">
+                        <td colSpan={8} className="px-4 py-3">
                           <Detail person={p} />
                         </td>
                       </tr>

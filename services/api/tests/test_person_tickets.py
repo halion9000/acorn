@@ -134,6 +134,28 @@ def person(**over):
     return ep.PersonOut(**{**base, **over})
 
 
+def test_a_person_carries_the_count_and_newest_ticket_of_their_own_client_and_address():
+    acme, birch = uuid.uuid4(), uuid.uuid4()
+    amy, other_client, nobody = (
+        person(client_id=acme, email="Amy@x.com"),
+        person(client_id=birch, email="amy@x.com"),
+        person(client_id=acme, email="n@x.com"),
+    )
+    newest = NOW - timedelta(days=1)
+    out = ep.attach_ticket_counts([amy, other_client, nobody], {(acme, "amy@x.com"): (3, newest)})
+    assert [(p.tickets, p.last_ticket_at) for p in out] == [(3, newest), (0, None), (0, None)]
+    assert out[0].email == "Amy@x.com", "the address shown is untouched; only the match is lower-cased"
+
+
+def test_a_list_page_still_loads_when_the_ticket_table_cannot_be_read():
+    class Broken:
+        def begin_nested(self):
+            raise RuntimeError("relation person_tickets does not exist")
+
+    items = [person()]
+    assert asyncio.run(ep.with_ticket_counts(Broken(), items)) == items
+
+
 def test_the_people_csv_has_a_header_a_row_per_person_and_sorted_tools():
     import csv
     import io

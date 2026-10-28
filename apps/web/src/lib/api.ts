@@ -675,6 +675,9 @@ export interface IdentityPerson {
   sources: { vendor: string; external_id: string; enabled: boolean | null; details: Record<string, unknown> }[];
   open_alerts: number;
   top_severity: string | null;
+  /** HaloPSA tickets about this person and when the newest was opened. Absent from an older API. */
+  tickets?: number;
+  last_ticket_at?: string | null;
   /** Open alerts by the tool that raised them. Absent from an older API. */
   alerts_by_source?: Record<string, number>;
   /** What each backup tool says about this person's data. Absent from an older API. */

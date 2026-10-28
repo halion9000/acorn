@@ -33488,6 +33488,16 @@ components:
           anyOf:
           - $ref: '#/components/schemas/ExposureOut'
           - type: 'null'
+        tickets:
+          type: integer
+          title: Tickets
+          default: 0
+        last_ticket_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Ticket At
       type: object
       required:
       - key

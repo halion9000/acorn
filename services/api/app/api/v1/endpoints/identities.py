@@ -91,6 +91,9 @@ class PersonOut(BaseModel):
     alerts_by_source: dict[str, int] = Field(default_factory=dict)
     backups: list[BackupOut] = Field(default_factory=list)
     exposure: ExposureOut | None = None
+    # HaloPSA tickets about this person in the window CORE reads, and when the newest was opened (the list page only; the person's own panel lists the tickets).
+    tickets: int = 0
+    last_ticket_at: datetime | None = None
 
 
 class IdentitySummary(BaseModel):
@@ -265,9 +268,10 @@ async def list_identities(
     )
     total = len(rows)
     start = (page - 1) * page_size
+    items = [_out(p) for p in rows[start : start + page_size]]
     return IdentityList(
         summary=summarize(people),
-        items=[_out(p) for p in rows[start : start + page_size]],
+        items=await with_ticket_counts(db, items),
         total=total,
         page=page,
         page_size=page_size,
@@ -408,6 +412,36 @@ async def _tolerant(db: Any, statement: Any) -> list[Any]:
     except Exception:  # noqa: BLE001
         logging.getLogger(__name__).warning("identity panel: a section could not be read", exc_info=True)
         return []
+
+
+def attach_ticket_counts(items: list[PersonOut], counts: dict[tuple[uuid.UUID, str], tuple[int, datetime]]) -> list[PersonOut]:
+    """The people with their ticket count and newest ticket, matched on the client and the lower-case address (the way the tickets are stored)."""
+    out = []
+    for p in items:
+        n, newest = counts.get((p.client_id, p.email.lower()), (0, None))
+        out.append(p.model_copy(update={"tickets": n, "last_ticket_at": newest}) if n else p)
+    return out
+
+
+async def with_ticket_counts(db: Any, items: list[PersonOut]) -> list[PersonOut]:
+    """One grouped read for the people on this page. A database that does not have the table yet (a migration waiting for the next restart) shows no tickets and the list still loads."""
+    if not items:
+        return items
+    tenants = {p.client_id for p in items}
+    emails = {p.email.lower() for p in items}
+    try:
+        async with cross_tenant_reads(db), db.begin_nested():
+            rows = (
+                await db.execute(
+                    select(PersonTicket.tenant_id, PersonTicket.user_email, func.count(), func.max(PersonTicket.opened_at))
+                    .where(PersonTicket.tenant_id.in_(tenants), PersonTicket.user_email.in_(emails))
+                    .group_by(PersonTicket.tenant_id, PersonTicket.user_email)
+                )
+            ).all()
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).warning("identity list: ticket counts could not be read", exc_info=True)
+        return items
+    return attach_ticket_counts(items, {(t, e): (n, newest) for t, e, n, newest in rows})
 
 
 def signin_rows(events: list[Any]) -> list[SigninRow]:
