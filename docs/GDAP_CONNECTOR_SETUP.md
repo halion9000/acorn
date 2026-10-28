@@ -2,6 +2,8 @@
 
 Status: planned, nothing built or created yet. Saved 2026-10-27. Read "What clients will see" before doing Part 5.
 
+**Update (2026-10-27, after a deep read of CIPP's API; see `docs/CIPP_CAPABILITIES.md` in the CORE repo):** CIPP already reads DLP, sensitivity labels, PIM role policies, mailbox rules, forwarding, OAuth apps and more, and has about 290 action functions (reset password, revoke sessions, block sign-in, remove a mailbox rule, contain a compromised user in one call). It acts through its own app, which is already consented in every client tenant. So Parts 3 and 5 (a second app and consenting it in each client) are only needed for something CIPP cannot do; the access reviews read (`AccessReview.Read.All`) and SharePoint tenant settings are the two known gaps in CIPP's read permissions. Playbook actions should go through CIPP first.
+
 Goal: read more Microsoft 365 data than CIPP exposes (to answer the 34 client-review Microsoft questions CIPP does not cover), and let playbooks run write actions (reset password, revoke sessions, disable account, delete a message, disable a mailbox rule) under the Autonomy guardrails.
 
 ## What clients will see (decide this before Part 5)
