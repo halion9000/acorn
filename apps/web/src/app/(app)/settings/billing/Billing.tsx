@@ -462,7 +462,7 @@ function Reconcile() {
                   {differenceText(r.difference)}
                   {disagreedText(r) ? <div className="text-xs text-slate-500" data-testid={`age-${r.client_id}-${r.invoice_item}`}>{disagreedText(r)}</div> : null}
                   {r.note_state === "accepted" ? <div className="text-xs text-slate-400" data-testid={`note-${r.client_id}-${r.invoice_item}`}>Accepted: {r.note}</div> : null}
-                  {r.note_state === "stale" ? <div className="text-xs text-red-300">The note ("{r.note}") was for a different difference.</div> : null}
+                  {r.note_state === "stale" ? <div className="text-xs text-red-300">The note (&quot;{r.note}&quot;) was for a different difference.</div> : null}
                 </td>
                 <td className="print:hidden">
                   {r.note_state === "accepted" ? (
@@ -537,7 +537,7 @@ function Mapping() {
   };
   const withSuggestion = (data?.unmapped ?? []).filter((u) => u.suggestion.length > 0);
   const sure = withSuggestion.filter((u) => u.confidence === "high");
-  const useAll = async (only: typeof withSuggestion = withSuggestion) => {
+  const applyAll = async (only: typeof withSuggestion = withSuggestion) => {
     for (const u of only) {
       const ok = await saveQuiet(u.invoice_item, u.suggestion);
       if (!ok) return;
@@ -583,12 +583,12 @@ function Mapping() {
               <h3 className="text-sm uppercase text-slate-500">Billed lines still to map</h3>
               <span className="flex gap-2 print:hidden">
                 {sure.length > 0 ? (
-                  <button type="button" className="rounded border border-emerald-500/50 px-2 py-0.5 text-xs text-emerald-200" onClick={() => void useAll(sure)}>
+                  <button type="button" className="rounded border border-emerald-500/50 px-2 py-0.5 text-xs text-emerald-200" onClick={() => void applyAll(sure)}>
                     Use the {sure.length} high-confidence suggestions
                   </button>
                 ) : null}
                 {withSuggestion.length > 0 ? (
-                  <button type="button" className="rounded border border-sky-500/50 px-2 py-0.5 text-xs text-sky-200" onClick={() => void useAll()}>
+                  <button type="button" className="rounded border border-sky-500/50 px-2 py-0.5 text-xs text-sky-200" onClick={() => void applyAll()}>
                     Use all {withSuggestion.length} suggestions
                   </button>
                 ) : null}

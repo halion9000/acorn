@@ -591,7 +591,7 @@ function Tools() {
       {(cards.error || weights.error || problem) && <p role="alert" className="text-sm text-red-300">{cards.error ?? weights.error ?? problem}</p>}
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-slate-200">Which tool has the most problems</h2>
-        <p className="text-sm text-slate-400">Each tool's checks across all clients, worst first. Accepted and not applicable checks are left out.</p>
+        <p className="text-sm text-slate-400">Each tool&apos;s checks across all clients, worst first. Accepted and not applicable checks are left out.</p>
         {!cards.data && !cards.error && <p className="text-sm text-slate-500">Loading…</p>}
         {cards.data && cards.data.length === 0 && <p className="text-sm text-slate-400">No tool has sent checks yet.</p>}
         {cards.data && cards.data.length > 0 && (

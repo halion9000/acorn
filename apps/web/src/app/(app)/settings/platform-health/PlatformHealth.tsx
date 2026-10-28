@@ -123,7 +123,7 @@ export function PlatformHealth() {
           )}
           {snapshot.runtime?.loop && snapshot.runtime.loop.samples > 0 && (
             <p data-testid="loop-lag" className="text-sm text-slate-400">
-              The API's wake-up delay over the last {Math.round(snapshot.runtime.loop.window_seconds / 60)} minutes: typically {snapshot.runtime.loop.typical_seconds} s, worst {snapshot.runtime.loop.max_seconds} s.
+              The API&apos;s wake-up delay over the last {Math.round(snapshot.runtime.loop.window_seconds / 60)} minutes: typically {snapshot.runtime.loop.typical_seconds} s, worst {snapshot.runtime.loop.max_seconds} s.
             </p>
           )}
           {(snapshot.runtime?.slow_routes ?? []).length > 0 && (
