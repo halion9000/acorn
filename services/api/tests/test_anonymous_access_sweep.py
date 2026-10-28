@@ -78,6 +78,9 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/directory-audits"): (
         "CORE's identity-related directory audit entries read through CIPP: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only add entries under that feed's own client tenants, and only for clients already mapped (the 422 here is the empty body)"
     ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/client-documents"): (
+        "CORE's read-only copy of a client's IT Glue documentation (documents, runbooks, configurations, locations, and password entries as a name and link only, never the password): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only add or update records under that feed's own client tenants, and text that looks like a secret is blanked on arrival",
+    ),
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/person-tickets"): (
         "CORE's list of each person's recent HaloPSA tickets: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only add or update tickets under that feed's own client tenants, and only for clients already mapped (the 422 here is the empty body)"
     ),

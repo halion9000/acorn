@@ -1,0 +1,69 @@
+{
+  "route": "client-documents",
+  "method": "POST",
+  "body": {
+    "vendor": "itglue",
+    "items": [
+      {
+        "vendor_client_id": "1987544",
+        "id": "doc:21",
+        "kind": "document",
+        "title": "Network overview",
+        "folder": null,
+        "body": "Create the account in Entra.",
+        "url": "https://liveoak.itglue.com/1987544/docs/21",
+        "updated_at": "2026-01-01T00:00:00.000Z"
+      },
+      {
+        "vendor_client_id": "1987544",
+        "id": "doc:22",
+        "kind": "document",
+        "title": "Onboarding guide",
+        "folder": "HR",
+        "body": "Create the account in Entra.",
+        "url": "https://liveoak.itglue.com/1987544/docs/22",
+        "updated_at": "2026-10-20T00:00:00.000Z"
+      },
+      {
+        "vendor_client_id": "1987544",
+        "id": "cfg:31",
+        "kind": "configuration",
+        "title": "FW-01",
+        "folder": null,
+        "body": "Hostname: fw01",
+        "url": null,
+        "updated_at": null
+      },
+      {
+        "vendor_client_id": "1987544",
+        "id": "loc:41",
+        "kind": "location",
+        "title": "HQ",
+        "folder": null,
+        "body": "Address: Austin",
+        "url": null,
+        "updated_at": null
+      },
+      {
+        "vendor_client_id": "1987544",
+        "id": "pw:16465978",
+        "kind": "password",
+        "title": "Microsoft 365 admin",
+        "folder": null,
+        "body": "Username: admin@tecovas.com",
+        "url": "https://liveoak.itglue.com/1987544/passwords/16465978",
+        "updated_at": null
+      },
+      {
+        "vendor_client_id": "1987544",
+        "id": "asset:9",
+        "kind": "asset",
+        "title": "HQ network",
+        "folder": "Network runbook",
+        "body": "WAN IP: 203.0.113.4",
+        "url": "https://liveoak.itglue.com/1987544/assets/9",
+        "updated_at": null
+      }
+    ]
+  }
+}

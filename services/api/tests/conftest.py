@@ -79,3 +79,13 @@ def _a_class_cannot_change_the_environment_the_next_class_sees():
 @pytest.fixture(autouse=True, scope="module")
 def _a_module_cannot_change_the_environment_the_next_module_sees():
     yield from _restore_the_environment_afterwards()
+
+
+# The chat endpoint looks up the clients' documentation (a database read) before it answers. A test of the chat loop has no database, and the lookup would wait on a connection that never comes; tests of the lookup call it directly.
+@pytest.fixture(autouse=True)
+def _the_chat_does_not_search_documentation_unless_a_test_says_so(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from app.api.v1.endpoints import copilot
+
+    monkeypatch.setattr(copilot, "docs_snapshot", AsyncMock(return_value=None))

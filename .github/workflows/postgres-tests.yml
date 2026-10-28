@@ -231,6 +231,7 @@ jobs:
             tests/test_clear_placeholder_serials_postgres.py \
             tests/test_playbook_dry_runs_postgres.py \
             tests/test_pipeline_health_postgres.py \
+            tests/test_client_documents_postgres.py \
             tests/test_service_migrations_postgres.py \
             -v --tb=short -rs --junitxml=postgres-tests.junit.xml
 

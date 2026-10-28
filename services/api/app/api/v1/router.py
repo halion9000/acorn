@@ -22,6 +22,7 @@ from app.api.v1.endpoints import (
     business_context,
     canary,
     cases,
+    client_documents,
     client_posture,
     client_review,
     compliance,
@@ -210,6 +211,8 @@ api_router.include_router(identity.ingest_router)
 api_router.include_router(identities.router)
 api_router.include_router(identities.ingest_router)
 api_router.include_router(identity.router)
+api_router.include_router(client_documents.ingest_router)
+api_router.include_router(client_documents.router)
 api_router.include_router(client_posture.router)
 api_router.include_router(billing.router)
 api_router.include_router(billing.ingest_router)

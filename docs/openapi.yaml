@@ -7201,6 +7201,19 @@ paths:
           default: 24h
           title: Window
         description: Rolling window. One of 24h, 7d, 30d.
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: Only this client's numbers (one of the organization's clients).
+            Leave out for the whole organization and every client.
+          title: Client Id
+        description: Only this client's numbers (one of the organization's clients).
+          Leave out for the whole organization and every client.
       responses:
         '200':
           description: Successful Response
@@ -10589,6 +10602,110 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/client-documents:
+    post:
+      tags:
+      - client-documents
+      summary: Report Core Feed Client Documents
+      description: Record the documentation CORE read from the documentation tool,
+        under the client each record belongs to.
+      operationId: report_core_feed_client_documents_api_v1_inbox_core_feed__tenant_token__client_documents_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientDocsReport'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientDocsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-documents:
+    get:
+      tags:
+      - client-documents
+      summary: Search the clients' documentation
+      operationId: search_client_documents_api_v1_client_documents_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 2
+          maxLength: 300
+          title: Q
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 8
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocHit'
+                title: Response Search Client Documents Api V1 Client Documents Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-documents/summary:
+    get:
+      tags:
+      - client-documents
+      summary: What documentation is held, per client
+      operationId: client_documents_summary_api_v1_client_documents_summary_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/DocSummary'
+                type: array
+                title: Response Client Documents Summary Api V1 Client Documents Summary
+                  Get
+      security:
+      - HTTPBearer: []
   /api/v1/client-posture/{client_id}:
     get:
       tags:
@@ -23219,6 +23336,96 @@ components:
       - days
       - rows
       title: ClientCounts
+    ClientDocIn:
+      properties:
+        vendor_client_id:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Vendor Client Id
+        id:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Id
+        kind:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          title: Kind
+        title:
+          type: string
+          maxLength: 300
+          minLength: 1
+          title: Title
+        folder:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Folder
+        body:
+          type: string
+          maxLength: 120000
+          title: Body
+          default: ''
+        url:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Url
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Updated At
+      type: object
+      required:
+      - id
+      - kind
+      - title
+      title: ClientDocIn
+    ClientDocsReport:
+      properties:
+        vendor:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          title: Vendor
+        items:
+          items:
+            $ref: '#/components/schemas/ClientDocIn'
+          type: array
+          maxItems: 100
+          title: Items
+      type: object
+      required:
+      - vendor
+      - items
+      title: ClientDocsReport
+    ClientDocsResponse:
+      properties:
+        accepted:
+          type: integer
+          title: Accepted
+        unmapped:
+          type: integer
+          title: Unmapped
+          default: 0
+        ignored:
+          type: integer
+          title: Ignored
+          default: 0
+        unmapped_clients:
+          items:
+            $ref: '#/components/schemas/UnmappedClient'
+          type: array
+          title: Unmapped Clients
+      type: object
+      required:
+      - accepted
+      title: ClientDocsResponse
     ClientDomains:
       properties:
         client_id:
@@ -26437,6 +26644,73 @@ components:
       type: object
       title: DismissTuningRequest
       description: Body for ``POST /detection/tuning/{rule_id}/dismiss``.
+    DocHit:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client
+        kind:
+          type: string
+          title: Kind
+        title:
+          type: string
+          title: Title
+        folder:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Folder
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        snippet:
+          type: string
+          title: Snippet
+      type: object
+      required:
+      - client_id
+      - client
+      - kind
+      - title
+      - snippet
+      title: DocHit
+    DocSummary:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client
+        kinds:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Kinds
+        refreshed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Refreshed At
+      type: object
+      required:
+      - client_id
+      - client
+      - kinds
+      - refreshed_at
+      title: DocSummary
     DomainWithWeb:
       properties:
         domain:

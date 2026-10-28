@@ -30,6 +30,7 @@ from app.copilot_tools import (
     TOOL_PERMISSIONS,
     ConfirmationError,
     alert_snapshot,
+    docs_snapshot,
     execute_copilot_tool,
     split_pending,
     verify_confirmation,
@@ -250,6 +251,11 @@ async def copilot_chat(
         await db.rollback()
         if snapshot:
             messages.append(SystemMessage(content=snapshot))
+    # A question that the clients' documentation (IT Glue) can answer gets the matching passages up front, for the same reason: a model that cannot call tools would otherwise say it has no access.
+    docs = await docs_snapshot(tenant_id=str(user.tenant_id), user=user, message=body.message)
+    await db.rollback()
+    if docs:
+        messages.append(SystemMessage(content=docs))
     messages.extend(history)
     messages.append(HumanMessage(content=body.message))
 

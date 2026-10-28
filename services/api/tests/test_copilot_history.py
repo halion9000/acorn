@@ -423,3 +423,25 @@ def test_the_model_and_migration_agree():
     assert "PRIMARY KEY (tenant_id, owner_key, conversation_id)" in sql
     assert {c.name for c in CopilotConversation.__table__.primary_key.columns} == {"tenant_id", "owner_key", "conversation_id"}
     assert [m for m in (SystemMessage,) if m]  # (keeps the import honest)
+
+
+class TestClientDocumentation:
+    """A question the clients' documentation can answer reaches the model with the matching passages, as the live alerts do; a question it cannot answer adds nothing."""
+
+    def test_the_matching_passages_are_given_to_the_model_with_the_question(self, monkeypatch):
+        seen = {}
+
+        async def docs(*, tenant_id, user, message, limit=5):
+            seen["message"] = message
+            return "[Client documentation: passages from IT Glue]\n- Airport Security Park: Onboarding guide (document)\n  Step 1"
+
+        monkeypatch.setattr(copilot, "docs_snapshot", docs)
+        r = chat(client_as(), "do you use an onboarding guide for airport security park")
+        assert r.status_code == 200
+        system = [m.content for m in LLM.sent[-1] if isinstance(m, SystemMessage)]
+        assert any(s.startswith("[Client documentation") and "Onboarding guide" in s for s in system)
+        assert seen["message"] == "do you use an onboarding guide for airport security park"
+
+    def test_nothing_is_added_when_nothing_matched(self):
+        chat(client_as(), "hello there friend")
+        assert not any(isinstance(m, SystemMessage) and m.content.startswith("[Client documentation") for m in LLM.sent[-1])

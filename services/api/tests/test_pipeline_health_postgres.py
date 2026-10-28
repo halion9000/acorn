@@ -17,7 +17,9 @@ from sqlalchemy.pool import NullPool
 
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 APP_URL = os.environ.get("AISOC_TEST_PG_APP_URL", "")
-pytestmark = pytest.mark.skipif(not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database")
+pytestmark = pytest.mark.skipif(
+    not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"
+)
 
 
 @pytest.fixture
@@ -30,7 +32,9 @@ async def world():
     try:
         async with owner.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-            await conn.execute(text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :n, 'parent')"), {"i": parent, "n": f"ph-p-{tag}"})
+            await conn.execute(
+                text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :n, 'parent')"), {"i": parent, "n": f"ph-p-{tag}"}
+            )
             await conn.execute(
                 text("insert into tenants (id, name, slug, mssp_role, parent_tenant_id) values (:i, :n, :n, 'child', :p)"),
                 {"i": client, "n": f"ph-c-{tag}", "p": parent},
@@ -42,7 +46,15 @@ async def world():
                         "insert into alerts (tenant_id, title, severity, status, event_time, first_seen, last_seen, source_event_ids, created_at) "
                         "values (:t, :ti, 'low', 'new', :e, :f, :l, cast(:s as jsonb), :c)"
                     ),
-                    {"t": client, "ti": f"a{i}", "e": now - timedelta(minutes=5, seconds=5), "f": now - timedelta(minutes=5, seconds=4), "l": now - timedelta(minutes=5, seconds=1), "s": events, "c": now - timedelta(minutes=5)},
+                    {
+                        "t": client,
+                        "ti": f"a{i}",
+                        "e": now - timedelta(minutes=5, seconds=5),
+                        "f": now - timedelta(minutes=5, seconds=4),
+                        "l": now - timedelta(minutes=5, seconds=1),
+                        "s": events,
+                        "c": now - timedelta(minutes=5),
+                    },
                 )
         yield app, parent, client, now
     finally:

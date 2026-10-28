@@ -13,6 +13,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 import time
 import uuid
@@ -32,6 +33,9 @@ from app.models.alert import Alert
 def _like_pattern(query: str) -> str:
     """A substring pattern for ILIKE with %, _ and the escape character escaped, so a model-supplied `%` matches a literal percent instead of turning the search into a wildcard scan (pair with escape="\\")."""
     return "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
+logger = logging.getLogger(__name__)
 
 
 async def _get_session(tenant_id: uuid.UUID) -> AsyncSession:
@@ -158,6 +162,82 @@ async def alert_snapshot(*, tenant_id: str, user: Any, hours: int = 24, limit: i
     if not isinstance(result, dict) or "error" in result:
         return None
     return format_alert_snapshot(result, hours)
+
+
+async def search_client_docs(*, tenant_id: str, query: str, limit: int = 6) -> dict[str, Any]:
+    """Search the clients' documentation: the organization's own and every client's, best match first. A query that names a client looks only in that client's."""
+    from app.api.v1.endpoints.client_documents import find
+
+    try:
+        tid = uuid.UUID(tenant_id)
+    except ValueError:
+        return {"error": "invalid tenant_id"}
+    if not query or not query.strip():
+        return {"error": "query is required"}
+    async with await _get_session(tid) as db:
+        hits = await find(db, tid, query, None, max(1, min(int(limit or 6), 15)))
+    return {
+        "results": [h.model_dump(mode="json", exclude={"client_id"}) for h in hits],
+        "count": len(hits),
+        **(
+            {}
+            if hits
+            else {
+                "note": "Nothing in the synced documentation matches. It may not be documented, or the documentation may not be synced for that client yet."
+            }
+        ),
+    }
+
+
+def format_docs_snapshot(results: list[dict[str, Any]]) -> str | None:
+    """The matching documentation as text for the model, or None when nothing matched."""
+    if not results:
+        return None
+    lines = [
+        "[Client documentation: passages from IT Glue that match the question. Answer from them when they apply and name the document; if they do not answer the question, say the documentation does not cover it. Do not invent what a document says.]"
+    ]
+    for r in results:
+        where = f"{r['client']}: " if r.get("client") else ""
+        link = f" {r['url']}" if r.get("url") else ""
+        if r.get("kind") == "password":
+            # Only the entry's name, user name and link are held, never the password: say so, so the model points at the link and does not guess.
+            lines.append(
+                f"- {where}{r['title']} (a password entry in IT Glue; the password itself is masked there, open the link to reveal it){link}\n  {r['snippet']}"
+            )
+            continue
+        lines.append(f"- {where}{r['title']} ({r['kind']}){link}\n  {r['snippet']}")
+    return "\n".join(lines)
+
+
+async def docs_snapshot(*, tenant_id: str, user: Any, message: str, limit: int = 5) -> str | None:
+    """Documentation matching a question, as text for the model; None when the caller may not read it, the question is too short to search, or nothing matched. A greeting is not searched."""
+    from app.services.client_docs import search_terms
+
+    try:
+        if len(search_terms(message)) < 3:
+            # Three words is the least that makes a question: short messages ("hi", "thanks") would match unrelated documents.
+            named = await _names_a_client(tenant_id, message)
+            if not named:
+                return None
+        result = await execute_copilot_tool("search_client_docs", {"query": message, "limit": limit}, tenant_id, user=user)
+        if not isinstance(result, dict) or "error" in result:
+            return None
+        return format_docs_snapshot(result.get("results") or [])
+    except Exception as exc:  # noqa: BLE001
+        # Documentation is extra context: a failed lookup must never stop the chat from answering.
+        logger.warning("copilot.docs_snapshot.failed error=%s", type(exc).__name__)
+        return None
+
+
+async def _names_a_client(tenant_id: str, message: str) -> bool:
+    from app.services.client_docs import clients_named
+
+    try:
+        tid = uuid.UUID(tenant_id)
+    except ValueError:
+        return False
+    scope = await _scope_tenants(tid)
+    return bool(clients_named(message, [(cid, name) for cid, name in scope if name]))
 
 
 async def get_alert(*, tenant_id: str, alert_id: str) -> dict[str, Any]:
@@ -320,6 +400,24 @@ COPILOT_TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "search_client_docs",
+            "description": "Search the clients' documentation (IT Glue documents, runbooks, onboarding guides, configurations) for a question or keywords. Use it for how a client is set up, what a client's procedure or guide says, or where something is documented. Put the client's name in the query to look only at that client. Returns the best matches with a passage, the client and a link.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The question or keywords, including the client's name when it is about one client.",
+                    },
+                    "limit": {"type": "integer", "description": "Maximum number of results (default 6, max 15)."},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_alert",
             "description": "Get full details of a single alert by its ID.",
             "parameters": {
@@ -394,6 +492,7 @@ COPILOT_TOOL_SCHEMAS = [
 # Dispatch table mapping tool names to their async implementations
 _COPILOT_TOOL_DISPATCH: dict[str, Any] = {
     "search_alerts": search_alerts,
+    "search_client_docs": search_client_docs,
     "get_alert": get_alert,
     "delete_alert": delete_alert,
     "search_cases": search_cases,
@@ -484,6 +583,7 @@ CONFIRMED_ACTIONS: dict[str, Any] = {"delete_alert": perform_delete_alert}
 # The permission each tool needs, the same ones the matching REST endpoints require. A tool with no entry here is not run.
 TOOL_PERMISSIONS: dict[str, str] = {
     "search_alerts": "alerts:read",
+    "search_client_docs": "alerts:read",
     "get_alert": "alerts:read",
     "delete_alert": "alerts:delete",
     "search_cases": "cases:read",
