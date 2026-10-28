@@ -453,6 +453,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as exc:
         logger.warning("alert_suppression worker failed to start", error=str(exc))
 
+    # The shipped detection rules, into the Rules list and the Detection Catalog (idempotent; a failure only logs).
+    try:
+        from app.services.seed_shipped_detections import enabled as _seed_enabled
+        from app.services.seed_shipped_detections import seed_once as _seed_detections
+
+        if _seed_enabled():
+
+            async def _seed_shipped_detections() -> None:
+                logger.info("shipped detections seeded", result=await _seed_detections())
+
+            asyncio.create_task(_seed_shipped_detections(), name="seed_shipped_detections")
+    except Exception as exc:
+        logger.warning("seeding the shipped detections failed to start", error=str(exc))
+
     # Phase 2.6 — flip /readyz to 200. All lifespan-managed
     # dependencies have been touched at this point (DB, Redis,
     # Neo4j, schedulers); the load balancer can route traffic
