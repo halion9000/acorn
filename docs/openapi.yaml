@@ -10992,6 +10992,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/person-tickets:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Person Tickets
+      description: Record each person's recent tickets, under the client each belongs
+        to.
+      operationId: report_core_feed_person_tickets_api_v1_inbox_core_feed__tenant_token__person_tickets_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonTicketsReport'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonTicketsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/identity/mfa-summary:
     get:
       tags:
@@ -33237,6 +33271,11 @@ components:
           title: Alerts
         signins:
           $ref: '#/components/schemas/SigninBrief'
+        tickets:
+          items:
+            $ref: '#/components/schemas/TicketBrief'
+          type: array
+          title: Tickets
       type: object
       required:
       - person
@@ -33332,6 +33371,103 @@ components:
       - mfa
       - tools
       title: PersonOut
+    PersonTicketIn:
+      properties:
+        vendor_client_id:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Vendor Client Id
+        id:
+          type: string
+          maxLength: 40
+          minLength: 1
+          title: Id
+        summary:
+          type: string
+          maxLength: 300
+          minLength: 1
+          title: Summary
+        status:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Status
+        opened_at:
+          type: string
+          format: date-time
+          title: Opened At
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Updated At
+        user_email:
+          type: string
+          maxLength: 320
+          minLength: 3
+          title: User Email
+        user_name:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: User Name
+        url:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Url
+      type: object
+      required:
+      - id
+      - summary
+      - opened_at
+      - user_email
+      title: PersonTicketIn
+    PersonTicketsReport:
+      properties:
+        vendor:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          title: Vendor
+        items:
+          items:
+            $ref: '#/components/schemas/PersonTicketIn'
+          type: array
+          maxItems: 500
+          title: Items
+      type: object
+      required:
+      - vendor
+      - items
+      title: PersonTicketsReport
+    PersonTicketsResponse:
+      properties:
+        accepted:
+          type: integer
+          title: Accepted
+        unmapped:
+          type: integer
+          title: Unmapped
+          default: 0
+        ignored:
+          type: integer
+          title: Ignored
+          default: 0
+        unmapped_clients:
+          items:
+            $ref: '#/components/schemas/UnmappedClient'
+          type: array
+          title: Unmapped Clients
+      type: object
+      required:
+      - accepted
+      title: PersonTicketsResponse
     PipelineHealth:
       properties:
         overall_status:
@@ -39447,6 +39583,38 @@ components:
       - updated_at
       - updated_by
       title: ThresholdUpdateResponse
+    TicketBrief:
+      properties:
+        id:
+          type: string
+          title: Id
+        summary:
+          type: string
+          title: Summary
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+        opened_at:
+          type: string
+          format: date-time
+          title: Opened At
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        source:
+          type: string
+          title: Source
+      type: object
+      required:
+      - id
+      - summary
+      - opened_at
+      - source
+      title: TicketBrief
     TicketChoice:
       properties:
         mode:

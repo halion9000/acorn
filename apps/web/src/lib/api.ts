@@ -696,6 +696,8 @@ export interface IdentityDetail {
   person: IdentityPerson;
   alerts: { id: string; title: string; severity: string; status: string; source: string | null; created_at: string | null }[];
   signins: { last_30_days: number; failed: number; unusual: number; countries: string[]; last_at: string | null };
+  /** The latest few tickets that name this person in the ticketing tool, newest first. */
+  tickets?: { id: string; summary: string; status: string | null; opened_at: string; url: string | null; source: string }[];
 }
 
 export interface IdentityQuery {

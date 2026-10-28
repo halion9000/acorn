@@ -44,6 +44,7 @@ MODELS = {
     "actions-result": feed.ActionResult,
     "signins": sig.SignInsReport,
     "directory-audits": ident.DirectoryAuditsReport,
+    "person-tickets": idn.PersonTicketsReport,
     "mfa-users": ident.MfaUsersReport,
     "secure-scores": ident.SecureScoreReport,
     "vcio-reviews": cr.VcioReviewReport,

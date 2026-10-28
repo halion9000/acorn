@@ -637,6 +637,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | POST | `/inbox/core-feed/{tenant_token}/license-counts` | Report core feed license counts | no sign-in required (public, or secured another way) |
 | POST | `/inbox/core-feed/{tenant_token}/m365-checks` | Report core feed m365 checks | no sign-in required (public, or secured another way) |
 | POST | `/inbox/core-feed/{tenant_token}/mfa-users` | Report core feed mfa users | no sign-in required (public, or secured another way) |
+| POST | `/inbox/core-feed/{tenant_token}/person-tickets` | Report core feed person tickets | no sign-in required (public, or secured another way) |
 | POST | `/inbox/core-feed/{tenant_token}/scripts` | Report core feed scripts | no sign-in required (public, or secured another way) |
 | POST | `/inbox/core-feed/{tenant_token}/secure-scores` | Report core feed secure score | no sign-in required (public, or secured another way) |
 | POST | `/inbox/core-feed/{tenant_token}/signins` | Report core feed signins | no sign-in required (public, or secured another way) |

@@ -134,6 +134,32 @@ function Detail({ person }: { person: IdentityPerson }) {
           </div>
         )}
       </section>
+      <section data-testid="person-tickets">
+        <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">Recent tickets</h4>
+        {(data.tickets ?? []).length === 0 ? (
+          <p className="text-sm text-gray-500">No ticket in the last 60 days names this person.</p>
+        ) : (
+          <ul className="space-y-1">
+            {(data.tickets ?? []).map((t) => (
+              <li key={`${t.source}-${t.id}`} className="text-sm text-gray-200">
+                {t.url ? (
+                  <a href={t.url} target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:underline">
+                    #{t.id} {t.summary}
+                  </a>
+                ) : (
+                  <span>
+                    #{t.id} {t.summary}
+                  </span>
+                )}
+                <span className="ml-2 text-xs text-gray-400">
+                  {t.status ? `${t.status} · ` : ''}
+                  {safeDistance(t.opened_at, { addSuffix: true })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <section>
         <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">Sign-ins, last 30 days</h4>
         {s.last_30_days === 0 ? (

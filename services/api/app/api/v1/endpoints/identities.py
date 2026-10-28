@@ -12,7 +12,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -23,6 +23,7 @@ from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.identity_source import IdentitySource
+from app.models.person_ticket import PersonTicket
 from app.models.signin import IdentityMfaUser, SigninEvent
 from app.services.alert_suppression import SUPPRESSED, source_of
 from app.services.identity_people import (
@@ -250,10 +251,23 @@ class SigninBrief(BaseModel):
     last_at: datetime | None = None
 
 
+class TicketBrief(BaseModel):
+    id: str
+    summary: str
+    status: str | None = None
+    opened_at: datetime
+    url: str | None = None
+    source: str
+
+
+TICKETS_SHOWN = 5
+
+
 class PersonDetail(BaseModel):
     person: PersonOut
     alerts: list[AlertBrief]
     signins: SigninBrief
+    tickets: list[TicketBrief] = Field(default_factory=list)
 
 
 @router.get("/detail", response_model=PersonDetail, dependencies=[Depends(require_permission("alerts:read"))])
@@ -281,6 +295,19 @@ async def identity_detail(user: AuthUser, db: DBSession, client_id: uuid.UUID, e
         last_at=max((e.occurred_at for e in events), default=None),
     )
     rows = alerts.get(found.key, [])[:25]
+    async with cross_tenant_reads(db):
+        ticket_rows = (
+            (
+                await db.execute(
+                    select(PersonTicket)
+                    .where(PersonTicket.tenant_id == client_id, PersonTicket.user_email == wanted)
+                    .order_by(PersonTicket.opened_at.desc())
+                    .limit(TICKETS_SHOWN)
+                )
+            )
+            .scalars()
+            .all()
+        )
     return PersonDetail(
         person=_out(found, with_sources=True),
         alerts=[
@@ -295,6 +322,7 @@ async def identity_detail(user: AuthUser, db: DBSession, client_id: uuid.UUID, e
             for a in rows
         ],
         signins=brief,
+        tickets=[TicketBrief(id=t.ticket_id, summary=t.summary, status=t.status, opened_at=t.opened_at, url=t.url, source=t.source) for t in ticket_rows],
     )
 
 
@@ -369,3 +397,88 @@ async def report_core_feed_identities(tenant_token: str, body: IdentitiesReport,
     await db.commit()
     return result
 
+
+
+# ---- CORE reports each person's recent tickets -------------------------------------------------------------------------------------------------------------
+
+MAX_TICKETS = 500
+TICKET_DAYS = 90
+
+
+class PersonTicketIn(BaseModel):
+    vendor_client_id: str | None = Field(default=None, max_length=200)
+    id: str = Field(min_length=1, max_length=40)
+    summary: str = Field(min_length=1, max_length=300)
+    status: str | None = Field(default=None, max_length=80)
+    opened_at: datetime
+    updated_at: datetime | None = None
+    user_email: str = Field(min_length=3, max_length=320)
+    user_name: str | None = Field(default=None, max_length=255)
+    url: str | None = Field(default=None, max_length=500)
+
+
+class PersonTicketsReport(BaseModel):
+    vendor: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
+    items: list[PersonTicketIn] = Field(max_length=MAX_TICKETS)
+
+
+class PersonTicketsResponse(BaseModel):
+    accepted: int
+    unmapped: int = 0
+    ignored: int = 0
+    unmapped_clients: list[UnmappedClient] = Field(default_factory=list)
+
+
+async def apply_person_tickets(db: Any, owner: uuid.UUID, report: PersonTicketsReport, now: datetime | None = None) -> PersonTicketsResponse:
+    """Store each ticket under the client its tool client id is mapped to (a ticket whose client is not mapped yet is counted and skipped), and forget those older than 90 days. The caller owns the transaction."""
+    from app.api.v1.endpoints.signins import targets_by_tenant
+
+    now = now or datetime.now(UTC)
+    by_tenant, unmapped, ignored, waiting = await targets_by_tenant(db, owner, report)  # type: ignore[arg-type]
+    accepted = 0
+    for tid, items in by_tenant.items():
+        async with acting_as_tenant(db, tid):
+            values = []
+            seen: set[str] = set()
+            for it in items:
+                email = normalize_email(it.user_email)
+                if email is None or it.id in seen:
+                    continue
+                seen.add(it.id)
+                values.append(
+                    {
+                        "tenant_id": tid,
+                        "source": report.vendor,
+                        "ticket_id": it.id,
+                        "summary": it.summary,
+                        "status": it.status,
+                        "opened_at": it.opened_at if it.opened_at.tzinfo else it.opened_at.replace(tzinfo=UTC),
+                        "updated_at": it.updated_at,
+                        "user_email": email,
+                        "user_name": it.user_name,
+                        "url": it.url,
+                        "received_at": now,
+                    }
+                )
+            if values:
+                stmt = pg_insert(PersonTicket).values(values)
+                update = {c: stmt.excluded[c] for c in values[0] if c not in ("tenant_id", "source", "ticket_id")}
+                await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source", "ticket_id"], set_=update))
+                accepted += len(values)
+            await db.execute(delete(PersonTicket).where(PersonTicket.tenant_id == tid, PersonTicket.opened_at < now - timedelta(days=TICKET_DAYS)))
+    return PersonTicketsResponse(
+        accepted=accepted,
+        unmapped=unmapped,
+        ignored=ignored,
+        unmapped_clients=[UnmappedClient(vendor_client_id=w.vendor_client_id, name=w.name, devices=w.devices) for w in waiting],
+    )
+
+
+@ingest_router.post("/core-feed/{tenant_token}/person-tickets", response_model=PersonTicketsResponse)
+async def report_core_feed_person_tickets(tenant_token: str, body: PersonTicketsReport, db: DBSession) -> PersonTicketsResponse:
+    """Record each person's recent tickets, under the client each belongs to."""
+    owner = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, owner)
+    result = await apply_person_tickets(db, owner, body)
+    await db.commit()
+    return result
