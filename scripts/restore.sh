@@ -157,7 +157,9 @@ restore_postgres() {
   log "Download complete ($(du -sh "$local_file" | cut -f1))"
 
   log "Restoring to ${POSTGRES_URL}…"
-  gunzip -c "$local_file" | psql "$POSTGRES_URL" --single-transaction
+  # A dump made by a newer pg_dump than the server (the CI runner's client is newer than the postgres:16 image) opens with `SET transaction_timeout`, which an older server rejects; that one line aborted
+  # the whole restore. Settings the server does not know are dropped. ON_ERROR_STOP makes any other error fail the restore instead of rolling it back and reporting success.
+  gunzip -c "$local_file" | sed '/^SET transaction_timeout = /d' | psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 --single-transaction
   log "PostgreSQL restore complete"
 }
 
