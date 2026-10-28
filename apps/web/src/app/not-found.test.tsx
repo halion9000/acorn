@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-vi.mock('@/components/landing/sections/StickyNav', () => ({ StickyNav: () => null }));
-vi.mock('@/components/landing/sections/Footer', () => ({ Footer: () => null }));
 
 import NotFoundPage, { metadata } from './not-found';
 
@@ -15,10 +13,10 @@ describe('the 404 page', () => {
     expect(String(metadata.description)).not.toMatch(/demo/i);
   });
 
-  it('still offers the dashboard, pricing, docs and contact, and a way home', () => {
+  it('still offers the dashboard and the docs, and a way home', () => {
     render(<NotFoundPage />);
     const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(expect.arrayContaining(['/', '/dashboard', '/pricing', '/contact']));
+    expect(hrefs).toEqual(expect.arrayContaining(['/', '/dashboard']));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('We do not have a page at that URL.');
     expect(screen.getByText('Your workspace: alerts, cases, and the metrics behind them.')).toBeInTheDocument();
   });

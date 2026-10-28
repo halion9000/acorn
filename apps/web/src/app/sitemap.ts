@@ -6,17 +6,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const base = getPublicSiteUrl();
   const now = new Date();
 
-  const highPriority = ["/", "/benchmark", "/settings/connectors", "/pricing"];
+  const highPriority = ["/", "/settings/connectors"];
   const mediumPriority = [
-    "/sovereign",
-    "/customers",
-    "/blog",
-    "/about",
-    "/contact",
     "/purple-team",
     "/responder",
-    "/mesh",
-    "/why-open-source",
     "/compliance",
     "/hunt",
     "/explore",
@@ -35,9 +28,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/detection",
     "/threat-intel",
     "/sla",
-    "/press",
-    "/privacy",
-    "/terms",
   ];
 
   // Free standalone tools (search-indexed acquisition — v8 W2). The four tool

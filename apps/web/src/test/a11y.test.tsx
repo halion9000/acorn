@@ -4,7 +4,6 @@
  * Runs `axe-core` (via `vitest-axe`) against the highest-traffic surfaces a
  * buyer hits inside the first five minutes:
  *
- *   - Landing `Hero` (root marketing visual)
  *   - Onboarding `StartHero` (the three WS-A2 CTAs)
  *   - `ThemeToggle` (the WS-F1 chrome control)
  *   - `TopBar` (console chrome around every authenticated page)
@@ -107,7 +106,6 @@ vi.mock('../../../package.json', () => ({
 }));
 
 // Component imports go after the mocks so the mocks are resolved first.
-import { Hero } from '../components/landing/Hero';
 import { StartHero } from '../components/onboarding/StartHero';
 import { ThemeToggle } from '../components/theme/ThemeToggle';
 import { ThemeProvider } from '../components/theme/ThemeProvider';
@@ -132,12 +130,6 @@ const axeOptions = {
 };
 
 describe('WCAG 2.1 AA — high-traffic surfaces', () => {
-  it('Landing Hero has no accessibility violations', async () => {
-    const { container } = render(<Hero />);
-    const results = await axe(container, axeOptions);
-    expect(results).toHaveNoViolations();
-  });
-
   it('Onboarding StartHero has no accessibility violations', async () => {
     const { container } = render(<StartHero />);
     const results = await axe(container, axeOptions);

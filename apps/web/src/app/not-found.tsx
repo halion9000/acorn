@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, Telescope } from 'lucide-react';
-import { StickyNav } from '@/components/landing/sections/StickyNav';
-import { Footer } from '@/components/landing/sections/Footer';
 import { docs } from '@/lib/docs';
 
 /**
@@ -33,7 +31,7 @@ import { docs } from '@/lib/docs';
 export const metadata: Metadata = {
   title: '404 — page not found · A.C.O.R.N',
   description:
-    'That URL is not part of the A.C.O.R.N marketing site. Jump back to the homepage, open the dashboard, or pick one of the popular destinations below.',
+    'That URL is not part of A.C.O.R.N. Open the dashboard or pick one of the destinations below.',
   // Tell crawlers we know this is a 404 surface; do not let them index it.
   robots: { index: false, follow: false },
 };
@@ -53,21 +51,10 @@ const DESTINATIONS: ReadonlyArray<Destination> = [
       'Your workspace: alerts, cases, and the metrics behind them.',
   },
   {
-    label: 'See pricing',
-    href: '/pricing',
-    blurb: 'Free to self-host. Pay only when we host.',
-  },
-  {
     label: 'Read the docs',
     href: docs('intro'),
     blurb: 'Architecture, agent contract, deployment recipes, connector SDK.',
     external: true,
-  },
-  {
-    label: 'Contact the team',
-    href: '/contact',
-    blurb:
-      'Sovereign deployments, design-partner conversations, security disclosures.',
   },
 ];
 
@@ -77,8 +64,6 @@ export default function NotFoundPage() {
       data-theme="dark"
       className="relative min-h-screen overflow-x-hidden bg-surface-base text-fg-primary"
     >
-      <StickyNav />
-
       <section className="px-6 pt-32 pb-12">
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-brand-300">
@@ -142,8 +127,6 @@ export default function NotFoundPage() {
           </ul>
         </div>
       </section>
-
-      <Footer />
     </main>
   );
 }

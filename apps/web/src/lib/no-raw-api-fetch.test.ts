@@ -44,7 +44,6 @@ export function findRawApiFetches(files: { path: string; text: string }[]): stri
 // ANY bare fetch() in a file that mentions /api/v1 is a violation, unless the file is listed here on purpose.
 const BARE_FETCH = /(?<![A-Za-z_.\w])fetch\(/g;
 const NO_TOKEN_ON_PURPOSE: Record<string, string> = {
-  [path.join('app', '(marketing)', 'waitlist', 'page.tsx')]: 'public marketing signup: the visitor is not logged in',
   [path.join('lib', 'replay.ts')]: 'public share link (/api/v1/r/{slug}) is open to anyone by design',
   [path.join('app', '(app)', 'cases', 'page.tsx')]: 'server component: there is no browser token on the server; the client view reloads with the login',
 };
