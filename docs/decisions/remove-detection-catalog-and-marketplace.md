@@ -1,6 +1,6 @@
 # Plan: remove the Detection Catalog and the Marketplace
 
-Status: PROPOSED (2026-10-28). Nothing has been deleted. Written at Hal's request; each step below needs his go-ahead before it is made.
+Status: PROPOSED (2026-10-28), updated with Hal's answers the same day. Nothing has been deleted. Each step below still needs his go-ahead before it is made.
 
 ## What exists today (three separate things that look like one)
 
@@ -20,7 +20,7 @@ What the content really is: 1,087 shipped detection rules (non-quarantined) and 
 
 ## Steps (each is its own commit, tested, and can be stopped after)
 
-1. **Rules page gets the Sigma imports.** Show the 77 imported rules on the Rules page as rules that are off ("testing") with a switch to turn them on, in the category filter that now exists. Needs a decision: seed them into every client tenant (about 77 x 224 rows, like the built-ins) or only for the parent and let clients inherit. Verify: count on the live Rules page, turn one on, see it fire in a test.
+1. **The Sigma imports become rule packs (Hal's decision: "buckets" applied to different tenants).** The API already has rule packs (`/mssp/rule-packs`, tables `mssp_rule_packs`, `mssp_rule_pack_rules`, `mssp_rule_pack_assignments`): a parent-curated bundle of rules that is assigned to client tenants, with per-client overrides. Nothing uses it yet (0 packs) and the web app has no page for it. Plan: (a) load the 77 imported rules once, as the parent's own rules in "testing" status, instead of copying them into every client (so no 77 x 224 rows); (b) one pack per category (cloud, endpoint, identity...); (c) a Rule packs page (a tab on the Rules page): the packs with their rules, and a checkbox per client to apply a pack; (d) assigning a pack to a client is what makes its rules apply there. Open points to check in the code before building: how `resolve_effective_rules` treats a rule whose status is "testing" when its pack is assigned, and whether an assignment should also be what promotes it. Verify: assign one pack to one test client and see only that client's effective rules grow.
 2. **Playbooks page lists the shipped playbook files.** Move what the Marketplace Playbooks tab and the Community tab do (browse, "add to my playbooks") into the Playbooks page. Verify: each shipped playbook appears once; adding one creates the tenant playbook.
 3. **Remove the pages and menu entries.** Delete `/detection/catalog`, `/marketplace`, the Community tab, `ContributorLeaderboard`, their tests and sidebar entries; `/marketplace` and `/detection/catalog` redirect to the Rules and Playbooks pages. Verify: web build and tests, the nav tests.
 4. **Remove the API.** Delete `community.py`, `marketplace.py`, `community_catalog.py`, the catalog seeding (`load_catalog_detections.py`, `seed_shipped_detections.py`, its startup task in `main.py`), their routes from `router.py`, `unguarded_routes.txt` and the route-sweep lists; regenerate the capabilities and OpenAPI docs and Cipher's copy. Verify: the full API test run, the route-sweep tests, OpenAPI check.
@@ -33,8 +33,12 @@ What the content really is: 1,087 shipped detection rules (non-quarantined) and 
 - The public benchmark page's `CommunitySubmissions` component is a different feature and is not touched.
 - Roles that hide `/marketplace` or `/detection/catalog` in their saved settings will point at pages that no longer exist; harmless, but the role editor should drop them.
 
-## Needs Hal's decision before step 1
+## Decided by Hal
 
-1. Seed the 77 Sigma rules into every client, or only the parent?
-2. Are any of the 62 playbooks you would not want shown on the Playbooks page?
-3. Do all four steps in order, or stop after step 3 (pages gone, API and tables left in place for now)?
+- Sigma rules: buckets (packs) applied to tenants, not copied into every client.
+- Roles & Permissions moved under Settings (done, 2026-10-28).
+
+## Still needs Hal's decision
+
+1. Are any of the 62 playbooks you would not want shown on the Playbooks page?
+2. Do all five steps in order, or stop after step 3 (pages gone, API and tables left in place for now)?
