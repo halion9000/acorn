@@ -202,6 +202,17 @@ class TestEverythingSurvivesARestart:
             run(db_path, lambda s, t=tenant: community.install_community_detection(rule_id, current_user=person(t), db=s))
         assert row(db_path, "detection", rule_id).data["install_count"] == 3
 
+    def test_the_installed_list_names_only_what_this_tenant_installed(self, db_path):
+        first = publish_detection(db_path, person())
+        run(db_path, approve("detection", first))
+        mine, other = person(uuid.uuid4()), person(uuid.uuid4())
+        assert run(db_path, lambda s: community.installed_community_detections(mine, s)) == {"ids": []}
+        run(db_path, lambda s: community.install_community_detection(first, current_user=mine, db=s))
+        assert run(db_path, lambda s: community.installed_community_detections(mine, s)) == {"ids": [first]}
+        assert run(db_path, lambda s: community.installed_community_detections(other, s)) == {
+            "ids": []
+        }, "another tenant's install is not mine"
+
     def test_the_running_average_is_right_across_separate_requests(self, db_path):
         publish_plugin(db_path, person())
         run(db_path, approve("plugin", "plug-1"))  # only an approved plugin can be rated

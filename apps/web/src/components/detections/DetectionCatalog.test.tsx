@@ -11,11 +11,14 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 const rule = { id: 'r1', name: 'Suspicious PowerShell', description: 'Encoded command line', author: 'Someone', level: 'high', tags: [], install_count: 3, rating: 0, rating_count: 0, status: 'approved', submitted_at: '2026-10-08T00:00:00Z' };
 
 let installResponse: () => Promise<Response>;
+let installedIds: string[] = [];
 
 beforeEach(() => {
   authFetch.mockReset();
   installResponse = async () => json(200, { message: 'installed' });
+  installedIds = [];
   authFetch.mockImplementation(async (url: string) => {
+    if (url.includes('/installed/detections')) return json(200, { ids: installedIds });
     if (url.includes('/install')) return installResponse();
     return json(200, { items: [rule], total: 1, page: 1, page_size: 24 });
   });
@@ -26,6 +29,26 @@ async function renderAndFindInstall() {
   await screen.findByText('Suspicious PowerShell');
   return screen.getByRole('button', { name: 'Install Rule' });
 }
+
+describe('a rule this workspace already installed', () => {
+  it('opens as Installed, with nothing to click', async () => {
+    installedIds = ['r1'];
+    render(<DetectionCatalog />);
+    await screen.findByText('Suspicious PowerShell');
+    expect(await screen.findByRole('button', { name: /Installed/ })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Install Rule' })).not.toBeInTheDocument();
+  });
+
+  it('still offers Install when the installed list cannot be read', async () => {
+    authFetch.mockImplementation(async (url: string) => {
+      if (url.includes('/installed/detections')) return new Response('nope', { status: 500 });
+      return json(200, { items: [rule], total: 1, page: 1, page_size: 24 });
+    });
+    render(<DetectionCatalog />);
+    await screen.findByText('Suspicious PowerShell');
+    expect(screen.getByRole('button', { name: 'Install Rule' })).toBeEnabled();
+  });
+});
 
 // The Install button marked the rule "Installed" whenever the request merely COMPLETED: a 403 (no rules:write), a 400 or a 500 all showed a green "Installed".
 describe('the Install button', () => {

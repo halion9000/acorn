@@ -437,6 +437,21 @@ async def list_community_detections(
     }
 
 
+@router.get("/installed/detections", dependencies=[Depends(require_permission("rules:view"))])
+async def installed_community_detections(current_user: AuthUser, db: DBSession) -> dict[str, list[str]]:
+    """The ids of the catalog detections this tenant has installed, so the catalog can mark them. Read from the rules' provenance, so it covers exactly the rules the install route made.
+    A separate route because the browse list is public and has no tenant."""
+    from sqlalchemy import select
+
+    from app.models.detection_rule import DetectionRule
+
+    provenances = (
+        (await db.execute(select(DetectionRule.provenance).where(DetectionRule.tenant_id == current_user.tenant_id))).scalars().all()
+    )
+    ids = {p["community_detection_id"] for p in provenances if isinstance(p, dict) and p.get("community_detection_id")}
+    return {"ids": sorted(ids)}
+
+
 @router.get("/detections/{detection_id}")
 async def get_community_detection(detection_id: str, db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     """Get Sigma rule detail including full YAML content (sigma_yaml field)."""

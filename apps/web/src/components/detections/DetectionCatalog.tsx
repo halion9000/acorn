@@ -78,9 +78,11 @@ function StarRating({ rating, count }: { rating: number; count: number }) {
   );
 }
 
-function DetectionCard({ rule }: { rule: DetectionRule }) {
+function DetectionCard({ rule, alreadyInstalled }: { rule: DetectionRule; alreadyInstalled: boolean }) {
   const [installing, setInstalling] = useState(false);
-  const [installed, setInstalled] = useState(false);
+  const [justInstalled, setInstalled] = useState(false);
+  // Installed in this workspace before this page opened, or by the button just now.
+  const installed = alreadyInstalled || justInstalled;
   const [installError, setInstallError] = useState<string | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -233,6 +235,8 @@ export function DetectionCatalog() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetched, setFetched] = useState(false);
+  // Ids of the catalog rules this workspace already has, so they open as Installed. A failed read only means the button says Install Rule (the server still answers 409 for a repeat).
+  const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
 
   const loadRules = async (
     q: string,
@@ -269,6 +273,10 @@ export function DetectionCatalog() {
   };
 
   useEffect(() => {
+    authFetch('/api/v1/community/installed/detections')
+      .then((res) => (res.ok ? res.json() : { ids: [] }))
+      .then((data: { ids?: string[] }) => setInstalledIds(new Set(data.ids ?? [])))
+      .catch(() => undefined);
     loadRules(search, productFilter, levelFilter, sortBy, page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -401,7 +409,7 @@ export function DetectionCatalog() {
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {rules.map((rule) => (
-              <DetectionCard key={rule.id} rule={rule} />
+              <DetectionCard key={rule.id} rule={rule} alreadyInstalled={installedIds.has(rule.id)} />
             ))}
           </div>
 
