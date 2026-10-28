@@ -187,6 +187,7 @@ jobs:
               sys.exit("the actions Postgres test must RUN and pass: a skip means its variables or database were not as required")
           PY
 
+      # test_service_migrations_postgres.py is LAST ON PURPOSE: it drops the public schema, so every file after it would find no tables.
       - name: Run the Postgres-backed tests
         if: ${{ !cancelled() }}  # even when the actions step above failed: one red step should not hide the others
         working-directory: services/api
@@ -219,13 +220,13 @@ jobs:
             tests/test_alert_finding_uid_index_postgres.py \
             tests/test_core_feed_sla_postgres.py \
             tests/test_iocs_from_alerts_postgres.py \
-            tests/test_service_migrations_postgres.py \
             tests/test_bulk_and_m365_postgres.py \
             tests/test_core_feed_scripts_postgres.py \
             tests/test_db_constraint_contract_postgres.py \
             tests/test_db_rls_and_grants_postgres.py \
             tests/test_client_review_postgres.py \
             tests/test_core_feed_all_routes_postgres.py \
+            tests/test_service_migrations_postgres.py \
             -v --tb=short -rs --junitxml=postgres-tests.junit.xml
 
       # When a step above fails, put the failing test names and the end of pytest's output into ANNOTATIONS (visible on the run's summary and through the

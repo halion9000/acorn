@@ -120,7 +120,7 @@ jobs:
               ok_api=1
               echo "✓ api /health 200"
             fi
-            if [ "$ok_web" -eq 0 ] && probe_http "http://localhost:3000" "200"; then
+            if [ "$ok_web" -eq 0 ] && probe_http "http://localhost:3000/login" "200"; then
               ok_web=1
               echo "✓ web 200"
             fi

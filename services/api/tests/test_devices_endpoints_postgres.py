@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+from app.api.v1.endpoints import devices as devices_endpoints
 from app.api.v1.endpoints.devices import (
     DeviceIn,
     DeviceOut,
@@ -21,7 +22,6 @@ from app.api.v1.endpoints.devices import (
     host_key,
     is_missing_from,
     last_online_of,
-    list_devices,
     list_duplicates,
     merge_duplicate,
     offline_days_of,
@@ -76,6 +76,31 @@ async def world():
         await owner.dispose()
 
 
+# The route functions are called directly here, so a parameter left out arrives as FastAPI's ``Query(...)`` object (truthy) rather than its default: that once hid every device behind
+# ``hidden=Query(...)``. Every filter is given its real default, and a test overrides only what it is about.
+LIST_DEFAULTS = {
+    "page": 1,
+    "page_size": 50,
+    "client_id": None,
+    "search": None,
+    "vendor": None,
+    "not_in_master": False,
+    "missing": None,
+    "offline": False,
+    "has_alerts": False,
+    "attention": False,
+    "stale": False,
+    "hidden": False,
+    "os": None,
+    "kind": None,
+    "encryption": None,
+}
+
+
+async def list_devices(current_user, db, **filters):
+    return await devices_endpoints.list_devices(current_user, db, **{**LIST_DEFAULTS, **filters})
+
+
 async def session(tenant_id, work):
     engine = create_async_engine(APP_URL, poolclass=NullPool)
     try:
@@ -89,11 +114,11 @@ async def session(tenant_id, work):
 
 
 def user(tenant_id):
-    return SimpleNamespace(tenant_id=tenant_id)
+    return SimpleNamespace(tenant_id=tenant_id, user_id=None)
 
 
-def dev(vendor, vid, ext, host, serial=None):
-    return DeviceIn(vendor=vendor, vendor_client_id=vid, external_id=ext, hostname=host, serial=serial)
+def dev(vendor, vid, ext, host, serial=None, os=None):
+    return DeviceIn(vendor=vendor, vendor_client_id=vid, external_id=ext, hostname=host, serial=serial, os=os)
 
 
 async def test_devices_land_under_their_mapped_client_and_unmapped_ones_are_counted(world):
@@ -527,11 +552,13 @@ def test_offline_days_only_counts_a_device_a_tool_has_not_seen_for_a_week_and_un
 
 async def test_offline_filter_and_count_use_the_tools_last_online_not_the_sync_time(world):
     p = world["parent"]
-    old = (datetime.now(UTC) - timedelta(days=30)).isoformat()
+    old = (datetime.now(UTC) - timedelta(days=8)).isoformat()  # offline a week, but not yet quiet long enough to hide by itself (10 days)
+    ancient = (datetime.now(UTC) - timedelta(days=30)).isoformat()
     new = datetime.now(UTC).isoformat()
     items = [
         DeviceIn(vendor="ninjaone", vendor_client_id="5", external_id="o1", hostname="OLD-PC", details={"last_contact": old}),
         DeviceIn(vendor="ninjaone", vendor_client_id="5", external_id="o2", hostname="NEW-PC", details={"last_contact": new}),
+        DeviceIn(vendor="ninjaone", vendor_client_id="5", external_id="o4", hostname="ANCIENT-PC", details={"last_contact": ancient}),
         DeviceIn(vendor="ninjaone", vendor_client_id="5", external_id="o3", hostname="NO-TIME-PC"),  # no tool says: unknown, not offline
     ]
     await session(p, lambda db: apply_devices(db, p, DevicesReport(items=items)))
@@ -552,8 +579,9 @@ async def test_offline_filter_and_count_use_the_tools_last_online_not_the_sync_t
         ),
     )
     assert [d.hostname for d in res.items] == ["OLD-PC"]
-    assert res.items[0].offline_days >= 30
+    assert res.items[0].offline_days >= 8
     assert res.summary.offline == 1
+    assert res.summary.hidden == 1, "a device quiet for a month hides by itself, so it is not in the list at all"
 
 
 # ---- possible duplicates: list, "not a duplicate", merge ----------------------------------------------------------------------------------------------------------
@@ -564,7 +592,13 @@ async def _front_desk_pair(world):
     await session(
         p,
         lambda db: apply_devices(
-            db, p, DevicesReport(items=[dev("ninjaone", "5", "1", "FRONT-DESK"), dev("addigy", "a1", "2", "front-desk")])
+            db,
+            p,
+            # Same name, different tools, no serials: ingest folds such a pair into one device by itself, unless the tools disagree about the operating system. That disagreement is what leaves
+            # the pair for a person to decide on, so it is what these tests start from.
+            DevicesReport(
+                items=[dev("ninjaone", "5", "1", "FRONT-DESK", os="Windows 11"), dev("addigy", "a1", "2", "front-desk", os="macOS 14")]
+            ),
         ),
     )
     found = await session(p, lambda db: list_duplicates(user(p), db, client_id=None))
