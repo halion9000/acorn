@@ -78,3 +78,20 @@ def test_the_detail_carries_tickets_and_defaults_to_none():
     assert ep.PersonDetail.model_fields["tickets"].default_factory() == []
     t = ep.TicketBrief(id="9", summary="s", opened_at=NOW, source="halopsa")
     assert (t.status, t.url) == (None, None)
+
+
+def test_the_latest_ten_sign_ins_come_newest_first_with_the_unusual_ones_marked():
+    events = [
+        SimpleNamespace(occurred_at=NOW - timedelta(hours=i), app="Outlook", country="US", city=None, ip_address="1.1.1.1", success=i % 2 == 0, mfa=True, anomaly_score=0.9 if i == 3 else None)
+        for i in range(14)
+    ]
+    rows = ep.signin_rows(list(reversed(events)))
+    assert len(rows) == ep.SIGNINS_SHOWN == 10
+    assert rows[0].at == NOW and rows[-1].at == NOW - timedelta(hours=9)
+    assert [r.unusual for r in rows].index(True) == 3
+    assert ep.signin_rows([]) == []
+
+
+def test_the_detail_lists_default_to_empty_so_an_older_client_still_reads_it():
+    d = ep.PersonDetail.model_fields
+    assert d["recent_signins"].default_factory() == [] and d["changes"].default_factory() == []

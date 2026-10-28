@@ -12300,7 +12300,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ChangeRow'
+                  $ref: '#/components/schemas/app__api__v1__endpoints__billing__ChangeRow'
                 title: Response Changes Log Api V1 Billing Changes Get
         '422':
           description: Validation Error
@@ -23478,51 +23478,6 @@ components:
       - tags
       - sla_due_at
       title: CaseResponse
-    ChangeRow:
-      properties:
-        client_id:
-          type: string
-          format: uuid
-          title: Client Id
-        client_name:
-          type: string
-          title: Client Name
-        source:
-          type: string
-          title: Source
-        item:
-          type: string
-          title: Item
-        unit:
-          type: string
-          title: Unit
-        count:
-          type: integer
-          title: Count
-        previous_count:
-          anyOf:
-          - type: integer
-          - type: 'null'
-          title: Previous Count
-        observed_at:
-          type: string
-          format: date-time
-          title: Observed At
-        unusual:
-          type: boolean
-          title: Unusual
-          default: false
-      type: object
-      required:
-      - client_id
-      - client_name
-      - source
-      - item
-      - unit
-      - count
-      - previous_count
-      - observed_at
-      title: ChangeRow
     CheckAcceptanceOut:
       properties:
         reason:
@@ -33276,6 +33231,16 @@ components:
             $ref: '#/components/schemas/TicketBrief'
           type: array
           title: Tickets
+        recent_signins:
+          items:
+            $ref: '#/components/schemas/SigninRow'
+          type: array
+          title: Recent Signins
+        changes:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__identities__ChangeRow'
+          type: array
+          title: Changes
       type: object
       required:
       - person
@@ -37955,6 +37920,49 @@ components:
           title: Last At
       type: object
       title: SigninBrief
+    SigninRow:
+      properties:
+        at:
+          type: string
+          format: date-time
+          title: At
+        app:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: App
+        country:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Country
+        city:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: City
+        ip:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ip
+        success:
+          type: boolean
+          title: Success
+        mfa:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Mfa
+        unusual:
+          type: boolean
+          title: Unusual
+          default: false
+      type: object
+      required:
+      - at
+      - success
+      title: SigninRow
     SigninSummary:
       properties:
         last_24h:
@@ -41952,6 +41960,51 @@ components:
       required:
       - tickets
       title: TicketsResponse
+    app__api__v1__endpoints__billing__ChangeRow:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        source:
+          type: string
+          title: Source
+        item:
+          type: string
+          title: Item
+        unit:
+          type: string
+          title: Unit
+        count:
+          type: integer
+          title: Count
+        previous_count:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Previous Count
+        observed_at:
+          type: string
+          format: date-time
+          title: Observed At
+        unusual:
+          type: boolean
+          title: Unusual
+          default: false
+      type: object
+      required:
+      - client_id
+      - client_name
+      - source
+      - item
+      - unit
+      - count
+      - previous_count
+      - observed_at
+      title: ChangeRow
     app__api__v1__endpoints__business_context__UpdateRuleRequest:
       properties:
         yaml:
@@ -42360,6 +42413,38 @@ components:
       - completed_at
       - created_by
       title: HuntResponse
+    app__api__v1__endpoints__identities__ChangeRow:
+      properties:
+        at:
+          type: string
+          format: date-time
+          title: At
+        activity:
+          type: string
+          title: Activity
+        actor:
+          type: string
+          title: Actor
+        target:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+        success:
+          type: boolean
+          title: Success
+          default: true
+      type: object
+      required:
+      - at
+      - activity
+      - actor
+      title: ChangeRow
     app__api__v1__endpoints__identities__IdentitySummary:
       properties:
         total:

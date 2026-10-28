@@ -139,6 +139,42 @@ describe('the Identities page', () => {
     expect(detail).toHaveTextContent('authenticator');
   });
 
+  it('a row also shows the latest tickets, sign-ins and directory changes, each only when there is something to show', async () => {
+    const base = { person: person(), alerts: [], signins: { last_30_days: 0, failed: 0, unusual: 0, countries: [], last_at: null } };
+    api.detail.mockResolvedValue({
+      ...base,
+      tickets: [{ id: '101', summary: 'Cannot print', status: 'Open', opened_at: '2026-10-22T00:00:00Z', url: 'https://acme.halopsa.com/tickets?id=101', source: 'halopsa' }],
+      recent_signins: [
+        { at: '2026-10-22T10:00:00Z', app: 'Outlook', country: 'US', city: 'Austin', ip: '1.1.1.1', success: true, mfa: false, unusual: true },
+        { at: '2026-10-22T09:00:00Z', app: null, country: null, city: null, ip: null, success: false, mfa: null, unusual: false },
+      ],
+      changes: [{ at: '2026-10-21T10:00:00Z', activity: 'Reset user password', actor: 'admin@acme.com', target: 'amy@acme.com', detail: null, success: true }],
+    });
+    show();
+    await userEvent.click((await screen.findAllByTestId('identity-row'))[0]);
+    const detail = await screen.findByTestId('identity-detail');
+    expect(within(detail).getByRole('link', { name: '#101 Cannot print' })).toHaveAttribute('href', 'https://acme.halopsa.com/tickets?id=101');
+    const signins = within(detail).getByTestId('person-signins');
+    expect(signins).toHaveTextContent('Outlook');
+    expect(signins).toHaveTextContent('Austin, US');
+    expect(signins).toHaveTextContent('no multi-factor');
+    expect(signins).toHaveTextContent('flagged unusual');
+    expect(signins).toHaveTextContent('unknown app');
+    expect(within(detail).getByTestId('person-changes')).toHaveTextContent('Reset user password');
+    expect(within(detail).getByTestId('person-changes')).toHaveTextContent('by admin@acme.com');
+    expect(within(detail).getByTestId('person-changes')).not.toHaveTextContent(' on amy@acme.com');
+  });
+
+  it('shows no sign-in or change sections for an older answer that has neither, and says when there are no tickets', async () => {
+    api.detail.mockResolvedValue({ person: person(), alerts: [], signins: { last_30_days: 0, failed: 0, unusual: 0, countries: [], last_at: null } });
+    show();
+    await userEvent.click((await screen.findAllByTestId('identity-row'))[0]);
+    const detail = await screen.findByTestId('identity-detail');
+    expect(within(detail).getByTestId('person-tickets')).toHaveTextContent('No ticket in the last 60 days names this person.');
+    expect(within(detail).queryByTestId('person-signins')).toBeNull();
+    expect(within(detail).queryByTestId('person-changes')).toBeNull();
+  });
+
   it('says plainly when nobody matches, and shows an error with a retry', async () => {
     api.list.mockResolvedValueOnce(list([], { total: 0 }));
     const first = show();

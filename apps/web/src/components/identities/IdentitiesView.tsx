@@ -173,6 +173,43 @@ function Detail({ person }: { person: IdentityPerson }) {
           </ul>
         )}
       </section>
+      {(data.recent_signins ?? []).length > 0 && (
+        <section data-testid="person-signins">
+          <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">Latest sign-ins</h4>
+          <ul className="space-y-0.5 text-sm text-gray-200">
+            {(data.recent_signins ?? []).map((e, i) => (
+              <li key={`${e.at}-${i}`}>
+                <span className={`mr-2 rounded border px-1 py-0.5 text-[11px] ${e.success ? 'border-emerald-700 text-emerald-300' : 'border-red-700 text-red-300'}`}>{e.success ? 'ok' : 'failed'}</span>
+                {e.app ?? 'unknown app'}
+                <span className="ml-2 text-xs text-gray-400">
+                  {[e.city, e.country].filter(Boolean).join(', ') || 'unknown place'}
+                  {e.ip ? ` · ${e.ip}` : ''}
+                  {e.mfa === false ? ' · no multi-factor' : ''}
+                  {e.unusual ? ' · flagged unusual' : ''} · {safeDistance(e.at, { addSuffix: true })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {(data.changes ?? []).length > 0 && (
+        <section data-testid="person-changes">
+          <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">Recent changes</h4>
+          <ul className="space-y-0.5 text-sm text-gray-200">
+            {(data.changes ?? []).map((c, i) => (
+              <li key={`${c.at}-${i}`}>
+                {c.activity}
+                <span className="ml-2 text-xs text-gray-400">
+                  by {c.actor}
+                  {c.target && c.target.toLowerCase() !== data.person.email.toLowerCase() ? ` on ${c.target}` : ''}
+                  {c.detail ? ` · ${c.detail}` : ''}
+                  {c.success ? '' : ' · failed'} · {safeDistance(c.at, { addSuffix: true })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

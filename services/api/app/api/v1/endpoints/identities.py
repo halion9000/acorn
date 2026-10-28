@@ -12,7 +12,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -24,7 +24,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.identity_source import IdentitySource
 from app.models.person_ticket import PersonTicket
-from app.models.signin import IdentityMfaUser, SigninEvent
+from app.models.signin import DirectoryAuditEvent, IdentityMfaUser, SigninEvent
 from app.services.alert_suppression import SUPPRESSED, source_of
 from app.services.identity_people import (
     MICROSOFT,
@@ -261,6 +261,34 @@ class TicketBrief(BaseModel):
 
 
 TICKETS_SHOWN = 5
+SIGNINS_SHOWN = 10
+CHANGES_SHOWN = 10
+
+
+class SigninRow(BaseModel):
+    at: datetime
+    app: str | None = None
+    country: str | None = None
+    city: str | None = None
+    ip: str | None = None
+    success: bool
+    mfa: bool | None = None
+    unusual: bool = False
+
+
+class ChangeRow(BaseModel):
+    at: datetime
+    activity: str
+    actor: str
+    target: str | None = None
+    detail: str | None = None
+    success: bool = True
+
+
+def signin_rows(events: list[Any]) -> list[SigninRow]:
+    """The person's latest sign-ins, newest first."""
+    latest = sorted(events, key=lambda e: e.occurred_at, reverse=True)[:SIGNINS_SHOWN]
+    return [SigninRow(at=e.occurred_at, app=e.app, country=e.country, city=e.city, ip=e.ip_address, success=e.success, mfa=e.mfa, unusual=e.anomaly_score is not None) for e in latest]
 
 
 class PersonDetail(BaseModel):
@@ -268,6 +296,8 @@ class PersonDetail(BaseModel):
     alerts: list[AlertBrief]
     signins: SigninBrief
     tickets: list[TicketBrief] = Field(default_factory=list)
+    recent_signins: list[SigninRow] = Field(default_factory=list)
+    changes: list[ChangeRow] = Field(default_factory=list)
 
 
 @router.get("/detail", response_model=PersonDetail, dependencies=[Depends(require_permission("alerts:read"))])
@@ -296,6 +326,22 @@ async def identity_detail(user: AuthUser, db: DBSession, client_id: uuid.UUID, e
     )
     rows = alerts.get(found.key, [])[:25]
     async with cross_tenant_reads(db):
+        change_rows = (
+            (
+                await db.execute(
+                    select(DirectoryAuditEvent)
+                    .where(
+                        DirectoryAuditEvent.tenant_id == client_id,
+                        DirectoryAuditEvent.occurred_at >= since,
+                        or_(DirectoryAuditEvent.target.ilike(wanted), DirectoryAuditEvent.actor.ilike(wanted)),
+                    )
+                    .order_by(DirectoryAuditEvent.occurred_at.desc())
+                    .limit(CHANGES_SHOWN)
+                )
+            )
+            .scalars()
+            .all()
+        )
         ticket_rows = (
             (
                 await db.execute(
@@ -322,6 +368,8 @@ async def identity_detail(user: AuthUser, db: DBSession, client_id: uuid.UUID, e
             for a in rows
         ],
         signins=brief,
+        recent_signins=signin_rows(events),
+        changes=[ChangeRow(at=c.occurred_at, activity=c.activity, actor=c.actor, target=c.target, detail=c.detail, success=c.success) for c in change_rows],
         tickets=[TicketBrief(id=t.ticket_id, summary=t.summary, status=t.status, opened_at=t.opened_at, url=t.url, source=t.source) for t in ticket_rows],
     )
 
