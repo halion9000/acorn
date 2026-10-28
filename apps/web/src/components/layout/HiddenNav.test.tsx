@@ -44,10 +44,10 @@ describe('the sidebar for a role that hides things', () => {
     expect(screen.getByText('Client Security')).toBeInTheDocument();
   });
 
-  it('keeps the roles page even when its section is hidden', () => {
+  it('hides the pages of a hidden section, and the roles page is no longer a sidebar entry (it is listed under Settings)', () => {
     state.hidden = new Set(['section:Platform']);
     render(<Sidebar />);
-    expect(screen.getByRole('link', { name: /Roles/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Roles/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /SLA Tracking/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Compliance/ })).toBeInTheDocument(); // the vCIO section is its own, not part of Platform
   });
@@ -77,6 +77,27 @@ describe('opening the address of a hidden page', () => {
       expect(screen.getByRole('status')).toHaveTextContent('hidden for your role');
       unmount();
     }
+  });
+
+  it('never hides the roles page by address, even when Settings and its section are hidden', () => {
+    state.hidden = new Set(['/settings', 'section:Platform', '/settings/rbac']);
+    for (const path of ['/settings/rbac', '/settings/rbac/anything']) {
+      state.path = path;
+      const { unmount } = render(
+        <HiddenPageGuard>
+          <p>the roles page</p>
+        </HiddenPageGuard>,
+      );
+      expect(screen.getByText('the roles page')).toBeInTheDocument();
+      unmount();
+    }
+    state.path = '/settings/connectors';
+    render(
+      <HiddenPageGuard>
+        <p>connectors</p>
+      </HiddenPageGuard>,
+    );
+    expect(screen.queryByText('connectors')).not.toBeInTheDocument(); // the rest of Settings is hidden, as the role asked
   });
 
   it('never hides the dashboard', () => {

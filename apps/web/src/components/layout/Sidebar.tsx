@@ -372,11 +372,6 @@ const navSections: NavSection[] = [
         icon: <SparklesIcon />,
       },
       {
-        label: 'Roles & Permissions',
-        href: '/settings/rbac',
-        icon: <ShieldIcon />,
-      },
-      {
         label: 'MSSP Dashboard',
         href: '/mssp',
         icon: <GlobeIcon />,

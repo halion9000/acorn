@@ -225,15 +225,15 @@ describe('hiding parts of the console from a role', () => {
     await waitFor(() => expect(posts[0].body.hidden_nav).toEqual(['/settings/client-posture']));
   });
 
-  it('greys out the pages of a hidden section, and offers no way to hide the roles page or the home page', async () => {
+  it('greys out the pages of a hidden section, and offers no way to hide the home page or the roles page', async () => {
     open();
     await openForm();
     await userEvent.click(screen.getByRole('checkbox', { name: 'Show the Automation section' }));
     expect(screen.getByRole('checkbox', { name: 'Show Playbooks' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Show Dashboard' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Show Dashboard' })).toBeChecked();
-    const rbac = screen.getAllByRole('checkbox').find((c) => (c as HTMLInputElement).disabled && /Roles/.test(c.getAttribute('aria-label') ?? ''));
-    expect(rbac).toBeTruthy();
+    // The roles page is not a sidebar entry (it is listed under Settings), so there is nothing to tick that would hide it.
+    expect(screen.getAllByRole('checkbox').some((c) => /Roles/.test(c.getAttribute('aria-label') ?? ''))).toBe(false);
   });
 
   it('a starting point fills in the permissions and what is hidden but saves nothing until Create', async () => {

@@ -37,21 +37,32 @@ export function visibleSections<I extends CatalogItem, S extends CatalogSection<
  * Whether the page the person is on is one their role hides. The longest matching address wins, so hiding /detection does not hide /detection/catalog's own entry the other way round: a path is hidden when the
  * most specific nav entry that covers it is hidden.
  */
+/** True when ``pathname`` is ``href`` or a page under it. */
+function covers(href: string, pathname: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function pathIsHidden<I extends CatalogItem, S extends CatalogSection<I>>(sections: S[], hidden: ReadonlySet<string>, pathname: string): boolean {
   if (hidden.size === 0) return false;
+  // The home page and the roles page are never hidden, whether or not they are sidebar entries of their own.
+  if (ALWAYS_VISIBLE.some((a) => covers(a, pathname))) return false;
   let best: { href: string; section?: string } | null = null;
   for (const s of sections) {
     for (const i of s.items) {
-      const covers = pathname === i.href || pathname.startsWith(`${i.href}/`);
-      if (covers && (!best || i.href.length > best.href.length)) best = { href: i.href, section: s.title };
+      if (covers(i.href, pathname) && (!best || i.href.length > best.href.length)) best = { href: i.href, section: s.title };
     }
   }
+  // A page that is not a sidebar entry of its own (the cost dashboard and the roles page sit under Settings) can still be hidden by its address: the longest hidden
+  // address that covers it, when that is more specific than the entry it falls under.
+  let direct = '';
+  for (const h of hidden) if (!h.startsWith('section:') && covers(h, pathname) && h.length > direct.length) direct = h;
+  if (direct && (!best || direct.length > best.href.length)) return true;
   return best ? isHidden(hidden, best.href, best.section) : false;
 }
 
 /** The entries of a role's hidden list, from whatever the API sent (anything that is not text is ignored). */
 /** Pages that moved, by their old address. */
-const MOVED_PAGES: Record<string, string> = { '/connectors': '/settings/connectors', '/audit': '/settings/audit' };
+const MOVED_PAGES: Record<string, string> = { '/connectors': '/settings/connectors', '/audit': '/settings/audit', '/costs': '/settings/costs' };
 
 export function toHiddenSet(value: unknown): Set<string> {
   const set = new Set(Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);

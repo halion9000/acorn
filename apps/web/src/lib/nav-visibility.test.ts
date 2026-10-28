@@ -80,6 +80,24 @@ describe('pathIsHidden', () => {
   });
 });
 
+// The roles page and the cost dashboard are listed under Settings, not as sidebar entries of their own.
+const UNDER_SETTINGS = CATALOG.map((s) => ({ ...s, items: s.items.filter((i) => i.href !== '/settings/rbac') }));
+
+describe('pages that are not sidebar entries of their own', () => {
+  it('the roles page is never hidden by address, even when Settings and its section are hidden', () => {
+    const hidden = new Set(['/settings', '/settings/rbac', sectionKey('Platform')]);
+    expect(pathIsHidden(UNDER_SETTINGS, hidden, '/settings/rbac')).toBe(false);
+    expect(pathIsHidden(UNDER_SETTINGS, hidden, '/settings/rbac/roles/7')).toBe(false);
+    expect(pathIsHidden(UNDER_SETTINGS, hidden, '/settings/connectors')).toBe(true); // the rest of Settings is hidden, as asked
+  });
+  it('a page under Settings can still be hidden by its own address, and only that page', () => {
+    const hidden = new Set(['/settings/costs']);
+    expect(pathIsHidden(UNDER_SETTINGS, hidden, '/settings/costs')).toBe(true);
+    expect(pathIsHidden(UNDER_SETTINGS, hidden, '/settings')).toBe(false);
+    expect(pathIsHidden(UNDER_SETTINGS, hidden, '/settings/connectors')).toBe(false);
+  });
+});
+
 describe('isHidden and toHiddenSet', () => {
   it('reads a section or a page', () => {
     expect(isHidden(new Set(['/fim']), '/fim', 'Automation')).toBe(true);
@@ -90,7 +108,7 @@ describe('isHidden and toHiddenSet', () => {
     const set = toHiddenSet(['/connectors', '/audit', '/costs']);
     expect(set.has('/settings/connectors')).toBe(true);
     expect(set.has('/settings/audit')).toBe(true);
-    expect(set.has('/settings/costs')).toBe(false);
+    expect(set.has('/settings/costs')).toBe(true);
   });
   it('ignores anything the API sent that is not text', () => {
     expect([...toHiddenSet(['/a', 3, null, 'section:X'])]).toEqual(['/a', 'section:X']);

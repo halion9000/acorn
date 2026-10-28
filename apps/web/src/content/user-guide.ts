@@ -30,7 +30,7 @@ The left sidebar groups the console:
 | Client Security | **Client Posture**, **Multi-Factor**, **Secure Score**, **Sign-in Scores**, **Client Cleanup**, **Platform Health** |
 | Response and testing | Playbooks, Marketplace, File Integrity, Honeytokens, Purple Team |
 | vCIO | Compliance, Executive Digest, Client Review |
-| Admin | Get started, **Connectors**, Roles & Permissions, **MSSP Dashboard**, Team Analytics, SLA Tracking, Audit Log, **Settings** (which holds the Cost Dashboard) |
+| Admin | Get started, **Connectors**, **MSSP Dashboard**, Team Analytics, SLA Tracking, Audit Log, **Settings** (which holds Roles & Permissions and the Cost Dashboard) |
 
 \`Ctrl+K\` opens a command palette that jumps to the main pages.
 
