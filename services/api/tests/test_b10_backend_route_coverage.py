@@ -300,8 +300,6 @@ _EXCEPTIONS: dict[str, str] = {
     # Frontend calls a route that does not exist on any service (known bug).
     # WebSocket streaming — not representable in OpenAPI but served at runtime.
     "/api/v1/graph_ws/stream": "WebSocket endpoint, not in OpenAPI schema",
-    # Frontend calls a route that does not exist on any service (known bug).
-    "/api/v1/copilot/conversations": "frontend calls a route that does not exist (known bug)",
     # Bare contextual root — the agents service serves /contextual/actions etc.
     # but the bare /contextual prefix has no handler; frontend calls it for
     # discovery and tolerates 404.
@@ -316,8 +314,6 @@ _EXCEPTIONS: dict[str, str] = {
     # Report.md paths are served by agents via specific rewrite, but the
     # resolver's :caseId/:runId normalization doesn't match the frontend's
     # ${caseId}/${runId} template literals against the rewrite regex.
-    # Copilot conversation by ID — dynamic CRUD not in static OpenAPI
-    "/api/v1/copilot/conversations/${id}": "frontend calls a route that does not exist (known bug)",
     # Dead client code: api.ts defines these two but nothing calls them (test_unserved_stream_exceptions_have_no_callers fails the moment
     # something does, so this cannot hide a live call). Neither is served: the API serves only /copilot/chat, and the agents service's
     # copilot is a separate hardcoded-reply endpoint that must NOT be wired in (see the comment in next.config.js).

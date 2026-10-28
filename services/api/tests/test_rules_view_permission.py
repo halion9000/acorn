@@ -1,13 +1,13 @@
 """rules:view: read the detection rules, split out of rules:read.
 
-rules:read guards 18 routes: 13 plain reads and 5 that compute. One of the five, POST /rules/{id}/backtest, runs a rule over up to 365 days
+rules:read guards 19 routes: 14 plain reads and 5 that compute. One of the five, POST /rules/{id}/backtest, runs a rule over up to 365 days
 of the tenant's REAL events in the ClickHouse data lake and returns `sample_matches`, the matching event rows: telemetry, which is what
 lake:query exists to gate and what CORE's key was deliberately not given. So a key that only needed to READ rules could read lake telemetry.
 (/rules/hunt, /rules/{id}/execute and /detection/test only evaluate events the CALLER sends; /translation/translate translates a rule.) Each
 claim is tested over the whole application rather than assumed:
   1. NOBODY LOSES ACCESS: whatever held rules:read (a role, a custom database role, a `rules:*` wildcard, a key) still reads rules AND still
   reaches all five computing routes.
-  2. rules:view ALONE GRANTS NOTHING ELSE: a key holding only it satisfies exactly the 13 reads among every route in the application.
+  2. rules:view ALONE GRANTS NOTHING ELSE: a key holding only it satisfies exactly the 14 reads among every route in the application.
   3. CORE's real key scopes reach none of the five computing routes, and still reach every rules route its detection tools call.
 NOT VERIFIED LIVE: the lake is not configured in the test environment, so a real backtest returning real rows was not demonstrated; what was
 shown is that authorization let the key in (and that it no longer does).
@@ -43,6 +43,8 @@ VIEW_ROUTES = {
     ("GET", "/detection-proposals/baselines"),
     ("GET", "/detection-proposals/{proposal_id}"),
     ("GET", "/translation/formats"),
+    # Which catalog detections this client has installed (names no telemetry): added with the Detection Catalog's "Installed" badge.
+    ("GET", "/community/installed/detections"),
 }
 COMPUTE_ROUTES = {
     ("POST", "/rules/hunt"),
@@ -118,13 +120,13 @@ class TestRolesAreUnchanged:
 
 
 class TestTheRoutes:
-    def test_exactly_these_thirteen_routes_need_rules_view_and_each_is_a_get(self):
+    def test_exactly_these_fourteen_routes_need_rules_view_and_each_is_a_get(self):
         found = {
             (m, p) for p, r in ALL_ROUTES if required_permissions(r) == {"rules:view"} for m in r.methods if m not in {"HEAD", "OPTIONS"}
         }
-        assert found == VIEW_ROUTES and len(found) == 13 and all(m == "GET" for m, _ in found)
+        assert found == VIEW_ROUTES and len(found) == 14 and all(m == "GET" for m, _ in found)
 
-    def test_a_key_holding_only_rules_view_can_use_exactly_those_thirteen_routes_in_the_whole_application(self):
+    def test_a_key_holding_only_rules_view_can_use_exactly_those_fourteen_routes_in_the_whole_application(self):
         assert _satisfied_by(["rules:view"]) == VIEW_ROUTES
 
     def test_exactly_these_five_routes_still_need_rules_read_and_rules_view_does_not_reach_them(self):
@@ -134,7 +136,7 @@ class TestTheRoutes:
         assert found == COMPUTE_ROUTES
         assert not (_satisfied_by(["rules:view"]) & COMPUTE_ROUTES)
 
-    def test_whoever_held_rules_read_still_reaches_all_eighteen_routes(self):
+    def test_whoever_held_rules_read_still_reaches_all_nineteen_routes(self):
         assert _satisfied_by(["rules:read"]) == VIEW_ROUTES | COMPUTE_ROUTES
 
     def test_the_backtest_route_returns_matching_event_rows_which_is_why_it_stays_behind_rules_read(self):
