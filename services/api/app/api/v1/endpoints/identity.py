@@ -65,6 +65,7 @@ class DirectoryAuditIn(BaseModel):
     reason: str | None = Field(default=None, max_length=200)
     target: str | None = Field(default=None, max_length=320)
     target_type: str | None = Field(default=None, max_length=40)
+    detail: str | None = Field(default=None, max_length=400)
 
 
 class DirectoryAuditsReport(BaseModel):
@@ -143,6 +144,7 @@ async def apply_directory_audits(
                         reason=it.reason,
                         target=it.target,
                         target_type=it.target_type,
+                        detail=it.detail,
                         sensitivity=sensitivity_of(it.activity, on_others=on_others),
                         occurred_at=_utc(it.at),
                     )
@@ -486,6 +488,7 @@ class ScoredChange(BaseModel):
     activity: str
     category: str
     target: str | None
+    detail: str | None = None
     success: bool
     sensitivity: int
     occurred_at: datetime
@@ -535,6 +538,7 @@ async def top_changes(
                 activity=r.activity,
                 category=r.category,
                 target=r.target,
+                detail=r.detail,
                 success=r.success,
                 sensitivity=r.sensitivity,
                 occurred_at=r.occurred_at,

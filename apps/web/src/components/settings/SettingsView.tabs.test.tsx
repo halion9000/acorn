@@ -67,7 +67,9 @@ describe('Settings tabs by capability', () => {
     render(<SettingsView />);
     expect(await screen.findByRole('button', { name: /^tenant access/i })).toBeInTheDocument();
     expect(tab(/^alert email/i)).toBeInTheDocument();
-    for (const existing of [/^profile/i, /^workspace/i, /^integrations/i, /^api keys/i, /^notifications/i, /^audit/i]) expect(tab(existing)).toBeInTheDocument();
+    for (const existing of [/^profile/i, /^workspace/i, /^integrations/i, /^api keys/i, /^notifications/i]) expect(tab(existing)).toBeInTheDocument();
+    // The Audit log tab only showed five recent entries and was listed twice (it is also under More settings, as the full searchable page), so the tab is gone.
+    expect(screen.queryByRole('button', { name: /^audit log/i })).toBeNull();
   });
 
   it('an unrecognised capability opens nothing', async () => {

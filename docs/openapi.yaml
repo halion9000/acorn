@@ -26849,6 +26849,12 @@ components:
             maxLength: 40
           - type: 'null'
           title: Target Type
+        detail:
+          anyOf:
+          - type: string
+            maxLength: 400
+          - type: 'null'
+          title: Detail
       type: object
       required:
       - id
@@ -36738,6 +36744,11 @@ components:
           - type: string
           - type: 'null'
           title: Target
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
         success:
           type: boolean
           title: Success

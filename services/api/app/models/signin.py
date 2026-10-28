@@ -63,6 +63,8 @@ class DirectoryAuditEvent(Base):
     reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
     target: Mapped[str | None] = mapped_column(String(320), nullable=True)
     target_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # What changed, in a sentence (migration 118); None for entries stored before it, or when Microsoft recorded nothing more.
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     sensitivity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

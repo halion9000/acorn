@@ -46,6 +46,18 @@ describe('SigninScores', () => {
     expect(authFetch).toHaveBeenCalledWith('/api/v1/identity/top?days=7&limit=50');
   });
 
+  it('shows what each change was in a Details column, and a dash when Microsoft recorded nothing more', async () => {
+    const base = { client_id: 'c1', client_name: 'Acme Dental', actor: 'eve@acme.com', actor_is_app: false, category: 'GroupManagement', target: 'bob@acme.com', success: true, sensitivity: 2, occurred_at: '2026-10-19T10:00:00Z', score: 0.9 };
+    const withDetail = { ...base, activity: 'Remove member from group', detail: 'Group: Finance Team via TeamsMiddleTier' };
+    const without = { ...base, activity: 'Update user', score: 0.5 };
+    authFetch.mockImplementation((url?: string) => Promise.resolve((url ?? '').includes('/identity/top') ? reply([withDetail, without]) : reply([])));
+    render(<SigninScores />);
+    await screen.findAllByTestId('change-row');
+    const details = screen.getAllByTestId('change-detail').map((d) => d.textContent);
+    expect(details).toEqual(['Group: Finance Team via TeamsMiddleTier', '—']);
+    expect(screen.getAllByRole('columnheader', { name: /Details/ }).length).toBeGreaterThan(0);
+  });
+
   it('lists the scored sign-ins with who, where and what looked wrong', async () => {
     authFetch.mockImplementation((url?: string) => Promise.resolve((url ?? '').includes('/identity/top') ? reply([]) : reply([row(), row({ user: 'amy@acme.com', score: 0.5, success: false, mfa: true, risk: 'none' })])));
     render(<SigninScores />);

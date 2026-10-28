@@ -312,16 +312,6 @@ const navSections: NavSection[] = [
         href: '/settings/signin-scores',
         icon: <ChartBarIcon />,
       },
-      {
-        label: 'Client Cleanup',
-        href: '/settings/client-cleanup',
-        icon: <FolderIcon />,
-      },
-      {
-        label: 'Platform Health',
-        href: '/settings/platform-health',
-        icon: <ClockIcon />,
-      },
     ],
   },
   {

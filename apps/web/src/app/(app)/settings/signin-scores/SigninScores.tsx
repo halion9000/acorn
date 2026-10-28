@@ -51,6 +51,7 @@ const CHANGE_COLUMNS: Column<ScoredChange>[] = [
   { key: "by", label: "Done by", value: (r) => r.actor, filter: "text" },
   { key: "what", label: "What", value: (r) => `${r.activity}${r.success ? "" : " (failed)"}`, filter: "text" },
   { key: "to", label: "To", value: (r) => r.target ?? null, filter: "text" },
+  { key: "detail", label: "Details", value: (r) => r.detail ?? null, filter: "text" },
   { key: "client", label: "Client", value: (r) => r.client_name ?? "This organization", filter: "text" },
   { key: "when", label: "When", value: (r) => new Date(r.occurred_at).toLocaleString(), sortValue: (r) => when(r.occurred_at), filter: "text" },
 ];
@@ -78,6 +79,8 @@ export interface ScoredChange {
   activity: string;
   category: string;
   target: string | null;
+  /** What changed (the group, the property and its old and new value, what made the change), when Microsoft recorded it. */
+  detail?: string | null;
   success: boolean;
   sensitivity: number;
   occurred_at: string;
@@ -118,6 +121,7 @@ function ChangesTable({ rows }: { rows: ScoredChange[] }) {
                 {r.success ? "" : " (failed)"}
               </td>
               <td className="px-3 text-slate-400">{r.target ?? "—"}</td>
+              <td className="max-w-xs px-3 text-xs text-slate-300" data-testid="change-detail">{r.detail ?? "—"}</td>
               <td className="px-3 text-slate-400">{r.client_name ?? "This organization"}</td>
               <td className="px-3 text-slate-400">{new Date(r.occurred_at).toLocaleString()}</td>
             </tr>

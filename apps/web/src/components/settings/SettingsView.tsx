@@ -69,7 +69,6 @@ type TabId =
   | 'notifications'
   | 'appearance'
   | 'deployment'
-  | 'audit'
   | 'about';
 
 interface ApiKey {
@@ -79,14 +78,6 @@ interface ApiKey {
   scopes: string[];
   createdAt: string;
   lastUsedAt?: string;
-}
-
-interface AuditEntry {
-  id: string;
-  actor: string;
-  action: string;
-  target: string;
-  at: string;
 }
 
 interface Preferences {
@@ -242,11 +233,6 @@ const TABS: { id: TabId; label: string; description: string; requires?: 'manage_
       'Live air-gap policy and LLM provider snapshot for this A.C.O.R.N pod.',
   },
   {
-    id: 'audit',
-    label: 'Audit log',
-    description: 'Recent administrative events.',
-  },
-  {
     id: 'about',
     label: 'About',
     description: 'Version, license, links.',
@@ -260,6 +246,8 @@ export const MORE_SETTINGS: { href: string; label: string; description: string }
   { href: '/settings/connectors', label: 'Connectors', description: 'The tools connected to A.C.O.R.N, and the ones CORE manages' },
   { href: '/settings/client-mapping', label: 'Client mapping', description: 'Link the clients of each tool to your client tenants' },
   { href: '/settings/audit', label: 'Audit log', description: 'Every administrative and security event, searchable' },
+  { href: '/settings/client-cleanup', label: 'Client cleanup', description: 'Clients with nothing in them, and tool clients mapped to the wrong one' },
+  { href: '/settings/platform-health', label: 'Platform health', description: 'Whether every service is answering' },
   { href: '/settings/triage', label: 'Auto-close', description: 'How sure AI triage must be to close an alert itself' },
   { href: '/settings/tickets', label: 'Tickets', description: 'The HaloPSA status a resolved incident moves its ticket to' },
 ];
@@ -358,7 +346,6 @@ export function SettingsView() {
               {tab === 'notifications' && <NotificationsPanel />}
               {tab === 'appearance' && <AppearancePanel />}
               {tab === 'deployment' && <DeploymentAIPanel />}
-              {tab === 'audit' && <AuditPanel />}
               {tab === 'about' && <AboutPanel />}
             </motion.div>
           </AnimatePresence>
@@ -2111,70 +2098,6 @@ function StatusPill({
       <span aria-hidden className={dotCls} />
       {label}
     </span>
-  );
-}
-
-// ─── Panel: Audit ─────────────────────────────────────────────────────────────
-
-const _auditFetcher = (url: string) =>
-  authFetch(url, { credentials: 'include' }).then((r) => r.json());
-
-function AuditPanel() {
-  const { data, isLoading, error } = useSWR<AuditEntry[]>(
-    '/api/v1/audit?page_size=5',
-    _auditFetcher,
-    { refreshInterval: 60000 },
-  );
-
-  const entries = data ?? [];
-
-  return (
-    <div>
-      <PanelHeader
-        title="Audit log"
-        description="Recent administrative events. Full searchable audit history is available via the API."
-      />
-      {isLoading && !data && (
-        <div className="px-6 py-8 text-center text-sm text-gray-500">Loading recent activity…</div>
-      )}
-      {error && !data && (
-        <div className="px-6 py-8 text-center text-sm text-red-400">
-          Unable to load audit log. Check that the API service is reachable.
-        </div>
-      )}
-      {!isLoading && !error && entries.length === 0 && (
-        <div className="px-6 py-8 text-center text-sm text-gray-500">No recent audit events.</div>
-      )}
-      {entries.length > 0 && (
-        <ol className="divide-y divide-gray-800">
-          {entries.map((a) => (
-            <li key={a.id} className="flex items-start gap-3 px-6 py-4">
-              <span
-                aria-hidden
-                className={clsx(
-                  'mt-1 inline-block h-2 w-2 shrink-0 rounded-full',
-                  a.action === 'failed-sync'
-                    ? 'bg-red-400'
-                    : a.action === 'rotated'
-                    ? 'bg-amber-400'
-                    : 'bg-emerald-400',
-                )}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-gray-100">
-                  <span className="font-medium">{a.actor}</span>{' '}
-                  <span className="text-gray-400">{a.action}</span>{' '}
-                  <span>{a.target}</span>
-                </p>
-                <p className="text-xs text-gray-500" suppressHydrationWarning>
-                  {safeDistance(a.at, { addSuffix: true })}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-    </div>
   );
 }
 

@@ -17,7 +17,8 @@
         "success": true,
         "reason": null,
         "target": "bob@acme.com",
-        "target_type": "User"
+        "target_type": "User",
+        "detail": null
       },
       {
         "vendor_client_id": "c1",
@@ -32,7 +33,8 @@
         "success": true,
         "reason": null,
         "target": "bob@acme.com",
-        "target_type": "User"
+        "target_type": "User",
+        "detail": null
       }
     ]
   }

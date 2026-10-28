@@ -4,6 +4,8 @@ import os
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from types import SimpleNamespace
+
 import pytest
 from app.api.v1.endpoints import identity as ep
 from app.db.rls import set_rls_context
@@ -122,6 +124,23 @@ async def test_entries_are_stored_once_under_the_mapped_client_and_scored_by_act
         world["msp"], lambda db: ep.apply_directory_audits(db, world["msp"], audits(audit("a1"), audit("a2", actor="Eve@x.com")), NOW)
     )
     assert (again.accepted, again.duplicates) == (0, 2)
+
+
+async def test_what_changed_is_stored_with_the_entry_and_comes_back_in_the_top_list(world, monkeypatch):
+    fake_scoring(monkeypatch, anomalous={"dt1"})
+    await run(
+        world["msp"],
+        lambda db: ep.apply_directory_audits(
+            db,
+            world["msp"],
+            audits(audit("dt1", activity="Add member to group", detail="Group: Finance Team via TeamsMiddleTier", at=datetime.now(UTC)), audit("dt2", at=datetime.now(UTC))),
+            datetime.now(UTC),
+        ),
+    )
+    assert await scalar("select detail from directory_audit_events where source_id = 'dt1' and tenant_id = :t", t=world["mapped"]) == "Group: Finance Team via TeamsMiddleTier"
+    assert await scalar("select detail is null from directory_audit_events where source_id = 'dt2' and tenant_id = :t", t=world["mapped"]) is True
+    top = await run(world["msp"], lambda db: ep.top_changes(SimpleNamespace(tenant_id=world["msp"]), db, days=7, limit=50))
+    assert [c.detail for c in top if c.activity == "Add member to group"] == ["Group: Finance Team via TeamsMiddleTier"]
 
 
 async def test_an_app_actor_is_stored_but_not_sent_for_scoring(world, monkeypatch):
