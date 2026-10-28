@@ -21,6 +21,7 @@
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useRealtimeChannel, type RealtimeStatus } from '@/lib/realtime';
+import { vendorLabel } from '@/components/mssp/ClientMapping';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
@@ -29,6 +30,7 @@ interface LiveEvent {
   severity: Severity;
   text: string;
   source: string;
+  device?: string;
   receivedAt: number; // epoch ms
 }
 
@@ -53,6 +55,8 @@ interface RealtimeAlertMessage {
 
 interface AlertLike {
   id?: string;
+  hostname?: string | null;
+  raw_event?: { source?: unknown } | null;
   severity?: string;
   title?: string;
   description?: string;
@@ -121,7 +125,11 @@ function eventFromMessage(msg: RealtimeAlertMessage, fallbackId: number): LiveEv
     (payload as { title?: string }).title ??
     (payload as { description?: string }).description ??
     'Security event received';
+  // Alerts CORE forwards all arrive through the generic JSON inbox, so `source` is just "Generic Generic JSON"; the sender's own name (ninjaone, huntress...) is in raw_event.
+  const sender = inner.raw_event?.source;
+  const tool = typeof sender === 'string' && /^[a-z0-9][a-z0-9_-]{0,39}$/.test(sender) ? vendorLabel(sender) : undefined;
   const source =
+    tool ??
     inner.source ??
     inner.source_system ??
     (payload as { source?: string }).source ??
@@ -136,6 +144,7 @@ function eventFromMessage(msg: RealtimeAlertMessage, fallbackId: number): LiveEv
     severity: normalizeSeverity(inner.severity ?? (payload as { severity?: string }).severity),
     text: title,
     source,
+    device: typeof inner.hostname === 'string' && inner.hostname.trim() ? inner.hostname.trim() : undefined,
     receivedAt,
   };
 }
@@ -216,7 +225,8 @@ export function LiveFeedPanel() {
             <div className="min-w-0 flex-1">
               <p className="text-xs text-gray-300 leading-tight truncate">{event.text}</p>
               <p className="text-[11px] text-gray-600 mt-0.5">
-                {event.source} · {relativeTime(event.receivedAt, now)}
+                {event.source}
+                {event.device ? ` · ${event.device}` : ''} · {relativeTime(event.receivedAt, now)}
               </p>
             </div>
           </div>

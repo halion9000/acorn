@@ -86,6 +86,19 @@ describe('LiveFeedPanel', () => {
     expect(screen.getByText('No events yet.')).toBeInTheDocument();
   });
 
+  it('names the tool that sent a forwarded alert and the device, not "Generic Generic JSON"', () => {
+    setChannel('open', alert('a2', { title: "Device 'FS2' is offline", source: 'Generic Generic JSON', hostname: 'FS2', raw_event: { source: 'ninjaone' } }));
+    render(<LiveFeedPanel />);
+    expect(screen.getByText(/NinjaOne\s+· FS2 · /)).toBeInTheDocument();
+    expect(screen.queryByText(/Generic Generic JSON/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the alert's own source when no sender is named", () => {
+    setChannel('open', alert('a3', { source: 'edr', raw_event: {} }));
+    render(<LiveFeedPanel />);
+    expect(screen.getByText(/edr · /)).toBeInTheDocument();
+  });
+
   it('keeps the events it has, and says it is reconnecting, if the connection drops after events arrived', () => {
     setChannel('open', alert('a1', { title: 'First real event' }));
     const { rerender } = render(<LiveFeedPanel />);
