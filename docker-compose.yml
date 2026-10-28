@@ -741,6 +741,9 @@ services:
       # approve, reject, GET /actions/{id}, and all of /live-actions, which executes vendor actions). Empty means
       # the routes answer 503 (fail closed). Callers (slack-bot) read the same variable.
       AISOC_ACTIONS_SERVICE_TOKEN: ${AISOC_ACTIONS_SERVICE_TOKEN:-}
+      # How playbooks reach CORE for Microsoft 365 account actions through CIPP (CORE writes both into this .env). CORE decides whether an action really runs; it is off until CIPP_ACTIONS_LIVE=true is saved there.
+      AISOC_CORE_ACTIONS_URL: ${AISOC_CORE_ACTIONS_URL:-}
+      AISOC_CORE_ACTIONS_TOKEN: ${AISOC_CORE_ACTIONS_TOKEN:-}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       REDIS_URL: redis://:redis_dev_secret@redis:6379/5
       DATABASE_URL: postgresql+asyncpg://aisoc:${POSTGRES_PASSWORD:-aisoc_dev_secret}@postgres:5432/aisoc

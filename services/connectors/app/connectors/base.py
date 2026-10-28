@@ -113,6 +113,11 @@ class Capability(str, Enum):
     RUN_AV_SCAN = "run_av_scan"
     # Okta identity response
     SUSPEND_SESSION = "suspend_session"
+    # Microsoft 365 account actions through CORE and CIPP
+    CONTAIN_USER = "contain_user"
+    DISABLE_MAILBOX_RULE = "disable_mailbox_rule"
+    ENABLE_USER = "enable_user"
+    REMOVE_MAILBOX_RULE = "remove_mailbox_rule"
     FORCE_MFA = "force_mfa"
     # SIEM response (Splunk + Elastic)
     SEARCH_SIEM = "search_siem"

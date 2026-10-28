@@ -52,8 +52,8 @@ def test_register_builtin_executors_returns_full_count() -> None:
     """
     count = register_builtin_executors()
     # 19 original + 10 Phase B2 vendors (SentinelOne/Entra/GWS/PAN-OS/FortiGate/
-    # Cloudflare/Jira/ServiceNow/PagerDuty/Slack).
-    assert count == 29
+    # Cloudflare/Jira/ServiceNow/PagerDuty/Slack) + 6 Microsoft 365 account actions through CORE and CIPP (core_cipp.py).
+    assert count == 35
 
 
 def test_builtin_executors_cover_canonical_vendor_capability_pairs() -> None:
@@ -98,6 +98,13 @@ def test_builtin_executors_cover_canonical_vendor_capability_pairs() -> None:
         ("panos", "block_ip"),
         ("fortigate", "block_ip"),
         ("cloudflare", "block_ip"),
+        # Microsoft 365 account actions through CORE and CIPP
+        ("core_cipp", "revoke_session"),
+        ("core_cipp", "disable_user"),
+        ("core_cipp", "enable_user"),
+        ("core_cipp", "contain_user"),
+        ("core_cipp", "disable_mailbox_rule"),
+        ("core_cipp", "remove_mailbox_rule"),
         ("jira", "create_ticket"),
         ("servicenow", "create_ticket"),
         ("pagerduty", "create_ticket"),
@@ -132,7 +139,7 @@ def test_register_builtin_executors_is_idempotent_with_overwrite() -> None:
     register_builtin_executors()
     # Second call without overwrite would raise — confirm overwrite works.
     count = register_builtin_executors(overwrite=True)
-    assert count == 29
+    assert count == 35
 
 
 def test_register_builtin_twice_without_overwrite_raises() -> None:

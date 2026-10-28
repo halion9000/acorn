@@ -69,6 +69,11 @@ KNOWN_CAPABILITIES: frozenset[str] = frozenset(
         "block_ip",
         "create_notable_event",
         "force_mfa",
+        # Microsoft 365 account actions through CORE and CIPP
+        "contain_user",
+        "disable_mailbox_rule",
+        "enable_user",
+        "remove_mailbox_rule",
         "run_av_scan",
         "run_script",
         "search_siem",

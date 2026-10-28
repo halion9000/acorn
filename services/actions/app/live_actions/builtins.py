@@ -597,5 +597,11 @@ def register_builtin_executors(*, overwrite: bool = False) -> int:
     for adapter_cls in _BUILTIN_ADAPTERS:
         registry.register_executor(adapter_cls(), source="builtin", overwrite=overwrite)
         count += 1
+    # Microsoft 365 account actions through CORE and CIPP (see core_cipp.py).
+    from .core_cipp import core_cipp_executors
+
+    for executor in core_cipp_executors():
+        registry.register_executor(executor, source="builtin", overwrite=overwrite)
+        count += 1
     logger.info("live_action.builtins_registered", count=count)
     return count
