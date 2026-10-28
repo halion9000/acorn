@@ -1034,7 +1034,7 @@ async def get_alert(
         return payload.model_copy(
             update={
                 "source": _tool_of(alert),
-                "source_url": _source_url_of(alert, await _huntress_base(db, {tid, current_user.tenant_id})),
+                "source_url": _source_url_of(alert, await _huntress_base_if_needed(db, alert, {tid, current_user.tenant_id})),
                 "links": _links_of(alert),
                 "client_name": client_name,
                 "narrative": alert.narrative,
@@ -1085,6 +1085,14 @@ def _source_url_of(alert: Any, huntress_base: str | None = None) -> str | None:
         if escalation.isdigit():
             return f"{huntress_base}/{escalation}"
     return None
+
+
+async def _huntress_base_if_needed(db: Any, alert: Any, tenant_ids: set) -> str | None:
+    """The account address only for a Huntress alert that carries no link of its own: any other alert costs no extra query."""
+    raw = alert.raw_event if isinstance(getattr(alert, "raw_event", None), dict) else {}
+    if raw.get("source") != "huntress" or isinstance(raw.get("url"), str):
+        return None
+    return await _huntress_base(db, tenant_ids)
 
 
 async def _huntress_base(db: Any, tenant_ids: set) -> str | None:
