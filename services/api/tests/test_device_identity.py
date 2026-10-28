@@ -168,3 +168,36 @@ def test_macs_of_also_reads_ninjaones_mac_addresses_fact_as_one_string_several_o
     assert macs_of({"facts": "nope"}) == set()
     assert macs_of({"facts": {"macAddresses": 5}}) == set()
     assert macs_of({"macs": ["1c6a1b49048d"], "facts": {"macAddresses": "1C:6A:1B:49:04:8D"}}) == {"1c6a1b49048d"}, "one MAC from two tools is one MAC"
+
+
+# ---- what the possible-duplicates list leaves out -------------------------------------------------------------------------------------------------------------
+
+
+def _row(i, hostname, serial=None, ips=(), maker=None):
+    import uuid
+    from types import SimpleNamespace
+
+    return SimpleNamespace(id=uuid.UUID(int=i), hostname=hostname, serial_number=serial, ip_addresses=list(ips), manufacturer=maker)
+
+
+def test_two_auvik_records_under_one_name_are_two_devices_not_duplicates():
+    from app.services.device_upsert import duplicate_pairs
+
+    a, b = _row(1, "bridge-2.local."), _row(2, "bridge-2.local.")
+    assert duplicate_pairs([a, b], {a.id: {"auvik"}, b.id: {"auvik"}}, set(), set()) == []
+    c, d = _row(3, "FRONT-DESK-PC"), _row(4, "FRONT-DESK-PC")
+    assert duplicate_pairs([c, d], {c.id: {"ninjaone"}, d.id: {"huntress"}}, set(), set()) == [(c.id, d.id)], "different tools under one real name are still offered"
+    e, f = _row(5, "FRONT-DESK-PC"), _row(6, "FRONT-DESK-PC")
+    assert duplicate_pairs([e, f], {e.id: {"auvik", "ninjaone"}, f.id: {"auvik"}}, set(), set()) == [], "they share an Auvik record, so they are two Auvik devices"
+    g, h = _row(7, "FRONT-DESK-PC"), _row(8, "FRONT-DESK-PC")
+    assert duplicate_pairs([g, h], {g.id: {"ninjaone"}, h.id: {"ninjaone"}}, set(), set()) == [(g.id, h.id)], "a re-installed agent machine is still left for a person"
+
+
+def test_a_stock_name_or_one_many_devices_carry_is_not_offered():
+    from app.services.device_upsert import duplicate_pairs
+
+    ipad1, ipad2 = _row(1, "iPad"), _row(2, "iPad.local.")
+    assert duplicate_pairs([ipad1, ipad2], {ipad1.id: {"addigy"}, ipad2.id: {"auvik"}}, set(), set()) == []
+    crowd = [_row(i, "KIOSK-LOBBY") for i in range(10, 18)]
+    tools = {r.id: {f"tool{i}"} for i, r in enumerate(crowd)}
+    assert duplicate_pairs(crowd, tools, set(), set()) == [], "eight devices with one name is a reused name, not one machine"

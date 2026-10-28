@@ -489,6 +489,7 @@ async def test_the_duplicates_list_loads_every_client_once_not_once_per_client_w
     for t, pair in made.items():
         for d in pair:
             d.tenant_id = t
+            d.hostname = "FRONT-DESK-PC"  # a real machine name: a one-letter name is a stock name and is never offered as a duplicate
     loads = []
 
     async def scope(db, o, client_id):

@@ -115,6 +115,9 @@ def same_brand(a: object, b: object) -> bool:
 # Meraki and UniFi list physical network hardware, each unit once and with its own identity. So two records from one of them are two units however alike their names (a closet of access points
 # all called "U6-Pro"), a Meraki unit is never a UniFi unit, and neither is a computer that an agent runs on. A name match involving them is a coincidence, not a duplicate.
 HARDWARE_TOOLS = frozenset({"meraki", "unifi"})
+# Network discovery tools list each device they find once, under whatever name it has. Two records of one of them in a client are two devices (a closet of switches, a run of "bridge-2" names), so
+# two devices that BOTH carry a record from one of these are never offered as duplicates of each other.
+DISCOVERY_TOOLS = frozenset({"auvik", "unifi", "meraki"})
 AGENT_TOOLS = frozenset({"ninjaone", "huntress", "addigy", "threatmate", "screenconnect", "fieldeffect", "dnsfilter", "autoelevate", "slide", "blumira", "cipp"})
 
 

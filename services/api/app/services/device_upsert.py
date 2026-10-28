@@ -18,7 +18,7 @@ from typing import Any
 from sqlalchemy import delete, func, select, tuple_
 
 from app.models.device import Device, DeviceSource
-from app.services.device_identity import could_be_same_machine, hostname_key, ip_brand_pairs, is_placeholder_name, loose_name_key, netbios_truncated_pairs, normalize_serial
+from app.services.device_identity import DISCOVERY_TOOLS, could_be_same_machine, hostname_key, ip_brand_pairs, is_placeholder_name, loose_name_key, netbios_truncated_pairs, normalize_serial
 
 
 @dataclass
@@ -197,6 +197,8 @@ async def possible_duplicates(db: Any, tenant_id: uuid.UUID) -> list[tuple[uuid.
 def duplicate_pairs(rows: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], only_screenconnect: set[Any]) -> list[tuple[Any, Any]]:
     """The pairs of one client's devices a person might want to merge (see ``possible_duplicates``), from devices already in hand. ``rows`` need ``id``, ``hostname``, ``serial_number``, ``ip_addresses`` and
     ``manufacturer``; ``tools`` maps a device id to the tools that report it; ``dismissed`` holds the pairs a person said are different (ordered by id text); ``only_screenconnect`` the devices only ScreenConnect lists."""
+    from app.services.device_merge import MAX_AUTO_MERGE_GROUP, usable_for_merge
+
     by_name: dict[str, list[Any]] = {}
     for d in rows:
         key = hostname_key(d.hostname)
@@ -205,6 +207,9 @@ def duplicate_pairs(rows: list[Any], tools: dict[Any, set[str]], dismissed: set[
             by_name.setdefault(loose_name_key(d.hostname) or key, []).append(d)
     pairs: list[tuple[uuid.UUID, uuid.UUID]] = []
     for group in by_name.values():
+        # A stock name ("iPad", "MacBook-Pro") or one that many devices carry says nothing about being one machine: the same limits the automatic merge uses.
+        if not usable_for_merge(hostname_key(group[0].hostname)) or len(group) > MAX_AUTO_MERGE_GROUP:
+            continue
         for i, a in enumerate(group):
             for b in group[i + 1 :]:
                 if a.serial_number and b.serial_number:  # two different serials: not the same machine
@@ -219,4 +224,5 @@ def duplicate_pairs(rows: list[Any], tools: dict[Any, set[str]], dismissed: set[
     pairs += ip_brand_pairs(rows, tools, dismissed, set(pairs))
     # The same machine under its full name in one tool and its 15-character NetBIOS name in another.
     pairs += netbios_truncated_pairs(rows, tools, dismissed, set(pairs))
-    return pairs
+    # Two devices that both have a record from one network discovery tool are two devices (see DISCOVERY_TOOLS).
+    return [p for p in pairs if not (tools.get(p[0], set()) & tools.get(p[1], set()) & DISCOVERY_TOOLS)]
