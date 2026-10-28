@@ -810,6 +810,24 @@ export default function PurpleTeamPage() {
         </div>
       </div>
 
+      <details data-testid="purple-team-help" className="rounded-lg border border-gray-700 bg-gray-900/60 p-3 text-sm text-gray-300">
+        <summary className="cursor-pointer font-medium text-gray-100">How this page is used</summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-400">
+          <li>
+            <span className="text-gray-200">Tabletop</span> works on its own: write down a scenario, list the techniques it covers, and add findings as the group talks it through.
+          </li>
+          <li>
+            <span className="text-gray-200">Executions</span> lists tests of your detections. A test is recorded here as <em>pending</em> when someone asks for it through the API (an Atomic Red Team test) or starts a
+            Caldera operation; this page does not run anything on a machine. Run the test on a lab machine yourself, then use <em>Report</em> on its row to say whether an alert fired and how long it took.
+          </li>
+          <li>
+            <span className="text-gray-200">Coverage</span> fills in from those reported results: a technique counts as covered when a test of it was detected. Until tests have been reported it is empty. Capture a snapshot
+            now and then to see which techniques improved or regressed.
+          </li>
+          <li>Caldera only works when a Caldera server is connected to this installation; without one, Atomic Red Team plus manual reporting is all there is.</li>
+        </ul>
+      </details>
+
       {/* Tabs */}
       <div className="border-b border-gray-700">
         <nav className="-mb-px flex gap-6">
