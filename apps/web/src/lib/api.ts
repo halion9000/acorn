@@ -3539,6 +3539,8 @@ export interface ThreatIndicator {
   malwareFamily?: string;
   /** Ids of the alerts this indicator was seen on. */
   linkedAlerts?: string[];
+  /** The first of those alerts, with titles, so a list row can say what they were about. */
+  linkedAlertSummaries?: { id: string; title: string; severity: string }[];
   /** Where the indicator came from, when the feed says (an alert id, a feed reference). */
   sourceRef?: string;
   expiresAt?: string;
@@ -3582,6 +3584,7 @@ export const threatIntelApi = {
       source_ref: string | null;
       expires_at: string | null;
       linked_alerts: string[] | null;
+      linked_alert_summaries?: { id: string; title: string; severity: string }[];
       context: Record<string, unknown>;
       tenant_id: string;
       is_active: boolean;
@@ -3611,6 +3614,7 @@ export const threatIntelApi = {
       campaign: ioc.campaign ?? undefined,
       malwareFamily: ioc.malware_family ?? undefined,
       linkedAlerts: ioc.linked_alerts ?? undefined,
+      linkedAlertSummaries: ioc.linked_alert_summaries?.length ? ioc.linked_alert_summaries : undefined,
       sourceRef: ioc.source_ref ?? undefined,
       expiresAt: ioc.expires_at ?? undefined,
     }));

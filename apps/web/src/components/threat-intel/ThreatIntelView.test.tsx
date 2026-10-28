@@ -64,6 +64,27 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('the indicator list', () => {
+  it('says what the alert was about on the closed row: the first alert title, and how many more', async () => {
+    list.mockResolvedValue({
+      indicators: [
+        indicator({
+          linkedAlerts: ['a1', 'a2', 'a3'],
+          linkedAlertSummaries: [
+            { id: 'a1', title: 'Endpoint Risk - Suspicious Process Detected', severity: 'medium' },
+            { id: 'a2', title: 'Second alert', severity: 'low' },
+          ],
+        }),
+        indicator({ id: 'i2', value: 'b'.repeat(64), linkedAlerts: undefined, linkedAlertSummaries: undefined }),
+      ],
+      total: 2,
+    });
+    render(<ThreatIntelView />);
+    const issues = await screen.findAllByTestId('ioc-alert-issue');
+    expect(issues).toHaveLength(1);
+    expect(issues[0].textContent).toBe('Endpoint Risk - Suspicious Process Detected +2 more');
+    expect(issues[0].getAttribute('title')).toBe('Endpoint Risk - Suspicious Process Detected | Second alert');
+  });
+
   it('opens an indicator on click and shows what is known about it, instead of a dead row', async () => {
     getAlert.mockImplementation(async (id: string) => ({ id, title: `Alert for ${id.slice(0, 4)}`, severity: 'medium' }));
     render(<ThreatIntelView />);

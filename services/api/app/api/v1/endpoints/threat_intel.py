@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import AuthUser, require_permission
 from app.db.database import get_db
+from app.models.alert import Alert
 from app.models.threat_intel import ThreatActor, ThreatIntelFeed, ThreatIntelIOC
 
 router = APIRouter(prefix="/threat-intel", tags=["threat-intel"])
@@ -58,7 +59,15 @@ class IOCCreate(BaseModel):
     context: dict[str, Any] = Field(default_factory=dict)
 
 
+class LinkedAlertOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    severity: str
+
+
 class IOCOut(IOCCreate):
+    # The first alerts that name the indicator, with their titles, so the list can say what the alert was about without opening each row.
+    linked_alert_summaries: list[LinkedAlertOut] = Field(default_factory=list)
     id: uuid.UUID
     tenant_id: uuid.UUID
     is_active: bool
@@ -144,7 +153,26 @@ async def list_iocs(
         q = q.where(ThreatIntelIOC.is_active == is_active)
     q = q.order_by(ThreatIntelIOC.last_seen.desc()).offset(offset).limit(limit)
     result = await db.execute(q)
-    return list(result.scalars().all())
+    rows = list(result.scalars().all())
+    return await with_alert_summaries(db, current_user.tenant_id, rows)
+
+
+LINKED_SUMMARY_COUNT = 2
+
+
+async def with_alert_summaries(db: AsyncSession, tenant_id: uuid.UUID, rows: list[ThreatIntelIOC]) -> list[IOCOut]:
+    """The indicators as API objects, each with the titles of its first ``LINKED_SUMMARY_COUNT`` linked alerts (one query for the whole page)."""
+    wanted = {a for r in rows for a in (r.linked_alerts or [])[:LINKED_SUMMARY_COUNT]}
+    found: dict[uuid.UUID, LinkedAlertOut] = {}
+    if wanted:
+        for alert_id, title, severity in (await db.execute(select(Alert.id, Alert.title, Alert.severity).where(Alert.tenant_id == tenant_id, Alert.id.in_(wanted)))).all():
+            found[alert_id] = LinkedAlertOut(id=alert_id, title=title, severity=severity)
+    out: list[IOCOut] = []
+    for r in rows:
+        item = IOCOut.model_validate(r)
+        item.linked_alert_summaries = [found[a] for a in (r.linked_alerts or [])[:LINKED_SUMMARY_COUNT] if a in found]
+        out.append(item)
+    return out
 
 
 @router.post("/iocs", response_model=IOCOut, status_code=status.HTTP_201_CREATED)

@@ -170,6 +170,12 @@ function IOCRow({ ioc }: { ioc: ThreatIndicator }) {
               ))}
             </div>
           )}
+          {(ioc.linkedAlertSummaries ?? []).length > 0 && (
+            <p className="text-xs text-gray-300 mt-0.5 truncate" data-testid="ioc-alert-issue" title={(ioc.linkedAlertSummaries ?? []).map((a) => a.title).join(' | ')}>
+              {ioc.linkedAlertSummaries![0].title}
+              {(ioc.linkedAlerts?.length ?? 0) > 1 && <span className="text-gray-500"> {`+${(ioc.linkedAlerts?.length ?? 1) - 1} more`}</span>}
+            </p>
+          )}
           <p className="text-xs text-gray-600 mt-0.5 truncate">{ioc.description ?? ''}</p>
         </div>
 

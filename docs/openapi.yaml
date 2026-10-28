@@ -29445,6 +29445,11 @@ components:
           additionalProperties: true
           type: object
           title: Context
+        linked_alert_summaries:
+          items:
+            $ref: '#/components/schemas/LinkedAlertOut'
+          type: array
+          title: Linked Alert Summaries
         id:
           type: string
           format: uuid
@@ -30631,6 +30636,24 @@ components:
       required:
       - accepted
       title: LicenseCountsResponse
+    LinkedAlertOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        title:
+          type: string
+          title: Title
+        severity:
+          type: string
+          title: Severity
+      type: object
+      required:
+      - id
+      - title
+      - severity
+      title: LinkedAlertOut
     LinkedTicket:
       properties:
         id:
