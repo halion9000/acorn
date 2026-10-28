@@ -2,24 +2,16 @@
 #
 # What remains after the guarding passes (all deliberate; see LEFT_LOGIN_ONLY in tests/test_remaining_routes_matrix.py):
 #   PUBLIC by design (also listed, with reasons, in test_anonymous_access_sweep.py): login/refresh, SSO, passkey sign-in,
-#     health, OAuth callback, VAPID public key, waitlist signup, public replay links, the community catalog.
+#     health, OAuth callback, VAPID public key, waitlist signup, public replay links.
 #   PERSONAL to the caller: passkeys, saved views, push subscriptions, on-call settings, /auth/me, own tenant identity.
 #   (The realtime ticket was listed here. It is not personal: it opens the tenant's alert, case, agent and graph streams, so it now needs alerts:read and cases:read.)
-#   OPEN to any login on purpose: phishing submission (any user may report an email), marketplace browsing, community rating.
+#   OPEN to any login on purpose: phishing submission (any user may report an email).
 DELETE /passkeys/credentials/{credential_id} [passkeys.py::revoke_credential]
 DELETE /saved-views/{view_id} [saved_views.py::delete_saved_view]
 GET /auth/me [auth.py::get_me]
 GET /canary/{token_id} [canary.py::canary_visit]
-GET /community/detections [community.py::list_community_detections]
-GET /community/detections/{detection_id} [community.py::get_community_detection]
-GET /community/playbooks [community.py::list_community_playbooks]
-GET /community/plugins [community.py::list_community_plugins]
-GET /community/plugins/{plugin_id} [community.py::get_community_plugin]
 GET /health [health.py::api_reachability]
 GET /health/pipeline [health.py::get_pipeline_health]
-GET /marketplace [marketplace.py::list_marketplace]
-GET /marketplace/installed [marketplace.py::list_installed]
-GET /marketplace/mitre [marketplace.py::mitre_coverage]
 GET /oauth/callback [oauth.py::oauth_callback]
 GET /oncall/me [oncall.py::my_oncall]
 GET /passkeys/credentials [passkeys.py::list_my_credentials]
@@ -29,7 +21,6 @@ GET /tenants/me/identity [tenants.py::get_my_tenant_identity]
 PATCH /auth/me/preferences [auth.py::patch_me_preferences]
 POST /auth/logout [auth.py::logout]
 PATCH /saved-views/{view_id} [saved_views.py::update_saved_view]
-POST /community/plugins/{plugin_id}/rate [community.py::rate_community_plugin]
 POST /passkeys/authenticate/begin [passkeys.py::passkey_authenticate_begin]
 POST /passkeys/register/begin [passkeys.py::passkey_register_begin]
 POST /phishing/submit [phishing.py::submit]

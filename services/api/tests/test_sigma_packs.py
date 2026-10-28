@@ -13,8 +13,8 @@ from app.models.detection_rule import DetectionRule
 from app.models.mssp import MSSPRulePack, MSSPRulePackAssignment, MSSPRulePackRule
 from app.models.tenant import Tenant
 from app.scripts.load_builtin_detections import detections_dir
-from app.scripts.load_catalog_detections import read_entries
 from app.services import sigma_packs as sp
+from app.services.sigma_imports import read_entries
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine

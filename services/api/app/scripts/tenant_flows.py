@@ -47,9 +47,9 @@ TENANT_IDS: dict[str, str] = {"A": "aaaaaaaa-0000-0000-0000-000000000001", "B": 
 # against the same environment does not collide with the first ("already exists", then every dependent step skipped).
 RUN: dict[str, str] = {"tag": ""}
 
-# Flows that REPLACE or REMOVE configuration a tenant may already have (the whole business-context rule set, the whole settings object, a marketplace install of the catalogue's first item). Harmless on a scratch database; destructive on a real tenant, so
+# Flows that REPLACE or REMOVE configuration a tenant may already have (the whole business-context rule set, the whole settings object). Harmless on a scratch database; destructive on a real tenant, so
 # against a deployed API they are skipped unless --include-destructive says the tenants are disposable.
-DESTRUCTIVE_FLOWS = frozenset({"business_context_rules", "tenant_settings", "marketplace_installs"})
+DESTRUCTIVE_FLOWS = frozenset({"business_context_rules", "tenant_settings"})
 
 
 def leaks_in(text: str, path: str, status: int, watch: dict[str, str]) -> list[list]:
@@ -427,7 +427,6 @@ def build_flows() -> dict[str, list[Step]]:
     flows.update(_ninth_batch())
     flows.update(_tenth_batch())
     flows.update(_eleventh_batch())
-    flows.update(_twelfth_batch())
     flows.update(_thirteenth_batch())
     flows.update(_fourteenth_batch())
     flows["fresh"] = fresh + _more_fresh()  # still last: A creating objects B has never mentioned
@@ -1400,7 +1399,7 @@ def _thirteenth_batch() -> dict[str, list[Step]]:
                 "B cannot view A (a row-level-security table)",
                 "B",
                 "get",
-                "/api/v1/marketplace/installed",
+                "/api/v1/identities",
                 view_as="A",
                 expect=(403,),
                 check=refused,
@@ -1469,102 +1468,6 @@ def _thirteenth_batch() -> dict[str, list[Step]]:
                 expect=(200,),
                 check=lambda r, c: [t["id"] for t in r.json()["tenants"]] == [TENANT_IDS["A"]],
             ),
-        ],
-    }
-
-
-def _twelfth_batch() -> dict[str, list[Step]]:
-    """Marketplace installs: a tenant's "installed" markers (a table since migration 068; they used to be a per-process dict that vanished on restart). Each tenant must see, repeat and remove only its own. The flow installs a catalogue item and uninstalls it
-    again, so on a tenant that had already installed that item for real it would end uninstalled: it is one of the flows skipped against a deployed environment unless --include-destructive says the tenants are disposable."""
-    item = {"type": "{mp_type}", "id": "{mp_id}"}
-    return {
-        "marketplace_installs": [
-            S(
-                "A reads the catalogue (capturing the first item's id)",
-                "A",
-                "get",
-                "/api/v1/marketplace",
-                expect=(200,),
-                capture=("mp_id", "items.0.id"),
-            ),
-            S(
-                "A reads the catalogue (capturing the first item's type)",
-                "A",
-                "get",
-                "/api/v1/marketplace",
-                expect=(200,),
-                capture=("mp_type", "items.0.type"),
-            ),
-            S(
-                "A installs it",
-                "A",
-                "post",
-                "/api/v1/marketplace/install",
-                over=item,
-                expect=(200,),
-                check=lambda r, c: r.json()["id"] == c["mp_id"],
-            ),
-            S(
-                "A's installed list has it",
-                "A",
-                "get",
-                "/api/v1/marketplace/installed",
-                expect=(200,),
-                check=lambda r, c: any(i["id"] == c["mp_id"] and i["type"] == c["mp_type"] for i in r.json()["items"]),
-            ),
-            S(
-                "B's installed list does not",
-                "B",
-                "get",
-                "/api/v1/marketplace/installed",
-                expect=(200,),
-                check=lambda r, c: not any(i["id"] == c["mp_id"] for i in r.json()["items"]),
-            ),
-            S("B cannot uninstall A's install", "B", "delete", "/api/v1/marketplace/install", params=item, expect=(404,), nobody=True),
-            S(
-                "A's install is intact after B's attempt",
-                "A",
-                "get",
-                "/api/v1/marketplace/installed",
-                expect=(200,),
-                check=lambda r, c: any(i["id"] == c["mp_id"] for i in r.json()["items"]),
-            ),
-            S(
-                "B installs the same item for ITSELF (its own row)",
-                "B",
-                "post",
-                "/api/v1/marketplace/install",
-                over=item,
-                expect=(200,),
-                check=lambda r, c: r.json()["already_installed"] is False,
-            ),
-            S(
-                "B reinstalling is idempotent",
-                "B",
-                "post",
-                "/api/v1/marketplace/install",
-                over=item,
-                expect=(200,),
-                check=lambda r, c: r.json()["already_installed"] is True,
-            ),
-            S("A uninstalls its own", "A", "delete", "/api/v1/marketplace/install", params=item, expect=(200,), nobody=True),
-            S(
-                "A's installed list no longer has it",
-                "A",
-                "get",
-                "/api/v1/marketplace/installed",
-                expect=(200,),
-                check=lambda r, c: not any(i["id"] == c["mp_id"] for i in r.json()["items"]),
-            ),
-            S(
-                "B's own install survives A's uninstall",
-                "B",
-                "get",
-                "/api/v1/marketplace/installed",
-                expect=(200,),
-                check=lambda r, c: any(i["id"] == c["mp_id"] for i in r.json()["items"]),
-            ),
-            S("B uninstalls its own (cleanup)", "B", "delete", "/api/v1/marketplace/install", params=item, expect=(200,), nobody=True),
         ],
     }
 
@@ -2403,7 +2306,7 @@ def main(argv: list[str] | None = None) -> int:
     url.add_argument(
         "--include-destructive",
         action="store_true",
-        help="ALSO run the flows that REPLACE or REMOVE existing configuration (the WHOLE business-context rule set, the WHOLE tenant settings, and a marketplace install of the catalogue's first item); only for disposable tenants",
+        help="ALSO run the flows that REPLACE or REMOVE existing configuration (the WHOLE business-context rule set, and the WHOLE tenant settings); only for disposable tenants",
     )
     url.add_argument("--allow-insecure-http", action="store_true", help="allow http:// for a host that is not local")
     url.add_argument("--yes-write-test-data", action="store_true", help="required: the flows create (and some delete) data in BOTH tenants")

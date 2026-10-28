@@ -35,11 +35,6 @@ def m(perm, *names):
 
 
 INTENDED = {
-    "community": {
-        **m("rules:write", "publish_detection", "install_community_detection"),
-        **m("playbooks:write", "submit_playbook", "install_community_playbook"),
-        **m("settings:write", "install_community_plugin"),
-    },
     "graph": {
         **m(R, "get_attack_path", "get_blast_radius", "get_mitre_coverage", "get_mitre_coverage_compat", "get_entity_neighbors"),
         **m(W, "upsert_alert_graph", "upsert_case_graph", "upsert_host", "upsert_user"),
@@ -105,8 +100,6 @@ LEFT_LOGIN_ONLY = {
     "auth (me)": "your own profile",
     "tenants (me)": "your own tenant's identity settings",
     "phishing submit": "any user may report a suspicious email",
-    "community GETs + rate": "public community catalog; rating is harmless",
-    "marketplace GETs": "catalog browsing",
     "health": "reachability / pipeline status",
 }
 
@@ -158,7 +151,7 @@ def _call(client, method, route):
 
 
 def test_the_table_found_every_route():
-    assert len(ROWS) >= 98
+    assert len(ROWS) >= 93
 
 
 def test_every_route_requires_exactly_its_intended_permission():

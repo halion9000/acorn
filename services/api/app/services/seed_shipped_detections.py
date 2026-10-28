@@ -1,7 +1,8 @@
-"""At startup, put the detection rules the repository ships where people can see them: the first-party rules as built-in rules in every tenant, the imported Sigma rules in the Detection Catalog.
+"""At startup, put the detection rules the repository ships where people can see them: the first-party rules as built-in rules in every tenant, and the imported Sigma rules as the MSSP parent's
+own rules grouped into rule packs (``app.services.sigma_packs``), which the MSSP applies to the clients it chooses.
 
-Both loaders are idempotent (a rule or entry that exists is left as it is), so running this on every start costs a read of the folder and nothing else once the rows exist. A failure is logged and never
-stops the API: with no detections folder, or a database that is not ready, the lists stay as they were. Switch off with ``AISOC_SEED_SHIPPED_DETECTIONS=0``.
+Both loaders are idempotent (a rule, pack or membership that exists is left as it is), so running this on every start costs a read of the folder and nothing else once the rows exist. A failure is logged and
+never stops the API: with no detections folder, or a database that is not ready, the lists stay as they were. Switch off with ``AISOC_SEED_SHIPPED_DETECTIONS=0``.
 """
 
 from __future__ import annotations
@@ -46,7 +47,7 @@ async def seed_packs(session_factory: Any, entries: list[dict[str, Any]]) -> dic
 async def seed_once(session_factory: Any = None) -> dict[str, Any]:
     """Run both loaders once. Returns what each did (or why it did nothing); never raises."""
     from app.scripts import load_builtin_detections as builtin  # noqa: PLC0415
-    from app.scripts import load_catalog_detections as catalog  # noqa: PLC0415
+    from app.services import sigma_imports  # noqa: PLC0415
 
     result: dict[str, Any] = {}
     try:
@@ -65,10 +66,7 @@ async def seed_once(session_factory: Any = None) -> dict[str, Any]:
                 await session.commit()
             created += report.created
         result["builtin"] = {"tenants": len(tenants), "created": created}
-        entries, _ = catalog.read_entries(root)
-        async with session_factory() as session:
-            result["catalog"] = await catalog.load(session, entries)
-            await session.commit()
+        entries, _ = sigma_imports.read_entries(root)
         result["packs"] = await seed_packs(session_factory, entries)
     except Exception as exc:  # noqa: BLE001 - seeding is a convenience; the API starts regardless
         LOG.warning("seeding the shipped detections failed: %s", exc)

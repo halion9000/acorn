@@ -32,7 +32,6 @@ INLINE_CHECK = re.compile(
 ENTRY = "sign-in entry point: it has to be reachable before there is a session"
 SSO = "SSO redirect or callback: the browser reaches it before there is a session; it validates its own state or assertion"
 PROBE = "health or liveness probe: carries no tenant data"
-PUBLIC_CATALOG = "public catalog browse: shows approved entries only (the listing filters on status)"
 OWN = "acts only on the caller's own account, credential, subscription or preference"
 OWN_VIEWS = "the caller's own saved views: every handler filters on SavedView.user_id == the caller"
 
@@ -50,11 +49,6 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/auth/saml/logout"): SSO,
     ("GET", "/auth/saml/metadata"): "the service provider's public SAML metadata: public by design",
     ("GET", "/api/v1/oauth/callback"): "OAuth redirect target: the state parameter is validated in the handler (400 without it)",
-    ("GET", "/api/v1/community/detections"): PUBLIC_CATALOG,
-    ("GET", "/api/v1/community/detections/{detection_id}"): PUBLIC_CATALOG,
-    ("GET", "/api/v1/community/playbooks"): PUBLIC_CATALOG,
-    ("GET", "/api/v1/community/plugins"): PUBLIC_CATALOG,
-    ("GET", "/api/v1/community/plugins/{plugin_id}"): PUBLIC_CATALOG,
     ("GET", "/api/v1/health"): PROBE,
     ("GET", "/health"): PROBE,
     ("GET", "/livez"): PROBE,
@@ -200,22 +194,8 @@ LOGIN_ONLY_NO_CHECK: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/saved-views"): OWN_VIEWS,
     ("PATCH", "/api/v1/saved-views/{view_id}"): OWN_VIEWS,
     ("DELETE", "/api/v1/saved-views/{view_id}"): OWN_VIEWS,
-    ("GET", "/api/v1/marketplace"): "read-only browsing: documented as open to any login (test_guarded_routers_matrix.py)",
-    ("GET", "/api/v1/marketplace/installed"): "read-only browsing of what the caller's tenant installed: open to any login by design",
-    ("GET", "/api/v1/marketplace/mitre"): "read-only ATT&CK coverage: open to any login by design",
     ("GET", "/api/v1/health/pipeline"): "read-only pipeline status for the caller's own tenant (every query is scoped to user.tenant_id)",
     ("POST", "/api/v1/phishing/submit"): "any person may report a suspicious email: that is the point of the route",
-    (
-        "POST",
-        "/api/v1/community/plugins/publish",
-    ): (
-        "submits a plugin for MODERATION (it is pending until approved). "
-        "Whether publishing should need a permission is a product decision, not decided here"
-    ),
-    (
-        "POST",
-        "/api/v1/community/plugins/{plugin_id}/rate",
-    ): "one rating per person, approved plugins only, never your own (integrity fixed earlier)",
     ("GET", "/graphql"): "every resolver checks its own permission (test_graphql_authorization.py)",
     ("POST", "/graphql"): "every resolver checks its own permission (test_graphql_authorization.py)",
 }

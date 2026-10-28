@@ -9,7 +9,7 @@ webhook (`Failed to apply inbound status: {exc}`, answered to an EXTERNAL system
 and its parameter values).
 NOT changed, and listed with a reason below so the list can only shrink: the credential-vault diagnostics (connector admins only; they name
 the AISOC_CREDENTIAL_KEY variable and say what is wrong, no key material), the lake/query-error sites (where the text can be the analyst's
-own query error), the SSO protocol errors, and the marketplace index parse error.
+own query error), the SSO protocol errors.
 """
 
 import ast
@@ -142,10 +142,6 @@ STILL_INTERPOLATING = {
         1,
         "lake query failed: inherits clickhouse.py's generic connection-failure message; "
         "a server-reported query error is the analyst's own (reviewed)",
-    ),
-    "api/v1/endpoints/marketplace.py": (
-        1,
-        "a JSON parse error of a local index file: names a line and column, no path: low risk, NOT reviewed further",
     ),
 }
 

@@ -1,6 +1,6 @@
 # Plan: remove the Detection Catalog and the Marketplace
 
-Status: PROPOSED (2026-10-28), updated with Hal's answers the same day. Nothing has been deleted. Each step below still needs his go-ahead before it is made.
+Status: DONE (2026-10-28). Hal delegated the decisions ("do what you think is best"). Step 1 (rule packs) shipped first; steps 2 to 5 followed in one pass: step 2 needed no work because the Playbooks page already lists the shared library of the 62 shipped playbooks (the agents service serves them), so nothing was moved; the pages, routes, models, seeding, tests and the two tables are removed. What is left on purpose: the static content index the Coverage page reads, and the public marketing pages' wording about a marketplace (copy for Hal to decide).
 
 ## What exists today (three separate things that look like one)
 

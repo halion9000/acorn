@@ -50,7 +50,6 @@ _ROUTE_LABELS: list[tuple[re.Pattern[str], str, str]] = [
     (re.compile(r"^/api/v1/rbac/roles/?(.*)"), "roles", "role"),
     (re.compile(r"^/api/v1/rbac/users/?(.*)"), "user_roles", "user_role"),
     (re.compile(r"^/api/v1/plugins/?(.*)"), "plugins", "plugin"),
-    (re.compile(r"^/api/v1/community/?(.*)"), "community", "community_item"),
     (re.compile(r"^/api/v1/tenants/?(.*)"), "tenants", "tenant"),
     (re.compile(r"^/api/v1/auth/?(.*)"), "auth", "auth"),
     (re.compile(r"^/auth/?(.*)"), "auth", "auth"),

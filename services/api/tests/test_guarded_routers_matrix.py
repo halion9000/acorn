@@ -1,4 +1,4 @@
-"""Role x route and API-key-scope matrix for the MSSP, remediation, reports and marketplace routers.
+"""Role x route and API-key-scope matrix for the MSSP, remediation and reports routers.
 
 Routes are discovered from the real routers (not listed by hand), so a new route in
 any of them is checked automatically. Expectations come from the real role table.
@@ -7,7 +7,6 @@ any of them is checked automatically. Expectations come from the real role table
                everything else -> mssp:manage
   remediation  GET -> remediation:read, everything else -> remediation:write
   reports      GET -> reports:read, everything else -> reports:write
-  marketplace  install / uninstall -> settings:write (browsing stays open to any login)
 """
 
 import re
@@ -18,7 +17,7 @@ import pytest
 import respx
 from app.api.v1 import deps
 from app.api.v1.deps import CurrentUser
-from app.api.v1.endpoints import marketplace, mssp, remediation, reports
+from app.api.v1.endpoints import mssp, remediation, reports
 from app.core.security import ROLE_PERMISSIONS, has_permission
 from app.main import app
 from fastapi.routing import APIRoute
@@ -38,14 +37,12 @@ def expected_permission(module, route: APIRoute, method: str) -> str | None:
         return "remediation:read" if method == "GET" else "remediation:write"
     if module is reports:
         return "reports:read" if method == "GET" else "reports:write"
-    if module is marketplace:
-        return "settings:write" if method in ("POST", "PUT", "PATCH", "DELETE") else None
     raise AssertionError(module)
 
 
 def discover():
     rows = []
-    for module in (mssp, remediation, reports, marketplace):
+    for module in (mssp, remediation, reports):
         for r in module.router.routes:
             if isinstance(r, APIRoute):
                 for method in sorted(r.methods - {"HEAD", "OPTIONS"}):
@@ -89,7 +86,6 @@ def test_discovery_found_the_routers():
     assert len([1 for m, *_ in GUARDED if m is mssp]) >= 20
     assert len([1 for m, *_ in GUARDED if m is remediation]) >= 6
     assert len([1 for m, *_ in GUARDED if m is reports]) >= 8
-    assert len([1 for m, *_ in GUARDED if m is marketplace]) == 2
 
 
 def test_every_route_requires_exactly_the_permission_for_its_kind():

@@ -24,7 +24,6 @@ from app.api.v1.endpoints import (
     cases,
     client_posture,
     client_review,
-    community,
     compliance,
     connectors,
     copilot,
@@ -63,7 +62,6 @@ from app.api.v1.endpoints import (
     lake,
     llm_credentials,
     llm_status,
-    marketplace,
     metrics,
     mssp,
     mssp_clients,
@@ -151,8 +149,6 @@ api_router.include_router(playbook_dry_runs.router)
 api_router.include_router(platform_alert_email.router)
 api_router.include_router(platform_tenant_access.router)
 api_router.include_router(plugins.router)
-api_router.include_router(community.router)
-api_router.include_router(marketplace.router)
 api_router.include_router(rbac.router)
 api_router.include_router(audit.router)
 api_router.include_router(compliance.router)

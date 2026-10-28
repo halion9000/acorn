@@ -126,11 +126,6 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/actions/{action_id}/result"): (
         "CORE reports how a claimed vendor action went: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); only a claimed action of that tenant can be answered (the 422 here is the empty body)"
     ),
-    ("GET", "/api/v1/community/detections"): "public community catalog (global content, no tenant data)",
-    ("GET", "/api/v1/community/detections/{detection_id}"): "public community catalog",
-    ("GET", "/api/v1/community/playbooks"): "public community catalog",
-    ("GET", "/api/v1/community/plugins"): "public community catalog",
-    ("GET", "/api/v1/community/plugins/{plugin_id}"): "public community catalog",
 }
 
 

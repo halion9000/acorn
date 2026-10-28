@@ -6,7 +6,6 @@ import asyncio
 from types import SimpleNamespace
 
 from app.scripts import load_builtin_detections as builtin
-from app.scripts import load_catalog_detections as catalog
 from app.services import seed_shipped_detections as seed
 
 
@@ -27,7 +26,7 @@ class Session:
         pass
 
 
-def test_both_loaders_run_once_per_tenant_and_for_the_catalog(monkeypatch):
+def test_the_builtin_loader_runs_once_per_tenant_and_the_sigma_rules_are_loaded_as_packs_from_the_shipped_files(monkeypatch):
     calls = []
 
     async def tenants(_s):
@@ -37,16 +36,21 @@ def test_both_loaders_run_once_per_tenant_and_for_the_catalog(monkeypatch):
         calls.append(tid)
         return SimpleNamespace(created=3)
 
-    async def load_catalog(_s, entries):
-        return {"created": len(entries), "existing": 0}
+    packed = []
+
+    async def seed_packs(_factory, entries):
+        packed.append(len(entries))
+        return {"parents": 1, "rules_created": len(entries), "packs_created": 6, "links_created": len(entries)}
 
     monkeypatch.setattr(builtin, "list_tenant_ids", tenants)
     monkeypatch.setattr(builtin, "load", load_rules)
-    monkeypatch.setattr(catalog, "load", load_catalog)
+    monkeypatch.setattr(seed, "seed_packs", seed_packs)
     out = asyncio.run(seed.seed_once(lambda: Session()))
     assert calls == ["t1", "t2"]
     assert out["builtin"] == {"tenants": 2, "created": 6}
-    assert out["catalog"]["created"] > 0
+    assert "catalog" not in out, "there is no Detection Catalog any more"
+    assert packed and packed[0] >= 50, "the shipped Sigma files are what the packs are made from"
+    assert out["packs"]["packs_created"] == 6
 
 
 def test_a_failure_is_reported_not_raised(monkeypatch):
