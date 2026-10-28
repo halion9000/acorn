@@ -2871,9 +2871,9 @@ export const insightsApi = {
    * pick a window. SWR keys should include the window so flipping the
    * filter doesn't show stale numbers from the previous range.
    */
-  getSOC: (window: InsightsWindow) =>
+  getSOC: (window: InsightsWindow, clientId?: string) =>
     request<SOCInsightsResponse>('/api/v1/insights/soc', {
-      params: { window },
+      params: { window, ...(clientId ? { client_id: clientId } : {}) },
     }),
 };
 

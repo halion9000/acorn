@@ -11,13 +11,16 @@
  */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { SWRConfig } from 'swr';
 import type { ReactElement } from 'react';
 
 vi.mock('@/lib/api', () => ({
   insightsApi: {
     getSOC: vi.fn(),
+  },
+  msspApi: {
+    listChildren: vi.fn(),
   },
 }));
 
@@ -31,8 +34,9 @@ vi.mock('@/lib/realtime', () => ({
   })),
 }));
 
-import { insightsApi, type SOCInsightsResponse } from '@/lib/api';
+import { insightsApi, msspApi, type SOCInsightsResponse } from '@/lib/api';
 import { SOCInsightsView } from './SOCInsightsView';
+import { tileHref } from './InsightTileCard';
 import { pointsToPath } from './Sparkline';
 
 /**
@@ -127,6 +131,7 @@ const sampleResponse: SOCInsightsResponse = {
 describe('SOCInsightsView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (msspApi.listChildren as ReturnType<typeof vi.fn>).mockResolvedValue([]);
   });
 
   it('renders a skeleton placeholder before data resolves', () => {
@@ -177,6 +182,29 @@ describe('SOCInsightsView', () => {
     expect(screen.queryByTestId('insights-history-note')).toBeNull();
   });
 
+  it('picking a client asks for that client only and points the alert tiles at that client', async () => {
+    (msspApi.listChildren as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'c-2', name: 'Tecovas, Inc.', mssp_role: 'child' },
+      { id: 'c-1', name: 'Airport Security Park', mssp_role: 'child' },
+    ]);
+    const mock = insightsApi.getSOC as ReturnType<typeof vi.fn>;
+    mock.mockResolvedValue(sampleResponse);
+    renderIsolated(<SOCInsightsView />);
+    const picker = await screen.findByRole('combobox', { name: 'Client' });
+    expect(Array.from((picker as HTMLSelectElement).options).map((o) => o.text)).toEqual(['All clients', 'Airport Security Park', 'Tecovas, Inc.']);
+    expect(mock).toHaveBeenLastCalledWith('24h', undefined);
+    fireEvent.change(picker, { target: { value: 'c-1' } });
+    await waitFor(() => expect(mock).toHaveBeenLastCalledWith('24h', 'c-1'));
+    await waitFor(() => expect(screen.getByText('MTTA').closest('a')).toHaveAttribute('href', '/alerts?status=all&client=c-1'));
+  });
+
+  it('has no client picker for an organization with no clients', async () => {
+    (insightsApi.getSOC as ReturnType<typeof vi.fn>).mockResolvedValue(sampleResponse);
+    renderIsolated(<SOCInsightsView />);
+    await waitFor(() => expect(screen.getByText('MTTA')).toBeInTheDocument());
+    expect(screen.queryByRole('combobox', { name: 'Client' })).toBeNull();
+  });
+
   it('renders an error state when the API call fails', async () => {
     (insightsApi.getSOC as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error('500 boom'),
@@ -221,5 +249,18 @@ describe('pointsToPath', () => {
     const points = [1, 2, 3, 4, 5, 6, 7, 8];
     const path = pointsToPath(points);
     expect(path.split(' ').length).toBe(points.length);
+  });
+});
+
+describe('tileHref', () => {
+  it('sends each tile to the page that lists what is behind it, for one client when one is picked', () => {
+    expect(tileHref('mtta')).toBe('/alerts?status=all');
+    expect(tileHref('mttr')).toBe('/alerts?status=resolved');
+    expect(tileHref('fp_rate', 'c-1')).toBe('/alerts?status=false_positive&client=c-1');
+    expect(tileHref('alerts_per_day')).toBe('/alerts?status=all');
+    expect(tileHref('cases_per_day')).toBe('/cases');
+    expect(tileHref('analyst_hours_saved')).toBe('/cases');
+    expect(tileHref('agent_cost_per_investigation')).toBe('/costs');
+    expect(tileHref('something_new')).toBeNull();
   });
 });

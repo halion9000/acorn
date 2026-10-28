@@ -49,7 +49,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -451,6 +451,12 @@ async def get_soc_insights(
         "24h",
         description="Rolling window. One of 24h, 7d, 30d.",
     ),
+    client_id: Annotated[
+        uuid.UUID | None,
+        Query(
+            description="Only this client's numbers (one of the organization's clients). Leave out for the whole organization and every client."
+        ),
+    ] = None,
 ) -> SOCInsightsResponse:
     """Return the seven-tile SOC Insights payload for the tenant.
 
@@ -470,6 +476,10 @@ async def get_soc_insights(
     # tenant at a time (row-level security only shows one tenant per scope).
     child_rows = (await db.execute(select(Tenant.id).where(Tenant.parent_tenant_id == tenant_id))).all()
     scope_ids = [tenant_id, *[r[0] for r in child_rows]]
+    if client_id is not None:
+        if client_id not in scope_ids[1:]:
+            raise HTTPException(status_code=404, detail="client not found")
+        scope_ids = [client_id]
     parts = []
     for tid in scope_ids:
         if tid == tenant_id:

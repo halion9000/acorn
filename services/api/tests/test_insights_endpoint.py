@@ -327,3 +327,36 @@ async def test_change_figures_appear_once_the_earlier_window_is_covered() -> Non
 async def test_a_tenant_with_no_alerts_has_no_comparison() -> None:
     response = await get_soc_insights(user=_stub_user(), db=_db_with_history(None, current=0), window="24h")
     assert response.comparison_ready is False and response.history_since is None
+
+
+def _db_with_clients(client_ids: list, scalar_value: int = 2) -> MagicMock:
+    db = _seeded_db(scalar_value=scalar_value)
+
+    async def _execute(stmt, *_a, **_k):
+        if "parent_tenant_id" in str(stmt):
+            return _FakeResult(rows=[(c,) for c in client_ids])
+        return _FakeResult()
+
+    db.execute = AsyncMock(side_effect=_execute)
+    return db
+
+
+@pytest.mark.asyncio
+async def test_one_client_shows_only_that_clients_numbers() -> None:
+    """With a client picked, the organization and its other clients are left out (3 tenants x 2 alerts would be 6; one client is 2)."""
+    clients = [uuid.uuid4(), uuid.uuid4()]
+    response = await get_soc_insights(user=_stub_user(), db=_db_with_clients(clients), window="7d", client_id=clients[0])
+    alerts = next(t for t in response.tiles if t.key == "alerts_per_day")
+    assert alerts.value == round(2 / 7, 2)
+
+
+@pytest.mark.asyncio
+async def test_a_client_that_is_not_this_organizations_is_a_404() -> None:
+    clients = [uuid.uuid4()]
+    with pytest.raises(HTTPException) as e:
+        await get_soc_insights(user=_stub_user(), db=_db_with_clients(clients), window="7d", client_id=uuid.uuid4())
+    assert e.value.status_code == 404
+    with pytest.raises(HTTPException):
+        # the organization's own id is not a client either
+        user = _stub_user()
+        await get_soc_insights(user=user, db=_db_with_clients(clients), window="7d", client_id=user.tenant_id)

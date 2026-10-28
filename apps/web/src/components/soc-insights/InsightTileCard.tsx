@@ -9,6 +9,7 @@
  */
 'use client';
 
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import type { InsightTile } from '@/lib/api';
@@ -16,9 +17,33 @@ import type { InsightTile } from '@/lib/api';
 interface InsightTileCardProps {
   tile: InsightTile;
   sparkline: ReactNode;
+  /** The client these numbers are for (the alerts link then lists only that client's alerts). */
+  clientId?: string;
 }
 
-export function InsightTileCard({ tile, sparkline }: InsightTileCardProps) {
+/** The page that lists what is behind a tile, or null when there is none. The alerts pages take the client as ``client``. */
+export function tileHref(key: string, clientId?: string): string | null {
+  const alerts = (status: string): string => `/alerts?status=${status}${clientId ? `&client=${encodeURIComponent(clientId)}` : ''}`;
+  switch (key) {
+    case 'mtta':
+    case 'alerts_per_day':
+      return alerts('all');
+    case 'mttr':
+      return alerts('resolved');
+    case 'fp_rate':
+      return alerts('false_positive');
+    case 'cases_per_day':
+    case 'analyst_hours_saved':
+      return '/cases';
+    case 'agent_cost_per_investigation':
+      return '/costs';
+    default:
+      return null;
+  }
+}
+
+export function InsightTileCard({ tile, sparkline, clientId }: InsightTileCardProps) {
+  const href = tileHref(tile.key, clientId);
   const direction = deltaDirection(tile);
   const deltaLabel = formatDelta(tile.delta_pct);
   const deltaTitle =
@@ -26,9 +51,9 @@ export function InsightTileCard({ tile, sparkline }: InsightTileCardProps) {
       ? 'No change figure yet: there is not a full earlier window of data to compare with.'
       : `Compared to the previous window: ${deltaLabel}.`;
 
-  return (
+  const card = (
     <div
-      className="flex flex-col justify-between rounded-lg border border-border bg-card p-4"
+      className={`flex h-full flex-col justify-between rounded-lg border border-border bg-card p-4${href ? ' transition-colors hover:border-primary/50' : ''}`}
       // The `aria-label` rolls the value + delta into one string so a
       // screen reader announces the change without us shipping a
       // table-with-headers.
@@ -57,6 +82,12 @@ export function InsightTileCard({ tile, sparkline }: InsightTileCardProps) {
         <div className="text-muted-foreground">{sparkline}</div>
       </div>
     </div>
+  );
+  if (!href) return card;
+  return (
+    <Link href={href} title={`See what is behind ${tile.label}`} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      {card}
+    </Link>
   );
 }
 

@@ -17,6 +17,7 @@ import {
   type InsightsWindow,
   type SOCInsightsResponse,
   insightsApi,
+  msspApi,
 } from '@/lib/api';
 
 import { InsightTileCard } from './InsightTileCard';
@@ -32,10 +33,13 @@ interface RealtimePoke {
 
 export function SOCInsightsView() {
   const [window, setWindow] = useState<InsightsWindow>('24h');
+  const [clientId, setClientId] = useState('');
+  // The organization's clients, for the picker. An organization with none (or a call that fails) just has no picker.
+  const { data: clients } = useSWR('insights:clients', () => msspApi.listChildren().catch(() => []), { revalidateOnFocus: false });
 
   const { data, error, isLoading, mutate } = useSWR<SOCInsightsResponse>(
-    ['insights:soc', window],
-    () => insightsApi.getSOC(window),
+    ['insights:soc', window, clientId],
+    () => insightsApi.getSOC(window, clientId || undefined),
     {
       // The realtime channel pokes us every 30s; we also revalidate
       // on focus in case the tab was backgrounded long enough for
@@ -72,6 +76,9 @@ export function SOCInsightsView() {
         manualMinutes={data?.manual_investigation_minutes}
         comparisonReady={data?.comparison_ready}
         historySince={data?.history_since}
+        clients={(clients ?? []).map((c) => ({ id: c.id, name: c.name }))}
+        clientId={clientId}
+        onClientChange={setClientId}
       />
 
       {error ? (
@@ -82,7 +89,7 @@ export function SOCInsightsView() {
       ) : isLoading || !data ? (
         <LoadingSkeleton />
       ) : (
-        <TileGrid tiles={data.tiles} />
+        <TileGrid tiles={data.tiles} clientId={clientId || undefined} />
       )}
     </div>
   );
@@ -99,9 +106,12 @@ interface HeaderProps {
   manualMinutes: number | undefined;
   comparisonReady: boolean | undefined;
   historySince: string | null | undefined;
+  clients: { id: string; name: string }[];
+  clientId: string;
+  onClientChange: (id: string) => void;
 }
 
-function Header({ window, onWindowChange, generatedAt, manualMinutes, comparisonReady, historySince }: HeaderProps) {
+function Header({ window, onWindowChange, generatedAt, manualMinutes, comparisonReady, historySince, clients, clientId, onClientChange }: HeaderProps) {
   const stamp = useMemo(() => {
     if (!generatedAt) return null;
     try {
@@ -119,7 +129,7 @@ function Header({ window, onWindowChange, generatedAt, manualMinutes, comparison
           Seven operational tiles for the SOC, refreshed every 30 seconds and
           on case changes. Deltas compare against the immediately preceding
           window. Hours-saved assumes {manualMinutes ?? 45} minutes of analyst
-          time per auto-closed case.
+          time per auto-closed case. Click a tile to see what is behind it.
         </p>
         {comparisonReady === false ? (
           <p className="mt-2 max-w-prose text-sm text-muted-foreground" data-testid="insights-history-note">
@@ -133,6 +143,21 @@ function Header({ window, onWindowChange, generatedAt, manualMinutes, comparison
           <span className="text-xs text-muted-foreground" aria-live="polite">
             Updated {stamp}
           </span>
+        ) : null}
+        {clients.length > 0 ? (
+          <select
+            aria-label="Client"
+            value={clientId}
+            onChange={(e) => onClientChange(e.target.value)}
+            className="rounded-md border border-border bg-card px-2 py-1 text-xs"
+          >
+            <option value="">All clients</option>
+            {[...clients].sort((a, b) => a.name.localeCompare(b.name)).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         ) : null}
         <WindowSelector value={window} onChange={onWindowChange} />
       </div>
@@ -177,9 +202,10 @@ function WindowSelector({ value, onChange }: WindowSelectorProps) {
 
 interface TileGridProps {
   tiles: InsightTile[];
+  clientId?: string;
 }
 
-function TileGrid({ tiles }: TileGridProps) {
+function TileGrid({ tiles, clientId }: TileGridProps) {
   return (
     <div
       // 7 tiles fit comfortably as a 4×2 grid at lg, 2×4 at md, 1 per
@@ -192,6 +218,7 @@ function TileGrid({ tiles }: TileGridProps) {
         <InsightTileCard
           key={tile.key}
           tile={tile}
+          clientId={clientId}
           sparkline={<Sparkline points={tile.sparkline.points} />}
         />
       ))}
