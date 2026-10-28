@@ -271,7 +271,7 @@ from app.models.mssp import (  # noqa: E402
     MSSPRulePackAssignment,
     MSSPRulePackRule,
 )
-from app.services.client_mapping import tenant_hidden  # noqa: E402
+from app.services.client_mapping import tenant_hidden, tenant_playbooks_allowed  # noqa: E402
 from app.services.mssp_rule_resolver import count_effective_rules, resolve_effective_rules  # noqa: E402
 
 
@@ -734,6 +734,8 @@ class ManagedTenantRow(BaseModel):
     tenant_id: str
     name: str
     hidden: bool = False
+    # Whether automated playbooks are allowed for this client (a choice only recorded so far: nothing starts playbooks by itself yet).
+    playbook_automation: bool = False
     sources: list[str] = []  # the tools (vendors) whose clients are mapped to this tenant, e.g. ["halopsa", "huntress"]
     has_metrics: bool
     snapshot_at: datetime | None = None
@@ -840,6 +842,7 @@ async def list_managed_tenants(
                 tenant_id=str(child.id),
                 name=child.name,
                 hidden=tenant_hidden(child),
+                playbook_automation=tenant_playbooks_allowed(child),
                 sources=sorted(sources.get(child.id, ())),
                 has_metrics=snap is not None,
                 snapshot_at=snap.snapshot_at.isoformat() if snap is not None and snap.snapshot_at else None,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ManagedTenantRow, MsspOverview } from '@/lib/api';
 
@@ -8,11 +8,13 @@ const overviewMock = vi.fn();
 const tenantsMock = vi.fn();
 const createClientMock = vi.fn();
 const hiddenMock = vi.fn();
+const playbooksMock = vi.fn();
 vi.mock('@/lib/api', () => ({
-  msspApi: { overview: () => overviewMock(), tenants: (h?: boolean) => tenantsMock(h), setClientHidden: (...a: unknown[]) => hiddenMock(...a), clients: async () => ({ clients: [], unmapped: unmapped.n }), createClient: (n: string) => createClientMock(n) },
+  msspApi: { overview: () => overviewMock(), tenants: (h?: boolean) => tenantsMock(h), setClientHidden: (...a: unknown[]) => hiddenMock(...a), setPlaybookAutomation: (...a: unknown[]) => playbooksMock(...a), clients: async () => ({ clients: [], unmapped: unmapped.n }), createClient: (n: string) => createClientMock(n) },
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
+import toast from 'react-hot-toast';
 import { orderSources } from './VendorBadge';
 import MSSPDashboardView, { figure, matchesFilter, tenantsToCsv } from './MSSPDashboardView';
 
@@ -40,6 +42,8 @@ beforeEach(() => {
   tenantsMock.mockReset();
   createClientMock.mockReset();
   hiddenMock.mockReset();
+  playbooksMock.mockReset();
+  playbooksMock.mockResolvedValue(undefined);
   hiddenMock.mockResolvedValue(undefined);
   unmapped.n = 0;
 });
@@ -95,7 +99,7 @@ describe('real tenants', () => {
     const reportingRow = within(table).getByText('Reporting Co').closest('tr') as HTMLElement;
     expect(within(reportingRow).getAllByRole('cell').map((c) => c.textContent).slice(2, 9)).toEqual(['12', '2', '4', '30', '1', '3', '80']);
     const quietRow = within(table).getByText('Quiet Co').closest('tr') as HTMLElement;
-    expect(within(quietRow).getAllByRole('cell').map((c) => c.textContent).slice(1)).toEqual(['—', '—', '—', '—', '—', '—', '—', '—', 'No data yet', 'Hide']);
+    expect(within(quietRow).getAllByRole('cell').map((c) => c.textContent).slice(1)).toEqual(['—', '—', '—', '—', '—', '—', '—', '—', 'No data yet', '', 'Hide']); // the empty cell is the automated-playbooks checkbox
   });
 
   it('shows a real zero as 0 and an unreported figure as a dash: they are not the same thing', async () => {
@@ -274,6 +278,38 @@ describe('adding a client by hand (the reported gap)', () => {
     await user.type(screen.getByLabelText('Client name'), '   ');
     expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
     expect(createClientMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('the automated playbooks column', () => {
+  it('shows the choice for each client, off unless the server says on, and saves a change', async () => {
+    overviewMock.mockResolvedValue({ ...none, total_tenants: 2 });
+    tenantsMock.mockResolvedValue([row({ name: 'Acme' }), row({ name: 'Beta', playbook_automation: true })]);
+    const user = userEvent.setup();
+    render(<MSSPDashboardView />);
+    const acme = await screen.findByRole('checkbox', { name: 'Allow automated playbooks for Acme' });
+    const beta = screen.getByRole('checkbox', { name: 'Allow automated playbooks for Beta' });
+    expect(acme).not.toBeChecked();
+    expect(beta).toBeChecked();
+    expect(screen.getByText(/playbooks do not start by themselves yet/)).toBeInTheDocument();
+    await user.click(acme);
+    expect(playbooksMock).toHaveBeenCalledWith('id-Acme', true);
+    expect(acme).toBeChecked();
+    await user.click(beta);
+    expect(playbooksMock).toHaveBeenCalledWith('id-Beta', false);
+    expect(beta).not.toBeChecked();
+  });
+
+  it('puts the box back and says so when the change cannot be saved', async () => {
+    overviewMock.mockResolvedValue({ ...none, total_tenants: 1 });
+    tenantsMock.mockResolvedValue([row({ name: 'Acme' })]);
+    playbooksMock.mockRejectedValue(new Error('Permission denied: mssp:manage'));
+    const user = userEvent.setup();
+    render(<MSSPDashboardView />);
+    const acme = await screen.findByRole('checkbox', { name: 'Allow automated playbooks for Acme' });
+    await user.click(acme);
+    await waitFor(() => expect(acme).not.toBeChecked());
+    expect(toast.error).toHaveBeenCalledWith('Permission denied: mssp:manage');
   });
 });
 

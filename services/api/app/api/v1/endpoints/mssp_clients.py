@@ -33,6 +33,7 @@ from app.services.client_mapping import (
     new_child,
     set_sync_vendors,
     set_tenant_hidden,
+    set_tenant_playbooks_allowed,
     suggestions_with_devices,
     sync_vendors,
     tenant_hidden,
@@ -381,6 +382,40 @@ async def set_client_hidden(
         tenant_id=current_user.tenant_id,
         actor_id=current_user.user_id,
         action="mssp:client_hidden" if body.hidden else "mssp:client_shown",
+        resource="tenant",
+        resource_id=str(child.id),
+        changes={"name": child.name},
+        request=request,
+    )
+    await db.commit()
+
+
+class PlaybookAutomationRequest(BaseModel):
+    enabled: bool
+
+
+@router.put("/tenants/{tenant_id}/playbook-automation", status_code=status.HTTP_204_NO_CONTENT)
+async def set_client_playbook_automation(
+    tenant_id: uuid.UUID,
+    body: PlaybookAutomationRequest,
+    request: Request,
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))],
+    db: TenantDBSession,
+) -> None:
+    """Allow automated playbooks for one client, or stop allowing them. Off for every client until someone switches it on.
+
+    This records the choice only: playbooks do not start by themselves yet. When they do, they must check this first."""
+    child = (
+        await db.execute(select(Tenant).where(Tenant.id == tenant_id, Tenant.parent_tenant_id == current_user.tenant_id))
+    ).scalar_one_or_none()
+    if child is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    set_tenant_playbooks_allowed(child, body.enabled)
+    await emit_audit(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        actor_id=current_user.user_id,
+        action="mssp:playbook_automation_on" if body.enabled else "mssp:playbook_automation_off",
         resource="tenant",
         resource_id=str(child.id),
         changes={"name": child.name},

@@ -244,6 +244,33 @@ async def test_hiding_a_tenant_that_is_not_yours_is_404():
     assert e.value.status_code == 404
 
 
+def test_a_client_allows_playbooks_only_once_someone_switches_it_on():
+    t = _tenant("Acme")
+    t.settings = {"keep": 1}
+    assert cm.tenant_playbooks_allowed(t) is False, "off for every client until switched on"
+    cm.set_tenant_playbooks_allowed(t, True)
+    assert cm.tenant_playbooks_allowed(t) is True and t.settings == {"keep": 1, "playbook_automation": True}
+    cm.set_tenant_playbooks_allowed(t, False)
+    assert cm.tenant_playbooks_allowed(t) is False and t.settings == {"keep": 1}
+
+
+@pytest.mark.asyncio
+async def test_switching_playbooks_on_for_a_client_saves_it_and_leaves_the_other_settings():
+    t = _tenant("Acme")
+    t.settings = {"keep": 1}
+    db = _db([t])
+    await mc.set_client_playbook_automation(t.id, mc.PlaybookAutomationRequest(enabled=True), MagicMock(), USER, db)
+    assert cm.tenant_playbooks_allowed(t) and t.settings["keep"] == 1
+    db.commit.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_playbook_automation_for_a_tenant_that_is_not_yours_is_404():
+    with pytest.raises(HTTPException) as e:
+        await mc.set_client_playbook_automation(uuid.uuid4(), mc.PlaybookAutomationRequest(enabled=True), MagicMock(), USER, _db([]))
+    assert e.value.status_code == 404
+
+
 def test_duplicate_groups_link_near_identical_names_and_chain_them():
     from app.services.client_matching import Candidate, duplicate_groups
 

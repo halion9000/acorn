@@ -99,6 +99,22 @@ def tenant_hidden(tenant: Any) -> bool:
     return bool((getattr(tenant, "settings", None) or {}).get("hidden"))
 
 
+def tenant_playbooks_allowed(tenant: Any) -> bool:
+    """A client the MSSP allows automated playbooks to run for (off unless someone switched it on). Kept in the tenant's settings, so no schema change.
+
+    This only RECORDS the choice: playbooks do not start by themselves yet, and whatever starts them later must check it first."""
+    return bool((getattr(tenant, "settings", None) or {}).get("playbook_automation"))
+
+
+def set_tenant_playbooks_allowed(tenant: Any, allowed: bool) -> None:
+    settings = dict(getattr(tenant, "settings", None) or {})
+    if allowed:
+        settings["playbook_automation"] = True
+    else:
+        settings.pop("playbook_automation", None)
+    tenant.settings = settings  # a new dict, so the JSONB column is seen as changed
+
+
 def set_tenant_hidden(tenant: Any, hidden: bool) -> None:
     settings = dict(getattr(tenant, "settings", None) or {})
     if hidden:

@@ -155,6 +155,21 @@ export default function MSSPDashboardView() {
     void load();
   }, [load]);
 
+  // The box shows the choice at once; if saving fails it goes back and says so.
+  const [playbookChoice, setPlaybookChoice] = useState<Record<string, boolean>>({});
+  const setPlaybooks = async (t: ManagedTenantRow, enabled: boolean) => {
+    setPlaybookChoice((c) => ({ ...c, [t.tenant_id]: enabled }));
+    try {
+      await msspApi.setPlaybookAutomation(t.tenant_id, enabled);
+    } catch (err) {
+      setPlaybookChoice((c) => {
+        const { [t.tenant_id]: _undone, ...rest } = c;
+        return rest;
+      });
+      toast.error(err instanceof Error && err.message ? err.message : 'Could not save that.');
+    }
+  };
+
   const setHidden = async (t: ManagedTenantRow, hidden: boolean) => {
     try {
       await msspApi.setClientHidden(t.tenant_id, hidden);
@@ -291,6 +306,7 @@ export default function MSSPDashboardView() {
                       <th className="px-5 py-3 font-medium text-right">Connectors</th>
                       <th className="px-5 py-3 font-medium text-right">Health</th>
                       <th className="px-5 py-3 font-medium">Last Snapshot</th>
+                      <th className="px-5 py-3 font-medium" title="Which clients automated playbooks may run for. Playbooks do not start by themselves yet; this records the choice.">Automated playbooks</th>
                       <th className="px-5 py-3 font-medium" />
                     </tr>
                   </thead>
@@ -318,6 +334,15 @@ export default function MSSPDashboardView() {
                         <td className="px-5 py-3 text-right text-gray-300">{figure(t.connector_count)}</td>
                         <td className="px-5 py-3 text-right text-gray-300">{figure(t.health_score, { decimals: 0 })}</td>
                         <td className="px-5 py-3 text-gray-400">{snapshotLabel(t.snapshot_at)}</td>
+                        <td className="px-5 py-3">
+                          <input
+                            type="checkbox"
+                            aria-label={`Allow automated playbooks for ${t.name}`}
+                            checked={playbookChoice[t.tenant_id] ?? t.playbook_automation ?? false}
+                            onChange={(e) => void setPlaybooks(t, e.target.checked)}
+                            className="h-4 w-4 cursor-pointer rounded border-gray-600 bg-gray-900 accent-blue-500"
+                          />
+                        </td>
                         <td className="px-5 py-3 text-right">
                           <button type="button" onClick={() => void setHidden(t, !t.hidden)} className="text-sm text-gray-400 hover:text-gray-200 transition-colors">
                             {t.hidden ? 'Show' : 'Hide'}
@@ -327,6 +352,9 @@ export default function MSSPDashboardView() {
                     ))}
                   </tbody>
                 </table>
+                <p className="px-5 py-3 text-xs text-gray-500">
+                  Automated playbooks: tick the clients playbooks may run for. This records your choice; playbooks do not start by themselves yet.
+                </p>
               </div>
             )}
           </div>

@@ -104,6 +104,19 @@ def test_a_workspace_with_no_children_has_no_managed_tenants_and_no_figures():
         assert figure is None
 
 
+def test_the_list_says_which_clients_allow_automated_playbooks():
+    async def body(s):
+        parent = await tenant(s, "Parent MSSP")
+        await tenant(s, "Acme", parent.id)
+        beta = await tenant(s, "Beta", parent.id)
+        beta.settings = {"playbook_automation": True}
+        await s.commit()
+        return await mssp.list_managed_tenants(include_hidden=False, db=s, current_user=caller(parent))
+
+    rows = run(body)
+    assert {r.name: r.playbook_automation for r in rows} == {"Acme": False, "Beta": True}
+
+
 def test_a_hidden_test_client_is_left_out_of_the_list_and_totals_until_asked_for():
     async def body(s):
         parent = await tenant(s, "Parent MSSP")

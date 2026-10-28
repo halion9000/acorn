@@ -14062,6 +14062,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/mssp/tenants/{tenant_id}/playbook-automation:
+    put:
+      tags:
+      - mssp
+      summary: Set Client Playbook Automation
+      description: 'Allow automated playbooks for one client, or stop allowing them.
+        Off for every client until someone switches it on.
+
+
+        This records the choice only: playbooks do not start by themselves yet. When
+        they do, they must check this first.'
+      operationId: set_client_playbook_automation_api_v1_mssp_tenants__tenant_id__playbook_automation_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: tenant_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Tenant Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaybookAutomationRequest'
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/mssp/clients/duplicates/dismiss:
     post:
       tags:
@@ -31234,6 +31271,10 @@ components:
           type: boolean
           title: Hidden
           default: false
+        playbook_automation:
+          type: boolean
+          title: Playbook Automation
+          default: false
         sources:
           items:
             type: string
@@ -33664,6 +33705,15 @@ components:
         percentile end-to-end latency for items that traversed this stage in the
 
         last hour. ``error_rate`` is errors / processed in the same window.'
+    PlaybookAutomationRequest:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+      type: object
+      required:
+      - enabled
+      title: PlaybookAutomationRequest
     PluginManifestOut:
       properties:
         id:

@@ -490,6 +490,8 @@ export interface ManagedTenantRow {
   name: string;
   /** Hidden by the MSSP (a test client); only returned when hidden clients are asked for. */
   hidden?: boolean;
+  /** The MSSP allows automated playbooks for this client. A recorded choice: nothing starts playbooks by itself yet. */
+  playbook_automation?: boolean;
   /** Tools (vendors) whose clients are mapped to this tenant. */
   sources?: string[];
   has_metrics: boolean;
@@ -872,6 +874,10 @@ export const msspApi = {
     return request<ManagedTenantRow[]>(`/api/v1/mssp/tenants${includeHidden ? '?include_hidden=true' : ''}`);
   },
   /** Hide a client tenant (a test client) from the lists and totals, or show it again. Nothing is deleted. */
+  async setPlaybookAutomation(tenantId: string, enabled: boolean): Promise<void> {
+    await request<void>(`/api/v1/mssp/tenants/${tenantId}/playbook-automation`, { method: 'PUT', body: JSON.stringify({ enabled }) });
+  },
+
   async setClientHidden(tenantId: string, hidden: boolean): Promise<void> {
     await request<void>(`/api/v1/mssp/tenants/${tenantId}/hidden`, { method: 'PUT', body: JSON.stringify({ hidden }) });
   },
