@@ -247,3 +247,12 @@ def test_the_machine_liongard_marks_with_a_number_is_offered_with_the_same_machi
     liongard, rmm = device("a", "NUC-ENCLAVE-AUS (1)"), device("b", "NUC-ENCLAVE-AUS")
     tools = {"a": {"liongard"}, "b": {"ninjaone", "huntress"}}
     assert duplicate_pairs([liongard, rmm], tools, set(), set()) == [("a", "b")]
+
+
+def test_an_unfilled_template_is_not_a_serial_number():
+    # Seen live: 30 devices carried "$(DEFAULT_STRING)", a BIOS field some tool passed through unfilled.
+    for junk in ("$(DEFAULT_STRING)", "$(Default_String)", " $(DEFAULT_STRING) ", "%SERIAL%", "{SerialNumber}", "<unknown>"):
+        assert normalize_serial(junk) is None, junk
+    # Real serials are untouched, including ones with brackets or a dollar sign inside.
+    for real in ("MXL51931WM", "5CG1234ABC", "ABC(1)", "$ABC", "AB%CD"):
+        assert normalize_serial(real) == real.upper(), real

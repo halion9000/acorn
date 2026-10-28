@@ -37,6 +37,8 @@ _PLACEHOLDERS = frozenset(
     }
 )
 _MIN_SERIAL_LEN = 4
+# An unfilled BIOS field some tools pass through as the template itself: "$(DEFAULT_STRING)", "%SERIAL%", "{SerialNumber}", "<unknown>". Never a real serial.
+_UNFILLED_TEMPLATE = re.compile(r"^(\$\(.*\)|%.*%|\{.*\}|<.*>)$")
 
 
 def normalize_serial(raw: object) -> str | None:
@@ -44,7 +46,7 @@ def normalize_serial(raw: object) -> str | None:
     if raw is None:
         return None
     text = re.sub(r"\s+", "", str(raw)).upper()
-    if len(text) < _MIN_SERIAL_LEN or text in _PLACEHOLDERS:
+    if len(text) < _MIN_SERIAL_LEN or text in _PLACEHOLDERS or _UNFILLED_TEMPLATE.match(text):
         return None
     if len(set(text)) == 1:  # 0000000, XXXXXXX, 1111111
         return None
