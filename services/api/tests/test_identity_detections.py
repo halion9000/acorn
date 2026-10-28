@@ -11,6 +11,7 @@ from app.services.identity_detections import (
     alert_id,
     alert_values,
     detect_ca_policy_change,
+    detect_device_code,
     detect_failed_after_revoke,
     detect_impossible_travel,
     detect_mass_deletion,
@@ -117,3 +118,40 @@ def test_the_alert_has_a_fixed_id_per_client_and_finding_and_the_tactic_set():
     assert v["mitre_tactics"] == ["Initial Access"] and v["mitre_techniques"] == ["T1078"]
     assert v["description"] == "Summary sentence.\n\nPerson: a@x.com\nCountry: RO"
     assert v["affected_users"] == ["a@x.com"] and v["severity"] == "high" and v["connector_type"] == "cipp"
+
+
+# ---- device code -------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+def coded(i, **over):
+    row = signin(i, **over)
+    row.auth_protocol, row.transfer_method, row.resource = "deviceCode", "deviceCodeFlow", "Microsoft Graph"
+    return row
+
+
+def test_a_successful_device_code_sign_in_raises_one_alert_naming_the_service_and_the_person():
+    found = detect_device_code([coded(1), signin(2)])
+    assert [f.title for f in found] == ["Device-code sign-in - a@x.com"]
+    assert found[0].severity == "medium" and found[0].technique == "T1078"
+    assert ("Service", "Microsoft Graph") in found[0].fields
+
+
+def test_either_signal_counts_and_no_multi_factor_makes_it_high():
+    only_protocol = signin(1)
+    only_protocol.auth_protocol, only_protocol.transfer_method = "deviceCode", None
+    only_transfer = signin(2)
+    only_transfer.auth_protocol, only_transfer.transfer_method = None, "deviceCodeFlow"
+    assert len(detect_device_code([only_protocol, only_transfer])) == 2
+    assert detect_device_code([coded(3, mfa=False)])[0].severity == "high"
+
+
+def test_failed_and_ordinary_sign_ins_and_rows_with_no_protocol_fields_are_ignored():
+    plain = signin(1)  # a row stored before the columns existed has no such attributes at all
+    assert detect_device_code([plain, coded(2, success=False)]) == []
+
+
+def test_each_device_code_sign_in_has_its_own_alert_id():
+    a, b = detect_device_code([coded(1), coded(2)])
+    tenant = uuid.uuid4()
+    assert alert_id(tenant, a) == alert_id(tenant, a), "a repeat is a no-op"
+    assert alert_id(tenant, a) != alert_id(tenant, b)

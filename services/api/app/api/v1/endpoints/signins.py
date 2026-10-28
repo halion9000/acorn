@@ -60,6 +60,9 @@ class SignInIn(BaseModel):
     mfa: bool | None = None
     risk: str | None = Field(default=None, max_length=20)
     conditional_access: str | None = Field(default=None, max_length=40)
+    auth_protocol: str | None = Field(default=None, max_length=40, description="Microsoft's authentication protocol (``deviceCode``, ``ropc``...); absent when it said none.")
+    transfer_method: str | None = Field(default=None, max_length=40, description="How the token was first transferred (``deviceCodeFlow``...); absent when it said none.")
+    resource: str | None = Field(default=None, max_length=160, description="The service signed in to.")
 
 
 class SignInsReport(BaseModel):
@@ -196,6 +199,9 @@ async def apply_signins(db: Any, owner: uuid.UUID, report: SignInsReport, now: d
                     mfa=it.mfa,
                     risk=it.risk,
                     conditional_access=it.conditional_access,
+                    auth_protocol=it.auth_protocol,
+                    transfer_method=it.transfer_method,
+                    resource=it.resource,
                     occurred_at=_utc(it.at),
                 )
                 rows.append(row)

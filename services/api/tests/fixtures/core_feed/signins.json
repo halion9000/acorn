@@ -20,7 +20,10 @@
         "interactive": true,
         "mfa": true,
         "risk": null,
-        "conditional_access": null
+        "conditional_access": null,
+        "auth_protocol": null,
+        "transfer_method": null,
+        "resource": null
       },
       {
         "vendor_client_id": "c1",
@@ -38,7 +41,10 @@
         "interactive": true,
         "mfa": true,
         "risk": null,
-        "conditional_access": null
+        "conditional_access": null,
+        "auth_protocol": null,
+        "transfer_method": null,
+        "resource": null
       }
     ]
   }

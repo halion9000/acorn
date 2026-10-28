@@ -147,6 +147,44 @@ def detect_impossible_travel(rows: list[Any], new_ids: set[str]) -> list[Finding
     return out
 
 
+def detect_device_code(new: list[Any]) -> list[Finding]:
+    """A successful sign-in made with the device-code flow. Attackers phish with it (the person is talked into typing a code on Microsoft's own page and the attacker is handed a token), so every one is
+    worth a look; a person setting up a meeting-room device or a command-line tool does it too. One finding per sign-in."""
+    out: list[Finding] = []
+    for r in sorted(new, key=lambda x: _utc(x.occurred_at)):
+        protocol = (getattr(r, "auth_protocol", None) or "").lower()
+        transfer = (getattr(r, "transfer_method", None) or "").lower()
+        if not r.success or (protocol != "devicecode" and transfer != "devicecodeflow"):
+            continue
+        resource = getattr(r, "resource", None)
+        out.append(
+            Finding(
+                rule_id="aisoc-id-device-code",
+                rule_name="Sign-in with a device code",
+                title=f"Device-code sign-in - {r.user_principal}",
+                severity="high" if r.mfa is False else "medium",
+                tactic="Initial Access",
+                technique="T1078",
+                key=f"device-code:{r.user_principal}:{r.source_id}",
+                occurred_at=r.occurred_at,
+                summary=f"{r.user_principal} signed in with a device code. Attackers phish people into approving one; confirm with the person that they started it (setting up a device or a tool is the usual innocent reason).",
+                fields=[
+                    ("Person", r.user_principal),
+                    ("App", r.app or "unknown"),
+                    ("Service", resource or "unknown"),
+                    ("Country", r.country or "unknown"),
+                    ("Address", r.ip_address or "unknown"),
+                    ("Multi-factor", "not used" if r.mfa is False else "used" if r.mfa else "unknown"),
+                    ("Time", _stamp(r.occurred_at)),
+                ],
+                users=[r.user_principal],
+                ips=[r.ip_address] if r.ip_address else [],
+                source_ids=[r.source_id],
+            )
+        )
+    return out
+
+
 # ---- directory audit rules ---------------------------------------------------------------------------------------------------------------------------------
 
 _REVOKE = re.compile(r"revoke.*(session|token)|invalidate.*(session|token)", re.IGNORECASE)
@@ -414,7 +452,7 @@ async def run_signin_detections(db: Any, tenant_id: uuid.UUID, rows: list[Any], 
             .scalars()
             .all()
         )
-        findings = detect_rare_country(rows, countries, total) + detect_impossible_travel([*earlier, *rows], new_ids)
+        findings = detect_rare_country(rows, countries, total) + detect_impossible_travel([*earlier, *rows], new_ids) + detect_device_code(rows)
     except Exception:  # noqa: BLE001
         logger.warning("identity detections: sign-in rules failed for tenant=%s", tenant_id, exc_info=True)
         return 0

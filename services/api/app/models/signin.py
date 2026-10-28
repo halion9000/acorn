@@ -37,6 +37,10 @@ class SigninEvent(Base):
     mfa: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     risk: Mapped[str | None] = mapped_column(String(20), nullable=True)
     conditional_access: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # How it was made (migration 120): None for sign-ins stored before it, or when Microsoft recorded nothing more than "none".
+    auth_protocol: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    transfer_method: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    resource: Mapped[str | None] = mapped_column(String(160), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     scored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

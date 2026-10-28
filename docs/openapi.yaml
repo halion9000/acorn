@@ -37843,6 +37843,29 @@ components:
             maxLength: 40
           - type: 'null'
           title: Conditional Access
+        auth_protocol:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Auth Protocol
+          description: Microsoft's authentication protocol (``deviceCode``, ``ropc``...);
+            absent when it said none.
+        transfer_method:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Transfer Method
+          description: How the token was first transferred (``deviceCodeFlow``...);
+            absent when it said none.
+        resource:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          title: Resource
+          description: The service signed in to.
       type: object
       required:
       - id
