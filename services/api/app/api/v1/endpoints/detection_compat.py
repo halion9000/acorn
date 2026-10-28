@@ -58,6 +58,7 @@ class FrontendDetectionRule(BaseModel):
     updatedAt: str
     lastTriggeredAt: str | None = None
     hitCount: int = 0
+    category: str | None = None
 
 
 class ListResponse(BaseModel):
@@ -132,6 +133,7 @@ def _to_frontend(rule: DetectionRule) -> FrontendDetectionRule:
         updatedAt=rule.updated_at.isoformat() if rule.updated_at else datetime.now(UTC).isoformat(),
         lastTriggeredAt=rule.last_triggered.isoformat() if rule.last_triggered else None,
         hitCount=rule.total_hits or 0,
+        category=rule.category or None,
     )
 
 

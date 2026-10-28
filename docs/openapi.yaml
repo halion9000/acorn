@@ -6359,6 +6359,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/community/installed/detections:
+    get:
+      tags:
+      - community
+      summary: Installed Community Detections
+      description: 'The ids of the catalog detections this tenant has installed, so
+        the catalog can mark them. Read from the rules'' provenance, so it covers
+        exactly the rules the install route made.
+
+        A separate route because the browse list is public and has no tenant.'
+      operationId: installed_community_detections_api_v1_community_installed_detections_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  items:
+                    type: string
+                  type: array
+                type: object
+                title: Response Installed Community Detections Api V1 Community Installed
+                  Detections Get
+      security:
+      - HTTPBearer: []
   /api/v1/community/detections/{detection_id}:
     get:
       tags:
@@ -28896,6 +28922,11 @@ components:
           type: integer
           title: Hitcount
           default: 0
+        category:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
       type: object
       required:
       - id

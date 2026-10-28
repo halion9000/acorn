@@ -4371,6 +4371,8 @@ export interface DetectionRule {
   updatedAt: string;
   lastTriggeredAt?: string;
   hitCount?: number;
+  /** Where the rule belongs (identity, cloud, endpoint...); rules made by hand are "custom". */
+  category?: string | null;
 }
 
 // ─── Detection management UI (WS-B3) ─────────────────────────────────────────

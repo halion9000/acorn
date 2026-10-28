@@ -135,6 +135,17 @@ export function DetectionsView() {
   const [enabledFilter, setEnabledFilter] = useState<'all' | 'on' | 'off'>(
     'all',
   );
+  const [category, setCategory] = useState('all');
+
+  // Every category the rules fall in, with how many rules each holds (a rule with none is counted under "uncategorised").
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of rules) {
+      const c = r.category?.trim() || 'uncategorised';
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [rules]);
 
   // Selection state for bulk operations. We keep it as a Set so we can
   // do O(1) `has()` checks while rendering each rule card.
@@ -145,6 +156,7 @@ export function DetectionsView() {
     const q = search.trim().toLowerCase();
     return rules.filter((r) => {
       if (language !== 'all' && r.language !== language) return false;
+      if (category !== 'all' && (r.category?.trim() || 'uncategorised') !== category) return false;
       if (enabledFilter === 'on' && !r.enabled) return false;
       if (enabledFilter === 'off' && r.enabled) return false;
       if (!q) return true;
@@ -158,7 +170,7 @@ export function DetectionsView() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [rules, search, language, enabledFilter]);
+  }, [rules, search, language, category, enabledFilter]);
 
   // ─── Selection helpers ─────────────────────────────────────────────────────
 
@@ -387,6 +399,20 @@ export function DetectionsView() {
               <option value="eql">EQL</option>
               <option value="lucene">Lucene</option>
               <option value="regex">Regex</option>
+            </select>
+
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              aria-label="Category"
+              className="rounded-md border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-300 outline-none focus:border-blue-500/60"
+            >
+              <option value="all">All categories ({rules.length})</option>
+              {categories.map(([name, count]) => (
+                <option key={name} value={name}>
+                  {name} ({count})
+                </option>
+              ))}
             </select>
 
             <div className="inline-flex rounded-md border border-gray-800 bg-gray-950 p-0.5 text-xs">

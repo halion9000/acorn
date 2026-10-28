@@ -41,6 +41,34 @@ beforeEach(() => {
   api.list.mockResolvedValue({ rules: [r1, r2], total: 2 });
 });
 
+describe('the category filter', () => {
+  it('lists each category with its rule count and narrows the list to the one chosen', async () => {
+    api.list.mockResolvedValue({
+      rules: [
+        rule({ id: 'i1', name: 'Impossible travel', category: 'identity' }),
+        rule({ id: 'i2', name: 'Device code sign-in', category: 'identity' }),
+        rule({ id: 'e1', name: 'Rare process', category: 'endpoint' }),
+        rule({ id: 'n1', name: 'Hand-made rule' }),
+      ],
+      total: 4,
+    });
+    renderView();
+    await screen.findByText('Impossible travel');
+    const select = screen.getByRole('combobox', { name: 'Category' });
+    expect(Array.from((select as HTMLSelectElement).options).map((o) => o.textContent)).toEqual([
+      'All categories (4)',
+      'endpoint (1)',
+      'identity (2)',
+      'uncategorised (1)',
+    ]);
+    await userEvent.setup().selectOptions(select, 'identity');
+    expect(screen.getByText('Impossible travel')).toBeInTheDocument();
+    expect(screen.getByText('Device code sign-in')).toBeInTheDocument();
+    expect(screen.queryByText('Rare process')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hand-made rule')).not.toBeInTheDocument();
+  });
+});
+
 describe('the rule list', () => {
   it('shows the real rules and no demo wording', async () => {
     const { container } = renderView();
