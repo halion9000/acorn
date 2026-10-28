@@ -214,3 +214,21 @@ describe('MarketplaceView tier filter', () => {
     expect(screen.getByRole('button', { name: /^All tiers\s*\(3\)/ })).toBeInTheDocument();
   });
 });
+
+describe('an installed playbook', () => {
+  it('says it is started from the Playbooks page, and a plugin does not say so', () => {
+    const playbook: MarketplaceItem = { ...baseItem, id: 'account-takeover-response', type: 'playbook', name: 'Account Takeover Response' };
+    swrCalls.set('/marketplace/index.json', { version: '1', generated: '2026-05-04T00:00:00Z', items: [baseItem, playbook], stats: { total: 2, playbooks: 1, detections: 0, plugins: 1, verified: 2, community: 0 } });
+    swrCalls.set('/api/v1/marketplace/installed', {
+      total: 2,
+      items: [
+        { type: 'plugin', id: 'cloudflare-waf', name: 'Cloudflare WAF', version: '1.0.0', installed_at: '2026-10-01T00:00:00Z', installed_by: 'x' },
+        { type: 'playbook', id: 'account-takeover-response', name: 'Account Takeover Response', version: '1.0.0', installed_at: '2026-10-01T00:00:00Z', installed_by: 'x' },
+      ],
+    });
+    render(<MarketplaceView />);
+    const hints = screen.getAllByTestId('playbook-run-hint');
+    expect(hints).toHaveLength(1);
+    expect(hints[0]).toHaveTextContent('Run it from Playbooks');
+  });
+});

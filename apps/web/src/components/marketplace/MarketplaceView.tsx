@@ -259,6 +259,11 @@ function InstallButton({ item, installed, busy, onInstall, onUninstall }: Instal
         >
           Installed
         </span>
+        {item.type === 'playbook' && (
+          <span className="text-[11px] text-zinc-500" data-testid="playbook-run-hint">
+            Run it from Playbooks; it does not start by itself.
+          </span>
+        )}
         <button
           onClick={() => onUninstall(item)}
           disabled={busy}
