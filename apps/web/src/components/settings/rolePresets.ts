@@ -17,7 +17,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     key: 'read-only-analyst',
     label: 'Read-only analyst',
     description: 'Sees alerts, cases and clients and can read everything, but changes nothing. Automation and platform administration are hidden.',
-    hidden: ['section:Automation', 'section:Platform'],
+    hidden: ['section:Automation', 'section:vCIO', 'section:Platform'],
     permissions: ['*:read'],
   },
   {

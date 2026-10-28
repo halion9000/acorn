@@ -29,7 +29,8 @@ The left sidebar groups the console:
 | Intelligence | Threat Intel, Attack Graph, Leafy, Investigation Chat, Coverage Advisor, EASM |
 | Client Security | **Client Posture**, **Multi-Factor**, **Secure Score**, **Sign-in Scores**, **Client Cleanup**, **Platform Health** |
 | Response and testing | Playbooks, Marketplace, File Integrity, Honeytokens, Purple Team |
-| Admin | Get started, **Connectors**, Roles & Permissions, Compliance, **MSSP Dashboard**, Team Analytics, SLA Tracking, Executive Digest, Audit Log, **Settings** (which holds the Cost Dashboard) |
+| vCIO | Compliance, Executive Digest, Client Review |
+| Admin | Get started, **Connectors**, Roles & Permissions, **MSSP Dashboard**, Team Analytics, SLA Tracking, Audit Log, **Settings** (which holds the Cost Dashboard) |
 
 \`Ctrl+K\` opens a command palette that jumps to the main pages.
 

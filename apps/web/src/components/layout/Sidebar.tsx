@@ -339,6 +339,26 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: 'vCIO',
+    items: [
+      {
+        label: 'Compliance',
+        href: '/compliance',
+        icon: <ShieldIcon />,
+      },
+      {
+        label: 'Executive Digest',
+        href: '/reports/digest',
+        icon: <DocumentReportIcon />,
+      },
+      {
+        label: 'Client Review',
+        href: '/reports/client-review',
+        icon: <DocumentReportIcon />,
+      },
+    ],
+  },
+  {
     title: 'Platform',
     items: [
       {
@@ -357,11 +377,6 @@ const navSections: NavSection[] = [
         icon: <ShieldIcon />,
       },
       {
-        label: 'Compliance',
-        href: '/compliance',
-        icon: <ShieldIcon />,
-      },
-      {
         label: 'MSSP Dashboard',
         href: '/mssp',
         icon: <GlobeIcon />,
@@ -375,16 +390,6 @@ const navSections: NavSection[] = [
         label: 'SLA Tracking',
         href: '/sla',
         icon: <ChartBarIcon />,
-      },
-      {
-        label: 'Executive Digest',
-        href: '/reports/digest',
-        icon: <DocumentReportIcon />,
-      },
-      {
-        label: 'Client Review',
-        href: '/reports/client-review',
-        icon: <DocumentReportIcon />,
       },
       {
         label: 'Settings',
