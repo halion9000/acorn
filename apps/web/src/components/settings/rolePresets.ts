@@ -17,7 +17,8 @@ export const ROLE_PRESETS: RolePreset[] = [
     key: 'read-only-analyst',
     label: 'Read-only analyst',
     description: 'Sees alerts, cases and clients and can read everything, but changes nothing. Automation and platform administration are hidden.',
-    hidden: ['section:Automation', 'section:vCIO', 'section:Platform'],
+    // Platform used to hold only these pages and Settings; it now also holds the dashboards, which this role keeps.
+    hidden: ['section:Automation', 'section:vCIO', '/onboarding', '/guide', '/mssp', '/analytics/team', '/sla', '/settings'],
     permissions: ['*:read'],
   },
   {

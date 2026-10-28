@@ -110,6 +110,10 @@ describe('isHidden and toHiddenSet', () => {
     expect(set.has('/settings/audit')).toBe(true);
     expect(set.has('/settings/costs')).toBe(true);
   });
+  it('does not tie Settings to the Platform section: each is hidden only when the role says so', () => {
+    expect(toHiddenSet(['section:Platform']).has('/settings')).toBe(false);
+    expect(toHiddenSet(['/settings']).has('section:Platform')).toBe(false);
+  });
   it('ignores anything the API sent that is not text', () => {
     expect([...toHiddenSet(['/a', 3, null, 'section:X'])]).toEqual(['/a', 'section:X']);
     expect(toHiddenSet(undefined).size).toBe(0);

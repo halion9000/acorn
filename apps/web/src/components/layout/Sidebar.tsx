@@ -152,15 +152,41 @@ const DocumentReportIcon = () => (
 
 const navSections: NavSection[] = [
   {
+    title: 'Platform',
     items: [
       {
-        label: 'Dashboard',
+        label: 'SOC Dashboard',
         href: '/dashboard',
         icon: <ChartBarIcon />,
       },
       {
         label: 'SOC Insights',
         href: '/dashboards/soc-insights',
+        icon: <ChartBarIcon />,
+      },
+      {
+        label: 'Get started',
+        href: '/onboarding',
+        icon: <SparklesIcon />,
+      },
+      {
+        label: 'User guide',
+        href: '/guide',
+        icon: <SparklesIcon />,
+      },
+      {
+        label: 'MSSP Dashboard',
+        href: '/mssp',
+        icon: <GlobeIcon />,
+      },
+      {
+        label: 'Team Analytics',
+        href: '/analytics/team',
+        icon: <ChartBarIcon />,
+      },
+      {
+        label: 'SLA Tracking',
+        href: '/sla',
         icon: <ChartBarIcon />,
       },
     ],
@@ -359,33 +385,7 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: 'Platform',
     items: [
-      {
-        label: 'Get started',
-        href: '/onboarding',
-        icon: <SparklesIcon />,
-      },
-      {
-        label: 'User guide',
-        href: '/guide',
-        icon: <SparklesIcon />,
-      },
-      {
-        label: 'MSSP Dashboard',
-        href: '/mssp',
-        icon: <GlobeIcon />,
-      },
-      {
-        label: 'Team Analytics',
-        href: '/analytics/team',
-        icon: <ChartBarIcon />,
-      },
-      {
-        label: 'SLA Tracking',
-        href: '/sla',
-        icon: <ChartBarIcon />,
-      },
       {
         label: 'Settings',
         href: '/settings',

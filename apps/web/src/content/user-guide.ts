@@ -24,13 +24,14 @@ The left sidebar groups the console:
 
 | Area | Pages |
 |---|---|
-| Work | Dashboard, SOC Insights, **Alerts**, **Devices**, Investigation Queue, **Cases**, Hunt, Explore |
+| Platform (top) | SOC Dashboard, SOC Insights, Get started, User guide, **MSSP Dashboard**, Team Analytics, SLA Tracking |
+| Work | **Alerts**, **Devices**, Investigation Queue, **Cases**, Hunt, Explore |
 | Detection | Detection Rules, Detection Catalog, Vendor Detections, MITRE Coverage, Detection Tuning, Shifts |
 | Intelligence | Threat Intel, Attack Graph, Leafy, Investigation Chat, Coverage Advisor, EASM |
 | Client Security | **Client Posture**, **Multi-Factor**, **Secure Score**, **Sign-in Scores**, **Client Cleanup**, **Platform Health** |
 | Response and testing | Playbooks, Marketplace, File Integrity, Honeytokens, Purple Team |
 | vCIO | Compliance, Executive Digest, Client Review |
-| Admin | Get started, **Connectors**, **MSSP Dashboard**, Team Analytics, SLA Tracking, Audit Log, **Settings** (which holds Roles & Permissions and the Cost Dashboard) |
+| Settings (bottom, on its own) | **Settings**, which holds Connectors, Roles & Permissions, Audit Log and the Cost Dashboard. A role can hide Platform and Settings separately. |
 
 \`Ctrl+K\` opens a command palette that jumps to the main pages.
 

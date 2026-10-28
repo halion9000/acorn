@@ -110,3 +110,18 @@ describe('opening the address of a hidden page', () => {
     expect(screen.getByText('home')).toBeInTheDocument();
   });
 });
+
+describe('Platform and Settings are hidden independently', () => {
+  it('hiding the Platform section leaves Settings, and hiding Settings leaves the Platform pages', () => {
+    state.hidden = new Set(['section:Platform']);
+    const first = render(<Sidebar />);
+    expect(screen.queryByRole('link', { name: /SLA Tracking/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Settings/ })).toBeInTheDocument();
+    first.unmount();
+    state.hidden = new Set(['/settings']);
+    render(<Sidebar />);
+    expect(screen.queryByRole('link', { name: /^Settings$/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /SLA Tracking/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /SOC Dashboard/ })).toBeInTheDocument();
+  });
+});

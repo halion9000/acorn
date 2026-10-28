@@ -230,8 +230,8 @@ describe('hiding parts of the console from a role', () => {
     await openForm();
     await userEvent.click(screen.getByRole('checkbox', { name: 'Show the Automation section' }));
     expect(screen.getByRole('checkbox', { name: 'Show Playbooks' })).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: 'Show Dashboard' })).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: 'Show Dashboard' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Show SOC Dashboard' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Show SOC Dashboard' })).toBeChecked();
     // The roles page is not a sidebar entry (it is listed under Settings), so there is nothing to tick that would hide it.
     expect(screen.getAllByRole('checkbox').some((c) => /Roles/.test(c.getAttribute('aria-label') ?? ''))).toBe(false);
   });
@@ -244,7 +244,11 @@ describe('hiding parts of the console from a role', () => {
     expect(screen.getByText('Permissions (2 selected)')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'alerts:write' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Show the Automation section' })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Show the Platform section' })).not.toBeChecked();
+    // Platform also holds the dashboards, which this role keeps: it hides the admin pages in it one by one.
+    expect(screen.getByRole('checkbox', { name: 'Show the Platform section' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Show SLA Tracking' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Show Settings' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Show SOC Insights' })).toBeChecked();
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0].body.name).toBe('Read-only analyst');

@@ -64,7 +64,7 @@ function writeRecent(path: string) {
 }
 
 const NAV_ITEMS: { label: string; href: string; keywords: string[] }[] = [
-  { label: 'Dashboard',       href: '/dashboard',    keywords: ['home', 'overview', 'metrics'] },
+  { label: 'SOC Dashboard',   href: '/dashboard',    keywords: ['home', 'overview', 'metrics', 'dashboard'] },
   { label: 'Alerts',          href: '/alerts',       keywords: ['notifications', 'incidents'] },
   { label: 'Cases',           href: '/cases',        keywords: ['investigations', 'tickets'] },
   { label: 'Hunt',            href: '/hunt',         keywords: ['threat hunting', 'search', 'kql', 'esql'] },
