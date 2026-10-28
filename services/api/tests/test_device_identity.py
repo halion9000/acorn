@@ -223,3 +223,27 @@ def test_a_stock_name_or_one_many_devices_carry_is_not_offered():
     crowd = [_row(i, "KIOSK-LOBBY") for i in range(10, 18)]
     tools = {r.id: {f"tool{i}"} for i, r in enumerate(crowd)}
     assert duplicate_pairs(crowd, tools, set(), set()) == [], "eight devices with one name is a reused name, not one machine"
+
+
+def test_a_trailing_duplicate_marker_is_not_part_of_the_name():
+    from app.services.device_identity import loose_name_key
+
+    # Liongard names a second machine with an already-used name "NAME (1)"; the other tools know it as "NAME".
+    assert loose_name_key("NUC-ENCLAVE-AUS (1)") == loose_name_key("NUC-ENCLAVE-AUS") == "nucenclaveaus"
+    assert loose_name_key("Server (12)") == "server"
+    # Only a marker after a space at the very end: digits that are part of the name, and brackets elsewhere, stay.
+    assert loose_name_key("PC-10") == "pc10" and loose_name_key("Lab (A)") == "laba" and loose_name_key("(1)") == "1"
+    assert loose_name_key("PC (1) Annex") == "pc1annex"
+
+
+def test_the_machine_liongard_marks_with_a_number_is_offered_with_the_same_machine_in_the_other_tools():
+    from types import SimpleNamespace
+
+    from app.services.device_upsert import duplicate_pairs
+
+    def device(i, hostname):
+        return SimpleNamespace(id=i, hostname=hostname, serial_number=None, ip_addresses=[], manufacturer=None)
+
+    liongard, rmm = device("a", "NUC-ENCLAVE-AUS (1)"), device("b", "NUC-ENCLAVE-AUS")
+    tools = {"a": {"liongard"}, "b": {"ninjaone", "huntress"}}
+    assert duplicate_pairs([liongard, rmm], tools, set(), set()) == [("a", "b")]

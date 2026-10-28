@@ -54,6 +54,9 @@ def normalize_serial(raw: object) -> str | None:
 _ENDS_IN_IPV4 = re.compile(r"(^|[^0-9])\d{1,3}(\.\d{1,3}){3}$")
 
 
+_DUPLICATE_MARK = re.compile(r"\s+\(\d{1,2}\)$")
+
+
 def hostname_key(raw: object) -> str:
     """A hostname reduced for comparison: lower-case, first label only (``PC-01.corp.local`` and ``pc-01`` are one name).
 
@@ -73,7 +76,8 @@ def loose_name_key(raw: object) -> str:
     key = hostname_key(raw)
     if _ENDS_IN_IPV4.search(key):
         return key
-    return re.sub(r"[^a-z0-9]+", "", key)
+    # A tool that meets two machines with one name marks the second "NAME (1)" (Liongard does): that is the same name as far as the other tools are concerned.
+    return re.sub(r"[^a-z0-9]+", "", _DUPLICATE_MARK.sub("", key))
 
 
 def mac_key(raw: object) -> str | None:
