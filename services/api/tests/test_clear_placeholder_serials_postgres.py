@@ -27,7 +27,8 @@ async def world():
         async with engine.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
             await conn.execute(
-                text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :s, 'child')"), {"i": tid, "n": f"ser-{tag}", "s": f"ser-{tag}"}
+                text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :s, 'child')"),
+                {"i": tid, "n": f"ser-{tag}", "s": f"ser-{tag}"},
             )
         yield engine, tid
     finally:
@@ -63,7 +64,9 @@ async def test_a_device_holding_an_unfilled_template_serial_is_removed_with_its_
         await add_device(conn, tid, "PC-NONE", None, [("auvik", "5")])
         await conn.execute(text(sql))
         await conn.execute(text(sql))  # running it again changes nothing
-        devices = (await conn.execute(text("select hostname from devices where tenant_id = :t order by hostname"), {"t": tid})).scalars().all()
+        devices = (
+            (await conn.execute(text("select hostname from devices where tenant_id = :t order by hostname"), {"t": tid})).scalars().all()
+        )
         sources = (await conn.execute(text("select count(*) from device_sources where tenant_id = :t"), {"t": tid})).scalar_one()
     assert devices == ["PC-NONE", "PC-REAL"]
     assert sources == 2, "the removed device's three source records went with it"

@@ -690,6 +690,20 @@ def alert_id(tenant_id: uuid.UUID, finding: Finding) -> uuid.UUID:
     return uuid.uuid5(_NAMESPACE, f"{tenant_id}:{finding.rule_id}:{finding.key}")
 
 
+# The words the shipped playbooks' triggers use ("account-takeover", "impossible-travel"), so a playbook can be matched to the alert (see ``playbook_dry_runs``). Only the rules that are
+# really signs of a taken-over account carry them; a legacy protocol or a deleted-in-bulk alert is not an account takeover.
+PLAYBOOK_TAGS: dict[str, list[str]] = {
+    "aisoc-id-impossible-travel": ["account-takeover", "impossible-travel"],
+    "aisoc-id-device-code": ["account-takeover"],
+    "aisoc-id-password-spray": ["account-takeover"],
+    "aisoc-id-mfa-fatigue": ["account-takeover", "mfa"],
+    "aisoc-id-guessed-password": ["account-takeover"],
+    "aisoc-id-failed-after-revoke": ["account-takeover"],
+    "aisoc-id-admin-security-info": ["account-takeover"],
+    "aisoc-id-app-consent": ["account-takeover"],
+}
+
+
 def alert_values(tenant_id: uuid.UUID, finding: Finding, now: datetime) -> dict[str, Any]:
     """The columns of the alert row for a finding."""
     lines = [finding.summary, ""] + [f"{k}: {v}" for k, v in finding.fields]
@@ -721,7 +735,7 @@ def alert_values(tenant_id: uuid.UUID, finding: Finding, now: datetime) -> dict[
             "finding": {"uid": f"{finding.rule_id}:{finding.key}", "title": finding.title},
         },
         "enrichment_data": {},
-        "tags": ["identity", finding.rule_id],
+        "tags": ["identity", finding.rule_id, *PLAYBOOK_TAGS.get(finding.rule_id, [])],
         "event_time": at,
         "first_seen": at,
         "last_seen": at,

@@ -39,6 +39,7 @@ from app.services.plugin_manager import get_plugin_manager
 from app.workers.alert_email_worker import run_forever as run_alert_email
 from app.workers.hunt_scheduler import run_forever as run_hunt_scheduler
 from app.workers.oauth_refresh import run_forever as run_oauth_refresh
+from app.workers.playbook_dry_run_worker import run_playbook_dry_runs
 from app.workers.retention_sweeper import run_retention_sweeper
 from app.workers.suppression_sweeper import run_suppression_sweeper
 from app.workers.weekly_digest_task import run_forever as run_weekly_digest
@@ -455,6 +456,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as exc:
         logger.warning("alert_suppression worker failed to start", error=str(exc))
 
+    # Automatic playbooks, first version: for the clients the MSSP ticked, record which playbooks WOULD have run for each alert (nothing is run). Switch off with AISOC_PLAYBOOK_DRY_RUNS=0.
+    dry_run_task: asyncio.Task | None = None
+    if os.environ.get("AISOC_PLAYBOOK_DRY_RUNS", "1").strip().lower() not in ("0", "false", "no", "off"):
+        try:
+            dry_run_task = asyncio.create_task(
+                _run_guarded_scheduler_worker(
+                    job_name="playbook_dry_runs", ttl_seconds=_RETENTION_LOCK_TTL_SECONDS, worker=run_playbook_dry_runs
+                ),
+                name="playbook_dry_runs_worker",
+            )
+            logger.info("playbook_dry_runs worker started")
+        except Exception as exc:
+            logger.warning("playbook_dry_runs worker failed to start", error=str(exc))
+
     # The shipped detection rules, into the Rules list and the Detection Catalog (idempotent; a failure only logs).
     try:
         from app.services.seed_shipped_detections import enabled as _seed_enabled
@@ -520,6 +535,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             logger.warning("hunt_scheduler worker shutdown error", error=type(exc).__name__)
 
+    if dry_run_task is not None and not dry_run_task.done():
+        dry_run_task.cancel()
     if retention_task is not None and not retention_task.done():
         retention_task.cancel()
         try:

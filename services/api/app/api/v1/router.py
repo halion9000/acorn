@@ -76,6 +76,7 @@ from app.api.v1.endpoints import (
     phishing,
     platform_alert_email,
     platform_tenant_access,
+    playbook_dry_runs,
     playbooks,
     plugins,
     posture,
@@ -146,6 +147,7 @@ api_router.include_router(rule_tuning.router)
 api_router.include_router(federated.router)
 api_router.include_router(graph.router)
 api_router.include_router(playbooks.router)
+api_router.include_router(playbook_dry_runs.router)
 api_router.include_router(platform_alert_email.router)
 api_router.include_router(platform_tenant_access.router)
 api_router.include_router(plugins.router)

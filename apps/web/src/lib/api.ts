@@ -874,6 +874,29 @@ export const devicesApi = {
   },
 };
 
+/** A playbook that WOULD have run for an alert, and what it would have done. Nothing was run. */
+export interface PlaybookDryRun {
+  alert_id: string;
+  alert_title: string | null;
+  client_id: string;
+  client_name: string | null;
+  playbook_id: string;
+  playbook_name: string;
+  matched_on: string[];
+  steps: { id: string; type: string; name: string }[];
+  created_at: string;
+}
+
+export const playbookDryRunsApi = {
+  /** The newest dry runs for this organization and its clients, or for one alert. */
+  async list(opts: { alertId?: string; limit?: number } = {}): Promise<{ nothing_was_run: boolean; items: PlaybookDryRun[] }> {
+    const q = new URLSearchParams();
+    if (opts.alertId) q.set('alert_id', opts.alertId);
+    if (opts.limit) q.set('limit', String(opts.limit));
+    return request(`/api/v1/playbook-dry-runs${q.size ? `?${q}` : ''}`);
+  },
+};
+
 export const msspApi = {
   async listChildren(): Promise<ChildTenant[]> {
     return request<ChildTenant[]>('/api/v1/mssp/children');

@@ -190,3 +190,29 @@ def test_each_device_code_sign_in_has_its_own_alert_id():
     tenant = uuid.uuid4()
     assert alert_id(tenant, a) == alert_id(tenant, a), "a repeat is a no-op"
     assert alert_id(tenant, a) != alert_id(tenant, b)
+
+
+def test_alerts_for_account_takeover_signs_carry_the_words_playbook_triggers_use():
+    import uuid
+    from datetime import UTC, datetime
+
+    from app.services.identity_detections import Finding, alert_values
+
+    def tags(rule_id):
+        f = Finding(
+            rule_id=rule_id,
+            rule_name="r",
+            title="t",
+            severity="high",
+            tactic="Credential Access",
+            technique="T1110",
+            key="k",
+            occurred_at=datetime(2026, 10, 28, tzinfo=UTC),
+            summary="s",
+        )
+        return alert_values(uuid.uuid4(), f, datetime(2026, 10, 28, tzinfo=UTC))["tags"]
+
+    assert tags("aisoc-id-guessed-password") == ["identity", "aisoc-id-guessed-password", "account-takeover"]
+    assert tags("aisoc-id-impossible-travel")[2:] == ["account-takeover", "impossible-travel"]
+    assert tags("aisoc-id-legacy-protocol") == ["identity", "aisoc-id-legacy-protocol"], "a legacy protocol is not an account takeover"
+    assert tags("aisoc-id-mass-deletion") == ["identity", "aisoc-id-mass-deletion"]

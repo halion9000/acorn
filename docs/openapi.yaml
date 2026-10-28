@@ -5586,6 +5586,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/playbook-dry-runs:
+    get:
+      tags:
+      - playbooks
+      summary: 'Playbooks that would have run (a dry run: nothing was run)'
+      description: The newest dry runs for this organization and its clients, or for
+        one alert. Each says which playbook, why it matched and the steps it would
+        have taken.
+      operationId: list_dry_runs_api_v1_playbook_dry_runs_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: Only this alert's dry runs.
+          title: Alert Id
+        description: Only this alert's dry runs.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DryRunList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/platform/alert-email:
     get:
       tags:
@@ -27472,6 +27517,88 @@ components:
       - lowConfidence
       - stale
       title: DriftSummary
+    DryRunList:
+      properties:
+        nothing_was_run:
+          type: boolean
+          title: Nothing Was Run
+          default: true
+        items:
+          items:
+            $ref: '#/components/schemas/DryRunOut'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: DryRunList
+    DryRunOut:
+      properties:
+        alert_id:
+          type: string
+          format: uuid
+          title: Alert Id
+        alert_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Alert Title
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        playbook_id:
+          type: string
+          title: Playbook Id
+        playbook_name:
+          type: string
+          title: Playbook Name
+        matched_on:
+          items:
+            type: string
+          type: array
+          title: Matched On
+        steps:
+          items:
+            $ref: '#/components/schemas/DryRunStep'
+          type: array
+          title: Steps
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - alert_id
+      - client_id
+      - playbook_id
+      - playbook_name
+      - matched_on
+      - steps
+      - created_at
+      title: DryRunOut
+    DryRunStep:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+        name:
+          type: string
+          title: Name
+      type: object
+      required:
+      - id
+      - type
+      - name
+      title: DryRunStep
     DuplicateGroupOut:
       properties:
         tenants:

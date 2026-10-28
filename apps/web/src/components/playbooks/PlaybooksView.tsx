@@ -25,6 +25,7 @@ import { SavedViewsBar } from '@/components/saved-views/SavedViewsBar';
 import { DraftFromPromptDialog } from './DraftFromPromptDialog';
 import { authFetch } from '@/lib/auth-session';
 import { installCommunityItem } from '@/lib/communityInstall';
+import { DryRunsTab } from './DryRuns';
 
 /** Filter snapshot stored by the backend as a saved-view preset. */
 type PlaybookFilterSnapshot = PlaybookGalleryFilters;
@@ -396,7 +397,7 @@ function CommunityPlaybookCard({ playbook }: { playbook: CommunityPlaybook }) {
 /* ─────────────────────────── Main ─────────────────────────── */
 
 export function PlaybooksView() {
-  const [tab, setTab] = useState<'playbooks' | 'runs' | 'community'>('playbooks');
+  const [tab, setTab] = useState<'playbooks' | 'runs' | 'dryruns' | 'community'>('playbooks');
   const { data, isLoading, error, mutate } = useSWR<Playbook[]>('/api/v1/playbooks', fetcher, {
     refreshInterval: 30000,
   });
@@ -462,6 +463,12 @@ export function PlaybooksView() {
           Run History
         </button>
         <button
+          onClick={() => setTab('dryruns')}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${tab === 'dryruns' ? 'border-blue-500 text-blue-300' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+        >
+          Dry Runs
+        </button>
+        <button
           onClick={() => setTab('community')}
           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${tab === 'community' ? 'border-blue-500 text-blue-300' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
         >
@@ -471,6 +478,9 @@ export function PlaybooksView() {
 
       {/* Run History */}
       {tab === 'runs' && <RunHistoryTab />}
+
+      {/* Dry runs: which playbooks would have run for which alerts (nothing is run) */}
+      {tab === 'dryruns' && <DryRunsTab />}
 
       {/* Community */}
       {tab === 'community' && <CommunityPlaybooksTab />}
