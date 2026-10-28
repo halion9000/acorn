@@ -383,7 +383,7 @@ async def identity_detail(user: AuthUser, db: DBSession, client_id: uuid.UUID, e
     since = datetime.now(UTC) - timedelta(days=30)
     async with cross_tenant_reads(db):
         events = (
-            (await db.execute(select(SigninEvent).where(SigninEvent.tenant_id == client_id, SigninEvent.user_principal.ilike(wanted), SigninEvent.occurred_at >= since)))
+            (await db.execute(select(SigninEvent).where(SigninEvent.tenant_id == client_id, func.lower(SigninEvent.user_principal) == wanted, SigninEvent.occurred_at >= since)))
             .scalars()
             .all()
         )
