@@ -282,10 +282,10 @@ export function AttackGraphView() {
   );
 
   const mitreState = useSWR<MitreCoverage>(
-    'mitre-coverage',
+    ['mitre-coverage', client],
     // A failure reaches the error state below (with a Retry). It used to be caught here and replaced with a synthetic heatmap of invented "Technique 3.2"
     // cells, so a failed call presented made-up coverage as the tenant's own.
-    () => graphApi.getMitreCoverage(),
+    () => graphApi.getMitreCoverage(client ? { client } : {}),
     { revalidateOnFocus: false, refreshInterval: 60_000 },
   );
 

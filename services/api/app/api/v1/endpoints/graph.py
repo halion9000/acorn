@@ -646,6 +646,7 @@ async def get_mitre_coverage(
 async def get_mitre_coverage_compat(
     db: DBSession,
     current_user: CurrentUser = Depends(get_current_user),
+    client: Annotated[uuid.UUID | None, Query(description="Only this client's alerts (the caller's own tenant or one of its clients). Default: all of them.")] = None,
 ) -> MitreCoverageResponse:
     """Aggregated MITRE coverage in the shape the analyst console expects.
 
@@ -659,23 +660,29 @@ async def get_mitre_coverage_compat(
     from datetime import datetime as _dt
 
     records: list[dict[str, Any]] = []
-    try:
-        records = await graph_service.get_mitre_coverage(
-            tenant_id=str(current_user.tenant_id),
-        )
-    except Exception as exc:
-        if not _is_graph_unavailable(exc):
-            raise _query_failed(exc) from exc
-        logger.info(
-            "MITRE coverage (compat): graph backend unavailable; using alerts",
-            exc_info=False,
-        )
+    scoped_to = None
+    if client is not None:
+        # One client: its own alerts only (the knowledge graph is not split by client, so it is not asked).
+        children = [row.id for row in (await db.execute(select(Tenant.id).where(Tenant.parent_tenant_id == current_user.tenant_id))).all()]
+        scoped_to = overview_scope(current_user.tenant_id, children, client)[0]
+    else:
+        try:
+            records = await graph_service.get_mitre_coverage(
+                tenant_id=str(current_user.tenant_id),
+            )
+        except Exception as exc:
+            if not _is_graph_unavailable(exc):
+                raise _query_failed(exc) from exc
+            logger.info(
+                "MITRE coverage (compat): graph backend unavailable; using alerts",
+                exc_info=False,
+            )
 
     if not records:
         # No graph (or nothing in it): fall back to the techniques the alerts themselves carry.
         from app.services.mitre_from_alerts import observed_techniques
 
-        observed = await observed_techniques(db, current_user.tenant_id)
+        observed = await observed_techniques(db, scoped_to or current_user.tenant_id)
         records = [
             {"technique_id": tid, "name": tid, "tactic": cell["tactic"], "alert_count": cell["alerts"]}
             for tid, cell in sorted(observed.items())

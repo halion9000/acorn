@@ -4279,8 +4279,9 @@ export const graphApi = {
       params: filters as Record<string, string | number>,
     }),
 
-  getMitreCoverage: () =>
-    request<MitreCoverage>('/api/v1/graph/mitre/coverage'),
+  /** Techniques seen on alerts; ``client`` limits it to one client's alerts. */
+  getMitreCoverage: (params: { client?: string } = {}) =>
+    request<MitreCoverage>('/api/v1/graph/mitre/coverage', { params: params.client ? { client: params.client } : undefined }),
 
   /**
    * Fetch the reconstructed attack-path graph for a single case.

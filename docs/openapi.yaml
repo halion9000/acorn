@@ -5201,6 +5201,22 @@ paths:
 
         knowledge graph is offline, mirroring that endpoint''s behaviour.'
       operationId: get_mitre_coverage_compat_api_v1_graph_mitre_coverage_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: 'Only this client''s alerts (the caller''s own tenant or one
+            of its clients). Default: all of them.'
+          title: Client
+        description: 'Only this client''s alerts (the caller''s own tenant or one
+          of its clients). Default: all of them.'
       responses:
         '200':
           description: Successful Response
@@ -5208,8 +5224,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MitreCoverageResponse'
-      security:
-      - HTTPBearer: []
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/graph/entities/host:
     post:
       tags:

@@ -12,7 +12,7 @@ const getMitreCoverage = vi.hoisted(() => vi.fn());
 const children = vi.hoisted(() => ({ list: [] as { id: string; name: string }[] }));
 vi.mock('@/lib/api', () => ({
   __esModule: true,
-  graphApi: { getOverview: (f?: unknown) => getOverview(f), getMitreCoverage: () => getMitreCoverage() },
+  graphApi: { getOverview: (f?: unknown) => getOverview(f), getMitreCoverage: (p?: unknown) => getMitreCoverage(p) },
   msspApi: { listChildren: async () => children.list },
 }));
 
@@ -101,6 +101,18 @@ describe('the client picker', () => {
     await waitFor(() => expect(getOverview).toHaveBeenLastCalledWith({ depth: 3, client: 'c-1' }));
     await user.selectOptions(select, '');
     await waitFor(() => expect(getOverview).toHaveBeenLastCalledWith({ depth: 3 }));
+  });
+
+  it('limits the technique heatmap to the picked client too', async () => {
+    children.list = [{ id: 'c-1', name: 'Acme Dental' }];
+    getOverview.mockResolvedValue({ nodes: [], edges: [], generatedAt: '2026-10-08T12:00:00Z' });
+    getMitreCoverage.mockResolvedValue(coverage);
+    const user = userEvent.setup();
+    renderView();
+    const select = await screen.findByRole('combobox', { name: 'Client' });
+    await waitFor(() => expect(getMitreCoverage).toHaveBeenLastCalledWith({}));
+    await user.selectOptions(select, 'c-1');
+    await waitFor(() => expect(getMitreCoverage).toHaveBeenLastCalledWith({ client: 'c-1' }));
   });
 
   it('is not drawn for an organisation with no clients', async () => {
