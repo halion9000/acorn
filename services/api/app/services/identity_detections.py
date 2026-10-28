@@ -8,6 +8,7 @@ Until now these were stored and scored for unusual behaviour but nothing alerted
 - ``password_spray``: five or more people failing a password from one address within an hour.
 - ``mfa_fatigue``: five or more failed or unanswered multi-factor prompts for one person within an hour.
 - ``guessed_password``: a success right after five or more wrong passwords for the same person within an hour.
+- ``risky_signin``: Microsoft's own medium or high risk rating on a successful sign-in.
 - ``legacy_protocol``: a successful sign-in over IMAP, POP, SMTP, ActiveSync or "other clients", which cannot ask for multi-factor.
 - ``admin_security_info``: an administrator registered, changed or removed a person's sign-in methods.
 - ``app_consent``: consent or a delegated permission was given to an application.
@@ -187,6 +188,41 @@ def detect_device_code(new: list[Any]) -> list[Finding]:
                     ("Person", r.user_principal),
                     ("App", r.app or "unknown"),
                     ("Service", resource or "unknown"),
+                    ("Country", r.country or "unknown"),
+                    ("Address", r.ip_address or "unknown"),
+                    ("Multi-factor", "not used" if r.mfa is False else "used" if r.mfa else "unknown"),
+                    ("Time", _stamp(r.occurred_at)),
+                ],
+                users=[r.user_principal],
+                ips=[r.ip_address] if r.ip_address else [],
+                source_ids=[r.source_id],
+            )
+        )
+    return out
+
+
+def detect_risky_signin(new: list[Any]) -> list[Finding]:
+    """A successful sign-in that Microsoft itself scored as medium or high risk (only tenants whose licence shows the score send one). Microsoft's own judgement, so it is worth a look even when no other rule fires."""
+    out: list[Finding] = []
+    for r in sorted(new, key=lambda x: _utc(x.occurred_at)):
+        risk = (getattr(r, "risk", None) or "").lower()
+        if not r.success or risk not in ("medium", "high"):
+            continue
+        out.append(
+            Finding(
+                rule_id="aisoc-id-risky-signin",
+                rule_name="Microsoft rated a sign-in as risky",
+                title=f"{risk.capitalize()}-risk sign-in - {r.user_principal}",
+                severity="high" if risk == "high" else "medium",
+                tactic="Initial Access",
+                technique="T1078",
+                key=f"risky:{r.user_principal}:{r.source_id}",
+                occurred_at=r.occurred_at,
+                summary=f"Microsoft rated a successful sign-in by {r.user_principal} as {risk} risk. Confirm with the person that it was them.",
+                fields=[
+                    ("Person", r.user_principal),
+                    ("Risk", risk),
+                    ("App", r.app or "unknown"),
                     ("Country", r.country or "unknown"),
                     ("Address", r.ip_address or "unknown"),
                     ("Multi-factor", "not used" if r.mfa is False else "used" if r.mfa else "unknown"),
@@ -726,6 +762,7 @@ async def run_signin_detections(db: Any, tenant_id: uuid.UUID, rows: list[Any], 
             + detect_impossible_travel([*earlier, *rows], new_ids)
             + detect_device_code(rows)
             + detect_legacy_protocol(rows)
+            + detect_risky_signin(rows)
             + detect_password_spray([*earlier, *rows], new_ids)
             + detect_mfa_fatigue([*earlier, *rows], new_ids)
             + detect_guessed_password([*earlier, *rows], new_ids)

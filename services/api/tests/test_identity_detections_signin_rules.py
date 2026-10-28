@@ -10,6 +10,7 @@ from app.services.identity_detections import (
     detect_legacy_protocol,
     detect_mfa_fatigue,
     detect_password_spray,
+    detect_risky_signin,
 )
 
 T0 = datetime(2026, 10, 27, 12, 0, tzinfo=UTC)
@@ -131,3 +132,19 @@ def test_the_same_person_and_protocol_is_one_alert_a_day_and_a_new_day_is_a_new_
 
 def test_a_row_with_no_client_app_is_ignored():
     assert detect_legacy_protocol([row(1)]) == []
+
+
+# ---- Microsoft's own risk rating ---------------------------------------------------------------------------------------------------------------------------------
+
+
+def test_a_successful_medium_or_high_risk_sign_in_is_an_alert_with_matching_severity():
+    rows = [row(1), row(2), row(3)]
+    rows[0].risk, rows[1].risk, rows[2].risk = "high", "medium", "low"
+    found = detect_risky_signin(rows)
+    assert [(f.title, f.severity) for f in found] == [("High-risk sign-in - a@x.com", "high"), ("Medium-risk sign-in - a@x.com", "medium")]
+
+
+def test_failed_unrated_and_rows_without_a_risk_field_are_ignored():
+    failed = row(1, code=50126)
+    failed.risk = "high"
+    assert detect_risky_signin([failed, row(2)]) == []
