@@ -18,6 +18,7 @@ import { ContributorLeaderboard } from './ContributorLeaderboard';
 import { MitreRuleHeatmap } from './MitreRuleHeatmap';
 import { ConfidenceTrends } from './ConfidenceTrends';
 import { DriftInbox } from './DriftInbox';
+import { RulePacksView } from './RulePacksView';
 
 const SAMPLE_SIGMA = `title: Suspicious PowerShell Encoded Command
 id: aisoc-rule-001
@@ -84,13 +85,19 @@ const SEVERITY_BADGE: Record<string, string> = {
 
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 
-type DetectionsTab = 'rules' | 'coverage' | 'confidence' | 'drift';
+type DetectionsTab = 'rules' | 'packs' | 'coverage' | 'confidence' | 'drift';
 
 const TABS: { id: DetectionsTab; label: string; description: string }[] = [
   {
     id: 'rules',
     label: 'Rules',
     description: 'Author, tune, and operate the active rule library.',
+  },
+  {
+    id: 'packs',
+    label: 'Rule packs',
+    description:
+      'Buckets of rules (the imported Sigma rules, grouped by what they watch) that you apply to the clients you choose.',
   },
   {
     id: 'coverage',
@@ -572,6 +579,8 @@ export function DetectionsView() {
           <ContributorLeaderboard />
         </>
       )}
+
+      {tab === 'packs' && <RulePacksView />}
 
       {tab === 'coverage' && <MitreRuleHeatmap />}
 

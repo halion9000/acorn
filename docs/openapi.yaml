@@ -13451,6 +13451,68 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/mssp/rule-packs/summary:
+    get:
+      tags:
+      - mssp
+      summary: Rule Packs Overview
+      description: 'Every pack of this MSSP with its rules and the clients (child
+        tenants) it is applied to: what the Rule packs page lists.'
+      operationId: rule_packs_overview_api_v1_mssp_rule_packs_summary_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/PackOverview'
+                type: array
+                title: Response Rule Packs Overview Api V1 Mssp Rule Packs Summary
+                  Get
+      security:
+      - HTTPBearer: []
+  /api/v1/mssp/rule-packs/{pack_id}/clients/{child_id}:
+    put:
+      tags:
+      - mssp
+      summary: Set Pack For Client
+      description: 'Apply a pack to one client, or stop applying it (the box on the
+        Rule packs page). Safe to repeat: it sets the state rather than adding a row
+        each time.'
+      operationId: set_pack_for_client_api_v1_mssp_rule_packs__pack_id__clients__child_id__put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: pack_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Pack Id
+      - name: child_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Child Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PackClientRequest'
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/mssp/rule-packs/{pack_id}:
     get:
       tags:
@@ -33288,6 +33350,78 @@ components:
       - parameter_overrides
       - created_at
       title: PackAssignmentOut
+    PackClientRequest:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+      type: object
+      required:
+      - enabled
+      title: PackClientRequest
+    PackOverview:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        category:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+        rules:
+          items:
+            $ref: '#/components/schemas/PackRuleBrief'
+          type: array
+          title: Rules
+        applied_to:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Applied To
+      type: object
+      required:
+      - id
+      - name
+      - description
+      - category
+      - rules
+      - applied_to
+      title: PackOverview
+      description: 'One pack as the Rule packs page shows it: what is in it, and the
+        clients it is applied to.'
+    PackRuleBrief:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        severity:
+          type: string
+          title: Severity
+        category:
+          type: string
+          title: Category
+      type: object
+      required:
+      - id
+      - name
+      - severity
+      - category
+      title: PackRuleBrief
     ParserIn:
       properties:
         name:

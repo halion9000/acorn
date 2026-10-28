@@ -485,6 +485,17 @@ export interface MsspOverview {
 }
 
 /** One real child tenant, with its latest metrics snapshot. `has_metrics` is false (and every metric null) until one has been recorded. */
+/** A rule pack: a bucket of detection rules the MSSP applies to the clients it chooses. */
+export interface RulePackOverview {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  rules: { id: string; name: string; severity: string; category: string }[];
+  /** Ids of the clients the pack is applied to. */
+  applied_to: string[];
+}
+
 export interface ManagedTenantRow {
   tenant_id: string;
   name: string;
@@ -873,10 +884,19 @@ export const msspApi = {
   async tenants(includeHidden = false): Promise<ManagedTenantRow[]> {
     return request<ManagedTenantRow[]>(`/api/v1/mssp/tenants${includeHidden ? '?include_hidden=true' : ''}`);
   },
-  /** Hide a client tenant (a test client) from the lists and totals, or show it again. Nothing is deleted. */
+  /** Allow automated playbooks for one client, or stop allowing them. A recorded choice: nothing starts playbooks by itself yet. */
   async setPlaybookAutomation(tenantId: string, enabled: boolean): Promise<void> {
     await request<void>(`/api/v1/mssp/tenants/${tenantId}/playbook-automation`, { method: 'PUT', body: JSON.stringify({ enabled }) });
   },
+  /** Every rule pack with its rules and the clients it is applied to. */
+  async rulePacks(): Promise<RulePackOverview[]> {
+    return request<RulePackOverview[]>('/api/v1/mssp/rule-packs/summary');
+  },
+  /** Apply a rule pack to one client, or stop applying it. */
+  async setRulePackForClient(packId: string, clientId: string, enabled: boolean): Promise<void> {
+    await request<void>(`/api/v1/mssp/rule-packs/${packId}/clients/${clientId}`, { method: 'PUT', body: JSON.stringify({ enabled }) });
+  },
+  /** Hide a client tenant (a test client) from the lists and totals, or show it again. Nothing is deleted. */
 
   async setClientHidden(tenantId: string, hidden: boolean): Promise<void> {
     await request<void>(`/api/v1/mssp/tenants/${tenantId}/hidden`, { method: 'PUT', body: JSON.stringify({ hidden }) });

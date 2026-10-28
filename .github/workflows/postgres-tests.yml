@@ -227,6 +227,7 @@ jobs:
             tests/test_client_review_postgres.py \
             tests/test_core_feed_all_routes_postgres.py \
             tests/test_easm_drift_postgres.py \
+            tests/test_sigma_packs_postgres.py \
             tests/test_service_migrations_postgres.py \
             -v --tb=short -rs --junitxml=postgres-tests.junit.xml
 

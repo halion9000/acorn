@@ -22,6 +22,27 @@ def enabled(env: dict[str, str] | None = None) -> bool:
     )
 
 
+async def seed_packs(session_factory: Any, entries: list[dict[str, Any]]) -> dict[str, int]:
+    """Load the imported Sigma rules as rule packs for every MSSP parent tenant (see ``app.services.sigma_packs``). Totals across the parents."""
+    from sqlalchemy import text  # noqa: PLC0415
+
+    from app.services import sigma_packs  # noqa: PLC0415
+
+    async with session_factory() as session:
+        parents = [
+            r[0] for r in (await session.execute(text("select id from tenants where mssp_role = 'parent' order by created_at, id"))).all()
+        ]
+    total: dict[str, int] = {"parents": len(parents), "rules_created": 0, "packs_created": 0, "links_created": 0}
+    for parent_id in parents:
+        async with session_factory() as session:
+            await session.execute(text("select set_config('app.current_tenant_id', :t, true)"), {"t": str(parent_id)})
+            report = await sigma_packs.load_packs(session, parent_id, entries)
+            await session.commit()
+        for key in ("rules_created", "packs_created", "links_created"):
+            total[key] += report[key]
+    return total
+
+
 async def seed_once(session_factory: Any = None) -> dict[str, Any]:
     """Run both loaders once. Returns what each did (or why it did nothing); never raises."""
     from app.scripts import load_builtin_detections as builtin  # noqa: PLC0415
@@ -48,6 +69,7 @@ async def seed_once(session_factory: Any = None) -> dict[str, Any]:
         async with session_factory() as session:
             result["catalog"] = await catalog.load(session, entries)
             await session.commit()
+        result["packs"] = await seed_packs(session_factory, entries)
     except Exception as exc:  # noqa: BLE001 - seeding is a convenience; the API starts regardless
         LOG.warning("seeding the shipped detections failed: %s", exc)
         result["error"] = str(exc)[:200]

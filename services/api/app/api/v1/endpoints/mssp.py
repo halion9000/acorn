@@ -322,6 +322,28 @@ class PackAssignmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PackRuleBrief(BaseModel):
+    id: uuid.UUID
+    name: str
+    severity: str
+    category: str
+
+
+class PackOverview(BaseModel):
+    """One pack as the Rule packs page shows it: what is in it, and the clients it is applied to."""
+
+    id: uuid.UUID
+    name: str
+    description: str | None
+    category: str | None
+    rules: list[PackRuleBrief]
+    applied_to: list[uuid.UUID]
+
+
+class PackClientRequest(BaseModel):
+    enabled: bool
+
+
 class RuleOverrideCreate(BaseModel):
     child_tenant_id: uuid.UUID
     rule_id: uuid.UUID
@@ -402,6 +424,87 @@ async def list_rule_packs(
         select(MSSPRulePack).where(MSSPRulePack.parent_tenant_id == current_user.tenant_id).order_by(MSSPRulePack.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+@router.get("/rule-packs/summary", response_model=list[PackOverview], dependencies=[Depends(require_permission("mssp:read"))])
+async def rule_packs_overview(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[PackOverview]:
+    """Every pack of this MSSP with its rules and the clients (child tenants) it is applied to: what the Rule packs page lists."""
+    packs = (
+        (await db.execute(select(MSSPRulePack).where(MSSPRulePack.parent_tenant_id == current_user.tenant_id).order_by(MSSPRulePack.name)))
+        .scalars()
+        .all()
+    )
+    if not packs:
+        return []
+    ids = [p.id for p in packs]
+    members = (
+        await db.execute(
+            select(MSSPRulePackRule.pack_id, DetectionRule)
+            .join(DetectionRule, DetectionRule.id == MSSPRulePackRule.rule_id)
+            .where(MSSPRulePackRule.pack_id.in_(ids))
+            .order_by(DetectionRule.name)
+        )
+    ).all()
+    assigned = (
+        await db.execute(
+            select(MSSPRulePackAssignment.pack_id, MSSPRulePackAssignment.child_tenant_id).where(
+                MSSPRulePackAssignment.pack_id.in_(ids), MSSPRulePackAssignment.enabled.is_(True)
+            )
+        )
+    ).all()
+    rules_of: dict[uuid.UUID, list[PackRuleBrief]] = {}
+    for pack_id, rule in members:
+        rules_of.setdefault(pack_id, []).append(PackRuleBrief(id=rule.id, name=rule.name, severity=rule.severity, category=rule.category))
+    clients_of: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for pack_id, child_id in assigned:
+        clients_of.setdefault(pack_id, []).append(child_id)
+    return [
+        PackOverview(
+            id=p.id,
+            name=p.name,
+            description=p.description,
+            category=p.category,
+            rules=rules_of.get(p.id, []),
+            applied_to=clients_of.get(p.id, []),
+        )
+        for p in packs
+    ]
+
+
+@router.put(
+    "/rule-packs/{pack_id}/clients/{child_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    dependencies=[Depends(require_permission("mssp:manage"))],
+)
+async def set_pack_for_client(
+    pack_id: uuid.UUID,
+    child_id: uuid.UUID,
+    body: PackClientRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """Apply a pack to one client, or stop applying it (the box on the Rule packs page). Safe to repeat: it sets the state rather than adding a row each time."""
+    pack = await db.get(MSSPRulePack, pack_id)
+    if not pack or pack.parent_tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=404, detail="Rule pack not found")
+    await _require_owned_child(db, current_user, child_id)
+    row = (
+        await db.execute(
+            select(MSSPRulePackAssignment).where(
+                MSSPRulePackAssignment.pack_id == pack_id, MSSPRulePackAssignment.child_tenant_id == child_id
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        if body.enabled:
+            db.add(MSSPRulePackAssignment(pack_id=pack_id, child_tenant_id=child_id, enabled=True, assigned_by_user=current_user.id))
+    else:
+        row.enabled = body.enabled
+    await db.commit()
 
 
 @router.post(
