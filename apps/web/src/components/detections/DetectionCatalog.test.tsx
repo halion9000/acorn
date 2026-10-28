@@ -88,3 +88,14 @@ describe('an empty catalog', () => {
     expect(document.body.textContent).toContain('published to share');
   });
 });
+
+describe('the licence link', () => {
+  it('links to the licence of an imported rule, and only over https', async () => {
+    authFetch.mockImplementation(async () => json(200, { items: [{ ...rule, license_url: 'https://github.com/SigmaHQ/Detection-Rule-License' }, { ...rule, id: 'r2', name: 'Other rule', license_url: 'javascript:alert(1)' }], total: 2, page: 1, page_size: 24 }));
+    render(<DetectionCatalog />);
+    await screen.findByText('Other rule');
+    const links = screen.getAllByRole('link', { name: 'Licence' });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', 'https://github.com/SigmaHQ/Detection-Rule-License');
+  });
+});

@@ -22,6 +22,8 @@ interface DetectionRule {
   rating_count: number;
   status: string;
   submitted_at: string;
+  /** Where the rule's licence is published (rules imported from SigmaHQ carry one). */
+  license_url?: string | null;
 }
 
 interface DetectionListResponse {
@@ -174,7 +176,17 @@ function DetectionCard({ rule }: { rule: DetectionRule }) {
 
       {/* Install button */}
       <div className="flex items-center justify-between pt-2 border-t border-zinc-700/40">
-        <span className="text-xs text-zinc-600">by {rule.author}</span>
+        <span className="text-xs text-zinc-600">
+          by {rule.author}
+          {rule.license_url && /^https:\/\//.test(rule.license_url) && (
+            <>
+              {' · '}
+              <a href={rule.license_url} target="_blank" rel="noopener noreferrer" className="text-zinc-500 underline hover:text-zinc-300" onClick={(e) => e.stopPropagation()}>
+                Licence
+              </a>
+            </>
+          )}
+        </span>
         <button
           onClick={handleInstall}
           disabled={installing || installed}
