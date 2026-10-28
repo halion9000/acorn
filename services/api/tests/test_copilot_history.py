@@ -157,6 +157,49 @@ class TestItSurvivesARestart:
         assert history_seen_by_model()[:2] == ["remember: the incident is INC-4471", first["reply"]["content"]]
 
 
+class TestRecentChats:
+    """The chat page's "Recent" list: the conversations that are stored were never offered back, so it always said history was unavailable."""
+
+    def test_the_list_has_each_conversation_newest_first_with_a_title_and_a_count(self):
+        c = client_as()
+        first = chat(c, "what is on host WS-1?\nand more detail on the second line").json()["conversationId"]
+        second = chat(c, "x" * 100).json()["conversationId"]
+        chat(c, "and its owner?", first)  # the first conversation is now the most recently used
+        listed = c.get("/copilot/conversations").json()["conversations"]
+        assert [r["id"] for r in listed] == [first, second]
+        assert listed[0]["title"] == "what is on host WS-1?" and listed[0]["messageCount"] == 4
+        assert listed[1]["title"] == "x" * 59 + "…", "a long first message is cut for the list"
+
+    def test_a_conversation_opens_as_its_messages_in_order_and_can_be_carried_on(self):
+        c = client_as()
+        cid = chat(c, "what is on host WS-1?").json()["conversationId"]
+        opened = c.get(f"/copilot/conversations/{cid}").json()
+        assert opened["id"] == cid and opened["title"] == "what is on host WS-1?"
+        assert [(m["role"], m["content"]) for m in opened["messages"]][0] == ("user", "what is on host WS-1?")
+        assert [m["role"] for m in opened["messages"]] == ["user", "assistant"]
+        chat(c, "and its owner?", cid)
+        assert history_seen_by_model()[:2] == ["what is on host WS-1?", opened["messages"][1]["content"]]
+
+    def test_nobody_sees_another_persons_or_tenants_conversations(self):
+        tenant = uuid.uuid4()
+        mine, colleague, outsider = client_as(tenant), client_as(tenant), client_as()
+        cid = chat(mine, "private question").json()["conversationId"]
+        for other in (colleague, outsider):
+            assert other.get("/copilot/conversations").json() == {"conversations": []}
+            assert other.get(f"/copilot/conversations/{cid}").status_code == 404
+
+    def test_an_unknown_or_malformed_id_is_a_404_and_an_empty_list_is_not_an_error(self):
+        c = client_as()
+        assert c.get("/copilot/conversations").json() == {"conversations": []}
+        assert c.get("/copilot/conversations/nope").status_code == 404
+        assert c.get("/copilot/conversations/bad id!").status_code == 404
+
+    def test_a_role_without_copilot_access_cannot_list_or_open(self):
+        c = client_as(role="viewer")
+        assert c.get("/copilot/conversations").status_code == 403
+        assert c.get("/copilot/conversations/anything").status_code == 403
+
+
 class TestIsolation:
     """The key used to be the client-supplied id alone."""
 

@@ -7686,6 +7686,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/copilot/conversations:
+    get:
+      tags:
+      - copilot
+      summary: The signed-in person's recent copilot conversations, newest first.
+      operationId: list_copilot_conversations_api_v1_copilot_conversations_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationList'
+      security:
+      - HTTPBearer: []
+  /api/v1/copilot/conversations/{conversation_id}:
+    get:
+      tags:
+      - copilot
+      summary: One of the signed-in person's conversations, to carry on in the chat.
+      operationId: get_copilot_conversation_api_v1_copilot_conversations__conversation_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Conversation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/copilot/chat:
     post:
       tags:
@@ -25009,6 +25052,58 @@ components:
       - framework_id
       - controls
       title: ControlsResponse
+    ConversationDetail:
+      properties:
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        messages:
+          items:
+            $ref: '#/components/schemas/StoredMessage'
+          type: array
+          title: Messages
+      type: object
+      required:
+      - id
+      - title
+      - messages
+      title: ConversationDetail
+    ConversationList:
+      properties:
+        conversations:
+          items:
+            $ref: '#/components/schemas/ConversationSummary'
+          type: array
+          title: Conversations
+      type: object
+      required:
+      - conversations
+      title: ConversationList
+    ConversationSummary:
+      properties:
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        updatedAt:
+          type: string
+          format: date-time
+          title: Updatedat
+        messageCount:
+          type: integer
+          title: Messagecount
+      type: object
+      required:
+      - id
+      - title
+      - updatedAt
+      - messageCount
+      title: ConversationSummary
     CopilotChatRequest:
       properties:
         conversationId:
@@ -38485,6 +38580,28 @@ components:
       required:
       - updated
       title: StatusResponse
+    StoredMessage:
+      properties:
+        id:
+          type: string
+          title: Id
+        role:
+          type: string
+          title: Role
+        content:
+          type: string
+          title: Content
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+      type: object
+      required:
+      - id
+      - role
+      - content
+      - createdAt
+      title: StoredMessage
     SubmissionResponse:
       properties:
         id:

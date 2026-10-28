@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -154,6 +155,55 @@ def _context_snippet(ctx: CopilotContext | None) -> str:
 # ---------------------------------------------------------------------------
 # Endpoint
 # ---------------------------------------------------------------------------
+
+
+class ConversationSummary(BaseModel):
+    id: str
+    title: str
+    updatedAt: datetime
+    messageCount: int
+
+
+class ConversationList(BaseModel):
+    conversations: list[ConversationSummary]
+
+
+class StoredMessage(BaseModel):
+    id: str
+    role: str
+    content: str
+    createdAt: datetime
+
+
+class ConversationDetail(BaseModel):
+    id: str
+    title: str
+    messages: list[StoredMessage]
+
+
+@router.get("/conversations", response_model=ConversationList, summary="The signed-in person's recent copilot conversations, newest first.")
+async def list_copilot_conversations(
+    user: Annotated[AuthUser, Depends(require_permission("copilot:use"))], db: TenantDBSession
+) -> ConversationList:
+    return ConversationList(conversations=await copilot_history.list_conversations(db, user.tenant_id, copilot_history.owner_key(user)))
+
+
+@router.get(
+    "/conversations/{conversation_id}",
+    response_model=ConversationDetail,
+    summary="One of the signed-in person's conversations, to carry on in the chat.",
+)
+async def get_copilot_conversation(
+    conversation_id: str, user: Annotated[AuthUser, Depends(require_permission("copilot:use"))], db: TenantDBSession
+) -> ConversationDetail:
+    found = (
+        await copilot_history.get_conversation(db, user.tenant_id, copilot_history.owner_key(user), conversation_id)
+        if copilot_history.valid_conversation_id(conversation_id)
+        else None
+    )
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    return ConversationDetail(**found)
 
 
 @router.post(

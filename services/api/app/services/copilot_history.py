@@ -82,6 +82,62 @@ async def append_turn(db: AsyncSession, tenant_id: uuid.UUID, owner: str, conver
     await db.commit()
 
 
+TITLE_CHARS = 60
+LIST_LIMIT = 30  # the recent-chats list shows this many, newest first
+
+
+def conversation_title(stored: list[dict[str, Any]] | None) -> str:
+    """What the recent-chats list calls a conversation: the start of the first thing the person asked."""
+    for m in stored or []:
+        if m.get("role") == "human" and str(m.get("content", "")).strip():
+            first_line = str(m["content"]).strip().splitlines()[0].strip()
+            return first_line if len(first_line) <= TITLE_CHARS else first_line[: TITLE_CHARS - 1].rstrip() + "…"
+    return "Conversation"
+
+
+async def list_conversations(db: AsyncSession, tenant_id: uuid.UUID, owner: str, limit: int = LIST_LIMIT) -> list[dict[str, Any]]:
+    """This owner's recent conversations, newest first: id, title, when it was last used and how many messages it holds. Nobody else's are ever returned."""
+    await set_rls_context(db, tenant_id)
+    rows = (
+        (
+            await db.execute(
+                select(CopilotConversation)
+                .where(CopilotConversation.tenant_id == tenant_id, CopilotConversation.owner_key == owner)
+                .order_by(CopilotConversation.updated_at.desc(), CopilotConversation.conversation_id)
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        {"id": r.conversation_id, "title": conversation_title(r.messages), "updatedAt": r.updated_at, "messageCount": len(r.messages or [])}
+        for r in rows
+    ]
+
+
+async def get_conversation(db: AsyncSession, tenant_id: uuid.UUID, owner: str, conversation_id: str) -> dict[str, Any] | None:
+    """One of this owner's conversations as the chat page shows it, or None (an id that belongs to someone else is simply unknown). Only each exchange's text is stored, not
+    when each message was sent, so every message carries the time the conversation was last used."""
+    await set_rls_context(db, tenant_id)
+    row = await db.get(CopilotConversation, (tenant_id, owner, conversation_id), populate_existing=True)
+    if row is None:
+        return None
+    return {
+        "id": row.conversation_id,
+        "title": conversation_title(row.messages),
+        "messages": [
+            {
+                "id": f"{row.conversation_id}-{i}",
+                "role": "user" if m.get("role") == "human" else "assistant",
+                "content": m.get("content", ""),
+                "createdAt": row.updated_at,
+            }
+            for i, m in enumerate(row.messages or [])
+        ],
+    }
+
+
 async def _prune(db: AsyncSession, tenant_id: uuid.UUID, owner: str) -> None:
     """Keep this owner's newest MAX_CONVERSATIONS_PER_OWNER conversations."""
     stale = (
