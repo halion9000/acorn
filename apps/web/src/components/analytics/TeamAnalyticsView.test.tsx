@@ -6,7 +6,9 @@ import type { Case } from '@/lib/api';
 const recentMock = vi.fn();
 vi.mock('@/lib/api', () => ({ casesApi: { recent: (limit?: number) => recentMock(limit) } }));
 
-import { CASE_LIMIT, TeamAnalyticsView, buildTeamStats, formatDuration, sortRows } from './TeamAnalyticsView';
+vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
+
+import { CASE_LIMIT, TeamAnalyticsView, buildTeamStats, casesBehind, formatDuration, sortRows } from './TeamAnalyticsView';
 
 // The page was a "gamification leaderboard" of invented people (Sarah Chen, Marcus Rivera, ...) with invented scores, accuracy, badges and a
 // "Team Highlights" feed, shown to every workspace. Now it is computed from real cases, and only from what cases record.
@@ -85,6 +87,30 @@ describe('buildTeamStats', () => {
   });
 });
 
+describe('casesBehind', () => {
+  const cases = [
+    finished('a', 'ana', 3 * day, 1 * day),
+    finished('b', 'bo', 5 * day, 2 * day, 'resolved', 'resolvedAt'),
+    finished('c', undefined, 4 * day, 3 * day), // closed by nobody in particular
+    finished('old', 'ana', 80 * day, 70 * day), // outside the 30-day window
+    make({ id: 'o1', assignee: 'ana', createdAt: iso(9 * day) }),
+    make({ id: 'o2', createdAt: iso(20 * day) }),
+  ];
+
+  it('lists exactly as many cases as each card counts', () => {
+    const stats = buildTeamStats(cases, NOW, 30);
+    expect(casesBehind(cases, NOW, 30, 'closed')).toHaveLength(stats.totalClosed);
+    expect(casesBehind(cases, NOW, 30, 'open')).toHaveLength(stats.totalOpen);
+    expect(new Set(casesBehind(cases, NOW, 30, 'analysts').map((c) => c.assignee)).size).toBe(stats.activeAnalysts);
+  });
+
+  it('closed: finished in the period, newest first; open: oldest first; analysts: only cases someone was assigned', () => {
+    expect(casesBehind(cases, NOW, 30, 'closed').map((c) => c.id)).toEqual(['a', 'b', 'c']);
+    expect(casesBehind(cases, NOW, 30, 'open').map((c) => c.id)).toEqual(['o2', 'o1']);
+    expect(casesBehind(cases, NOW, 30, 'analysts').map((c) => c.id)).toEqual(['a', 'b']);
+  });
+});
+
 describe('sortRows', () => {
   const rows = [
     { analyst: 'bo', closed: 3, avgMinutes: 60, open: 1 },
@@ -119,6 +145,22 @@ describe('the page', () => {
     vi.setSystemTime(NOW);
   });
   afterEach(() => vi.useRealTimers());
+
+  it('opens the cases behind a card, links each to its case, and closes them again', async () => {
+    recentMock.mockResolvedValue({ cases: [finished('a', 'ana', 3 * day, 1 * day), make({ id: 'o1', title: 'Printer down', assignee: undefined })], total: 2, page: 1, pageSize: 2 });
+    render(<TeamAnalyticsView />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Open Cases/i }));
+    const row = await screen.findByTestId('case-behind');
+    expect(row).toHaveTextContent('Printer down');
+    expect(row).toHaveTextContent('Unassigned');
+    expect(within(row).getByRole('link')).toHaveAttribute('href', '/cases/o1');
+    await user.click(screen.getByRole('button', { name: /^Cases Closed \(30 days\)/i }));
+    expect(screen.getByText(/Cases closed \(last 30 days\): 1/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('case-behind')).getByRole('link')).toHaveAttribute('href', '/cases/a');
+    await user.click(screen.getByRole('button', { name: /^Cases Closed \(30 days\)/i }));
+    expect(screen.queryByTestId('case-behind')).not.toBeInTheDocument();
+  });
 
   it('shows an honest empty state, none of the invented people, and no gamification', async () => {
     recentMock.mockResolvedValue({ cases: [], total: 0, page: 1, pageSize: 0 });

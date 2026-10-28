@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { clsx } from 'clsx';
+import Link from 'next/link';
 import { EmptyState, EmptyStateIcons } from '@/components/ui/EmptyState';
 import { casesApi, type Case } from '@/lib/api';
 
@@ -94,6 +95,87 @@ export function buildTeamStats(cases: Case[], now: number, days: number): TeamSt
   return { rows, totalClosed, avgMinutes: mean(allMinutes), totalOpen, activeAnalysts: rows.filter((r) => r.closed > 0).length, unassignedOpen };
 }
 
+export type CardKind = 'closed' | 'open' | 'analysts';
+
+/**
+ * The cases behind a card, by the very rules `buildTeamStats` counts with, so the list always has as many rows as the number on the card says.
+ * closed: finished in the period; open: not finished; analysts: finished in the period by someone the case is assigned to (the people the card counts).
+ */
+export function casesBehind(cases: Case[], now: number, days: number, kind: CardKind): Case[] {
+  const since = now - days * 86400000;
+  const picked = cases.filter((c) => {
+    if (!FINISHED.has(c.status)) return kind === 'open';
+    if (kind === 'open') return false;
+    const end = finishedAt(c);
+    if (end === null || end < since || end > now) return false;
+    return kind === 'closed' || Boolean(c.assignee?.trim());
+  });
+  const when = (c: Case) => finishedAt(c) ?? 0;
+  if (kind === 'open') return picked.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  if (kind === 'analysts') return picked.sort((a, b) => (a.assignee ?? '').localeCompare(b.assignee ?? '') || when(b) - when(a));
+  return picked.sort((a, b) => when(b) - when(a));
+}
+
+const CARD_TITLES: Record<CardKind, string> = {
+  closed: 'Cases closed',
+  open: 'Open cases, oldest first',
+  analysts: 'Cases closed by assigned analysts',
+};
+
+function CasesBehind({ cases, kind, days, now }: { cases: Case[]; kind: CardKind; days: number; now: number }) {
+  const rows = casesBehind(cases, now, days, kind);
+  const closedKind = kind !== 'open';
+  const day = (value: string | number | null | undefined) => (value ? new Date(value).toLocaleDateString() : '—');
+  return (
+    <section aria-label={CARD_TITLES[kind]} className="rounded-xl border border-gray-800/60 bg-gray-900/40 p-5 space-y-3">
+      <h2 className="text-lg font-semibold text-white">
+        {CARD_TITLES[kind]}
+        {closedKind ? ` (last ${days} days)` : ''}: {rows.length}
+      </h2>
+      {rows.length === 0 ? (
+        <p className="text-sm text-gray-500">No cases.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-800/60 text-xs uppercase tracking-wider text-gray-500">
+                <th className="pb-2 pr-3 font-medium">Case</th>
+                <th className="pb-2 pr-3 font-medium">Client</th>
+                <th className="pb-2 pr-3 font-medium">Assigned to</th>
+                <th className="pb-2 pr-3 font-medium">Severity</th>
+                <th className="pb-2 pr-3 font-medium">Opened</th>
+                {closedKind ? <th className="pb-2 pr-3 font-medium">Closed</th> : null}
+                {closedKind ? <th className="pb-2 font-medium text-right">Took</th> : null}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800/40">
+              {rows.map((c) => {
+                const end = finishedAt(c);
+                return (
+                  <tr key={c.id} data-testid="case-behind">
+                    <td className="py-2 pr-3">
+                      <Link href={`/cases/${c.id}`} className="text-blue-400 hover:text-blue-300">
+                        {c.caseNumber ? `${c.caseNumber} · ` : ''}
+                        {c.title}
+                      </Link>
+                    </td>
+                    <td className="py-2 pr-3 text-gray-300">{c.clientName ?? '—'}</td>
+                    <td className="py-2 pr-3 text-gray-300">{c.assignee?.trim() || 'Unassigned'}</td>
+                    <td className="py-2 pr-3 text-gray-300">{c.severity}</td>
+                    <td className="py-2 pr-3 tabular-nums text-gray-400">{day(c.createdAt)}</td>
+                    {closedKind ? <td className="py-2 pr-3 tabular-nums text-gray-400">{day(end)}</td> : null}
+                    {closedKind ? <td className="py-2 text-right tabular-nums text-gray-300">{end === null ? '—' : formatDuration(minutesBetween(c, end))}</td> : null}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function sortRows(rows: AnalystRow[], key: SortKey): AnalystRow[] {
   const byName = (a: AnalystRow, b: AnalystRow) => a.analyst.localeCompare(b.analyst);
   return [...rows].sort((a, b) => {
@@ -127,6 +209,7 @@ export function TeamAnalyticsView() {
   const [days, setDays] = useState<Period>(30);
   const [sortBy, setSortBy] = useState<SortKey>('closed');
   const [search, setSearch] = useState('');
+  const [shown, setShown] = useState<CardKind | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -143,7 +226,9 @@ export function TeamAnalyticsView() {
     void load();
   }, [load]);
 
-  const stats = useMemo(() => (cases ? buildTeamStats(cases, Date.now(), days) : null), [cases, days]);
+  // One moment for the numbers and the lists behind them, so they cannot disagree.
+  const now = useMemo(() => Date.now(), [cases, days]); // eslint-disable-line react-hooks/exhaustive-deps
+  const stats = useMemo(() => (cases ? buildTeamStats(cases, now, days) : null), [cases, now, days]);
   const rows = useMemo(() => {
     if (!stats) return [];
     const needle = search.trim().toLowerCase();
@@ -192,18 +277,40 @@ export function TeamAnalyticsView() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { label: `Cases Closed (${days} days)`, value: String(stats.totalClosed), accent: 'text-emerald-400' },
+              { label: `Cases Closed (${days} days)`, value: String(stats.totalClosed), accent: 'text-emerald-400', kind: 'closed' as CardKind },
               { label: 'Avg Resolution Time', value: formatDuration(stats.avgMinutes), accent: 'text-sky-400' },
-              { label: 'Open Cases', value: String(stats.totalOpen), accent: 'text-violet-400', hint: stats.unassignedOpen ? `${stats.unassignedOpen} unassigned` : undefined },
-              { label: 'Analysts Closing Cases', value: String(stats.activeAnalysts), accent: 'text-amber-400' },
-            ].map((stat) => (
-              <div key={stat.label} className="rounded-xl border border-gray-800/60 bg-gray-900/40 p-5 space-y-4">
-                <p className="text-xs font-medium uppercase tracking-wider text-gray-400">{stat.label}</p>
-                <p className={clsx('text-3xl font-bold', stat.accent)}>{stat.value}</p>
-                {stat.hint ? <p className="text-xs text-gray-500">{stat.hint}</p> : null}
-              </div>
-            ))}
+              { label: 'Open Cases', value: String(stats.totalOpen), accent: 'text-violet-400', kind: 'open' as CardKind, hint: stats.unassignedOpen ? `${stats.unassignedOpen} unassigned` : undefined },
+              { label: 'Analysts Closing Cases', value: String(stats.activeAnalysts), accent: 'text-amber-400', kind: 'analysts' as CardKind },
+            ].map((stat) => {
+              const body = (
+                <>
+                  <p className="text-xs font-medium uppercase tracking-wider text-gray-400">{stat.label}</p>
+                  <p className={clsx('text-3xl font-bold', stat.accent)}>{stat.value}</p>
+                  {stat.hint ? <p className="text-xs text-gray-500">{stat.hint}</p> : null}
+                </>
+              );
+              const box = 'rounded-xl border bg-gray-900/40 p-5 space-y-4 text-left';
+              // The three counts open the cases behind them; click again to close the list.
+              return stat.kind ? (
+                <button
+                  key={stat.label}
+                  type="button"
+                  onClick={() => setShown(shown === stat.kind ? null : stat.kind)}
+                  aria-pressed={shown === stat.kind}
+                  className={clsx(box, 'cursor-pointer transition hover:border-gray-600', shown === stat.kind ? 'border-gray-500' : 'border-gray-800/60')}
+                >
+                  {body}
+                  <p className="text-[11px] text-gray-500">{shown === stat.kind ? 'Hide the cases' : 'Show the cases'}</p>
+                </button>
+              ) : (
+                <div key={stat.label} className={clsx(box, 'border-gray-800/60')}>
+                  {body}
+                </div>
+              );
+            })}
           </div>
+
+          {shown ? <CasesBehind cases={cases} kind={shown} days={days} now={now} /> : null}
 
           <div className="rounded-xl border border-gray-800/60 bg-gray-900/40 p-5 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
