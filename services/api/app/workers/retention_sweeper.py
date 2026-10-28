@@ -219,7 +219,9 @@ async def sweep_once(
         jobs["alerts"] = lambda s: sweep_alerts(s, now=now, days=alert_days, batch=batch, max_batches=max_batches, dry_run=dry)
     history_days = int(getattr(settings, "RETENTION_POSTURE_HISTORY_DAYS", 0) or 0)
     if history_days > 0:  # opt in, like alerts: with the default 0 the class is not listed in the result
-        jobs["posture_history"] = lambda s: sweep_posture_history(s, now=now, days=history_days, batch=batch, max_batches=max_batches, dry_run=dry)
+        jobs["posture_history"] = lambda s: sweep_posture_history(
+            s, now=now, days=history_days, batch=batch, max_batches=max_batches, dry_run=dry
+        )
     for name, job in jobs.items():
         try:
             async with session_factory() as session:

@@ -63,7 +63,10 @@ def item(key, status="unknown", evidence="AiSOC does not collect this yet"):
 
 
 def test_a_typed_status_replaces_the_worked_out_one_and_remembers_it():
-    items = ro.merge_readiness([item("backups"), item("edr", "not_met", "4 of 6")], [row("readiness", "backups", "met", note="Veeam to the cloud, tested in September")])
+    items = ro.merge_readiness(
+        [item("backups"), item("edr", "not_met", "4 of 6")],
+        [row("readiness", "backups", "met", note="Veeam to the cloud, tested in September")],
+    )
     backups = items[0]
     assert (backups.status, backups.manual, backups.auto_status) == ("met", True, "unknown")
     assert backups.note == "Veeam to the cloud, tested in September"
@@ -83,7 +86,9 @@ def test_typing_the_same_status_marks_it_confirmed_without_a_difference():
 
 
 def test_the_counts_follow_the_typed_statuses():
-    items = ro.merge_readiness([item("a", "unknown"), item("b", "met"), item("c", "not_met")], [row("readiness", "a", "met"), row("readiness", "c", "partly")])
+    items = ro.merge_readiness(
+        [item("a", "unknown"), item("b", "met"), item("c", "not_met")], [row("readiness", "a", "met"), row("readiness", "c", "partly")]
+    )
     assert ro.readiness_counts(items) == {"met": 2, "partly": 1, "not_met": 0, "unknown": 0}
 
 
@@ -121,7 +126,10 @@ def test_a_note_alone_leaves_the_technology_answer_alone():
 
 
 def test_a_question_that_needed_a_person_gets_the_typed_status_and_a_checked_one_remembers_the_check():
-    items = [M365Answer(group="g", question="Ensure A", status="needs_person"), M365Answer(group="g", question="Ensure B", status="not_met", evidence="read through CIPP")]
+    items = [
+        M365Answer(group="g", question="Ensure A", status="needs_person"),
+        M365Answer(group="g", question="Ensure B", status="not_met", evidence="read through CIPP"),
+    ]
     out = ro.merge_m365(items, [row("m365", "Ensure A", "met", note="checked in the portal"), row("m365", "Ensure B", "partly")])
     assert (out[0].status, out[0].manual, out[0].auto_status, out[0].note) == ("met", True, "needs_person", "checked in the portal")
     assert (out[1].status, out[1].auto_status, out[1].evidence) == ("partly", "not_met", "read through CIPP")
@@ -207,4 +215,6 @@ def test_a_client_cannot_hold_more_than_the_limit_of_typed_answers():
     with pytest.raises(HTTPException) as e:
         put(FakeDB(count=ro.MAX_PER_CLIENT))
     assert e.value.status_code == 422
-    assert put(FakeDB(existing=row("readiness", "backups", "met"), count=ro.MAX_PER_CLIENT)).status == "met", "changing one that exists is always allowed"
+    assert (
+        put(FakeDB(existing=row("readiness", "backups", "met"), count=ro.MAX_PER_CLIENT)).status == "met"
+    ), "changing one that exists is always allowed"

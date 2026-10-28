@@ -124,7 +124,12 @@ def test_a_successful_imap_sign_in_is_one_alert_and_a_modern_client_is_none():
 
 
 def test_the_same_person_and_protocol_is_one_alert_a_day_and_a_new_day_is_a_new_one():
-    rows = [row(1, client_app="POP3"), row(2, client_app="POP3", at=T0 + timedelta(hours=3)), row(3, client_app="POP3", at=T0 + timedelta(days=1)), row(4, client_app="SMTP")]
+    rows = [
+        row(1, client_app="POP3"),
+        row(2, client_app="POP3", at=T0 + timedelta(hours=3)),
+        row(3, client_app="POP3", at=T0 + timedelta(days=1)),
+        row(4, client_app="SMTP"),
+    ]
     found = detect_legacy_protocol(rows)
     assert len(found) == 3
     assert len({f.key for f in found}) == 3

@@ -27,7 +27,10 @@ async def tenants():
         async with engine.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
             for key, tid in ids.items():
-                await conn.execute(text("insert into tenants (id, name, slug) values (:i, :n, :s)"), {"i": tid, "n": f"ub-{key}-{tag}", "s": f"ub-{key}-{tag}"})
+                await conn.execute(
+                    text("insert into tenants (id, name, slug) values (:i, :n, :s)"),
+                    {"i": tid, "n": f"ub-{key}-{tag}", "s": f"ub-{key}-{tag}"},
+                )
         yield ids, engine
     finally:
         async with engine.begin() as conn:
@@ -69,8 +72,16 @@ async def state(engine, tid):
 
 SEQUENCES = {
     "serial joins two tools, then an update": [
-        [r("ninjaone", "n1", "PC-1", "SERIAL-ONE", os="Windows 11"), r("huntress", "h1", "pc-1", "serial-one"), r("threatmate", "t1", "PC-2")],
-        [r("ninjaone", "n1", "PC-1 renamed", "SERIAL-ONE"), r("addigy", "a1", "MAC-1", "SERIAL-MAC"), r("ninjaone", "n3", "MAC-1b", "serial-mac")],
+        [
+            r("ninjaone", "n1", "PC-1", "SERIAL-ONE", os="Windows 11"),
+            r("huntress", "h1", "pc-1", "serial-one"),
+            r("threatmate", "t1", "PC-2"),
+        ],
+        [
+            r("ninjaone", "n1", "PC-1 renamed", "SERIAL-ONE"),
+            r("addigy", "a1", "MAC-1", "SERIAL-MAC"),
+            r("ninjaone", "n3", "MAC-1b", "serial-mac"),
+        ],
     ],
     "a source moves to another device and the one it left is removed": [
         [r("ninjaone", "n1", "PC-1", "SERIAL-ONE"), r("ninjaone", "n2", "PC-2")],
@@ -81,7 +92,12 @@ SEQUENCES = {
         [r("threatmate", "t1", "PC-9", "REAL-SERIAL-9"), r("ninjaone", "n7", "OTHER", "real-serial-9")],
     ],
     "the same tool id twice in one batch": [
-        [r("ninjaone", "n1", "FIRST-NAME", "SERIAL-ONE"), r("ninjaone", "n1", "SECOND-NAME", "SERIAL-ONE"), r("ninjaone", "n5", "PC-5"), r("ninjaone", "n5", "PC-5", "SERIAL-FIVE")],
+        [
+            r("ninjaone", "n1", "FIRST-NAME", "SERIAL-ONE"),
+            r("ninjaone", "n1", "SECOND-NAME", "SERIAL-ONE"),
+            r("ninjaone", "n5", "PC-5"),
+            r("ninjaone", "n5", "PC-5", "SERIAL-FIVE"),
+        ],
     ],
     "a tool now reports a different serial under the same id": [
         [r("ninjaone", "n1", "PC-1", "SERIAL-ONE"), r("huntress", "h1", "PC-1", "SERIAL-ONE")],
@@ -89,7 +105,8 @@ SEQUENCES = {
     ],
     "many devices and a repeat batch": [
         [r("ninjaone", f"n{i}", f"PC-{i}", f"SERIAL-{i % 7}") for i in range(30)],
-        [r("huntress", f"h{i}", f"PC-{i}", f"serial-{i % 7}") for i in range(30)] + [r("ninjaone", f"n{i}", f"PC-{i}", f"SERIAL-{i % 7}") for i in range(30)],
+        [r("huntress", f"h{i}", f"PC-{i}", f"serial-{i % 7}") for i in range(30)]
+        + [r("ninjaone", f"n{i}", f"PC-{i}", f"SERIAL-{i % 7}") for i in range(30)],
     ],
 }
 

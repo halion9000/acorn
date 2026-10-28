@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.deps import require_permission
 from app.api.v1.endpoints.auth import get_current_user
 from app.db.database import get_db
-from app.models.report import ReportArtefact, ReportTemplate
 from app.db.rls_scope import acting_as_tenant
+from app.models.report import ReportArtefact, ReportTemplate
 from app.models.tenant import Tenant, User
 from app.services.digest_html import render_digest_html
 from app.services.digest_pdf import WeasyPrintUnavailableError, render_digest_pdf
@@ -235,7 +235,9 @@ async def weekly_digest(
     fmt: str = Query("json", alias="format", pattern="^(json|html|pdf)$"),
     period_start: datetime | None = Query(None, description="ISO timestamp; defaults to now-7d"),
     period_end: datetime | None = Query(None, description="ISO timestamp; defaults to now"),
-    client_id: uuid.UUID | None = Query(None, description="One of your clients, for a digest of that client alone. Omit for your own tenant."),
+    client_id: uuid.UUID | None = Query(
+        None, description="One of your clients, for a digest of that client alone. Omit for your own tenant."
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ExecutiveDigest | HTMLResponse | Response:
@@ -256,7 +258,11 @@ async def weekly_digest(
 
     client_name: str | None = None
     if client_id is not None and client_id != current_user.tenant_id:
-        client = (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.id == client_id, Tenant.parent_tenant_id == current_user.tenant_id))).first()
+        client = (
+            await db.execute(
+                select(Tenant.id, Tenant.name).where(Tenant.id == client_id, Tenant.parent_tenant_id == current_user.tenant_id)
+            )
+        ).first()
         if client is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
         client_name = client.name

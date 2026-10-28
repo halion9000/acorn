@@ -34,7 +34,7 @@ from app.models.device import Device, DeviceMergeDismissal, DeviceMergeLog, Devi
 from app.models.tenant import Tenant
 from app.services.client_mapping import IncomingClient, auto_link_by_devices, record_device_hints, tenant_hidden, upsert_clients
 from app.services.device_merge import DeviceMergeError, auto_merge_same_name, can_undo, dismiss_pair, merge_devices, undo_merge
-from app.services.device_upsert import DeviceReport, duplicate_pairs, possible_duplicates, preload_known, upsert_device
+from app.services.device_upsert import DeviceReport, duplicate_pairs, preload_known, upsert_device
 from app.services.infra_review import encryption_state
 
 logger = logging.getLogger(__name__)
@@ -69,8 +69,25 @@ DEVICE_KINDS = ("computer", "network", "camera", "other")
 # What each tool says a device is. Auvik names a type for everything it finds; UniFi's product line says Protect for cameras; NinjaOne's node class starts NMS_ for network gear.
 _AUVIK_CAMERA = {"camera"}
 _AUVIK_NETWORK = {
-    "switch", "l3switch", "router", "accesspoint", "thinaccesspoint", "firewall", "utm", "securityappliance", "bridge", "controller", "hub", "modem",
-    "loadbalancer", "voipswitch", "stack", "chassis", "packetprocessor", "backhaul", "telecommunications",
+    "switch",
+    "l3switch",
+    "router",
+    "accesspoint",
+    "thinaccesspoint",
+    "firewall",
+    "utm",
+    "securityappliance",
+    "bridge",
+    "controller",
+    "hub",
+    "modem",
+    "loadbalancer",
+    "voipswitch",
+    "stack",
+    "chassis",
+    "packetprocessor",
+    "backhaul",
+    "telecommunications",
 }
 _AUVIK_COMPUTER = {"workstation", "server", "hypervisor", "virtualmachine", "thinclient", "tablet", "handheld"}
 # Meraki's productType: wireless, switch, appliance, cellularGateway are network gear; camera; sensor (environmental) is neither; systemsManager is a managed computer or phone.
@@ -78,7 +95,20 @@ _MERAKI_NETWORK = {"wireless", "switch", "appliance", "cellulargateway", "wirele
 _NINJA_NETWORK = re.compile(r"^NMS_(SWITCH|ROUTER|FIREWALL|WIRELESS|ACCESS_POINT|LOAD_BALANCER|NETWORK)", re.IGNORECASE)
 _NINJA_CAMERA = re.compile(r"CAMERA", re.IGNORECASE)
 # Tools whose devices are computers (an agent runs on them), unless the tool itself says otherwise.
-_COMPUTER_TOOLS = {"ninjaone", "huntress", "addigy", "threatmate", "screenconnect", "fieldeffect", "dnsfilter", "autoelevate", "slide", "datto-bcdr", "blumira", "cipp"}
+_COMPUTER_TOOLS = {
+    "ninjaone",
+    "huntress",
+    "addigy",
+    "threatmate",
+    "screenconnect",
+    "fieldeffect",
+    "dnsfilter",
+    "autoelevate",
+    "slide",
+    "datto-bcdr",
+    "blumira",
+    "cipp",
+}
 
 
 def device_kind(sources: list[Any]) -> str:
@@ -492,7 +522,9 @@ def _cache_seconds() -> float:
     return SYNC_CACHE_SECONDS if time.monotonic() - _last_sync < SYNC_BURST_SECONDS else LOAD_CACHE_SECONDS
 
 
-async def _refresh_in_background(key: tuple, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[uuid.UUID, str], master: str | None, generation: int) -> None:
+async def _refresh_in_background(
+    key: tuple, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[uuid.UUID, str], master: str | None, generation: int
+) -> None:
     """Build the list on a session of its own and keep it, unless a person changed something since this began (then it is stale and is dropped). A failure leaves the last list in place."""
     try:
         async with AsyncSessionLocal() as session:
@@ -578,7 +610,14 @@ async def _load(db: Any, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[
                     last_seen=d.last_seen,
                     first_seen=d.first_seen,
                     sources=[
-                        DeviceSourceOut(vendor=s.vendor, name=s.name, last_seen=s.last_seen, details=s.details or {}, last_checkin=checkin_of(s), stale=source_stale(checkin_of(s)))
+                        DeviceSourceOut(
+                            vendor=s.vendor,
+                            name=s.name,
+                            last_seen=s.last_seen,
+                            details=s.details or {},
+                            last_checkin=checkin_of(s),
+                            stale=source_stale(checkin_of(s)),
+                        )
                         for s in srcs
                     ],
                     # Only computers are machines the master tool is expected to manage: network gear, cameras, printers and unnamed things are never a coverage gap.
@@ -720,7 +759,9 @@ async def list_devices(
     vendor: str | None = Query(default=None, pattern=_VENDOR, description="Only devices this tool reports."),
     not_in_master: bool = Query(default=False, description="Only devices the master tool does not report."),
     missing: str | None = Query(
-        default=None, pattern="^(addigy|threatmate|huntress|screenconnect|fieldeffect)$", description="Only devices this tool should report but does not."
+        default=None,
+        pattern="^(addigy|threatmate|huntress|screenconnect|fieldeffect)$",
+        description="Only devices this tool should report but does not.",
     ),
     offline: bool = Query(default=False, description="Only devices no tool has seen online for a week or more."),
     has_alerts: bool = Query(default=False, description="Only devices with at least one open alert."),
@@ -733,8 +774,16 @@ async def list_devices(
     os: str | None = Query(
         default=None, pattern="^(windows|mac|ios|linux)$", description="Only devices running this kind of operating system."
     ),
-    kind: str | None = Query(default=None, pattern="^(computer|network|camera|other)$", description="Only this kind of device: computers, network devices, cameras or other."),
-    encryption: str | None = Query(default=None, pattern="^(not_encrypted|encrypted)$", description="Only Windows workstations a tool reports are not (or are) fully BitLocker-encrypted."),
+    kind: str | None = Query(
+        default=None,
+        pattern="^(computer|network|camera|other)$",
+        description="Only this kind of device: computers, network devices, cameras or other.",
+    ),
+    encryption: str | None = Query(
+        default=None,
+        pattern="^(not_encrypted|encrypted)$",
+        description="Only Windows workstations a tool reports are not (or are) fully BitLocker-encrypted.",
+    ),
 ) -> DeviceListOut:
     owner = current_user.tenant_id
     scope, clients = await _scope(db, owner, client_id)
@@ -914,7 +963,9 @@ def group_unmapped(hints: list[Any], aliases: dict[tuple[str, str], Any], mapped
     response_model=list[UnmappedGroup],
     summary="Devices waiting for their client to be mapped, by tool and client",
 )
-async def unmapped_devices(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> list[UnmappedGroup]:
+async def unmapped_devices(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
+) -> list[UnmappedGroup]:
     """The machines tools report for clients that are not mapped yet. They are not stored (a device needs a client), so the Devices list cannot show them; this can."""
     owner = current_user.tenant_id
     hints = list((await db.execute(select(ClientDeviceHint).where(ClientDeviceHint.tenant_id == owner))).scalars().all())
@@ -949,7 +1000,8 @@ async def list_duplicates(
             continue
         async with _as(db, owner, tid):
             dismissed = {
-                (x.device_a, x.device_b) for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tid))).scalars().all()
+                (x.device_a, x.device_b)
+                for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tid))).scalars().all()
             }
         tools = {d.id: {s.vendor for s in d.sources} for d in devices}
         only_screenconnect = {d.id for d in devices if d.sources and all(s.vendor == "screenconnect" for s in d.sources)}

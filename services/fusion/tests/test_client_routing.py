@@ -106,7 +106,9 @@ def _worker(child):
         )
     )
     sink = SimpleNamespace(
-        child_tenant_for_client=AsyncMock(return_value=child), child_tenant_for_domain=AsyncMock(return_value=None), persist=AsyncMock(return_value=PersistResult(PersistOutcome.INSERTED, "r1"))
+        child_tenant_for_client=AsyncMock(return_value=child),
+        child_tenant_for_domain=AsyncMock(return_value=None),
+        persist=AsyncMock(return_value=PersistResult(PersistOutcome.INSERTED, "r1")),
     )
     worker = FusionWorker(engine=engine, sink=sink)
     worker._producer = AsyncMock()  # noqa: SLF001
@@ -166,7 +168,9 @@ async def test_a_threatmate_alert_about_a_clients_domain_goes_to_that_client_not
 @pytest.mark.asyncio
 async def test_an_address_on_a_domain_nobody_owns_stays_where_the_segment_maps():
     event = _event("threatmate", threatmate_client_id="327", device_name="portal.liveoakit.com")
-    assert await route_to_client_tenant(PARENT, event, _alias_to_msp_child, _domain_resolver({"childrenandfamilies.org": CHILD})) == MSP_CHILD
+    assert (
+        await route_to_client_tenant(PARENT, event, _alias_to_msp_child, _domain_resolver({"childrenandfamilies.org": CHILD})) == MSP_CHILD
+    )
 
 
 @pytest.mark.asyncio

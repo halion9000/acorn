@@ -539,14 +539,31 @@ async def claim_core_feed_actions(tenant_token: str, body: ClaimRequest, db: DBS
     scope = await _scope_ids(db, tenant_id)
     async with cross_tenant_reads(db):
         holding = set(
-            (await db.execute(select(VendorAction.tenant_id).where(VendorAction.tenant_id.in_(scope), VendorAction.status.in_(("pending", "claimed"))).distinct())).scalars().all()
+            (
+                await db.execute(
+                    select(VendorAction.tenant_id)
+                    .where(VendorAction.tenant_id.in_(scope), VendorAction.status.in_(("pending", "claimed")))
+                    .distinct()
+                )
+            )
+            .scalars()
+            .all()
         )
     moment = time.monotonic()
     everywhere = moment - _last_full_claim.get(tenant_id, -1e12) >= FULL_CLAIM_EVERY_SECONDS
     if everywhere:
         _last_full_claim[tenant_id] = moment
     rows = sorted(
-        [r for got in await _across(db, tenant_id, lambda tid: claim_actions(db, tid, body.vendor), tenants=scope if everywhere else [t for t in scope if t in holding]) for r in got],
+        [
+            r
+            for got in await _across(
+                db,
+                tenant_id,
+                lambda tid: claim_actions(db, tid, body.vendor),
+                tenants=scope if everywhere else [t for t in scope if t in holding],
+            )
+            for r in got
+        ],
         key=lambda r: r.created_at,
     )
     await db.commit()
@@ -636,7 +653,11 @@ async def report_core_feed_scripts(tenant_token: str, body: ScriptsReport, db: D
 class ClientItem(BaseModel):
     id: str = Field(min_length=1, max_length=200, description="The vendor's own id for the client.")
     name: str = Field(min_length=1, max_length=300)
-    microsoft_tenant_id: str | None = Field(default=None, max_length=64, description="The Microsoft 365 tenant id the tool reports for the client, when it does: it links the client to the one another tool already mapped.")
+    microsoft_tenant_id: str | None = Field(
+        default=None,
+        max_length=64,
+        description="The Microsoft 365 tenant id the tool reports for the client, when it does: it links the client to the one another tool already mapped.",
+    )
 
 
 class ClientsReport(BaseModel):

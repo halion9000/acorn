@@ -19,7 +19,19 @@ Status = Literal["good", "needs_work", "missing"]
 
 # Mail providers and Microsoft's own tenant domains are not a client's domain.
 IGNORED_DOMAINS = frozenset(
-    {"gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "yahoo.com", "icloud.com", "aol.com", "msn.com", "protonmail.com", "me.com"}
+    {
+        "gmail.com",
+        "googlemail.com",
+        "outlook.com",
+        "hotmail.com",
+        "live.com",
+        "yahoo.com",
+        "icloud.com",
+        "aol.com",
+        "msn.com",
+        "protonmail.com",
+        "me.com",
+    }
 )
 MAX_DOMAINS = 5
 _DOMAIN = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
@@ -50,7 +62,12 @@ def assess_spf(txt: list[str]) -> Finding:
     if not records:
         return Finding(status="missing", summary="No SPF record: anyone can send mail as this domain without failing SPF.")
     if len(records) > 1:
-        return Finding(status="needs_work", summary="More than one SPF record: receivers treat that as an error.", record=records[0], issues=["multiple SPF records"])
+        return Finding(
+            status="needs_work",
+            summary="More than one SPF record: receivers treat that as an error.",
+            record=records[0],
+            issues=["multiple SPF records"],
+        )
     rec = records[0]
     terms = rec.split()[1:]
     issues: list[str] = []
@@ -67,7 +84,11 @@ def assess_spf(txt: list[str]) -> Finding:
     if issues:
         return Finding(status="needs_work", summary="SPF is published but weak: " + "; ".join(issues) + ".", record=rec, issues=issues)
     soft = all_term is not None and all_term.startswith("~")
-    return Finding(status="good", summary="SPF is published" + (" (soft fail '~all', which is common with DMARC)." if soft else " and rejects other senders."), record=rec)
+    return Finding(
+        status="good",
+        summary="SPF is published" + (" (soft fail '~all', which is common with DMARC)." if soft else " and rejects other senders."),
+        record=rec,
+    )
 
 
 def _tags(record: str) -> dict[str, str]:
@@ -82,7 +103,10 @@ def _tags(record: str) -> dict[str, str]:
 def assess_dmarc(txt: list[str]) -> Finding:
     records = [t.strip() for t in txt if t.strip().lower().startswith("v=dmarc1")]
     if not records:
-        return Finding(status="missing", summary="No DMARC record: spoofed mail from this domain is not told to be rejected, and no one is sent reports.")
+        return Finding(
+            status="missing",
+            summary="No DMARC record: spoofed mail from this domain is not told to be rejected, and no one is sent reports.",
+        )
     rec = records[0]
     tags = _tags(rec)
     policy = tags.get("p", "").lower()
@@ -97,14 +121,19 @@ def assess_dmarc(txt: list[str]) -> Finding:
     if not tags.get("rua"):
         issues.append("no report address (rua=), so no one sees abuse")
     if issues:
-        return Finding(status="needs_work", summary="DMARC is published but not enforcing fully: " + "; ".join(issues) + ".", record=rec, issues=issues)
+        return Finding(
+            status="needs_work", summary="DMARC is published but not enforcing fully: " + "; ".join(issues) + ".", record=rec, issues=issues
+        )
     return Finding(status="good", summary=f"DMARC enforces '{policy}' and sends reports.", record=rec)
 
 
 def assess_dkim(found: dict[str, str]) -> Finding:
     """``found`` maps each selector that has a record to that record's text."""
     if not found:
-        return Finding(status="missing", summary="No DKIM key found at the common selectors (selector1/2 for Microsoft 365, google). Another selector may be in use.")
+        return Finding(
+            status="missing",
+            summary="No DKIM key found at the common selectors (selector1/2 for Microsoft 365, google). Another selector may be in use.",
+        )
     return Finding(status="good", summary="DKIM key published at: " + ", ".join(sorted(found)) + ".", record=next(iter(found.values())))
 
 
@@ -127,10 +156,14 @@ class DohResolver:
             return []
         try:
             if self._client is not None:
-                res = await self._client.get(self._url, params={"name": name, "type": rtype}, headers={"Accept": "application/dns-json"}, timeout=8.0)
+                res = await self._client.get(
+                    self._url, params={"name": name, "type": rtype}, headers={"Accept": "application/dns-json"}, timeout=8.0
+                )
             else:
                 async with httpx.AsyncClient() as c:
-                    res = await c.get(self._url, params={"name": name, "type": rtype}, headers={"Accept": "application/dns-json"}, timeout=8.0)
+                    res = await c.get(
+                        self._url, params={"name": name, "type": rtype}, headers={"Accept": "application/dns-json"}, timeout=8.0
+                    )
             if res.status_code != 200:
                 return []
             return [str(a.get("data", "")) for a in (res.json().get("Answer") or []) if isinstance(a, dict)]
@@ -195,9 +228,17 @@ async def check_domain(domain: str, resolver: Resolver) -> DomainPosture:
         recs = await resolver.cname(name) or [t for t in await resolver.txt(name) if "p=" in t.lower()]
         return (sel, recs[0]) if recs else None
 
-    found = {s: r for s, r in (x for x in await asyncio.gather(*(selector(s) for s in DKIM_SELECTORS)) if x)}
+    found = dict(x for x in await asyncio.gather(*(selector(s) for s in DKIM_SELECTORS)) if x)
     spf, dmarc = assess_spf(spf_txt), assess_dmarc(dmarc_txt)
-    return DomainPosture(domain=domain, status=overall(spf, dmarc, bool(mx)), mx=mx, mail_provider=mail_provider(mx), spf=spf, dmarc=dmarc, dkim=assess_dkim(found))
+    return DomainPosture(
+        domain=domain,
+        status=overall(spf, dmarc, bool(mx)),
+        mx=mx,
+        mail_provider=mail_provider(mx),
+        spf=spf,
+        dmarc=dmarc,
+        dkim=assess_dkim(found),
+    )
 
 
 async def check_domains(domains: list[str], resolver: Resolver) -> list[DomainPosture]:

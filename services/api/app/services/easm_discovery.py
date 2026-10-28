@@ -159,7 +159,10 @@ async def _internetdb_lookup(ip: str, client: httpx.AsyncClient) -> list[Discove
         "hostnames": hostnames,
     }
     out = [DiscoveredAsset(asset_type=ExternalAssetType.IP, value=ip, metadata=meta)]
-    out.extend(DiscoveredAsset(asset_type=ExternalAssetType.SUBDOMAIN, value=h, metadata={"source": "internetdb", "resolved_ip": ip}) for h in hostnames)
+    out.extend(
+        DiscoveredAsset(asset_type=ExternalAssetType.SUBDOMAIN, value=h, metadata={"source": "internetdb", "resolved_ip": ip})
+        for h in hostnames
+    )
     return out
 
 
@@ -259,7 +262,9 @@ async def run_discovery(
 
     # The domains the scan was given or found, with the addresses they resolve to: assets in their own right.
     for domain, found in (domains or {}).items():
-        all_assets.append(DiscoveredAsset(asset_type=ExternalAssetType.DOMAIN, value=domain, metadata={"source": "dns", "resolved_ips": found}))
+        all_assets.append(
+            DiscoveredAsset(asset_type=ExternalAssetType.DOMAIN, value=domain, metadata={"source": "dns", "resolved_ips": found})
+        )
     looked_up = lookup_targets if lookup_targets is not None else ip_targets
     if looked_up and getattr(s, "AISOC_EASM_INTERNETDB_ENABLED", True):
         found = await _internetdb_scan(looked_up)

@@ -179,7 +179,11 @@ def digest(monkeypatch):
 
 
 def digest_call(fmt="json", start=None, end=None, caller=None, client_id=None, client=None):
-    return run(rp.weekly_digest(fmt=fmt, period_start=start, period_end=end, client_id=client_id, db=FakeDB(client=client), current_user=caller or user()))
+    return run(
+        rp.weekly_digest(
+            fmt=fmt, period_start=start, period_end=end, client_id=client_id, db=FakeDB(client=client), current_user=caller or user()
+        )
+    )
 
 
 def test_digest_json_is_the_built_digest_for_the_callers_tenant(digest):

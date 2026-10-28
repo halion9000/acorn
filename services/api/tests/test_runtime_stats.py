@@ -34,7 +34,13 @@ def test_routes_are_ranked_by_total_time_with_typical_p95_and_worst():
     top = rs.slow_routes()
     assert [r["route"] for r in top] == ["GET /devices", "POST /ingest", "GET /cheap"]
     d = top[0]
-    assert d["calls"] == 20 and d["total_seconds"] == 7.8 and d["typical_seconds"] == 0.1 and d["worst_seconds"] == 5.0 and d["p95_seconds"] == 5.0
+    assert (
+        d["calls"] == 20
+        and d["total_seconds"] == 7.8
+        and d["typical_seconds"] == 0.1
+        and d["worst_seconds"] == 5.0
+        and d["p95_seconds"] == 5.0
+    )
     assert len(rs.slow_routes(limit=1)) == 1
 
 

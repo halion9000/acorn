@@ -71,7 +71,15 @@ async def add_action(engine, w, client, status="pending", age=timedelta(0), vend
                 "insert into vendor_actions (tenant_id, alert_id, vendor, incident_uid, action, status, created_at, claimed_at) "
                 "values (:t, :a, :v, :u, 'approve', :s, :c, :cl)"
             ),
-            {"t": w[client], "a": w["alerts"][client], "v": vendor, "u": f"{vendor}:{client}", "s": status, "c": now - age, "cl": (now - claimed_age) if claimed_age is not None else None},
+            {
+                "t": w[client],
+                "a": w["alerts"][client],
+                "v": vendor,
+                "u": f"{vendor}:{client}",
+                "s": status,
+                "c": now - age,
+                "cl": (now - claimed_age) if claimed_age is not None else None,
+            },
         )
 
 
@@ -151,4 +159,6 @@ async def test_once_a_minute_every_tenant_is_worked_on_anyway_so_a_blind_lookup_
     assert updates == 12, "the three statements in each of the four tenants: the safety-net pass"
     await add_action(engine, w, "acme")
     narrow, narrow_updates = await poll(engine, w)
-    assert [a.incident_uid for a in narrow.actions] == ["huntress:acme"] and narrow_updates == 6, "the next polls are narrow again (acme and the claimed cyan one hold something)"
+    assert [a.incident_uid for a in narrow.actions] == [
+        "huntress:acme"
+    ] and narrow_updates == 6, "the next polls are narrow again (acme and the claimed cyan one hold something)"

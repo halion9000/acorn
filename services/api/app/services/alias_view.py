@@ -54,7 +54,7 @@ async def alias_view(db: Any, owner: uuid.UUID) -> tuple[dict[tuple[str, str], A
 @event.listens_for(Session, "before_flush")
 def _forget_on_flush(session: Session, _ctx: Any, _instances: Any) -> None:
     for obj in (*session.new, *session.dirty, *session.deleted):
-        if isinstance(obj, (ClientAlias, Tenant)):
+        if isinstance(obj, ClientAlias | Tenant):
             _cache.clear()
             return
 

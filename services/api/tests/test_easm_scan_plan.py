@@ -12,7 +12,14 @@ from fastapi import BackgroundTasks, HTTPException
 
 
 def settings(**over):
-    base = dict(AISOC_FEATURE_EASM=True, AISOC_EASM_SHODAN_API_KEY="", AISOC_EASM_CENSYS_API_ID="", AISOC_EASM_CENSYS_API_SECRET="", AISOC_EASM_ACTIVE_SCAN_ENABLED=False, AISOC_EASM_INTERNETDB_ENABLED=False)
+    base = {
+        "AISOC_FEATURE_EASM": True,
+        "AISOC_EASM_SHODAN_API_KEY": "",
+        "AISOC_EASM_CENSYS_API_ID": "",
+        "AISOC_EASM_CENSYS_API_SECRET": "",
+        "AISOC_EASM_ACTIVE_SCAN_ENABLED": False,
+        "AISOC_EASM_INTERNETDB_ENABLED": False,
+    }
     base.update(over)
     return NS(**base)
 
@@ -44,7 +51,9 @@ def test_the_keyless_internetdb_lookup_needs_only_addresses():
 def test_each_source_that_is_set_up_runs_and_a_half_set_up_censys_does_not():
     assert easm.scan_plan(settings(AISOC_EASM_SHODAN_API_KEY="k"), [])["sources"] == ["shodan"]
     assert easm.scan_plan(settings(AISOC_EASM_CENSYS_API_ID="i"), [])["can_run"] is False, "a Censys id without its secret is not a source"
-    both = easm.scan_plan(settings(AISOC_EASM_CENSYS_API_ID="i", AISOC_EASM_CENSYS_API_SECRET="s", AISOC_EASM_ACTIVE_SCAN_ENABLED=True), ["203.0.113.10"])
+    both = easm.scan_plan(
+        settings(AISOC_EASM_CENSYS_API_ID="i", AISOC_EASM_CENSYS_API_SECRET="s", AISOC_EASM_ACTIVE_SCAN_ENABLED=True), ["203.0.113.10"]
+    )
     assert both["sources"] == ["censys", "port check"] and both["problem"] is None
 
 

@@ -33,19 +33,43 @@ class AssessAnswer(BaseModel):
 
 # Question (or the start of it, when it is the only one that starts that way) -> the checks that answer it, in order of preference. The first one the client has wins.
 CHECK_ANSWERS: tuple[tuple[str, tuple[str, ...], str], ...] = (
-    ("Are all Windows Desktop Operating systems installed 10 or 11 Professional?", ("ninjaone_unsupported_os",), "Windows machines, servers and workstations together"),
-    ("Are all servers running currently supported versions of their respective Vendor Operating System?", ("ninjaone_unsupported_os",), "Windows machines, servers and workstations together"),
+    (
+        "Are all Windows Desktop Operating systems installed 10 or 11 Professional?",
+        ("ninjaone_unsupported_os",),
+        "Windows machines, servers and workstations together",
+    ),
+    (
+        "Are all servers running currently supported versions of their respective Vendor Operating System?",
+        ("ninjaone_unsupported_os",),
+        "Windows machines, servers and workstations together",
+    ),
     ("Are Windows Updates for security patches configured and enabled?", ("ninjaone_patching",), "Windows machines"),
-    ("Are all workstations up to the latest service pack and updates for their respective OS?", ("ninjaone_patching",), "Windows machines, servers and workstations together"),
-    ("Has a managed endpoint security been deployed to protect against virus, malware, and host intrusion", ("huntress_protection", "ninjaone_antivirus"), ""),
+    (
+        "Are all workstations up to the latest service pack and updates for their respective OS?",
+        ("ninjaone_patching",),
+        "Windows machines, servers and workstations together",
+    ),
+    (
+        "Has a managed endpoint security been deployed to protect against virus, malware, and host intrusion",
+        ("huntress_protection", "ninjaone_antivirus"),
+        "",
+    ),
     ("Are all firm-issued Windows Laptops encrypted?", ("liongard_disk_encryption",), ""),
     ("Are all users up to date on their training?", ("sat_training_completion",), ""),
     ("Are users clicking on phishing emails?", ("sat_phishing_simulation",), ""),
     ("Are test restores performed regularly?", ("slide_verification",), ""),
-    ("Are backups (either incremental or full) scheduled to run on mission-critical systems daily?", ("slide_alerts", "liongard_datto_bcdr"), ""),
+    (
+        "Are backups (either incremental or full) scheduled to run on mission-critical systems daily?",
+        ("slide_alerts", "liongard_datto_bcdr"),
+        "",
+    ),
     ("Do you ensure that DKIM is enabled for all mail enabled domains", ("liongard_email_domain_records",), ""),
     ("Do you ensure the SPF record is configured for all mail enabled domains", ("liongard_email_domain_records",), ""),
-    ("Do you ensure the DMARC record is configured for all mail enabled domains", ("threatmate_dmarc", "liongard_email_domain_records"), ""),
+    (
+        "Do you ensure the DMARC record is configured for all mail enabled domains",
+        ("threatmate_dmarc", "liongard_email_domain_records"),
+        "",
+    ),
 )
 
 _RDP_QUESTION = "Is the Public port 3389 (Remote Desktop) exposed allowing remote access to servers and/or desktops?"

@@ -14,7 +14,17 @@ T0 = datetime(2026, 10, 27, 12, 0, tzinfo=UTC)
 
 
 def audit(i, activity, actor="admin@x.com", target="u@x.com", success=True, actor_is_app=False):
-    return NS(source_id=f"a{i}", activity=activity, actor=actor, target=target, occurred_at=T0, success=success, actor_is_app=actor_is_app, actor_ip="2.2.2.2", target_type="User")
+    return NS(
+        source_id=f"a{i}",
+        activity=activity,
+        actor=actor,
+        target=target,
+        occurred_at=T0,
+        success=success,
+        actor_is_app=actor_is_app,
+        actor_ip="2.2.2.2",
+        target_type="User",
+    )
 
 
 def test_an_admin_registering_or_deleting_security_info_is_one_alert_each_and_the_person_registering_their_own_is_not():
@@ -26,12 +36,20 @@ def test_an_admin_registering_or_deleting_security_info_is_one_alert_each_and_th
         audit(5, "Admin registered security info", success=False),
     ]
     found = detect_security_info_changed_by_admin(rows)
-    assert [f.title for f in found] == ["Sign-in methods registered by an administrator - u@x.com", "Sign-in methods deleted by an administrator - u@x.com"]
+    assert [f.title for f in found] == [
+        "Sign-in methods registered by an administrator - u@x.com",
+        "Sign-in methods deleted by an administrator - u@x.com",
+    ]
     assert found[0].technique == "T1556.006" and found[0].users == ["admin@x.com", "u@x.com"]
 
 
 def test_consent_and_a_delegated_grant_each_raise_one_alert_about_the_application():
-    rows = [audit(1, "Consent to application", target="Evil Mail Reader"), audit(2, "Add delegated permission grant", target="Evil Mail Reader"), audit(3, "Remove delegated permission grant"), audit(4, "Add service principal")]
+    rows = [
+        audit(1, "Consent to application", target="Evil Mail Reader"),
+        audit(2, "Add delegated permission grant", target="Evil Mail Reader"),
+        audit(3, "Remove delegated permission grant"),
+        audit(4, "Add service principal"),
+    ]
     found = detect_app_consent(rows)
     assert [f.key for f in found] == ["consent:a1", "consent:a2"]
     assert found[0].title == "Consent given to an application - Evil Mail Reader"

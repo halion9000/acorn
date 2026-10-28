@@ -25,7 +25,12 @@ async def world(monkeypatch):
     try:
         async with engine.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-            for key, parent, name in (("parent", None, "msp"), ("acme", w["parent"], "Acme Dental"), ("birch", w["parent"], "Birch Law"), ("outsider", None, "other-msp")):
+            for key, parent, name in (
+                ("parent", None, "msp"),
+                ("acme", w["parent"], "Acme Dental"),
+                ("birch", w["parent"], "Birch Law"),
+                ("outsider", None, "other-msp"),
+            ):
                 await conn.execute(
                     text("insert into tenants (id, name, slug, parent_tenant_id, mssp_role) values (:i, :n, :s, :p, :r)"),
                     {"i": w[key], "n": f"{name}-{tag}", "s": f"s-{key}-{tag}", "p": parent, "r": "child" if parent else "parent"},
@@ -71,7 +76,10 @@ async def test_the_search_covers_the_tenant_and_its_clients_worst_first_and_neve
 
 async def test_severity_hours_and_open_only_narrow_it(world):
     crit = await ct.search_alerts(tenant_id=str(world["parent"]), severity="critical", hours=24, only_open=True)
-    assert {a["title"] for a in crit["alerts"]} == {"acme: critical ransomware", "birch: critical"}, "the 72-hour-old one and the other MSP's are out"
+    assert {a["title"] for a in crit["alerts"]} == {
+        "acme: critical ransomware",
+        "birch: critical",
+    }, "the 72-hour-old one and the other MSP's are out"
     open_only = await ct.search_alerts(tenant_id=str(world["parent"]), only_open=True, limit=20)
     assert "acme: high resolved" not in {a["title"] for a in open_only["alerts"]}
     keyword = await ct.search_alerts(tenant_id=str(world["parent"]), query="ransomware")

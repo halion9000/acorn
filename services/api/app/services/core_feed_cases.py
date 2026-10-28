@@ -130,7 +130,9 @@ async def close_finished_cases_in_scope(db: Any, tenant_id: uuid.UUID, now: date
     ).all()
     for (case_id,) in closed:
         await db.execute(
-            text("INSERT INTO aisoc_case_comments (id, case_id, tenant_id, author, body, is_system, created_at) VALUES (:id, :c, :t, 'system', :body, true, :now)"),
+            text(
+                "INSERT INTO aisoc_case_comments (id, case_id, tenant_id, author, body, is_system, created_at) VALUES (:id, :c, :t, 'system', :body, true, :now)"
+            ),
             {"id": uuid.uuid4(), "c": case_id, "t": tenant_id, "body": AUTO_CLOSE_NOTE, "now": now},
         )
     return len(closed)

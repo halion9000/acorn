@@ -30,18 +30,35 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.client_review_answer import ClientReviewAnswer
-from app.models.signin import ClientCheckHistory, ClientCheckItemHistory, ClientM365Check, CoreSweepRun, CoreTool, ClientVcioReview, IdentityMfaUser, IdentitySecureScore
+from app.models.signin import (
+    ClientCheckHistory,
+    ClientCheckItemHistory,
+    ClientM365Check,
+    ClientVcioReview,
+    CoreSweepRun,
+    CoreTool,
+    IdentityMfaUser,
+    IdentitySecureScore,
+)
 from app.models.tenant import Tenant
 from app.services import fleet_cache
 from app.services.assessment_review import AssessAnswer, assessment_answers
 from app.services.check_history import changes as check_changes
 from app.services.check_history import item_changes
-from app.services.score_history import load_weights, record_today
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
 from app.services.infra_review import CIPP_BASELINE_SOURCE, SAAS_SOURCES, TOOL_CHECK_SOURCES
 from app.services.m365_review import M365Answer, m365_answers
-from app.services.review_overrides import MAX_PER_CLIENT, clean_answer, merge_assess, merge_m365, merge_readiness, merge_tech, readiness_counts
+from app.services.review_overrides import (
+    MAX_PER_CLIENT,
+    clean_answer,
+    merge_assess,
+    merge_m365,
+    merge_readiness,
+    merge_tech,
+    readiness_counts,
+)
 from app.services.sat_review import SAT_SOURCE
+from app.services.score_history import load_weights, record_today
 from app.services.tech_stack import TechAnswer, tech_stack
 
 logger = logging.getLogger(__name__)
@@ -176,7 +193,7 @@ class M365ChecksReport(BaseModel):
     source: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
 
     @model_validator(mode="after")
-    def _own_source_only(self) -> "M365ChecksReport":
+    def _own_source_only(self) -> M365ChecksReport:
         if self.source is not None and TOOL_CHECK_SOURCES.get(self.source) != self.vendor:
             raise ValueError(f"{self.vendor} may not write checks under {self.source}")
         return self
@@ -195,13 +212,17 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
     now = now or datetime.now(UTC)
     by_tenant, unmapped, ignored, waiting = await targets_by_tenant(db, owner, _M365View(report))
     accepted = 0
-    weights = await load_weights(db, owner)  # the owner's weights are read here, in the owner's scope: the client scope below cannot see them
+    weights = await load_weights(
+        db, owner
+    )  # the owner's weights are read here, in the owner's scope: the client scope below cannot see them
     for tid in by_tenant:
         async with acting_as_tenant(db, tid):
             source = report.source or report.vendor
             new_checks = [c.model_dump() for c in report.checks]
             # What changed since the last report goes into the history (a check appearing, or its status moving), so the page can say since when and show a trend.
-            previous = (await db.execute(select(ClientM365Check.checks).where(ClientM365Check.tenant_id == tid, ClientM365Check.source == source))).scalar_one_or_none()
+            previous = (
+                await db.execute(select(ClientM365Check.checks).where(ClientM365Check.tenant_id == tid, ClientM365Check.source == source))
+            ).scalar_one_or_none()
             for change in check_changes(previous, new_checks, source):
                 db.add(ClientCheckHistory(tenant_id=tid, observed_at=now, **change))
             try:
@@ -215,7 +236,9 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
             update = {c: stmt.excluded[c] for c in values if c not in ("tenant_id", "source")}
             await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source"], set_=update))
             try:
-                async with db.begin_nested():  # a failure to keep the daily score (an older database without the table) must not lose the checks
+                async with (
+                    db.begin_nested()
+                ):  # a failure to keep the daily score (an older database without the table) must not lose the checks
                     await record_today(db, tid, now, weights)
             except Exception:  # noqa: BLE001
                 logger.warning("score history not recorded for %s", tid, exc_info=True)
@@ -261,7 +284,13 @@ async def save_review_answer(
     st, ans, note = clean_answer(body.section, body.key, body.status, body.answer, body.note)
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
         existing = (
-            await db.execute(select(ClientReviewAnswer).where(ClientReviewAnswer.tenant_id == client_id, ClientReviewAnswer.section == body.section, ClientReviewAnswer.key == body.key))
+            await db.execute(
+                select(ClientReviewAnswer).where(
+                    ClientReviewAnswer.tenant_id == client_id,
+                    ClientReviewAnswer.section == body.section,
+                    ClientReviewAnswer.key == body.key,
+                )
+            )
         ).scalar_one_or_none()
         if st is None and ans is None and note is None:
             if existing is not None:
@@ -269,11 +298,22 @@ async def save_review_answer(
                 await db.commit()
             return AnswerOut(section=body.section, key=body.key, cleared=True)
         if existing is None:
-            count = (await db.execute(select(func.count()).select_from(ClientReviewAnswer).where(ClientReviewAnswer.tenant_id == client_id))).scalar_one()
+            count = (
+                await db.execute(select(func.count()).select_from(ClientReviewAnswer).where(ClientReviewAnswer.tenant_id == client_id))
+            ).scalar_one()
             if count >= MAX_PER_CLIENT:
                 raise HTTPException(status_code=422, detail=f"A client can have at most {MAX_PER_CLIENT} typed answers")
         now = datetime.now(UTC)
-        values = {"tenant_id": client_id, "section": body.section, "key": body.key, "status": st, "answer": ans, "note": note, "updated_by": current_user.user_id, "updated_at": now}
+        values = {
+            "tenant_id": client_id,
+            "section": body.section,
+            "key": body.key,
+            "status": st,
+            "answer": ans,
+            "note": note,
+            "updated_by": current_user.user_id,
+            "updated_at": now,
+        }
         stmt = pg_insert(ClientReviewAnswer).values(values)
         update = {c: stmt.excluded[c] for c in values if c not in ("tenant_id", "section", "key")}
         await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "section", "key"], set_=update))
@@ -316,7 +356,11 @@ async def apply_sweep_runs(db: Any, owner: uuid.UUID, report: SweepRunsReport, n
     for run in report.runs:
         values = {"tenant_id": owner, "ran_at": now, **run.model_dump()}
         stmt = pg_insert(CoreSweepRun).values(values)
-        await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "source")}))
+        await db.execute(
+            stmt.on_conflict_do_update(
+                index_elements=["tenant_id", "source"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "source")}
+            )
+        )
     return len(report.runs)
 
 
@@ -398,19 +442,33 @@ async def client_review(
         users = (await db.execute(select(IdentityMfaUser).where(IdentityMfaUser.tenant_id == client_id))).scalars().all()
         score_row = (await db.execute(select(IdentitySecureScore).where(IdentitySecureScore.tenant_id == client_id))).scalars().first()
         vcio_row = (await db.execute(select(ClientVcioReview).where(ClientVcioReview.tenant_id == client_id))).scalars().first()
-        m365_row = (
-            (await db.execute(m365_baseline_query(client_id)))
-            .scalars()
-            .first()
-        )
+        m365_row = (await db.execute(m365_baseline_query(client_id))).scalars().first()
         sat_row = (
             (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source == SAT_SOURCE)))
             .scalars()
             .first()
         )
         typed = list((await db.execute(select(ClientReviewAnswer).where(ClientReviewAnswer.tenant_id == client_id))).scalars().all())
-        saas_rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_(SAAS_SOURCES)))).scalars().all()
-        tool_rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_(list(TOOL_CHECK_SOURCES))))).scalars().all()
+        saas_rows = (
+            (
+                await db.execute(
+                    select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_(SAAS_SOURCES))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        tool_rows = (
+            (
+                await db.execute(
+                    select(ClientM365Check).where(
+                        ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_(list(TOOL_CHECK_SOURCES))
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
         a = (
             await db.execute(
                 select(
@@ -449,7 +507,14 @@ async def client_review(
     saas_checks = [{**c, "source": row.source} for row in saas_rows for c in (row.checks or []) if isinstance(c, dict)]
     tool_checks = {c["key"]: c for row in tool_rows for c in (row.checks or []) if isinstance(c, dict) and isinstance(c.get("key"), str)}
     ready = readiness(
-        facts, mfa, score.percent if score else None, sat=sat_checks, devices=shown, saas=saas_checks, enrolled_in={v for v, tid in aliases if tid == client_id}, tool_checks=tool_checks
+        facts,
+        mfa,
+        score.percent if score else None,
+        sat=sat_checks,
+        devices=shown,
+        saas=saas_checks,
+        enrolled_in={v for v, tid in aliases if tid == client_id},
+        tool_checks=tool_checks,
     )
     merge_readiness(ready.items, typed)
     counts = readiness_counts(ready.items)
@@ -466,12 +531,24 @@ async def client_review(
         cases=ReviewCases(open=c[0], opened_30d=c[1], resolved_30d=c[2]),
         readiness=ready,
         tech_stack=merge_tech(
-            tech_stack(shown, facts, has_microsoft_365=bool(users), sat=sat_checks, saas=saas_checks, enrolled_in={v for v, tid in aliases if tid == client_id}, mapped_tools={v for v, _ in aliases}),
+            tech_stack(
+                shown,
+                facts,
+                has_microsoft_365=bool(users),
+                sat=sat_checks,
+                saas=saas_checks,
+                enrolled_in={v for v, tid in aliases if tid == client_id},
+                mapped_tools={v for v, _ in aliases},
+            ),
             typed,
         ),
-        m365=merge_m365(m365_answers([c for c in (m365_row.checks if m365_row is not None else []) if isinstance(c, dict)], list(users)), typed),
+        m365=merge_m365(
+            m365_answers([c for c in (m365_row.checks if m365_row is not None else []) if isinstance(c, dict)], list(users)), typed
+        ),
         m365_refreshed_at=m365_row.refreshed_at if m365_row is not None else None,
-        assess=merge_assess(assessment_answers({**tool_checks, **{c["key"]: c for c in sat_checks if isinstance(c.get("key"), str)}}), typed),
+        assess=merge_assess(
+            assessment_answers({**tool_checks, **{c["key"]: c for c in sat_checks if isinstance(c.get("key"), str)}}), typed
+        ),
         vcio=(
             ReviewVcio(
                 recommendations=VcioRecommendations(**(vcio_row.recommendations or {})),
@@ -503,11 +580,19 @@ async def apply_core_tools(db: Any, owner: uuid.UUID, report: CoreToolsReport, n
     """Keep exactly the tools CORE listed (a tool CORE no longer lists is dropped). The caller owns the transaction."""
     now = now or datetime.now(UTC)
     seen: dict[str, CoreToolIn] = {t.tool_id: t for t in report.tools}
-    await db.execute(delete(CoreTool).where(CoreTool.tenant_id == owner, CoreTool.tool_id.not_in(list(seen))) if seen else delete(CoreTool).where(CoreTool.tenant_id == owner))
+    await db.execute(
+        delete(CoreTool).where(CoreTool.tenant_id == owner, CoreTool.tool_id.not_in(list(seen)))
+        if seen
+        else delete(CoreTool).where(CoreTool.tenant_id == owner)
+    )
     for tool in seen.values():
         values = {"tenant_id": owner, "reported_at": now, **tool.model_dump()}
         stmt = pg_insert(CoreTool).values(values)
-        await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "tool_id"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "tool_id")}))
+        await db.execute(
+            stmt.on_conflict_do_update(
+                index_elements=["tenant_id", "tool_id"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "tool_id")}
+            )
+        )
     return len(seen)
 
 

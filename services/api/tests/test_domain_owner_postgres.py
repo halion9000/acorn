@@ -45,7 +45,14 @@ async def world():
                             "insert into identity_mfa_users (tenant_id, source, user_id, upn, enabled, user_type, admin, licensed, registered, capable, ca_enforced, security_defaults, snapshot_id) "
                             "values (:t, 'cipp', :u, :upn, :en, :ut, false, true, true, true, false, false, :s)"
                         ),
-                        {"t": ids[tenant], "u": f"{tenant}-{domain}-{i}-{tag}", "upn": f"user{i}@{domain}", "en": enabled, "ut": user_type, "s": snap},
+                        {
+                            "t": ids[tenant],
+                            "u": f"{tenant}-{domain}-{i}-{tag}",
+                            "upn": f"user{i}@{domain}",
+                            "en": enabled,
+                            "ut": user_type,
+                            "s": snap,
+                        },
                     )
 
             await people("acme", "acme-clinic.org", 5)  # the client's own domain
@@ -117,8 +124,12 @@ async def test_threatmate_alerts_filed_under_the_msp_move_to_the_client_that_own
     assert result.moved == 3 and result.left_duplicates == 1
     assert {k.split("-")[0]: v for k, v in result.by_client.items()} == {"acme": 3}
     moved = {n: await where(owner, a[n]) for n in a}
-    assert moved["host"] == moved["mail_address"] == moved["seg_host"] == ids["acme"], "including the one filed under the client tenant the MSP's own segments map to"
+    assert (
+        moved["host"] == moved["mail_address"] == moved["seg_host"] == ids["acme"]
+    ), "including the one filed under the client tenant the MSP's own segments map to"
     for stays in ("ambiguous", "lone_user", "guests", "disabled", "own_domain", "not_a_host", "other_vendor", "dup_parent"):
         assert moved[stays] == ids["parent"], stays
-    assert moved["seg_own_domain"] == moved["seg_ip"] == ids["msp_child"], "the MSP's own domain and a bare address belong to nobody, so they stay"
+    assert (
+        moved["seg_own_domain"] == moved["seg_ip"] == ids["msp_child"]
+    ), "the MSP's own domain and a bare address belong to nobody, so they stay"
     assert moved["dup_child"] == ids["acme"] and moved["other_parents"] == ids["other_parent"]

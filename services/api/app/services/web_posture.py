@@ -39,14 +39,24 @@ class WebPosture(BaseModel):
 
 def assess_certificate(probe: ProbeResult, now: datetime) -> Finding:
     if probe.cert_error:
-        return Finding(status="needs_work", summary=f"The certificate does not verify ({probe.cert_error}): visitors get a browser warning.", issues=[probe.cert_error])
+        return Finding(
+            status="needs_work",
+            summary=f"The certificate does not verify ({probe.cert_error}): visitors get a browser warning.",
+            issues=[probe.cert_error],
+        )
     if probe.cert_not_after is None:
         return Finding(status="missing", summary="No HTTPS: nothing answered on port 443.")
     days = (probe.cert_not_after - now).days
     if days < 0:
-        return Finding(status="needs_work", summary=f"The certificate expired {-days} day{'s' if days != -1 else ''} ago.", issues=["expired"])
+        return Finding(
+            status="needs_work", summary=f"The certificate expired {-days} day{'s' if days != -1 else ''} ago.", issues=["expired"]
+        )
     if days <= CERT_WARN_DAYS:
-        return Finding(status="needs_work", summary=f"The certificate expires in {days} day{'s' if days != 1 else ''}: renew it.", issues=["expires soon"])
+        return Finding(
+            status="needs_work",
+            summary=f"The certificate expires in {days} day{'s' if days != 1 else ''}: renew it.",
+            issues=["expires soon"],
+        )
     return Finding(status="good", summary=f"The certificate is valid for another {days} days.")
 
 
@@ -55,7 +65,11 @@ def assess_https_redirect(probe: ProbeResult) -> Finding:
         return Finding(status="good", summary="Nothing answers on plain HTTP, so no one is served an unencrypted page.")
     if probe.http_redirect_to and probe.http_redirect_to.lower().startswith("https://"):
         return Finding(status="good", summary="Plain HTTP is sent to HTTPS.")
-    return Finding(status="needs_work", summary="Plain HTTP answers and is not sent to HTTPS: pages can be read or changed in transit.", issues=["no https redirect"])
+    return Finding(
+        status="needs_work",
+        summary="Plain HTTP answers and is not sent to HTTPS: pages can be read or changed in transit.",
+        issues=["no https redirect"],
+    )
 
 
 def assess_headers(headers: dict[str, str]) -> Finding:
@@ -77,7 +91,9 @@ def web_posture(probe: ProbeResult, now: datetime) -> WebPosture | None:
     """None when no website answered at all (a mail-only domain), which is normal."""
     if not probe.answered:
         return None
-    return WebPosture(certificate=assess_certificate(probe, now), https_redirect=assess_https_redirect(probe), headers=assess_headers(probe.headers))
+    return WebPosture(
+        certificate=assess_certificate(probe, now), https_redirect=assess_https_redirect(probe), headers=assess_headers(probe.headers)
+    )
 
 
 class WebProbe(Protocol):
@@ -93,7 +109,9 @@ class LiveProbe:
     async def _certificate(self, domain: str) -> tuple[bool, str | None, datetime | None]:
         """(answered, error, not_after). A certificate that fails verification is an error, not an unreachable site."""
         try:
-            _, writer = await asyncio.wait_for(asyncio.open_connection(domain, 443, ssl=ssl.create_default_context(), server_hostname=domain), self._timeout)
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(domain, 443, ssl=ssl.create_default_context(), server_hostname=domain), self._timeout
+            )
         except ssl.SSLCertVerificationError as exc:
             return True, (exc.verify_message or "certificate verification failed"), None
         except (OSError, TimeoutError, ssl.SSLError):
@@ -110,7 +128,9 @@ class LiveProbe:
         headers: dict[str, str] = {}
         redirect: str | None = None
         http_answered = False
-        async with httpx.AsyncClient(follow_redirects=False, timeout=self._timeout, headers={"User-Agent": "aisoc-posture-check"}) as client:
+        async with httpx.AsyncClient(
+            follow_redirects=False, timeout=self._timeout, headers={"User-Agent": "aisoc-posture-check"}
+        ) as client:
             if answered and cert_error is None:
                 try:
                     headers = {k.lower(): v for k, v in (await client.get(f"https://{domain}/")).headers.items()}
@@ -123,4 +143,11 @@ class LiveProbe:
                     redirect = res.headers.get("location")
             except httpx.HTTPError:
                 pass
-        return ProbeResult(answered=answered or http_answered, cert_error=cert_error, cert_not_after=not_after, http_redirect_to=redirect, http_answered=http_answered, headers=headers)
+        return ProbeResult(
+            answered=answered or http_answered,
+            cert_error=cert_error,
+            cert_not_after=not_after,
+            http_redirect_to=redirect,
+            http_answered=http_answered,
+            headers=headers,
+        )

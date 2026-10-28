@@ -30,7 +30,10 @@ async def tenants():
         async with engine.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
             for key, tid in ids.items():
-                await conn.execute(text("insert into tenants (id, name, slug) values (:i, :n, :s)"), {"i": tid, "n": f"ct-{key}-{tag}", "s": f"ct-{key}-{tag}"})
+                await conn.execute(
+                    text("insert into tenants (id, name, slug) values (:i, :n, :s)"),
+                    {"i": tid, "n": f"ct-{key}-{tag}", "s": f"ct-{key}-{tag}"},
+                )
         yield ids
     finally:
         async with engine.begin() as conn:
@@ -57,9 +60,27 @@ async def listed(tid):
 
 async def test_each_report_replaces_the_last_and_drops_a_tool_core_no_longer_lists(tenants):
     a = tenants["a"]
-    assert await run(a, lambda db: apply_core_tools(db, a, CoreToolsReport(tools=[tool("huntress", "Huntress", True, "EDR"), tool("petra-mdr", "Petra MDR", True), tool("hudu", "Hudu", False)]))) == 3
-    assert [(t.tool_id, t.connected) for t in await listed(a)] == [("huntress", True), ("petra-mdr", True), ("hudu", False)], "connected ones first, then by name"
-    await run(a, lambda db: apply_core_tools(db, a, CoreToolsReport(tools=[tool("huntress", "Huntress EDR", False), tool("hudu", "Hudu", True)])))
+    assert (
+        await run(
+            a,
+            lambda db: apply_core_tools(
+                db,
+                a,
+                CoreToolsReport(
+                    tools=[tool("huntress", "Huntress", True, "EDR"), tool("petra-mdr", "Petra MDR", True), tool("hudu", "Hudu", False)]
+                ),
+            ),
+        )
+        == 3
+    )
+    assert [(t.tool_id, t.connected) for t in await listed(a)] == [
+        ("huntress", True),
+        ("petra-mdr", True),
+        ("hudu", False),
+    ], "connected ones first, then by name"
+    await run(
+        a, lambda db: apply_core_tools(db, a, CoreToolsReport(tools=[tool("huntress", "Huntress EDR", False), tool("hudu", "Hudu", True)]))
+    )
     now = {t.tool_id: t for t in await listed(a)}
     assert set(now) == {"huntress", "hudu"}, "petra-mdr was not listed, so it is gone"
     assert now["huntress"].title == "Huntress EDR" and now["huntress"].connected is False and now["hudu"].connected is True
@@ -82,6 +103,11 @@ async def test_one_tenant_never_sees_or_changes_another_tenants_tools(tenants):
 
 
 def test_a_tool_id_or_text_that_does_not_fit_is_refused():
-    for bad in ({"tool_id": "Has Space", "title": "x", "connected": True}, {"tool_id": "ok", "title": "", "connected": True}, {"tool_id": "ok", "title": "x" * 121, "connected": True}, {"tool_id": "ok", "title": "x", "connected": "yes please"}):
+    for bad in (
+        {"tool_id": "Has Space", "title": "x", "connected": True},
+        {"tool_id": "ok", "title": "", "connected": True},
+        {"tool_id": "ok", "title": "x" * 121, "connected": True},
+        {"tool_id": "ok", "title": "x", "connected": "yes please"},
+    ):
         with pytest.raises(ValidationError):
             CoreToolIn(**bad)

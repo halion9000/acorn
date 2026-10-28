@@ -52,21 +52,43 @@ async def session(engine, tenant):
 
 def signin(tid, i, *, user="a@x.com", country="US", at=NOW, success=True):
     return SigninEvent(
-        tenant_id=tid, source="cipp", source_id=f"s{i}-{uuid.uuid4().hex[:6]}", user_principal=user, ip_address="1.2.3.4", country=country, city="X", app="Outlook",
-        success=success, interactive=True, mfa=True, occurred_at=at,
+        tenant_id=tid,
+        source="cipp",
+        source_id=f"s{i}-{uuid.uuid4().hex[:6]}",
+        user_principal=user,
+        ip_address="1.2.3.4",
+        country=country,
+        city="X",
+        app="Outlook",
+        success=success,
+        interactive=True,
+        mfa=True,
+        occurred_at=at,
     )
 
 
 def audit(tid, i, activity, *, target="u@x.com", at=NOW):
     return DirectoryAuditEvent(
-        tenant_id=tid, source="cipp", source_id=f"a{i}-{uuid.uuid4().hex[:6]}", actor="admin@x.com", actor_is_app=False, activity=activity, category="UserManagement", success=True,
-        target=target, target_type="User", sensitivity=1, occurred_at=at,
+        tenant_id=tid,
+        source="cipp",
+        source_id=f"a{i}-{uuid.uuid4().hex[:6]}",
+        actor="admin@x.com",
+        actor_is_app=False,
+        activity=activity,
+        category="UserManagement",
+        success=True,
+        target=target,
+        target_type="User",
+        sensitivity=1,
+        occurred_at=at,
     )
 
 
 async def alerts(engine, tid):
     db = await session(engine, tid)
-    rows = (await db.execute(text("select title, severity, mitre_tactics, rule_id from alerts where tenant_id = :t order by title"), {"t": tid})).all()
+    rows = (
+        await db.execute(text("select title, severity, mitre_tactics, rule_id from alerts where tenant_id = :t order by title"), {"t": tid})
+    ).all()
     await db.close()
     return rows
 
@@ -77,7 +99,10 @@ async def test_a_rare_country_and_impossible_travel_raise_one_alert_each_and_a_r
     db = await session(engine, tid)
     history = [signin(tid, i, user=f"u{i % 5}@x.com", at=NOW - timedelta(days=2, minutes=i)) for i in range(60)]
     db.add_all(history)
-    new = [signin(tid, 100, user="a@x.com", country="US", at=NOW - timedelta(minutes=30)), signin(tid, 101, user="a@x.com", country="RO", at=NOW - timedelta(minutes=5))]
+    new = [
+        signin(tid, 100, user="a@x.com", country="US", at=NOW - timedelta(minutes=30)),
+        signin(tid, 101, user="a@x.com", country="RO", at=NOW - timedelta(minutes=5)),
+    ]
     db.add_all(new)
     await db.flush()
     assert await run_signin_detections(db, tid, new, NOW) == 2
@@ -97,7 +122,9 @@ async def test_a_thin_history_judges_no_country_and_the_audit_rules_raise_mass_d
     db = await session(engine, tid)
     thin = [signin(tid, 1, country="US", at=NOW - timedelta(days=1)), signin(tid, 2, country="RO", at=NOW)]
     db.add_all(thin)
-    audits = [audit(tid, i, "Delete user", at=NOW - timedelta(minutes=i)) for i in range(10)] + [audit(tid, 50, "Add member to role", target="boss@x.com")]
+    audits = [audit(tid, i, "Delete user", at=NOW - timedelta(minutes=i)) for i in range(10)] + [
+        audit(tid, 50, "Add member to role", target="boss@x.com")
+    ]
     db.add_all(audits)
     await db.flush()
     assert await run_signin_detections(db, tid, [thin[1]], NOW) == 0

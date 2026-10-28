@@ -119,7 +119,9 @@ class TestTheRoutes:
         assert NAMED_WRITE_ONLY <= WRITE_ONLY and not (_satisfied_by(["alerts:triage"]) & WRITE_ONLY)
 
     def test_there_are_30_other_alerts_write_routes_and_whoever_held_alerts_write_still_reaches_all_33(self):
-        assert len(WRITE_ONLY) == 30, "a route moved onto or off alerts:write: re-read why, and update this number deliberately (28 + hide and unhide an alert type)"
+        assert (
+            len(WRITE_ONLY) == 30
+        ), "a route moved onto or off alerts:write: re-read why, and update this number deliberately (28 + hide and unhide an alert type)"
         assert _satisfied_by(["alerts:write"]) >= TRIAGE_ROUTES | WRITE_ONLY
 
 

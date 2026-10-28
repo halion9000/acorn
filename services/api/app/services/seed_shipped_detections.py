@@ -14,7 +14,12 @@ LOG = logging.getLogger(__name__)
 
 
 def enabled(env: dict[str, str] | None = None) -> bool:
-    return (env if env is not None else os.environ).get("AISOC_SEED_SHIPPED_DETECTIONS", "1").strip().lower() not in ("0", "false", "no", "off")
+    return (env if env is not None else os.environ).get("AISOC_SEED_SHIPPED_DETECTIONS", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
 
 
 async def seed_once(session_factory: Any = None) -> dict[str, Any]:

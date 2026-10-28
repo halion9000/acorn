@@ -7,8 +7,15 @@ import uuid
 
 import httpx
 import pytest
-from app.live_actions import LiveActionRequest, LiveActionStatus, dispatch, list_descriptors, register_builtin_executors, reset_for_tests
-from app.live_actions import core_cipp
+from app.live_actions import (
+    LiveActionRequest,
+    LiveActionStatus,
+    core_cipp,
+    dispatch,
+    list_descriptors,
+    register_builtin_executors,
+    reset_for_tests,
+)
 from app.live_actions.core_cipp import CoreCippAction, core_cipp_executors
 from app.models.action import ActionType
 
@@ -36,12 +43,19 @@ def _executor(answer, capability="revoke_session", core_action="revoke_sessions"
     async def lookup(_tenant):
         return customer
 
-    ex = CoreCippAction(capability, core_action, legacy, "d", client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)), customer_lookup=lookup)
+    ex = CoreCippAction(
+        capability,
+        core_action,
+        legacy,
+        "d",
+        client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+        customer_lookup=lookup,
+    )
     return ex, seen
 
 
 def _req(**over):
-    base = dict(capability="revoke_session", vendor_id="core_cipp", target="pat@acme.com", params={"client_id": "client-1"})
+    base = {"capability": "revoke_session", "vendor_id": "core_cipp", "target": "pat@acme.com", "params": {"client_id": "client-1"}}
     base.update(over)
     return LiveActionRequest(**base)
 
@@ -54,15 +68,31 @@ async def test_what_is_sent_to_core_is_the_allowlisted_action_with_the_token_and
     assert out.status is LiveActionStatus.SUCCEEDED
     assert seen[0].headers["authorization"] == f"Bearer {TOKEN}"
     body = json.loads(seen[0].content)
-    assert body == {"action": "revoke_sessions", "client_id": "client-1", "user": "pat@acme.com", "dry_run": False, "reason": f"playbook run {run}", "actor": "playbook:ato"}
+    assert body == {
+        "action": "revoke_sessions",
+        "client_id": "client-1",
+        "user": "pat@acme.com",
+        "dry_run": False,
+        "reason": f"playbook run {run}",
+        "actor": "playbook:ato",
+    }
 
 
 @pytest.mark.asyncio
 async def test_core_answers_map_to_honest_statuses():
     cases = {
         "executed": ((200, {"status": "executed", "detail": "ok"}), LiveActionStatus.SUCCEEDED),
-        "dry_run": ((200, {"status": "dry_run", "detail": "Real actions are switched off in CORE", "would_send": {"function": "ExecRevokeSessions"}}), LiveActionStatus.SIMULATED),
-        "refused": ((403, {"status": "refused", "code": "protected", "detail": "this account is on the protected list"}), LiveActionStatus.BLOCKED),
+        "dry_run": (
+            (
+                200,
+                {"status": "dry_run", "detail": "Real actions are switched off in CORE", "would_send": {"function": "ExecRevokeSessions"}},
+            ),
+            LiveActionStatus.SIMULATED,
+        ),
+        "refused": (
+            (403, {"status": "refused", "code": "protected", "detail": "this account is on the protected list"}),
+            LiveActionStatus.BLOCKED,
+        ),
         "failed": ((502, {"status": "failed", "detail": "CIPP returned 403"}), LiveActionStatus.FAILED),
         "unauthorised": ((401, {"error": {"message": "invalid or missing token"}}), LiveActionStatus.FAILED),
     }
@@ -93,7 +123,13 @@ async def test_nothing_is_sent_without_the_route_or_a_client_and_an_unreachable_
     def boom(request):
         raise httpx.ConnectError("down")
 
-    bad = CoreCippAction("revoke_session", "revoke_sessions", ActionType.SUSPEND_SESSION, "d", client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(boom)))
+    bad = CoreCippAction(
+        "revoke_session",
+        "revoke_sessions",
+        ActionType.SUSPEND_SESSION,
+        "d",
+        client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(boom)),
+    )
     assert (await bad.execute(_req())).status is LiveActionStatus.FAILED
 
 
@@ -128,7 +164,9 @@ async def test_through_the_dispatcher_a_high_blast_action_is_only_previewed_unle
         return httpx.Response(200, json={"status": "dry_run", "detail": "preview"})
 
     monkeypatch.setattr(core_cipp.httpx, "AsyncClient", lambda *a, **k: real(transport=httpx.MockTransport(handler)))
-    out = await dispatch(LiveActionRequest(capability="disable_user", vendor_id="core_cipp", target="pat@acme.com", params={"client_id": "c"}))
+    out = await dispatch(
+        LiveActionRequest(capability="disable_user", vendor_id="core_cipp", target="pat@acme.com", params={"client_id": "c"})
+    )
     assert [s["dry_run"] for s in sent] == [True]
     assert out.status is LiveActionStatus.SIMULATED
     assert out.details.get("autonomy_mode") == "dry_run" or "autonomy_mode" in out.details or out.details.get("status") == "dry_run"

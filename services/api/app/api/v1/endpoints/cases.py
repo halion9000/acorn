@@ -419,7 +419,8 @@ async def list_cases(
     ),
     client_id: uuid.UUID | None = Query(None, description="With scope=all, only this client's cases."),
     sort: Literal["newest", "work"] = Query(
-        "newest", description="``work``: the order to work them in: most severe first, then no owner, then the oldest (the Act now board asks for this)."
+        "newest",
+        description="``work``: the order to work them in: most severe first, then no owner, then the oldest (the Act now board asks for this).",
     ),
 ) -> list[CaseResponse]:
     # Tenant scoping is non-optional. The aisoc_cases table has carried a
@@ -471,7 +472,9 @@ async def list_cases(
 
     def order(prefix: str) -> str:
         if sort == "work":
-            sev = f"CASE lower({prefix}severity) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END"
+            sev = (
+                f"CASE lower({prefix}severity) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END"
+            )
             return f"{sev}, ({prefix}assignee IS NOT NULL AND {prefix}assignee <> ''), {prefix}created_at ASC"
         return f"{prefix}created_at DESC"
 
@@ -731,7 +734,9 @@ async def get_case_devices(case_id: str, db: DBSession, user: Annotated[AuthUser
 
     cid = await _resolve_case_id(case_id, db, user.tenant_id)
     row = (
-        await db.execute(text("SELECT alert_ids FROM aisoc_cases WHERE id = :id AND tenant_id = :tenant_id").bindparams(id=cid, tenant_id=user.tenant_id))
+        await db.execute(
+            text("SELECT alert_ids FROM aisoc_cases WHERE id = :id AND tenant_id = :tenant_id").bindparams(id=cid, tenant_id=user.tenant_id)
+        )
     ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Case not found.")
@@ -741,10 +746,18 @@ async def get_case_devices(case_id: str, db: DBSession, user: Annotated[AuthUser
     alerts = (await db.execute(select(Alert).where(Alert.id.in_(alert_ids), Alert.tenant_id == user.tenant_id))).scalars().all()
     hosts = {h.lower() for a in alerts for h in (a.affected_hosts or []) if isinstance(h, str) and h.strip()}
     devices = (
-        (await db.execute(select(Device).where(Device.tenant_id == user.tenant_id, func.lower(Device.hostname).in_(hosts)))).scalars().all() if hosts else []
+        (await db.execute(select(Device).where(Device.tenant_id == user.tenant_id, func.lower(Device.hostname).in_(hosts)))).scalars().all()
+        if hosts
+        else []
     )
     sources = (
-        (await db.execute(select(DeviceSource).where(DeviceSource.tenant_id == user.tenant_id, DeviceSource.device_id.in_([d.id for d in devices])))).scalars().all()
+        (
+            await db.execute(
+                select(DeviceSource).where(DeviceSource.tenant_id == user.tenant_id, DeviceSource.device_id.in_([d.id for d in devices]))
+            )
+        )
+        .scalars()
+        .all()
         if devices
         else []
     )

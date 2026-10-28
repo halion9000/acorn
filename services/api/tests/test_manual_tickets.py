@@ -121,7 +121,9 @@ async def test_a_bad_number_is_a_422_and_a_full_list_is_a_409(audit):
 
 
 @pytest.mark.asyncio
-async def test_removing_deletes_a_hand_entered_ticket_or_one_halopsa_no_longer_has_and_a_core_ticket_halopsa_still_has_is_not_removable(audit):
+async def test_removing_deletes_a_hand_entered_ticket_or_one_halopsa_no_longer_has_and_a_core_ticket_halopsa_still_has_is_not_removable(
+    audit,
+):
     alert = _alert(
         {
             "tickets": [{"system": "halopsa", "id": "100", "summary": "Still in Halo"}, {"system": "halopsa", "id": "300"}],
@@ -223,12 +225,21 @@ def test_leading_zeros_are_dropped_from_a_numeric_ticket_number_everywhere():
 def test_an_older_alert_gets_its_tools_link_built_from_the_ids_it_carries():
     from app.api.v1.endpoints.alerts import _source_url_of
 
-    tm = SimpleNamespace(raw_event={"source": "threatmate", "unmapped": {"context": {"threatmate_client_id": "11085", "threatmate_alert_id": "894119459"}}})
+    tm = SimpleNamespace(
+        raw_event={"source": "threatmate", "unmapped": {"context": {"threatmate_client_id": "11085", "threatmate_alert_id": "894119459"}}}
+    )
     assert _source_url_of(tm) == "https://app.threatmate.com/alerts?tenantId=11085&finding=894119459"
     hu = SimpleNamespace(raw_event={"source": "huntress", "unmapped": {"context": {"huntress_escalation_id": "1100116"}}})
     base = "https://acme.huntress.io/account/escalations"
     assert _source_url_of(hu, base) == f"{base}/1100116"
     assert _source_url_of(hu) is None  # no account address known: no guess
-    assert _source_url_of(SimpleNamespace(raw_event={"source": "threatmate", "unmapped": {"context": {"threatmate_client_id": "x/../", "threatmate_alert_id": "1"}}})) is None
+    assert (
+        _source_url_of(
+            SimpleNamespace(
+                raw_event={"source": "threatmate", "unmapped": {"context": {"threatmate_client_id": "x/../", "threatmate_alert_id": "1"}}}
+            )
+        )
+        is None
+    )
     sent = SimpleNamespace(raw_event={"url": "https://x.example/a", "source": "huntress"})
     assert _source_url_of(sent, base) == "https://x.example/a"

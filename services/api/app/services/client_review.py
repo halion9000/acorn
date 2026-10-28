@@ -127,7 +127,11 @@ def _banded(percent: float, met: float, partly: float) -> str:
 
 # (the check a tool sends, the checklist key, the question): Liongard's and ThreatMate's per-client checks that answer a readiness question.
 TOOL_ITEMS = (
-    ("liongard_email_domain_records", "email_domain_records", "Are the client's e-mail domains protected against spoofing (SPF, DMARC, DKIM)?"),
+    (
+        "liongard_email_domain_records",
+        "email_domain_records",
+        "Are the client's e-mail domains protected against spoofing (SPF, DMARC, DKIM)?",
+    ),
     ("itglue_domain_expiry", "domain_expiry", "Are the client's domain names renewed ahead of expiry?"),
     ("itglue_certificate_expiry", "certificate_expiry", "Are the client's SSL certificates renewed ahead of expiry?"),
     ("threatmate_external_exposure", "external_exposure", "Is the client's public-facing infrastructure free of serious issues?"),

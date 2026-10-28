@@ -69,7 +69,20 @@ def totals(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """One line per tool and item across clients: how many clients have it, the total, the total not assigned (licences) and the total a while ago, with the change."""
     by: dict[tuple[str, str], dict[str, Any]] = {}
     for r in rows:
-        t = by.setdefault((r["source"], r["item"]), {"source": r["source"], "item": r["item"], "unit": r["unit"], "clients": 0, "total": 0, "available": 0, "had_available": False, "before": 0, "before_known": True})
+        t = by.setdefault(
+            (r["source"], r["item"]),
+            {
+                "source": r["source"],
+                "item": r["item"],
+                "unit": r["unit"],
+                "clients": 0,
+                "total": 0,
+                "available": 0,
+                "had_available": False,
+                "before": 0,
+                "before_known": True,
+            },
+        )
         t["clients"] += 1
         t["total"] += r["count"]
         if r.get("available") is not None:
@@ -167,7 +180,9 @@ def reconcile(billed: list[dict[str, Any]], held: list[dict[str, Any]], mapping:
             continue
         shown = [{"source": p["source"], "item": p["item"], "count": have.get((p["source"], p["item"]), 0)} for p in parts]
         counted = sum(p["count"] for p in shown)
-        rows.append({"invoice_item": item, "billed": int(b["count"]), "counted": counted, "difference": counted - int(b["count"]), "parts": shown})
+        rows.append(
+            {"invoice_item": item, "billed": int(b["count"]), "counted": counted, "difference": counted - int(b["count"]), "parts": shown}
+        )
     rows.sort(key=lambda r: (-abs(r["difference"]), r["invoice_item"]))
     return {"rows": rows, "unmapped": unmapped}
 
@@ -293,7 +308,7 @@ def forecast_next(points: list[dict[str, Any]], horizon_days: int = 30) -> int |
     var = sum((x - mx) ** 2 for x in xs)
     if var == 0:
         return None
-    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / var
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys, strict=False)) / var
     at = max(xs) + horizon_days
     return max(0, int(round(my + slope * (at - mx))))
 

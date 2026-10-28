@@ -4,7 +4,16 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from app.services.client_review import device_facts, readiness
-from app.services.infra_review import backup_summary, edr_summary, encryption_readiness, encryption_state, hypervisor_of, network_online, network_role, saas_backup
+from app.services.infra_review import (
+    backup_summary,
+    edr_summary,
+    encryption_readiness,
+    encryption_state,
+    hypervisor_of,
+    network_online,
+    network_role,
+    saas_backup,
+)
 from app.services.tech_stack import tech_stack
 from app.services.vcio_proposals import drafts_from_readiness
 
@@ -33,7 +42,17 @@ def test_meraki_product_types_are_firewall_switch_and_wireless():
 
 
 def test_unifi_models_are_told_apart():
-    for model, role in (("UDM-Pro", "firewall"), ("UCG-Ultra", "firewall"), ("USG-3P", "firewall"), ("USW-24-PoE", "switch"), ("US-8-60W", "switch"), ("USW-Flex-Mini", "switch"), ("U6-Pro", "wireless"), ("UAP-AC-Lite", "wireless"), ("U7-Pro", "wireless")):
+    for model, role in (
+        ("UDM-Pro", "firewall"),
+        ("UCG-Ultra", "firewall"),
+        ("USG-3P", "firewall"),
+        ("USW-24-PoE", "switch"),
+        ("US-8-60W", "switch"),
+        ("USW-Flex-Mini", "switch"),
+        ("U6-Pro", "wireless"),
+        ("UAP-AC-Lite", "wireless"),
+        ("U7-Pro", "wireless"),
+    ):
         assert network_role(dev([src("unifi")], model=model)) == (role, "UniFi"), model
     assert network_role(dev([src("unifi")], model="UVC-G4-Bullet")) is None
     assert network_role(dev([src("unifi")], model=None)) is None
@@ -47,7 +66,14 @@ def test_auvik_types_use_the_maker_the_device_reports():
 
 
 def test_the_questions_name_the_brands_found():
-    a = answers([dev([src("meraki", product_type="appliance")], model="MX68"), dev([src("unifi")], model="USW-24"), dev([src("unifi")], model="USW-48"), dev([src("meraki", product_type="wireless")], model="MR46")])
+    a = answers(
+        [
+            dev([src("meraki", product_type="appliance")], model="MX68"),
+            dev([src("unifi")], model="USW-24"),
+            dev([src("unifi")], model="USW-48"),
+            dev([src("meraki", product_type="wireless")], model="MR46"),
+        ]
+    )
     assert (a["firewall"].status, a["firewall"].suggested) == ("seen", "Meraki")
     assert (a["switch"].status, a["switch"].suggested) == ("seen", "UniFi (2)")
     assert (a["wireless"].status, a["wireless"].suggested) == ("seen", "Meraki")
@@ -146,7 +172,11 @@ def test_a_datto_agent_listed_without_an_operating_system_still_counts_as_a_prot
 
 
 def test_a_datto_agent_with_no_recent_snapshot_is_flagged_and_not_counted_as_current():
-    old = [dev([datto(OLD)], os="Windows Server 2022"), dev([datto(None)], os="Windows Server 2019"), dev([datto()], os="Windows Server 2016")]
+    old = [
+        dev([datto(OLD)], os="Windows Server 2022"),
+        dev([datto(None)], os="Windows Server 2019"),
+        dev([datto()], os="Windows Server 2016"),
+    ]
     s = backup_summary(old)
     assert (s.tools["datto-bcdr"].quiet, s.protected, s.fresh) == (2, 3, 1)
     assert "2 with no snapshot in 3 days" in answers(old)["backup_bcdr"].evidence
@@ -191,7 +221,15 @@ def test_saas_backup_is_the_worst_product_and_none_reported_is_unknown():
 
 def test_the_cloud_backup_question_names_datto_saas_when_it_reports_and_is_unknown_otherwise():
     devices = []
-    a = {x.key: x for x in tech_stack(devices, device_facts(devices, 0, 0), False, saas=[{**chk("saas_backup_microsoft", "met", "Microsoft 365 backed up"), "source": "datto-saas"}])}
+    a = {
+        x.key: x
+        for x in tech_stack(
+            devices,
+            device_facts(devices, 0, 0),
+            False,
+            saas=[{**chk("saas_backup_microsoft", "met", "Microsoft 365 backed up"), "source": "datto-saas"}],
+        )
+    }
     assert (a["backup_saas"].status, a["backup_saas"].suggested) == ("seen", "Datto SaaS Protection")
     assert "Microsoft 365 backed up" in a["backup_saas"].evidence
     none = {x.key: x for x in tech_stack(devices, device_facts(devices, 0, 0), False)}
@@ -201,7 +239,9 @@ def test_the_cloud_backup_question_names_datto_saas_when_it_reports_and_is_unkno
 def test_the_checklist_asks_whether_microsoft_and_google_are_backed_up_only_when_datto_saas_reports():
     facts = device_facts([], 0, 0)
     assert "saas_backup" not in {i.key for i in readiness(facts, None, None).items}
-    item = {i.key: i for i in readiness(facts, None, None, saas=[chk("saas_backup_microsoft", "partly", "80% backed up")]).items}["saas_backup"]
+    item = {i.key: i for i in readiness(facts, None, None, saas=[chk("saas_backup_microsoft", "partly", "80% backed up")]).items}[
+        "saas_backup"
+    ]
     assert item.status == "partly"
     keys = {d.key for d in drafts_from_readiness(readiness(facts, None, None, saas=[chk("saas_backup_google", "not_met", "none")]))}
     assert "saas_backup" in keys
@@ -234,7 +274,9 @@ def test_network_online_counts_known_states_for_network_hardware_only():
 def test_the_checklist_shows_network_health_only_when_a_tool_reports_it():
     facts = device_facts([], 0, 0)
     assert "network_online" not in {i.key for i in readiness(facts, None, None, devices=[]).items}
-    up = [dev([src("meraki", product_type="switch", status="online")]) for _ in range(9)] + [dev([src("meraki", product_type="wireless", status="offline")])]
+    up = [dev([src("meraki", product_type="switch", status="online")]) for _ in range(9)] + [
+        dev([src("meraki", product_type="wireless", status="offline")])
+    ]
     item = {i.key: i for i in readiness(facts, None, None, devices=up).items}["network_online"]
     assert (item.status, "9 of 10" in item.evidence) == ("partly", True)
     allup = [dev([src("unifi", product_line="network", status="online")])]
@@ -361,7 +403,12 @@ def test_the_training_item_says_where_its_answer_comes_from():
     enrolled = {i.key: i for i in readiness(facts, None, None, enrolled_in={"huntress-sat"}).items}["training"]
     assert enrolled.status == "unknown"
     assert "set up in Huntress SAT" in enrolled.evidence
-    done = {i.key: i for i in readiness(facts, None, None, enrolled_in={"huntress-sat"}, sat=[chk("sat_training_assigned", "met", "2 assignments running")]).items}["training"]
+    done = {
+        i.key: i
+        for i in readiness(
+            facts, None, None, enrolled_in={"huntress-sat"}, sat=[chk("sat_training_assigned", "met", "2 assignments running")]
+        ).items
+    }["training"]
     assert done.status == "met"
 
 
@@ -392,7 +439,9 @@ def test_a_devices_encryption_comes_from_whichever_tools_report_it_and_a_disagre
     assert encryption_state(laptop("a", bl("ninjaone", False))) is False
     assert encryption_state(laptop("a", bl("ninjaone", True), bl("liongard", True))) is True
     assert encryption_state(laptop("a", bl("ninjaone", True), bl("liongard", False))) is False
-    assert encryption_state(laptop("a", src("ninjaone"), src("huntress", bitlocker_encrypted="yes"))) is None, "no tool gives a yes/no, so there is no answer (not 'no')"
+    assert (
+        encryption_state(laptop("a", src("ninjaone"), src("huntress", bitlocker_encrypted="yes"))) is None
+    ), "no tool gives a yes/no, so there is no answer (not 'no')"
     assert encryption_state(laptop("a")) is None
 
 

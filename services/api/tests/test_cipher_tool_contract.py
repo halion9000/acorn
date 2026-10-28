@@ -132,7 +132,14 @@ CIPHER_CALLS = [
     ("aisoc_billing_map", "GET", "/billing/map", [], None, False),
     ("aisoc_data_quality", "GET", "/billing/data-quality", ["limit"], None, False),
     ("aisoc_last_reported", "GET", "/billing/last-reported", ["only_silent", "limit"], None, False),
-    ("aisoc_list_people", "GET", "/identities", ["search", "client_id", "source", "only_in", "kind", "admin", "disabled", "mfa", "exposed", "page_size", "page"], None, False),
+    (
+        "aisoc_list_people",
+        "GET",
+        "/identities",
+        ["search", "client_id", "source", "only_in", "kind", "admin", "disabled", "mfa", "exposed", "page_size", "page"],
+        None,
+        False,
+    ),
     ("aisoc_secure_scores", "GET", "/identity/secure-scores/brief", [], None, False),
     ("aisoc_client_review", "GET", "/client-review/{client_id}", [], None, False),
     ("aisoc_list_assets", "GET", "/assets", ["asset_type", "criticality", "limit", "offset"], None, False),
@@ -561,7 +568,9 @@ def test_an_estate_tool_is_a_get_that_needs_exactly_alerts_read_which_the_key_al
     needed = set(required_permissions(_route(method, path)))
     # The billing pages need billing:view, which alerts:read implies: the key still holds what they need and gains nothing.
     assert method == "GET" and len(needed) == 1 and needed <= {"alerts:read", "billing:view"}, f"{name}: {method} {path}"
-    assert "alerts:read" in CORE_KEY_SCOPES and all(permission_in(CORE_KEY_SCOPES, p) for p in needed), f"{name}: the key must already hold {needed}"
+    assert "alerts:read" in CORE_KEY_SCOPES and all(
+        permission_in(CORE_KEY_SCOPES, p) for p in needed
+    ), f"{name}: the key must already hold {needed}"
 
 
 def test_the_estate_routes_are_gets_with_no_side_effects_in_their_handlers():
@@ -611,8 +620,17 @@ def test_allowed_values_treats_anything_more_elaborate_as_open_text():
 
 def test_the_devices_filter_values_are_the_ones_the_endpoint_really_accepts():
     row = next(r for r in CONTRACT if r["tool"] == "aisoc_list_devices")
-    assert row["enums"] == {"missing": ["addigy", "threatmate", "huntress", "screenconnect", "fieldeffect"], "os": ["windows", "mac", "ios", "linux"]}
-    assert _allowed_values(_query_parameters(row)["missing"]["schema"]) == {"addigy", "threatmate", "huntress", "screenconnect", "fieldeffect"}
+    assert row["enums"] == {
+        "missing": ["addigy", "threatmate", "huntress", "screenconnect", "fieldeffect"],
+        "os": ["windows", "mac", "ios", "linux"],
+    }
+    assert _allowed_values(_query_parameters(row)["missing"]["schema"]) == {
+        "addigy",
+        "threatmate",
+        "huntress",
+        "screenconnect",
+        "fieldeffect",
+    }
     assert _allowed_values(_query_parameters(row)["os"]["schema"]) == {"windows", "mac", "ios", "linux"}
 
 

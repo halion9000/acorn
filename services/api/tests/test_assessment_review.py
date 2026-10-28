@@ -20,7 +20,13 @@ def test_all_145_template_questions_are_listed_in_order_under_their_sheet_and_gr
     assert len(answers) == 145 == len(QUESTIONS)
     assert [a.question for a in answers] == [q for _s, _g, q in QUESTIONS]
     assert {a.sheet for a in answers} == {
-        "Administrative", "Network and infrastructure", "Servers", "Workstations", "Cybersecurity and risk", "Backup and disaster recovery", "Google Workspace",
+        "Administrative",
+        "Network and infrastructure",
+        "Servers",
+        "Workstations",
+        "Cybersecurity and risk",
+        "Backup and disaster recovery",
+        "Google Workspace",
     }
     assert all(len(a.question) <= 400 for a in answers), "a question is its own answer key, which holds 400 characters"
     assert len({a.question for a in answers}) == 145
@@ -57,16 +63,35 @@ def test_a_check_the_client_has_answers_the_question_it_speaks_to_and_says_which
 
 def test_the_first_check_the_client_has_wins_and_an_unusable_status_is_ignored():
     q = "Has a managed endpoint security been deployed to protect against virus, malware, and host intrusion"
-    both = by_question(assessment_answers({"huntress_protection": {"status": "met", "evidence": "all protected"}, "ninjaone_antivirus": {"status": "not_met", "evidence": "x"}}))
+    both = by_question(
+        assessment_answers(
+            {
+                "huntress_protection": {"status": "met", "evidence": "all protected"},
+                "ninjaone_antivirus": {"status": "not_met", "evidence": "x"},
+            }
+        )
+    )
     assert both[q].status == "met" and "huntress_protection" in both[q].evidence
-    only_second = by_question(assessment_answers({"huntress_protection": {"status": "unknown", "evidence": ""}, "ninjaone_antivirus": {"status": "partly", "evidence": "2 without"}}))
+    only_second = by_question(
+        assessment_answers(
+            {
+                "huntress_protection": {"status": "unknown", "evidence": ""},
+                "ninjaone_antivirus": {"status": "partly", "evidence": "2 without"},
+            }
+        )
+    )
     assert only_second[q].status == "partly" and "ninjaone_antivirus" in only_second[q].evidence
 
 
 def test_public_rdp_is_ruled_out_by_a_clean_exposure_scan_and_named_by_a_finding_but_other_findings_say_nothing():
     q = "Is the Public port 3389 (Remote Desktop) exposed allowing remote access to servers and/or desktops?"
-    assert by_question(assessment_answers({"threatmate_external_exposure": {"status": "met", "evidence": "No exposed services"}}))[q].status == "met"
-    bad = by_question(assessment_answers({"threatmate_external_exposure": {"status": "not_met", "evidence": "Exposed RDP on 203.0.113.9"}}))[q]
+    assert (
+        by_question(assessment_answers({"threatmate_external_exposure": {"status": "met", "evidence": "No exposed services"}}))[q].status
+        == "met"
+    )
+    bad = by_question(
+        assessment_answers({"threatmate_external_exposure": {"status": "not_met", "evidence": "Exposed RDP on 203.0.113.9"}})
+    )[q]
     assert bad.status == "not_met" and "RDP" in bad.evidence
     other = by_question(assessment_answers({"threatmate_external_exposure": {"status": "not_met", "evidence": "Open FTP on one host"}}))[q]
     assert other.status == "needs_person"

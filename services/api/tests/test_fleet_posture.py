@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, tool_rows, coverage_matrix, rank_clients, stale_sources, summarize
+from app.services.fleet_posture import BOARDS, FleetCheck, board_rows, coverage_matrix, rank_clients, stale_sources, summarize, tool_rows
 
 
 def chk(status, key="k", client="Acme", accepted=False):
@@ -36,9 +36,21 @@ def test_clients_are_ranked_worst_first_and_those_without_a_score_last():
 
 
 def test_a_board_takes_only_its_checks_worst_first_and_skips_fine_ones_unless_asked():
-    rows = [chk("met", "a", "Zed"), chk("partly", "a", "Beta"), chk("not_met", "a", "Zed"), chk("not_met", "other", "Acme"), chk("not_met", "a", "Acme", accepted=True), chk("not_met", "b", "Acme")]
+    rows = [
+        chk("met", "a", "Zed"),
+        chk("partly", "a", "Beta"),
+        chk("not_met", "a", "Zed"),
+        chk("not_met", "other", "Acme"),
+        chk("not_met", "a", "Acme", accepted=True),
+        chk("not_met", "b", "Acme"),
+    ]
     got = board_rows(rows, ["a", "b"])
-    assert [(r.client_name, r.key, r.status, r.accepted) for r in got] == [("Acme", "b", "not_met", False), ("Zed", "a", "not_met", False), ("Beta", "a", "partly", False), ("Acme", "a", "not_met", True)]
+    assert [(r.client_name, r.key, r.status, r.accepted) for r in got] == [
+        ("Acme", "b", "not_met", False),
+        ("Zed", "a", "not_met", False),
+        ("Beta", "a", "partly", False),
+        ("Acme", "a", "not_met", True),
+    ]
     assert len(board_rows(rows, ["a", "b"], include_met=True)) == 5
 
 
@@ -65,7 +77,10 @@ def test_the_coverage_matrix_lists_tools_most_used_first_and_what_each_client_la
 def test_a_client_mapped_to_nothing_is_still_listed_missing_everything():
     m = coverage_matrix([("a", "ninjaone")], {"a": "Acme", "z": "Zed"})
     assert {c["client_name"]: c["missing"] for c in m["clients"]} == {"Acme": [], "Zed": ["ninjaone"]}
-    assert coverage_matrix([], {"z": "Zed"}) == {"tools": [], "clients": [{"client_id": "z", "client_name": "Zed", "tools": [], "missing": []}]}
+    assert coverage_matrix([], {"z": "Zed"}) == {
+        "tools": [],
+        "clients": [{"client_id": "z", "client_name": "Zed", "tools": [], "missing": []}],
+    }
 
 
 def test_accepted_risks_that_run_out_soonest_come_first_and_expired_ones_are_gone():
@@ -122,7 +137,16 @@ def test_a_check_is_overdue_only_when_its_date_has_passed_and_it_is_not_fully_me
 def _fc(client, key, status, evidence="", items=(), source="ninjaone", accepted=False):
     from app.services.fleet_posture import FleetCheck
 
-    return FleetCheck(client_id=f"id-{client}", client_name=client, source=source, key=key, status=status, evidence=evidence, items=tuple(items), accepted=accepted)
+    return FleetCheck(
+        client_id=f"id-{client}",
+        client_name=client,
+        source=source,
+        key=key,
+        status=status,
+        evidence=evidence,
+        items=tuple(items),
+        accepted=accepted,
+    )
 
 
 def test_a_search_finds_a_machine_or_word_in_the_evidence_the_key_or_the_items_and_puts_problems_first():
@@ -135,7 +159,11 @@ def test_a_search_finds_a_machine_or_word_in_the_evidence_the_key_or_the_items_a
         _fc("Gamma", "meraki_wan", "not_met", "WAN up", ["MX-1"]),
     ]
     out = search_checks(checks, "Srv-02")
-    assert [(r["client_name"], r["status"]) for r in out] == [("Acme", "not_met"), ("Beta", "partly"), ("Aaa", "met")], "problems first, not by name"
+    assert [(r["client_name"], r["status"]) for r in out] == [
+        ("Acme", "not_met"),
+        ("Beta", "partly"),
+        ("Aaa", "met"),
+    ], "problems first, not by name"
     assert out[0]["matched_items"] == ["srv-02: 40 days"] and out[0]["matched_text"] is False
     assert out[1]["matched_items"] == [] and out[1]["matched_text"] is True
     assert [r["key"] for r in search_checks(checks, "quiet agents")] == ["huntress_quiet_agents"], "the check name matches with spaces"
@@ -165,7 +193,12 @@ def test_a_heavier_check_moves_the_score_further_and_the_counts_stay_plain_count
 def test_the_breakdown_adds_up_to_the_points_lost_biggest_first_and_leaves_out_accepted_checks():
     from app.services.fleet_posture import score_breakdown
 
-    checks = [_fc("A", "backup", "not_met"), _fc("A", "patching", "partly"), _fc("A", "av", "met"), _fc("A", "wan", "not_met", accepted=True)]
+    checks = [
+        _fc("A", "backup", "not_met"),
+        _fc("A", "patching", "partly"),
+        _fc("A", "av", "met"),
+        _fc("A", "wan", "not_met", accepted=True),
+    ]
     b = score_breakdown(checks)
     assert b["score"] == 50 and b["lost"] == 50.0, "(0 + .5 + 1) / 3 = 50%"
     assert [(r["key"], r["points_lost"]) for r in b["rows"]] == [("backup", 33.3), ("patching", 16.7)]
@@ -187,7 +220,10 @@ def test_tool_scorecards_rank_the_tool_with_most_problems_first_and_count_client
         _fc("C", "k3", "not_met", source="ninjaone", accepted=True),
     ]
     out = tool_scorecards(checks)
-    assert [(t["source"], t["checks"], t["percent_fine"], t["clients_with_problems"]) for t in out] == [("slide", 3, 33, 1), ("ninjaone", 2, 75, 1)]
+    assert [(t["source"], t["checks"], t["percent_fine"], t["clients_with_problems"]) for t in out] == [
+        ("slide", 3, 33, 1),
+        ("ninjaone", 2, 75, 1),
+    ]
     assert (out[0]["met"], out[0]["partly"], out[0]["not_met"]) == (1, 0, 2)
     assert tool_scorecards([]) == []
 
@@ -197,7 +233,10 @@ def test_similar_size_average_uses_only_clients_within_a_factor_of_two_and_with_
 
     others = {"a": (60, 80), "b": (45, 60), "c": (200, 10), "d": (10, 5), "e": (100, None), "f": (0, 99), "g": (90, 70)}
     out = similar_size_average(50, others)
-    assert out == {"average": 70, "clients": 3}, "a (60), b (45) and g (90) are within 25 to 100; c, d are not, e has no score, f has no machines"
+    assert out == {
+        "average": 70,
+        "clients": 3,
+    }, "a (60), b (45) and g (90) are within 25 to 100; c, d are not, e has no score, f has no machines"
     assert similar_size_average(0, others) == {"average": None, "clients": 0}
     assert similar_size_average(1000, others) == {"average": None, "clients": 0}
 
@@ -216,10 +255,22 @@ def test_a_change_is_new_worse_better_or_the_same_by_the_order_not_met_partly_me
 
 def test_a_tools_checks_are_only_that_tools_worst_first_without_fine_ones_unless_asked():
     def of(source, status, client="Acme", key="k", accepted=False):
-        return FleetCheck(client_id=client.lower(), client_name=client, source=source, key=key, status=status, evidence="e", accepted=accepted)
+        return FleetCheck(
+            client_id=client.lower(), client_name=client, source=source, key=key, status=status, evidence="e", accepted=accepted
+        )
 
-    rows = [of("huntress", "met"), of("huntress", "partly", "Beta"), of("huntress", "not_met", "Zed"), of("threatmate", "not_met"), of("huntress", "not_met", "Acme", "b", accepted=True)]
+    rows = [
+        of("huntress", "met"),
+        of("huntress", "partly", "Beta"),
+        of("huntress", "not_met", "Zed"),
+        of("threatmate", "not_met"),
+        of("huntress", "not_met", "Acme", "b", accepted=True),
+    ]
     got = tool_rows(rows, "huntress")
-    assert [(r.client_name, r.status, r.accepted) for r in got] == [("Zed", "not_met", False), ("Beta", "partly", False), ("Acme", "not_met", True)]
+    assert [(r.client_name, r.status, r.accepted) for r in got] == [
+        ("Zed", "not_met", False),
+        ("Beta", "partly", False),
+        ("Acme", "not_met", True),
+    ]
     assert len(tool_rows(rows, "huntress", include_met=True)) == 4
     assert tool_rows(rows, "nothing") == []

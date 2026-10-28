@@ -26,10 +26,20 @@ async def world():
         async with engine.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
             for t, n in ((mine, "mine"), (other, "other")):
-                await conn.execute(text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :s, 'parent')"), {"i": t, "n": f"ioc-{n}-{tag}", "s": f"ioc-{n}-{tag}"})
-            for aid, tenant, title in ((uuid.UUID(int=1), mine, "Endpoint Risk - Suspicious Process Detected"), (uuid.UUID(int=2), mine, "Second alert"), (uuid.UUID(int=3), mine, "Third alert"), (uuid.UUID(int=4), other, "Someone else's alert")):
                 await conn.execute(
-                    text("insert into alerts (id, tenant_id, title, severity, status, event_time, first_seen, last_seen) values (:i, :t, :ti, 'medium', 'new', :n, :n, :n)"),
+                    text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :s, 'parent')"),
+                    {"i": t, "n": f"ioc-{n}-{tag}", "s": f"ioc-{n}-{tag}"},
+                )
+            for aid, tenant, title in (
+                (uuid.UUID(int=1), mine, "Endpoint Risk - Suspicious Process Detected"),
+                (uuid.UUID(int=2), mine, "Second alert"),
+                (uuid.UUID(int=3), mine, "Third alert"),
+                (uuid.UUID(int=4), other, "Someone else's alert"),
+            ):
+                await conn.execute(
+                    text(
+                        "insert into alerts (id, tenant_id, title, severity, status, event_time, first_seen, last_seen) values (:i, :t, :ti, 'medium', 'new', :n, :n, :n)"
+                    ),
                     {"i": aid, "t": tenant, "ti": title, "n": now},
                 )
         yield mine, other, engine
@@ -44,8 +54,22 @@ async def world():
 def ioc(tenant, linked):
     now = datetime.now(UTC)
     return ThreatIntelIOC(
-        id=uuid.uuid4(), tenant_id=tenant, ioc_type="file_hash_sha256", value="a" * 64, confidence=30, severity="info", tlp="amber", source="alerts", is_active=True, false_positive=False,
-        linked_alerts=linked, context={}, first_seen=now, last_seen=now, created_at=now, updated_at=now,
+        id=uuid.uuid4(),
+        tenant_id=tenant,
+        ioc_type="file_hash_sha256",
+        value="a" * 64,
+        confidence=30,
+        severity="info",
+        tlp="amber",
+        source="alerts",
+        is_active=True,
+        false_positive=False,
+        linked_alerts=linked,
+        context={},
+        first_seen=now,
+        last_seen=now,
+        created_at=now,
+        updated_at=now,
     )
 
 
@@ -58,7 +82,10 @@ async def test_each_indicator_gets_the_titles_of_its_first_two_alerts_and_nothin
     rows = [ioc(mine, [uuid.UUID(int=1), uuid.UUID(int=2), uuid.UUID(int=3)]), ioc(mine, None), ioc(mine, [uuid.UUID(int=4)])]
     out = await with_alert_summaries(db, mine, rows)
     await db.close()
-    assert [a.title for a in out[0].linked_alert_summaries] == ["Endpoint Risk - Suspicious Process Detected", "Second alert"], "the first two only"
+    assert [a.title for a in out[0].linked_alert_summaries] == [
+        "Endpoint Risk - Suspicious Process Detected",
+        "Second alert",
+    ], "the first two only"
     assert out[0].linked_alert_summaries[0].severity == "medium"
     assert out[1].linked_alert_summaries == []
     assert out[2].linked_alert_summaries == [], "an alert of another tenant is never named"

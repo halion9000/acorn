@@ -234,7 +234,9 @@ async def test_top_signins_are_the_highest_scores_of_the_window_with_their_clien
         await c.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
         for sid, score, age in (("t1", 0.2, timedelta(hours=1)), ("t2", 0.9, timedelta(hours=2)), ("t3", 0.99, timedelta(days=30))):
             await c.execute(
-                text("update signin_events set anomaly_score = :s, occurred_at = now() - cast(:a as interval) where source_id = :i and tenant_id = :t"),
+                text(
+                    "update signin_events set anomaly_score = :s, occurred_at = now() - cast(:a as interval) where source_id = :i and tenant_id = :t"
+                ),
                 {"s": score, "a": age, "i": sid, "t": world["mapped"]},
             )
     await engine.dispose()

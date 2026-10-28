@@ -188,7 +188,9 @@ async def list_clients(current_user: Annotated[AuthUser, Depends(require_permiss
         current_user.tenant_id,
         [uuid.UUID(c.tenant_id) for c in candidates],
         lambda tid: acting_as_tenant(db, tid),
-        only={(a.vendor, a.vendor_client_id) for a in aliases if a.child_tenant_id is None and not a.ignored},  # only a client still to map gets suggestions
+        only={
+            (a.vendor, a.vendor_client_id) for a in aliases if a.child_tenant_id is None and not a.ignored
+        },  # only a client still to map gets suggestions
     )
     out = [
         ClientAliasOut(
@@ -237,20 +239,51 @@ class SuspectMapping(BaseModel):
     score: float
 
 
-@router.get("/clients/suspect-mappings", response_model=list[SuspectMapping], summary="Mapped vendor clients whose names look unrelated to the client they are mapped to")
-async def list_suspect_mappings(current_user: Annotated[AuthUser, Depends(require_permission("mssp:read"))], db: TenantDBSession) -> list[SuspectMapping]:
+@router.get(
+    "/clients/suspect-mappings",
+    response_model=list[SuspectMapping],
+    summary="Mapped vendor clients whose names look unrelated to the client they are mapped to",
+)
+async def list_suspect_mappings(
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:read"))], db: TenantDBSession
+) -> list[SuspectMapping]:
     """A check on mappings a person made or accepted: a vendor client called one thing mapped to a client called something else, with no machine in common. Worst first."""
     owner = current_user.tenant_id
-    aliases = (await db.execute(select(ClientAlias).where(ClientAlias.tenant_id == owner, ClientAlias.child_tenant_id.is_not(None), ClientAlias.ignored.is_(False)))).scalars().all()
+    aliases = (
+        (
+            await db.execute(
+                select(ClientAlias).where(
+                    ClientAlias.tenant_id == owner, ClientAlias.child_tenant_id.is_not(None), ClientAlias.ignored.is_(False)
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
     if not aliases:
         return []
     candidates = await child_candidates(db, owner, include_hidden=True)
     names = {c.tenant_id: c.name for c in candidates}
-    overlaps = await device_overlaps(db, owner, [uuid.UUID(c.tenant_id) for c in candidates], lambda tid: acting_as_tenant(db, tid), only={(a.vendor, a.vendor_client_id) for a in aliases})
+    overlaps = await device_overlaps(
+        db,
+        owner,
+        [uuid.UUID(c.tenant_id) for c in candidates],
+        lambda tid: acting_as_tenant(db, tid),
+        only={(a.vendor, a.vendor_client_id) for a in aliases},
+    )
     rows = []
     for a in aliases:
         shared = sum(o.shared for o in overlaps.get((a.vendor, a.vendor_client_id), []) if o.tenant_id == str(a.child_tenant_id))
-        rows.append({"alias_id": a.id, "vendor": a.vendor, "vendor_client_name": a.vendor_client_name, "client_id": a.child_tenant_id, "client_name": names.get(str(a.child_tenant_id)) or str(a.child_tenant_id), "shared_devices": shared})
+        rows.append(
+            {
+                "alias_id": a.id,
+                "vendor": a.vendor,
+                "vendor_client_name": a.vendor_client_name,
+                "client_id": a.child_tenant_id,
+                "client_name": names.get(str(a.child_tenant_id)) or str(a.child_tenant_id),
+                "shared_devices": shared,
+            }
+        )
     return [SuspectMapping(**{k: v for k, v in r.items() if k != "shared_devices"}) for r in suspect_mappings(rows)]
 
 

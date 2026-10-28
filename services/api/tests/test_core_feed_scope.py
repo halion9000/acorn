@@ -119,10 +119,14 @@ async def test_tickets_are_stored_on_that_vendors_incident_only():
         ],
     )
     assert await cf.apply_tickets(db, OWNER, rep) == 3
-    assert len(db.executed) == 3  # the incident report, the escalation and the signal; another vendor's uids (petra, a lookalike prefix) are not this vendor's
+    assert (
+        len(db.executed) == 3
+    )  # the incident report, the escalation and the signal; another vendor's uids (petra, a lookalike prefix) are not this vendor's
     sql, params = _sql(db.executed[0])
     assert sql.lower().startswith("update alerts") and OWNER in params.values() and "huntress:7" in params.values()
-    assert {"huntress-escalation:11", "huntress-signal:12"} <= {v for e in db.executed[1:] for v in _sql(e)[1].values() if isinstance(v, str)}
+    assert {"huntress-escalation:11", "huntress-signal:12"} <= {
+        v for e in db.executed[1:] for v in _sql(e)[1].values() if isinstance(v, str)
+    }
     stored = next(v for v in params.values() if isinstance(v, dict) and "tickets" in v)["tickets"]
     assert stored == [{"id": "123", "system": "halopsa", "summary": "S", "status": "Open"}]  # absent fields are left out, not null
 

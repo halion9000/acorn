@@ -23,11 +23,32 @@ T0 = datetime(2026, 10, 27, 12, 0, tzinfo=UTC)
 
 
 def signin(i, user="a@x.com", country="US", at=T0, success=True, interactive=True, mfa=True, ip="1.1.1.1", city="Austin"):
-    return NS(source_id=f"s{i}", user_principal=user, country=country, occurred_at=at, success=success, interactive=interactive, mfa=mfa, ip_address=ip, city=city, app="Outlook")
+    return NS(
+        source_id=f"s{i}",
+        user_principal=user,
+        country=country,
+        occurred_at=at,
+        success=success,
+        interactive=interactive,
+        mfa=mfa,
+        ip_address=ip,
+        city=city,
+        app="Outlook",
+    )
 
 
 def audit(i, activity, actor="admin@x.com", target="u@x.com", at=T0, success=True, actor_is_app=False, target_type="User"):
-    return NS(source_id=f"a{i}", activity=activity, actor=actor, target=target, occurred_at=at, success=success, actor_is_app=actor_is_app, actor_ip="2.2.2.2", target_type=target_type)
+    return NS(
+        source_id=f"a{i}",
+        activity=activity,
+        actor=actor,
+        target=target,
+        occurred_at=at,
+        success=success,
+        actor_is_app=actor_is_app,
+        actor_ip="2.2.2.2",
+        target_type=target_type,
+    )
 
 
 # ---- rare country ------------------------------------------------------------------------------------------------------------------------------------------------
@@ -107,7 +128,21 @@ def test_a_role_addition_and_a_conditional_access_change_are_flagged_and_an_app_
 
 
 def _finding(key="k"):
-    return Finding("aisoc-id-x", "Rule", "Title", "high", "Initial Access", "T1078", key, T0, "Summary sentence.", [("Person", "a@x.com"), ("Country", "RO")], ["a@x.com"], ["1.1.1.1"], ["s1"])
+    return Finding(
+        "aisoc-id-x",
+        "Rule",
+        "Title",
+        "high",
+        "Initial Access",
+        "T1078",
+        key,
+        T0,
+        "Summary sentence.",
+        [("Person", "a@x.com"), ("Country", "RO")],
+        ["a@x.com"],
+        ["1.1.1.1"],
+        ["s1"],
+    )
 
 
 def test_the_alert_has_a_fixed_id_per_client_and_finding_and_the_tactic_set():

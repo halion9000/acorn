@@ -17,7 +17,9 @@ logger = structlog.get_logger()
 INTERVAL_SECONDS = 60
 
 
-async def run_suppression_sweeper(*, sleep: Callable[[float], Any] = asyncio.sleep, session_factory: Callable[[], Any] = AsyncSessionLocal) -> None:
+async def run_suppression_sweeper(
+    *, sleep: Callable[[float], Any] = asyncio.sleep, session_factory: Callable[[], Any] = AsyncSessionLocal
+) -> None:
     """The long-running loop (started under the scheduler lock from the API lifespan). A failed pass never ends it; cancellation does."""
     await sleep(20)
     while True:

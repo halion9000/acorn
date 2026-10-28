@@ -285,7 +285,13 @@ async def _hidden_nav(db: Any, user: User) -> list[str]:
     try:
         # In its own savepoint: a failure here (an older database without the column) must not take the sign-in check or the pages away.
         async with db.begin_nested():
-            rows = (await db.execute(select(Role.hidden_nav).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user.id, Role.tenant_id == user.tenant_id))).all()
+            rows = (
+                await db.execute(
+                    select(Role.hidden_nav)
+                    .join(UserRole, UserRole.role_id == Role.id)
+                    .where(UserRole.user_id == user.id, Role.tenant_id == user.tenant_id)
+                )
+            ).all()
     except Exception:  # noqa: BLE001
         logger.warning("could not read the roles' hidden pages; showing everything")
         return []

@@ -310,7 +310,17 @@ def verify_ed25519_signature(public_key_bytes: bytes, message: bytes, signature:
 # Names that are enforced somewhere in the code but are not (yet) granted to any role
 # beyond the "*" wildcard holders. They are valid permission names.
 _UNGRANTED_PERMISSIONS = frozenset(
-    {"sla:write", "mssp:onboard", "hunts:read", "intel:read", "alerts:triage", "rules:view", "connectors:view", "cases:work", "billing:view"}
+    {
+        "sla:write",
+        "mssp:onboard",
+        "hunts:read",
+        "intel:read",
+        "alerts:triage",
+        "rules:view",
+        "connectors:view",
+        "cases:work",
+        "billing:view",
+    }
 )  # hunts:read: held through lake:query (IMPLIED_BY below) or granted on its own  # noqa: E501
 
 

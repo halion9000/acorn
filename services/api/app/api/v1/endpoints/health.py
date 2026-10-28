@@ -82,13 +82,13 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlalchemy import and_, func, select
 
-from app.services.runtime_stats import loop_lag, slow_routes
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.metrics import PipelineHealth, PipelineStage
 from app.core.config import settings
 from app.models.alert import Alert
 from app.models.connector import Connector
 from app.services.connector_freshness import compute_freshness
+from app.services.runtime_stats import loop_lag, slow_routes
 
 logger = logging.getLogger(__name__)
 
@@ -850,7 +850,13 @@ def platform_warnings(
             }
         )
     if loop and loop.get("slow"):
-        out.append({"key": "loop", "level": "warn", "text": f"The API stopped answering for up to {loop['max_seconds']} s in the last {loop['window_seconds'] // 60} minutes: something heavy is blocking it (see the slowest routes below)"})
+        out.append(
+            {
+                "key": "loop",
+                "level": "warn",
+                "text": f"The API stopped answering for up to {loop['max_seconds']} s in the last {loop['window_seconds'] // 60} minutes: something heavy is blocking it (see the slowest routes below)",
+            }
+        )
     if disk and disk["used_percent"] >= DISK_WARN_PERCENT:
         out.append({"key": "disk", "level": "warn", "text": f"Disk is {disk['used_percent']}% full ({disk['free_gb']} GB free)"})
     stalled = [f["vendor"] for f in device_feeds if f.get("stalled")]
@@ -911,6 +917,8 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
         "disk": disk,
         "pending_migrations": pending or [],
         "runtime": {"loop": loop, "slow_routes": slow_routes()},
-        "warnings": platform_warnings(down=down, disk=disk, pending=pending, core_feed=core_feed, device_feeds=feeds, signins=signins, loop=loop),
+        "warnings": platform_warnings(
+            down=down, disk=disk, pending=pending, core_feed=core_feed, device_feeds=feeds, signins=signins, loop=loop
+        ),
         "generated_at": datetime.now(UTC),
     }

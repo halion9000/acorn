@@ -102,7 +102,9 @@ async def load(session: Any, entries: list[dict[str, Any]]) -> dict[str, int]:
 
     from app.models.community_catalog import CommunityCatalogItem  # noqa: PLC0415
 
-    have = set((await session.execute(select(CommunityCatalogItem.item_id).where(CommunityCatalogItem.kind == "detection"))).scalars().all())
+    have = set(
+        (await session.execute(select(CommunityCatalogItem.item_id).where(CommunityCatalogItem.kind == "detection"))).scalars().all()
+    )
     created = 0
     for e in entries:
         if e["id"] in have:

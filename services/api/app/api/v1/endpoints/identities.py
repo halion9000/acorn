@@ -134,12 +134,21 @@ def _out(p: Person, with_sources: bool = False) -> PersonOut:
         mfa=p.mfa,
         mfa_methods=p.mfa_methods,
         tools=p.vendors,
-        sources=[SourceOut(vendor=s.vendor, external_id=s.external_id, enabled=s.enabled, details=s.details) for s in p.sources] if with_sources else [],
+        sources=[SourceOut(vendor=s.vendor, external_id=s.external_id, enabled=s.enabled, details=s.details) for s in p.sources]
+        if with_sources
+        else [],
         open_alerts=p.open_alerts,
         top_severity=p.top_severity,
         alerts_by_source=p.alerts_by_source,
         backups=[BackupOut(vendor=b.vendor, status=b.status, detail=b.detail) for b in p.backups],
-        exposure=ExposureOut(count=p.exposure.count, latest=p.exposure.latest, password=p.exposure.password, stealer_log=p.exposure.stealer_log, malware=p.exposure.malware, breaches=p.exposure.breaches)
+        exposure=ExposureOut(
+            count=p.exposure.count,
+            latest=p.exposure.latest,
+            password=p.exposure.password,
+            stealer_log=p.exposure.stealer_log,
+            malware=p.exposure.malware,
+            breaches=p.exposure.breaches,
+        )
         if p.exposure is not None
         else None,
     )
@@ -153,7 +162,11 @@ async def _people(db: Any, owner: uuid.UUID, client_id: uuid.UUID | None) -> tup
     now = datetime.now(UTC)
     cutoff = now - timedelta(days=ALERT_LOOKBACK_DAYS)
     async with cross_tenant_reads(db):
-        users = (await db.execute(select(IdentityMfaUser).where(IdentityMfaUser.tenant_id.in_(scope), IdentityMfaUser.source == MICROSOFT))).scalars().all()
+        users = (
+            (await db.execute(select(IdentityMfaUser).where(IdentityMfaUser.tenant_id.in_(scope), IdentityMfaUser.source == MICROSOFT)))
+            .scalars()
+            .all()
+        )
         sources = (await db.execute(select(IdentitySource).where(IdentitySource.tenant_id.in_(scope)))).scalars().all()
         alerts = (
             (
@@ -191,7 +204,9 @@ def summarize(people: list[Person]) -> IdentitySummary:
         alert_sources=dict(sorted(alert_sources.items())),
         backup_problems=sum(1 for p in people if any(b.status != "ok" for b in p.backups)),
         exposed=sum(1 for p in people if p.exposure is not None),
-        exposed_serious=sum(1 for p in people if p.exposure is not None and (p.exposure.password or p.exposure.stealer_log or p.exposure.malware)),
+        exposed_serious=sum(
+            1 for p in people if p.exposure is not None and (p.exposure.password or p.exposure.stealer_log or p.exposure.malware)
+        ),
     )
 
 
@@ -204,11 +219,23 @@ async def list_identities(
     client_id: uuid.UUID | None = Query(default=None),
     search: str | None = Query(default=None, max_length=100),
     source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$", description="Only people this tool knows."),
-    only_in: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$", description="Only people known to this one tool and no other."),
+    only_in: str | None = Query(
+        default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$", description="Only people known to this one tool and no other."
+    ),
     has_alerts: bool = Query(default=False),
-    backup: str | None = Query(default=None, pattern="^(ok|problem|none)$", description="ok: every backup tool is fine; problem: some backup tool reports one; none: no backup tool knows the person."),
-    alert_source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$", description="Only people with an open alert from this tool."),
-    exposed: str | None = Query(default=None, pattern="^(any|serious)$", description="any: the address was found in a breach; serious: with a password, a stealer log or malware."),
+    backup: str | None = Query(
+        default=None,
+        pattern="^(ok|problem|none)$",
+        description="ok: every backup tool is fine; problem: some backup tool reports one; none: no backup tool knows the person.",
+    ),
+    alert_source: str | None = Query(
+        default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$", description="Only people with an open alert from this tool."
+    ),
+    exposed: str | None = Query(
+        default=None,
+        pattern="^(any|serious)$",
+        description="any: the address was found in a breach; serious: with a password, a stealer log or malware.",
+    ),
     mfa: str | None = Query(default=None, pattern="^(covered|registered_not_required|none|unknown)$"),
     admin: bool = Query(default=False),
     disabled: bool = Query(default=False),
@@ -220,7 +247,20 @@ async def list_identities(
         raise HTTPException(status_code=422, detail=f"sort must be one of: {', '.join(SORTS)}")
     people, _ = await _people(db, user.tenant_id, client_id)
     rows = sort_people(
-        filter_people(people, search=search, source=source, only_in=only_in, has_alerts=has_alerts, alert_source=alert_source, backup=backup, exposed=exposed, mfa=mfa, admin=admin, disabled=disabled, kind=kind),
+        filter_people(
+            people,
+            search=search,
+            source=source,
+            only_in=only_in,
+            has_alerts=has_alerts,
+            alert_source=alert_source,
+            backup=backup,
+            exposed=exposed,
+            mfa=mfa,
+            admin=admin,
+            disabled=disabled,
+            kind=kind,
+        ),
         sort,
     )
     total = len(rows)
@@ -262,7 +302,9 @@ def people_csv(rows: list[PersonOut]) -> str:
     return out.getvalue()
 
 
-@router.get("/export.csv", summary="The people the page is showing, as a CSV file", dependencies=[Depends(require_permission("alerts:read"))])
+@router.get(
+    "/export.csv", summary="The people the page is showing, as a CSV file", dependencies=[Depends(require_permission("alerts:read"))]
+)
 async def export_identities(
     user: AuthUser,
     db: DBSession,
@@ -284,7 +326,20 @@ async def export_identities(
         raise HTTPException(status_code=422, detail=f"sort must be one of: {', '.join(SORTS)}")
     people, _ = await _people(db, user.tenant_id, client_id)
     rows = sort_people(
-        filter_people(people, search=search, source=source, only_in=only_in, has_alerts=has_alerts, alert_source=alert_source, backup=backup, exposed=exposed, mfa=mfa, admin=admin, disabled=disabled, kind=kind),
+        filter_people(
+            people,
+            search=search,
+            source=source,
+            only_in=only_in,
+            has_alerts=has_alerts,
+            alert_source=alert_source,
+            backup=backup,
+            exposed=exposed,
+            mfa=mfa,
+            admin=admin,
+            disabled=disabled,
+            kind=kind,
+        ),
         sort,
     )
     return Response(
@@ -358,7 +413,19 @@ async def _tolerant(db: Any, statement: Any) -> list[Any]:
 def signin_rows(events: list[Any]) -> list[SigninRow]:
     """The person's latest sign-ins, newest first."""
     latest = sorted(events, key=lambda e: e.occurred_at, reverse=True)[:SIGNINS_SHOWN]
-    return [SigninRow(at=e.occurred_at, app=e.app, country=e.country, city=e.city, ip=e.ip_address, success=e.success, mfa=e.mfa, unusual=e.anomaly_score is not None) for e in latest]
+    return [
+        SigninRow(
+            at=e.occurred_at,
+            app=e.app,
+            country=e.country,
+            city=e.city,
+            ip=e.ip_address,
+            success=e.success,
+            mfa=e.mfa,
+            unusual=e.anomaly_score is not None,
+        )
+        for e in latest
+    ]
 
 
 class PersonDetail(BaseModel):
@@ -371,7 +438,9 @@ class PersonDetail(BaseModel):
 
 
 @router.get("/detail", response_model=PersonDetail, dependencies=[Depends(require_permission("alerts:read"))])
-async def identity_detail(user: AuthUser, db: DBSession, client_id: uuid.UUID, email: Annotated[str, Query(max_length=320)]) -> PersonDetail:
+async def identity_detail(
+    user: AuthUser, db: DBSession, client_id: uuid.UUID, email: Annotated[str, Query(max_length=320)]
+) -> PersonDetail:
     """One person: every tool's record of them, the open alerts that name them, and a summary of their recent sign-ins."""
     wanted = normalize_email(email)
     if wanted is None:
@@ -383,7 +452,15 @@ async def identity_detail(user: AuthUser, db: DBSession, client_id: uuid.UUID, e
     since = datetime.now(UTC) - timedelta(days=30)
     async with cross_tenant_reads(db):
         events = (
-            (await db.execute(select(SigninEvent).where(SigninEvent.tenant_id == client_id, func.lower(SigninEvent.user_principal) == wanted, SigninEvent.occurred_at >= since)))
+            (
+                await db.execute(
+                    select(SigninEvent).where(
+                        SigninEvent.tenant_id == client_id,
+                        func.lower(SigninEvent.user_principal) == wanted,
+                        SigninEvent.occurred_at >= since,
+                    )
+                )
+            )
             .scalars()
             .all()
         )
@@ -409,7 +486,10 @@ async def identity_detail(user: AuthUser, db: DBSession, client_id: uuid.UUID, e
         )
         ticket_rows = await _tolerant(
             db,
-            select(PersonTicket).where(PersonTicket.tenant_id == client_id, PersonTicket.user_email == wanted).order_by(PersonTicket.opened_at.desc()).limit(TICKETS_SHOWN),
+            select(PersonTicket)
+            .where(PersonTicket.tenant_id == client_id, PersonTicket.user_email == wanted)
+            .order_by(PersonTicket.opened_at.desc())
+            .limit(TICKETS_SHOWN),
         )
     return PersonDetail(
         person=_out(found, with_sources=True),
@@ -426,8 +506,14 @@ async def identity_detail(user: AuthUser, db: DBSession, client_id: uuid.UUID, e
         ],
         signins=brief,
         recent_signins=signin_rows(events),
-        changes=[ChangeRow(at=c.occurred_at, activity=c.activity, actor=c.actor, target=c.target, detail=c.detail, success=c.success) for c in change_rows],
-        tickets=[TicketBrief(id=t.ticket_id, summary=t.summary, status=t.status, opened_at=t.opened_at, url=t.url, source=t.source) for t in ticket_rows],
+        changes=[
+            ChangeRow(at=c.occurred_at, activity=c.activity, actor=c.actor, target=c.target, detail=c.detail, success=c.success)
+            for c in change_rows
+        ],
+        tickets=[
+            TicketBrief(id=t.ticket_id, summary=t.summary, status=t.status, opened_at=t.opened_at, url=t.url, source=t.source)
+            for t in ticket_rows
+        ],
     )
 
 
@@ -503,7 +589,6 @@ async def report_core_feed_identities(tenant_token: str, body: IdentitiesReport,
     return result
 
 
-
 # ---- CORE reports each person's recent tickets -------------------------------------------------------------------------------------------------------------
 
 MAX_TICKETS = 500
@@ -534,7 +619,9 @@ class PersonTicketsResponse(BaseModel):
     unmapped_clients: list[UnmappedClient] = Field(default_factory=list)
 
 
-async def apply_person_tickets(db: Any, owner: uuid.UUID, report: PersonTicketsReport, now: datetime | None = None) -> PersonTicketsResponse:
+async def apply_person_tickets(
+    db: Any, owner: uuid.UUID, report: PersonTicketsReport, now: datetime | None = None
+) -> PersonTicketsResponse:
     """Store each ticket under the client its tool client id is mapped to (a ticket whose client is not mapped yet is counted and skipped), and forget those older than 90 days. The caller owns the transaction."""
     from app.api.v1.endpoints.signins import targets_by_tenant
 
@@ -570,7 +657,9 @@ async def apply_person_tickets(db: Any, owner: uuid.UUID, report: PersonTicketsR
                 update = {c: stmt.excluded[c] for c in values[0] if c not in ("tenant_id", "source", "ticket_id")}
                 await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source", "ticket_id"], set_=update))
                 accepted += len(values)
-            await db.execute(delete(PersonTicket).where(PersonTicket.tenant_id == tid, PersonTicket.opened_at < now - timedelta(days=TICKET_DAYS)))
+            await db.execute(
+                delete(PersonTicket).where(PersonTicket.tenant_id == tid, PersonTicket.opened_at < now - timedelta(days=TICKET_DAYS))
+            )
     return PersonTicketsResponse(
         accepted=accepted,
         unmapped=unmapped,

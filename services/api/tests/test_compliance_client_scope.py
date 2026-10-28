@@ -61,5 +61,12 @@ async def test_a_tenant_that_is_not_one_of_the_callers_clients_is_not_found():
 def test_every_endpoint_that_reads_or_writes_evidence_takes_the_client_scope():
     import inspect
 
-    for name in ("trigger_evidence_collection", "collect_evidence", "list_evidence", "get_evidence", "review_evidence", "compliance_report"):
+    for name in (
+        "trigger_evidence_collection",
+        "collect_evidence",
+        "list_evidence",
+        "get_evidence",
+        "review_evidence",
+        "compliance_report",
+    ):
         assert "tenant" in inspect.signature(getattr(c, name)).parameters, name

@@ -120,7 +120,13 @@ async def test_two_entries_from_the_same_tool_are_two_machines(tenant):
     await report(tenant, "huntress", "h1", "LAB-PC-22")
     assert await merge_pass(tenant) == 1, "the other tool joins one of them; the two NinjaOne records stay apart"
     assert await count(tenant) == 2
-    assert await count(tenant, "select count(*) from devices d where tenant_id = :t and exists (select 1 from device_sources s where s.device_id = d.id and s.vendor = 'ninjaone')") == 2
+    assert (
+        await count(
+            tenant,
+            "select count(*) from devices d where tenant_id = :t and exists (select 1 from device_sources s where s.device_id = d.id and s.vendor = 'ninjaone')",
+        )
+        == 2
+    )
 
 
 async def test_a_name_on_more_devices_than_the_group_limit_is_left_alone(tenant):
@@ -182,7 +188,12 @@ async def test_the_old_company_and_name_screenconnect_record_and_the_session_rec
     assert await merge_pass(tenant) == 3
     assert await count(tenant) == 2
     # Each machine keeps its session-id record and loses the duplicate old one.
-    assert await count(tenant, "select count(*) from device_sources where tenant_id = :t and vendor = 'screenconnect' and external_id like '%::%'") == 0
+    assert (
+        await count(
+            tenant, "select count(*) from device_sources where tenant_id = :t and vendor = 'screenconnect' and external_id like '%::%'"
+        )
+        == 0
+    )
     assert await count(tenant, "select count(*) from device_sources where tenant_id = :t and vendor = 'screenconnect'") == 2
 
 
@@ -303,13 +314,17 @@ async def test_a_unifi_unit_is_not_merged_into_a_machine_an_agent_runs_on_even_w
 
 
 async def test_a_huntress_machine_and_an_auvik_device_that_is_only_a_mac_are_one_workstation(tenant):
-    await report(tenant, "huntress", "h1", "FRONT-DESK-PC", serial="PF2ABC12", os="Windows 11", details={"macs": ["AABBCCDDEE01", "AABBCCDDEE02"]})
+    await report(
+        tenant, "huntress", "h1", "FRONT-DESK-PC", serial="PF2ABC12", os="Windows 11", details={"macs": ["AABBCCDDEE01", "AABBCCDDEE02"]}
+    )
     await report(tenant, "auvik", "a1", "dhcp-client-77", serial="aa:bb:cc:dd:ee:02")
     assert await count(tenant) == 2
     assert await merge_pass(tenant) == 1
     assert await count(tenant) == 1
     assert await count(tenant, "select count(*) from device_sources where tenant_id = :t") == 2
-    assert await count(tenant, "select serial_number from devices where tenant_id = :t") == "PF2ABC12", "the machine keeps its real serial, not the MAC"
+    assert (
+        await count(tenant, "select serial_number from devices where tenant_id = :t") == "PF2ABC12"
+    ), "the machine keeps its real serial, not the MAC"
 
 
 async def test_two_machines_with_different_real_serials_are_never_merged_on_a_shared_mac(tenant):
@@ -337,7 +352,13 @@ async def test_an_auvik_device_and_a_ninjaone_machine_that_hold_the_same_mac_are
 
 
 async def age(tid, host, days):
-    await run(tid, lambda db: db.execute(text("update devices set last_seen = now() - make_interval(days => :d) where tenant_id = :t and hostname = :h"), {"d": days, "t": tid, "h": host}))
+    await run(
+        tid,
+        lambda db: db.execute(
+            text("update devices set last_seen = now() - make_interval(days => :d) where tenant_id = :t and hostname = :h"),
+            {"d": days, "t": tid, "h": host},
+        ),
+    )
 
 
 async def test_an_auvik_workstation_is_the_agent_machine_that_holds_its_address(tenant):
@@ -383,5 +404,8 @@ async def test_merging_a_device_that_only_has_a_mac_serial_gives_the_machine_its
     assert await count(tenant, "select serial_number from devices where tenant_id = :t") == "PF2REAL9"
     log_id = await count(tenant, "select id::text from device_merge_log where tenant_id = :t")
     await run(tenant, lambda db: undo_merge(db, tenant, uuid.UUID(log_id)))
-    assert await count(tenant, "select serial_number from devices where tenant_id = :t and hostname = :h", h="dhcp-client-9") == "AA:BB:CC:DD:EE:09"
+    assert (
+        await count(tenant, "select serial_number from devices where tenant_id = :t and hostname = :h", h="dhcp-client-9")
+        == "AA:BB:CC:DD:EE:09"
+    )
     assert await count(tenant, "select serial_number from devices where tenant_id = :t and hostname = :h", h="REAL-PC") == "PF2REAL9"

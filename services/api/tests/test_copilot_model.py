@@ -9,7 +9,14 @@ from app.services.llm_resolver import LlmConfig
 
 
 def _config(**kw) -> LlmConfig:
-    base = {"allowed": True, "base_url": "https://llm.example.com", "model": "gpt-4.1", "api_key": "sk-test", "source": "tenant", "reason": ""}
+    base = {
+        "allowed": True,
+        "base_url": "https://llm.example.com",
+        "model": "gpt-4.1",
+        "api_key": "sk-test",
+        "source": "tenant",
+        "reason": "",
+    }
     return LlmConfig(**{**base, **kw})
 
 

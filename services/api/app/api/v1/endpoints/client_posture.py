@@ -24,16 +24,47 @@ from app.db.rls_scope import acting_as_tenant
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.identity_source import IdentitySource
-from app.services.audit import emit_audit
-from app.models.signin import ClientCheckAcceptance, ClientCheckHistory, ClientM365Check, CheckWeight, ClientCheckComment, ClientCheckItemHistory, ClientCheckOwner, ClientScoreHistory, ClientScoreTarget, CoreSweepRun, IdentityMfaUser
+from app.models.signin import (
+    CheckWeight,
+    ClientCheckAcceptance,
+    ClientCheckComment,
+    ClientCheckHistory,
+    ClientCheckItemHistory,
+    ClientCheckOwner,
+    ClientM365Check,
+    ClientScoreHistory,
+    ClientScoreTarget,
+    CoreSweepRun,
+    IdentityMfaUser,
+)
 from app.models.tenant import Tenant
-from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
-from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
 from app.services import fleet_cache
+from app.services.audit import emit_audit
+from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
+from app.services.fleet_posture import (
+    BOARDS,
+    MAX_WEIGHT,
+    FleetCheck,
+    average_score,
+    below_target,
+    board_rows,
+    classify_change,
+    coverage_matrix,
+    expiring_acceptances,
+    is_overdue,
+    rank_clients,
+    score_breakdown,
+    search_checks,
+    similar_size_average,
+    stale_sources,
+    summarize,
+    tool_rows,
+    tool_scorecards,
+)
+from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
 from app.services.score_history import load_weights
 from app.services.score_history import trend as score_trend
-from app.services.fleet_posture import MAX_WEIGHT, average_score, below_target, classify_change, is_overdue, score_breakdown, search_checks, similar_size_average, tool_rows, tool_scorecards, BOARDS, FleetCheck, board_rows, coverage_matrix, expiring_acceptances, rank_clients, stale_sources, summarize
-from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
+from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
 
 router = APIRouter(prefix="/client-posture", tags=["posture"])
 
@@ -85,7 +116,7 @@ class PostureCheck(BaseModel):
     # The accounts, machines or systems behind the verdict, when the tool says which.
     items: list[str] = []
     # Set when a person has accepted this check for the client (and it has not run out).
-    accepted: "CheckAcceptanceOut | None" = None
+    accepted: CheckAcceptanceOut | None = None
     # Who is looking after this check and by when; overdue is true once the date has passed and the check is still not met.
     owner: str | None = None
     due_date: date | None = None
@@ -146,7 +177,10 @@ async def _owners_of(db: Any, client_id: uuid.UUID) -> dict[str, tuple[str, date
     """{check key: (owner, due date)} for one client. Read inside that client's scope. An older database without the table gives none."""
     try:
         async with db.begin_nested():
-            return {r.key: (r.owner, r.due_date) for r in (await db.execute(select(ClientCheckOwner).where(ClientCheckOwner.tenant_id == client_id))).scalars().all()}
+            return {
+                r.key: (r.owner, r.due_date)
+                for r in (await db.execute(select(ClientCheckOwner).where(ClientCheckOwner.tenant_id == client_id))).scalars().all()
+            }
     except Exception:  # noqa: BLE001
         return {}
 
@@ -155,7 +189,15 @@ async def _comment_counts(db: Any, client_id: uuid.UUID) -> dict[str, int]:
     """{check key: number of comments} for one client, read inside that client's scope. An older database without the table gives none."""
     try:
         async with db.begin_nested():
-            return {k: n for k, n in (await db.execute(select(ClientCheckComment.key, func.count()).where(ClientCheckComment.tenant_id == client_id).group_by(ClientCheckComment.key))).all()}
+            return dict(
+                (
+                    await db.execute(
+                        select(ClientCheckComment.key, func.count())
+                        .where(ClientCheckComment.tenant_id == client_id)
+                        .group_by(ClientCheckComment.key)
+                    )
+                ).all()
+            )
     except Exception:  # noqa: BLE001
         return {}
 
@@ -167,18 +209,30 @@ async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, alia
     if not sources:
         return {}
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
-        rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_(sources)))).scalars().all()
+        rows = (
+            (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == client_id, ClientM365Check.source.in_(sources))))
+            .scalars()
+            .all()
+        )
         since_rows = (
             await db.execute(
-                select(ClientCheckHistory.key, func.max(ClientCheckHistory.observed_at)).where(ClientCheckHistory.tenant_id == client_id, ClientCheckHistory.source.in_(sources)).group_by(ClientCheckHistory.key)
+                select(ClientCheckHistory.key, func.max(ClientCheckHistory.observed_at))
+                .where(ClientCheckHistory.tenant_id == client_id, ClientCheckHistory.source.in_(sources))
+                .group_by(ClientCheckHistory.key)
             )
         ).all()
-        accepted_rows = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id))).scalars().all()
+        accepted_rows = (
+            (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id))).scalars().all()
+        )
         owners = await _owners_of(db, client_id)
         comment_counts = await _comment_counts(db, client_id)
-    since = {k: t for k, t in since_rows}
+    since = dict(since_rows)
     now = datetime.now(UTC)
-    accepted = {a.key: CheckAcceptanceOut(reason=a.reason, accepted_at=a.accepted_at, expires_at=a.expires_at, not_applicable=a.not_applicable) for a in accepted_rows if a.expires_at is None or a.expires_at > now}
+    accepted = {
+        a.key: CheckAcceptanceOut(reason=a.reason, accepted_at=a.accepted_at, expires_at=a.expires_at, not_applicable=a.not_applicable)
+        for a in accepted_rows
+        if a.expires_at is None or a.expires_at > now
+    }
     out: dict[str, ToolChecksOut] = {}
     for row in rows:
         checks = [
@@ -347,7 +401,9 @@ async def _client_of_owner(db: Any, owner: uuid.UUID, client_id: uuid.UUID) -> N
             raise HTTPException(status_code=404, detail="Client not found")
 
 
-@router.get("/{client_id}/check-history", response_model=CheckHistoryOut, summary="When each of a client's tool checks appeared or changed status")
+@router.get(
+    "/{client_id}/check-history", response_model=CheckHistoryOut, summary="When each of a client's tool checks appeared or changed status"
+)
 async def check_history(
     client_id: uuid.UUID,
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
@@ -362,10 +418,24 @@ async def check_history(
     if key:
         stmt = stmt.where(ClientCheckHistory.key == key)
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
-        rows = (await db.execute(stmt.order_by(ClientCheckHistory.observed_at.desc(), ClientCheckHistory.id.desc()).limit(limit))).scalars().all()
+        rows = (
+            (await db.execute(stmt.order_by(ClientCheckHistory.observed_at.desc(), ClientCheckHistory.id.desc()).limit(limit)))
+            .scalars()
+            .all()
+        )
     return CheckHistoryOut(
         client_id=client_id,
-        rows=[CheckHistoryRow(key=r.key, source=r.source, status=r.status, previous_status=r.previous_status, evidence=r.evidence, observed_at=r.observed_at) for r in rows],
+        rows=[
+            CheckHistoryRow(
+                key=r.key,
+                source=r.source,
+                status=r.status,
+                previous_status=r.previous_status,
+                evidence=r.evidence,
+                observed_at=r.observed_at,
+            )
+            for r in rows
+        ],
     )
 
 
@@ -389,17 +459,47 @@ class ScoreHistoryOut(BaseModel):
     direction: str
 
 
-@router.get("/{client_id}/score-history", response_model=ScoreHistoryOut, summary="A client's check score day by day, and whether it got better or worse")
-async def score_history(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: Annotated[int, Query(ge=1, le=730)] = 90) -> ScoreHistoryOut:
+@router.get(
+    "/{client_id}/score-history",
+    response_model=ScoreHistoryOut,
+    summary="A client's check score day by day, and whether it got better or worse",
+)
+async def score_history(
+    client_id: uuid.UUID,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    days: Annotated[int, Query(ge=1, le=730)] = 90,
+) -> ScoreHistoryOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
     days = max(2, min(days, 730))
     since = (datetime.now(UTC) - timedelta(days=days)).date()
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
-        rows = (await db.execute(select(ClientScoreHistory).where(ClientScoreHistory.tenant_id == client_id, ClientScoreHistory.day >= since).order_by(ClientScoreHistory.day))).scalars().all()
-    shown = [{"day": r.day.isoformat(), "score": r.score, "met": r.met, "partly": r.partly, "not_met": r.not_met, "accepted": r.accepted} for r in rows]
+        rows = (
+            (
+                await db.execute(
+                    select(ClientScoreHistory)
+                    .where(ClientScoreHistory.tenant_id == client_id, ClientScoreHistory.day >= since)
+                    .order_by(ClientScoreHistory.day)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    shown = [
+        {"day": r.day.isoformat(), "score": r.score, "met": r.met, "partly": r.partly, "not_met": r.not_met, "accepted": r.accepted}
+        for r in rows
+    ]
     t = score_trend(shown)
-    return ScoreHistoryOut(client_id=client_id, days=days, rows=[ScoreDay(**r) for r in shown], first=t["first"], last=t["last"], change=t["change"], direction=t["direction"])
+    return ScoreHistoryOut(
+        client_id=client_id,
+        days=days,
+        rows=[ScoreDay(**r) for r in shown],
+        first=t["first"],
+        last=t["last"],
+        change=t["change"],
+        direction=t["direction"],
+    )
 
 
 class OwnerIn(BaseModel):
@@ -414,9 +514,16 @@ class OwnerOut(BaseModel):
     due_date: date | None
 
 
-@router.put("/{client_id}/owners/{key}", response_model=OwnerOut, summary="Say who is looking after a check for a client and by when, or clear it")
+@router.put(
+    "/{client_id}/owners/{key}", response_model=OwnerOut, summary="Say who is looking after a check for a client and by when, or clear it"
+)
 async def set_check_owner(
-    client_id: uuid.UUID, key: str, body: OwnerIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, request: Request = None  # type: ignore[assignment]
+    client_id: uuid.UUID,
+    key: str,
+    body: OwnerIn,
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))],
+    db: DBSession,
+    request: Request = None,  # type: ignore[assignment]
 ) -> OwnerOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
@@ -429,9 +536,20 @@ async def set_check_owner(
         if not name:
             await db.execute(delete(ClientCheckOwner).where(ClientCheckOwner.tenant_id == client_id, ClientCheckOwner.key == key))
         else:
-            values = {"tenant_id": client_id, "key": key, "owner": name, "due_date": body.due_date, "updated_by": current_user.user_id, "updated_at": datetime.now(UTC)}
+            values = {
+                "tenant_id": client_id,
+                "key": key,
+                "owner": name,
+                "due_date": body.due_date,
+                "updated_by": current_user.user_id,
+                "updated_at": datetime.now(UTC),
+            }
             stmt = pg_insert(ClientCheckOwner).values(values)
-            await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "key")}))
+            await db.execute(
+                stmt.on_conflict_do_update(
+                    index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "key")}
+                )
+            )
         await db.commit()
     await emit_audit(
         db=db,
@@ -440,7 +558,12 @@ async def set_check_owner(
         action="posture:check_owner_set" if name else "posture:check_owner_cleared",
         resource="client_check",
         resource_id=f"{client_id}:{key}",
-        changes={"client": str(client_id), "key": key, "owner": name or None, "due_date": body.due_date.isoformat() if body.due_date and name else None},
+        changes={
+            "client": str(client_id),
+            "key": key,
+            "owner": name or None,
+            "due_date": body.due_date.isoformat() if body.due_date and name else None,
+        },
         request=request,
     )
     await db.commit()
@@ -460,20 +583,36 @@ class ItemHistoryOut(BaseModel):
     events: list[ItemEventOut]
 
 
-@router.get("/{client_id}/checks/{key}/item-history", response_model=ItemHistoryOut, summary="When machines or accounts joined or left the list behind one of a client's checks, newest first")
-async def check_item_history(client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, limit: Annotated[int, Query(ge=1, le=5000)] = 200) -> ItemHistoryOut:
+@router.get(
+    "/{client_id}/checks/{key}/item-history",
+    response_model=ItemHistoryOut,
+    summary="When machines or accounts joined or left the list behind one of a client's checks, newest first",
+)
+async def check_item_history(
+    client_id: uuid.UUID,
+    key: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 200,
+) -> ItemHistoryOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
         rows = (
-            await db.execute(
-                select(ClientCheckItemHistory)
-                .where(ClientCheckItemHistory.tenant_id == client_id, ClientCheckItemHistory.key == key)
-                .order_by(ClientCheckItemHistory.observed_at.desc(), ClientCheckItemHistory.id.desc())
-                .limit(max(1, min(limit, 500)))
+            (
+                await db.execute(
+                    select(ClientCheckItemHistory)
+                    .where(ClientCheckItemHistory.tenant_id == client_id, ClientCheckItemHistory.key == key)
+                    .order_by(ClientCheckItemHistory.observed_at.desc(), ClientCheckItemHistory.id.desc())
+                    .limit(max(1, min(limit, 500)))
+                )
             )
-        ).scalars().all()
-    return ItemHistoryOut(client_id=client_id, key=key, events=[ItemEventOut(item=r.item, event=r.event, observed_at=r.observed_at) for r in rows])
+            .scalars()
+            .all()
+        )
+    return ItemHistoryOut(
+        client_id=client_id, key=key, events=[ItemEventOut(item=r.item, event=r.event, observed_at=r.observed_at) for r in rows]
+    )
 
 
 MAX_COMMENTS_PER_CHECK = 200
@@ -500,17 +639,41 @@ def _check_key_ok(key: str) -> bool:
     return bool(key) and len(key) <= 80 and all(c.isalnum() or c in "_-" for c in key)
 
 
-@router.get("/{client_id}/checks/{key}/comments", response_model=CommentsOut, summary="The comments on one of a client's checks, oldest first")
-async def check_comments(client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> CommentsOut:
+@router.get(
+    "/{client_id}/checks/{key}/comments", response_model=CommentsOut, summary="The comments on one of a client's checks, oldest first"
+)
+async def check_comments(
+    client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
+) -> CommentsOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
-        rows = (await db.execute(select(ClientCheckComment).where(ClientCheckComment.tenant_id == client_id, ClientCheckComment.key == key).order_by(ClientCheckComment.created_at, ClientCheckComment.id))).scalars().all()
-    return CommentsOut(client_id=client_id, key=key, comments=[CommentOut(id=r.id, author=r.author, body=r.body, created_at=r.created_at) for r in rows])
+        rows = (
+            (
+                await db.execute(
+                    select(ClientCheckComment)
+                    .where(ClientCheckComment.tenant_id == client_id, ClientCheckComment.key == key)
+                    .order_by(ClientCheckComment.created_at, ClientCheckComment.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    return CommentsOut(
+        client_id=client_id, key=key, comments=[CommentOut(id=r.id, author=r.author, body=r.body, created_at=r.created_at) for r in rows]
+    )
 
 
-@router.post("/{client_id}/checks/{key}/comments", response_model=CommentOut, status_code=201, summary="Add a comment to one of a client's checks")
-async def add_check_comment(client_id: uuid.UUID, key: str, body: CommentIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> CommentOut:
+@router.post(
+    "/{client_id}/checks/{key}/comments", response_model=CommentOut, status_code=201, summary="Add a comment to one of a client's checks"
+)
+async def add_check_comment(
+    client_id: uuid.UUID,
+    key: str,
+    body: CommentIn,
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))],
+    db: DBSession,
+) -> CommentOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
     if not _check_key_ok(key):
@@ -519,10 +682,21 @@ async def add_check_comment(client_id: uuid.UUID, key: str, body: CommentIn, cur
     if not 1 <= len(text_) <= 1000:
         raise HTTPException(status_code=422, detail="A comment is 1 to 1000 characters")
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
-        count = (await db.execute(select(func.count()).select_from(ClientCheckComment).where(ClientCheckComment.tenant_id == client_id, ClientCheckComment.key == key))).scalar_one()
+        count = (
+            await db.execute(
+                select(func.count())
+                .select_from(ClientCheckComment)
+                .where(ClientCheckComment.tenant_id == client_id, ClientCheckComment.key == key)
+            )
+        ).scalar_one()
         if count >= MAX_COMMENTS_PER_CHECK:
             raise HTTPException(status_code=422, detail=f"A check can have at most {MAX_COMMENTS_PER_CHECK} comments")
-        row = ClientCheckComment(tenant_id=client_id, key=key, author=(getattr(current_user, "email", None) or str(current_user.user_id) or "unknown")[:200], body=text_)
+        row = ClientCheckComment(
+            tenant_id=client_id,
+            key=key,
+            author=(getattr(current_user, "email", None) or str(current_user.user_id) or "unknown")[:200],
+            body=text_,
+        )
         db.add(row)
         await db.flush()
         out = CommentOut(id=row.id, author=row.author, body=row.body, created_at=row.created_at or datetime.now(UTC))
@@ -541,7 +715,9 @@ class TargetOut(BaseModel):
 
 
 @router.put("/{client_id}/target", response_model=TargetOut, summary="Set the score a client should stay at or above, or remove it")
-async def set_target(client_id: uuid.UUID, body: TargetIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> TargetOut:
+async def set_target(
+    client_id: uuid.UUID, body: TargetIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+) -> TargetOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
     if body.target is not None and not 1 <= body.target <= 100:
@@ -549,9 +725,19 @@ async def set_target(client_id: uuid.UUID, body: TargetIn, current_user: Annotat
     if body.target is None:
         await db.execute(delete(ClientScoreTarget).where(ClientScoreTarget.tenant_id == owner, ClientScoreTarget.client_id == client_id))
     else:
-        values = {"tenant_id": owner, "client_id": client_id, "target": body.target, "updated_by": current_user.user_id, "updated_at": datetime.now(UTC)}
+        values = {
+            "tenant_id": owner,
+            "client_id": client_id,
+            "target": body.target,
+            "updated_by": current_user.user_id,
+            "updated_at": datetime.now(UTC),
+        }
         stmt = pg_insert(ClientScoreTarget).values(values)
-        await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "client_id"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "client_id")}))
+        await db.execute(
+            stmt.on_conflict_do_update(
+                index_elements=["tenant_id", "client_id"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "client_id")}
+            )
+        )
     await db.commit()
     fleet_cache.clear()
     return TargetOut(client_id=client_id, target=body.target)
@@ -569,9 +755,18 @@ MAX_ACCEPT_DAYS = 730
 MAX_ACCEPTANCES_PER_CLIENT = 200
 
 
-@router.put("/{client_id}/acceptances/{key}", response_model=CheckAcceptanceOut, summary="Accept a failing check for a client, with a reason and an optional end date")
+@router.put(
+    "/{client_id}/acceptances/{key}",
+    response_model=CheckAcceptanceOut,
+    summary="Accept a failing check for a client, with a reason and an optional end date",
+)
 async def accept_check(
-    client_id: uuid.UUID, key: str, body: AcceptIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, request: Request = None  # type: ignore[assignment]
+    client_id: uuid.UUID,
+    key: str,
+    body: AcceptIn,
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))],
+    db: DBSession,
+    request: Request = None,  # type: ignore[assignment]
 ) -> CheckAcceptanceOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
@@ -587,14 +782,34 @@ async def accept_check(
     now = datetime.now(UTC)
     expires = now + timedelta(days=body.expires_in_days) if body.expires_in_days else None
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
-        existing = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id, ClientCheckAcceptance.key == key))).scalar_one_or_none()
+        existing = (
+            await db.execute(
+                select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id, ClientCheckAcceptance.key == key)
+            )
+        ).scalar_one_or_none()
         if existing is None:
-            count = (await db.execute(select(func.count()).select_from(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id))).scalar_one()
+            count = (
+                await db.execute(
+                    select(func.count()).select_from(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id)
+                )
+            ).scalar_one()
             if count >= MAX_ACCEPTANCES_PER_CLIENT:
                 raise HTTPException(status_code=422, detail=f"A client can have at most {MAX_ACCEPTANCES_PER_CLIENT} accepted checks")
-        values = {"tenant_id": client_id, "key": key, "reason": reason, "accepted_by": current_user.user_id, "accepted_at": now, "expires_at": expires, "not_applicable": body.not_applicable}
+        values = {
+            "tenant_id": client_id,
+            "key": key,
+            "reason": reason,
+            "accepted_by": current_user.user_id,
+            "accepted_at": now,
+            "expires_at": expires,
+            "not_applicable": body.not_applicable,
+        }
         stmt = pg_insert(ClientCheckAcceptance).values(values)
-        await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "key")}))
+        await db.execute(
+            stmt.on_conflict_do_update(
+                index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in values if c not in ("tenant_id", "key")}
+            )
+        )
         await db.commit()
     await emit_audit(
         db=db,
@@ -629,9 +844,16 @@ class BulkAcceptOut(BaseModel):
     skipped: list[BulkSkipped]
 
 
-@router.post("/fleet/acceptances", response_model=BulkAcceptOut, summary="Accept the same check for several clients at once with one reason, or mark it not applicable to them")
+@router.post(
+    "/fleet/acceptances",
+    response_model=BulkAcceptOut,
+    summary="Accept the same check for several clients at once with one reason, or mark it not applicable to them",
+)
 async def accept_check_for_many(
-    body: BulkAcceptIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, request: Request = None  # type: ignore[assignment]
+    body: BulkAcceptIn,
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))],
+    db: DBSession,
+    request: Request = None,  # type: ignore[assignment]
 ) -> BulkAcceptOut:
     """One reason, and one end date (or none), for the same check on each listed client. A client that is not yours, or that is over its limit, is skipped and named; the rest are done."""
     ids = list(dict.fromkeys(body.client_ids))
@@ -661,19 +883,34 @@ async def accept_check_for_many(
 
 @router.delete("/{client_id}/acceptances/{key}", status_code=204, summary="Stop accepting a check for a client")
 async def remove_acceptance(
-    client_id: uuid.UUID, key: str, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession, request: Request = None  # type: ignore[assignment]
+    client_id: uuid.UUID,
+    key: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))],
+    db: DBSession,
+    request: Request = None,  # type: ignore[assignment]
 ) -> None:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
-        existing = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id, ClientCheckAcceptance.key == key))).scalar_one_or_none()
+        existing = (
+            await db.execute(
+                select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == client_id, ClientCheckAcceptance.key == key)
+            )
+        ).scalar_one_or_none()
         removed = existing is not None
         if existing is not None:
             await db.delete(existing)
             await db.commit()
     if removed:
         await emit_audit(
-            db=db, tenant_id=owner, actor_id=current_user.user_id, action="posture:check_acceptance_removed", resource="client_check", resource_id=f"{client_id}:{key}", changes={"client": str(client_id), "key": key}, request=request
+            db=db,
+            tenant_id=owner,
+            actor_id=current_user.user_id,
+            action="posture:check_acceptance_removed",
+            resource="client_check",
+            resource_id=f"{client_id}:{key}",
+            changes={"client": str(client_id), "key": key},
+            request=request,
         )
         await db.commit()
     fleet_cache.clear()
@@ -704,7 +941,11 @@ def sweep_health(sent: int, failed: int, ran_at: datetime, now: datetime) -> str
     return "ok"
 
 
-@router.get("/sweeps/latest", response_model=list[SweepRunOut], summary="The latest pass of each of CORE's per-client sweeps, and whether it reached A.C.O.R.N")
+@router.get(
+    "/sweeps/latest",
+    response_model=list[SweepRunOut],
+    summary="The latest pass of each of CORE's per-client sweeps, and whether it reached A.C.O.R.N",
+)
 async def sweep_runs(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> list[SweepRunOut]:
     owner = current_user.tenant_id
     rows = (await db.execute(select(CoreSweepRun).where(CoreSweepRun.tenant_id == owner).order_by(CoreSweepRun.source))).scalars().all()
@@ -740,7 +981,9 @@ async def _fleet_checks(db: Any, owner: uuid.UUID) -> tuple[list[FleetCheck], di
     return result
 
 
-async def _read_fleet_checks(db: Any, owner: uuid.UUID) -> tuple[list[FleetCheck], dict[uuid.UUID, str], dict[uuid.UUID, dict[str, datetime]]]:
+async def _read_fleet_checks(
+    db: Any, owner: uuid.UUID
+) -> tuple[list[FleetCheck], dict[uuid.UUID, str], dict[uuid.UUID, dict[str, datetime]]]:
     _ids, clients = await _scope(db, owner, None)
     shown, names = _ids[1:], clients
     sources = list(TOOL_CHECK_SOURCES)
@@ -749,11 +992,27 @@ async def _read_fleet_checks(db: Any, owner: uuid.UUID) -> tuple[list[FleetCheck
     refreshed: dict[uuid.UUID, dict[str, datetime]] = {}
     for cid in shown:
         async with _as(db, owner, cid):
-            rows = (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == cid, ClientM365Check.source.in_(sources)))).scalars().all()
+            rows = (
+                (await db.execute(select(ClientM365Check).where(ClientM365Check.tenant_id == cid, ClientM365Check.source.in_(sources))))
+                .scalars()
+                .all()
+            )
             if not rows:
                 continue
-            since = {k: t for k, t in (await db.execute(select(ClientCheckHistory.key, func.max(ClientCheckHistory.observed_at)).where(ClientCheckHistory.tenant_id == cid).group_by(ClientCheckHistory.key))).all()}
-            accepted = {a.key for a in (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == cid))).scalars().all() if a.expires_at is None or a.expires_at > now}
+            since = dict(
+                (
+                    await db.execute(
+                        select(ClientCheckHistory.key, func.max(ClientCheckHistory.observed_at))
+                        .where(ClientCheckHistory.tenant_id == cid)
+                        .group_by(ClientCheckHistory.key)
+                    )
+                ).all()
+            )
+            accepted = {
+                a.key
+                for a in (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == cid))).scalars().all()
+                if a.expires_at is None or a.expires_at > now
+            }
             owners = await _owners_of(db, cid)
         refreshed[cid] = {r.source: r.refreshed_at for r in rows}
         for r in rows:
@@ -761,7 +1020,20 @@ async def _read_fleet_checks(db: Any, owner: uuid.UUID) -> tuple[list[FleetCheck
                 if isinstance(c, dict) and c.get("key") and c.get("status"):
                     key = str(c["key"])
                     out.append(
-                        FleetCheck(client_id=str(cid), client_name=names.get(cid) or str(cid), source=r.source, key=key, status=str(c["status"]), evidence=str(c.get("evidence", "")), refreshed_at=r.refreshed_at, since=since.get(key), accepted=key in accepted, items=tuple(_items_of(c)), owner=owners.get(key, (None, None))[0], due_date=owners.get(key, (None, None))[1])
+                        FleetCheck(
+                            client_id=str(cid),
+                            client_name=names.get(cid) or str(cid),
+                            source=r.source,
+                            key=key,
+                            status=str(c["status"]),
+                            evidence=str(c.get("evidence", "")),
+                            refreshed_at=r.refreshed_at,
+                            since=since.get(key),
+                            accepted=key in accepted,
+                            items=tuple(_items_of(c)),
+                            owner=owners.get(key, (None, None))[0],
+                            due_date=owners.get(key, (None, None))[1],
+                        )
                     )
     return out, names, refreshed
 
@@ -798,7 +1070,13 @@ async def fleet_summary(current_user: Annotated[AuthUser, Depends(require_permis
         by_client.setdefault(c.client_id, []).append(c)
     try:
         async with db.begin_nested():  # an older database without the table must still show the fleet
-            targets = {cid: t for cid, t in (await db.execute(select(ClientScoreTarget.client_id, ClientScoreTarget.target).where(ClientScoreTarget.tenant_id == owner))).all()}
+            targets = dict(
+                (
+                    await db.execute(
+                        select(ClientScoreTarget.client_id, ClientScoreTarget.target).where(ClientScoreTarget.tenant_id == owner)
+                    )
+                ).all()
+            )
     except Exception:  # noqa: BLE001
         targets = {}
     summaries = []
@@ -806,7 +1084,16 @@ async def fleet_summary(current_user: Annotated[AuthUser, Depends(require_permis
     for cid, rows in by_client.items():
         s = summarize(rows, weights)
         target = targets.get(uuid.UUID(cid))
-        summaries.append({"client_id": uuid.UUID(cid), "client_name": names.get(uuid.UUID(cid)), "stale_tools": stale_sources(refreshed.get(uuid.UUID(cid), {}), now), "target": target, "below_target": below_target(s["score"], target), **s})
+        summaries.append(
+            {
+                "client_id": uuid.UUID(cid),
+                "client_name": names.get(uuid.UUID(cid)),
+                "stale_tools": stale_sources(refreshed.get(uuid.UUID(cid), {}), now),
+                "target": target,
+                "below_target": below_target(s["score"], target),
+                **s,
+            }
+        )
     ranked = rank_clients(summaries)
     return FleetOut(generated_at=now, clients=[FleetClient(**s) for s in ranked], average_score=average_score([s["score"] for s in ranked]))
 
@@ -825,8 +1112,14 @@ async def fleet_weights(current_user: Annotated[AuthUser, Depends(require_permis
     return [WeightOut(key=k, weight=w) for k, w in sorted((await load_weights(db, current_user.tenant_id)).items())]
 
 
-@router.put("/fleet/weights/{key}", response_model=WeightOut, summary="Make a check count more (2 to 5 times) towards every client's score, or 1 for the default")
-async def set_weight(key: str, body: WeightIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> WeightOut:
+@router.put(
+    "/fleet/weights/{key}",
+    response_model=WeightOut,
+    summary="Make a check count more (2 to 5 times) towards every client's score, or 1 for the default",
+)
+async def set_weight(
+    key: str, body: WeightIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+) -> WeightOut:
     owner = current_user.tenant_id
     if not _check_key_ok(key):
         raise HTTPException(status_code=422, detail="That is not a check key")
@@ -835,9 +1128,19 @@ async def set_weight(key: str, body: WeightIn, current_user: Annotated[AuthUser,
     if body.weight == 1:
         await db.execute(delete(CheckWeight).where(CheckWeight.tenant_id == owner, CheckWeight.key == key))
     else:
-        values = {"tenant_id": owner, "key": key, "weight": body.weight, "updated_by": current_user.user_id, "updated_at": datetime.now(UTC)}
+        values = {
+            "tenant_id": owner,
+            "key": key,
+            "weight": body.weight,
+            "updated_by": current_user.user_id,
+            "updated_at": datetime.now(UTC),
+        }
         stmt = pg_insert(CheckWeight).values(values)
-        await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in ("weight", "updated_by", "updated_at")}))
+        await db.execute(
+            stmt.on_conflict_do_update(
+                index_elements=["tenant_id", "key"], set_={c: stmt.excluded[c] for c in ("weight", "updated_by", "updated_at")}
+            )
+        )
     await db.commit()
     fleet_cache.clear()
     return WeightOut(key=key, weight=body.weight)
@@ -858,8 +1161,14 @@ class ScoreBreakdownOut(BaseModel):
     rows: list[ScoreBreakdownRow]
 
 
-@router.get("/{client_id}/score-breakdown", response_model=ScoreBreakdownOut, summary="Where a client's lost points went: each check that is not met and what it cost, biggest first")
-async def client_score_breakdown(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> ScoreBreakdownOut:
+@router.get(
+    "/{client_id}/score-breakdown",
+    response_model=ScoreBreakdownOut,
+    summary="Where a client's lost points went: each check that is not met and what it cost, biggest first",
+)
+async def client_score_breakdown(
+    client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
+) -> ScoreBreakdownOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
     checks, _names, _refreshed = await _fleet_checks(db, owner)
@@ -878,9 +1187,17 @@ class CompareOut(BaseModel):
     similar_clients: int
 
 
-@router.get("/{client_id}/compare", response_model=CompareOut, summary="A client's score next to the fleet average and the average of clients about the same size")
-async def compare_client(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> CompareOut:
-    from app.api.v1.endpoints.billing import _all_client_counts  # noqa: PLC0415 - billing reads sizes; imported here to keep the modules apart
+@router.get(
+    "/{client_id}/compare",
+    response_model=CompareOut,
+    summary="A client's score next to the fleet average and the average of clients about the same size",
+)
+async def compare_client(
+    client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
+) -> CompareOut:
+    from app.api.v1.endpoints.billing import (
+        _all_client_counts,  # noqa: PLC0415 - billing reads sizes; imported here to keep the modules apart
+    )
     from app.services.license_counts import BASELINE_ITEMS, BASELINE_TOOL  # noqa: PLC0415
 
     owner = current_user.tenant_id
@@ -892,11 +1209,21 @@ async def compare_client(client_id: uuid.UUID, current_user: Annotated[AuthUser,
         by_client.setdefault(c.client_id, []).append(c)
     scores = {cid: summarize(rows, weights)["score"] for cid, rows in by_client.items()}
     per_client, _n = await _all_client_counts(db, owner)
-    sizes = {str(cid): sum(int(r["count"]) for r in rows if r["source"] == BASELINE_TOOL and r["item"] in BASELINE_ITEMS) for cid, rows in per_client.items()}
+    sizes = {
+        str(cid): sum(int(r["count"]) for r in rows if r["source"] == BASELINE_TOOL and r["item"] in BASELINE_ITEMS)
+        for cid, rows in per_client.items()
+    }
     mine = str(client_id)
     others = {cid: (sizes.get(cid, 0), sc) for cid, sc in scores.items() if cid != mine}
     similar = similar_size_average(sizes.get(mine, 0), others)
-    return CompareOut(client_id=client_id, score=scores.get(mine), fleet_average=average_score(list(scores.values())), size=sizes.get(mine, 0), similar_average=similar["average"], similar_clients=similar["clients"])
+    return CompareOut(
+        client_id=client_id,
+        score=scores.get(mine),
+        fleet_average=average_score(list(scores.values())),
+        size=sizes.get(mine, 0),
+        similar_average=similar["average"],
+        similar_clients=similar["clients"],
+    )
 
 
 class ToolScorecard(BaseModel):
@@ -909,7 +1236,11 @@ class ToolScorecard(BaseModel):
     percent_fine: int | None
 
 
-@router.get("/fleet/tools", response_model=list[ToolScorecard], summary="Each tool's checks across all clients: how many are fine and how many clients have a problem from it, worst first")
+@router.get(
+    "/fleet/tools",
+    response_model=list[ToolScorecard],
+    summary="Each tool's checks across all clients: how many are fine and how many clients have a problem from it, worst first",
+)
 async def fleet_tools(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> list[ToolScorecard]:
     checks, _names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
     return [ToolScorecard(**t) for t in tool_scorecards(checks)]
@@ -927,8 +1258,15 @@ class SearchHit(BaseModel):
     accepted: bool = False
 
 
-@router.get("/fleet/search", response_model=list[SearchHit], summary="Find the checks of all clients that mention a machine, account or word")
-async def fleet_search(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, q: str, limit: Annotated[int, Query(ge=1, le=5000)] = 100) -> list[SearchHit]:
+@router.get(
+    "/fleet/search", response_model=list[SearchHit], summary="Find the checks of all clients that mention a machine, account or word"
+)
+async def fleet_search(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    q: str,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 100,
+) -> list[SearchHit]:
     """Which client has host SRV-02, or an account called jsmith, or an expiring certificate: searches what every tool reported (evidence, check name and the machines or accounts behind each check)."""
     checks, _names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
     return [SearchHit(**{**h, "client_id": uuid.UUID(h["client_id"])}) for h in search_checks(checks, q, max(1, min(limit, 300)))]
@@ -963,7 +1301,11 @@ async def fleet_boards(current_user: Annotated[AuthUser, Depends(require_permiss
 
 @router.get("/fleet/boards/{board}", response_model=FleetBoardOut, summary="One board: the clients whose related checks are not fine")
 async def fleet_board(
-    board: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, include_met: bool = False, limit: Annotated[int, Query(ge=1, le=5000)] = 500
+    board: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    include_met: bool = False,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 500,
 ) -> FleetBoardOut:
     if board not in BOARDS:
         raise HTTPException(status_code=404, detail="No such board")
@@ -974,13 +1316,37 @@ async def fleet_board(
         board=board,
         title=title,
         keys=list(keys),
-        rows=[FleetBoardRow(client_id=uuid.UUID(r.client_id), client_name=r.client_name, source=r.source, key=r.key, status=r.status, evidence=r.evidence, since=r.since, accepted=r.accepted, items=list(r.items), owner=r.owner, due_date=r.due_date, overdue=is_overdue(r.status, r.due_date, datetime.now(UTC).date())) for r in rows],
+        rows=[
+            FleetBoardRow(
+                client_id=uuid.UUID(r.client_id),
+                client_name=r.client_name,
+                source=r.source,
+                key=r.key,
+                status=r.status,
+                evidence=r.evidence,
+                since=r.since,
+                accepted=r.accepted,
+                items=list(r.items),
+                owner=r.owner,
+                due_date=r.due_date,
+                overdue=is_overdue(r.status, r.due_date, datetime.now(UTC).date()),
+            )
+            for r in rows
+        ],
     )
 
 
-@router.get("/fleet/tools/{source}/checks", response_model=FleetBoardOut, summary="The checks one tool reported across clients that are not fine, to see what its problems are")
+@router.get(
+    "/fleet/tools/{source}/checks",
+    response_model=FleetBoardOut,
+    summary="The checks one tool reported across clients that are not fine, to see what its problems are",
+)
 async def fleet_tool_checks(
-    source: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, include_met: bool = False, limit: Annotated[int, Query(ge=1, le=5000)] = 2000
+    source: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    include_met: bool = False,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 2000,
 ) -> FleetBoardOut:
     checks, _names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
     rows = tool_rows(checks, source, include_met=include_met)[:limit]
@@ -989,7 +1355,23 @@ async def fleet_tool_checks(
         board=source,
         title=source,
         keys=sorted({c.key for c in rows}),
-        rows=[FleetBoardRow(client_id=uuid.UUID(r.client_id), client_name=r.client_name, source=r.source, key=r.key, status=r.status, evidence=r.evidence, since=r.since, accepted=r.accepted, items=list(r.items), owner=r.owner, due_date=r.due_date, overdue=is_overdue(r.status, r.due_date, today)) for r in rows],
+        rows=[
+            FleetBoardRow(
+                client_id=uuid.UUID(r.client_id),
+                client_name=r.client_name,
+                source=r.source,
+                key=r.key,
+                status=r.status,
+                evidence=r.evidence,
+                since=r.since,
+                accepted=r.accepted,
+                items=list(r.items),
+                owner=r.owner,
+                due_date=r.due_date,
+                overdue=is_overdue(r.status, r.due_date, today),
+            )
+            for r in rows
+        ],
     )
 
 
@@ -1000,7 +1382,9 @@ async def fleet_coverage(current_user: Annotated[AuthUser, Depends(require_permi
     shown = {str(i): names.get(i) or str(i) for i in ids[1:]}
     rows = (
         await db.execute(
-            select(ClientAlias.child_tenant_id, ClientAlias.vendor).where(ClientAlias.tenant_id == owner, ClientAlias.ignored.is_(False), ClientAlias.child_tenant_id.is_not(None))
+            select(ClientAlias.child_tenant_id, ClientAlias.vendor).where(
+                ClientAlias.tenant_id == owner, ClientAlias.ignored.is_(False), ClientAlias.child_tenant_id.is_not(None)
+            )
         )
     ).all()
     return coverage_matrix([(str(c), v) for c, v in rows if str(c) in shown], shown)
@@ -1016,8 +1400,15 @@ class FleetChange(BaseModel):
     observed_at: datetime
 
 
-@router.get("/fleet/changes", response_model=list[FleetChange], summary="Checks that appeared or changed status across all clients in the last days")
-async def fleet_changes(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: Annotated[int, Query(ge=1, le=400)] = 1, limit: Annotated[int, Query(ge=1, le=5000)] = 300) -> list[FleetChange]:
+@router.get(
+    "/fleet/changes", response_model=list[FleetChange], summary="Checks that appeared or changed status across all clients in the last days"
+)
+async def fleet_changes(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    days: Annotated[int, Query(ge=1, le=400)] = 1,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 300,
+) -> list[FleetChange]:
     owner = current_user.tenant_id
     days = max(1, min(days, 90))
     ids, names = await _scope(db, owner, None)
@@ -1025,8 +1416,27 @@ async def fleet_changes(current_user: Annotated[AuthUser, Depends(require_permis
     out: list[FleetChange] = []
     for cid in ids[1:]:
         async with _as(db, owner, cid):
-            rows = (await db.execute(select(ClientCheckHistory).where(ClientCheckHistory.tenant_id == cid, ClientCheckHistory.observed_at >= since))).scalars().all()
-        out += [FleetChange(client_id=cid, client_name=names.get(cid) or str(cid), key=r.key, source=r.source, status=r.status, previous_status=r.previous_status, observed_at=r.observed_at) for r in rows]
+            rows = (
+                (
+                    await db.execute(
+                        select(ClientCheckHistory).where(ClientCheckHistory.tenant_id == cid, ClientCheckHistory.observed_at >= since)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        out += [
+            FleetChange(
+                client_id=cid,
+                client_name=names.get(cid) or str(cid),
+                key=r.key,
+                source=r.source,
+                status=r.status,
+                previous_status=r.previous_status,
+                observed_at=r.observed_at,
+            )
+            for r in rows
+        ]
     # Worsening first (a check that became not met), then the newest.
     out.sort(key=lambda c: (c.status != "not_met", -c.observed_at.timestamp()))
     return out[: max(1, min(limit, 1000))]
@@ -1050,8 +1460,17 @@ class DigestOut(BaseModel):
     counts: dict[str, int]
 
 
-@router.get("/fleet/digest", response_model=DigestOut, summary="One digest for the owner: what got worse and better lately, what is overdue, what accepted risks end soon and who is below target")
-async def fleet_digest(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: Annotated[int, Query(ge=1, le=400)] = 1, limit: Annotated[int, Query(ge=1, le=5000)] = 15) -> DigestOut:
+@router.get(
+    "/fleet/digest",
+    response_model=DigestOut,
+    summary="One digest for the owner: what got worse and better lately, what is overdue, what accepted risks end soon and who is below target",
+)
+async def fleet_digest(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    days: Annotated[int, Query(ge=1, le=400)] = 1,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 15,
+) -> DigestOut:
     days = max(1, min(days, 30))
     limit = max(1, min(limit, 50))
     now = datetime.now(UTC)
@@ -1059,7 +1478,9 @@ async def fleet_digest(current_user: Annotated[AuthUser, Depends(require_permiss
     worse, better = [], []
     for c in changes:
         how = classify_change(c.status, c.previous_status)
-        item = DigestItem(client_id=c.client_id, client_name=c.client_name, text=f"{c.key.replace('_', ' ')} is now {c.status.replace('_', ' ')}")
+        item = DigestItem(
+            client_id=c.client_id, client_name=c.client_name, text=f"{c.key.replace('_', ' ')} is now {c.status.replace('_', ' ')}"
+        )
         if how == "worse":
             worse.append(item)
         elif how == "better":
@@ -1067,13 +1488,36 @@ async def fleet_digest(current_user: Annotated[AuthUser, Depends(require_permiss
     checks, names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
     today = now.date()
     overdue = sorted(
-        (DigestItem(client_id=uuid.UUID(c.client_id), client_name=c.client_name, text=f"{c.key.replace('_', ' ')} is overdue ({c.owner or 'no owner'}, due {c.due_date})") for c in checks if not c.accepted and is_overdue(c.status, c.due_date, today)),
+        (
+            DigestItem(
+                client_id=uuid.UUID(c.client_id),
+                client_name=c.client_name,
+                text=f"{c.key.replace('_', ' ')} is overdue ({c.owner or 'no owner'}, due {c.due_date})",
+            )
+            for c in checks
+            if not c.accepted and is_overdue(c.status, c.due_date, today)
+        ),
         key=lambda i: (i.client_name.lower(), i.text),
     )
     ending = await fleet_acceptances(current_user, db, within_days=7, limit=1000)
-    expiring = [DigestItem(client_id=a.client_id, client_name=a.client_name, text=f"accepted risk {a.key.replace('_', ' ')} ends {a.expires_at.date() if a.expires_at else ''} ({a.reason})") for a in ending]
+    expiring = [
+        DigestItem(
+            client_id=a.client_id,
+            client_name=a.client_name,
+            text=f"accepted risk {a.key.replace('_', ' ')} ends {a.expires_at.date() if a.expires_at else ''} ({a.reason})",
+        )
+        for a in ending
+    ]
     summary = await fleet_summary(current_user, db)
-    below = [DigestItem(client_id=c.client_id, client_name=c.client_name or str(c.client_id), text=f"score {c.score}% is under its target of {c.target}%") for c in summary.clients if c.below_target]
+    below = [
+        DigestItem(
+            client_id=c.client_id,
+            client_name=c.client_name or str(c.client_id),
+            text=f"score {c.score}% is under its target of {c.target}%",
+        )
+        for c in summary.clients
+        if c.below_target
+    ]
     lists = {"worse": worse, "better": better, "overdue": overdue, "expiring": expiring, "below_target": below}
     return DigestOut(generated_at=now, days=days, counts={k: len(v) for k, v in lists.items()}, **{k: v[:limit] for k, v in lists.items()})
 
@@ -1089,8 +1533,17 @@ class FleetAcceptance(BaseModel):
     not_applicable: bool = False
 
 
-@router.get("/fleet/acceptances", response_model=list[FleetAcceptance], summary="Accepted risks across all clients that still stand, the ones about to run out first")
-async def fleet_acceptances(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, within_days: Annotated[int | None, Query(ge=1, le=3650)] = None, limit: Annotated[int, Query(ge=1, le=5000)] = 300) -> list[FleetAcceptance]:
+@router.get(
+    "/fleet/acceptances",
+    response_model=list[FleetAcceptance],
+    summary="Accepted risks across all clients that still stand, the ones about to run out first",
+)
+async def fleet_acceptances(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    within_days: Annotated[int | None, Query(ge=1, le=3650)] = None,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 300,
+) -> list[FleetAcceptance]:
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, None)
     now = datetime.now(UTC)
@@ -1098,6 +1551,17 @@ async def fleet_acceptances(current_user: Annotated[AuthUser, Depends(require_pe
     for cid in ids[1:]:
         async with _as(db, owner, cid):
             found = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == cid))).scalars().all()
-        rows += [{"client_id": cid, "client_name": names.get(cid) or str(cid), "key": a.key, "reason": a.reason, "accepted_at": a.accepted_at, "expires_at": a.expires_at, "not_applicable": a.not_applicable} for a in found]
+        rows += [
+            {
+                "client_id": cid,
+                "client_name": names.get(cid) or str(cid),
+                "key": a.key,
+                "reason": a.reason,
+                "accepted_at": a.accepted_at,
+                "expires_at": a.expires_at,
+                "not_applicable": a.not_applicable,
+            }
+            for a in found
+        ]
     kept = expiring_acceptances(rows, now, None if within_days is None else max(1, min(within_days, 400)))
     return [FleetAcceptance(**r) for r in kept[: max(1, min(limit, 1000))]]

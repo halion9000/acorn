@@ -75,7 +75,11 @@ def test_the_tenant_is_optional_so_the_console_can_scan_its_own_tenant():
 
 
 def test_domain_names_are_accepted_tidied_and_listed_after_the_addresses():
-    assert ScanRequest(tenant_id=T, ip_targets=["Example.COM.", "8.8.8.8", "example.com", " www.Acme.org "]).ip_targets == ["8.8.8.8", "example.com", "www.acme.org"]
+    assert ScanRequest(tenant_id=T, ip_targets=["Example.COM.", "8.8.8.8", "example.com", " www.Acme.org "]).ip_targets == [
+        "8.8.8.8",
+        "example.com",
+        "www.acme.org",
+    ]
 
 
 def test_split_targets_separates_addresses_from_names():
@@ -96,7 +100,11 @@ async def test_a_domain_resolves_to_its_public_ipv4_addresses_only_and_never_mor
             return ["mail.acme.com"]
 
         async def a(self, name):
-            return {"acme.com": ["8.8.8.8", "10.0.0.5", "not-an-ip"], "www.acme.com": ["8.8.8.8", "1.1.1.1"], "mail.acme.com": ["9.9.9.9", "169.254.169.254"]}.get(name, [])
+            return {
+                "acme.com": ["8.8.8.8", "10.0.0.5", "not-an-ip"],
+                "www.acme.com": ["8.8.8.8", "1.1.1.1"],
+                "mail.acme.com": ["9.9.9.9", "169.254.169.254"],
+            }.get(name, [])
 
     assert await resolve_domains(["acme.com"], Fake()) == {"acme.com": ["8.8.8.8", "1.1.1.1", "9.9.9.9"]}
 
@@ -105,9 +113,13 @@ async def test_a_domain_resolves_to_its_public_ipv4_addresses_only_and_never_mor
             return ["acme-com.mail.protection.outlook.com", "mx1.acme.com"]
 
         async def a(self, name):
-            return {"acme.com": ["8.8.8.8"], "mx1.acme.com": ["1.1.1.1"], "acme-com.mail.protection.outlook.com": ["52.101.1.1"]}.get(name, [])
+            return {"acme.com": ["8.8.8.8"], "mx1.acme.com": ["1.1.1.1"], "acme-com.mail.protection.outlook.com": ["52.101.1.1"]}.get(
+                name, []
+            )
 
-    assert await resolve_domains(["acme.com"], Hosted()) == {"acme.com": ["8.8.8.8", "1.1.1.1"]}, "a hosted mail service is not the client's own server"
+    assert await resolve_domains(["acme.com"], Hosted()) == {
+        "acme.com": ["8.8.8.8", "1.1.1.1"]
+    }, "a hosted mail service is not the client's own server"
 
     class Many(Fake):
         async def a(self, name):

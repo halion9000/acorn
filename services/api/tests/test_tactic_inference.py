@@ -22,7 +22,9 @@ def test_clear_titles_get_their_tactic(title, tactic):
     assert infer_tactic(title) == tactic
 
 
-@pytest.mark.parametrize("title", ["Process: 'com.huntress.HuntressAgent' does not exist", "C:", "HTTP is running on tcp Port 80.", "", None])
+@pytest.mark.parametrize(
+    "title", ["Process: 'com.huntress.HuntressAgent' does not exist", "C:", "HTTP is running on tcp Port 80.", "", None]
+)
 def test_a_title_no_rule_fits_gets_no_tactic(title):
     assert infer_tactic(title) is None
 

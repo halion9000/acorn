@@ -119,7 +119,11 @@ def tech_stack(
         else:
             put(key, "not_seen", "None seen", f"None of the client's {of} {what} report {tool_label(tool)}.")
 
-    for key, role, noun in (("firewall", "firewall", "firewall"), ("switch", "switch", "switch"), ("wireless", "wireless", "wireless access point")):
+    for key, role, noun in (
+        ("firewall", "firewall", "firewall"),
+        ("switch", "switch", "switch"),
+        ("wireless", "wireless", "wireless access point"),
+    ):
         put(key, *network_answer(devices, role, noun))
     put("backup_isp", "unknown", None, _UNKNOWN)
     put("server_brand", *server_brand_answer(devices))
@@ -173,7 +177,12 @@ def tech_stack(
     put("backup_bcdr", *backup_answer(devices))
     cloud = saas_backup(saas)
     if cloud is None:
-        put("backup_saas", "unknown", None, "No Datto SaaS Protection or Dropsuite data has arrived for this client; it may use another cloud backup, or not be mapped to one of them yet, so ask the client.")
+        put(
+            "backup_saas",
+            "unknown",
+            None,
+            "No Datto SaaS Protection or Dropsuite data has arrived for this client; it may use another cloud backup, or not be mapped to one of them yet, so ask the client.",
+        )
     else:
         put("backup_saas", "seen", saas_tools(saas) or "Cloud backup", cloud[1])
     return out

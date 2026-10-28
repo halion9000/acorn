@@ -135,7 +135,10 @@ async def _children_by_microsoft_tenant(db: Any, tenant_id: uuid.UUID, visible: 
     rows = (
         await db.execute(
             select(ClientAlias.microsoft_tenant_id, ClientAlias.child_tenant_id).where(
-                ClientAlias.tenant_id == tenant_id, ClientAlias.microsoft_tenant_id.isnot(None), ClientAlias.child_tenant_id.isnot(None), ClientAlias.ignored.is_(False)
+                ClientAlias.tenant_id == tenant_id,
+                ClientAlias.microsoft_tenant_id.isnot(None),
+                ClientAlias.child_tenant_id.isnot(None),
+                ClientAlias.ignored.is_(False),
             )
         )
     ).all()
@@ -162,13 +165,22 @@ async def upsert_clients(db: Any, tenant_id: uuid.UUID, vendor: str, clients: li
     }
     visible = {c.tenant_id for c in candidates}
     # Read only when this report carries ids: a tool that reports none costs no extra query.
-    by_ms = await _children_by_microsoft_tenant(db, tenant_id, visible) if any(normalize_microsoft_tenant_id(c.microsoft_tenant_id) for c in clients) else {}
+    by_ms = (
+        await _children_by_microsoft_tenant(db, tenant_id, visible)
+        if any(normalize_microsoft_tenant_id(c.microsoft_tenant_id) for c in clients)
+        else {}
+    )
     created = linked = 0
     for c in clients:
         row = existing.get(c.client_id)
         ms = normalize_microsoft_tenant_id(c.microsoft_tenant_id)
         if row is not None:
-            placeholder = row.vendor_client_name == row.vendor_client_id and row.child_tenant_id is None and not row.ignored and row.match_source != "manual"
+            placeholder = (
+                row.vendor_client_name == row.vendor_client_id
+                and row.child_tenant_id is None
+                and not row.ignored
+                and row.match_source != "manual"
+            )
             if placeholder and c.name != c.client_id:  # a row made from device reports, now with the tool's real name
                 suggestions = suggest(c.name, candidates)
                 if is_confident(suggestions):

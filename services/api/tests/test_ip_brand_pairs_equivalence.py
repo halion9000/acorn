@@ -21,7 +21,9 @@ from app.services.device_identity import (
 )
 
 
-def naive_ip_brand_pairs(devices: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], taken: set[tuple[Any, Any]]) -> list[tuple[Any, Any]]:
+def naive_ip_brand_pairs(
+    devices: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], taken: set[tuple[Any, Any]]
+) -> list[tuple[Any, Any]]:
     out: list[tuple[Any, Any]] = []
     seen = set(taken)
     for a in devices:
@@ -57,8 +59,20 @@ def random_client(rng: random.Random) -> tuple[list[Any], dict[Any, set[str]], s
     for i in range(rng.randint(0, 40)):
         placeholder = rng.random() < 0.4
         ips = [rng.choice(ADDRESSES) for _ in range(rng.randint(0, 3))]
-        host = f"Device@{rng.choice(ADDRESSES[:8])}" if placeholder else rng.choice([f"PC-{i}", f"pc-{i}.corp.local", f"AP-{i % 3}", f"Device@{rng.choice(ADDRESSES[:8])}.x"])
-        devices.append(NS(id=uuid.UUID(int=rng.getrandbits(128)), hostname=host, ip_addresses=ips, manufacturer=rng.choice(MAKERS), serial_number=rng.choice([None, None, "S1", "S2"])))
+        host = (
+            f"Device@{rng.choice(ADDRESSES[:8])}"
+            if placeholder
+            else rng.choice([f"PC-{i}", f"pc-{i}.corp.local", f"AP-{i % 3}", f"Device@{rng.choice(ADDRESSES[:8])}.x"])
+        )
+        devices.append(
+            NS(
+                id=uuid.UUID(int=rng.getrandbits(128)),
+                hostname=host,
+                ip_addresses=ips,
+                manufacturer=rng.choice(MAKERS),
+                serial_number=rng.choice([None, None, "S1", "S2"]),
+            )
+        )
     tools = {d.id: set(rng.choice(TOOLSETS)) for d in devices}
     ids = [d.id for d in devices]
     pairs = [tuple(sorted((rng.choice(ids), rng.choice(ids)), key=str)) for _ in range(rng.randint(0, 4))] if len(ids) > 1 else []

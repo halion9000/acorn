@@ -36,13 +36,32 @@ def ms(tenant, upn, **over):
 
 
 def src(tenant, vendor, email, **over):
-    base = {"tenant_id": tenant, "vendor": vendor, "external_id": f"{vendor}-{email}", "email": email, "display_name": None, "enabled": None, "kind": "user", "details": {}, "refreshed_at": NOW}
+    base = {
+        "tenant_id": tenant,
+        "vendor": vendor,
+        "external_id": f"{vendor}-{email}",
+        "email": email,
+        "display_name": None,
+        "enabled": None,
+        "kind": "user",
+        "details": {},
+        "refreshed_at": NOW,
+    }
     base.update(over)
     return SimpleNamespace(**base)
 
 
 def alert(tenant, users, severity="high", days_ago=1, title="t"):
-    return SimpleNamespace(id=uuid.uuid4(), tenant_id=tenant, affected_users=users, severity=severity, title=title, status="new", created_at=NOW - timedelta(days=days_ago), raw_event={})
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        tenant_id=tenant,
+        affected_users=users,
+        severity=severity,
+        title=title,
+        status="new",
+        created_at=NOW - timedelta(days=days_ago),
+        raw_event={},
+    )
 
 
 # ---- e-mail addresses ---------------------------------------------------------------------------------------------------------------------------------
@@ -62,7 +81,12 @@ def test_other_text_is_not_an_address(bad):
 
 
 def test_one_person_in_several_tools_is_one_row_listing_the_tools():
-    people = ip.build_people(NAMES, [ms(A, "amy@acme.com", display_name="Amy")], [src(A, "dropsuite", "AMY@acme.com"), src(A, "huntress-sat", "amy@acme.com", display_name="Amy S")], NOW)
+    people = ip.build_people(
+        NAMES,
+        [ms(A, "amy@acme.com", display_name="Amy")],
+        [src(A, "dropsuite", "AMY@acme.com"), src(A, "huntress-sat", "amy@acme.com", display_name="Amy S")],
+        NOW,
+    )
     assert len(people) == 1
     p = people[0]
     assert (p.email, p.client_name, p.display_name) == ("amy@acme.com", "Acme", "Amy")
@@ -76,7 +100,12 @@ def test_the_same_address_in_two_clients_is_two_people():
 
 
 def test_a_person_only_a_side_tool_knows_still_appears_and_non_addresses_are_left_out():
-    people = ip.build_people(NAMES, [ms(A, "svc-account"), ms(A, "amy@acme.com")], [src(A, "datto-saas", "shared@acme.com", kind="shared"), src(A, "dropsuite", "not-an-address")], NOW)
+    people = ip.build_people(
+        NAMES,
+        [ms(A, "svc-account"), ms(A, "amy@acme.com")],
+        [src(A, "datto-saas", "shared@acme.com", kind="shared"), src(A, "dropsuite", "not-an-address")],
+        NOW,
+    )
     assert sorted(p.email for p in people) == ["amy@acme.com", "shared@acme.com"]
     assert next(p for p in people if p.email == "shared@acme.com").kind == "shared"
 
@@ -125,7 +154,10 @@ def test_a_person_only_a_side_tool_knows_has_unknown_multifactor():
 
 def test_open_alerts_are_tied_to_the_people_they_name_in_the_same_client_only():
     people = ip.build_people(NAMES, [ms(A, "amy@acme.com"), ms(B, "amy@acme.com"), ms(A, "bob@acme.com")], [], NOW)
-    by_key = ip.attach_alerts(people, [alert(A, ["Amy@Acme.com", "someone-else"], "low"), alert(A, ["amy@acme.com"], "critical", days_ago=0), alert(B, ["bob@acme.com"])])
+    by_key = ip.attach_alerts(
+        people,
+        [alert(A, ["Amy@Acme.com", "someone-else"], "low"), alert(A, ["amy@acme.com"], "critical", days_ago=0), alert(B, ["bob@acme.com"])],
+    )
     amy_a = next(p for p in people if p.email == "amy@acme.com" and p.tenant_id == A)
     amy_b = next(p for p in people if p.email == "amy@acme.com" and p.tenant_id == B)
     bob_a = next(p for p in people if p.email == "bob@acme.com")
@@ -147,7 +179,11 @@ def test_an_alert_naming_a_person_twice_counts_once_and_unknown_people_are_ignor
 def sample():
     people = ip.build_people(
         NAMES,
-        [ms(A, "amy@acme.com", display_name="Amy", admin=True, registered=True, ca_enforced=True), ms(A, "bob@acme.com", display_name="Bob"), ms(B, "cy@beta.com", enabled=False)],
+        [
+            ms(A, "amy@acme.com", display_name="Amy", admin=True, registered=True, ca_enforced=True),
+            ms(A, "bob@acme.com", display_name="Bob"),
+            ms(B, "cy@beta.com", enabled=False),
+        ],
         [src(A, "dropsuite", "amy@acme.com"), src(A, "dropsuite", "dan@acme.com")],
         NOW,
     )
@@ -198,7 +234,11 @@ def test_the_report_refuses_bad_vendors_kinds_and_oversized_lists():
 
     ok = {"external_id": "1", "email": "a@b.co"}
     assert ep.IdentitiesReport(vendor="datto-saas", items=[ok]).items[0].kind == "user"
-    for bad in ({"vendor": "Bad Vendor", "items": []}, {"vendor": "x", "items": [{**ok, "kind": "robot"}]}, {"vendor": "x", "items": [ok] * 1001}):
+    for bad in (
+        {"vendor": "Bad Vendor", "items": []},
+        {"vendor": "x", "items": [{**ok, "kind": "robot"}]},
+        {"vendor": "x", "items": [ok] * 1001},
+    ):
         with pytest.raises(ValidationError):
             ep.IdentitiesReport(**bad)
 
@@ -228,7 +268,11 @@ def test_apply_stores_only_real_addresses_under_the_mapped_client_and_counts_the
     db = FakeDB()
     report = ep.IdentitiesReport(
         vendor="dropsuite",
-        items=[ep.IdentityIn(vendor_client_id="1", external_id="e1", email="Amy@Acme.com"), ep.IdentityIn(vendor_client_id="1", external_id="e2", email="not-an-address"), ep.IdentityIn(vendor_client_id="999", external_id="e3", email="z@z.com")],
+        items=[
+            ep.IdentityIn(vendor_client_id="1", external_id="e1", email="Amy@Acme.com"),
+            ep.IdentityIn(vendor_client_id="1", external_id="e2", email="not-an-address"),
+            ep.IdentityIn(vendor_client_id="999", external_id="e3", email="z@z.com"),
+        ],
     )
     out = asyncio.run(ep.apply_identities(db, uuid.uuid4(), report))
     assert seen["vendor"] == "dropsuite"
@@ -255,7 +299,9 @@ def src_of(raw, connector=None):
 
 def test_a_person_an_mdr_tool_raised_an_alert_about_is_known_to_that_tool():
     people = ip.build_people(NAMES, [ms(A, "amy@acme.com")], [], NOW)
-    out = ip.add_alert_sources(people, [tool_alert(A, ["Amy@Acme.com"], "petra"), tool_alert(A, ["amy@acme.com"], "fieldeffect")], NAMES, src_of)
+    out = ip.add_alert_sources(
+        people, [tool_alert(A, ["Amy@Acme.com"], "petra"), tool_alert(A, ["amy@acme.com"], "fieldeffect")], NAMES, src_of
+    )
     amy = out[0]
     assert amy.vendors == ["cipp", "fieldeffect", "petra"]
     assert [s.details.get("via") for s in amy.sources if s.vendor == "petra"] == ["an alert it raised"]
@@ -268,7 +314,16 @@ def test_a_person_only_an_alert_names_still_appears_under_that_client_with_that_
 
 def test_a_tool_is_listed_once_per_person_and_other_tools_alerts_do_not_make_people():
     people = ip.build_people(NAMES, [], [], NOW)
-    out = ip.add_alert_sources(people, [tool_alert(A, ["x@acme.com"], "huntress"), tool_alert(A, ["x@acme.com"], "huntress"), tool_alert(A, ["pc-user@acme.com"], "ninjaone")], NAMES, src_of)
+    out = ip.add_alert_sources(
+        people,
+        [
+            tool_alert(A, ["x@acme.com"], "huntress"),
+            tool_alert(A, ["x@acme.com"], "huntress"),
+            tool_alert(A, ["pc-user@acme.com"], "ninjaone"),
+        ],
+        NAMES,
+        src_of,
+    )
     assert [(p.email, p.vendors) for p in out] == [("x@acme.com", ["huntress"])]
     assert len(out[0].sources) == 1
 
@@ -298,7 +353,11 @@ def test_each_persons_open_alerts_are_counted_by_the_tool_that_raised_them_most_
     )
     amy = next(p for p in people if p.email == "amy@acme.com")
     bob = next(p for p in people if p.email == "bob@acme.com")
-    assert list(amy.alerts_by_source.items()) == [("huntress", 2), ("other", 1), ("petra", 1)], "an alert naming no tool is 'other'; ties go by name"
+    assert list(amy.alerts_by_source.items()) == [
+        ("huntress", 2),
+        ("other", 1),
+        ("petra", 1),
+    ], "an alert naming no tool is 'other'; ties go by name"
     assert sum(amy.alerts_by_source.values()) == amy.open_alerts == 4
     assert bob.alerts_by_source == {"blumira": 1}
     assert len(attach) == 2
@@ -325,7 +384,16 @@ def test_people_can_be_filtered_to_those_with_an_open_alert_from_one_tool():
 
 def test_the_summary_says_how_many_people_have_an_alert_from_each_tool():
     people = ip.build_people(NAMES, [ms(A, "amy@acme.com"), ms(A, "bob@acme.com")], [], NOW)
-    ip.attach_alerts(people, [tool_alert(A, ["amy@acme.com"], "petra"), tool_alert(A, ["amy@acme.com"], "petra"), tool_alert(A, ["bob@acme.com"], "petra"), tool_alert(A, ["bob@acme.com"], "huntress")], src_of)
+    ip.attach_alerts(
+        people,
+        [
+            tool_alert(A, ["amy@acme.com"], "petra"),
+            tool_alert(A, ["amy@acme.com"], "petra"),
+            tool_alert(A, ["bob@acme.com"], "petra"),
+            tool_alert(A, ["bob@acme.com"], "huntress"),
+        ],
+        src_of,
+    )
     assert ep.summarize(people).alert_sources == {"huntress": 1, "petra": 2}
 
 
@@ -375,7 +443,16 @@ def test_datto_saas_says_whether_the_seat_is_protected_not_when_it_ran():
 
 
 def test_a_person_in_both_backup_tools_shows_both_and_other_tools_add_nothing():
-    people = ip.build_people(NAMES, [ms(A, "amy@acme.com")], [drop("amy@acme.com", last_backup=NOW.isoformat(), errors=0), datto("amy@acme.com", "Active"), src(A, "huntress-sat", "amy@acme.com")], NOW)
+    people = ip.build_people(
+        NAMES,
+        [ms(A, "amy@acme.com")],
+        [
+            drop("amy@acme.com", last_backup=NOW.isoformat(), errors=0),
+            datto("amy@acme.com", "Active"),
+            src(A, "huntress-sat", "amy@acme.com"),
+        ],
+        NOW,
+    )
     assert [b.vendor for b in people[0].backups] == ["datto-saas", "dropsuite"]
     assert ip.build_people(NAMES, [ms(A, "x@a.com")], [], NOW)[0].backups == []
 
@@ -411,7 +488,18 @@ def test_exposure_is_attached_to_a_known_person_and_is_not_a_tool_that_knows_the
     people = ip.build_people(
         NAMES,
         [ms(A, "amy@a.com"), ms(A, "bo@a.com")],
-        [tm("amy@a.com", exposed_in=2, latest_breach="2025-02-10", password_exposed=True, stealer_log=False, malware=False, breaches=[{"name": "Forum", "date": "2023-05-01", "data": ["Passwords"]}]), tm("bo@a.com", exposed_in=1)],
+        [
+            tm(
+                "amy@a.com",
+                exposed_in=2,
+                latest_breach="2025-02-10",
+                password_exposed=True,
+                stealer_log=False,
+                malware=False,
+                breaches=[{"name": "Forum", "date": "2023-05-01", "data": ["Passwords"]}],
+            ),
+            tm("bo@a.com", exposed_in=1),
+        ],
         NOW,
     )
     amy = next(p for p in people if p.email == "amy@a.com")
@@ -459,7 +547,19 @@ def test_liongard_breach_lines_are_exposure_too_and_the_worst_reading_wins():
         NAMES,
         [ms(A, "amy@a.com"), ms(A, "bo@a.com")],
         [
-            src(A, "liongard", "amy@a.com", details={"exposed_in": 9, "latest_breach": "2024-06", "password_exposed": True, "stealer_log": False, "malware": False, "breaches": []}),
+            src(
+                A,
+                "liongard",
+                "amy@a.com",
+                details={
+                    "exposed_in": 9,
+                    "latest_breach": "2024-06",
+                    "password_exposed": True,
+                    "stealer_log": False,
+                    "malware": False,
+                    "breaches": [],
+                },
+            ),
             tm("amy@a.com", exposed_in=2, stealer_log=True),
             src(A, "liongard", "bo@a.com", details={"exposed_in": 4, "latest_breach": None, "password_exposed": False}),
         ],
@@ -476,7 +576,14 @@ def test_liongard_breach_lines_are_exposure_too_and_the_worst_reading_wins():
 
 
 def directory(tenant, email, **details):
-    base = {"directory": True, "platforms": ["google"], "mfa_enrolled": True, "super_admin": False, "licensed": True, "last_login_at": "2026-10-22T08:00:00Z"}
+    base = {
+        "directory": True,
+        "platforms": ["google"],
+        "mfa_enrolled": True,
+        "super_admin": False,
+        "licensed": True,
+        "last_login_at": "2026-10-22T08:00:00Z",
+    }
     base.update(details)
     return src(tenant, "threatmate", email, details=base, enabled=True)
 
@@ -496,7 +603,10 @@ def test_threatmate_supplies_the_second_factor_admin_and_licence_of_a_person_no_
     people = ip.build_people(
         NAMES,
         [],
-        [directory(A, "gail@acme.com", mfa_enrolled=True), directory(A, "gus@acme.com", mfa_enrolled=False, super_admin=True, licensed=False)],
+        [
+            directory(A, "gail@acme.com", mfa_enrolled=True),
+            directory(A, "gus@acme.com", mfa_enrolled=False, super_admin=True, licensed=False),
+        ],
         NOW,
     )
     gail, gus = person_of(people, "gail@acme.com"), person_of(people, "gus@acme.com")
@@ -518,7 +628,9 @@ def test_microsofts_own_row_always_wins_over_threatmates_reading_of_the_same_per
 
 
 def test_a_super_admin_in_the_directory_is_an_admin_even_when_microsoft_says_no():
-    people = ip.build_people(NAMES, [ms(A, "amy@acme.com", admin=False)], [directory(A, "amy@acme.com", platforms=["microsoft"], super_admin=True)], NOW)
+    people = ip.build_people(
+        NAMES, [ms(A, "amy@acme.com", admin=False)], [directory(A, "amy@acme.com", platforms=["microsoft"], super_admin=True)], NOW
+    )
     assert person_of(people, "amy@acme.com").admin is True
 
 
@@ -534,7 +646,9 @@ def test_a_suspended_directory_user_is_disabled_and_an_unknown_state_is_left_unk
 
 def test_an_exposed_address_no_directory_knows_is_still_not_made_into_a_person_but_one_in_the_directory_carries_its_exposure():
     exposed_only = src(A, "threatmate", "ghost@acme.com", details={"exposed_in": 2, "password_exposed": True})
-    both = directory(A, "gail@acme.com", exposed_in=3, password_exposed=True, breaches=[{"name": "Leak", "date": "2025-01-01", "data": ["Passwords"]}])
+    both = directory(
+        A, "gail@acme.com", exposed_in=3, password_exposed=True, breaches=[{"name": "Leak", "date": "2025-01-01", "data": ["Passwords"]}]
+    )
     people = ip.build_people(NAMES, [], [exposed_only, both], NOW)
     assert [p.email for p in people] == ["gail@acme.com"]
     gail = person_of(people, "gail@acme.com")

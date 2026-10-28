@@ -26,7 +26,9 @@ def clean_hidden_nav(entries: Iterable[str] | None) -> list[str]:
     for raw in entries or []:
         entry = str(raw).strip()
         if not valid_entry(entry):
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Not a section or page the console can hide: {entry[:80]!r}")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Not a section or page the console can hide: {entry[:80]!r}"
+            )
         if entry not in out:
             out.append(entry)
     if len(out) > MAX_ENTRIES:

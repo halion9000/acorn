@@ -21,8 +21,6 @@ async def no_scope(_db, _tenant_id):
     yield
 
 
-
-
 @pytest.fixture(autouse=True)
 def _sqlite_has_no_tenant_scope(monkeypatch):
     """The real scope sets a Postgres setting; these tests run on SQLite. Patched per test (not at import) so no other test module sees it."""

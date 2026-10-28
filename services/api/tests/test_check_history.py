@@ -17,7 +17,9 @@ def test_only_a_changed_status_is_recorded_and_it_keeps_the_old_status():
 
 
 def test_a_check_missing_from_the_new_report_is_not_a_change():
-    assert changes([c("a", "not_met")], [c("b", "met")], "x") == [{"source": "x", "key": "b", "status": "met", "previous_status": None, "evidence": "e"}]
+    assert changes([c("a", "not_met")], [c("b", "met")], "x") == [
+        {"source": "x", "key": "b", "status": "met", "previous_status": None, "evidence": "e"}
+    ]
 
 
 def test_unknown_statuses_and_keyless_rows_are_ignored_and_evidence_is_cut():
@@ -44,7 +46,10 @@ def test_items_that_join_or_leave_a_checks_list_are_reported_and_a_first_report_
     assert item_changes(prev, new) == [{"key": "av", "item": "PC-3", "event": "joined"}, {"key": "av", "item": "PC-1", "event": "left"}]
     assert item_changes(None, new) == [], "the first report would otherwise make every item join"
     assert item_changes(prev, [{"key": "av", "items": ["PC-1", "PC-2"]}]) == [], "an unchanged list says nothing"
-    assert item_changes(prev, [{"key": "av"}]) == [{"key": "av", "item": "PC-1", "event": "left"}, {"key": "av", "item": "PC-2", "event": "left"}], "an emptied list means everything left"
+    assert item_changes(prev, [{"key": "av"}]) == [
+        {"key": "av", "item": "PC-1", "event": "left"},
+        {"key": "av", "item": "PC-2", "event": "left"},
+    ], "an emptied list means everything left"
 
 
 def test_a_wholesale_replacement_keeps_only_the_first_events_of_that_check():

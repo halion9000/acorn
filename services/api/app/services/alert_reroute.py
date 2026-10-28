@@ -120,7 +120,7 @@ async def _reroute_by_domain(db: Any, parent_id: uuid.UUID, result: RerouteResul
     owners = await domain_owners(db, parent_id)
     if not owners:
         return
-    names = {tid: name for tid, name in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == parent_id))).all()}
+    names = dict((await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == parent_id))).all())
     by_route: dict[tuple[uuid.UUID, uuid.UUID], list[str]] = {}
     for source_id, alert_id, device in (await db.execute(text(_DOMAIN_CANDIDATES_SQL), {"parent": parent_id})).all():
         child = owners.get(registrable_domain(device) or "")

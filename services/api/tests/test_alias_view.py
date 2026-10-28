@@ -69,7 +69,10 @@ async def test_writing_an_alias_or_a_tenant_through_the_orm_clears_it_and_anythi
     session = NS(new=[object()], dirty=[], deleted=[])
     av._forget_on_flush(session, None, None)
     assert await av.alias_view(db, owner) and db.reads == 2, "an unrelated object changed: still kept"
-    for changed in (ClientAlias(tenant_id=owner, vendor="x", vendor_client_id="1", vendor_client_name="n", normalized_name="n"), Tenant(name="t", slug="t")):
+    for changed in (
+        ClientAlias(tenant_id=owner, vendor="x", vendor_client_id="1", vendor_client_name="n", normalized_name="n"),
+        Tenant(name="t", slug="t"),
+    ):
         await av.alias_view(db, owner)
         av._forget_on_flush(NS(new=[changed], dirty=[], deleted=[]), None, None)
         before = db.reads

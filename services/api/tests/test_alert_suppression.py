@@ -32,7 +32,13 @@ def rule(**over):
 
 
 def alert(**over):
-    base = {"tenant_id": CLIENT, "rule_id": None, "title": "Process: 'x' does not exist", "source": "ninjaone", "hosts": ["PC-1.corp.local"]}
+    base = {
+        "tenant_id": CLIENT,
+        "rule_id": None,
+        "title": "Process: 'x' does not exist",
+        "source": "ninjaone",
+        "hosts": ["PC-1.corp.local"],
+    }
     base.update(over)
     return base
 
@@ -148,7 +154,13 @@ class FakeDB:
 
 
 def an_alert(**over):
-    base = {"title": "Process: 'x' does not exist", "rule_id": None, "raw_event": {"source": "ninjaone"}, "connector_type": None, "affected_hosts": ["PC-1.corp.local"]}
+    base = {
+        "title": "Process: 'x' does not exist",
+        "rule_id": None,
+        "raw_event": {"source": "ninjaone"},
+        "connector_type": None,
+        "affected_hosts": ["PC-1.corp.local"],
+    }
     base.update(over)
     return SimpleNamespace(**base)
 

@@ -151,8 +151,14 @@ def detect_impossible_travel(rows: list[Any], new_ids: set[str]) -> list[Finding
                     summary=f"{user} signed in from {earlier.country} and {minutes} minutes later from {later.country}. A VPN can cause this; confirm with the person.",
                     fields=[
                         ("Person", user),
-                        ("First", f"{earlier.country} ({earlier.city or 'unknown city'}), {earlier.ip_address or 'unknown address'}, {_stamp(earlier.occurred_at)}"),
-                        ("Second", f"{later.country} ({later.city or 'unknown city'}), {later.ip_address or 'unknown address'}, {_stamp(later.occurred_at)}"),
+                        (
+                            "First",
+                            f"{earlier.country} ({earlier.city or 'unknown city'}), {earlier.ip_address or 'unknown address'}, {_stamp(earlier.occurred_at)}",
+                        ),
+                        (
+                            "Second",
+                            f"{later.country} ({later.city or 'unknown city'}), {later.ip_address or 'unknown address'}, {_stamp(later.occurred_at)}",
+                        ),
                         ("Minutes apart", str(minutes)),
                     ],
                     users=[user],
@@ -301,7 +307,12 @@ def detect_mfa_fatigue(rows: list[Any], new_ids: set[str]) -> list[Finding]:
                 key=f"fatigue:{user}:{hour}",
                 occurred_at=first.occurred_at,
                 summary=f"{user} had {len(items)} multi-factor requests that failed or went unanswered within an hour. Someone may know the password and be hoping the person approves one; ask them, and reset the password if so.",
-                fields=[("Person", user), ("Prompts", str(len(items))), ("Addresses", ", ".join(ips[:5]) or "unknown"), ("First", _stamp(first.occurred_at))],
+                fields=[
+                    ("Person", user),
+                    ("Prompts", str(len(items))),
+                    ("Addresses", ", ".join(ips[:5]) or "unknown"),
+                    ("First", _stamp(first.occurred_at)),
+                ],
                 users=[user],
                 ips=ips[:10],
                 source_ids=[i.source_id for i in items][:50],
@@ -322,7 +333,11 @@ def detect_guessed_password(rows: list[Any], new_ids: set[str]) -> list[Finding]
             if not r.success or r.source_id not in new_ids:
                 continue
             window_start = _utc(r.occurred_at) - TRAVEL_WINDOW
-            fails = [f for f in items if not f.success and f.error_code in WRONG_PASSWORD and window_start <= _utc(f.occurred_at) <= _utc(r.occurred_at)]
+            fails = [
+                f
+                for f in items
+                if not f.success and f.error_code in WRONG_PASSWORD and window_start <= _utc(f.occurred_at) <= _utc(r.occurred_at)
+            ]
             if len(fails) < GUESS_FAILURES:
                 continue
             ips = sorted({f.ip_address for f in fails if f.ip_address})
@@ -407,7 +422,9 @@ def detect_failed_after_revoke(audits: list[Any], signins: list[Any]) -> list[Fi
             continue
         person = a.target.lower()
         start = _utc(a.occurred_at)
-        failed = [s for s in signins if s.user_principal == person and not s.success and start < _utc(s.occurred_at) <= start + REVOKE_WINDOW]
+        failed = [
+            s for s in signins if s.user_principal == person and not s.success and start < _utc(s.occurred_at) <= start + REVOKE_WINDOW
+        ]
         if len(failed) < REVOKE_FAILURES:
             continue
         ips = sorted({s.ip_address for s in failed if s.ip_address})
@@ -520,7 +537,19 @@ _CONSENT = re.compile(r"^(consent to application|add delegated permission grant)
 _APP_CREDENTIAL = re.compile(r"(certificates and secrets management|add service principal credentials)", re.IGNORECASE)
 
 
-def _audit_finding(a: Any, *, rule_id: str, rule_name: str, title: str, severity: str, tactic: str, technique: str, key: str, summary: str, target_label: str) -> Finding:
+def _audit_finding(
+    a: Any,
+    *,
+    rule_id: str,
+    rule_name: str,
+    title: str,
+    severity: str,
+    tactic: str,
+    technique: str,
+    key: str,
+    summary: str,
+    target_label: str,
+) -> Finding:
     return Finding(
         rule_id=rule_id,
         rule_name=rule_name,
@@ -681,7 +710,10 @@ def alert_values(tenant_id: uuid.UUID, finding: Finding, now: datetime) -> dict[
         "affected_assets": [],
         "child_alert_ids": [],
         "is_merged": False,
-        "raw_event": {"source": "aisoc-identity-detections", "finding": {"uid": f"{finding.rule_id}:{finding.key}", "title": finding.title}},
+        "raw_event": {
+            "source": "aisoc-identity-detections",
+            "finding": {"uid": f"{finding.rule_id}:{finding.key}", "title": finding.title},
+        },
         "enrichment_data": {},
         "tags": ["identity", finding.rule_id],
         "event_time": at,
@@ -705,7 +737,9 @@ async def save_findings(db: Any, tenant_id: uuid.UUID, findings: list[Finding], 
     try:
         async with db.begin_nested():  # a failure rolls back to here, not the whole request
             for f in findings:
-                res = await db.execute(pg_insert(Alert).values(**alert_values(tenant_id, f, now)).on_conflict_do_nothing(index_elements=["id"]))
+                res = await db.execute(
+                    pg_insert(Alert).values(**alert_values(tenant_id, f, now)).on_conflict_do_nothing(index_elements=["id"])
+                )
                 made += res.rowcount or 0
     except Exception:  # noqa: BLE001
         logger.warning("identity detections: saving alerts failed for tenant=%s", tenant_id, exc_info=True)

@@ -24,7 +24,15 @@ def test_posture_carries_the_tools_the_client_is_mapped_to():
 
     from app.api.v1.endpoints.client_posture import ClientPosture, PostureAlerts, PostureDevices, PostureTool
 
-    base = {"client_id": uuid.uuid4(), "client_name": "Acme", "generated_at": datetime.now(UTC), "devices": PostureDevices(), "identity": None, "alerts": PostureAlerts(open=0, critical=0, high=0, without_ticket=0), "open_cases": 0}
+    base = {
+        "client_id": uuid.uuid4(),
+        "client_name": "Acme",
+        "generated_at": datetime.now(UTC),
+        "devices": PostureDevices(),
+        "identity": None,
+        "alerts": PostureAlerts(open=0, critical=0, high=0, without_ticket=0),
+        "open_cases": 0,
+    }
     assert ClientPosture(**base).tools == []
     p = ClientPosture(**base, tools=[PostureTool(vendor="ninjaone", vendor_client_id="83", vendor_client_name="Acme")])
     assert (p.tools[0].vendor, p.tools[0].vendor_client_id) == ("ninjaone", "83")
@@ -65,7 +73,9 @@ def test_the_posture_of_a_client_in_datto_saas_still_reports_its_alert_counts_an
             if "client_aliases" in text:
                 return SimpleNamespace(all=lambda: [("datto-saas", "494057", "Acme"), ("huntress", "5", "Acme")])
             if "client_m365_checks" in text:
-                if ".source IN" in text:  # the tool-checks query (several sources at once) for a client mapped to Huntress: it has sent none
+                if (
+                    ".source IN" in text
+                ):  # the tool-checks query (several sources at once) for a client mapped to Huntress: it has sent none
                     return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
                 row = SimpleNamespace(checks=[{"key": "saas_backup_google", "status": "met", "evidence": "e"}])
                 return SimpleNamespace(scalars=lambda: SimpleNamespace(first=lambda: row))
@@ -123,7 +133,11 @@ def _posture_with(monkeypatch, aliases, rows, history=None, accepted=None):
             if "client_m365_checks" in text:
                 queries.append(text)
                 asked = [src for src, _ in rows if f"'{src}'" in text]
-                got = [SimpleNamespace(source=src, checks=checks, refreshed_at=datetime(2026, 10, 24, tzinfo=UTC)) for src, checks in rows if src in asked]
+                got = [
+                    SimpleNamespace(source=src, checks=checks, refreshed_at=datetime(2026, 10, 24, tzinfo=UTC))
+                    for src, checks in rows
+                    if src in asked
+                ]
                 return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: got, first=lambda: got[0] if got else None))
             if "client_check_history" in text:
                 return SimpleNamespace(all=lambda: history or [])
@@ -139,7 +153,14 @@ def _posture_with(monkeypatch, aliases, rows, history=None, accepted=None):
 
 def test_checks_are_shown_per_tool_and_only_for_tools_the_client_is_mapped_to(monkeypatch):
     rows = [
-        ("threatmate", [{"key": "threatmate_patching", "status": "not_met", "evidence": "1 of 3"}, {"key": "", "status": "met", "evidence": "dropped: no key"}, "not a dict"]),
+        (
+            "threatmate",
+            [
+                {"key": "threatmate_patching", "status": "not_met", "evidence": "1 of 3"},
+                {"key": "", "status": "met", "evidence": "dropped: no key"},
+                "not a dict",
+            ],
+        ),
         ("liongard", [{"key": "liongard_edr_coverage", "status": "met", "evidence": "2 of 2"}]),
         ("itglue", [{"key": "itglue_domain_expiry", "status": "partly", "evidence": "1 expires soon"}]),
     ]
@@ -153,13 +174,18 @@ def test_checks_are_shown_per_tool_and_only_for_tools_the_client_is_mapped_to(mo
 
 
 def test_cipps_extra_checks_are_read_from_their_own_source_when_the_client_is_mapped_to_cipp(monkeypatch):
-    rows = [("cipp-health", [{"key": "cipp_licences", "status": "partly", "evidence": "3 unused"}]), ("cipp", [{"key": "baseline_x", "status": "met", "evidence": "the Microsoft 365 baseline is not a tool check"}])]
+    rows = [
+        ("cipp-health", [{"key": "cipp_licences", "status": "partly", "evidence": "3 unused"}]),
+        ("cipp", [{"key": "baseline_x", "status": "met", "evidence": "the Microsoft 365 baseline is not a tool check"}]),
+    ]
     out, _ = _posture_with(monkeypatch, [("cipp", "tenant-1", "Acme")], rows)
     assert list(out.tool_checks) == ["cipp-health"]
 
 
 def test_a_client_mapped_to_no_checking_tool_reads_no_check_rows_at_all(monkeypatch):
-    out, queries = _posture_with(monkeypatch, [("screenconnect", "5", "Acme")], [("threatmate", [{"key": "k", "status": "met", "evidence": "x"}])])
+    out, queries = _posture_with(
+        monkeypatch, [("screenconnect", "5", "Acme")], [("threatmate", [{"key": "k", "status": "met", "evidence": "x"}])]
+    )
     assert out.tool_checks == {} and queries == []
 
 
@@ -171,10 +197,33 @@ def test_each_check_says_since_when_it_has_had_its_status_and_whether_a_person_a
     from types import SimpleNamespace
 
     changed = datetime(2026, 10, 20, tzinfo=UTC)
-    live = SimpleNamespace(key="threatmate_patching", reason="Client will replace the machines in January", accepted_at=datetime(2026, 10, 21, tzinfo=UTC), expires_at=datetime.now(UTC) + timedelta(days=30), not_applicable=False)
-    gone = SimpleNamespace(key="threatmate_security_score", reason="old", accepted_at=datetime(2026, 1, 1, tzinfo=UTC), expires_at=datetime(2026, 2, 1, tzinfo=UTC), not_applicable=False)
-    rows = [("threatmate", [{"key": "threatmate_patching", "status": "not_met", "evidence": "x"}, {"key": "threatmate_security_score", "status": "not_met", "evidence": "y"}, {"key": "threatmate_end_of_life", "status": "met", "evidence": "z"}])]
-    out, _ = _posture_with(monkeypatch, [("threatmate", "11", "Acme")], rows, history=[("threatmate_patching", changed)], accepted=[live, gone])
+    live = SimpleNamespace(
+        key="threatmate_patching",
+        reason="Client will replace the machines in January",
+        accepted_at=datetime(2026, 10, 21, tzinfo=UTC),
+        expires_at=datetime.now(UTC) + timedelta(days=30),
+        not_applicable=False,
+    )
+    gone = SimpleNamespace(
+        key="threatmate_security_score",
+        reason="old",
+        accepted_at=datetime(2026, 1, 1, tzinfo=UTC),
+        expires_at=datetime(2026, 2, 1, tzinfo=UTC),
+        not_applicable=False,
+    )
+    rows = [
+        (
+            "threatmate",
+            [
+                {"key": "threatmate_patching", "status": "not_met", "evidence": "x"},
+                {"key": "threatmate_security_score", "status": "not_met", "evidence": "y"},
+                {"key": "threatmate_end_of_life", "status": "met", "evidence": "z"},
+            ],
+        )
+    ]
+    out, _ = _posture_with(
+        monkeypatch, [("threatmate", "11", "Acme")], rows, history=[("threatmate_patching", changed)], accepted=[live, gone]
+    )
     by = {c.key: c for c in out.tool_checks["threatmate"].checks}
     assert by["threatmate_patching"].since == changed
     assert by["threatmate_patching"].accepted is not None and by["threatmate_patching"].accepted.reason.startswith("Client will replace")
@@ -187,7 +236,12 @@ def test_a_check_carries_the_list_behind_it_and_a_malformed_list_is_ignored(monk
         (
             "ninjaone",
             [
-                {"key": "ninjaone_antivirus", "status": "not_met", "evidence": "x", "items": ["PC-1: none installed", "", 7, "PC-2: switched off"]},
+                {
+                    "key": "ninjaone_antivirus",
+                    "status": "not_met",
+                    "evidence": "x",
+                    "items": ["PC-1: none installed", "", 7, "PC-2: switched off"],
+                },
                 {"key": "ninjaone_patching", "status": "partly", "evidence": "y", "items": "not a list"},
                 {"key": "ninjaone_unsupported_os", "status": "met", "evidence": "z"},
             ],
@@ -242,7 +296,13 @@ def test_accepting_a_check_needs_a_reason_a_sensible_key_and_a_bounded_end_date(
     def call(key, reason, days=None):
         return asyncio.run(ep.accept_check(owner, key, ep.AcceptIn(reason=reason, expires_in_days=days), user, DB()))
 
-    for key, reason, days in (("k", "  ", None), ("k", "x" * 401, None), ("bad key!", "fine reason", None), ("k", "fine reason", 0), ("k", "fine reason", ep.MAX_ACCEPT_DAYS + 1)):
+    for key, reason, days in (
+        ("k", "  ", None),
+        ("k", "x" * 401, None),
+        ("bad key!", "fine reason", None),
+        ("k", "fine reason", 0),
+        ("k", "fine reason", ep.MAX_ACCEPT_DAYS + 1),
+    ):
         with pytest.raises(HTTPException) as e:
             call(key, reason, days)
         assert e.value.status_code == 422, (key, reason, days)

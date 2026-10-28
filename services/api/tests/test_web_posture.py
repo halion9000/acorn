@@ -13,7 +13,13 @@ NOW = datetime(2026, 10, 24, tzinfo=UTC)
 
 
 def probe(**over):
-    base = {"answered": True, "cert_not_after": NOW + timedelta(days=200), "http_answered": True, "http_redirect_to": "https://acme.com/", "headers": {}}
+    base = {
+        "answered": True,
+        "cert_not_after": NOW + timedelta(days=200),
+        "http_answered": True,
+        "http_redirect_to": "https://acme.com/",
+        "headers": {},
+    }
     return wp.ProbeResult(**{**base, **over})
 
 
@@ -43,10 +49,15 @@ def test_https_redirect_present_missing_and_no_plain_http_at_all():
 def test_headers_all_present_and_each_missing_one_is_named():
     full = {"Strict-Transport-Security": "max-age=31536000", "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY"}
     assert wp.assess_headers(full).status == "good"
-    assert wp.assess_headers({**full, "X-Frame-Options": ""} | {"Content-Security-Policy": "frame-ancestors 'none'"}).status == "good", "CSP frame-ancestors also stops framing"
+    assert (
+        wp.assess_headers({**full, "X-Frame-Options": ""} | {"Content-Security-Policy": "frame-ancestors 'none'"}).status == "good"
+    ), "CSP frame-ancestors also stops framing"
     f = wp.assess_headers({})
     assert f.status == "needs_work" and len(f.issues) == 3
-    assert any("Strict-Transport-Security" in i for i in wp.assess_headers({k: v for k, v in full.items() if k != "Strict-Transport-Security"}).issues)
+    assert any(
+        "Strict-Transport-Security" in i
+        for i in wp.assess_headers({k: v for k, v in full.items() if k != "Strict-Transport-Security"}).issues
+    )
     assert wp.assess_headers({**full, "X-Content-Type-Options": "sniff"}).status == "needs_work"
 
 

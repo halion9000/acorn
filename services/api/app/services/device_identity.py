@@ -93,7 +93,7 @@ _NO_IP = ("0.0.0.0", "127.", "169.254.", "255.")
 def usable_ips(addresses: object) -> set[str]:
     """The IPv4 addresses of a device that can identify it: dotted quads, not 0.0.0.0, loopback, link-local or broadcast."""
     out: set[str] = set()
-    for a in addresses if isinstance(addresses, (list, tuple, set)) else []:
+    for a in addresses if isinstance(addresses, list | tuple | set) else []:
         text = str(a).strip()
         if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", text) and not text.startswith(_NO_IP):
             out.add(text)
@@ -118,7 +118,9 @@ HARDWARE_TOOLS = frozenset({"meraki", "unifi"})
 # Network discovery tools list each device they find once, under whatever name it has. Two records of one of them in a client are two devices (a closet of switches, a run of "bridge-2" names), so
 # two devices that BOTH carry a record from one of these are never offered as duplicates of each other.
 DISCOVERY_TOOLS = frozenset({"auvik", "unifi", "meraki"})
-AGENT_TOOLS = frozenset({"ninjaone", "huntress", "addigy", "threatmate", "screenconnect", "fieldeffect", "dnsfilter", "autoelevate", "slide", "blumira", "cipp"})
+AGENT_TOOLS = frozenset(
+    {"ninjaone", "huntress", "addigy", "threatmate", "screenconnect", "fieldeffect", "dnsfilter", "autoelevate", "slide", "blumira", "cipp"}
+)
 
 
 def could_be_same_machine(a: set[str], b: set[str]) -> bool:
@@ -133,7 +135,9 @@ def could_be_same_machine(a: set[str], b: set[str]) -> bool:
 _NETBIOS_LENGTHS = (15, 16)
 
 
-def netbios_truncated_pairs(devices: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], taken: set[tuple[Any, Any]]) -> list[tuple[Any, Any]]:
+def netbios_truncated_pairs(
+    devices: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], taken: set[tuple[Any, Any]]
+) -> list[tuple[Any, Any]]:
     """Pairs of one client's devices where one name is the other cut to the NetBIOS length (15 or 16 characters) and the other is longer.
 
     Two devices that the same tool reports are two machines (a tool lists each machine once), so a pair needs tools that do not overlap. Two different serial numbers, a hardware unit against a machine an agent runs on,
@@ -165,7 +169,9 @@ def netbios_truncated_pairs(devices: list[Any], tools: dict[Any, set[str]], dism
     return out
 
 
-def ip_brand_pairs(devices: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], taken: set[tuple[Any, Any]]) -> list[tuple[Any, Any]]:
+def ip_brand_pairs(
+    devices: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], taken: set[tuple[Any, Any]]
+) -> list[tuple[Any, Any]]:
     """Pairs of one client's devices where one has a made-up name (Auvik's ``Device@10.7.220.92``) and the other holds one of its addresses without disagreeing about the maker.
 
     Names say nothing for such a device, so it is matched on what Auvik does know: an address and, when both sides state one, the brand. Two different serial numbers, a hardware unit against a machine an agent

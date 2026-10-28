@@ -92,7 +92,13 @@ async def merge_devices(
     moved_ids = [str(s.id) for s in moved]
     for source in moved:
         source.device_id = keep.id
-    filled: dict[str, Any] = {"fields": [], "ip_addresses": False, "first_seen_was": None, "carried_serial": None, "replaced_serial": replaced_serial}
+    filled: dict[str, Any] = {
+        "fields": [],
+        "ip_addresses": False,
+        "first_seen_was": None,
+        "carried_serial": None,
+        "replaced_serial": replaced_serial,
+    }
     for name in _COPIED:
         if getattr(keep, name) is None and getattr(remove, name) is not None:
             setattr(keep, name, getattr(remove, name))
@@ -293,14 +299,21 @@ async def auto_merge_by_mac(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID |
         if mac:
             holders.setdefault(mac, set()).add(d.id)
     vendors: dict[uuid.UUID, set[str]] = {}
-    for device_id, vendor, external_id in (await db.execute(select(DeviceSource.device_id, DeviceSource.vendor, DeviceSource.external_id).where(DeviceSource.tenant_id == tenant_id))).all():
+    for device_id, vendor, external_id in (
+        await db.execute(
+            select(DeviceSource.device_id, DeviceSource.vendor, DeviceSource.external_id).where(DeviceSource.tenant_id == tenant_id)
+        )
+    ).all():
         vendors.setdefault(device_id, set()).add(_tool_of(vendor, external_id))
     # Only the tools that report MACs have their details read (a tool's details can be large), and only the two keys that hold them.
     for device_id, mac, macs, ninja in (
         await db.execute(
-            select(DeviceSource.device_id, DeviceSource.details["mac"], DeviceSource.details["macs"], DeviceSource.details["facts"]["macAddresses"]).where(
-                DeviceSource.tenant_id == tenant_id, DeviceSource.vendor.in_(MAC_TOOLS)
-            )
+            select(
+                DeviceSource.device_id,
+                DeviceSource.details["mac"],
+                DeviceSource.details["macs"],
+                DeviceSource.details["facts"]["macAddresses"],
+            ).where(DeviceSource.tenant_id == tenant_id, DeviceSource.vendor.in_(MAC_TOOLS))
         )
     ).all():
         for found in macs_of({"mac": mac, "macs": macs, "facts": {"macAddresses": ninja}}):
@@ -308,7 +321,10 @@ async def auto_merge_by_mac(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID |
     pairs = [sorted(ids, key=str) for ids in holders.values() if len(ids) == 2]
     if not pairs:
         return 0
-    dismissed = {(x.device_a, x.device_b) for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tenant_id))).scalars().all()}
+    dismissed = {
+        (x.device_a, x.device_b)
+        for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tenant_id))).scalars().all()
+    }
     gone: set[uuid.UUID] = set()
     merged = 0
     for first, second in pairs:
@@ -326,13 +342,14 @@ async def auto_merge_by_mac(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID |
         if _ordered(first, second) in dismissed:
             continue
         # The device with a real serial is kept, so the machine does not end up identified by a MAC.
-        keep, remove = sorted((a, b), key=lambda d: (1 if mac_key(d.serial_number) else 0, -len(vendors.get(d.id, set())), d.first_seen, str(d.id)))
+        keep, remove = sorted(
+            (a, b), key=lambda d: (1 if mac_key(d.serial_number) else 0, -len(vendors.get(d.id, set())), d.first_seen, str(d.id))
+        )
         await merge_devices(db, tenant_id, keep.id, remove.id, actor_id)
         gone.add(remove.id)
         vendors[keep.id] = va | vb
         merged += 1
     return merged
-
 
 
 # What Auvik calls a computer (see ``device_kind`` in the devices endpoint): the types a person's workstation or a server can have.
@@ -350,11 +367,21 @@ async def auto_merge_by_ip(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | 
     from app.services.device_identity import AGENT_TOOLS, usable_ips
 
     vendors: dict[uuid.UUID, set[str]] = {}
-    for device_id, vendor, external_id in (await db.execute(select(DeviceSource.device_id, DeviceSource.vendor, DeviceSource.external_id).where(DeviceSource.tenant_id == tenant_id))).all():
+    for device_id, vendor, external_id in (
+        await db.execute(
+            select(DeviceSource.device_id, DeviceSource.vendor, DeviceSource.external_id).where(DeviceSource.tenant_id == tenant_id)
+        )
+    ).all():
         vendors.setdefault(device_id, set()).add(_tool_of(vendor, external_id))
     # Only Auvik's details are read, and only its device type.
     auvik_computer: set[uuid.UUID] = set()
-    for device_id, device_type in (await db.execute(select(DeviceSource.device_id, DeviceSource.details["device_type"]).where(DeviceSource.tenant_id == tenant_id, DeviceSource.vendor == "auvik"))).all():
+    for device_id, device_type in (
+        await db.execute(
+            select(DeviceSource.device_id, DeviceSource.details["device_type"]).where(
+                DeviceSource.tenant_id == tenant_id, DeviceSource.vendor == "auvik"
+            )
+        )
+    ).all():
         if str(device_type or "").strip().lower() in _AUVIK_COMPUTER_TYPES:
             auvik_computer.add(device_id)
     discovered = {d for d in auvik_computer if vendors[d] <= _NETWORK_TOOLS}
@@ -370,7 +397,10 @@ async def auto_merge_by_ip(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | 
     for i in agent_machines:
         for ip in usable_ips(devices[i].ip_addresses):
             holders_agent.setdefault(ip, set()).add(i)
-    dismissed = {(x.device_a, x.device_b) for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tenant_id))).scalars().all()}
+    dismissed = {
+        (x.device_a, x.device_b)
+        for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tenant_id))).scalars().all()
+    }
     gone: set[uuid.UUID] = set()
     merged = 0
     for ip, found in holders_found.items():
@@ -417,7 +447,9 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
             by_name.setdefault(loose_name_key(d.hostname) or key, []).append(d)
     vendors: dict[uuid.UUID, set[str]] = {}
     for device_id, vendor, external_id in (
-        await db.execute(select(DeviceSource.device_id, DeviceSource.vendor, DeviceSource.external_id).where(DeviceSource.tenant_id == tenant_id))
+        await db.execute(
+            select(DeviceSource.device_id, DeviceSource.vendor, DeviceSource.external_id).where(DeviceSource.tenant_id == tenant_id)
+        )
     ).all():
         vendors.setdefault(device_id, set()).add(_tool_of(vendor, external_id))
 

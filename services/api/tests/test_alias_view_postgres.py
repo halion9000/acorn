@@ -47,7 +47,9 @@ async def world():
 
 
 def report():
-    return billing.LicenseCountsReport(vendor="huntress", vendor_client_id="7", counts=[billing.LicenseCountIn(item="Agents", unit="device", count=12)])
+    return billing.LicenseCountsReport(
+        vendor="huntress", vendor_client_id="7", counts=[billing.LicenseCountIn(item="Agents", unit="device", count=12)]
+    )
 
 
 async def post(engine, w):
@@ -62,21 +64,34 @@ async def test_a_mapping_saved_through_the_orm_applies_to_the_next_report_at_onc
     w, engine = world
     async with async_sessionmaker(engine, expire_on_commit=False)() as db:
         await db.execute(text("select set_config('app.rls_fail_closed', 'off', false)"))
-        db.add(ClientAlias(tenant_id=w["parent"], vendor="huntress", vendor_client_id="7", vendor_client_name="Seven", normalized_name="seven", match_source="manual"))
+        db.add(
+            ClientAlias(
+                tenant_id=w["parent"],
+                vendor="huntress",
+                vendor_client_id="7",
+                vendor_client_name="Seven",
+                normalized_name="seven",
+                match_source="manual",
+            )
+        )
         await db.commit()
     first = await post(engine, w)
     assert (first.accepted, first.unmapped) == (0, 1), "not mapped yet"
     # The mapping is saved now. The report that follows is within the few seconds the view is kept, and must still see it.
     async with async_sessionmaker(engine, expire_on_commit=False)() as db:
         await db.execute(text("select set_config('app.rls_fail_closed', 'off', false)"))
-        alias = (await db.execute(select(ClientAlias).where(ClientAlias.tenant_id == w["parent"], ClientAlias.vendor_client_id == "7"))).scalar_one()
+        alias = (
+            await db.execute(select(ClientAlias).where(ClientAlias.tenant_id == w["parent"], ClientAlias.vendor_client_id == "7"))
+        ).scalar_one()
         alias.child_tenant_id = w["acme"]
         await db.commit()
     second = await post(engine, w)
     assert (second.accepted, second.unmapped) == (1, 0), "mapped: the next report is stored"
     async with async_sessionmaker(engine, expire_on_commit=False)() as db:
         await db.execute(text("select set_config('app.rls_fail_closed', 'off', false)"))
-        alias = (await db.execute(select(ClientAlias).where(ClientAlias.tenant_id == w["parent"], ClientAlias.vendor_client_id == "7"))).scalar_one()
+        alias = (
+            await db.execute(select(ClientAlias).where(ClientAlias.tenant_id == w["parent"], ClientAlias.vendor_client_id == "7"))
+        ).scalar_one()
         alias.ignored = True
         await db.commit()
     third = await post(engine, w)

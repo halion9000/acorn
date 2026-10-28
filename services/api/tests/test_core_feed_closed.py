@@ -76,9 +76,19 @@ async def test_huntress_escalations_and_signals_are_closed_too_but_another_vendo
     db = _db([3])
     report = ClosedReport(
         vendor="huntress",
-        closed=[ClosedItem(uid="huntress:1"), ClosedItem(uid="huntress-escalation:9", state="resolved"), ClosedItem(uid="huntress-signal:3", state="closed"), ClosedItem(uid="blumira:7"), ClosedItem(uid="huntressx:5")],
+        closed=[
+            ClosedItem(uid="huntress:1"),
+            ClosedItem(uid="huntress-escalation:9", state="resolved"),
+            ClosedItem(uid="huntress-signal:3", state="closed"),
+            ClosedItem(uid="blumira:7"),
+            ClosedItem(uid="huntressx:5"),
+        ],
     )
     assert await apply_closed(db, TENANT, report) == 3
     _, params = _sql(db.executed[0])
     sent = [x for v in params.values() if isinstance(v, list | tuple) for x in v if str(x).startswith("huntress")]
-    assert sorted(sent) == ["huntress-escalation:9", "huntress-signal:3", "huntress:1"], "another vendor's uid, and a lookalike prefix, are left out"
+    assert sorted(sent) == [
+        "huntress-escalation:9",
+        "huntress-signal:3",
+        "huntress:1",
+    ], "another vendor's uid, and a lookalike prefix, are left out"

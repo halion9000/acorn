@@ -14,17 +14,32 @@ _RULES: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
     (tactic, re.compile(pattern, re.IGNORECASE))
     for tactic, pattern in (
         ("Credential Access", r"credential|password|brute.?force|spray|mfa fatigue|token theft|keylog"),
-        ("Initial Access", r"from new country|impossible travel|unusual (sign|log)[- ]?in|phish|unexpected country|external (rdp|exposure)|exposed (to the internet|service)"),
+        (
+            "Initial Access",
+            r"from new country|impossible travel|unusual (sign|log)[- ]?in|phish|unexpected country|external (rdp|exposure)|exposed (to the internet|service)",
+        ),
         ("Lateral Movement", r"lateral|pass.the.hash|psexec|remote service|\bsmb\b.*(share|relay)|\brdp\b"),
         ("Privilege Escalation", r"privilege escalation|elevat|admin role (added|granted)|added to .*admin"),
-        ("Persistence", r"persist|scheduled task|startup item|autorun|run key|new (service|account) (created|installed)|inbox rule|mail forward"),
-        ("Defense Evasion", r"disabled|tamper|clear(ed)? (the )?(event )?log|defender (off|disabled)|bitlocker|encryption is disabled|not installed|security (agent|software)"),
+        (
+            "Persistence",
+            r"persist|scheduled task|startup item|autorun|run key|new (service|account) (created|installed)|inbox rule|mail forward",
+        ),
+        (
+            "Defense Evasion",
+            r"disabled|tamper|clear(ed)? (the )?(event )?log|defender (off|disabled)|bitlocker|encryption is disabled|not installed|security (agent|software)",
+        ),
         ("Discovery", r"port scan|network scan|enumerat|discovery|reconnaissance|recon\b"),
         ("Collection", r"mailbox access|email collection|screen capture|clipboard"),
         ("Command and Control", r"command and control|\bc2\b|beacon|dns tunnel|reverse shell|tor exit"),
         ("Exfiltration", r"exfiltrat|data (leak|loss|theft)|large (upload|download)|external share|mass download"),
-        ("Impact", r"ransom|file deletions?|mass delet|wiper|denial.of.service|\bdos\b|flood|crash|cpu consumption|memory leak|resource exhaustion|encrypts? files"),
-        ("Execution", r"remote code execution|code execution|arbitrary code|command injection|buffer overflow|out.of.bounds|malware|trojan|powershell|macro|exploit"),
+        (
+            "Impact",
+            r"ransom|file deletions?|mass delet|wiper|denial.of.service|\bdos\b|flood|crash|cpu consumption|memory leak|resource exhaustion|encrypts? files",
+        ),
+        (
+            "Execution",
+            r"remote code execution|code execution|arbitrary code|command injection|buffer overflow|out.of.bounds|malware|trojan|powershell|macro|exploit",
+        ),
     )
 )
 

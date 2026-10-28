@@ -55,7 +55,11 @@ def test_per_user_and_conditional_access_count_as_required_when_nothing_is_repor
 
 
 def test_when_registration_is_reported_it_still_decides_who_has_a_second_factor():
-    users = [person(security_defaults=True, registered=True, methods="microsoftAuthenticator"), person(security_defaults=True), person(registered=True)]
+    users = [
+        person(security_defaults=True, registered=True, methods="microsoftAuthenticator"),
+        person(security_defaults=True),
+        person(registered=True),
+    ]
     c = counts_for_mfa(users)
     assert (c["with_mfa"], c["not_required"], c["without_mfa"]) == (1, 1, 1)
     assert c["registration_unknown"] == 0

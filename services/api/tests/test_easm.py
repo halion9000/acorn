@@ -378,7 +378,14 @@ async def test_detect_drift_existing_asset_port_change():
 async def test_internetdb_turns_a_lookup_into_an_ip_asset_with_its_ports_and_cves_and_hostnames_as_subdomains():
     from app.services.easm_discovery import _internetdb_lookup
 
-    body = {"ip": "8.8.8.8", "ports": [443, 53, "x"], "hostnames": ["dns.google"], "vulns": ["CVE-2024-1"], "cpes": ["cpe:/a:x"], "tags": ["cloud"]}
+    body = {
+        "ip": "8.8.8.8",
+        "ports": [443, 53, "x"],
+        "hostnames": ["dns.google"],
+        "vulns": ["CVE-2024-1"],
+        "cpes": ["cpe:/a:x"],
+        "tags": ["cloud"],
+    }
 
     def handler(request):
         return httpx.Response(200, json=body) if request.url.path == "/8.8.8.8" else httpx.Response(404)
@@ -407,6 +414,9 @@ async def test_a_scan_for_domains_keeps_only_host_names_that_belong_to_them():
         DiscoveredAsset(asset_type=ExternalAssetType.SUBDOMAIN, value="someone-else.net", metadata={}),
         DiscoveredAsset(asset_type=ExternalAssetType.SUBDOMAIN, value="notacme.com", metadata={}),
     ]
-    with patch("app.services.easm_discovery.get_settings", return_value=fake_settings), patch("app.services.easm_discovery._internetdb_scan", return_value=looked):
+    with (
+        patch("app.services.easm_discovery.get_settings", return_value=fake_settings),
+        patch("app.services.easm_discovery._internetdb_scan", return_value=looked),
+    ):
         out = await run_discovery("Acme", lookup_targets=["8.8.8.8"], domains={"acme.com": ["8.8.8.8"]})
     assert [(a.asset_type.value, a.value) for a in out] == [("domain", "acme.com"), ("ip", "8.8.8.8"), ("subdomain", "www.acme.com")]

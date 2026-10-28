@@ -61,7 +61,16 @@ def database(tmp_path):
     DB.sync = create_engine(f"sqlite:///{DB.path}")
     Base.metadata.create_all(
         DB.sync,
-        tables=[Tenant.__table__, CopilotConversation.__table__, DetectionSuggestion.__table__, RetentionPolicyRow.__table__, ClientCheckHistory.__table__, ClientLicenseHistory.__table__, ClientScoreHistory.__table__, ClientM365Check.__table__],
+        tables=[
+            Tenant.__table__,
+            CopilotConversation.__table__,
+            DetectionSuggestion.__table__,
+            RetentionPolicyRow.__table__,
+            ClientCheckHistory.__table__,
+            ClientLicenseHistory.__table__,
+            ClientScoreHistory.__table__,
+            ClientM365Check.__table__,
+        ],
     )
     rs._meta.create_all(DB.sync)
     engine = create_async_engine(f"sqlite+aiosqlite:///{DB.path}", poolclass=NullPool)
@@ -490,8 +499,30 @@ def history_rows(age_days, tenant=A):
     _next_id[0] += 2
     cid, lid = _next_id[0], _next_id[0] + 1
     with Session(DB.sync) as s:
-        s.add(ClientCheckHistory(id=cid, tenant_id=tenant, source="ninjaone", key="k", status="met", previous_status=None, evidence="", observed_at=ago(age_days)))
-        s.add(ClientLicenseHistory(id=lid, tenant_id=tenant, source="ninjaone", item="Macs", unit="device", count=1, previous_count=None, observed_at=ago(age_days)))
+        s.add(
+            ClientCheckHistory(
+                id=cid,
+                tenant_id=tenant,
+                source="ninjaone",
+                key="k",
+                status="met",
+                previous_status=None,
+                evidence="",
+                observed_at=ago(age_days),
+            )
+        )
+        s.add(
+            ClientLicenseHistory(
+                id=lid,
+                tenant_id=tenant,
+                source="ninjaone",
+                item="Macs",
+                unit="device",
+                count=1,
+                previous_count=None,
+                observed_at=ago(age_days),
+            )
+        )
         s.add(ClientScoreHistory(tenant_id=tenant, day=ago(age_days).date(), score=80, met=1, partly=0, not_met=0, accepted=0))
         s.commit()
     return cid, lid, ago(age_days).date()
@@ -539,7 +570,7 @@ class TestPostureHistoryRetentionIsOptIn:
             assert s.execute(select(ClientM365Check.source)).all() == [("ninjaone",)]
 
     def test_the_window_is_clamped_to_a_day(self):
-        today, old = history_rows(0.1), history_rows(3)
+        today, _old = history_rows(0.1), history_rows(3)
         sweep(RETENTION_POSTURE_HISTORY_DAYS=1)
         checks, _l, _d = remaining_history()
         assert checks == {today[0]}

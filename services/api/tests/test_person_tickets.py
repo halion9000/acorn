@@ -17,7 +17,13 @@ TENANT = uuid.uuid4()
 
 
 def item(tid="1", **over):
-    base = {"vendor_client_id": "5", "id": tid, "summary": "Printer is down", "opened_at": NOW - timedelta(days=2), "user_email": "Amy@Acme.com"}
+    base = {
+        "vendor_client_id": "5",
+        "id": tid,
+        "summary": "Printer is down",
+        "opened_at": NOW - timedelta(days=2),
+        "user_email": "Amy@Acme.com",
+    }
     return ep.PersonTicketIn(**{**base, **over})
 
 
@@ -34,7 +40,12 @@ def apply(monkeypatch, items, placed=None):
     from app.api.v1.endpoints import signins
 
     async def fake_targets(db, owner, report):
-        return {TENANT: placed if placed is not None else report.items}, 1, 0, [SimpleNamespace(vendor_client_id="999", name="Gone Co", devices=1)]
+        return (
+            {TENANT: placed if placed is not None else report.items},
+            1,
+            0,
+            [SimpleNamespace(vendor_client_id="999", name="Gone Co", devices=1)],
+        )
 
     monkeypatch.setattr(signins, "targets_by_tenant", fake_targets)
     monkeypatch.setattr(ep, "acting_as_tenant", lambda db, tid: contextlib.nullcontext())
@@ -82,7 +93,16 @@ def test_the_detail_carries_tickets_and_defaults_to_none():
 
 def test_the_latest_ten_sign_ins_come_newest_first_with_the_unusual_ones_marked():
     events = [
-        SimpleNamespace(occurred_at=NOW - timedelta(hours=i), app="Outlook", country="US", city=None, ip_address="1.1.1.1", success=i % 2 == 0, mfa=True, anomaly_score=0.9 if i == 3 else None)
+        SimpleNamespace(
+            occurred_at=NOW - timedelta(hours=i),
+            app="Outlook",
+            country="US",
+            city=None,
+            ip_address="1.1.1.1",
+            success=i % 2 == 0,
+            mfa=True,
+            anomaly_score=0.9 if i == 3 else None,
+        )
         for i in range(14)
     ]
     rows = ep.signin_rows(list(reversed(events)))
@@ -98,7 +118,19 @@ def test_the_detail_lists_default_to_empty_so_an_older_client_still_reads_it():
 
 
 def person(**over):
-    base = {"key": "c:a@x.com", "client_id": uuid.uuid4(), "client_name": "Acme", "email": "a@x.com", "display_name": "Amy", "kind": "user", "enabled": True, "admin": False, "mfa": "covered", "tools": ["dropsuite", "cipp"], "open_alerts": 2}
+    base = {
+        "key": "c:a@x.com",
+        "client_id": uuid.uuid4(),
+        "client_name": "Acme",
+        "email": "a@x.com",
+        "display_name": "Amy",
+        "kind": "user",
+        "enabled": True,
+        "admin": False,
+        "mfa": "covered",
+        "tools": ["dropsuite", "cipp"],
+        "open_alerts": 2,
+    }
     return ep.PersonOut(**{**base, **over})
 
 

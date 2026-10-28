@@ -28,7 +28,13 @@ async def world():
         for key, tid in ids.items():
             await c.execute(
                 text("insert into tenants (id, name, slug, parent_tenant_id, mssp_role) values (:i, :n, :s, :p, :r)"),
-                {"i": tid, "n": f"ac-{key}-{tag}", "s": f"ac-{key}-{tag}", "p": None if key == "parent" else ids["parent"], "r": "parent" if key == "parent" else "child"},
+                {
+                    "i": tid,
+                    "n": f"ac-{key}-{tag}",
+                    "s": f"ac-{key}-{tag}",
+                    "p": None if key == "parent" else ids["parent"],
+                    "r": "parent" if key == "parent" else "child",
+                },
             )
 
         async def alert(tenant: str, status: str) -> uuid.UUID:
@@ -39,7 +45,15 @@ async def world():
             )
             return aid
 
-        async def case(name: str, tenant: str, alerts: list[uuid.UUID], *, status: str = "new", created_by: str | None = "system", assignee: str | None = None) -> None:
+        async def case(
+            name: str,
+            tenant: str,
+            alerts: list[uuid.UUID],
+            *,
+            status: str = "new",
+            created_by: str | None = "system",
+            assignee: str | None = None,
+        ) -> None:
             cid = uuid.uuid4()
             cases[name] = cid
             await c.execute(
@@ -47,7 +61,16 @@ async def world():
                     "insert into aisoc_cases (id, tenant_id, title, severity, status, alert_ids, created_by, assignee, case_number) "
                     "values (:i, :t, :n, 'high', :s, CAST(:a AS UUID[]), :cb, :as, :num)"
                 ),
-                {"i": cid, "t": ids[tenant], "n": name, "s": status, "a": [str(x) for x in alerts], "cb": created_by, "as": assignee, "num": f"AC-{tag}-{name}"},
+                {
+                    "i": cid,
+                    "t": ids[tenant],
+                    "n": name,
+                    "s": status,
+                    "a": [str(x) for x in alerts],
+                    "cb": created_by,
+                    "as": assignee,
+                    "num": f"AC-{tag}-{name}",
+                },
             )
 
         await case("all_done", "parent", [await alert("parent", "resolved")])
@@ -57,7 +80,9 @@ async def world():
         await case("no_alerts", "parent", [])
         await case("already_closed", "parent", [await alert("parent", "resolved")], status="closed")
         await case("child_done", "child", [await alert("child", "closed")])
-        await case("fp_and_closed", "child", [await alert("child", "false_positive"), await alert("child", "closed")], status="investigating")
+        await case(
+            "fp_and_closed", "child", [await alert("child", "false_positive"), await alert("child", "closed")], status="investigating"
+        )
     yield {"ids": ids, "cases": cases}
     async with engine.begin() as c:
         await c.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
@@ -83,9 +108,21 @@ async def statuses(world):
     try:
         async with engine.connect() as c:
             await c.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-            rows = (await c.execute(text("select title, status, closed_at is not null as has_closed_at from aisoc_cases where id = any(cast(:c as uuid[]))"), {"c": [str(x) for x in world["cases"].values()]})).all()
+            rows = (
+                await c.execute(
+                    text(
+                        "select title, status, closed_at is not null as has_closed_at from aisoc_cases where id = any(cast(:c as uuid[]))"
+                    ),
+                    {"c": [str(x) for x in world["cases"].values()]},
+                )
+            ).all()
             comments = (
-                await c.execute(text("select c.title, count(*) from aisoc_case_comments m join aisoc_cases c on c.id = m.case_id where c.id = any(cast(:c as uuid[])) and m.is_system group by 1"), {"c": [str(x) for x in world["cases"].values()]})
+                await c.execute(
+                    text(
+                        "select c.title, count(*) from aisoc_case_comments m join aisoc_cases c on c.id = m.case_id where c.id = any(cast(:c as uuid[])) and m.is_system group by 1"
+                    ),
+                    {"c": [str(x) for x in world["cases"].values()]},
+                )
             ).all()
         return {r.title: (r.status, r.has_closed_at) for r in rows}, dict(comments)
     finally:
@@ -98,12 +135,19 @@ async def test_only_unassigned_system_cases_whose_alerts_are_all_closed_are_clos
     got, comments = await statuses(world)
     assert got["all_done"] == ("closed", True)
     assert got["child_done"] == ("closed", True), "a client tenant's case is closed too"
-    assert got["fp_and_closed"] == ("closed", True), "false positives count as closed; an investigating case with nobody assigned also closes"
+    assert got["fp_and_closed"] == (
+        "closed",
+        True,
+    ), "false positives count as closed; an investigating case with nobody assigned also closes"
     assert got["mixed"][0] == "new", "one alert is still open"
     assert got["assigned"][0] == "new", "somebody took it"
     assert got["by_hand"][0] == "new", "a person opened it"
     assert got["no_alerts"][0] == "new", "nothing to judge it by"
-    assert comments == {"all_done": 1, "child_done": 1, "fp_and_closed": 1}, "a system note on each case it closed, none on the others, none on one that was already closed"
+    assert comments == {
+        "all_done": 1,
+        "child_done": 1,
+        "fp_and_closed": 1,
+    }, "a system note on each case it closed, none on the others, none on one that was already closed"
 
 
 async def test_a_second_run_does_nothing_and_the_kill_switch_turns_it_off(world, monkeypatch):
@@ -121,8 +165,13 @@ async def test_a_case_reopened_after_a_new_alert_joins_it_is_not_closed_while_th
         aid = uuid.uuid4()
         tid = world["ids"]["parent"]
         await db.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-        await db.execute(text("insert into alerts (id, tenant_id, title, severity, status) values (:i, :t, 'late', 'high', 'new')"), {"i": aid, "t": tid})
-        await db.execute(text("update aisoc_cases set alert_ids = alert_ids || CAST(:a AS UUID) where id = :c"), {"a": str(aid), "c": world["cases"]["all_done"]})
+        await db.execute(
+            text("insert into alerts (id, tenant_id, title, severity, status) values (:i, :t, 'late', 'high', 'new')"), {"i": aid, "t": tid}
+        )
+        await db.execute(
+            text("update aisoc_cases set alert_ids = alert_ids || CAST(:a AS UUID) where id = :c"),
+            {"a": str(aid), "c": world["cases"]["all_done"]},
+        )
 
     await run(world["ids"]["parent"], join_new_alert)
     await run(world["ids"]["parent"], lambda db: cfc.close_finished_cases(db, world["ids"]["parent"], now=NOW))
@@ -142,7 +191,12 @@ async def test_an_auto_closed_case_is_told_apart_from_one_a_person_closed_in_the
     assert counts.by_status.get("auto_closed") == 1
 
     async def listed(status):
-        rows = await run(parent, lambda db: cases_ep.list_cases(db, user, status_filter=status, severity=None, assignee=None, limit=50, offset=0, scope="own", client_id=None))
+        rows = await run(
+            parent,
+            lambda db: cases_ep.list_cases(
+                db, user, status_filter=status, severity=None, assignee=None, limit=50, offset=0, scope="own", client_id=None
+            ),
+        )
         return sorted(r.title for r in rows)
 
     assert await listed("auto_closed") == ["all_done"]

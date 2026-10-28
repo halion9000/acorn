@@ -28,8 +28,8 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.signin import DirectoryAuditEvent, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
 from app.services.directory_scoring import directory_features, sensitivity_of
-from app.services.mfa_registration import has_second_factor, registration_known, required_of
 from app.services.identity_detections import run_audit_detections
+from app.services.mfa_registration import has_second_factor, registration_known, required_of
 from app.services.signin_scoring import HISTORY_DAYS, score_events
 
 LOG = logging.getLogger(__name__)
@@ -432,7 +432,11 @@ async def mfa_users(
             .all()
         )
     known = registration_known(list(users))
-    picked = [u for u in _counted(list(users)) if (not has_second_factor(u, known) if which == "without" else (known and u.registered and not _required(u)))]
+    picked = [
+        u
+        for u in _counted(list(users))
+        if (not has_second_factor(u, known) if which == "without" else (known and u.registered and not _required(u)))
+    ]
     picked.sort(key=lambda u: (not u.admin, u.upn))
     return [
         MfaUserOut(upn=u.upn, display_name=u.display_name, admin=u.admin, registered=u.registered, required=_required(u), methods=u.methods)

@@ -6,7 +6,6 @@ import uuid
 from types import SimpleNamespace
 
 import httpx
-
 from app.api.v1.endpoints import client_posture as cp
 from app.services import domain_posture as dp
 
@@ -57,7 +56,10 @@ class FakeResolver:
 
 def test_a_domain_with_everything_is_good_and_names_its_mail_provider():
     r = FakeResolver(
-        txt={"acme.com": ["v=spf1 include:spf.protection.outlook.com -all"], "_dmarc.acme.com": ["v=DMARC1; p=reject; rua=mailto:r@acme.com"]},
+        txt={
+            "acme.com": ["v=spf1 include:spf.protection.outlook.com -all"],
+            "_dmarc.acme.com": ["v=DMARC1; p=reject; rua=mailto:r@acme.com"],
+        },
         cname={"selector1._domainkey.acme.com": ["selector1-acme-com._domainkey.acme.onmicrosoft.com"]},
         mx={"acme.com": ["acme-com.mail.protection.outlook.com"]},
     )

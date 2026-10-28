@@ -54,7 +54,14 @@ def test_a_rule_becomes_an_approved_entry_the_catalog_page_and_install_can_use()
 
 
 def test_files_that_are_not_rules_are_left_out():
-    for text in ("", "- a list", "id: x\nname: y\n", "id: 1\nname: n\nlogsource: {product: a}\n", ":\n  - [", "id: ''\nname: n\nlogsource: {}\ndetection: {a: 1}\n"):
+    for text in (
+        "",
+        "- a list",
+        "id: x\nname: y\n",
+        "id: 1\nname: n\nlogsource: {product: a}\n",
+        ":\n  - [",
+        "id: ''\nname: n\nlogsource: {}\ndetection: {a: 1}\n",
+    ):
         assert lc.entry_for(text, "f.yaml", NOW) is None
 
 

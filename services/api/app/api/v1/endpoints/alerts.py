@@ -723,7 +723,8 @@ async def list_alerts(
         default=None, pattern="^(linked|none)$", description="linked: only alerts with a HaloPSA ticket; none: only alerts without one."
     ),
     collapse: bool = Query(
-        default=False, description="Show one row for each group of repeats (same rule, machines and users): the newest, with ``repeat_count`` saying how many there are."
+        default=False,
+        description="Show one row for each group of repeats (same rule, machines and users): the newest, with ``repeat_count`` saying how many there are.",
     ),
 ) -> AlertListResponse:
     """List alerts for the current tenant and its client tenants, with filtering and pagination.
@@ -742,7 +743,9 @@ async def list_alerts(
     match either filter — that's intentional; analysts who care about
     confidence should only see alerts that actually carry the signal.
     """
-    collapse = collapse is True  # called directly (without FastAPI), an omitted parameter is its Query() default, which must not read as "on"
+    collapse = (
+        collapse is True
+    )  # called directly (without FastAPI), an omitted parameter is its Query() default, which must not read as "on"
     if confidence_label is not None and confidence_label not in {"high", "medium", "low"}:
         # NOTE: the local `status` query parameter shadows the `fastapi.status` module here, so use the literal 400.
         raise HTTPException(status_code=400, detail="confidence_label must be one of: high, medium, low")
@@ -812,10 +815,16 @@ async def list_alerts(
     async def add_tally(tid: uuid.UUID) -> int:
         """Add one tenant's counts to the tally and return how many alerts it has (under the ``source`` filter). The caller has the session scoped to that tenant."""
         base = and_(Alert.tenant_id == tid, Alert.raw_event["source"].astext == source) if source else Alert.tenant_id == tid
-        grouped = (await db.execute(select(Alert.severity, Alert.status, func.count()).where(base).group_by(Alert.severity, Alert.status))).all()
+        grouped = (
+            await db.execute(select(Alert.severity, Alert.status, func.count()).where(base).group_by(Alert.severity, Alert.status))
+        ).all()
         if not grouped:
             return 0  # nothing here, so nothing without a ticket either: one query instead of two
-        tally["no_ticket"] += (await db.execute(select(func.count()).select_from(Alert).where(and_(base, Alert.status.notin_(FINISHED_STATUSES), not_(has_ticket_expr()))))).scalar_one() or 0
+        tally["no_ticket"] += (
+            await db.execute(
+                select(func.count()).select_from(Alert).where(and_(base, Alert.status.notin_(FINISHED_STATUSES), not_(has_ticket_expr())))
+            )
+        ).scalar_one() or 0
         for sev, st, n in grouped:
             tally["total"] += n
             tally["critical"] += n if sev == "critical" else 0
@@ -1084,7 +1093,11 @@ async def _huntress_base(db: Any, tenant_ids: set) -> str | None:
         found = (
             await db.execute(
                 select(Alert.raw_event["url"].astext)
-                .where(Alert.tenant_id.in_(tenant_ids), Alert.raw_event["source"].astext == "huntress", Alert.raw_event["url"].astext.like("https://%/account/escalations/%"))
+                .where(
+                    Alert.tenant_id.in_(tenant_ids),
+                    Alert.raw_event["source"].astext == "huntress",
+                    Alert.raw_event["url"].astext.like("https://%/account/escalations/%"),
+                )
                 .limit(1)
             )
         ).scalar_one_or_none()

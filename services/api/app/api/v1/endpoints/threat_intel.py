@@ -165,7 +165,9 @@ async def with_alert_summaries(db: AsyncSession, tenant_id: uuid.UUID, rows: lis
     wanted = {a for r in rows for a in (r.linked_alerts or [])[:LINKED_SUMMARY_COUNT]}
     found: dict[uuid.UUID, LinkedAlertOut] = {}
     if wanted:
-        for alert_id, title, severity in (await db.execute(select(Alert.id, Alert.title, Alert.severity).where(Alert.tenant_id == tenant_id, Alert.id.in_(wanted)))).all():
+        for alert_id, title, severity in (
+            await db.execute(select(Alert.id, Alert.title, Alert.severity).where(Alert.tenant_id == tenant_id, Alert.id.in_(wanted)))
+        ).all():
             found[alert_id] = LinkedAlertOut(id=alert_id, title=title, severity=severity)
     out: list[IOCOut] = []
     for r in rows:

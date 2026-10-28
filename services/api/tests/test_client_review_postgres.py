@@ -62,7 +62,9 @@ async def world():
     yield ids
     async with engine.begin() as c:
         await c.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-        await c.execute(text("set local session_replication_role = replica"))  # the audit log refuses deletes (and the cascade from tenants); this is a disposable database
+        await c.execute(
+            text("set local session_replication_role = replica")
+        )  # the audit log refuses deletes (and the cascade from tenants); this is a disposable database
         await c.execute(text("delete from cases where tenant_id = :t"), {"t": ids["client"]})
         await c.execute(text("delete from tenants where id = any(cast(:t as uuid[]))"), {"t": [str(x) for x in ids.values()]})
     await engine.dispose()
@@ -289,12 +291,19 @@ async def test_history_records_only_changes_acceptances_expire_and_sweep_runs_ar
         await run(world["msp"], lambda db, checks=checks: ep.apply_m365_checks(db, world["msp"], m365_report(client="h-1", checks=checks)))
     hist = await run(world["msp"], lambda db: cp.check_history(world["client"], NS(tenant_id=world["msp"]), db))
     got = [(r.key, r.previous_status, r.status) for r in hist.rows]
-    assert len(got) == 3 and set(got) == {("a", None, "met"), ("b", None, "not_met"), ("b", "not_met", "partly")}, "a repeat and a same-status refresh add nothing"
+    assert len(got) == 3 and set(got) == {
+        ("a", None, "met"),
+        ("b", None, "not_met"),
+        ("b", "not_met", "partly"),
+    }, "a repeat and a same-status refresh add nothing"
     only_b = await run(world["msp"], lambda db: cp.check_history(world["client"], NS(tenant_id=world["msp"]), db, key="b"))
     assert [r.status for r in only_b.rows] == ["partly", "not_met"], "newest first"
 
     user = NS(tenant_id=world["msp"], user_id=None)
-    out = await run(world["msp"], lambda db: cp.accept_check(world["client"], "b", cp.AcceptIn(reason="  Replace in January ", expires_in_days=30), user, db))
+    out = await run(
+        world["msp"],
+        lambda db: cp.accept_check(world["client"], "b", cp.AcceptIn(reason="  Replace in January ", expires_in_days=30), user, db),
+    )
     assert out.reason == "Replace in January" and out.expires_at is not None
     again = await run(world["msp"], lambda db: cp.accept_check(world["client"], "b", cp.AcceptIn(reason="Still waiting"), user, db))
     assert again.expires_at is None, "a second acceptance replaces the first"
@@ -302,17 +311,55 @@ async def test_history_records_only_changes_acceptances_expire_and_sweep_runs_ar
         await run(world["msp"], lambda db: cp.accept_check(world["stranger"], "b", cp.AcceptIn(reason="not mine"), user, db))
     assert e.value.status_code == 404
     await run(world["msp"], lambda db: cp.remove_acceptance(world["client"], "b", user, db))
-    left = (await run(world["msp"], lambda db: db.execute(text("select count(*) from client_check_acceptances where tenant_id = :t"), {"t": world["client"]}))).scalar_one()
+    left = (
+        await run(
+            world["msp"],
+            lambda db: db.execute(text("select count(*) from client_check_acceptances where tenant_id = :t"), {"t": world["client"]}),
+        )
+    ).scalar_one()
     assert left == 0
-    actions = (await run(world["msp"], lambda db: db.execute(text("select action from audit_log where tenant_id = :t and resource = 'client_check' order by created_at"), {"t": world["msp"]}))).scalars().all()
-    assert actions == ["posture:check_accepted", "posture:check_accepted", "posture:check_acceptance_removed"], "each accept and the removal is in the audit log (the refused one is not)"
+    actions = (
+        (
+            await run(
+                world["msp"],
+                lambda db: db.execute(
+                    text("select action from audit_log where tenant_id = :t and resource = 'client_check' order by created_at"),
+                    {"t": world["msp"]},
+                ),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert actions == [
+        "posture:check_accepted",
+        "posture:check_accepted",
+        "posture:check_acceptance_removed",
+    ], "each accept and the removal is in the audit log (the refused one is not)"
 
-    report = ep.SweepRunsReport(runs=[ep.SweepRunIn(source="ninjaone", title="NinjaOne client checks", accounts=10, sent=7, failed=1, waiting=2, skipped=0, first_error="Acme: boom")])
+    report = ep.SweepRunsReport(
+        runs=[
+            ep.SweepRunIn(
+                source="ninjaone",
+                title="NinjaOne client checks",
+                accounts=10,
+                sent=7,
+                failed=1,
+                waiting=2,
+                skipped=0,
+                first_error="Acme: boom",
+            )
+        ]
+    )
     assert await run(world["msp"], lambda db: ep.apply_sweep_runs(db, world["msp"], report)) == 1
-    report2 = ep.SweepRunsReport(runs=[ep.SweepRunIn(source="ninjaone", title="NinjaOne client checks", accounts=10, sent=10, failed=0, waiting=0, skipped=0)])
+    report2 = ep.SweepRunsReport(
+        runs=[ep.SweepRunIn(source="ninjaone", title="NinjaOne client checks", accounts=10, sent=10, failed=0, waiting=0, skipped=0)]
+    )
     await run(world["msp"], lambda db: ep.apply_sweep_runs(db, world["msp"], report2))
     runs = await run(world["msp"], lambda db: cp.sweep_runs(NS(tenant_id=world["msp"]), db))
-    assert [(r.source, r.sent, r.failed, r.health) for r in runs] == [("ninjaone", 10, 0, "ok")], "the latest pass replaces the previous one"
+    assert [(r.source, r.sent, r.failed, r.health) for r in runs] == [
+        ("ninjaone", 10, 0, "ok")
+    ], "the latest pass replaces the previous one"
 
 
 async def test_the_fleet_views_rank_clients_list_a_board_and_show_the_days_changes(world):
@@ -329,7 +376,12 @@ async def test_the_fleet_views_rank_clients_list_a_board_and_show_the_days_chang
 
     await run(world["msp"], alias)
     checks = [
-        {"key": "cipp_inactive_accounts", "status": "not_met", "evidence": "4 licensed accounts have not signed in", "items": ["a@x.com (200 days)", "b@x.com (300 days)"]},
+        {
+            "key": "cipp_inactive_accounts",
+            "status": "not_met",
+            "evidence": "4 licensed accounts have not signed in",
+            "items": ["a@x.com (200 days)", "b@x.com (300 days)"],
+        },
         {"key": "cipp_subscriptions", "status": "met", "evidence": "3 subscriptions, none lapsed"},
         {"key": "cipp_unused_licences", "status": "partly", "evidence": "9 of 20 unused"},
     ]
@@ -344,16 +396,24 @@ async def test_the_fleet_views_rank_clients_list_a_board_and_show_the_days_chang
 
     board = await run(world["msp"], lambda db: cp.fleet_board("licences", user, db))
     rows = [(r.key, r.status) for r in board.rows if r.client_id == world["client"]]
-    assert rows == [("cipp_inactive_accounts", "not_met"), ("cipp_unused_licences", "partly")], "worst first, and the fine check is left out"
+    assert rows == [
+        ("cipp_inactive_accounts", "not_met"),
+        ("cipp_unused_licences", "partly"),
+    ], "worst first, and the fine check is left out"
     first = [r for r in board.rows if r.client_id == world["client"]][0]
-    assert first.items == ["a@x.com (200 days)", "b@x.com (300 days)"], "the list behind a check survives storing and reading (a field a copy leaves out is lost silently)"
+    assert first.items == [
+        "a@x.com (200 days)",
+        "b@x.com (300 days)",
+    ], "the list behind a check survives storing and reading (a field a copy leaves out is lost silently)"
     with_met = await run(world["msp"], lambda db: cp.fleet_board("backups", user, db, include_met=True))
     assert [r for r in with_met.rows if r.client_id == world["client"]] == [], "a board only holds its own checks"
     with pytest.raises(HTTPException) as e:
         await run(world["msp"], lambda db: cp.fleet_board("nope", user, db))
     assert e.value.status_code == 404
 
-    await run(world["msp"], lambda db: cp.accept_check(world["client"], "cipp_inactive_accounts", cp.AcceptIn(reason="Staff on leave"), user, db))
+    await run(
+        world["msp"], lambda db: cp.accept_check(world["client"], "cipp_inactive_accounts", cp.AcceptIn(reason="Staff on leave"), user, db)
+    )
     again = await run(world["msp"], lambda db: cp.fleet_summary(user, db))
     mine = [c for c in again.clients if c.client_id == world["client"]][0]
     assert (mine.not_met, mine.accepted, mine.score) == (0, 1, 75), "an accepted check leaves the score"
@@ -387,13 +447,20 @@ async def test_license_counts_are_stored_diffed_into_history_and_totalled_across
     await run(world["msp"], alias)
 
     def report(client="n-1", **counts):
-        return bl.LicenseCountsReport(vendor="ninjaone", vendor_client_id=client, counts=[bl.LicenseCountIn(item=k.replace("_", " "), unit="device", count=v) for k, v in counts.items()])
+        return bl.LicenseCountsReport(
+            vendor="ninjaone",
+            vendor_client_id=client,
+            counts=[bl.LicenseCountIn(item=k.replace("_", " "), unit="device", count=v) for k, v in counts.items()],
+        )
 
     waiting = await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], report("nobody", Macs=1)))
     assert (waiting.accepted, waiting.unmapped) == (0, 1)
     long_ago = datetime.now(UTC) - timedelta(days=40)
     await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], report(Windows_workstations=10, Macs=4), now=long_ago))
-    await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], report(Windows_workstations=10, Macs=4), now=long_ago + timedelta(days=1)))
+    await run(
+        world["msp"],
+        lambda db: bl.apply_license_counts(db, world["msp"], report(Windows_workstations=10, Macs=4), now=long_ago + timedelta(days=1)),
+    )
     await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], report(Windows_workstations=13)))
 
     user = NS(tenant_id=world["msp"], user_id=None)
@@ -404,13 +471,19 @@ async def test_license_counts_are_stored_diffed_into_history_and_totalled_across
 
     log = await run(world["msp"], lambda db: bl.changes_log(user, db, days=90))
     mine = [(c.item, c.previous_count, c.count) for c in log if c.client_id == world["client"]]
-    assert sorted(mine, key=str) == sorted([("Windows workstations", None, 10), ("Macs", None, 4), ("Windows workstations", 10, 13), ("Macs", 4, 0)], key=str), "an unchanged day adds nothing; a removal is a change to 0"
+    assert sorted(mine, key=str) == sorted(
+        [("Windows workstations", None, 10), ("Macs", None, 4), ("Windows workstations", 10, 13), ("Macs", 4, 0)], key=str
+    ), "an unchanged day adds nothing; a removal is a change to 0"
     assert log[0].observed_at >= log[-1].observed_at, "newest first"
     only_ninja = await run(world["msp"], lambda db: bl.changes_log(user, db, days=90, source="ninjaone"))
     assert {c.source for c in only_ninja} == {"ninjaone"} and len([c for c in only_ninja if c.client_id == world["client"]]) == 4
-    assert await run(world["msp"], lambda db: bl.changes_log(user, db, days=90, source="halopsa")) == [] or all(c.source == "halopsa" for c in await run(world["msp"], lambda db: bl.changes_log(user, db, days=90, source="halopsa")))
+    assert await run(world["msp"], lambda db: bl.changes_log(user, db, days=90, source="halopsa")) == [] or all(
+        c.source == "halopsa" for c in await run(world["msp"], lambda db: bl.changes_log(user, db, days=90, source="halopsa"))
+    )
 
-    series = await run(world["msp"], lambda db: bl.client_count_history(world["client"], "ninjaone", "Windows workstations", user, db, days=90))
+    series = await run(
+        world["msp"], lambda db: bl.client_count_history(world["client"], "ninjaone", "Windows workstations", user, db, days=90)
+    )
     assert [p.count for p in series.points] == [10, 13, 13], "10 forty days ago, 13 now, and the end point is now"
     assert series.points[0].at < series.points[1].at <= series.points[2].at
     with pytest.raises(HTTPException) as e0:
@@ -440,31 +513,77 @@ async def test_billed_lines_are_checked_against_the_tool_counts_they_are_mapped_
             )
 
     await run(world["msp"], aliases)
-    billed = bl.LicenseCountsReport(vendor="halopsa", vendor_client_id="r-halopsa", counts=[bl.LicenseCountIn(item="NinjaOne RMM (Included)", unit="other", count=16), bl.LicenseCountIn(item="Liongard (Included)", unit="other", count=1)])
-    counted = bl.LicenseCountsReport(vendor="ninjaone", vendor_client_id="r-ninjaone", counts=[bl.LicenseCountIn(item="Windows workstations", unit="device", count=14), bl.LicenseCountIn(item="Macs", unit="device", count=4)])
+    billed = bl.LicenseCountsReport(
+        vendor="halopsa",
+        vendor_client_id="r-halopsa",
+        counts=[
+            bl.LicenseCountIn(item="NinjaOne RMM (Included)", unit="other", count=16),
+            bl.LicenseCountIn(item="Liongard (Included)", unit="other", count=1),
+        ],
+    )
+    counted = bl.LicenseCountsReport(
+        vendor="ninjaone",
+        vendor_client_id="r-ninjaone",
+        counts=[
+            bl.LicenseCountIn(item="Windows workstations", unit="device", count=14),
+            bl.LicenseCountIn(item="Macs", unit="device", count=4),
+        ],
+    )
     for r in (billed, counted):
         await run(world["msp"], lambda db, r=r: bl.apply_license_counts(db, world["msp"], r))
     user = NS(tenant_id=world["msp"], user_id=None)
 
     # A count of tickets that HaloPSA reports is not an invoice line: it never shows as a line to map or to compare.
-    await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], bl.LicenseCountsReport(vendor="halopsa", vendor_client_id="r-halopsa", counts=[bl.LicenseCountIn(item="NinjaOne RMM (Included)", unit="other", count=16), bl.LicenseCountIn(item="Liongard (Included)", unit="other", count=1), bl.LicenseCountIn(item="Tickets opened in the last 30 days", unit="ticket", count=42)])))
+    await run(
+        world["msp"],
+        lambda db: bl.apply_license_counts(
+            db,
+            world["msp"],
+            bl.LicenseCountsReport(
+                vendor="halopsa",
+                vendor_client_id="r-halopsa",
+                counts=[
+                    bl.LicenseCountIn(item="NinjaOne RMM (Included)", unit="other", count=16),
+                    bl.LicenseCountIn(item="Liongard (Included)", unit="other", count=1),
+                    bl.LicenseCountIn(item="Tickets opened in the last 30 days", unit="ticket", count=42),
+                ],
+            ),
+        ),
+    )
     before = await run(world["msp"], lambda db: bl.billing_map(user, db))
     un = {u["invoice_item"]: u for u in before.unmapped}
-    assert "NinjaOne RMM (Included)" in un and un["NinjaOne RMM (Included)"]["suggestion"][0] == {"source": "ninjaone", "item": "Windows workstations"}
+    assert "NinjaOne RMM (Included)" in un and un["NinjaOne RMM (Included)"]["suggestion"][0] == {
+        "source": "ninjaone",
+        "item": "Windows workstations",
+    }
     assert un["Liongard (Included)"]["suggestion"] == []
-    assert "Tickets opened in the last 30 days" not in un and not any(c.item.startswith("Tickets opened") for c in before.counted_items), "tickets are not invoice lines and not something to map to"
+    assert "Tickets opened in the last 30 days" not in un and not any(
+        c.item.startswith("Tickets opened") for c in before.counted_items
+    ), "tickets are not invoice lines and not something to map to"
     assert any(c.source == "ninjaone" and c.item == "Macs" for c in before.counted_items)
     assert not any(c.source == "halopsa" for c in before.counted_items), "what is billed is not something to map to"
 
     nothing = await run(world["msp"], lambda db: bl.reconcile_billing(user, db))
     assert [r for r in nothing.rows if r.client_id == world["client"]] == [] and nothing.unmapped_lines >= 2
 
-    saved = await run(world["msp"], lambda db: bl.save_map(bl.MapIn(invoice_item=" NinjaOne RMM (Included) ", counted=[bl.CountedRef(source="ninjaone", item="Windows workstations"), bl.CountedRef(source="ninjaone", item="Macs")]), user, db))
+    saved = await run(
+        world["msp"],
+        lambda db: bl.save_map(
+            bl.MapIn(
+                invoice_item=" NinjaOne RMM (Included) ",
+                counted=[bl.CountedRef(source="ninjaone", item="Windows workstations"), bl.CountedRef(source="ninjaone", item="Macs")],
+            ),
+            user,
+            db,
+        ),
+    )
     assert saved.invoice_item == "NinjaOne RMM (Included)"
     after = await run(world["msp"], lambda db: bl.reconcile_billing(user, db))
     assert all("Tickets" not in r.invoice_item for r in after.rows) and after.unmapped_lines >= 1
     dq = await run(world["msp"], lambda db: bl.data_quality(user, db))
-    assert world["client"] not in [u.client_id for u in dq.unbilled], "this client is both counted by the RMM and billed, so it is not unbilled"
+    assert world["client"] not in [
+        u.client_id for u in dq.unbilled
+    ], "this client is both counted by the RMM and billed, so it is not unbilled"
     mine = [r for r in after.rows if r.client_id == world["client"]]
     assert [(r.invoice_item, r.billed, r.counted, r.difference) for r in mine] == [("NinjaOne RMM (Included)", 16, 18, 2)]
     assert [p["count"] for p in mine[0].parts] == [14, 4]
@@ -474,8 +593,14 @@ async def test_billed_lines_are_checked_against_the_tool_counts_they_are_mapped_
 
     async def backdate(db):
         async with acting_as_tenant(db, world["client"]):
-            await db.execute(text("update client_license_history set observed_at = observed_at - interval '20 days' where tenant_id = :c"), {"c": world["client"]})
-            await db.execute(text("update client_license_counts set first_seen_at = first_seen_at - interval '20 days' where tenant_id = :c"), {"c": world["client"]})
+            await db.execute(
+                text("update client_license_history set observed_at = observed_at - interval '20 days' where tenant_id = :c"),
+                {"c": world["client"]},
+            )
+            await db.execute(
+                text("update client_license_counts set first_seen_at = first_seen_at - interval '20 days' where tenant_id = :c"),
+                {"c": world["client"]},
+            )
 
     await run(world["msp"], backdate)
     old = [r for r in (await run(world["msp"], lambda db: bl.reconcile_billing(user, db))).rows if r.client_id == world["client"]]
@@ -486,21 +611,49 @@ async def test_billed_lines_are_checked_against_the_tool_counts_they_are_mapped_
     assert [r for r in dropped.rows if r.client_id == world["client"]] == []
 
     # A person says this difference of 2 is fine: the line is accepted while it stays 2, stale when the count moves, and a stranger's client cannot be given a note.
-    await run(world["msp"], lambda db: bl.save_note(bl.NoteIn(client_id=world["client"], invoice_item="NinjaOne RMM (Included)", note="  Flat  package, minimum of 18 ", difference=2), user, db))
+    await run(
+        world["msp"],
+        lambda db: bl.save_note(
+            bl.NoteIn(
+                client_id=world["client"], invoice_item="NinjaOne RMM (Included)", note="  Flat  package, minimum of 18 ", difference=2
+            ),
+            user,
+            db,
+        ),
+    )
     noted = [r for r in (await run(world["msp"], lambda db: bl.reconcile_billing(user, db))).rows if r.client_id == world["client"]]
     assert (noted[0].note_state, noted[0].note) == ("accepted", "Flat package, minimum of 18")
-    await run(world["msp"], lambda db: bl.apply_license_counts(db, world["msp"], bl.LicenseCountsReport(vendor="ninjaone", vendor_client_id="r-ninjaone", counts=[bl.LicenseCountIn(item="Windows workstations", unit="device", count=15), bl.LicenseCountIn(item="Macs", unit="device", count=4)])))
+    await run(
+        world["msp"],
+        lambda db: bl.apply_license_counts(
+            db,
+            world["msp"],
+            bl.LicenseCountsReport(
+                vendor="ninjaone",
+                vendor_client_id="r-ninjaone",
+                counts=[
+                    bl.LicenseCountIn(item="Windows workstations", unit="device", count=15),
+                    bl.LicenseCountIn(item="Macs", unit="device", count=4),
+                ],
+            ),
+        ),
+    )
     moved = [r for r in (await run(world["msp"], lambda db: bl.reconcile_billing(user, db))).rows if r.client_id == world["client"]]
     assert (moved[0].difference, moved[0].note_state) == (3, "stale"), "the difference is no longer the one the note was written for"
     with pytest.raises(HTTPException) as e:
-        await run(world["msp"], lambda db: bl.save_note(bl.NoteIn(client_id=world["stranger"], invoice_item="x", note="not mine", difference=1), user, db))
+        await run(
+            world["msp"],
+            lambda db: bl.save_note(bl.NoteIn(client_id=world["stranger"], invoice_item="x", note="not mine", difference=1), user, db),
+        )
     assert e.value.status_code == 404
     await run(world["msp"], lambda db: bl.delete_note(world["client"], "NinjaOne RMM (Included)", user, db))
     cleared = [r for r in (await run(world["msp"], lambda db: bl.reconcile_billing(user, db))).rows if r.client_id == world["client"]]
     assert (cleared[0].note_state, cleared[0].note) == ("none", None)
 
     again = await run(world["msp"], lambda db: bl.billing_map(user, db))
-    assert [m.invoice_item for m in again.mapped] == ["NinjaOne RMM (Included)"] and "NinjaOne RMM (Included)" not in {u["invoice_item"] for u in again.unmapped}
+    assert [m.invoice_item for m in again.mapped] == ["NinjaOne RMM (Included)"] and "NinjaOne RMM (Included)" not in {
+        u["invoice_item"] for u in again.unmapped
+    }
 
     await run(world["msp"], lambda db: bl.delete_map("NinjaOne RMM (Included)", user, db))
     gone = await run(world["msp"], lambda db: bl.billing_map(user, db))
@@ -524,8 +677,18 @@ async def test_each_report_of_a_clients_checks_keeps_one_score_row_for_the_day_a
     def report(checks):
         return ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-1", checks=checks)
 
-    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report([{"key": "a", "status": "not_met", "evidence": ""}, {"key": "b", "status": "met", "evidence": ""}])))
-    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report([{"key": "a", "status": "met", "evidence": ""}, {"key": "b", "status": "met", "evidence": ""}])))
+    await run(
+        world["msp"],
+        lambda db: ep.apply_m365_checks(
+            db, world["msp"], report([{"key": "a", "status": "not_met", "evidence": ""}, {"key": "b", "status": "met", "evidence": ""}])
+        ),
+    )
+    await run(
+        world["msp"],
+        lambda db: ep.apply_m365_checks(
+            db, world["msp"], report([{"key": "a", "status": "met", "evidence": ""}, {"key": "b", "status": "met", "evidence": ""}])
+        ),
+    )
     out = await run(world["msp"], lambda db: cp.score_history(world["client"], NS(tenant_id=world["msp"]), db))
     assert len(out.rows) == 1, "two reports on one day make one row, the last one"
     assert (out.rows[0].score, out.rows[0].met, out.rows[0].not_met) == (100, 2, 0)
@@ -550,15 +713,33 @@ async def test_a_check_can_be_marked_not_applicable_with_no_end_date_and_it_leav
     await run(world["msp"], alias)
     checks = [{"key": "fw", "status": "not_met", "evidence": ""}, {"key": "av", "status": "met", "evidence": ""}]
     user = NS(tenant_id=world["msp"], user_id=None)
-    out = await run(world["msp"], lambda db: cp.accept_check(world["client"], "fw", cp.AcceptIn(reason="No firewall on site", not_applicable=True), user, db))
+    out = await run(
+        world["msp"],
+        lambda db: cp.accept_check(world["client"], "fw", cp.AcceptIn(reason="No firewall on site", not_applicable=True), user, db),
+    )
     assert out.not_applicable is True and out.expires_at is None
     with pytest.raises(HTTPException) as e:
-        await run(world["msp"], lambda db: cp.accept_check(world["client"], "fw", cp.AcceptIn(reason="No firewall on site", not_applicable=True, expires_in_days=30), user, db))
+        await run(
+            world["msp"],
+            lambda db: cp.accept_check(
+                world["client"], "fw", cp.AcceptIn(reason="No firewall on site", not_applicable=True, expires_in_days=30), user, db
+            ),
+        )
     assert e.value.status_code == 422
-    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-9", checks=checks)))
+    await run(
+        world["msp"],
+        lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-9", checks=checks)),
+    )
     hist = await run(world["msp"], lambda db: cp.score_history(world["client"], NS(tenant_id=world["msp"]), db))
-    assert (hist.rows[0].score, hist.rows[0].not_met, hist.rows[0].accepted) == (100, 0, 1), "the check that does not apply is not counted against the client"
-    again = await run(world["msp"], lambda db: cp.accept_check(world["client"], "fw", cp.AcceptIn(reason="Accepted for now", expires_in_days=30), user, db))
+    assert (hist.rows[0].score, hist.rows[0].not_met, hist.rows[0].accepted) == (
+        100,
+        0,
+        1,
+    ), "the check that does not apply is not counted against the client"
+    again = await run(
+        world["msp"],
+        lambda db: cp.accept_check(world["client"], "fw", cp.AcceptIn(reason="Accepted for now", expires_in_days=30), user, db),
+    )
     assert again.not_applicable is False, "a later ordinary acceptance replaces it"
 
 
@@ -576,7 +757,10 @@ async def test_a_target_is_set_replaced_and_removed_and_the_fleet_flags_a_client
 
     await run(world["msp"], alias)
     checks = [{"key": "a", "status": "met", "evidence": ""}, {"key": "b", "status": "not_met", "evidence": ""}]
-    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-7", checks=checks)))
+    await run(
+        world["msp"],
+        lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-7", checks=checks)),
+    )
     user = NS(tenant_id=world["msp"], user_id=None)
 
     def mine(fleet):
@@ -615,13 +799,25 @@ async def test_an_owner_and_due_date_are_set_cleared_and_show_on_the_client_and_
         )
 
     await run(world["msp"], alias)
-    checks = [{"key": "ninjaone_antivirus", "status": "not_met", "evidence": ""}, {"key": "ninjaone_patching", "status": "met", "evidence": ""}]
-    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-11", checks=checks)))
+    checks = [
+        {"key": "ninjaone_antivirus", "status": "not_met", "evidence": ""},
+        {"key": "ninjaone_patching", "status": "met", "evidence": ""},
+    ]
+    await run(
+        world["msp"],
+        lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-11", checks=checks)),
+    )
     user = NS(tenant_id=world["msp"], user_id=None)
     yesterday = date.today() - timedelta(days=1)
-    out = await run(world["msp"], lambda db: cp.set_check_owner(world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="  Dana   R ", due_date=yesterday), user, db))
+    out = await run(
+        world["msp"],
+        lambda db: cp.set_check_owner(world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="  Dana   R ", due_date=yesterday), user, db),
+    )
     assert (out.owner, out.due_date) == ("Dana R", yesterday)
-    await run(world["msp"], lambda db: cp.set_check_owner(world["client"], "ninjaone_patching", cp.OwnerIn(owner="Sam", due_date=yesterday), user, db))
+    await run(
+        world["msp"],
+        lambda db: cp.set_check_owner(world["client"], "ninjaone_patching", cp.OwnerIn(owner="Sam", due_date=yesterday), user, db),
+    )
 
     cp.fleet_cache.clear()
     board = await run(world["msp"], lambda db: cp.fleet_board("endpoints", NS(tenant_id=world["msp"]), db, include_met=True))
@@ -633,14 +829,20 @@ async def test_an_owner_and_due_date_are_set_cleared_and_show_on_the_client_and_
     assert (by_key["ninjaone_antivirus"].owner, by_key["ninjaone_antivirus"].overdue) == ("Dana R", True)
     assert (by_key["ninjaone_patching"].owner, by_key["ninjaone_patching"].overdue) == ("Sam", False), "a met check is not overdue"
 
-    cleared = await run(world["msp"], lambda db: cp.set_check_owner(world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="  "), user, db))
+    cleared = await run(
+        world["msp"], lambda db: cp.set_check_owner(world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="  "), user, db)
+    )
     assert (cleared.owner, cleared.due_date) == (None, None)
     cp.fleet_cache.clear()
     board2 = await run(world["msp"], lambda db: cp.fleet_board("endpoints", NS(tenant_id=world["msp"]), db, include_met=True))
     assert {r.key: r.owner for r in board2.rows if r.client_id == world["client"]}["ninjaone_antivirus"] is None
-    for bad_client, bad_key, bad_body, code in ((world["stranger"], "ninjaone_antivirus", cp.OwnerIn(owner="x"), 404), (world["client"], "bad key!", cp.OwnerIn(owner="x"), 422), (world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="x" * 81), 422)):
+    for bad_client, bad_key, bad_body, code in (
+        (world["stranger"], "ninjaone_antivirus", cp.OwnerIn(owner="x"), 404),
+        (world["client"], "bad key!", cp.OwnerIn(owner="x"), 422),
+        (world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="x" * 81), 422),
+    ):
         with pytest.raises(HTTPException) as e:
-            await run(world["msp"], lambda db: cp.set_check_owner(bad_client, bad_key, bad_body, user, db))
+            await run(world["msp"], lambda db: cp.set_check_owner(bad_client, bad_key, bad_body, user, db))  # noqa: B023 - awaited in the same pass of the loop
         assert e.value.status_code == code
 
 
@@ -648,21 +850,51 @@ async def test_the_same_check_is_accepted_for_several_clients_at_once_and_a_stra
     from app.api.v1.endpoints import client_posture as cp
 
     user = NS(tenant_id=world["msp"], user_id=None)
-    out = await run(world["msp"], lambda db: cp.accept_check_for_many(cp.BulkAcceptIn(key="meraki_wan", client_ids=[world["client"], world["stranger"], world["client"]], reason="  One site, no firewall ", not_applicable=True), user, db))
+    out = await run(
+        world["msp"],
+        lambda db: cp.accept_check_for_many(
+            cp.BulkAcceptIn(
+                key="meraki_wan",
+                client_ids=[world["client"], world["stranger"], world["client"]],
+                reason="  One site, no firewall ",
+                not_applicable=True,
+            ),
+            user,
+            db,
+        ),
+    )
     assert out.accepted == 1, "the repeated client is done once"
     assert [(s.client_id, s.detail) for s in out.skipped] == [(world["stranger"], "Client not found")]
-    rows = (await run(world["msp"], lambda db: db.execute(text("select reason, not_applicable from client_check_acceptances where tenant_id = :t and key = 'meraki_wan'"), {"t": world["client"]}))).all()
+    rows = (
+        await run(
+            world["msp"],
+            lambda db: db.execute(
+                text("select reason, not_applicable from client_check_acceptances where tenant_id = :t and key = 'meraki_wan'"),
+                {"t": world["client"]},
+            ),
+        )
+    ).all()
     assert [tuple(r) for r in rows] == [("One site, no firewall", True)]
-    actions = (await run(world["msp"], lambda db: db.execute(text("select count(*) from audit_log where tenant_id = :t and action = 'posture:check_not_applicable'"), {"t": world["msp"]}))).scalar_one()
+    actions = (
+        await run(
+            world["msp"],
+            lambda db: db.execute(
+                text("select count(*) from audit_log where tenant_id = :t and action = 'posture:check_not_applicable'"), {"t": world["msp"]}
+            ),
+        )
+    ).scalar_one()
     assert actions >= 1
     for body, code in (
         (cp.BulkAcceptIn(key="meraki_wan", client_ids=[], reason="valid reason"), 422),
         (cp.BulkAcceptIn(key="meraki_wan", client_ids=[world["client"]], reason="x"), 422),
         (cp.BulkAcceptIn(key="bad key!", client_ids=[world["client"]], reason="valid reason"), 422),
-        (cp.BulkAcceptIn(key="meraki_wan", client_ids=[world["client"]], reason="valid reason", not_applicable=True, expires_in_days=5), 422),
+        (
+            cp.BulkAcceptIn(key="meraki_wan", client_ids=[world["client"]], reason="valid reason", not_applicable=True, expires_in_days=5),
+            422,
+        ),
     ):
         with pytest.raises(HTTPException) as e:
-            await run(world["msp"], lambda db: cp.accept_check_for_many(body, user, db))
+            await run(world["msp"], lambda db: cp.accept_check_for_many(body, user, db))  # noqa: B023 - awaited in the same pass of the loop
         assert e.value.status_code == code
 
 
@@ -679,11 +911,27 @@ async def test_comments_on_a_check_are_added_in_order_counted_on_the_check_and_k
         )
 
     await run(world["msp"], alias)
-    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-12", checks=[{"key": "ninjaone_antivirus", "status": "not_met", "evidence": ""}])))
+    await run(
+        world["msp"],
+        lambda db: ep.apply_m365_checks(
+            db,
+            world["msp"],
+            ep.M365ChecksReport(
+                vendor="ninjaone", vendor_client_id="n-12", checks=[{"key": "ninjaone_antivirus", "status": "not_met", "evidence": ""}]
+            ),
+        ),
+    )
     user = NS(tenant_id=world["msp"], user_id=uuid.uuid4(), email="dana@example.com")
-    a = await run(world["msp"], lambda db: cp.add_check_comment(world["client"], "ninjaone_antivirus", cp.CommentIn(body="  Waiting on   the client\nto reply "), user, db))
+    a = await run(
+        world["msp"],
+        lambda db: cp.add_check_comment(
+            world["client"], "ninjaone_antivirus", cp.CommentIn(body="  Waiting on   the client\nto reply "), user, db
+        ),
+    )
     assert (a.author, a.body) == ("dana@example.com", "Waiting on the client to reply")
-    await run(world["msp"], lambda db: cp.add_check_comment(world["client"], "ninjaone_antivirus", cp.CommentIn(body="Licence ordered"), user, db))
+    await run(
+        world["msp"], lambda db: cp.add_check_comment(world["client"], "ninjaone_antivirus", cp.CommentIn(body="Licence ordered"), user, db)
+    )
     thread = await run(world["msp"], lambda db: cp.check_comments(world["client"], "ninjaone_antivirus", NS(tenant_id=world["msp"]), db))
     assert [c.body for c in thread.comments] == ["Waiting on the client to reply", "Licence ordered"], "oldest first"
     other = await run(world["msp"], lambda db: cp.check_comments(world["client"], "ninjaone_patching", NS(tenant_id=world["msp"]), db))
@@ -692,10 +940,12 @@ async def test_comments_on_a_check_are_added_in_order_counted_on_the_check_and_k
     assert {c.key: c.comments for t in posture.tool_checks.values() for c in t.checks}["ninjaone_antivirus"] == 2
     for bad, code in ((cp.CommentIn(body="   "), 422), (cp.CommentIn(body="x" * 1001), 422)):
         with pytest.raises(HTTPException) as e:
-            await run(world["msp"], lambda db: cp.add_check_comment(world["client"], "ninjaone_antivirus", bad, user, db))
+            await run(world["msp"], lambda db: cp.add_check_comment(world["client"], "ninjaone_antivirus", bad, user, db))  # noqa: B023 - awaited in the same pass of the loop
         assert e.value.status_code == code
     with pytest.raises(HTTPException) as e2:
-        await run(world["msp"], lambda db: cp.add_check_comment(world["stranger"], "ninjaone_antivirus", cp.CommentIn(body="hello"), user, db))
+        await run(
+            world["msp"], lambda db: cp.add_check_comment(world["stranger"], "ninjaone_antivirus", cp.CommentIn(body="hello"), user, db)
+        )
     assert e2.value.status_code == 404
     with pytest.raises(HTTPException) as e3:
         await run(world["msp"], lambda db: cp.add_check_comment(world["client"], "bad key!", cp.CommentIn(body="hello"), user, db))
@@ -715,7 +965,11 @@ async def test_a_check_weight_changes_the_score_in_the_fleet_the_daily_history_a
         )
 
     await run(world["msp"], alias)
-    checks = [{"key": "backup", "status": "not_met", "evidence": ""}, {"key": "patching", "status": "met", "evidence": ""}, {"key": "av", "status": "met", "evidence": ""}]
+    checks = [
+        {"key": "backup", "status": "not_met", "evidence": ""},
+        {"key": "patching", "status": "met", "evidence": ""},
+        {"key": "av", "status": "met", "evidence": ""},
+    ]
     report = ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-13", checks=checks)
     user = NS(tenant_id=world["msp"], user_id=None)
 
@@ -727,8 +981,12 @@ async def test_a_check_weight_changes_the_score_in_the_fleet_the_daily_history_a
     assert mine(await run(world["msp"], lambda db: cp.fleet_summary(NS(tenant_id=world["msp"]), db))).score == 67
     out = await run(world["msp"], lambda db: cp.set_weight("backup", cp.WeightIn(weight=3), user, db))
     assert (out.key, out.weight) == ("backup", 3)
-    assert [(w.key, w.weight) for w in await run(world["msp"], lambda db: cp.fleet_weights(NS(tenant_id=world["msp"]), db))] == [("backup", 3)]
-    assert mine(await run(world["msp"], lambda db: cp.fleet_summary(NS(tenant_id=world["msp"]), db))).score == 40, "the fleet page uses the weight"
+    assert [(w.key, w.weight) for w in await run(world["msp"], lambda db: cp.fleet_weights(NS(tenant_id=world["msp"]), db))] == [
+        ("backup", 3)
+    ]
+    assert (
+        mine(await run(world["msp"], lambda db: cp.fleet_summary(NS(tenant_id=world["msp"]), db))).score == 40
+    ), "the fleet page uses the weight"
     await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report))
     hist = await run(world["msp"], lambda db: cp.score_history(world["client"], NS(tenant_id=world["msp"]), db))
     assert hist.rows[-1].score == 40, "the day's history row is recomputed with the weight at the next report"
@@ -738,13 +996,15 @@ async def test_a_check_weight_changes_the_score_in_the_fleet_the_daily_history_a
     assert any(t.source == "ninjaone" and t.not_met >= 1 for t in tools)
     for bad_key, bad_weight in (("backup", 6), ("backup", 0), ("bad key!", 2)):
         with pytest.raises(HTTPException) as e:
-            await run(world["msp"], lambda db: cp.set_weight(bad_key, cp.WeightIn(weight=bad_weight), user, db))
+            await run(world["msp"], lambda db: cp.set_weight(bad_key, cp.WeightIn(weight=bad_weight), user, db))  # noqa: B023 - awaited in the same pass of the loop
         assert e.value.status_code == 422
     with pytest.raises(HTTPException) as e2:
         await run(world["msp"], lambda db: cp.client_score_breakdown(world["stranger"], NS(tenant_id=world["msp"]), db))
     assert e2.value.status_code == 404
     await run(world["msp"], lambda db: cp.set_weight("backup", cp.WeightIn(weight=1), user, db))
-    assert await run(world["msp"], lambda db: cp.fleet_weights(NS(tenant_id=world["msp"]), db)) == [], "a weight of 1 is the default and is removed"
+    assert (
+        await run(world["msp"], lambda db: cp.fleet_weights(NS(tenant_id=world["msp"]), db)) == []
+    ), "a weight of 1 is the default and is removed"
 
 
 async def test_a_client_is_compared_with_the_fleet_and_with_clients_of_similar_size_and_a_count_has_a_forecast(world):
@@ -765,15 +1025,33 @@ async def test_a_client_is_compared_with_the_fleet_and_with_clients_of_similar_s
 
     await run(world["msp"], alias)
     for day, n in ((60, 10), (30, 13), (0, 16)):
-        counts = bl.LicenseCountsReport(vendor="ninjaone", vendor_client_id="n-14", counts=[bl.LicenseCountIn(item="Windows workstations", unit="device", count=n)])
-        await run(world["msp"], lambda db, c=counts, d=day: bl.apply_license_counts(db, world["msp"], c, now=datetime.now(UTC) - timedelta(days=d)))
-    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-14", checks=[{"key": "a", "status": "met", "evidence": ""}, {"key": "b", "status": "not_met", "evidence": ""}])))
+        counts = bl.LicenseCountsReport(
+            vendor="ninjaone", vendor_client_id="n-14", counts=[bl.LicenseCountIn(item="Windows workstations", unit="device", count=n)]
+        )
+        await run(
+            world["msp"],
+            lambda db, c=counts, d=day: bl.apply_license_counts(db, world["msp"], c, now=datetime.now(UTC) - timedelta(days=d)),
+        )
+    await run(
+        world["msp"],
+        lambda db: ep.apply_m365_checks(
+            db,
+            world["msp"],
+            ep.M365ChecksReport(
+                vendor="ninjaone",
+                vendor_client_id="n-14",
+                checks=[{"key": "a", "status": "met", "evidence": ""}, {"key": "b", "status": "not_met", "evidence": ""}],
+            ),
+        ),
+    )
     cp.fleet_cache.clear()
     out = await run(world["msp"], lambda db: cp.compare_client(world["client"], NS(tenant_id=world["msp"]), db))
     assert (out.score, out.size) == (50, 16)
     assert out.fleet_average is not None and out.similar_clients >= 0
     user = NS(tenant_id=world["msp"], user_id=None)
-    series = await run(world["msp"], lambda db: bl.client_count_history(world["client"], "ninjaone", "Windows workstations", user, db, days=90))
+    series = await run(
+        world["msp"], lambda db: bl.client_count_history(world["client"], "ninjaone", "Windows workstations", user, db, days=90)
+    )
     assert series.forecast_30d is not None and series.forecast_30d >= 16, "10, 13, 16 over two months keeps rising"
     with pytest.raises(HTTPException) as e:
         await run(world["msp"], lambda db: cp.compare_client(world["stranger"], NS(tenant_id=world["msp"]), db))
@@ -783,7 +1061,9 @@ async def test_a_client_is_compared_with_the_fleet_and_with_clients_of_similar_s
 async def test_a_mapped_vendor_client_with_an_unrelated_name_and_no_shared_machine_is_listed_as_suspect(world):
     from app.api.v1.endpoints import mssp_clients as mc
 
-    client_name = (await run(world["msp"], lambda db: db.execute(text("select name from tenants where id = :i"), {"i": world["client"]}))).scalar_one()
+    client_name = (
+        await run(world["msp"], lambda db: db.execute(text("select name from tenants where id = :i"), {"i": world["client"]}))
+    ).scalar_one()
 
     async def aliases(db):
         for vendor_name, vid in (("Harbor Legal Partners", "s-1"), (client_name, "s-2")):
@@ -797,7 +1077,9 @@ async def test_a_mapped_vendor_client_with_an_unrelated_name_and_no_shared_machi
 
     await run(world["msp"], aliases)
     out = await run(world["msp"], lambda db: mc.list_suspect_mappings(NS(tenant_id=world["msp"]), db))
-    assert [(s.vendor_client_name, s.client_id) for s in out] == [("Harbor Legal Partners", world["client"])], "the one with a like name is not listed"
+    assert [(s.vendor_client_name, s.client_id) for s in out] == [
+        ("Harbor Legal Partners", world["client"])
+    ], "the one with a like name is not listed"
     assert 0.0 <= out[0].score < 0.35
 
 
@@ -816,13 +1098,35 @@ async def test_the_digest_gathers_what_got_worse_what_is_overdue_what_ends_soon_
         )
 
     await run(world["msp"], alias)
-    good = [{"key": "ninjaone_antivirus", "status": "met", "evidence": ""}, {"key": "ninjaone_patching", "status": "met", "evidence": ""}, {"key": "ninjaone_backup", "status": "partly", "evidence": ""}]
-    bad = [{"key": "ninjaone_antivirus", "status": "not_met", "evidence": ""}, {"key": "ninjaone_patching", "status": "met", "evidence": ""}, {"key": "ninjaone_backup", "status": "met", "evidence": ""}]
-    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-15", checks=good)))
-    await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-15", checks=bad)))
+    good = [
+        {"key": "ninjaone_antivirus", "status": "met", "evidence": ""},
+        {"key": "ninjaone_patching", "status": "met", "evidence": ""},
+        {"key": "ninjaone_backup", "status": "partly", "evidence": ""},
+    ]
+    bad = [
+        {"key": "ninjaone_antivirus", "status": "not_met", "evidence": ""},
+        {"key": "ninjaone_patching", "status": "met", "evidence": ""},
+        {"key": "ninjaone_backup", "status": "met", "evidence": ""},
+    ]
+    await run(
+        world["msp"],
+        lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-15", checks=good)),
+    )
+    await run(
+        world["msp"],
+        lambda db: ep.apply_m365_checks(db, world["msp"], ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-15", checks=bad)),
+    )
     user = NS(tenant_id=world["msp"], user_id=None)
-    await run(world["msp"], lambda db: cp.set_check_owner(world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="Dana", due_date=date.today() - timedelta(days=2)), user, db))
-    await run(world["msp"], lambda db: cp.accept_check(world["client"], "ninjaone_patching", cp.AcceptIn(reason="Replacing soon", expires_in_days=3), user, db))
+    await run(
+        world["msp"],
+        lambda db: cp.set_check_owner(
+            world["client"], "ninjaone_antivirus", cp.OwnerIn(owner="Dana", due_date=date.today() - timedelta(days=2)), user, db
+        ),
+    )
+    await run(
+        world["msp"],
+        lambda db: cp.accept_check(world["client"], "ninjaone_patching", cp.AcceptIn(reason="Replacing soon", expires_in_days=3), user, db),
+    )
     await run(world["msp"], lambda db: cp.set_target(world["client"], cp.TargetIn(target=95), user, db))
     cp.fleet_cache.clear()
     d = await run(world["msp"], lambda db: cp.fleet_digest(NS(tenant_id=world["msp"]), db, days=1, limit=15))
@@ -852,7 +1156,11 @@ async def test_machines_joining_and_leaving_a_checks_list_are_kept_and_the_first
     await run(world["msp"], alias)
 
     def report(items):
-        return ep.M365ChecksReport(vendor="ninjaone", vendor_client_id="n-16", checks=[{"key": "ninjaone_antivirus", "status": "not_met", "evidence": "", "items": items}])
+        return ep.M365ChecksReport(
+            vendor="ninjaone",
+            vendor_client_id="n-16",
+            checks=[{"key": "ninjaone_antivirus", "status": "not_met", "evidence": "", "items": items}],
+        )
 
     await run(world["msp"], lambda db: ep.apply_m365_checks(db, world["msp"], report(["PC-1", "PC-2"])))
     first = await run(world["msp"], lambda db: cp.check_item_history(world["client"], "ninjaone_antivirus", NS(tenant_id=world["msp"]), db))

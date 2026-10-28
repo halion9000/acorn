@@ -10,7 +10,12 @@ from app import copilot_tools as ct
 
 
 def test_alert_questions_are_recognised_and_small_talk_is_not():
-    for q in ("Summarize the top 5 critical alerts in the last 24 hours.", "what is the worst incident today", "any new detections?", "Investigate host FILE01"):
+    for q in (
+        "Summarize the top 5 critical alerts in the last 24 hours.",
+        "what is the worst incident today",
+        "any new detections?",
+        "Investigate host FILE01",
+    ):
         assert ct.wants_alert_data(q), q
     for q in ("hi", "who are you?", "thanks!", ""):
         assert not ct.wants_alert_data(q), q
@@ -18,7 +23,12 @@ def test_alert_questions_are_recognised_and_small_talk_is_not():
 
 def test_the_snapshot_text_lists_each_alert_with_its_id_and_never_invents_one():
     text = ct.format_alert_snapshot(
-        {"alerts": [{"id": "a-1", "severity": "critical", "status": "new", "client": "Acme Dental", "title": "Ransomware on FILE01"}, {"id": "a-2", "severity": "high", "status": "new", "title": "VPN from new country"}]},
+        {
+            "alerts": [
+                {"id": "a-1", "severity": "critical", "status": "new", "client": "Acme Dental", "title": "Ransomware on FILE01"},
+                {"id": "a-2", "severity": "high", "status": "new", "title": "VPN from new country"},
+            ]
+        },
         24,
     )
     assert "a-1 | critical | new | client: Acme Dental | Ransomware on FILE01" in text and "a-2 | high | new | VPN from new country" in text

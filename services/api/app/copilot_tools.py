@@ -105,11 +105,31 @@ async def search_alerts(
                 }
                 for a in alerts
             )
-    found.sort(key=lambda a: (_SEVERITY_ORDER.get(str(a["severity"]).lower(), 5), -(datetime.fromisoformat(a["created_at"]).timestamp() if a["created_at"] else 0)))
+    found.sort(
+        key=lambda a: (
+            _SEVERITY_ORDER.get(str(a["severity"]).lower(), 5),
+            -(datetime.fromisoformat(a["created_at"]).timestamp() if a["created_at"] else 0),
+        )
+    )
     return {"count": len(found[:cap]), "alerts": found[:cap]}
 
 
-_ALERT_WORDS = ("alert", "critical", "high severity", "triage", "incident", "detection", "case", "escalat", "what happened", "summar", "last 24", "today", "this week", "investigate")
+_ALERT_WORDS = (
+    "alert",
+    "critical",
+    "high severity",
+    "triage",
+    "incident",
+    "detection",
+    "case",
+    "escalat",
+    "what happened",
+    "summar",
+    "last 24",
+    "today",
+    "this week",
+    "investigate",
+)
 
 
 def wants_alert_data(message: str) -> bool:
@@ -123,7 +143,9 @@ def format_alert_snapshot(result: dict[str, Any], hours: int) -> str:
     alerts = result.get("alerts") or []
     if not alerts:
         return f"[Live data] No open alerts were raised in the last {hours} hours."
-    lines = [f"[Live data] The {len(alerts)} most severe open alert(s) from the last {hours} hours, worst first (fetched just now from the platform):"]
+    lines = [
+        f"[Live data] The {len(alerts)} most severe open alert(s) from the last {hours} hours, worst first (fetched just now from the platform):"
+    ]
     for a in alerts:
         client = f" | client: {a['client']}" if a.get("client") else ""
         lines.append(f"- {a['id']} | {a['severity']} | {a['status']}{client} | {str(a['title'])[:140]}")

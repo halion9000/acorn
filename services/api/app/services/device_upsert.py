@@ -18,7 +18,16 @@ from typing import Any
 from sqlalchemy import delete, func, select, tuple_
 
 from app.models.device import Device, DeviceSource
-from app.services.device_identity import DISCOVERY_TOOLS, could_be_same_machine, hostname_key, ip_brand_pairs, is_placeholder_name, loose_name_key, netbios_truncated_pairs, normalize_serial
+from app.services.device_identity import (
+    DISCOVERY_TOOLS,
+    could_be_same_machine,
+    hostname_key,
+    ip_brand_pairs,
+    is_placeholder_name,
+    loose_name_key,
+    netbios_truncated_pairs,
+    normalize_serial,
+)
 
 
 @dataclass
@@ -61,8 +70,16 @@ async def preload_known(db: Any, tenant_id: uuid.UUID, reports: list[DeviceRepor
     keys = list({(r.vendor, r.external_id) for r in reports})
     for i in range(0, len(keys), 500):
         rows = (
-            await db.execute(select(DeviceSource).where(DeviceSource.tenant_id == tenant_id, tuple_(DeviceSource.vendor, DeviceSource.external_id).in_(keys[i : i + 500])))
-        ).scalars().all()
+            (
+                await db.execute(
+                    select(DeviceSource).where(
+                        DeviceSource.tenant_id == tenant_id, tuple_(DeviceSource.vendor, DeviceSource.external_id).in_(keys[i : i + 500])
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
         known.sources.update({(s.vendor, s.external_id): s for s in rows})
     ids = list({s.device_id for s in known.sources.values()})
     serials = list({n for n in (normalize_serial(r.serial) for r in reports) if n is not None})
@@ -71,7 +88,11 @@ async def preload_known(db: Any, tenant_id: uuid.UUID, reports: list[DeviceRepor
         for d in (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.id.in_(ids[i : i + 500])))).scalars().all():
             wanted[d.id] = d
     for i in range(0, len(serials), 500):
-        for d in (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.serial_number.in_(serials[i : i + 500])))).scalars().all():
+        for d in (
+            (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.serial_number.in_(serials[i : i + 500]))))
+            .scalars()
+            .all()
+        ):
             wanted[d.id] = d
     known.devices = wanted
     known.by_serial = {d.serial_number: d for d in wanted.values() if d.serial_number}
@@ -88,7 +109,9 @@ async def upsert_device(db: Any, tenant_id: uuid.UUID, report: DeviceReport, kno
         source = (
             await db.execute(
                 select(DeviceSource).where(
-                    DeviceSource.tenant_id == tenant_id, DeviceSource.vendor == report.vendor, DeviceSource.external_id == report.external_id
+                    DeviceSource.tenant_id == tenant_id,
+                    DeviceSource.vendor == report.vendor,
+                    DeviceSource.external_id == report.external_id,
                 )
             )
         ).scalar_one_or_none()
@@ -104,7 +127,9 @@ async def upsert_device(db: Any, tenant_id: uuid.UUID, report: DeviceReport, kno
         if known is not None:
             owner = known.by_serial.get(serial)
         else:
-            owner = (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.serial_number == serial))).scalar_one_or_none()
+            owner = (
+                await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.serial_number == serial))
+            ).scalar_one_or_none()
         if owner is not None:
             device = owner
         elif device is not None and device.serial_number is None:
@@ -189,12 +214,16 @@ async def possible_duplicates(db: Any, tenant_id: uuid.UUID) -> list[tuple[uuid.
         ).all()
     }
     tools: dict[uuid.UUID, set[str]] = {}
-    for device_id, vendor in (await db.execute(select(DeviceSource.device_id, DeviceSource.vendor).where(DeviceSource.tenant_id == tenant_id))).all():
+    for device_id, vendor in (
+        await db.execute(select(DeviceSource.device_id, DeviceSource.vendor).where(DeviceSource.tenant_id == tenant_id))
+    ).all():
         tools.setdefault(device_id, set()).add(vendor)
     return duplicate_pairs(rows, tools, dismissed, only_screenconnect)
 
 
-def duplicate_pairs(rows: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], only_screenconnect: set[Any]) -> list[tuple[Any, Any]]:
+def duplicate_pairs(
+    rows: list[Any], tools: dict[Any, set[str]], dismissed: set[tuple[Any, Any]], only_screenconnect: set[Any]
+) -> list[tuple[Any, Any]]:
     """The pairs of one client's devices a person might want to merge (see ``possible_duplicates``), from devices already in hand. ``rows`` need ``id``, ``hostname``, ``serial_number``, ``ip_addresses`` and
     ``manufacturer``; ``tools`` maps a device id to the tools that report it; ``dismissed`` holds the pairs a person said are different (ordered by id text); ``only_screenconnect`` the devices only ScreenConnect lists."""
     from app.services.device_merge import MAX_AUTO_MERGE_GROUP, usable_for_merge

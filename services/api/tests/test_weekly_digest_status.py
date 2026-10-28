@@ -129,7 +129,11 @@ async def test_a_clients_stored_digest_is_headed_with_the_clients_name_and_the_o
 
     monkeypatch.setattr(wdt, "AsyncSessionLocal", _Factory(_Session()))
     monkeypatch.setattr(wdt, "_artefact_exists", AsyncMock(return_value=False))
-    monkeypatch.setattr(wdt, "build_weekly_digest", AsyncMock(side_effect=lambda *a, **k: SimpleNamespace(client_name=None, model_dump=lambda mode="python": {"ok": True})))
+    monkeypatch.setattr(
+        wdt,
+        "build_weekly_digest",
+        AsyncMock(side_effect=lambda *a, **k: SimpleNamespace(client_name=None, model_dump=lambda mode="python": {"ok": True})),
+    )
     monkeypatch.setattr(wdt, "render_digest_pdf", render)
     start, end = datetime(2026, 10, 5, tzinfo=UTC), datetime(2026, 10, 11, 23, 59, 59, tzinfo=UTC)
     await wdt._generate_for_tenant(uuid.uuid4(), start, end, client_name="Acme Dental")

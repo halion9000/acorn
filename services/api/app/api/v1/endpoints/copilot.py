@@ -37,8 +37,8 @@ from app.copilot_tools import (
 from app.db.rls import TenantDBSession
 from app.llm.contract import safe_ainvoke
 from app.llm.factory import llm_override, make_chat_model
-from app.services.llm_resolver import LlmConfig, resolve_llm_config
 from app.services import copilot_history
+from app.services.llm_resolver import LlmConfig, resolve_llm_config
 
 logger = logging.getLogger(__name__)
 

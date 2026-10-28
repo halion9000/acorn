@@ -19,12 +19,12 @@ from app.core.config import get_settings
 from app.db.database import get_db
 from app.db.rls_sessions import mark_tenant
 from app.models.easm import ExternalAsset, ExternalAssetDrift, ExternalAssetType
-from app.models.tenant import Tenant
 from app.models.signin import IdentityMfaUser
+from app.models.tenant import Tenant
 from app.services.domain_posture import DohResolver, candidate_domains
 from app.services.easm_discovery import run_discovery
-from app.services.easm_targets import resolve_domains, split_targets
 from app.services.easm_drift import detect_drift
+from app.services.easm_targets import resolve_domains, split_targets
 
 logger = logging.getLogger("aisoc.easm")
 
@@ -61,7 +61,13 @@ async def _run_scan_job(
     from app.db.database import AsyncSessionLocal as async_session_factory
 
     started = datetime.now(UTC)
-    summary: dict[str, Any] = {"started_at": started.isoformat(), "sources": scan_plan(get_settings(), ip_targets, lookup_targets)["sources"], "found": 0, "changes": 0, "error": None}
+    summary: dict[str, Any] = {
+        "started_at": started.isoformat(),
+        "sources": scan_plan(get_settings(), ip_targets, lookup_targets)["sources"],
+        "found": 0,
+        "changes": 0,
+        "error": None,
+    }
     try:
         discovered = await run_discovery(org_query, ip_targets=ip_targets or None, lookup_targets=lookup_targets, domains=domains)
         async with async_session_factory() as db:
@@ -85,7 +91,14 @@ async def _run_scan_job(
             await db.execute(
                 update(Tenant)
                 .where(Tenant.id == tenant_id)
-                .values(settings=func.jsonb_set(func.coalesce(Tenant.settings, cast({}, JSONB)), cast(["easm_last_scan"], ARRAY(Text)), cast(json.dumps(summary), JSONB), True))
+                .values(
+                    settings=func.jsonb_set(
+                        func.coalesce(Tenant.settings, cast({}, JSONB)),
+                        cast(["easm_last_scan"], ARRAY(Text)),
+                        cast(json.dumps(summary), JSONB),
+                        True,
+                    )
+                )
             )
             await db.commit()
     except Exception:
@@ -102,7 +115,16 @@ def scan_plan(s: Any, ip_targets: list[str], lookup_targets: list[str] | None = 
     censys = bool(s.AISOC_EASM_CENSYS_API_ID and s.AISOC_EASM_CENSYS_API_SECRET)
     active_on = bool(s.AISOC_EASM_ACTIVE_SCAN_ENABLED)
     internetdb_on = bool(getattr(s, "AISOC_EASM_INTERNETDB_ENABLED", True))
-    sources = [name for name, on in (("internetdb", internetdb_on and (bool(lookup) or targets_expected)), ("shodan", shodan), ("censys", censys), ("port check", active_on and bool(ip_targets))) if on]
+    sources = [
+        name
+        for name, on in (
+            ("internetdb", internetdb_on and (bool(lookup) or targets_expected)),
+            ("shodan", shodan),
+            ("censys", censys),
+            ("port check", active_on and bool(ip_targets)),
+        )
+        if on
+    ]
     problem: str | None = None
     if not sources:
         if ip_targets and not active_on:

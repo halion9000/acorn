@@ -33,7 +33,18 @@ def _billing_gets() -> set[tuple[str, str]]:
     return {(m, p) for p, r in ALL_ROUTES if p.startswith("/billing") and "GET" in r.methods for m in ("GET",)}
 
 
-@pytest.mark.parametrize("granted,expected", [(["billing:view"], True), (["alerts:read"], True), (["billing:*"], True), (["*"], True), (["alerts:write"], False), (["mssp:manage"], False), ([], False)])
+@pytest.mark.parametrize(
+    "granted,expected",
+    [
+        (["billing:view"], True),
+        (["alerts:read"], True),
+        (["billing:*"], True),
+        (["*"], True),
+        (["alerts:write"], False),
+        (["mssp:manage"], False),
+        ([], False),
+    ],
+)
 def test_who_holds_billing_view(granted, expected):
     assert permission_in(granted, "billing:view") is expected
 

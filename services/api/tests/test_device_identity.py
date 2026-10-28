@@ -50,12 +50,20 @@ def test_a_name_that_ends_in_an_address_is_kept_whole_so_two_auvik_names_are_not
 
 def test_a_made_up_name_is_recognised_and_only_usable_addresses_count():
     assert is_placeholder_name("device@10.7.1.5") and not is_placeholder_name("front-desk")
-    assert usable_ips(["10.0.0.1", "0.0.0.0", "127.0.0.1", "169.254.3.4", "fe80::1", "not an ip", " 192.168.1.9 "]) == {"10.0.0.1", "192.168.1.9"}
+    assert usable_ips(["10.0.0.1", "0.0.0.0", "127.0.0.1", "169.254.3.4", "fe80::1", "not an ip", " 192.168.1.9 "]) == {
+        "10.0.0.1",
+        "192.168.1.9",
+    }
 
 
 def test_brands_agree_unless_both_are_stated_and_different():
     assert brand_key("Ubiquiti Inc.") == "ubiquiti"
-    assert same_brand("Ubiquiti Inc.", "ubiquiti") and same_brand("Ubiquiti Networks", "Ubiquiti") and same_brand(None, "Dell") and same_brand("", None)
+    assert (
+        same_brand("Ubiquiti Inc.", "ubiquiti")
+        and same_brand("Ubiquiti Networks", "Ubiquiti")
+        and same_brand(None, "Dell")
+        and same_brand("", None)
+    )
     assert not same_brand("Ubiquiti", "Lantronix")
 
 
@@ -134,7 +142,9 @@ def test_a_name_cut_to_15_characters_is_paired_with_the_full_name_from_other_too
     assert netbios_truncated_pairs([cut, full], tools, set(), set()) == [(cut.id, full.id)]
     sixteen = _dev(3, "NUC-GCR-SEA2-HOU.local.")  # the first label is 16 characters
     other = _dev(4, "NUC-GCR-SEA2-HOUSTON")
-    assert netbios_truncated_pairs([sixteen, other], {sixteen.id: {"auvik"}, other.id: {"ninjaone"}}, set(), set()) == [(sixteen.id, other.id)]
+    assert netbios_truncated_pairs([sixteen, other], {sixteen.id: {"auvik"}, other.id: {"ninjaone"}}, set(), set()) == [
+        (sixteen.id, other.id)
+    ]
 
 
 def test_only_the_cut_length_pairs_and_only_across_different_tools_and_serials():
@@ -163,11 +173,17 @@ def test_macs_of_also_reads_ninjaones_mac_addresses_fact_as_one_string_several_o
     from app.services.device_merge import macs_of
 
     assert macs_of({"facts": {"macAddresses": "C8:53:09:75:E0:4F"}}) == {"c85309 75e04f".replace(" ", "")}
-    assert macs_of({"facts": {"macAddresses": "C8:53:09:75:E0:4F, F8:89:D2:9E:DF:43;aa-bb-cc-dd-ee-01"}}) == {"c85309 75e04f".replace(" ", ""), "f889d29edf43", "aabbccddee01"}
+    assert macs_of({"facts": {"macAddresses": "C8:53:09:75:E0:4F, F8:89:D2:9E:DF:43;aa-bb-cc-dd-ee-01"}}) == {
+        "c85309 75e04f".replace(" ", ""),
+        "f889d29edf43",
+        "aabbccddee01",
+    }
     assert macs_of({"facts": {"macAddresses": ["C8:53:09:75:E0:4F", "bad"]}}) == {"c8530975e04f"}
     assert macs_of({"facts": "nope"}) == set()
     assert macs_of({"facts": {"macAddresses": 5}}) == set()
-    assert macs_of({"macs": ["1c6a1b49048d"], "facts": {"macAddresses": "1C:6A:1B:49:04:8D"}}) == {"1c6a1b49048d"}, "one MAC from two tools is one MAC"
+    assert macs_of({"macs": ["1c6a1b49048d"], "facts": {"macAddresses": "1C:6A:1B:49:04:8D"}}) == {
+        "1c6a1b49048d"
+    }, "one MAC from two tools is one MAC"
 
 
 # ---- what the possible-duplicates list leaves out -------------------------------------------------------------------------------------------------------------
@@ -186,11 +202,17 @@ def test_two_auvik_records_under_one_name_are_two_devices_not_duplicates():
     a, b = _row(1, "bridge-2.local."), _row(2, "bridge-2.local.")
     assert duplicate_pairs([a, b], {a.id: {"auvik"}, b.id: {"auvik"}}, set(), set()) == []
     c, d = _row(3, "FRONT-DESK-PC"), _row(4, "FRONT-DESK-PC")
-    assert duplicate_pairs([c, d], {c.id: {"ninjaone"}, d.id: {"huntress"}}, set(), set()) == [(c.id, d.id)], "different tools under one real name are still offered"
+    assert duplicate_pairs([c, d], {c.id: {"ninjaone"}, d.id: {"huntress"}}, set(), set()) == [
+        (c.id, d.id)
+    ], "different tools under one real name are still offered"
     e, f = _row(5, "FRONT-DESK-PC"), _row(6, "FRONT-DESK-PC")
-    assert duplicate_pairs([e, f], {e.id: {"auvik", "ninjaone"}, f.id: {"auvik"}}, set(), set()) == [], "they share an Auvik record, so they are two Auvik devices"
+    assert (
+        duplicate_pairs([e, f], {e.id: {"auvik", "ninjaone"}, f.id: {"auvik"}}, set(), set()) == []
+    ), "they share an Auvik record, so they are two Auvik devices"
     g, h = _row(7, "FRONT-DESK-PC"), _row(8, "FRONT-DESK-PC")
-    assert duplicate_pairs([g, h], {g.id: {"ninjaone"}, h.id: {"ninjaone"}}, set(), set()) == [(g.id, h.id)], "a re-installed agent machine is still left for a person"
+    assert duplicate_pairs([g, h], {g.id: {"ninjaone"}, h.id: {"ninjaone"}}, set(), set()) == [
+        (g.id, h.id)
+    ], "a re-installed agent machine is still left for a person"
 
 
 def test_a_stock_name_or_one_many_devices_carry_is_not_offered():

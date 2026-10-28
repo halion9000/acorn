@@ -210,7 +210,14 @@ def build_people(
         p.licensed = bool(u.licensed)
         p.mfa = mfa_state(u, known[u.tenant_id])
         p.mfa_methods = u.methods or None
-        p.sources.append(SourceRef(vendor=MICROSOFT, external_id=str(u.user_id), enabled=bool(u.enabled), details={"licensed": bool(u.licensed), "admin": bool(u.admin)}))
+        p.sources.append(
+            SourceRef(
+                vendor=MICROSOFT,
+                external_id=str(u.user_id),
+                enabled=bool(u.enabled),
+                details={"licensed": bool(u.licensed), "admin": bool(u.admin)},
+            )
+        )
 
     cutoff = now - timedelta(days=stale_days)
     exposure_rows: dict[str, list[Any]] = {}
@@ -246,7 +253,9 @@ def build_people(
 ALERT_TOOLS = frozenset({"huntress", "petra", "fieldeffect", "blumira"})
 
 
-def add_alert_sources(people: list[Person], alerts: list[Any], names: dict[uuid.UUID, str], source_of: Any, tools: frozenset[str] = ALERT_TOOLS) -> list[Person]:
+def add_alert_sources(
+    people: list[Person], alerts: list[Any], names: dict[uuid.UUID, str], source_of: Any, tools: frozenset[str] = ALERT_TOOLS
+) -> list[Person]:
     """Add each MDR tool that raised an alert naming a person to that person's tools (creating the person when no other tool knows them). Returns the people, with any new ones added."""
     index = {p.key: p for p in people}
     out = list(people)

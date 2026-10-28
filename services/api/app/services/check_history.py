@@ -20,7 +20,15 @@ def changes(previous: list[dict[str, Any]] | None, new: list[dict[str, Any]], so
         key, status = str(c["key"]), str(c["status"])
         if before.get(key) == status:
             continue
-        out.append({"source": source, "key": key[:80], "status": status, "previous_status": before.get(key), "evidence": str(c.get("evidence", ""))[:300]})
+        out.append(
+            {
+                "source": source,
+                "key": key[:80],
+                "status": status,
+                "previous_status": before.get(key),
+                "evidence": str(c.get("evidence", ""))[:300],
+            }
+        )
     return out
 
 

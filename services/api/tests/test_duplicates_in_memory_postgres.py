@@ -81,7 +81,12 @@ async def fill(engine, tid):
 
 async def dismiss_the_dismissed(engine, tid):
     db = await session(engine, tid)
-    ids = [r[0] for r in (await db.execute(text("select id from devices where tenant_id = :t and upper(hostname) = 'DISMISSED-PC'"), {"t": tid})).all()]
+    ids = [
+        r[0]
+        for r in (
+            await db.execute(text("select id from devices where tenant_id = :t and upper(hostname) = 'DISMISSED-PC'"), {"t": tid})
+        ).all()
+    ]
     assert len(ids) == 2
     await dismiss_pair(db, tid, ids[0], ids[1])
     await db.commit()

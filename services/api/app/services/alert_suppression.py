@@ -52,7 +52,10 @@ def expiry_from_days(days: int | None, now: datetime) -> datetime | None:
     if days is None:
         return None
     if isinstance(days, bool) or not isinstance(days, int) or days < 1 or days > MAX_DAYS:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"days must be a whole number from 1 to {MAX_DAYS}, or leave it out to hide without end")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"days must be a whole number from 1 to {MAX_DAYS}, or leave it out to hide without end",
+        )
     return now + timedelta(days=days)
 
 
@@ -97,15 +100,22 @@ async def apply_rule(db: Any, rule: Any, owner_tenant: uuid.UUID) -> int:
         async with ctx:
             rows = (
                 await db.execute(
-                    select(Alert.id, Alert.status, Alert.raw_event, Alert.connector_type, Alert.affected_hosts, Alert.rule_id, Alert.title).where(
-                        Alert.tenant_id == tid, Alert.status.notin_(_FINISHED), _type_filter(rule)
-                    )
+                    select(
+                        Alert.id, Alert.status, Alert.raw_event, Alert.connector_type, Alert.affected_hosts, Alert.rule_id, Alert.title
+                    ).where(Alert.tenant_id == tid, Alert.status.notin_(_FINISHED), _type_filter(rule))
                 )
             ).all()
             ids = [
                 r.id
                 for r in rows
-                if matches(rule, tenant_id=tid, rule_id=r.rule_id, title=r.title, source=source_of(r.raw_event, r.connector_type), hosts=r.affected_hosts)
+                if matches(
+                    rule,
+                    tenant_id=tid,
+                    rule_id=r.rule_id,
+                    title=r.title,
+                    source=source_of(r.raw_event, r.connector_type),
+                    hosts=r.affected_hosts,
+                )
             ]
             for i in range(0, len(ids), _CHUNK):
                 chunk = ids[i : i + _CHUNK]
@@ -126,7 +136,12 @@ async def release_rule(db: Any, rule: Any, owner_tenant: uuid.UUID) -> int:
             result = await db.execute(
                 update(Alert)
                 .where(Alert.tenant_id == tid, Alert.suppression_id == rule.id)
-                .values(status=func.coalesce(Alert.status_before_suppression, "new"), status_before_suppression=None, suppression_id=None, updated_at=datetime.now(UTC))
+                .values(
+                    status=func.coalesce(Alert.status_before_suppression, "new"),
+                    status_before_suppression=None,
+                    suppression_id=None,
+                    updated_at=datetime.now(UTC),
+                )
             )
             restored += result.rowcount or 0
     return restored

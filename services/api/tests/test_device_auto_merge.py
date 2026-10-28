@@ -65,7 +65,10 @@ async def test_one_report_checks_only_a_few_clients_and_the_rest_stay_due_for_th
     assert first == ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT and calls == tenants[: ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT]
     second = await ep._auto_merge_touched(FakeDb(), tenants, now=11.0)
     assert second == ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT, "the next report carries on with the clients not reached"
-    assert calls[ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT : ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT * 2] == tenants[ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT : ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT * 2]
+    assert (
+        calls[ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT : ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT * 2]
+        == tenants[ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT : ep.AUTO_MERGE_MAX_CLIENTS_PER_REPORT * 2]
+    )
     third = await ep._auto_merge_touched(FakeDb(), tenants, now=12.0)
     assert third == 3 and sorted(calls) == sorted(tenants), "every client is reached, each once"
     assert await ep._auto_merge_touched(FakeDb(), tenants, now=13.0) == 0

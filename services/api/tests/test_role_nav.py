@@ -18,7 +18,22 @@ def test_sections_and_page_addresses_are_accepted():
     assert valid_entry("/detection/vendor-detections")
 
 
-@pytest.mark.parametrize("bad", ["", "Automation", "section:", "section:<script>", "https://evil.example/x", "//evil.example", "/a b", "/x?y=1", "../etc", "section:" + "a" * 80, "/" + "a" * 130])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "",
+        "Automation",
+        "section:",
+        "section:<script>",
+        "https://evil.example/x",
+        "//evil.example",
+        "/a b",
+        "/x?y=1",
+        "../etc",
+        "section:" + "a" * 80,
+        "/" + "a" * 130,
+    ],
+)
 def test_anything_else_is_refused(bad):
     assert not valid_entry(bad)
     with pytest.raises(HTTPException) as e:
@@ -54,7 +69,9 @@ def test_the_role_carries_hidden_nav_through_every_schema():
     assert RoleUpdate().hidden_nav is None
     out = RoleOut(id=uuid.uuid4(), tenant_id=uuid.uuid4(), name="n", description=None, is_system=False, hidden_nav=["/hunt"])
     assert out.hidden_nav == ["/hunt"]
-    assert UserMeResponse(id=uuid.uuid4(), tenant_id=uuid.uuid4(), account_name="a", username="a", role="r", is_active=True).hidden_nav == []
+    assert (
+        UserMeResponse(id=uuid.uuid4(), tenant_id=uuid.uuid4(), account_name="a", username="a", role="r", is_active=True).hidden_nav == []
+    )
 
 
 def test_the_table_has_the_column_with_an_empty_default():

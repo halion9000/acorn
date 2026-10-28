@@ -20,7 +20,10 @@ def device(sources, hostname="h", os_name=None):
     )
 
 
-@pytest.mark.parametrize("device_type", ["switch", "l3Switch", "router", "accessPoint", "firewall", "utm", "securityAppliance", "bridge", "controller", "loadBalancer"])
+@pytest.mark.parametrize(
+    "device_type",
+    ["switch", "l3Switch", "router", "accessPoint", "firewall", "utm", "securityAppliance", "bridge", "controller", "loadBalancer"],
+)
 def test_auvik_network_gear_is_network(device_type):
     assert device_kind(device([("auvik", {"device_type": device_type})]).sources) == "network"
 
@@ -124,7 +127,12 @@ def test_a_meraki_managed_device_is_a_computer():
 
 
 def test_printers_and_things_no_tool_can_name_are_never_a_coverage_gap_either():
-    for sources in ([("auvik", {"device_type": "printer"})], [("auvik", {"device_type": "ups"})], [("ninjaone", {"node_class": "NMS_PRINTER"})], []):
+    for sources in (
+        [("auvik", {"device_type": "printer"})],
+        [("auvik", {"device_type": "ups"})],
+        [("ninjaone", {"node_class": "NMS_PRINTER"})],
+        [],
+    ):
         d = device(sources)
         assert d.kind == "other"
         for tool in ("huntress", "threatmate", "screenconnect", "fieldeffect", "addigy"):

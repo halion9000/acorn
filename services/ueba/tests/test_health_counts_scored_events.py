@@ -26,7 +26,9 @@ class FakeScoring:
 
 
 def body():
-    return routes_module.ScoreEventRequest(tenant_id=uuid.uuid4(), entity_type="user", entity_id="a@b.example", event_type="login", features={"hour_of_day": 3})
+    return routes_module.ScoreEventRequest(
+        tenant_id=uuid.uuid4(), entity_type="user", entity_id="a@b.example", event_type="login", features={"hour_of_day": 3}
+    )
 
 
 def test_record_event_counts_and_stamps_the_time():

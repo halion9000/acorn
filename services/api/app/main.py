@@ -446,7 +446,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     suppression_task: asyncio.Task | None = None
     try:
         suppression_task = asyncio.create_task(
-            _run_guarded_scheduler_worker(job_name="alert_suppression", ttl_seconds=_RETENTION_LOCK_TTL_SECONDS, worker=run_suppression_sweeper),
+            _run_guarded_scheduler_worker(
+                job_name="alert_suppression", ttl_seconds=_RETENTION_LOCK_TTL_SECONDS, worker=run_suppression_sweeper
+            ),
             name="alert_suppression_worker",
         )
         logger.info("alert_suppression worker started")
@@ -679,7 +681,9 @@ def request_id_for(supplied: str | None) -> str:
     return text if _REQUEST_ID_OK.fullmatch(text) else uuid.uuid4().hex
 
 
-def log_if_slow(method: str, endpoint: str, status: int, duration: float, threshold: float | None = None, request_id: str | None = None) -> bool:
+def log_if_slow(
+    method: str, endpoint: str, status: int, duration: float, threshold: float | None = None, request_id: str | None = None
+) -> bool:
     """Log a request that took longer than the threshold, with the route template (never the URL, which can carry ids or search text). Returns whether it logged."""
     limit = slow_request_threshold() if threshold is None else threshold
     if limit <= 0 or duration < limit:

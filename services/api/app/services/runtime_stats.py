@@ -31,7 +31,13 @@ def loop_lag(now: float, window_seconds: int = 300) -> dict[str, Any]:
     recent = sorted(lag for at, lag in _lags if at >= now - window_seconds)
     if not recent:
         return {"window_seconds": window_seconds, "samples": 0}
-    return {"window_seconds": window_seconds, "samples": len(recent), "max_seconds": round(recent[-1], 2), "typical_seconds": round(recent[len(recent) // 2], 3), "slow": recent[-1] >= LOOP_WARN_SECONDS}
+    return {
+        "window_seconds": window_seconds,
+        "samples": len(recent),
+        "max_seconds": round(recent[-1], 2),
+        "typical_seconds": round(recent[len(recent) // 2], 3),
+        "slow": recent[-1] >= LOOP_WARN_SECONDS,
+    }
 
 
 async def _sample_forever() -> None:

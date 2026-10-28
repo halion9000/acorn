@@ -21,18 +21,18 @@ import hashlib
 import json
 import logging
 import uuid
-from datetime import UTC, datetime
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 
-from app.services.compliance_catalog import CATALOGS
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.db.rls_scope import acting_as_tenant
 from app.models.tenant import Tenant
+from app.services.compliance_catalog import CATALOGS
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +42,18 @@ router = APIRouter(prefix="/compliance", tags=["compliance"])
 async def compliance_tenant(
     db: DBSession,
     user: AuthUser,
-    client_id: uuid.UUID | None = Query(None, description="One of your clients, to read or record its compliance instead of your own. Omit for your own."),
+    client_id: uuid.UUID | None = Query(
+        None, description="One of your clients, to read or record its compliance instead of your own. Omit for your own."
+    ),
 ) -> AsyncIterator[uuid.UUID]:
     """The tenant whose compliance evidence a request is about: the caller's own, or one of its clients when ``client_id`` names one. A tenant that is not the caller's own or one
     of its clients is a 404, the same as an unknown one. The request then runs scoped to that client (row-level security included) until it ends."""
     if client_id is None or client_id == user.tenant_id:
         yield user.tenant_id
         return
-    managed = (await db.execute(select(Tenant.id).where(Tenant.id == client_id, Tenant.parent_tenant_id == user.tenant_id))).scalar_one_or_none()
+    managed = (
+        await db.execute(select(Tenant.id).where(Tenant.id == client_id, Tenant.parent_tenant_id == user.tenant_id))
+    ).scalar_one_or_none()
     if managed is None:
         raise HTTPException(status_code=404, detail="Client not found")
     async with acting_as_tenant(db, client_id):
@@ -218,7 +222,9 @@ async def list_framework_controls(framework_id: str) -> ControlsResponse:
         raise HTTPException(status_code=404, detail=f"Framework '{framework_id}' not found.")
     return ControlsResponse(
         framework_id=framework_id,
-        controls=[ControlItem(control_id=cid, title=title, group=FRAMEWORK_GROUPS[framework_id].get(cid)) for cid, title in controls.items()],
+        controls=[
+            ControlItem(control_id=cid, title=title, group=FRAMEWORK_GROUPS[framework_id].get(cid)) for cid, title in controls.items()
+        ],
     )
 
 
@@ -513,7 +519,9 @@ async def get_evidence(evidence_id: uuid.UUID, db: DBSession, user: AuthUser, te
     summary="Accept or reject evidence",
     dependencies=[Depends(require_permission("reports:write"))],
 )
-async def review_evidence(evidence_id: uuid.UUID, body: ReviewEvidenceRequest, db: DBSession, user: AuthUser, tenant: ScopeTenant) -> EvidenceResponse:
+async def review_evidence(
+    evidence_id: uuid.UUID, body: ReviewEvidenceRequest, db: DBSession, user: AuthUser, tenant: ScopeTenant
+) -> EvidenceResponse:
     now = datetime.now(UTC)
     q = text("""
         UPDATE aisoc_compliance_evidence

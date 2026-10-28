@@ -74,7 +74,9 @@ from app.services.license_counts import reconcile, suggest  # noqa: E402
 
 
 def test_suggestions_match_the_specific_words_first():
-    assert suggest("Huntress SAT (Security Awareness Training) (Included)") == [{"source": "huntress", "item": "Awareness training learners"}]
+    assert suggest("Huntress SAT (Security Awareness Training) (Included)") == [
+        {"source": "huntress", "item": "Awareness training learners"}
+    ]
     assert suggest("Huntress for Workstations (Included)") == [{"source": "huntress", "item": "Agents"}]
     assert [s["item"] for s in suggest("NinjaOne RMM (Included)")] == ["Windows workstations", "Windows servers", "Macs"]
     assert suggest("Datto SaaS (PassThru)") == [{"source": "datto-saas", "item": "Billable seats"}]
@@ -83,12 +85,34 @@ def test_suggestions_match_the_specific_words_first():
 
 
 def test_reconcile_compares_each_mapped_line_with_the_added_up_counts_and_lists_the_unmapped():
-    billed = [{"item": "Huntress for Workstations (Included)", "count": 35}, {"item": "NinjaOne RMM (Included)", "count": 16}, {"item": "Liongard (Included)", "count": 1}]
-    held = [{"source": "huntress", "item": "Agents", "count": 40}, {"source": "ninjaone", "item": "Windows workstations", "count": 12}, {"source": "ninjaone", "item": "Macs", "count": 4}]
-    mapping = {"Huntress for Workstations (Included)": [{"source": "huntress", "item": "Agents"}], "NinjaOne RMM (Included)": [{"source": "ninjaone", "item": "Windows workstations"}, {"source": "ninjaone", "item": "Macs"}, {"source": "ninjaone", "item": "Windows servers"}]}
+    billed = [
+        {"item": "Huntress for Workstations (Included)", "count": 35},
+        {"item": "NinjaOne RMM (Included)", "count": 16},
+        {"item": "Liongard (Included)", "count": 1},
+    ]
+    held = [
+        {"source": "huntress", "item": "Agents", "count": 40},
+        {"source": "ninjaone", "item": "Windows workstations", "count": 12},
+        {"source": "ninjaone", "item": "Macs", "count": 4},
+    ]
+    mapping = {
+        "Huntress for Workstations (Included)": [{"source": "huntress", "item": "Agents"}],
+        "NinjaOne RMM (Included)": [
+            {"source": "ninjaone", "item": "Windows workstations"},
+            {"source": "ninjaone", "item": "Macs"},
+            {"source": "ninjaone", "item": "Windows servers"},
+        ],
+    }
     r = reconcile(billed, held, mapping)
-    assert [(x["invoice_item"], x["billed"], x["counted"], x["difference"]) for x in r["rows"]] == [("Huntress for Workstations (Included)", 35, 40, 5), ("NinjaOne RMM (Included)", 16, 16, 0)]
-    assert r["rows"][1]["parts"][2] == {"source": "ninjaone", "item": "Windows servers", "count": 0}, "a mapped item the tool does not count is shown as 0"
+    assert [(x["invoice_item"], x["billed"], x["counted"], x["difference"]) for x in r["rows"]] == [
+        ("Huntress for Workstations (Included)", 35, 40, 5),
+        ("NinjaOne RMM (Included)", 16, 16, 0),
+    ]
+    assert r["rows"][1]["parts"][2] == {
+        "source": "ninjaone",
+        "item": "Windows servers",
+        "count": 0,
+    }, "a mapped item the tool does not count is shown as 0"
     assert r["unmapped"] == [{"item": "Liongard (Included)", "billed": 1}]
 
 
@@ -97,7 +121,9 @@ def test_a_line_saved_as_no_tool_counts_this_is_neither_compared_nor_left_to_map
     held = [{"source": "huntress", "item": "Agents", "count": 5}]
     r = reconcile(billed, held, {"Managed Service": [], "Huntress MDR": [{"source": "huntress", "item": "Agents"}]})
     assert [x["invoice_item"] for x in r["rows"]] == ["Huntress MDR"], "the flat fee is not a row with a difference"
-    assert r["unmapped"] == [{"item": "Inky", "billed": 40}], "and it is not waiting to be mapped, while a line nobody has dealt with still is"
+    assert r["unmapped"] == [
+        {"item": "Inky", "billed": 40}
+    ], "and it is not waiting to be mapped, while a line nobody has dealt with still is"
 
 
 def test_the_biggest_difference_comes_first_whichever_way_it_goes():
@@ -124,7 +150,11 @@ def test_a_tool_that_counts_far_fewer_machines_than_the_rmm_is_flagged_with_the_
     from app.services.license_counts import endpoint_disagreements
 
     per = {
-        "a": [{"source": "ninjaone", "item": "Windows workstations", "count": 40}, {"source": "ninjaone", "item": "Macs", "count": 10}, {"source": "huntress", "item": "Agents", "count": 30}],
+        "a": [
+            {"source": "ninjaone", "item": "Windows workstations", "count": 40},
+            {"source": "ninjaone", "item": "Macs", "count": 10},
+            {"source": "huntress", "item": "Agents", "count": 30},
+        ],
         "b": [{"source": "ninjaone", "item": "Windows workstations", "count": 40}, {"source": "huntress", "item": "Agents", "count": 38}],
         "c": [{"source": "huntress", "item": "Agents", "count": 9}],
         "d": [{"source": "ninjaone", "item": "Windows workstations", "count": 3}, {"source": "huntress", "item": "Agents", "count": 0}],
@@ -138,7 +168,12 @@ def test_a_tool_that_counts_far_fewer_machines_than_the_rmm_is_flagged_with_the_
 def test_a_small_gap_is_not_a_disagreement_even_when_it_is_a_big_fraction():
     from app.services.license_counts import endpoint_disagreements
 
-    assert endpoint_disagreements({"a": [{"source": "ninjaone", "item": "Macs", "count": 5}, {"source": "huntress", "item": "Agents", "count": 3}]}) == []
+    assert (
+        endpoint_disagreements(
+            {"a": [{"source": "ninjaone", "item": "Macs", "count": 5}, {"source": "huntress", "item": "Agents", "count": 3}]}
+        )
+        == []
+    )
 
 
 def test_last_reported_takes_the_newest_count_per_client_and_tool_and_marks_the_silent_ones_first():
@@ -153,13 +188,20 @@ def test_last_reported_takes_the_newest_count_per_client_and_tool_and_marks_the_
         {"client": "b", "source": "slide", "updated_at": now - timedelta(days=3)},
     ]
     out = last_reported(rows, now)
-    assert [(r["client"], r["source"], r["days_ago"], r["silent"]) for r in out] == [("a", "huntress", 5, True), ("b", "slide", 3, True), ("b", "huntress", 2, False), ("a", "ninjaone", 0, False)]
+    assert [(r["client"], r["source"], r["days_ago"], r["silent"]) for r in out] == [
+        ("a", "huntress", 5, True),
+        ("b", "slide", 3, True),
+        ("b", "huntress", 2, False),
+        ("a", "ninjaone", 0, False),
+    ]
 
 
 def test_a_tool_with_mapped_clients_and_no_count_is_listed_and_a_renamed_source_is_matched():
     from app.services.license_counts import tools_without_counts
 
-    assert tools_without_counts({"ninjaone", "blumira", "datto-saas-seats", "cipp-health", "petra"}, {"ninjaone", "datto-saas", "cipp"}) == ["blumira", "petra"]
+    assert tools_without_counts(
+        {"ninjaone", "blumira", "datto-saas-seats", "cipp-health", "petra"}, {"ninjaone", "datto-saas", "cipp"}
+    ) == ["blumira", "petra"]
     assert tools_without_counts(set(), {"ninjaone"}) == []
 
 
@@ -218,9 +260,15 @@ def test_a_client_with_machines_and_no_billed_line_is_listed_largest_first_and_t
     from app.services.license_counts import unbilled_clients
 
     per = {
-        "a": [{"source": "ninjaone", "item": "Windows workstations", "count": 12}, {"source": "halopsa", "item": "NinjaOne RMM (Included)", "count": 12, "unit": "other"}],
+        "a": [
+            {"source": "ninjaone", "item": "Windows workstations", "count": 12},
+            {"source": "halopsa", "item": "NinjaOne RMM (Included)", "count": 12, "unit": "other"},
+        ],
         "b": [{"source": "ninjaone", "item": "Windows workstations", "count": 30}],
-        "c": [{"source": "ninjaone", "item": "Macs", "count": 4}, {"source": "halopsa", "item": "Tickets opened in the last 30 days", "count": 9, "unit": "ticket"}],
+        "c": [
+            {"source": "ninjaone", "item": "Macs", "count": 4},
+            {"source": "halopsa", "item": "Tickets opened in the last 30 days", "count": 9, "unit": "ticket"},
+        ],
         "d": [{"source": "halopsa", "item": "Managed Service", "count": 1, "unit": "other"}],
         "e": [{"source": "ninjaone", "item": "Windows workstations", "count": 0}],
         "f": [{"source": "huntress", "item": "Agents", "count": 50}],
@@ -286,7 +334,10 @@ def test_a_line_that_never_matched_since_it_was_first_recorded_says_it_is_only_a
 
 def test_a_billed_change_that_ended_a_match_starts_the_disagreement_there():
     # the tool counted 10 all along; the invoice was raised from 10 to 8 on day 7.
-    history = {_BILLED: [{"observed_at": _day(0), "count": 10}, {"observed_at": _day(7), "count": 8}], _PART: [{"observed_at": _day(0), "count": 10}]}
+    history = {
+        _BILLED: [{"observed_at": _day(0), "count": 10}, {"observed_at": _day(7), "count": 8}],
+        _PART: [{"observed_at": _day(0), "count": 10}],
+    }
     current = {_BILLED: (8, _day(0)), _PART: (10, _day(0))}
     since, complete = disagreement_since(_BILLED, [_PART], history, current, {"halopsa": _day(0), "huntress": _day(0)}, _day(20))
     assert (since, complete) == (_day(7), True)
@@ -294,7 +345,11 @@ def test_a_billed_change_that_ended_a_match_starts_the_disagreement_there():
 
 def test_several_parts_are_added_up_before_they_are_compared():
     a, b = ("ninjaone", "Windows workstations"), ("ninjaone", "Windows servers")
-    history = {_BILLED: [{"observed_at": _day(0), "count": 20}], a: [{"observed_at": _day(0), "count": 15}, {"observed_at": _day(4), "count": 17}], b: [{"observed_at": _day(0), "count": 5}]}
+    history = {
+        _BILLED: [{"observed_at": _day(0), "count": 20}],
+        a: [{"observed_at": _day(0), "count": 15}, {"observed_at": _day(4), "count": 17}],
+        b: [{"observed_at": _day(0), "count": 5}],
+    }
     current = {_BILLED: (20, _day(0)), a: (17, _day(0)), b: (5, _day(0))}
     since, complete = disagreement_since(_BILLED, [a, b], history, current, {"halopsa": _day(0), "ninjaone": _day(0)}, _day(9))
     assert (since, complete) == (_day(4), True), "15 + 5 matched 20; 17 + 5 does not"

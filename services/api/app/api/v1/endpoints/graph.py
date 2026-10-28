@@ -445,7 +445,10 @@ async def get_overview(
     depth: Annotated[
         int, Query(ge=1, le=6, description="Accepted for compatibility; the overview is always one hop (entity to technique).")
     ] = 3,
-    client: Annotated[uuid.UUID | None, Query(description="Only this client's alerts (the caller's own tenant or one of its clients). Default: all of them.")] = None,
+    client: Annotated[
+        uuid.UUID | None,
+        Query(description="Only this client's alerts (the caller's own tenant or one of its clients). Default: all of them."),
+    ] = None,
 ) -> dict[str, Any]:
     """The graph the Attack Graph page draws, from the last 30 days of alerts across the caller's tenant and its client tenants (see the note above)."""
     since = datetime.now(UTC) - timedelta(days=_OVERVIEW_WINDOW_DAYS)
@@ -646,7 +649,10 @@ async def get_mitre_coverage(
 async def get_mitre_coverage_compat(
     db: DBSession,
     current_user: CurrentUser = Depends(get_current_user),
-    client: Annotated[uuid.UUID | None, Query(description="Only this client's alerts (the caller's own tenant or one of its clients). Default: all of them.")] = None,
+    client: Annotated[
+        uuid.UUID | None,
+        Query(description="Only this client's alerts (the caller's own tenant or one of its clients). Default: all of them."),
+    ] = None,
 ) -> MitreCoverageResponse:
     """Aggregated MITRE coverage in the shape the analyst console expects.
 

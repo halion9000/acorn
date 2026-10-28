@@ -76,7 +76,9 @@ def _out(rule: AlertSuppression, now: datetime, names: dict[uuid.UUID, str], hid
     )
 
 
-@router.post("", response_model=SuppressionOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("alerts:write"))])
+@router.post(
+    "", response_model=SuppressionOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("alerts:write"))]
+)
 async def hide_alert_type(body: SuppressionIn, user: AuthUser, db: DBSession) -> SuppressionOut:
     """Hide this alert's type for the device, its client, or all clients, and hide the open alerts of that type right away."""
     now = datetime.now(UTC)
@@ -118,7 +120,9 @@ async def hide_alert_type(body: SuppressionIn, user: AuthUser, db: DBSession) ->
     await db.flush()
     hidden = await apply_rule(db, rule, user.tenant_id)
     await db.commit()
-    names = {r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()}
+    names = {
+        r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()
+    }
     return _out(rule, now, names, hidden)
 
 
@@ -130,12 +134,18 @@ async def list_suppressions(user: AuthUser, db: DBSession, include_ended: bool =
     if not include_ended:
         q = q.where(AlertSuppression.revoked_at.is_(None))
     rules = list((await db.execute(q)).scalars().all())
-    names = {r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()}
+    names = {
+        r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()
+    }
     counts: dict[uuid.UUID, int] = {}
     for tid in {r.client_tenant_id or user.tenant_id for r in rules} | {user.tenant_id, *names}:
         try:
             rows = (
-                await db.execute(select(Alert.suppression_id, func.count()).where(Alert.tenant_id == tid, Alert.status == SUPPRESSED).group_by(Alert.suppression_id))
+                await db.execute(
+                    select(Alert.suppression_id, func.count())
+                    .where(Alert.tenant_id == tid, Alert.status == SUPPRESSED)
+                    .group_by(Alert.suppression_id)
+                )
             ).all()
         except Exception:  # noqa: BLE001 - a count that cannot be read is shown as zero, not an error
             rows = []
@@ -148,7 +158,11 @@ async def list_suppressions(user: AuthUser, db: DBSession, include_ended: bool =
 @router.delete("/{suppression_id}", response_model=SuppressionOut, dependencies=[Depends(require_permission("alerts:write"))])
 async def lift_suppression(suppression_id: uuid.UUID, user: AuthUser, db: DBSession) -> SuppressionOut:
     """Stop hiding this alert type: its hidden alerts come back with the status they had."""
-    rule = (await db.execute(select(AlertSuppression).where(AlertSuppression.id == suppression_id, AlertSuppression.tenant_id == user.tenant_id))).scalar_one_or_none()
+    rule = (
+        await db.execute(
+            select(AlertSuppression).where(AlertSuppression.id == suppression_id, AlertSuppression.tenant_id == user.tenant_id)
+        )
+    ).scalar_one_or_none()
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such rule")
     restored = 0
@@ -157,6 +171,7 @@ async def lift_suppression(suppression_id: uuid.UUID, user: AuthUser, db: DBSess
         rule.revoked_at = datetime.now(UTC)
         rule.revoked_reason = "lifted"
         await db.commit()
-    names = {r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()}
+    names = {
+        r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()
+    }
     return _out(rule, datetime.now(UTC), names, restored)
-

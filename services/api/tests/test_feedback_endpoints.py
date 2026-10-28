@@ -386,7 +386,10 @@ def test_applying_a_redisposition_works_on_the_clients_alerts_too(monkeypatch):
     monkeypatch.setattr(scope, "find_alert_tenant", in_client)
     monkeypatch.setattr(scope, "acting_as_tenant", acting_as)
     monkeypatch.setattr(fb, "apply_redisposition", fake_apply)
-    out = run(fb.apply_redisposition_endpoint(fb.RedispositionApplyRequest(alert_ids=[str(uuid.uuid4())], new_disposition="benign", confirmation_token="t"), user(), FakeDB()))
+    out = run(
+        fb.apply_redisposition_endpoint(
+            fb.RedispositionApplyRequest(alert_ids=[str(uuid.uuid4())], new_disposition="benign", confirmation_token="t"), user(), FakeDB()
+        )
+    )
     assert out.updated == 1
     assert seen["tenant_id"] == client
-

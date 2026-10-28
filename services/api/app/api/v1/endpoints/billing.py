@@ -23,7 +23,26 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.client_alias import ClientAlias
 from app.models.signin import BillingDifferenceNote, BillingItemMap, ClientLicenseCount, ClientLicenseHistory
 from app.models.tenant import Tenant
-from app.services.license_counts import BASELINE_TOOL, changes, count_at, count_series, delta, forecast_next, note_state, endpoint_disagreements, last_reported, disagreement_since, reconcile, tools_without_counts, unbilled_clients, suggestion_confidence, suggest, totals, unusual, window_start
+from app.services.license_counts import (
+    BASELINE_TOOL,
+    changes,
+    count_at,
+    count_series,
+    delta,
+    disagreement_since,
+    endpoint_disagreements,
+    forecast_next,
+    last_reported,
+    note_state,
+    reconcile,
+    suggest,
+    suggestion_confidence,
+    tools_without_counts,
+    totals,
+    unbilled_clients,
+    unusual,
+    window_start,
+)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -59,7 +78,9 @@ class _View:
         self.items = [report]
 
 
-async def apply_license_counts(db: Any, owner: uuid.UUID, report: LicenseCountsReport, now: datetime | None = None) -> LicenseCountsResponse:
+async def apply_license_counts(
+    db: Any, owner: uuid.UUID, report: LicenseCountsReport, now: datetime | None = None
+) -> LicenseCountsResponse:
     """Store a client's counts for one tool, and write history for every item that is new, changed or gone. The caller owns the transaction."""
     now = now or datetime.now(UTC)
     by_tenant, unmapped, ignored, _waiting = await targets_by_tenant(db, owner, _View(report))
@@ -67,16 +88,35 @@ async def apply_license_counts(db: Any, owner: uuid.UUID, report: LicenseCountsR
     reported = [c.model_dump() for c in report.counts]
     for tid in by_tenant:
         async with acting_as_tenant(db, tid):
-            held = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == tid, ClientLicenseCount.source == report.vendor))).scalars().all()
+            held = (
+                (
+                    await db.execute(
+                        select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == tid, ClientLicenseCount.source == report.vendor)
+                    )
+                )
+                .scalars()
+                .all()
+            )
             plan = changes({r.item: r.count for r in held}, reported)
             for h in plan["history"]:
                 db.add(ClientLicenseHistory(tenant_id=tid, source=report.vendor, observed_at=now, **h))
             for u in plan["upserts"]:
                 values = {"tenant_id": tid, "source": report.vendor, "updated_at": now, "first_seen_at": now, **u}
                 stmt = pg_insert(ClientLicenseCount).values(values)
-                await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source", "item"], set_={c: stmt.excluded[c] for c in ("unit", "count", "available", "updated_at")}))
+                await db.execute(
+                    stmt.on_conflict_do_update(
+                        index_elements=["tenant_id", "source", "item"],
+                        set_={c: stmt.excluded[c] for c in ("unit", "count", "available", "updated_at")},
+                    )
+                )
             if plan["removed"]:
-                await db.execute(delete(ClientLicenseCount).where(ClientLicenseCount.tenant_id == tid, ClientLicenseCount.source == report.vendor, ClientLicenseCount.item.in_(plan["removed"])))
+                await db.execute(
+                    delete(ClientLicenseCount).where(
+                        ClientLicenseCount.tenant_id == tid,
+                        ClientLicenseCount.source == report.vendor,
+                        ClientLicenseCount.item.in_(plan["removed"]),
+                    )
+                )
             accepted += 1
     return LicenseCountsResponse(accepted=accepted, unmapped=unmapped, ignored=ignored)
 
@@ -126,12 +166,29 @@ async def _client_rows(db: Any, owner: uuid.UUID, cid: uuid.UUID, days: int, now
     out = []
     for r in held:
         then = count_at(by_item.get((r.source, r.item), []), r.count, r.first_seen_at, when, tracking[r.source])
-        out.append({"source": r.source, "item": r.item, "unit": r.unit, "count": r.count, "available": r.available, "then": then, "change": delta(r.count, then), "first_seen_at": r.first_seen_at, "updated_at": r.updated_at})
+        out.append(
+            {
+                "source": r.source,
+                "item": r.item,
+                "unit": r.unit,
+                "count": r.count,
+                "available": r.available,
+                "then": then,
+                "change": delta(r.count, then),
+                "first_seen_at": r.first_seen_at,
+                "updated_at": r.updated_at,
+            }
+        )
     return sorted(out, key=lambda x: (x["source"], x["item"]))
 
 
 @router.get("/clients/{client_id}", response_model=ClientCounts, summary="What each tool counts for one client, and how each count moved")
-async def client_counts(client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, days: Annotated[int, Query(ge=1, le=400)] = 30) -> ClientCounts:
+async def client_counts(
+    client_id: uuid.UUID,
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
+    db: DBSession,
+    days: Annotated[int, Query(ge=1, le=400)] = 30,
+) -> ClientCounts:
     owner = current_user.tenant_id
     if client_id != owner:
         found = (await db.execute(select(Tenant.id).where(Tenant.id == client_id, Tenant.parent_tenant_id == owner))).scalar_one_or_none()
@@ -139,7 +196,9 @@ async def client_counts(client_id: uuid.UUID, current_user: Annotated[AuthUser, 
             raise HTTPException(status_code=404, detail="Client not found")
     now = datetime.now(UTC)
     rows = await _client_rows(db, owner, client_id, days, now)
-    return ClientCounts(client_id=client_id, days=max(1, min(days, 400)), rows=[CountRow(**{k: v for k, v in r.items() if k != "then"}) for r in rows])
+    return ClientCounts(
+        client_id=client_id, days=max(1, min(days, 400)), rows=[CountRow(**{k: v for k, v in r.items() if k != "then"}) for r in rows]
+    )
 
 
 class SeriesPoint(BaseModel):
@@ -157,9 +216,18 @@ class CountSeries(BaseModel):
     forecast_30d: int | None = None
 
 
-@router.get("/clients/{client_id}/history", response_model=CountSeries, summary="One tool's count of one item for one client over time, as points for a chart")
+@router.get(
+    "/clients/{client_id}/history",
+    response_model=CountSeries,
+    summary="One tool's count of one item for one client over time, as points for a chart",
+)
 async def client_count_history(
-    client_id: uuid.UUID, source: str, item: str, current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, days: Annotated[int, Query(ge=1, le=400)] = 90
+    client_id: uuid.UUID,
+    source: str,
+    item: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
+    db: DBSession,
+    days: Annotated[int, Query(ge=1, le=400)] = 90,
 ) -> CountSeries:
     owner = current_user.tenant_id
     if client_id != owner:
@@ -169,13 +237,38 @@ async def client_count_history(
     now = datetime.now(UTC)
     since = window_start(now, days)
     async with _as(db, owner, client_id):
-        held = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == client_id, ClientLicenseCount.source == source, ClientLicenseCount.item == item))).scalar_one_or_none()
-        hist = (await db.execute(select(ClientLicenseHistory).where(ClientLicenseHistory.tenant_id == client_id, ClientLicenseHistory.source == source, ClientLicenseHistory.item == item))).scalars().all()
+        held = (
+            await db.execute(
+                select(ClientLicenseCount).where(
+                    ClientLicenseCount.tenant_id == client_id, ClientLicenseCount.source == source, ClientLicenseCount.item == item
+                )
+            )
+        ).scalar_one_or_none()
+        hist = (
+            (
+                await db.execute(
+                    select(ClientLicenseHistory).where(
+                        ClientLicenseHistory.tenant_id == client_id,
+                        ClientLicenseHistory.source == source,
+                        ClientLicenseHistory.item == item,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
     if held is None and not hist:
         raise HTTPException(status_code=404, detail="No such count for this client")
     rows = [{"observed_at": h.observed_at, "count": h.count, "previous_count": h.previous_count} for h in hist]
     points = count_series(rows, held.count if held is not None else 0, now, since)
-    return CountSeries(client_id=client_id, source=source, item=item, days=max(1, min(days, 400)), points=[SeriesPoint(**p) for p in points], forecast_30d=forecast_next(points))
+    return CountSeries(
+        client_id=client_id,
+        source=source,
+        item=item,
+        days=max(1, min(days, 400)),
+        points=[SeriesPoint(**p) for p in points],
+        forecast_30d=forecast_next(points),
+    )
 
 
 class TotalRow(BaseModel):
@@ -195,7 +288,11 @@ class FleetTotals(BaseModel):
 
 
 @router.get("/summary", response_model=FleetTotals, summary="Each tool's counts added across all clients, with the change over the window")
-async def summary(current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, days: Annotated[int, Query(ge=1, le=400)] = 30) -> FleetTotals:
+async def summary(
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
+    db: DBSession,
+    days: Annotated[int, Query(ge=1, le=400)] = 30,
+) -> FleetTotals:
     owner = current_user.tenant_id
     ids, _names = await _scope(db, owner, None)
     now = datetime.now(UTC)
@@ -220,7 +317,12 @@ class ChangeRow(BaseModel):
 
 @router.get("/changes", response_model=list[ChangeRow], summary="Every change to a count across all clients in the last days, newest first")
 async def changes_log(
-    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, days: Annotated[int, Query(ge=1, le=400)] = 30, limit: Annotated[int, Query(ge=1, le=5000)] = 500, client_id: uuid.UUID | None = None, source: str | None = None
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
+    db: DBSession,
+    days: Annotated[int, Query(ge=1, le=400)] = 30,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 500,
+    client_id: uuid.UUID | None = None,
+    source: str | None = None,
 ) -> list[ChangeRow]:
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, client_id)
@@ -230,10 +332,23 @@ async def changes_log(
         async with _as(db, owner, cid):
             stmt = select(ClientLicenseHistory).where(ClientLicenseHistory.tenant_id == cid, ClientLicenseHistory.observed_at >= since)
             if source:
-                stmt = stmt.where(ClientLicenseHistory.source == source)  # "halopsa" is the history of what was billed: each time an invoice quantity was corrected, and by how much
+                stmt = stmt.where(
+                    ClientLicenseHistory.source == source
+                )  # "halopsa" is the history of what was billed: each time an invoice quantity was corrected, and by how much
             rows = (await db.execute(stmt)).scalars().all()
         out += [
-            ChangeRow(client_id=cid, client_name=names.get(cid) or str(cid), source=r.source, item=r.item, unit=r.unit, count=r.count, previous_count=r.previous_count, observed_at=r.observed_at, unusual=unusual(r.count, r.previous_count)) for r in rows
+            ChangeRow(
+                client_id=cid,
+                client_name=names.get(cid) or str(cid),
+                source=r.source,
+                item=r.item,
+                unit=r.unit,
+                count=r.count,
+                previous_count=r.previous_count,
+                observed_at=r.observed_at,
+                unusual=unusual(r.count, r.previous_count),
+            )
+            for r in rows
         ]
     out.sort(key=lambda c: c.observed_at, reverse=True)
     return out[: max(1, min(limit, 2000))]
@@ -296,7 +411,11 @@ async def billing_map(current_user: Annotated[AuthUser, Depends(require_permissi
                     billed_clients[r["item"]] = billed_clients.get(r["item"], 0) + 1
             else:
                 tool_items.update([(r["source"], r["item"])])
-    unmapped = [{"invoice_item": i, "clients": n, "suggestion": suggest(i), "confidence": suggestion_confidence(i)} for i, n in sorted(billed_clients.items(), key=lambda kv: (-kv[1], kv[0])) if i not in mapping]
+    unmapped = [
+        {"invoice_item": i, "clients": n, "suggestion": suggest(i), "confidence": suggestion_confidence(i)}
+        for i, n in sorted(billed_clients.items(), key=lambda kv: (-kv[1], kv[0]))
+        if i not in mapping
+    ]
     return MapOut(
         mapped=[MapRow(invoice_item=i, counted=[CountedRef(**c) for c in cs]) for i, cs in sorted(mapping.items())],
         unmapped=unmapped,
@@ -311,17 +430,31 @@ async def save_map(body: MapIn, current_user: Annotated[AuthUser, Depends(requir
     if not item:
         raise HTTPException(status_code=422, detail="Name the invoice line")
     counted = [c.model_dump() for c in body.counted]
-    values = {"tenant_id": owner, "invoice_item": item, "counted": counted, "updated_by": current_user.user_id, "updated_at": datetime.now(UTC)}
+    values = {
+        "tenant_id": owner,
+        "invoice_item": item,
+        "counted": counted,
+        "updated_by": current_user.user_id,
+        "updated_at": datetime.now(UTC),
+    }
     stmt = pg_insert(BillingItemMap).values(values)
-    await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "invoice_item"], set_={c: stmt.excluded[c] for c in ("counted", "updated_by", "updated_at")}))
+    await db.execute(
+        stmt.on_conflict_do_update(
+            index_elements=["tenant_id", "invoice_item"], set_={c: stmt.excluded[c] for c in ("counted", "updated_by", "updated_at")}
+        )
+    )
     await db.commit()
     return MapRow(invoice_item=item, counted=body.counted)
 
 
 @router.delete("/map", status_code=204, summary="Stop checking an invoice line against tool counts")
-async def delete_map(invoice_item: str, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> None:
+async def delete_map(
+    invoice_item: str, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+) -> None:
     owner = current_user.tenant_id
-    await db.execute(delete(BillingItemMap).where(BillingItemMap.tenant_id == owner, BillingItemMap.invoice_item == " ".join(invoice_item.split())))
+    await db.execute(
+        delete(BillingItemMap).where(BillingItemMap.tenant_id == owner, BillingItemMap.invoice_item == " ".join(invoice_item.split()))
+    )
     await db.commit()
 
 
@@ -368,31 +501,58 @@ class NoteIn(BaseModel):
     difference: int
 
 
-@router.put("/notes", status_code=204, summary="Accept a difference between billed and counted for one client's invoice line, with a reason")
+@router.put(
+    "/notes", status_code=204, summary="Accept a difference between billed and counted for one client's invoice line, with a reason"
+)
 async def save_note(body: NoteIn, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> None:
     owner = current_user.tenant_id
     if body.client_id != owner:
-        found = (await db.execute(select(Tenant.id).where(Tenant.id == body.client_id, Tenant.parent_tenant_id == owner))).scalar_one_or_none()
+        found = (
+            await db.execute(select(Tenant.id).where(Tenant.id == body.client_id, Tenant.parent_tenant_id == owner))
+        ).scalar_one_or_none()
         if found is None:
             raise HTTPException(status_code=404, detail="Client not found")
     note = " ".join(body.note.split())
     item = " ".join(body.invoice_item.split())
     if len(note) < 3 or not item:
         raise HTTPException(status_code=422, detail="Give a reason of at least 3 characters")
-    values = {"tenant_id": owner, "client_id": body.client_id, "invoice_item": item, "note": note, "difference": body.difference, "updated_by": current_user.user_id, "updated_at": datetime.now(UTC)}
+    values = {
+        "tenant_id": owner,
+        "client_id": body.client_id,
+        "invoice_item": item,
+        "note": note,
+        "difference": body.difference,
+        "updated_by": current_user.user_id,
+        "updated_at": datetime.now(UTC),
+    }
     stmt = pg_insert(BillingDifferenceNote).values(values)
-    await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "client_id", "invoice_item"], set_={c: stmt.excluded[c] for c in ("note", "difference", "updated_by", "updated_at")}))
+    await db.execute(
+        stmt.on_conflict_do_update(
+            index_elements=["tenant_id", "client_id", "invoice_item"],
+            set_={c: stmt.excluded[c] for c in ("note", "difference", "updated_by", "updated_at")},
+        )
+    )
     await db.commit()
 
 
 @router.delete("/notes", status_code=204, summary="Stop accepting a difference for one client's invoice line")
-async def delete_note(client_id: uuid.UUID, invoice_item: str, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> None:
+async def delete_note(
+    client_id: uuid.UUID, invoice_item: str, current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+) -> None:
     owner = current_user.tenant_id
-    await db.execute(delete(BillingDifferenceNote).where(BillingDifferenceNote.tenant_id == owner, BillingDifferenceNote.client_id == client_id, BillingDifferenceNote.invoice_item == " ".join(invoice_item.split())))
+    await db.execute(
+        delete(BillingDifferenceNote).where(
+            BillingDifferenceNote.tenant_id == owner,
+            BillingDifferenceNote.client_id == client_id,
+            BillingDifferenceNote.invoice_item == " ".join(invoice_item.split()),
+        )
+    )
     await db.commit()
 
 
-async def _disagreement_starts(db: Any, owner: uuid.UUID, cid: uuid.UUID, lines: list[tuple[str, list[dict[str, str]]]], now: datetime) -> dict[str, tuple[datetime, bool]]:
+async def _disagreement_starts(
+    db: Any, owner: uuid.UUID, cid: uuid.UUID, lines: list[tuple[str, list[dict[str, str]]]], now: datetime
+) -> dict[str, tuple[datetime, bool]]:
     """For one client, since when each of these invoice lines (name and mapped parts) has not matched. Read under that client's own scope."""
     async with _as(db, owner, cid):
         held = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == cid))).scalars().all()
@@ -405,12 +565,21 @@ async def _disagreement_starts(db: Any, owner: uuid.UUID, cid: uuid.UUID, lines:
     for h in hist:
         history.setdefault((h.source, h.item), []).append({"observed_at": h.observed_at, "count": h.count})
         tracking[h.source] = min(tracking.get(h.source, h.observed_at), h.observed_at)
-    return {item: disagreement_since((BILLED_SOURCE, item), [(p["source"], p["item"]) for p in parts], history, current, tracking, now) for item, parts in lines}
+    return {
+        item: disagreement_since((BILLED_SOURCE, item), [(p["source"], p["item"]) for p in parts], history, current, tracking, now)
+        for item, parts in lines
+    }
 
 
-@router.get("/reconcile", response_model=ReconcileOut, summary="Where what is billed and what the tools count disagree, biggest difference first")
+@router.get(
+    "/reconcile", response_model=ReconcileOut, summary="Where what is billed and what the tools count disagree, biggest difference first"
+)
 async def reconcile_billing(
-    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, include_matches: bool = False, limit: Annotated[int, Query(ge=1, le=5000)] = 500, min_days: Annotated[int | None, Query(ge=0, le=400)] = None
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
+    db: DBSession,
+    include_matches: bool = False,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 500,
+    min_days: Annotated[int | None, Query(ge=0, le=400)] = None,
 ) -> ReconcileOut:
     owner = current_user.tenant_id
     now = datetime.now(UTC)
@@ -425,7 +594,13 @@ async def reconcile_billing(
         result = reconcile(billed, held, mapping)
         unmapped_lines += len(result["unmapped"])
         shown = [r for r in result["rows"] if include_matches or r["difference"] != 0]
-        starts = await _disagreement_starts(db, owner, cid, [(r["invoice_item"], mapping[r["invoice_item"]]) for r in shown if r["difference"] != 0], now) if any(r["difference"] != 0 for r in shown) else {}
+        starts = (
+            await _disagreement_starts(
+                db, owner, cid, [(r["invoice_item"], mapping[r["invoice_item"]]) for r in shown if r["difference"] != 0], now
+            )
+            if any(r["difference"] != 0 for r in shown)
+            else {}
+        )
         for r in shown:
             n = notes.get((cid, r["invoice_item"]))
             start = starts.get(r["invoice_item"])
@@ -434,8 +609,14 @@ async def reconcile_billing(
                 continue
             out.append(
                 ReconcileRow(
-                    client_id=cid, client_name=names.get(cid) or str(cid), note_state=note_state(n, r["difference"]), note=n["note"] if n else None,
-                    since=start[0] if start else None, days=days, since_complete=start[1] if start else True, **r,
+                    client_id=cid,
+                    client_name=names.get(cid) or str(cid),
+                    note_state=note_state(n, r["difference"]),
+                    note=n["note"] if n else None,
+                    since=start[0] if start else None,
+                    days=days,
+                    since_complete=start[1] if start else True,
+                    **r,
                 )
             )
     out.sort(key=lambda r: (-abs(r.difference), r.client_name.lower(), r.invoice_item))
@@ -463,20 +644,63 @@ class DataQualityOut(BaseModel):
     unbilled: list[DisagreementRow] = []
 
 
-@router.get("/data-quality", response_model=DataQualityOut, summary="Clients where a security tool counts noticeably fewer or more machines than the RMM manages, biggest gap first")
-async def data_quality(current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, limit: Annotated[int, Query(ge=1, le=5000)] = 500) -> DataQualityOut:
+@router.get(
+    "/data-quality",
+    response_model=DataQualityOut,
+    summary="Clients where a security tool counts noticeably fewer or more machines than the RMM manages, biggest gap first",
+)
+async def data_quality(
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
+    db: DBSession,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 500,
+) -> DataQualityOut:
     owner = current_user.tenant_id
     per_client, names = await _all_client_counts(db, owner)
-    rows = [DisagreementRow(client_id=d["client"], client_name=names.get(d["client"]) or str(d["client"]), tool=d["tool"], tool_count=d["tool_count"], baseline_count=d["baseline_count"], gap=d["gap"]) for d in endpoint_disagreements(per_client)]
-    mapped = {v for (v,) in (await db.execute(select(ClientAlias.vendor).where(ClientAlias.tenant_id == owner, ClientAlias.child_tenant_id.is_not(None), ClientAlias.ignored.is_(False)).distinct())).all()}
+    rows = [
+        DisagreementRow(
+            client_id=d["client"],
+            client_name=names.get(d["client"]) or str(d["client"]),
+            tool=d["tool"],
+            tool_count=d["tool_count"],
+            baseline_count=d["baseline_count"],
+            gap=d["gap"],
+        )
+        for d in endpoint_disagreements(per_client)
+    ]
+    mapped = {
+        v
+        for (v,) in (
+            await db.execute(
+                select(ClientAlias.vendor)
+                .where(ClientAlias.tenant_id == owner, ClientAlias.child_tenant_id.is_not(None), ClientAlias.ignored.is_(False))
+                .distinct()
+            )
+        ).all()
+    }
     counted = {r["source"] for rs in per_client.values() for r in rs}
     # Only meaningful once billing data exists at all: otherwise every client would look unbilled.
     unbilled = (
-        [DisagreementRow(client_id=u["client"], client_name=names.get(u["client"]) or str(u["client"]), tool=BILLED_SOURCE, tool_count=0, baseline_count=u["machines"], gap=-u["machines"]) for u in unbilled_clients(per_client, BILLED_SOURCE)]
+        [
+            DisagreementRow(
+                client_id=u["client"],
+                client_name=names.get(u["client"]) or str(u["client"]),
+                tool=BILLED_SOURCE,
+                tool_count=0,
+                baseline_count=u["machines"],
+                gap=-u["machines"],
+            )
+            for u in unbilled_clients(per_client, BILLED_SOURCE)
+        ]
         if BILLED_SOURCE in counted
         else []
     )
-    return DataQualityOut(generated_at=datetime.now(UTC), baseline_tool=BASELINE_TOOL, rows=rows[: max(1, min(limit, 2000))], no_counts=tools_without_counts(mapped, counted), unbilled=unbilled[: max(1, min(limit, 2000))])
+    return DataQualityOut(
+        generated_at=datetime.now(UTC),
+        baseline_tool=BASELINE_TOOL,
+        rows=rows[: max(1, min(limit, 2000))],
+        no_counts=tools_without_counts(mapped, counted),
+        unbilled=unbilled[: max(1, min(limit, 2000))],
+    )
 
 
 class LastReportedRow(BaseModel):
@@ -489,19 +713,37 @@ class LastReportedRow(BaseModel):
     silent: bool
 
 
-@router.get("/last-reported", response_model=list[LastReportedRow], summary="When each tool last reported a count for each client, silent ones first")
+@router.get(
+    "/last-reported",
+    response_model=list[LastReportedRow],
+    summary="When each tool last reported a count for each client, silent ones first",
+)
 async def last_reported_grid(
-    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))], db: DBSession, only_silent: bool = False, limit: Annotated[int, Query(ge=1, le=5000)] = 1000
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
+    db: DBSession,
+    only_silent: bool = False,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 1000,
 ) -> list[LastReportedRow]:
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, None)
     rows: list[dict[str, Any]] = []
     for cid in ids[1:]:
         async with _as(db, owner, cid):
-            held = (await db.execute(select(ClientLicenseCount.source, ClientLicenseCount.updated_at).where(ClientLicenseCount.tenant_id == cid))).all()
+            held = (
+                await db.execute(
+                    select(ClientLicenseCount.source, ClientLicenseCount.updated_at).where(ClientLicenseCount.tenant_id == cid)
+                )
+            ).all()
         rows += [{"client": cid, "source": src, "updated_at": at} for src, at in held]
     out = [
-        LastReportedRow(client_id=r["client"], client_name=names.get(r["client"]) or str(r["client"]), source=r["source"], last_reported_at=r["last_reported_at"], days_ago=r["days_ago"], silent=r["silent"])
+        LastReportedRow(
+            client_id=r["client"],
+            client_name=names.get(r["client"]) or str(r["client"]),
+            source=r["source"],
+            last_reported_at=r["last_reported_at"],
+            days_ago=r["days_ago"],
+            silent=r["silent"],
+        )
         for r in last_reported(rows, datetime.now(UTC))
     ]
     if only_silent:

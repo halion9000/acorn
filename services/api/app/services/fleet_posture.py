@@ -13,22 +13,56 @@ STATUS_ORDER = {"not_met": 0, "partly": 1, "met": 2}
 BOARDS: dict[str, tuple[str, tuple[str, ...]]] = {
     "renewals": (
         "Renewals and expiries",
-        ("itglue_domain_expiry", "itglue_certificate_expiry", "liongard_iis_certificates", "cipp_subscriptions", "meraki_licence", "halopsa_agreement", "slide_appliance"),
+        (
+            "itglue_domain_expiry",
+            "itglue_certificate_expiry",
+            "liongard_iis_certificates",
+            "cipp_subscriptions",
+            "meraki_licence",
+            "halopsa_agreement",
+            "slide_appliance",
+        ),
     ),
     "licences": ("Licence waste and unused accounts", ("cipp_unused_licences", "cipp_inactive_accounts", "liongard_stale_licensed_users")),
-    "windows": ("Windows support and updates", ("ninjaone_unsupported_os", "ninjaone_patching", "threatmate_end_of_life", "threatmate_patching")),
+    "windows": (
+        "Windows support and updates",
+        ("ninjaone_unsupported_os", "ninjaone_patching", "threatmate_end_of_life", "threatmate_patching"),
+    ),
     "backups": (
         "Backups",
-        ("slide_alerts", "slide_appliance", "slide_verification", "saas_backup_microsoft", "saas_backup_google", "saas_backup_email", "datto_saas_seats", "liongard_datto_bcdr"),
+        (
+            "slide_alerts",
+            "slide_appliance",
+            "slide_verification",
+            "saas_backup_microsoft",
+            "saas_backup_google",
+            "saas_backup_email",
+            "datto_saas_seats",
+            "liongard_datto_bcdr",
+        ),
     ),
     "network": ("Network", ("meraki_wan", "meraki_dual_wan", "meraki_licence", "meraki_admin_2fa")),
     "admins": (
         "Administrator accounts",
-        ("meraki_admin_2fa", "dnsfilter_org_mfa", "autoelevate_enforcing", "cipp_inactive_accounts", "liongard_ad_bad_logins", "fieldeffect_account_risk"),
+        (
+            "meraki_admin_2fa",
+            "dnsfilter_org_mfa",
+            "autoelevate_enforcing",
+            "cipp_inactive_accounts",
+            "liongard_ad_bad_logins",
+            "fieldeffect_account_risk",
+        ),
     ),
     "endpoints": (
         "Endpoint protection",
-        ("ninjaone_antivirus", "huntress_protection", "huntress_quiet_agents", "liongard_edr_coverage", "autoelevate_enforcing", "threatmate_hardening"),
+        (
+            "ninjaone_antivirus",
+            "huntress_protection",
+            "huntress_quiet_agents",
+            "liongard_edr_coverage",
+            "autoelevate_enforcing",
+            "threatmate_hardening",
+        ),
     ),
 }
 
@@ -77,7 +111,15 @@ def summarize(checks: list[FleetCheck], weights: dict[str, int] | None = None) -
 
 def rank_clients(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Worst first: lowest score, then most problems, then name. A client with no score goes last."""
-    return sorted(summaries, key=lambda s: (s["score"] is None, s["score"] if s["score"] is not None else 0, -s["not_met"], str(s.get("client_name") or "").lower()))
+    return sorted(
+        summaries,
+        key=lambda s: (
+            s["score"] is None,
+            s["score"] if s["score"] is not None else 0,
+            -s["not_met"],
+            str(s.get("client_name") or "").lower(),
+        ),
+    )
 
 
 def average_score(scores: list[int | None]) -> int | None:
@@ -102,7 +144,17 @@ def search_checks(checks: list[FleetCheck], query: str, limit: int = 100) -> lis
         if not in_text and not matched:
             continue
         out.append(
-            {"client_id": c.client_id, "client_name": c.client_name, "source": c.source, "key": c.key, "status": c.status, "evidence": c.evidence, "matched_items": matched[:5], "matched_text": in_text, "accepted": c.accepted}
+            {
+                "client_id": c.client_id,
+                "client_name": c.client_name,
+                "source": c.source,
+                "key": c.key,
+                "status": c.status,
+                "evidence": c.evidence,
+                "matched_items": matched[:5],
+                "matched_text": in_text,
+                "accepted": c.accepted,
+            }
         )
     out.sort(key=lambda r: (STATUS_ORDER.get(r["status"], 3), r["client_name"].lower(), r["key"]))
     return out[: max(1, limit)]
@@ -118,7 +170,13 @@ def score_breakdown(checks: list[FleetCheck], weights: dict[str, int] | None = N
     if not counted:
         return {"score": None, "lost": 0.0, "rows": []}
     rows = [
-        {"source": c.source, "key": c.key, "status": c.status, "weight": weight_of(c.key, weights), "points_lost": round(100 * weight_of(c.key, weights) * (1 - STATUS_WEIGHT[c.status]) / total, 1)}
+        {
+            "source": c.source,
+            "key": c.key,
+            "status": c.status,
+            "weight": weight_of(c.key, weights),
+            "points_lost": round(100 * weight_of(c.key, weights) * (1 - STATUS_WEIGHT[c.status]) / total, 1),
+        }
         for c in counted
         if STATUS_WEIGHT[c.status] < 1
     ]
@@ -144,8 +202,20 @@ def tool_scorecards(checks: list[FleetCheck]) -> list[dict[str, Any]]:
     out = []
     for t in by.values():
         share = int(100 * (t["met"] + 0.5 * t["partly"]) / t["checks"] + 0.5) if t["checks"] else None
-        out.append({"source": t["source"], "checks": t["checks"], "met": t["met"], "partly": t["partly"], "not_met": t["not_met"], "clients_with_problems": len(t["clients_with_problems"]), "percent_fine": share})
-    out.sort(key=lambda r: (r["percent_fine"] is None, r["percent_fine"] if r["percent_fine"] is not None else 0, -r["not_met"], r["source"]))
+        out.append(
+            {
+                "source": t["source"],
+                "checks": t["checks"],
+                "met": t["met"],
+                "partly": t["partly"],
+                "not_met": t["not_met"],
+                "clients_with_problems": len(t["clients_with_problems"]),
+                "percent_fine": share,
+            }
+        )
+    out.sort(
+        key=lambda r: (r["percent_fine"] is None, r["percent_fine"] if r["percent_fine"] is not None else 0, -r["not_met"], r["source"])
+    )
     return out
 
 
@@ -209,7 +279,12 @@ def coverage_matrix(aliases: list[tuple[str, str]], names: dict[str, str]) -> di
             counts[v] = counts.get(v, 0) + 1
     tools = sorted(counts, key=lambda v: (-counts[v], v))
     clients = [
-        {"client_id": cid, "client_name": names.get(cid, cid), "tools": [v for v in tools if v in have.get(cid, set())], "missing": [v for v in tools if v not in have.get(cid, set())]}
+        {
+            "client_id": cid,
+            "client_name": names.get(cid, cid),
+            "tools": [v for v in tools if v in have.get(cid, set())],
+            "missing": [v for v in tools if v not in have.get(cid, set())],
+        }
         for cid in names
     ]
     clients.sort(key=lambda c: (-len(c["tools"]), str(c["client_name"]).lower()))

@@ -63,7 +63,24 @@ def test_the_shortcut_in_score_gives_exactly_the_slow_answer():
             return 0.85 if min(len(ta), len(tb)) >= 1 and len(na) >= 3 and len(nb) >= 3 else 0.0
         return round(max(len(ta & tb) / len(ta | tb), SequenceMatcher(None, na, nb).ratio() * 0.9), 4)
 
-    words = ["acme", "dental", "group", "oak", "harbor", "legal", "bay", "city", "partners", "hotel", "fidelity", "revival", "medical", "llc", "inc", "co"]
+    words = [
+        "acme",
+        "dental",
+        "group",
+        "oak",
+        "harbor",
+        "legal",
+        "bay",
+        "city",
+        "partners",
+        "hotel",
+        "fidelity",
+        "revival",
+        "medical",
+        "llc",
+        "inc",
+        "co",
+    ]
     rnd = random.Random(7)
     names = [" ".join(rnd.choice(words) for _ in range(rnd.randint(1, 4))) for _ in range(150)]
     for a in names:
@@ -73,11 +90,29 @@ def test_the_shortcut_in_score_gives_exactly_the_slow_answer():
 
 def test_a_floor_changes_nothing_at_or_above_it():
     import random
-    from difflib import SequenceMatcher
 
-    from app.services.client_matching import EXACT, normalize_name, score
+    from app.services.client_matching import score
 
-    words = ["acme", "dental", "group", "oak", "harbor", "legal", "bay", "city", "partners", "hotel", "fidelity", "revival", "medical", "llc", "inc", "co", "acmee", "dentl"]
+    words = [
+        "acme",
+        "dental",
+        "group",
+        "oak",
+        "harbor",
+        "legal",
+        "bay",
+        "city",
+        "partners",
+        "hotel",
+        "fidelity",
+        "revival",
+        "medical",
+        "llc",
+        "inc",
+        "co",
+        "acmee",
+        "dentl",
+    ]
     rnd = random.Random(11)
     names = [" ".join(rnd.choice(words) for _ in range(rnd.randint(1, 4))) for _ in range(160)]
     for floor in (0.6, 0.75):
@@ -101,7 +136,10 @@ def test_a_mapping_with_an_unrelated_name_and_no_machine_in_common_is_suspect_wo
         {"vendor_client_name": "Sunrise Clinic", "client_name": "Sunrise Clinic Group", "shared_devices": 0},
     ]
     out = suspect_mappings(rows)
-    assert {r["vendor_client_name"] for r in out} == {"Harbor Legal", "Blue Bay Cafe"}, "a like name, a shared machine, an empty name and a contained name are left alone"
+    assert {r["vendor_client_name"] for r in out} == {
+        "Harbor Legal",
+        "Blue Bay Cafe",
+    }, "a like name, a shared machine, an empty name and a contained name are left alone"
     assert all(0.0 <= r["score"] < 0.35 for r in out)
     assert out == sorted(out, key=lambda r: (r["score"], r["client_name"].lower()))
     assert suspect_mappings(rows, threshold=0.0) == [], "a threshold of zero flags nothing"

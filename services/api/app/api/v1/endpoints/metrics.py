@@ -36,8 +36,8 @@ from app.models.connector import Connector
 from app.models.detection_rule import DetectionRule
 from app.models.remediation import RemediationGateLog
 from app.models.tenant import Tenant
-from app.services.tactic_inference import tactics_for
 from app.services import case_metrics as case_counts  # not `case_metrics`: get_dashboard_metrics has a local variable of that name
+from app.services.tactic_inference import tactics_for
 
 logger = logging.getLogger(__name__)
 
@@ -319,7 +319,9 @@ async def _get_dashboard_metrics_impl(
     # Count alerts per connector_type
     source_counts_rows = (
         await db.execute(
-            select(Alert.connector_type, func.count().label("cnt")).where(Alert.tenant_id.in_(tenant_ids), shown).group_by(Alert.connector_type)
+            select(Alert.connector_type, func.count().label("cnt"))
+            .where(Alert.tenant_id.in_(tenant_ids), shown)
+            .group_by(Alert.connector_type)
         )
     ).all()
     source_count_map: dict[str, int] = {row.connector_type: row.cnt for row in source_counts_rows if row.connector_type}
@@ -569,7 +571,12 @@ async def _get_soc_metrics_impl(
     escalation_rate = escalated_count / total_decisions if total_decisions > 0 else 0.0
 
     # ── Volume / case counts ──────────────────────────────────────────────────
-    alert_vol = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), Alert.created_at >= week_start, Alert.status != "suppressed"))) or 0
+    alert_vol = (
+        await db.scalar(
+            select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), Alert.created_at >= week_start, Alert.status != "suppressed"))
+        )
+        or 0
+    )
     cases_opened = await _sum_cases(case_counts.count_created, db, tenant_ids, week_start)
     cases_closed = await _sum_cases(case_counts.count_finished_since, db, tenant_ids, week_start)
 
