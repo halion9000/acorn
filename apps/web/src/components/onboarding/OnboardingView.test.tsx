@@ -76,6 +76,20 @@ describe('OnboardingView', () => {
     expect(within(screen.getByText('Sending data').parentElement as HTMLElement).getByText('1')).toBeInTheDocument();
   });
 
+  it('says how many of the connected tools CORE manages, since those are not among the types offered here', async () => {
+    api.list.mockResolvedValue({ connectors: [{ id: '1', type: 'core_feed', status: 'active' }, { id: '2', type: 'core_feed', status: 'active' }, { id: '3', type: 'okta', status: 'active' }] });
+    renderView();
+    expect(await screen.findByText('2 managed by CORE')).toBeInTheDocument();
+    expect(screen.getByText('connector types to set up here')).toBeInTheDocument();
+  });
+
+  it('adds no CORE note when none of the connected tools is CORE-managed', async () => {
+    api.list.mockResolvedValue({ connectors: [{ id: '1', type: 'okta', status: 'active' }] });
+    renderView();
+    await screen.findByText('connector types to set up here');
+    expect(screen.queryByText(/managed by CORE/)).toBeNull();
+  });
+
   it('"Most teams pick" shows only curated connectors the catalog actually has, in the curated order', async () => {
     renderView();
     await screen.findByText('Most teams pick');

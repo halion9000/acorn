@@ -147,6 +147,8 @@ export function OnboardingView() {
 
   const totalConnectorTypes = catalog?.length ?? 0;
   const connectedCount = existing?.length ?? 0;
+  // Tools CORE manages arrive as `core_feed` connectors: they are connected, but they are not among the connector types A.C.O.R.N offers to set up itself, so "Connected" can exceed "Available".
+  const viaCoreCount = (existing ?? []).filter((c) => c.type === 'core_feed').length;
   // `active` is the frontend ConnectorStatus that maps from backend
   // `health_status === 'healthy' && is_enabled === true`. That's exactly
   // what "the connector is sending data we trust" means here.
@@ -193,8 +195,8 @@ export function OnboardingView() {
             catalog so it never flickers in with zeros. */}
         {totalConnectorTypes > 0 && (
           <div className="mt-6 grid grid-cols-3 gap-3 max-w-xl">
-            <Stat label="Available" value={totalConnectorTypes} />
-            <Stat label="Connected" value={connectedCount} />
+            <Stat label="Available" value={totalConnectorTypes} hint="connector types to set up here" />
+            <Stat label="Connected" value={connectedCount} hint={viaCoreCount > 0 ? `${viaCoreCount} managed by CORE` : undefined} />
             <Stat
               label="Sending data"
               value={healthyCount}
@@ -341,10 +343,12 @@ function Stat({
   label,
   value,
   tone = 'neutral',
+  hint,
 }: {
   label: string;
   value: number;
   tone?: 'neutral' | 'good';
+  hint?: string;
 }) {
   return (
     <div
@@ -364,6 +368,7 @@ function Stat({
       >
         {value}
       </div>
+      {hint ? <div className="mt-0.5 text-[11px] text-gray-500">{hint}</div> : null}
     </div>
   );
 }
