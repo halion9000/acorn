@@ -6,13 +6,14 @@ people of each tool (Datto SaaS Protection, Dropsuite, Huntress SAT, HaloPSA...)
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -344,6 +345,16 @@ class ChangeRow(BaseModel):
     success: bool = True
 
 
+async def _tolerant(db: Any, statement: Any) -> list[Any]:
+    """Rows for a part of the person's panel that must never stop the rest from loading: a table or column an older database does not have yet (a migration waiting for the next restart) gives an empty list."""
+    try:
+        async with db.begin_nested():
+            return list((await db.execute(statement)).scalars().all())
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).warning("identity panel: a section could not be read", exc_info=True)
+        return []
+
+
 def signin_rows(events: list[Any]) -> list[SigninRow]:
     """The person's latest sign-ins, newest first."""
     latest = sorted(events, key=lambda e: e.occurred_at, reverse=True)[:SIGNINS_SHOWN]
@@ -385,33 +396,20 @@ async def identity_detail(user: AuthUser, db: DBSession, client_id: uuid.UUID, e
     )
     rows = alerts.get(found.key, [])[:25]
     async with cross_tenant_reads(db):
-        change_rows = (
-            (
-                await db.execute(
-                    select(DirectoryAuditEvent)
-                    .where(
-                        DirectoryAuditEvent.tenant_id == client_id,
-                        DirectoryAuditEvent.occurred_at >= since,
-                        or_(DirectoryAuditEvent.target.ilike(wanted), DirectoryAuditEvent.actor.ilike(wanted)),
-                    )
-                    .order_by(DirectoryAuditEvent.occurred_at.desc())
-                    .limit(CHANGES_SHOWN)
-                )
+        change_rows = await _tolerant(
+            db,
+            select(DirectoryAuditEvent)
+            .where(
+                DirectoryAuditEvent.tenant_id == client_id,
+                DirectoryAuditEvent.occurred_at >= since,
+                or_(func.lower(DirectoryAuditEvent.target) == wanted, func.lower(DirectoryAuditEvent.actor) == wanted),
             )
-            .scalars()
-            .all()
+            .order_by(DirectoryAuditEvent.occurred_at.desc())
+            .limit(CHANGES_SHOWN),
         )
-        ticket_rows = (
-            (
-                await db.execute(
-                    select(PersonTicket)
-                    .where(PersonTicket.tenant_id == client_id, PersonTicket.user_email == wanted)
-                    .order_by(PersonTicket.opened_at.desc())
-                    .limit(TICKETS_SHOWN)
-                )
-            )
-            .scalars()
-            .all()
+        ticket_rows = await _tolerant(
+            db,
+            select(PersonTicket).where(PersonTicket.tenant_id == client_id, PersonTicket.user_email == wanted).order_by(PersonTicket.opened_at.desc()).limit(TICKETS_SHOWN),
         )
     return PersonDetail(
         person=_out(found, with_sources=True),

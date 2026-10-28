@@ -118,3 +118,27 @@ def test_a_name_that_would_run_as_a_spreadsheet_formula_is_made_text():
 
     rows = list(csv.reader(io.StringIO(ep.people_csv([person(display_name='=HYPERLINK("http://evil","x")', client_name="+cmd")]))))
     assert rows[1][2].startswith("'=") and rows[1][0] == "'+cmd"
+
+
+class FailingDB:
+    def begin_nested(self):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def execute(self, _stmt):
+        raise RuntimeError('relation "person_tickets" does not exist')
+
+
+class OneRowDB(FailingDB):
+    async def execute(self, _stmt):
+        return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: ["row"]))
+
+
+def test_a_section_an_older_database_cannot_read_is_empty_and_the_rest_of_the_panel_still_loads():
+    assert asyncio.run(ep._tolerant(FailingDB(), object())) == []
+    assert asyncio.run(ep._tolerant(OneRowDB(), object())) == ["row"]
