@@ -33,7 +33,10 @@ def test_without_a_tenant_setting_nothing_is_overridden(config):
     assert tenant_llm_override(config) == {}
 
 
-def test_the_override_reaches_the_model_leafy_is_built_with():
+def test_the_override_reaches_the_model_leafy_is_built_with(monkeypatch):
+    monkeypatch.setenv(
+        "OPENAI_API_KEY", "sk-from-the-environment"
+    )  # the gateway-alias model below has no key of its own; without this the test only passes where the variable happens to be set
     with llm_override(**tenant_llm_override(_config())):
         model = make_chat_model("copilot")
     assert model.model_name == "gpt-4.1"

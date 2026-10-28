@@ -73,11 +73,11 @@ def outcome(application, path, **connect) -> str:
             try:
                 result = f"SENT:{future.result(timeout=WAIT_SECONDS)[:60]}"
             except WebSocketDisconnect as closed:
-                result = f"closed:{closed.code}"
+                result = f"closed:{refusal_code(closed)}"
             except FutureTimeout:
                 result = "OPEN"
     except WebSocketDisconnect as refused:
-        result = result or f"refused:{refused.code}"
+        result = result or f"refused:{refusal_code(refused)}"
     except Exception:
         result = result or "error"
     finally:
@@ -85,10 +85,23 @@ def outcome(application, path, **connect) -> str:
     return result
 
 
+def refusal_code(refusal: Exception) -> object:
+    """The close code, or for a refusal answered as an HTTP response (a 403 instead of an accepted socket: what GraphQL does, and an object with no ``code``) its status."""
+    return getattr(refusal, "code", None) or getattr(refusal, "status_code", "denied")
+
+
 def gets_nothing(result: str) -> bool:
     """Neither data nor an OPEN connection waiting for the client: an anonymous client that is merely left connected is already past the
     door."""
     return not result.startswith("SENT:") and result != "OPEN"
+
+
+def test_a_refusal_is_described_by_its_close_code_or_else_its_http_status():
+    from types import SimpleNamespace
+
+    assert refusal_code(SimpleNamespace(code=1008)) == 1008
+    assert refusal_code(SimpleNamespace(status_code=403)) == 403, "a refusal answered as an HTTP response has no close code"
+    assert refusal_code(SimpleNamespace()) == "denied"
 
 
 # ── the real application ──────────────────────────────────────────────────────────────────────────────────────────────

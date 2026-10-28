@@ -68,7 +68,18 @@ def test_a_domain_with_no_website_has_no_web_section():
 
 
 def test_the_endpoint_attaches_the_websites_findings_to_each_domain(monkeypatch):
-    from tests.test_domain_posture import FakeResolver
+    class FakeResolver:  # the same stub test_domain_posture uses, kept here so this test does not import another test file ('tests' is not a package)
+        def __init__(self, txt=None, mx=None):
+            self.t, self.m = txt or {}, mx or {}
+
+        async def txt(self, name):
+            return self.t.get(name, [])
+
+        async def cname(self, name):
+            return []
+
+        async def mx(self, name):
+            return self.m.get(name, [])
 
     owner = uuid.uuid4()
     monkeypatch.setattr(cp, "acting_as_tenant", lambda db, tid: contextlib.nullcontext())
