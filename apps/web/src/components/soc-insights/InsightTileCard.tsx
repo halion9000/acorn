@@ -23,7 +23,7 @@ export function InsightTileCard({ tile, sparkline }: InsightTileCardProps) {
   const deltaLabel = formatDelta(tile.delta_pct);
   const deltaTitle =
     tile.delta_pct === null
-      ? 'No data for the previous window — delta undefined.'
+      ? 'No change figure yet: there is not a full earlier window of data to compare with.'
       : `Compared to the previous window: ${deltaLabel}.`;
 
   return (

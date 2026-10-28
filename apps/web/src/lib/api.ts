@@ -2858,6 +2858,9 @@ export interface SOCInsightsResponse {
   tenant_id: string;
   tiles: InsightTile[];
   manual_investigation_minutes: number;
+  /** False while the data does not reach back over the whole earlier window; every delta_pct is then null. */
+  comparison_ready?: boolean;
+  history_since?: string | null;
 }
 
 export const insightsApi = {

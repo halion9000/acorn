@@ -143,6 +143,10 @@ class SOCInsightsResponse(BaseModel):
     # so the dashboard can show "assumes 45 min per case" beside the
     # hours-saved tile without hard-coding the same number client-side.
     manual_investigation_minutes: int = MANUAL_INVESTIGATION_MINUTES
+    # False while the data does not yet reach back over the whole preceding window: every ``delta_pct`` is then ``None`` (a week that is mostly empty makes any change look like +1500%).
+    comparison_ready: bool = True
+    # When the first alert was recorded, so the page can say when comparison starts.
+    history_since: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +199,14 @@ async def _count(db, model, tenant_id: uuid.UUID, start: datetime, end: datetime
     filters = [model.tenant_id == tenant_id, model.created_at >= start, model.created_at < end]
     filters.extend(extra)
     return int(await db.scalar(select(func.count()).where(and_(*filters))) or 0)
+
+
+async def _first_alert_at(db, tenant_id: uuid.UUID) -> datetime | None:
+    """When this tenant's first alert was recorded (None when it has none)."""
+    first = await db.scalar(select(func.min(Alert.created_at)).where(Alert.tenant_id == tenant_id))
+    if not isinstance(first, datetime):
+        return None
+    return first if first.tzinfo else first.replace(tzinfo=UTC)
 
 
 async def _fp_rate(db, tenant_id: uuid.UUID, start: datetime, end: datetime) -> float:
@@ -395,6 +407,7 @@ async def _tenant_parts(db, tid, start, now, prev_start) -> dict:
         cost, runs = await _llm_cost_aggregate(db, tid, a, b)
         out[tag + "cost"], out[tag + "runs"] = cost, runs
         out[tag + "auto_closed"] = await case_metrics.count_created(db, tid, a, b, statuses=case_metrics.FINISHED)
+    out["first_alert"] = await _first_alert_at(db, tid)
     out["alert_spark"] = await _alert_sparkline(db, tid, start, now)
     out["case_spark"] = await _case_sparkline(db, tid, start, now)
     out["cost_spark"] = await _llm_cost_sparkline(db, tid, start, now)
@@ -413,6 +426,8 @@ def _merge_parts(parts: list[dict]) -> dict:
         for k in ("alerts", "cases", "runs", "auto_closed"):
             m[tag + k] = sum(p[tag + k] for p in parts)
         m[tag + "cost"] = sum(p[tag + "cost"] for p in parts)
+    firsts = [p["first_alert"] for p in parts if p.get("first_alert") is not None]
+    m["first_alert"] = min(firsts) if firsts else None
     for k in ("alert_spark", "case_spark", "cost_spark"):
         m[k] = [sum(col) for col in zip(*[p[k] for p in parts], strict=True)]
     return m
@@ -464,6 +479,13 @@ async def get_soc_insights(
                 parts.append(await _tenant_parts(db, tid, start, now, prev_start))
     total = _merge_parts(parts)
 
+    history_since = total["first_alert"]
+    comparison_ready = history_since is not None and history_since <= prev_start
+
+    def _change(current: float, previous: float) -> float | None:
+        # No change figure until the data reaches back over the whole preceding window.
+        return _delta_pct(current, previous) if comparison_ready else None
+
     mtta_hours, prev_mtta = total["mtta"], total["prev_mtta"]
     mttr_hours, prev_mttr = total["mttr"], total["prev_mttr"]
     fp_rate, prev_fp_rate = total["fp"], total["prev_fp"]
@@ -492,7 +514,7 @@ async def get_soc_insights(
             value=mtta_hours,
             unit="hours",
             previous_value=prev_mtta,
-            delta_pct=_delta_pct(mtta_hours, prev_mtta),
+            delta_pct=_change(mtta_hours, prev_mtta),
             sparkline=InsightSparkline(points=alert_spark),
         ),
         InsightTile(
@@ -501,7 +523,7 @@ async def get_soc_insights(
             value=mttr_hours,
             unit="hours",
             previous_value=prev_mttr,
-            delta_pct=_delta_pct(mttr_hours, prev_mttr),
+            delta_pct=_change(mttr_hours, prev_mttr),
             sparkline=InsightSparkline(points=alert_spark),
         ),
         InsightTile(
@@ -510,7 +532,7 @@ async def get_soc_insights(
             value=fp_rate,
             unit="pct",
             previous_value=prev_fp_rate,
-            delta_pct=_delta_pct(fp_rate, prev_fp_rate),
+            delta_pct=_change(fp_rate, prev_fp_rate),
             sparkline=InsightSparkline(points=alert_spark),
         ),
         InsightTile(
@@ -519,7 +541,7 @@ async def get_soc_insights(
             value=alerts_per_day,
             unit="count",
             previous_value=prev_alerts_per_day,
-            delta_pct=_delta_pct(alerts_per_day, prev_alerts_per_day),
+            delta_pct=_change(alerts_per_day, prev_alerts_per_day),
             sparkline=InsightSparkline(points=alert_spark),
         ),
         InsightTile(
@@ -528,7 +550,7 @@ async def get_soc_insights(
             value=cases_per_day,
             unit="count",
             previous_value=prev_cases_per_day,
-            delta_pct=_delta_pct(cases_per_day, prev_cases_per_day),
+            delta_pct=_change(cases_per_day, prev_cases_per_day),
             sparkline=InsightSparkline(points=case_spark),
         ),
         InsightTile(
@@ -537,7 +559,7 @@ async def get_soc_insights(
             value=cost_per_inv,
             unit="usd",
             previous_value=prev_cost_per_inv,
-            delta_pct=_delta_pct(cost_per_inv, prev_cost_per_inv),
+            delta_pct=_change(cost_per_inv, prev_cost_per_inv),
             sparkline=InsightSparkline(points=cost_spark),
         ),
         InsightTile(
@@ -546,7 +568,7 @@ async def get_soc_insights(
             value=hours_saved,
             unit="hours_saved",
             previous_value=prev_hours_saved,
-            delta_pct=_delta_pct(hours_saved, prev_hours_saved),
+            delta_pct=_change(hours_saved, prev_hours_saved),
             sparkline=InsightSparkline(points=case_spark),
         ),
     ]
@@ -557,4 +579,6 @@ async def get_soc_insights(
         tenant_id=tenant_id,
         tiles=tiles,
         manual_investigation_minutes=MANUAL_INVESTIGATION_MINUTES,
+        comparison_ready=comparison_ready,
+        history_since=history_since,
     )

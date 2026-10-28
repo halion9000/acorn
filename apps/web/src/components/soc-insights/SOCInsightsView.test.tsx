@@ -164,6 +164,19 @@ describe('SOCInsightsView', () => {
     expect(grid.children.length).toBe(7);
   });
 
+  it('says why there are no change figures while the history is too short, and says nothing once it is long enough', async () => {
+    const mock = insightsApi.getSOC as ReturnType<typeof vi.fn>;
+    mock.mockResolvedValue({ ...sampleResponse, comparison_ready: false, history_since: '2026-05-10T12:00:00Z' });
+    const first = renderIsolated(<SOCInsightsView />);
+    await waitFor(() => expect(screen.getByTestId('insights-history-note')).toHaveTextContent(/hidden until there is a full earlier day/i));
+    first.unmount();
+
+    mock.mockResolvedValue({ ...sampleResponse, comparison_ready: true });
+    renderIsolated(<SOCInsightsView />);
+    await waitFor(() => expect(screen.getByText('MTTA')).toBeInTheDocument());
+    expect(screen.queryByTestId('insights-history-note')).toBeNull();
+  });
+
   it('renders an error state when the API call fails', async () => {
     (insightsApi.getSOC as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error('500 boom'),

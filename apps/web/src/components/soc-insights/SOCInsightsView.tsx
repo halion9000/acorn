@@ -70,6 +70,8 @@ export function SOCInsightsView() {
         onWindowChange={setWindow}
         generatedAt={data?.generated_at}
         manualMinutes={data?.manual_investigation_minutes}
+        comparisonReady={data?.comparison_ready}
+        historySince={data?.history_since}
       />
 
       {error ? (
@@ -95,9 +97,11 @@ interface HeaderProps {
   onWindowChange: (w: InsightsWindow) => void;
   generatedAt: string | undefined;
   manualMinutes: number | undefined;
+  comparisonReady: boolean | undefined;
+  historySince: string | null | undefined;
 }
 
-function Header({ window, onWindowChange, generatedAt, manualMinutes }: HeaderProps) {
+function Header({ window, onWindowChange, generatedAt, manualMinutes, comparisonReady, historySince }: HeaderProps) {
   const stamp = useMemo(() => {
     if (!generatedAt) return null;
     try {
@@ -117,6 +121,12 @@ function Header({ window, onWindowChange, generatedAt, manualMinutes }: HeaderPr
           window. Hours-saved assumes {manualMinutes ?? 45} minutes of analyst
           time per auto-closed case.
         </p>
+        {comparisonReady === false ? (
+          <p className="mt-2 max-w-prose text-sm text-muted-foreground" data-testid="insights-history-note">
+            Change figures are hidden until there is a full earlier {window === '24h' ? 'day' : window === '7d' ? 'week' : 'month'} of data to compare with
+            {historySince ? ` (the first alert was recorded ${new Date(historySince).toLocaleDateString()})` : ''}.
+          </p>
+        ) : null}
       </div>
       <div className="flex items-center gap-4">
         {stamp ? (

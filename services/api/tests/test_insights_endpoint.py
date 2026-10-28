@@ -23,7 +23,7 @@ Coverage targets:
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -292,3 +292,38 @@ async def test_get_soc_insights_includes_child_tenants() -> None:
     alerts_tile = next(t for t in response.tiles if t.key == "alerts_per_day")
     # 3 tenants x 2 alerts each / 7 days
     assert alerts_tile.value == round(6 / 7, 2)
+
+
+def _db_with_history(first_alert: datetime | None, current: int = 10) -> MagicMock:
+    """A mocked session whose tenant's first alert was recorded at ``first_alert``; every other count is ``current``."""
+    db = _seeded_db(scalar_value=current)
+
+    async def _scalar(stmt, *_a, **_k):
+        return first_alert if "min(" in str(stmt).lower() else current
+
+    db.scalar = AsyncMock(side_effect=_scalar)
+    return db
+
+
+@pytest.mark.asyncio
+async def test_no_change_figure_until_the_data_covers_the_whole_earlier_window() -> None:
+    """Three days of history cannot be compared with the 7 days before them: +1500% would only mean the platform is new."""
+    now = datetime.now(UTC)
+    response = await get_soc_insights(user=_stub_user(), db=_db_with_history(now - timedelta(days=3)), window="7d")
+    assert response.comparison_ready is False
+    assert response.history_since is not None
+    assert all(t.delta_pct is None for t in response.tiles)
+
+
+@pytest.mark.asyncio
+async def test_change_figures_appear_once_the_earlier_window_is_covered() -> None:
+    now = datetime.now(UTC)
+    response = await get_soc_insights(user=_stub_user(), db=_db_with_history(now - timedelta(days=20)), window="7d")
+    assert response.comparison_ready is True
+    assert any(t.delta_pct is not None for t in response.tiles)
+
+
+@pytest.mark.asyncio
+async def test_a_tenant_with_no_alerts_has_no_comparison() -> None:
+    response = await get_soc_insights(user=_stub_user(), db=_db_with_history(None, current=0), window="24h")
+    assert response.comparison_ready is False and response.history_since is None
