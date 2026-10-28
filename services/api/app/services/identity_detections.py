@@ -321,8 +321,12 @@ def detect_mfa_fatigue(rows: list[Any], new_ids: set[str]) -> list[Finding]:
     return out
 
 
-def detect_guessed_password(rows: list[Any], new_ids: set[str]) -> list[Finding]:
-    """A new successful sign-in that follows five or more wrong passwords for the same person within the hour before it."""
+def detect_guessed_password(rows: list[Any], new_ids: set[str], known_ips: dict[str, set[str]] | None = None) -> list[Finding]:
+    """A new successful sign-in that follows five or more wrong passwords for the same person within the hour before it.
+
+    Left out: a person who mistyped their password at their usual address (``known_ips``: the addresses they have signed in from successfully before). Every failure and the success come from
+    that one address, which is how a forgotten password looks; guessing comes from somewhere the person has not been. Seen live: seven wrong passwords then a success, all from the person's own address.
+    """
     by_user: dict[str, list[Any]] = defaultdict(list)
     for r in rows:
         by_user[r.user_principal].append(r)
@@ -341,6 +345,8 @@ def detect_guessed_password(rows: list[Any], new_ids: set[str]) -> list[Finding]
             if len(fails) < GUESS_FAILURES:
                 continue
             ips = sorted({f.ip_address for f in fails if f.ip_address})
+            if r.ip_address and r.ip_address in (known_ips or {}).get(user, set()) and set(ips) <= {r.ip_address}:
+                continue
             out.append(
                 Finding(
                     rule_id="aisoc-id-guessed-password",
@@ -791,6 +797,23 @@ async def run_signin_detections(db: Any, tenant_id: uuid.UUID, rows: list[Any], 
             .scalars()
             .all()
         )
+        # The addresses each person has signed in from successfully before this batch's hour: a forgotten password at one of them is not a guessed one.
+        known_ips: dict[str, set[str]] = defaultdict(set)
+        for who, address in (
+            await db.execute(
+                select(SigninEvent.user_principal, SigninEvent.ip_address)
+                .where(
+                    SigninEvent.tenant_id == tenant_id,
+                    SigninEvent.user_principal.in_(users),
+                    SigninEvent.occurred_at >= first - timedelta(days=BASELINE_DAYS),
+                    SigninEvent.occurred_at < first - TRAVEL_WINDOW,
+                    SigninEvent.success.is_(True),
+                    SigninEvent.ip_address.is_not(None),
+                )
+                .distinct()
+            )
+        ).all():
+            known_ips[who].add(address)
         findings = (
             detect_rare_country(rows, countries, total)
             + detect_impossible_travel([*earlier, *rows], new_ids)
@@ -799,7 +822,7 @@ async def run_signin_detections(db: Any, tenant_id: uuid.UUID, rows: list[Any], 
             + detect_risky_signin(rows)
             + detect_password_spray([*earlier, *rows], new_ids)
             + detect_mfa_fatigue([*earlier, *rows], new_ids)
-            + detect_guessed_password([*earlier, *rows], new_ids)
+            + detect_guessed_password([*earlier, *rows], new_ids, known_ips)
         )
     except Exception:  # noqa: BLE001
         logger.warning("identity detections: sign-in rules failed for tenant=%s", tenant_id, exc_info=True)

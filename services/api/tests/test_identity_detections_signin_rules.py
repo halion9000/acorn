@@ -102,6 +102,24 @@ def test_a_new_success_after_five_wrong_passwords_is_raised_once_and_names_both_
     assert ("Multi-factor", "not used") in f.fields
 
 
+def test_a_forgotten_password_at_the_persons_own_address_is_not_a_guessed_one():
+    # Seen live: seven wrong passwords, then a success, all from the address the person signs in from every day.
+    fails = [row(i, code=50126, ip="9.9.9.9", at=T0 + timedelta(minutes=i)) for i in range(7)]
+    ok = row(10, code=0, ip="9.9.9.9", at=T0 + timedelta(minutes=10))
+    known = {"a@x.com": {"9.9.9.9"}}
+    assert detect_guessed_password([*fails, ok], {"s10"}, known) == []
+    # The same run is raised when nothing is known about the address, ...
+    assert len(detect_guessed_password([*fails, ok], {"s10"}, {})) == 1
+    assert len(detect_guessed_password([*fails, ok], {"s10"})) == 1
+    # ... when the person has only used other addresses, ...
+    assert len(detect_guessed_password([*fails, ok], {"s10"}, {"a@x.com": {"8.8.8.8"}})) == 1
+    # ... when someone else knows that address, ...
+    assert len(detect_guessed_password([*fails, ok], {"s10"}, {"b@x.com": {"9.9.9.9"}})) == 1
+    # ... and when even one failure came from an address that is not the usual one: that is someone trying from elsewhere.
+    elsewhere = [*fails[:6], row(6, code=50126, ip="6.6.6.6", at=T0 + timedelta(minutes=6))]
+    assert len(detect_guessed_password([*elsewhere, ok], {"s10"}, known)) == 1
+
+
 def test_four_wrong_passwords_old_failures_other_people_and_old_successes_do_not_count():
     four = [row(i, code=50126, at=T0 + timedelta(minutes=i)) for i in range(4)]
     ok = row(10, at=T0 + timedelta(minutes=10))

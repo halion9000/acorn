@@ -50,17 +50,18 @@ async def session(engine, tenant):
     return db
 
 
-def signin(tid, i, *, user="a@x.com", country="US", at=NOW, success=True):
+def signin(tid, i, *, user="a@x.com", country="US", at=NOW, success=True, ip="1.2.3.4", error_code=None):
     return SigninEvent(
         tenant_id=tid,
         source="cipp",
         source_id=f"s{i}-{uuid.uuid4().hex[:6]}",
         user_principal=user,
-        ip_address="1.2.3.4",
+        ip_address=ip,
         country=country,
         city="X",
         app="Outlook",
         success=success,
+        error_code=error_code,
         interactive=True,
         mfa=True,
         occurred_at=at,
@@ -114,6 +115,25 @@ async def test_a_rare_country_and_impossible_travel_raise_one_alert_each_and_a_r
         ("Impossible travel - US to RO", "high", ["Initial Access"], "aisoc-id-impossible-travel"),
         ("Sign-in from an unusual country - RO", "medium", ["Initial Access"], "aisoc-id-rare-country"),
     ]
+
+
+@pytest.mark.asyncio
+async def test_wrong_passwords_then_a_success_is_an_alert_unless_it_is_all_at_the_persons_usual_address(world):
+    tid, engine = world
+    db = await session(engine, tid)
+    # a@x.com has signed in from 9.9.9.9 on earlier days; b@x.com has no history.
+    db.add_all([signin(tid, 200 + d, user="a@x.com", ip="9.9.9.9", at=NOW - timedelta(days=d + 2)) for d in range(3)])
+    new = []
+    for who, base in (("a@x.com", 300), ("b@x.com", 400)):
+        for i in range(6):
+            new.append(signin(tid, base + i, user=who, ip="9.9.9.9", success=False, error_code=50126, at=NOW - timedelta(minutes=30 - i)))
+        new.append(signin(tid, base + 9, user=who, ip="9.9.9.9", at=NOW - timedelta(minutes=10)))
+    db.add_all(new)
+    await db.flush()
+    assert await run_signin_detections(db, tid, new, NOW) == 1
+    await db.commit()
+    await db.close()
+    assert [r[0] for r in await alerts(engine, tid)] == ["Sign-in succeeded after 6 wrong passwords - b@x.com"]
 
 
 @pytest.mark.asyncio
