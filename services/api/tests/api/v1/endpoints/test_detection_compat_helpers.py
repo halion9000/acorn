@@ -353,3 +353,29 @@ def test_coverage_counts_rules_with_and_without_techniques() -> None:
     # Coverage is technique-keyed, so unmapped rules don't appear in cells.
     technique_ids = {cell.techniqueId for cell in resp.cells}
     assert technique_ids == {"T1059"}
+
+
+def test_a_rule_that_names_techniques_but_no_tactic_is_placed_by_the_techniques_own_tactic() -> None:
+    """Every shipped rule names techniques only; they used to all land in one "unmapped" column."""
+    rules = [
+        _make_rule(name="a", techniques=["T1003.001", "T1078.004"]),
+        _make_rule(name="b", techniques=["T1190"], status="testing"),
+        _make_rule(name="c", techniques=["T1404", "T9999"]),  # a mobile technique and a made-up id: no tactic known
+    ]
+    resp = _build_coverage(rules)
+    placed = {c.techniqueId: c.tactic for c in resp.cells}
+    assert placed == {
+        "T1003.001": "Credential Access",
+        "T1078.004": "Initial Access",
+        "T1190": "Initial Access",
+        "T1404": None,
+        "T9999": None,
+    }
+    # Columns come in ATT&CK order, and what has no tactic is last.
+    assert resp.tactics == ["Initial Access", "Credential Access"]
+    assert [c.techniqueId for c in resp.cells] == ["T1078.004", "T1190", "T1003.001", "T1404", "T9999"]
+
+
+def test_a_tactic_the_rule_declares_wins_over_the_techniques_default() -> None:
+    resp = _build_coverage([_make_rule(tactics=["execution"], techniques=["T1190"])])
+    assert [(c.techniqueId, c.tactic) for c in resp.cells] == [("T1190", "execution")]

@@ -34,6 +34,7 @@ from sqlalchemy import and_, or_, select, update
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.models.detection_rule import DetectionRule
+from app.services.mitre_tactics import tactic_of, tactic_rank
 from app.services.rule_engine import execute_rule
 
 router = APIRouter(prefix="/detection", tags=["detection_rules"])
@@ -587,16 +588,17 @@ def _build_coverage(rules: list[DetectionRule], *, now: datetime | None = None) 
 
     for rule in rules:
         is_active = rule.status == "active"
-        tactic = _primary_tactic(rule)
-        if tactic:
-            tactics_set.add(tactic)
+        declared = _primary_tactic(rule)
 
         for tech in rule.mitre_techniques or []:
             tech_id = str(tech).strip()
             if not tech_id:
                 continue
             cell = by_technique[tech_id]
-            # Keep the first non-null tactic we see for stable plotting.
+            # The rule's own tactic when it names one; otherwise the technique's tactic from ATT&CK (shipped rules name techniques only). Keep the first we see for stable plotting.
+            tactic = declared or tactic_of(tech_id)
+            if tactic:
+                tactics_set.add(tactic)
             if cell["tactic"] is None and tactic:
                 cell["tactic"] = tactic
             if is_active:
@@ -614,12 +616,12 @@ def _build_coverage(rules: list[DetectionRule], *, now: datetime | None = None) 
         )
         for tech_id, cell in by_technique.items()
     ]
-    cells.sort(key=lambda c: (c.tactic or "zzz-unmapped", c.techniqueId))
+    cells.sort(key=lambda c: (c.tactic is None, tactic_rank(c.tactic or ""), c.tactic or "", c.techniqueId))
 
     covered = sum(1 for c in cells if c.activeRules > 0)
 
     return CoverageResponse(
-        tactics=sorted(tactics_set),
+        tactics=sorted(tactics_set, key=lambda t: (tactic_rank(t), t)),
         cells=cells,
         summary=CoverageSummary(
             totalRules=total_rules,
