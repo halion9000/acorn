@@ -5,6 +5,10 @@ Until now these were stored and scored for unusual behaviour but nothing alerted
 - ``rare_country``: a successful sign-in from a country nobody in the client's tenant has signed in from in the last 45 days (judged only once the tenant has at least 50 sign-ins of history).
 - ``impossible_travel``: the same person signed in successfully, interactively, from two countries within an hour.
 - ``failed_after_revoke``: three or more failed sign-ins by a person in the two hours after their sessions were revoked.
+- ``password_spray``: five or more people failing a password from one address within an hour.
+- ``mfa_fatigue``: five or more failed or unanswered multi-factor prompts for one person within an hour.
+- ``guessed_password``: a success right after five or more wrong passwords for the same person within an hour.
+- ``legacy_protocol``: a successful sign-in over IMAP, POP, SMTP, ActiveSync or "other clients", which cannot ask for multi-factor.
 - ``mass_deletion``: ten or more users or groups deleted by one actor within fifteen minutes.
 - ``privileged_role_change``: someone was added to a directory role.
 - ``ca_policy_change``: a Conditional Access policy was added, changed or deleted.
@@ -33,6 +37,14 @@ REVOKE_WINDOW = timedelta(hours=2)
 REVOKE_FAILURES = 3
 MASS_DELETE_COUNT = 10
 MASS_DELETE_WINDOW = timedelta(minutes=15)
+SPRAY_PEOPLE = 5  # distinct people failing from one address within an hour
+FATIGUE_PROMPTS = 5  # refused or unanswered multi-factor prompts for one person within an hour
+GUESS_FAILURES = 5  # wrong passwords before a success counts as a guessed one
+# Microsoft's own error codes: a wrong password, an account locked by too many tries, and a multi-factor request that failed.
+WRONG_PASSWORD = {50126, 50053}
+MFA_FAILED = {500121, 50074, 50076}
+# What Microsoft calls the older protocols that cannot do multi-factor.
+LEGACY_CLIENTS = {"imap4", "pop3", "smtp", "authenticated smtp", "exchange activesync", "other clients"}
 
 _PRIORITY = {"critical": 95, "high": 80, "medium": 55, "low": 30, "info": 10}
 
@@ -175,6 +187,161 @@ def detect_device_code(new: list[Any]) -> list[Finding]:
                     ("Country", r.country or "unknown"),
                     ("Address", r.ip_address or "unknown"),
                     ("Multi-factor", "not used" if r.mfa is False else "used" if r.mfa else "unknown"),
+                    ("Time", _stamp(r.occurred_at)),
+                ],
+                users=[r.user_principal],
+                ips=[r.ip_address] if r.ip_address else [],
+                source_ids=[r.source_id],
+            )
+        )
+    return out
+
+
+def _hour(t: datetime) -> str:
+    return _utc(t).strftime("%Y%m%d%H")
+
+
+def detect_password_spray(rows: list[Any], new_ids: set[str]) -> list[Finding]:
+    """Five or more different people failing a password from one address in the same clock hour. One finding per address and hour; the batch must contain at least one new failure so an old hour is never raised again."""
+    buckets: dict[tuple[str, str], list[Any]] = defaultdict(list)
+    for r in rows:
+        if not r.success and r.error_code in WRONG_PASSWORD and r.ip_address:
+            buckets[(r.ip_address, _hour(r.occurred_at))].append(r)
+    out: list[Finding] = []
+    for (ip, hour), items in buckets.items():
+        people = sorted({i.user_principal for i in items})
+        if len(people) < SPRAY_PEOPLE or not any(i.source_id in new_ids for i in items):
+            continue
+        first = min(items, key=lambda x: _utc(x.occurred_at))
+        out.append(
+            Finding(
+                rule_id="aisoc-id-password-spray",
+                rule_name="Password spray",
+                title=f"Password spray from {ip} - {len(people)} people",
+                severity="high",
+                tactic="Credential Access",
+                technique="T1110.003",
+                key=f"spray:{ip}:{hour}",
+                occurred_at=first.occurred_at,
+                summary=f"{len(people)} different people failed a password from {ip} within the same hour: someone is trying one password against many accounts.",
+                fields=[
+                    ("Address", ip),
+                    ("Country", first.country or "unknown"),
+                    ("People", ", ".join(people[:10]) + (" ..." if len(people) > 10 else "")),
+                    ("Failures", str(len(items))),
+                    ("First", _stamp(first.occurred_at)),
+                ],
+                users=people[:25],
+                ips=[ip],
+                source_ids=[i.source_id for i in items][:50],
+            )
+        )
+    return out
+
+
+def detect_mfa_fatigue(rows: list[Any], new_ids: set[str]) -> list[Finding]:
+    """Five or more failed multi-factor requests for one person in the same clock hour (someone who has the password keeps sending prompts hoping to be approved)."""
+    buckets: dict[tuple[str, str], list[Any]] = defaultdict(list)
+    for r in rows:
+        if not r.success and r.error_code in MFA_FAILED:
+            buckets[(r.user_principal, _hour(r.occurred_at))].append(r)
+    out: list[Finding] = []
+    for (user, hour), items in buckets.items():
+        if len(items) < FATIGUE_PROMPTS or not any(i.source_id in new_ids for i in items):
+            continue
+        first = min(items, key=lambda x: _utc(x.occurred_at))
+        ips = sorted({i.ip_address for i in items if i.ip_address})
+        out.append(
+            Finding(
+                rule_id="aisoc-id-mfa-fatigue",
+                rule_name="Many failed multi-factor prompts",
+                title=f"Repeated multi-factor prompts - {user}",
+                severity="high",
+                tactic="Credential Access",
+                technique="T1621",
+                key=f"fatigue:{user}:{hour}",
+                occurred_at=first.occurred_at,
+                summary=f"{user} had {len(items)} multi-factor requests that failed or went unanswered within an hour. Someone may know the password and be hoping the person approves one; ask them, and reset the password if so.",
+                fields=[("Person", user), ("Prompts", str(len(items))), ("Addresses", ", ".join(ips[:5]) or "unknown"), ("First", _stamp(first.occurred_at))],
+                users=[user],
+                ips=ips[:10],
+                source_ids=[i.source_id for i in items][:50],
+            )
+        )
+    return out
+
+
+def detect_guessed_password(rows: list[Any], new_ids: set[str]) -> list[Finding]:
+    """A new successful sign-in that follows five or more wrong passwords for the same person within the hour before it."""
+    by_user: dict[str, list[Any]] = defaultdict(list)
+    for r in rows:
+        by_user[r.user_principal].append(r)
+    out: list[Finding] = []
+    for user, items in by_user.items():
+        items.sort(key=lambda x: _utc(x.occurred_at))
+        for r in items:
+            if not r.success or r.source_id not in new_ids:
+                continue
+            window_start = _utc(r.occurred_at) - TRAVEL_WINDOW
+            fails = [f for f in items if not f.success and f.error_code in WRONG_PASSWORD and window_start <= _utc(f.occurred_at) <= _utc(r.occurred_at)]
+            if len(fails) < GUESS_FAILURES:
+                continue
+            ips = sorted({f.ip_address for f in fails if f.ip_address})
+            out.append(
+                Finding(
+                    rule_id="aisoc-id-guessed-password",
+                    rule_name="Sign-in after many wrong passwords",
+                    title=f"Sign-in succeeded after {len(fails)} wrong passwords - {user}",
+                    severity="high",
+                    tactic="Credential Access",
+                    technique="T1110",
+                    key=f"guessed:{user}:{r.source_id}",
+                    occurred_at=r.occurred_at,
+                    summary=f"{user} failed {len(fails)} password attempts within an hour and then signed in successfully. The password may have been guessed; confirm with the person.",
+                    fields=[
+                        ("Person", user),
+                        ("Wrong passwords", str(len(fails))),
+                        ("Failed from", ", ".join(ips[:5]) or "unknown"),
+                        ("Signed in from", f"{r.ip_address or 'unknown'} ({r.country or 'unknown country'})"),
+                        ("Multi-factor", "not used" if r.mfa is False else "used" if r.mfa else "unknown"),
+                        ("Time", _stamp(r.occurred_at)),
+                    ],
+                    users=[user],
+                    ips=[ip for ip in [*ips[:5], r.ip_address] if ip],
+                    source_ids=[*(f.source_id for f in fails[:20]), r.source_id],
+                )
+            )
+    return out
+
+
+def detect_legacy_protocol(new: list[Any]) -> list[Finding]:
+    """A successful sign-in over a legacy protocol (IMAP, POP, SMTP, ActiveSync, "other clients"). They cannot ask for multi-factor, so they are how a stolen password is used past it. One finding per person, app and day."""
+    out: list[Finding] = []
+    seen: set[str] = set()
+    for r in sorted(new, key=lambda x: _utc(x.occurred_at)):
+        client = (getattr(r, "client_app", None) or "").strip()
+        if not r.success or client.lower() not in LEGACY_CLIENTS:
+            continue
+        key = f"legacy:{r.user_principal}:{client.lower()}:{_utc(r.occurred_at).strftime('%Y%m%d')}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(
+            Finding(
+                rule_id="aisoc-id-legacy-protocol",
+                rule_name="Sign-in over a legacy protocol",
+                title=f"Legacy-protocol sign-in ({client}) - {r.user_principal}",
+                severity="medium",
+                tactic="Defense Evasion",
+                technique="T1078",
+                key=key,
+                occurred_at=r.occurred_at,
+                summary=f"{r.user_principal} signed in with {client}, an older protocol that cannot ask for multi-factor. Block legacy authentication with a Conditional Access policy unless something here truly needs it.",
+                fields=[
+                    ("Person", r.user_principal),
+                    ("Protocol", client),
+                    ("Country", r.country or "unknown"),
+                    ("Address", r.ip_address or "unknown"),
                     ("Time", _stamp(r.occurred_at)),
                 ],
                 users=[r.user_principal],
@@ -452,7 +619,15 @@ async def run_signin_detections(db: Any, tenant_id: uuid.UUID, rows: list[Any], 
             .scalars()
             .all()
         )
-        findings = detect_rare_country(rows, countries, total) + detect_impossible_travel([*earlier, *rows], new_ids) + detect_device_code(rows)
+        findings = (
+            detect_rare_country(rows, countries, total)
+            + detect_impossible_travel([*earlier, *rows], new_ids)
+            + detect_device_code(rows)
+            + detect_legacy_protocol(rows)
+            + detect_password_spray([*earlier, *rows], new_ids)
+            + detect_mfa_fatigue([*earlier, *rows], new_ids)
+            + detect_guessed_password([*earlier, *rows], new_ids)
+        )
     except Exception:  # noqa: BLE001
         logger.warning("identity detections: sign-in rules failed for tenant=%s", tenant_id, exc_info=True)
         return 0
