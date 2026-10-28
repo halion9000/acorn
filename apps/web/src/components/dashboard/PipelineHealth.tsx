@@ -26,6 +26,7 @@ type Status = PipelineStage['status'];
 
 const STAGE_LABELS: Record<PipelineStage['stage'], string> = {
   ingest: 'Ingest',
+  feed: 'CORE feed',
   normalize: 'Normalize',
   fuse: 'Fuse',
   correlate: 'Correlate',
@@ -34,6 +35,7 @@ const STAGE_LABELS: Record<PipelineStage['stage'], string> = {
 
 const STAGE_DESCRIPTIONS: Record<PipelineStage['stage'], string> = {
   ingest: 'Connector → raw events',
+  feed: 'Tools reporting to A.C.O.R.N',
   normalize: 'OCSF mapping',
   fuse: 'Alert fusion',
   correlate: 'Cross-source correlation',
@@ -42,6 +44,7 @@ const STAGE_DESCRIPTIONS: Record<PipelineStage['stage'], string> = {
 
 const STAGE_ORDER: PipelineStage['stage'][] = [
   'ingest',
+  'feed',
   'normalize',
   'fuse',
   'correlate',
@@ -121,6 +124,11 @@ function StageCard({ stage }: { stage: PipelineStage }) {
         {STAGE_DESCRIPTIONS[stage.stage]}
       </p>
 
+      {stage.detail && (stage.status === 'unknown' || stage.stage === 'feed') ? (
+        <p className="mt-3 text-xs text-gray-400" data-testid="stage-detail">
+          {stage.detail}
+        </p>
+      ) : (
       <dl className="mt-3 space-y-1.5">
         <div className="flex items-baseline justify-between text-xs">
           <dt className="text-gray-500">Backlog</dt>
@@ -141,6 +149,7 @@ function StageCard({ stage }: { stage: PipelineStage }) {
           </dd>
         </div>
       </dl>
+      )}
     </div>
   );
 }
@@ -190,7 +199,7 @@ export function PipelineHealth() {
             Pipeline Health
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Ingest → normalize → fuse → correlate → alert
+            Ingest → CORE feed → normalize → fuse → correlate → alert
           </p>
         </div>
         {error ? (
@@ -200,7 +209,7 @@ export function PipelineHealth() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {STAGE_ORDER.map((name) => {
           const stage = stagesByName[name];
           if (isLoading || !stage) return <LoadingStage key={name} stage={name} />;

@@ -8,7 +8,7 @@ vi.mock('@/lib/api', () => ({ metricsApi: api }));
 import { PipelineHealth } from './PipelineHealth';
 
 const stage = (name: string, over: Record<string, unknown> = {}) => ({ stage: name, status: 'green', backlog: 12, p95_latency_ms: 340, error_rate: 0, ...over });
-const ALL = ['ingest', 'normalize', 'fuse', 'correlate', 'alert'];
+const ALL = ['ingest', 'feed', 'normalize', 'fuse', 'correlate', 'alert'];
 
 function renderIt() {
   return render(
@@ -26,11 +26,11 @@ beforeEach(() => {
 });
 
 describe('PipelineHealth', () => {
-  it('shows all five stages as loading placeholders first', () => {
+  it('shows all six stages as loading placeholders first', () => {
     let release: (v: unknown) => void = () => {};
     api.getPipelineHealth.mockReturnValue(new Promise((r) => { release = r; }));
     renderIt();
-    for (const l of ['Ingest', 'Normalize', 'Fuse', 'Correlate', 'Alert']) expect(screen.getByText(l)).toBeInTheDocument();
+    for (const l of ['Ingest', 'CORE feed', 'Normalize', 'Fuse', 'Correlate', 'Alert']) expect(screen.getByText(l)).toBeInTheDocument();
     expect(screen.queryByText('Backlog')).toBeNull();
     release({ stages: [] });
   });
@@ -39,15 +39,15 @@ describe('PipelineHealth', () => {
     api.getPipelineHealth.mockResolvedValue({ stages: [...ALL].reverse().map((n) => stage(n)) });
     renderIt();
     await screen.findAllByText('Backlog');
-    const names = screen.getAllByText(/^(Ingest|Normalize|Fuse|Correlate|Alert)$/, { selector: 'p.font-semibold' }).map((e) => e.textContent);
-    expect(names).toEqual(['Ingest', 'Normalize', 'Fuse', 'Correlate', 'Alert']);
+    const names = screen.getAllByText(/^(Ingest|CORE feed|Normalize|Fuse|Correlate|Alert)$/, { selector: 'p.font-semibold' }).map((e) => e.textContent);
+    expect(names).toEqual(['Ingest', 'CORE feed', 'Normalize', 'Fuse', 'Correlate', 'Alert']);
   });
 
   it('a stage the API did not send stays a placeholder instead of vanishing', async () => {
     api.getPipelineHealth.mockResolvedValue({ stages: ALL.filter((n) => n !== 'fuse').map((n) => stage(n)) });
     renderIt();
     await screen.findAllByText('Backlog');
-    expect(screen.getAllByText('Backlog')).toHaveLength(4);
+    expect(screen.getAllByText('Backlog')).toHaveLength(5);
     expect(screen.getByText('Fuse')).toBeInTheDocument();
   });
 
@@ -97,5 +97,29 @@ describe('PipelineHealth', () => {
     api.getPipelineHealth.mockResolvedValue({ stages: ALL.map((n) => stage(n)) });
     renderIt();
     expect(await screen.findByText('Live')).toBeInTheDocument();
+  });
+});
+
+
+describe('the lines that replace meaningless numbers', () => {
+  it('shows when CORE last reported, instead of backlog, latency and errors, on the CORE feed card', async () => {
+    api.getPipelineHealth.mockResolvedValue({ stages: [stage('feed', { backlog: 0, detail: 'CORE reported 2 min ago · 23 tools' })] });
+    renderIt();
+    const feed = await screen.findByText('CORE reported 2 min ago · 23 tools');
+    expect(feed).toBeInTheDocument();
+    expect(within(card('CORE feed')).queryByText('Backlog')).toBeNull();
+  });
+
+  it('says no alerts in the last hour on a grey stage, where zeros would read as all good, and keeps the numbers on a stage that has them', async () => {
+    api.getPipelineHealth.mockResolvedValue({
+      stages: [
+        stage('normalize', { status: 'unknown', backlog: 0, p95_latency_ms: 0, detail: 'No alerts in the last hour' }),
+        stage('fuse', { status: 'green', detail: 'No alerts in the last hour' }),
+      ],
+    });
+    renderIt();
+    await screen.findByText('No alerts in the last hour');
+    expect(within(card('Normalize')).queryByText('Backlog')).toBeNull();
+    expect(three('Fuse')).toEqual(['12', '340 ms', '0%']);
   });
 });

@@ -232,6 +232,47 @@ async def _ingest_stage(db, tenant_id, *, now: datetime) -> PipelineStage:
     )
 
 
+# ───────────────────────────── CORE feed stage ──────────────────
+
+FEED_SLOW_AFTER = timedelta(minutes=5)
+
+
+async def _feed_stage(db, tenant_id, *, now: datetime) -> PipelineStage:
+    """Is CORE still reporting its tools to AiSOC? Green when it reported in the last five minutes, yellow up to the silence limit (fifteen minutes), red beyond it, unknown when CORE was never
+    connected here. This is what alerts and devices from the tools actually travel on, so it is the stage that tells a person whether the data is arriving."""
+    feed = await core_feed_status(db, tenant_id, now)
+    if feed is None:
+        return PipelineStage(
+            stage="feed", backlog=0, p95_latency_ms=0.0, error_rate=0.0, status="unknown", detail="CORE is not connected to this workspace"
+        )
+    last = feed["last_report"]
+    tools = feed["sources"]
+    if last is None:
+        return PipelineStage(
+            stage="feed",
+            backlog=0,
+            p95_latency_ms=0.0,
+            error_rate=0.0,
+            status="red",
+            detail=f"CORE has never reported ({tools} tools set up)",
+        )
+    minutes = feed["minutes_ago"]
+    if feed["silent"]:
+        status = "red"
+    elif now - last > FEED_SLOW_AFTER:
+        status = "yellow"
+    else:
+        status = "green"
+    return PipelineStage(
+        stage="feed",
+        backlog=0,
+        p95_latency_ms=0.0,
+        error_rate=0.0,
+        status=status,
+        detail=f"CORE reported {'just now' if minutes < 1 else f'{minutes} min ago'} · {tools} tool{'' if tools == 1 else 's'}",
+    )
+
+
 # ───────────────────────────── normalize stage ───────────────────────────────
 
 
@@ -495,6 +536,7 @@ async def get_pipeline_health(
 
     stages = [
         await _ingest_stage(db, user.tenant_id, now=now),
+        await _feed_stage(db, user.tenant_id, now=now),
         await _normalize_stage(
             db,
             user.tenant_id,
@@ -526,6 +568,11 @@ async def get_pipeline_health(
             window_end=window_end,
         ),
     ]
+
+    # A stage with nothing to measure says so, instead of showing zeros that read as "all good": these stages work on alerts, and the last hour had none.
+    for s in stages:
+        if s.stage in ("normalize", "fuse", "correlate", "alert") and s.status == "unknown" and s.detail is None:
+            s.detail = "No alerts in the last hour"
 
     return PipelineHealth(
         overall_status=_worst_status([s.status for s in stages]),

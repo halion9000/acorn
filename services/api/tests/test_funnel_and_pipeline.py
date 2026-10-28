@@ -961,10 +961,10 @@ class TestAlertStage:
 
 
 class TestGetPipelineHealth:
-    """End-to-end assembly: five stages in order, worst-of overall."""
+    """End-to-end assembly: six stages in order (the CORE feed is the second), worst-of overall."""
 
     @pytest.mark.asyncio
-    async def test_returns_five_stages_in_canonical_order(self) -> None:
+    async def test_returns_six_stages_in_canonical_order(self) -> None:
         from app.api.v1.endpoints.health import (
             PipelineHealth,
             PipelineStage,
@@ -975,6 +975,7 @@ class TestGetPipelineHealth:
         # AsyncMock side_effect chain. The orchestrator's job is the
         # ordering + overall_status — that's what we lock in here.
         ingest = PipelineStage(stage="ingest", backlog=0, p95_latency_ms=0.0, error_rate=0.0, status="green")
+        feed = PipelineStage(stage="feed", backlog=0, p95_latency_ms=0.0, error_rate=0.0, status="green")
         normalize = PipelineStage(stage="normalize", backlog=0, p95_latency_ms=10.0, error_rate=0.0, status="green")
         fuse = PipelineStage(stage="fuse", backlog=0, p95_latency_ms=20.0, error_rate=0.0, status="green")
         correlate = PipelineStage(stage="correlate", backlog=0, p95_latency_ms=0.0, error_rate=0.0, status="green")
@@ -982,6 +983,7 @@ class TestGetPipelineHealth:
 
         with (
             patch("app.api.v1.endpoints.health._ingest_stage", new=AsyncMock(return_value=ingest)),
+            patch("app.api.v1.endpoints.health._feed_stage", new=AsyncMock(return_value=feed)),
             patch(
                 "app.api.v1.endpoints.health._normalize_stage",
                 new=AsyncMock(return_value=normalize),
@@ -1001,6 +1003,7 @@ class TestGetPipelineHealth:
         assert isinstance(payload, PipelineHealth)
         assert [s.stage for s in payload.stages] == [
             "ingest",
+            "feed",
             "normalize",
             "fuse",
             "correlate",
@@ -1024,6 +1027,7 @@ class TestGetPipelineHealth:
 
         with (
             patch("app.api.v1.endpoints.health._ingest_stage", new=AsyncMock(return_value=green)),
+            patch("app.api.v1.endpoints.health._feed_stage", new=AsyncMock(return_value=green)),
             patch("app.api.v1.endpoints.health._normalize_stage", new=AsyncMock(return_value=green)),
             patch("app.api.v1.endpoints.health._fuse_stage", new=AsyncMock(return_value=green)),
             patch("app.api.v1.endpoints.health._correlate_stage", new=AsyncMock(return_value=green)),
@@ -1038,6 +1042,7 @@ class TestGetPipelineHealth:
 
         with (
             patch("app.api.v1.endpoints.health._ingest_stage", new=AsyncMock(return_value=green)),
+            patch("app.api.v1.endpoints.health._feed_stage", new=AsyncMock(return_value=green)),
             patch("app.api.v1.endpoints.health._normalize_stage", new=AsyncMock(return_value=green)),
             patch("app.api.v1.endpoints.health._fuse_stage", new=AsyncMock(return_value=red)),
             patch("app.api.v1.endpoints.health._correlate_stage", new=AsyncMock(return_value=green)),
@@ -1060,3 +1065,65 @@ async def test_sum_cases_adds_every_tenant_in_scope() -> None:
 
     assert await _sum_cases(fn, None, ["a", "b", "c"], "x") == 9
     assert [t for t, _ in seen] == ["a", "b", "c"]
+
+
+class TestFeedStageAndNoDataNote:
+    """The CORE feed stage tells a person whether the tools' data is arriving; stages with nothing to measure say why."""
+
+    NOW = datetime(2026, 10, 28, 12, 0, tzinfo=UTC)
+
+    async def stage(self, feed):
+        from app.api.v1.endpoints import health
+
+        with patch.object(health, "core_feed_status", new=AsyncMock(return_value=feed)):
+            return await health._feed_stage(MagicMock(), uuid.uuid4(), now=self.NOW)
+
+    def feed(self, minutes_ago, sources=23):
+        from app.api.v1.endpoints.health import core_feed_row
+
+        return core_feed_row(self.NOW - timedelta(minutes=minutes_ago), sources, self.NOW)
+
+    @pytest.mark.asyncio
+    async def test_green_when_core_reported_in_the_last_five_minutes_and_it_says_when_and_how_many_tools(self) -> None:
+        s = await self.stage(self.feed(2))
+        assert (s.stage, s.status, s.detail) == ("feed", "green", "CORE reported 2 min ago · 23 tools")
+        assert (await self.stage(self.feed(0))).detail == "CORE reported just now · 23 tools"
+
+    @pytest.mark.asyncio
+    async def test_yellow_up_to_the_silence_limit_and_red_beyond_it(self) -> None:
+        assert (await self.stage(self.feed(6))).status == "yellow"
+        assert (await self.stage(self.feed(14))).status == "yellow"
+        assert (await self.stage(self.feed(16))).status == "red"
+
+    @pytest.mark.asyncio
+    async def test_unknown_when_core_was_never_connected_and_red_when_it_is_connected_but_never_reported(self) -> None:
+        none = await self.stage(None)
+        assert (none.status, none.detail) == ("unknown", "CORE is not connected to this workspace")
+        never = await self.stage({"sources": 3, "last_report": None, "minutes_ago": None, "silent": True})
+        assert never.status == "red" and "never reported" in (never.detail or "")
+
+    @pytest.mark.asyncio
+    async def test_a_stage_with_no_data_says_no_alerts_in_the_last_hour_and_one_with_data_does_not(self) -> None:
+        from app.api.v1.endpoints.health import PipelineStage, get_pipeline_health
+
+        def stage(name, status):
+            return PipelineStage(stage=name, backlog=0, p95_latency_ms=0.0, error_rate=0.0, status=status)
+
+        with (
+            patch("app.api.v1.endpoints.health._ingest_stage", new=AsyncMock(return_value=stage("ingest", "green"))),
+            patch("app.api.v1.endpoints.health._feed_stage", new=AsyncMock(return_value=stage("feed", "green"))),
+            patch("app.api.v1.endpoints.health._normalize_stage", new=AsyncMock(return_value=stage("normalize", "unknown"))),
+            patch("app.api.v1.endpoints.health._fuse_stage", new=AsyncMock(return_value=stage("fuse", "unknown"))),
+            patch("app.api.v1.endpoints.health._correlate_stage", new=AsyncMock(return_value=stage("correlate", "green"))),
+            patch("app.api.v1.endpoints.health._alert_stage", new=AsyncMock(return_value=stage("alert", "unknown"))),
+        ):
+            payload = await get_pipeline_health(user=_user(), db=MagicMock())
+        notes = {s.stage: s.detail for s in payload.stages}
+        assert notes == {
+            "ingest": None,
+            "feed": None,
+            "normalize": "No alerts in the last hour",
+            "fuse": "No alerts in the last hour",
+            "correlate": None,
+            "alert": "No alerts in the last hour",
+        }

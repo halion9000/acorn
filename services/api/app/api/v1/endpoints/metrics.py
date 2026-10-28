@@ -212,6 +212,8 @@ class PipelineStage(BaseModel):
     p95_latency_ms: float
     error_rate: float
     status: str
+    # One line for the page to show instead of numbers that mean nothing: why a stage has no figures (no alerts in the hour) or what the feed stage saw.
+    detail: str | None = None
 
 
 class PipelineHealth(BaseModel):

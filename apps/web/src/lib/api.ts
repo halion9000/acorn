@@ -2685,11 +2685,13 @@ export interface FunnelMetrics {
  * ``PipelineHealth`` strip on /dashboard.
  */
 export interface PipelineStage {
-  stage: 'ingest' | 'normalize' | 'fuse' | 'correlate' | 'alert';
+  stage: 'ingest' | 'feed' | 'normalize' | 'fuse' | 'correlate' | 'alert';
   backlog: number;
   p95_latency_ms: number;
   error_rate: number;
   status: 'unknown' | 'green' | 'yellow' | 'red';
+  /** One line shown instead of the numbers when they mean nothing (no alerts in the last hour) and for the CORE feed (when CORE last reported). */
+  detail?: string | null;
 }
 
 export interface PipelineHealth {
