@@ -960,6 +960,13 @@ class TestAlertStage:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+def _scope_db(client_ids: list | None = None) -> MagicMock:
+    """A session for the orchestrator: asked for the organization's clients, it lists ``client_ids``; every query is awaitable."""
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=MagicMock(all=lambda: [(c,) for c in (client_ids or [])]))
+    return db
+
+
 class TestGetPipelineHealth:
     """End-to-end assembly: six stages in order (the CORE feed is the second), worst-of overall."""
 
@@ -998,7 +1005,7 @@ class TestGetPipelineHealth:
                 new=AsyncMock(return_value=alert),
             ),
         ):
-            payload = await get_pipeline_health(user=_user(), db=MagicMock())
+            payload = await get_pipeline_health(user=_user(), db=_scope_db())
 
         assert isinstance(payload, PipelineHealth)
         assert [s.stage for s in payload.stages] == [
@@ -1033,7 +1040,7 @@ class TestGetPipelineHealth:
             patch("app.api.v1.endpoints.health._correlate_stage", new=AsyncMock(return_value=green)),
             patch("app.api.v1.endpoints.health._alert_stage", new=AsyncMock(return_value=yellow)),
         ):
-            payload = await get_pipeline_health(user=_user(), db=MagicMock())
+            payload = await get_pipeline_health(user=_user(), db=_scope_db())
 
         assert payload.overall_status == "yellow"
 
@@ -1048,7 +1055,7 @@ class TestGetPipelineHealth:
             patch("app.api.v1.endpoints.health._correlate_stage", new=AsyncMock(return_value=green)),
             patch("app.api.v1.endpoints.health._alert_stage", new=AsyncMock(return_value=yellow)),
         ):
-            payload = await get_pipeline_health(user=_user(), db=MagicMock())
+            payload = await get_pipeline_health(user=_user(), db=_scope_db())
         assert payload.overall_status == "red"
 
 
@@ -1117,7 +1124,7 @@ class TestFeedStageAndNoDataNote:
             patch("app.api.v1.endpoints.health._correlate_stage", new=AsyncMock(return_value=stage("correlate", "green"))),
             patch("app.api.v1.endpoints.health._alert_stage", new=AsyncMock(return_value=stage("alert", "unknown"))),
         ):
-            payload = await get_pipeline_health(user=_user(), db=MagicMock())
+            payload = await get_pipeline_health(user=_user(), db=_scope_db())
         notes = {s.stage: s.detail for s in payload.stages}
         assert notes == {
             "ingest": None,
@@ -1127,3 +1134,43 @@ class TestFeedStageAndNoDataNote:
             "correlate": None,
             "alert": "No alerts in the last hour",
         }
+
+
+class TestAlertStagesSeeTheClients:
+    """An MSSP's alerts live in its client organizations: the alert stages must read the organization and its clients together (they read the parent alone and said "no alerts in the last hour" with 65 alerts in the hour)."""
+
+    @pytest.mark.asyncio
+    async def test_the_alert_stages_are_asked_about_the_organization_and_every_client(self) -> None:
+        from app.api.v1.endpoints.health import PipelineStage, get_pipeline_health
+
+        seen: dict[str, object] = {}
+
+        def stage(name: str):
+            async def build(db, tenant_id, **_k):
+                seen[name] = tenant_id
+                return PipelineStage(stage=name, backlog=0, p95_latency_ms=0.0, error_rate=0.0, status="green")
+
+            return build
+
+        clients = [uuid.uuid4(), uuid.uuid4()]
+        user = _user()
+        ok = AsyncMock(return_value=PipelineStage(stage="x", backlog=0, p95_latency_ms=0.0, error_rate=0.0, status="green"))
+        with (
+            patch("app.api.v1.endpoints.health._ingest_stage", new=ok),
+            patch("app.api.v1.endpoints.health._feed_stage", new=ok),
+            patch("app.api.v1.endpoints.health._normalize_stage", new=stage("normalize")),
+            patch("app.api.v1.endpoints.health._fuse_stage", new=stage("fuse")),
+            patch("app.api.v1.endpoints.health._correlate_stage", new=stage("correlate")),
+            patch("app.api.v1.endpoints.health._alert_stage", new=stage("alert")),
+        ):
+            await get_pipeline_health(user=user, db=_scope_db(clients))
+
+        for name in ("normalize", "fuse", "correlate", "alert"):
+            assert seen[name] == [user.tenant_id, *clients], name
+
+    def test_a_list_of_organizations_filters_with_in_and_one_with_equals(self) -> None:
+        from app.api.v1.endpoints.health import _scoped
+
+        a, b = uuid.uuid4(), uuid.uuid4()
+        assert " IN " in str(_scoped([a, b]))
+        assert " IN " not in str(_scoped(a))

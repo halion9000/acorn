@@ -273,6 +273,13 @@ async def _feed_stage(db, tenant_id, *, now: datetime) -> PipelineStage:
     )
 
 
+def _scoped(tenant_id: Any) -> Any:
+    """An alerts filter for one organization, or for a list of them (an MSSP's own organization and its clients: the alerts live in the clients)."""
+    if isinstance(tenant_id, list | tuple | set):
+        return Alert.tenant_id.in_(list(tenant_id))
+    return Alert.tenant_id == tenant_id
+
+
 # ───────────────────────────── normalize stage ───────────────────────────────
 
 
@@ -295,7 +302,7 @@ async def _normalize_stage(
     p95_seconds = await db.scalar(
         select(_p95_seconds_expr(func.extract("epoch", Alert.created_at - Alert.event_time))).where(
             and_(
-                Alert.tenant_id == tenant_id,
+                _scoped(tenant_id),
                 Alert.created_at >= window_start,
                 Alert.created_at < window_end,
                 Alert.event_time.isnot(None),
@@ -347,7 +354,7 @@ async def _fuse_stage(
     p95_seconds = await db.scalar(
         select(_p95_seconds_expr(func.extract("epoch", Alert.last_seen - Alert.first_seen))).where(
             and_(
-                Alert.tenant_id == tenant_id,
+                _scoped(tenant_id),
                 Alert.created_at >= window_start,
                 Alert.created_at < window_end,
                 Alert.first_seen.isnot(None),
@@ -401,7 +408,7 @@ async def _correlate_stage(
         await db.scalar(
             select(func.count()).where(
                 and_(
-                    Alert.tenant_id == tenant_id,
+                    _scoped(tenant_id),
                     Alert.created_at >= window_start,
                     Alert.created_at < window_end,
                     func.jsonb_array_length(Alert.source_event_ids) == 1,
@@ -414,7 +421,7 @@ async def _correlate_stage(
         await db.scalar(
             select(func.count()).where(
                 and_(
-                    Alert.tenant_id == tenant_id,
+                    _scoped(tenant_id),
                     Alert.created_at >= window_start,
                     Alert.created_at < window_end,
                     func.jsonb_array_length(Alert.source_event_ids) >= 2,
@@ -464,7 +471,7 @@ async def _alert_stage(
         await db.scalar(
             select(func.count()).where(
                 and_(
-                    Alert.tenant_id == tenant_id,
+                    _scoped(tenant_id),
                     Alert.status.in_(("new", "triaging", "in_progress")),
                     Alert.first_seen_at.is_(None),
                 )
@@ -476,7 +483,7 @@ async def _alert_stage(
     p95_seconds = await db.scalar(
         select(_p95_seconds_expr(func.extract("epoch", Alert.first_seen_at - Alert.created_at))).where(
             and_(
-                Alert.tenant_id == tenant_id,
+                _scoped(tenant_id),
                 Alert.created_at >= window_start,
                 Alert.created_at < window_end,
                 Alert.first_seen_at.isnot(None),
@@ -534,40 +541,25 @@ async def get_pipeline_health(
     warn_seconds = int(getattr(settings, "AISOC_PIPELINE_STALE_WARN_SECONDS", 600) or 600)
     down_seconds = int(getattr(settings, "AISOC_PIPELINE_STALE_DOWN_SECONDS", 1800) or 1800)
 
+    from app.db.rls_scope import cross_tenant_reads
+    from app.models.tenant import Tenant
+
+    # The alert stages look at this organization and its clients together: an MSSP's alerts live in the client organizations, so looking at its own alone always read "no alerts".
+    scope = [user.tenant_id, *[r[0] for r in (await db.execute(select(Tenant.id).where(Tenant.parent_tenant_id == user.tenant_id))).all()]]
+
     stages = [
         await _ingest_stage(db, user.tenant_id, now=now),
         await _feed_stage(db, user.tenant_id, now=now),
-        await _normalize_stage(
-            db,
-            user.tenant_id,
-            warn_seconds=warn_seconds,
-            down_seconds=down_seconds,
-            window_start=window_start,
-            window_end=window_end,
-        ),
-        await _fuse_stage(
-            db,
-            user.tenant_id,
-            warn_seconds=warn_seconds,
-            down_seconds=down_seconds,
-            window_start=window_start,
-            window_end=window_end,
-        ),
-        await _correlate_stage(
-            db,
-            user.tenant_id,
-            window_start=window_start,
-            window_end=window_end,
-        ),
-        await _alert_stage(
-            db,
-            user.tenant_id,
-            warn_seconds=warn_seconds,
-            down_seconds=down_seconds,
-            window_start=window_start,
-            window_end=window_end,
-        ),
     ]
+    window = {"window_start": window_start, "window_end": window_end}
+    latency = {"warn_seconds": warn_seconds, "down_seconds": down_seconds}
+    async with cross_tenant_reads(db):
+        stages += [
+            await _normalize_stage(db, scope, **latency, **window),
+            await _fuse_stage(db, scope, **latency, **window),
+            await _correlate_stage(db, scope, **window),
+            await _alert_stage(db, scope, **latency, **window),
+        ]
 
     # A stage with nothing to measure says so, instead of showing zeros that read as "all good": these stages work on alerts, and the last hour had none.
     for s in stages:
