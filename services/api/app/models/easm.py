@@ -42,7 +42,11 @@ class ExternalAsset(Base):
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
-    asset_type: Mapped[ExternalAssetType] = mapped_column(SQLAEnum(ExternalAssetType, name="external_asset_type"), nullable=False)
+    asset_type: Mapped[ExternalAssetType] = mapped_column(
+        # The database enum holds the lower-case VALUES ('domain'); without values_callable SQLAlchemy sends the member NAME ('DOMAIN') and every scan that found something failed when saving.
+        SQLAEnum(ExternalAssetType, name="external_asset_type", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+    )
     value: Mapped[str] = mapped_column(String(512), nullable=False)  # domain, IP, cert CN, etc.
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
