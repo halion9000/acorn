@@ -30683,6 +30683,11 @@ components:
             format: date-time
           - type: 'null'
           title: Updated At
+        license:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: License
       type: object
       required:
       - group

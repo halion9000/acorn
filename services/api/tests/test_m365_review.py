@@ -226,3 +226,28 @@ def test_the_four_newer_baseline_checks_answer_their_template_questions():
     assert got["Ensure sign-in frequency for Intune Enrollment is set to 'Every time'"].status == "not_met"
     assert got["Ensure `Idle session timeout` is set to `3 hours (or less)` for unmanaged devices"].evidence == "after 2 hours"
     assert got["Ensure outbound anti-spam message limits are in place"].status == "partly"
+
+
+def test_a_licence_note_is_given_only_to_the_questions_that_need_one_and_every_note_names_a_real_check():
+    assert set(m.LICENSE_NOTES) <= set(m.CHECK_QUESTIONS), "a licence note for a check key that does not exist would be silently lost"
+    answers = {a.question: a for a in m.m365_answers([], [])}
+    gated = answers[m.question_for("Enable Conditional Access policies to block legacy authentication")]
+    assert gated.license and "Entra ID P1" in gated.license
+    assert "Entra ID P2" in (answers[m.question_for("Enable Identity Protection user risk policies")].license or "")
+    assert "Defender for Office 365" in (answers[m.question_for("Ensure Safe Links for Office Applications is Enabled")].license or "")
+    assert "E5" in (answers[m.question_for("Ensure the customer lockbox feature is enabled")].license or "")
+    assert answers[m.question_for("Ensure that SPF records are published")].license is None
+    assert sum(1 for a in answers.values() if a.license) == len(m.LICENSE_NOTES), "each note lands on exactly one question"
+
+
+def test_the_licence_note_survives_a_typed_answer_laid_over_the_question():
+    from types import SimpleNamespace
+
+    from app.services import review_overrides as ro
+
+    answers = m.m365_answers([], [])
+    q = m.question_for("Enable Identity Protection user risk policies")
+    row = SimpleNamespace(section="m365", key=q, status="met", note="checked", updated_at=None)
+    merged = ro.merge_m365(answers, [row])
+    got = next(a for a in merged if a.question == q)
+    assert got.manual is True and got.license and "Entra ID P2" in got.license

@@ -198,6 +198,32 @@ CHECK_QUESTIONS: dict[str, str] = {
     "sensitivity_label_policies": "Ensure Information Protection sensitivity label policies are published",
 }
 
+# The licence a question's setting needs, by CORE's check key, from Microsoft's own documentation. Only questions where the requirement is certain are listed; a question not listed has no note, which does not mean it
+# needs none. A tenant without the licence cannot satisfy the question, so a "not met" there is a plan gap, not a misconfiguration.
+_P1 = "Needs Microsoft Entra ID P1 (included in Microsoft 365 Business Premium and E3)."
+_P2 = "Needs Microsoft Entra ID P2 (included in Microsoft 365 E5) or Entra ID Governance."
+_DEFENDER = "Needs Microsoft Defender for Office 365 (Plan 1 or 2; included in Microsoft 365 Business Premium and E5)."
+LICENSE_NOTES: dict[str, str] = {
+    "legacy_auth_ca": _P1 + " Conditional Access.",
+    "device_code_ca": _P1 + " Conditional Access.",
+    "managed_device_ca": _P1 + " Conditional Access.",
+    "register_security_info_ca": _P1 + " Conditional Access.",
+    "intune_enrollment_frequency_ca": _P1 + " Conditional Access.",
+    "admin_signin_frequency": _P1 + " Conditional Access.",
+    "banned_passwords": _P1 + " Custom banned password lists.",
+    "onprem_password_protection": _P1 + " Password protection for on-premises Active Directory.",
+    "user_risk_ca": _P2 + " Identity Protection.",
+    "signin_risk_ca": _P2 + " Identity Protection.",
+    "access_reviews_guests": _P2,
+    "access_reviews_privileged": _P2,
+    "pim_ga_approval": _P2 + " Privileged Identity Management.",
+    "pim_privileged_approval": _P2 + " Privileged Identity Management.",
+    "safe_attachments": _DEFENDER,
+    "safe_attachments_collab": _DEFENDER,
+    "safe_links": _DEFENDER,
+    "customer_lockbox": "Needs Microsoft 365 E5 (or the Microsoft 365 E5 Compliance add-on).",
+}
+
 # Questions answered from the multi-factor list A.C.O.R.N already holds.
 MFA_QUESTIONS = {
     "admins": "Ensure multifactor authentication is enabled for all users in administrative roles",
@@ -220,6 +246,8 @@ class M365Answer(BaseModel):
     note: str | None = None
     auto_status: str | None = None
     updated_at: datetime | None = None
+    # The licence this question's setting needs, when it has one (see LICENSE_NOTES).
+    license: str | None = None
 
 
 def question_for(prefix: str) -> str:
@@ -279,8 +307,9 @@ def m365_answers(checks: list[dict[str, Any]], mfa_users: list[Any]) -> list[M36
             by_question[question_for(CHECK_QUESTIONS[key])] = (str(status), str(c.get("evidence") or "")[:300])
     for key, answer in from_mfa(mfa_users).items():
         by_question.setdefault(question_for(MFA_QUESTIONS[key]), answer)
+    licences = {question_for(CHECK_QUESTIONS[key]): note for key, note in LICENSE_NOTES.items()}
     out: list[M365Answer] = []
     for group, question in QUESTIONS:
         status, evidence = by_question.get(question, ("needs_person", ""))
-        out.append(M365Answer(group=group, question=question, status=status, evidence=evidence))
+        out.append(M365Answer(group=group, question=question, status=status, evidence=evidence, license=licences.get(question)))
     return out

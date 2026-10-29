@@ -10,6 +10,7 @@ import { useSearchParams } from "next/navigation";
 import { authFetch } from "@/lib/auth-session";
 import { VcioSuggestions } from "./VcioSuggestions";
 import { AnswerEditor, AnswerMarks } from "./AnswerEditor";
+import { answeredAutomatically, csvFileName, loadFolded, openCounts, openLabel, reviewCsv, saveFolded } from "./reviewExport";
 
 export interface Coverage {
   tool: string;
@@ -70,6 +71,8 @@ export interface M365Answer {
   /** From a check CORE read through CIPP (or the multi-factor list); needs_person when A.C.O.R.N has nothing that answers it. */
   status: 'met' | 'partly' | 'not_met' | 'needs_person';
   evidence: string;
+  /** The licence this question's setting needs, when it has one. */
+  license?: string | null;
   /** A typed status or answer replaces the worked-out one (manual); what A.C.O.R.N had worked out is kept in auto_*. A note changes no answer. */
   manual?: boolean;
   note?: string | null;
@@ -176,11 +179,57 @@ async function getJson<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+/** A tag for a row A.C.O.R.N answered from its own data, so a person can tell which answers they still have to check or give. */
+function AutoTag({ status, manual }: { status: string; manual: boolean | undefined }) {
+  return answeredAutomatically(status, manual) ? (
+    <span data-testid="auto-answered" className="mt-0.5 block text-[10px] uppercase tracking-wide text-slate-500">
+      automatic
+    </span>
+  ) : null;
+}
+
+function Card({
+  title,
+  children,
+  section,
+  summary,
+  folded,
+  onToggle,
+}: {
+  title: string;
+  children: React.ReactNode;
+  /** A section a person can fold away (the long question lists); the choice is remembered. */
+  section?: string;
+  /** Next to the title, for example how many questions are open. */
+  summary?: string;
+  folded?: string[];
+  onToggle?: (section: string) => void;
+}) {
+  const isFolded = !!section && !!folded?.includes(section);
   return (
     <section className="rounded-lg border border-slate-800 p-4">
-      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">{title}</h2>
-      {children}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+          {title}
+          {summary ? (
+            <span data-testid={`open-${section}`} className="ml-2 text-xs font-normal normal-case tracking-normal text-slate-500">
+              {summary}
+            </span>
+          ) : null}
+        </h2>
+        {section && onToggle ? (
+          <button
+            type="button"
+            aria-expanded={!isFolded}
+            aria-label={`${isFolded ? "Show" : "Hide"} ${title}`}
+            onClick={() => onToggle(section)}
+            className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-300 hover:bg-slate-800 print:hidden"
+          >
+            {isFolded ? "Show" : "Hide"}
+          </button>
+        ) : null}
+      </div>
+      <div className={isFolded ? "hidden print:block" : undefined}>{children}</div>
     </section>
   );
 }
@@ -194,6 +243,24 @@ export function ClientReview() {
   // Bumped after an answer is typed, so the review is read again with it.
   const [version, setVersion] = useState(0);
   const reload = () => setVersion((v) => v + 1);
+  // The sections a person folded away last time (read after the first paint: browser storage does not exist on the server).
+  const [folded, setFolded] = useState<string[]>([]);
+  useEffect(() => setFolded(loadFolded()), []);
+  const toggle = (section: string) =>
+    setFolded((prev) => {
+      const next = prev.includes(section) ? prev.filter((x) => x !== section) : [...prev, section];
+      saveFolded(next);
+      return next;
+    });
+  const downloadCsv = () => {
+    if (!review) return;
+    const url = URL.createObjectURL(new Blob([reviewCsv(review)], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = csvFileName(review);
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     let live = true;
@@ -234,6 +301,7 @@ export function ClientReview() {
   }, [clientId, version]);
 
   const coverage = useMemo(() => (review ? visibleCoverage(review.devices.coverage) : []), [review]);
+  const open = useMemo(() => (review ? openCounts(review) : null), [review]);
 
   return (
     <div className="space-y-4 p-6">
@@ -258,6 +326,9 @@ export function ClientReview() {
               </option>
             ))}
           </select>
+          <button type="button" disabled={!review} onClick={downloadCsv} className="rounded border border-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40">
+            Download CSV
+          </button>
           <button type="button" disabled={!review} onClick={() => window.print()} className="rounded border border-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40">
             Print or save as PDF
           </button>
@@ -281,14 +352,22 @@ export function ClientReview() {
             <p className="text-sm text-slate-300" data-testid="review-headline">
               {readinessHeadline(review.readiness)}
             </p>
+            {open && (
+              <p className="text-xs text-slate-400" data-testid="open-summary">
+                Questions still open: {open.readiness} in readiness, {open.tech} in technology, {open.m365} in Microsoft 365, {open.assess} in the assessment.
+              </p>
+            )}
             <p className="text-xs text-slate-500">Read {new Date(review.generated_at).toLocaleString()}. Alerts and cases cover the last {review.window_days} days.</p>
           </div>
 
-          <Card title="Cyber-insurance readiness">
+          <Card title="Cyber-insurance readiness" section="readiness" summary={open ? openLabel(open.readiness, review.readiness.items.length) : undefined} folded={folded} onToggle={toggle}>
             <ul className="space-y-2" data-testid="readiness">
               {review.readiness.items.map((i) => (
                 <li key={i.key} className="flex items-start gap-3 text-sm">
-                  <span className={`mt-0.5 w-20 shrink-0 rounded px-2 py-0.5 text-center text-[11px] font-medium ${STATUS[i.status].className}`}>{STATUS[i.status].label}</span>
+                  <span className="mt-0.5 w-20 shrink-0 text-center">
+                    <span className={`block rounded px-2 py-0.5 text-[11px] font-medium ${STATUS[i.status].className}`}>{STATUS[i.status].label}</span>
+                    <AutoTag status={i.status} manual={i.manual} />
+                  </span>
                   <span className="flex-1">
                     <span className="text-slate-200">{i.question}</span>
                     <span className="block text-xs text-slate-500">{i.evidence}</span>
@@ -301,7 +380,7 @@ export function ClientReview() {
           </Card>
 
           {(review.tech_stack ?? []).length > 0 && (
-            <Card title="Technology stack: suggested answers">
+            <Card title="Technology stack: suggested answers" section="tech" summary={open ? openLabel(open.tech, (review.tech_stack ?? []).length) : undefined} folded={folded} onToggle={toggle}>
               <p className="mb-2 text-xs text-slate-500">
                 The vCIO Toolbox review template&apos;s technology questions, with what A.C.O.R.N can see. Anything marked Ask the client is something A.C.O.R.N has no way to see. Nothing here is sent to vCIO Toolbox.
               </p>
@@ -320,6 +399,7 @@ export function ClientReview() {
                         <td className="py-1.5 pr-3 text-slate-300">{a.question}</td>
                         <td className={`w-32 pr-3 ${a.status === 'seen' ? 'text-emerald-300' : a.status === 'not_seen' ? 'text-amber-300' : 'text-slate-500'}`}>
                           {a.status === 'unknown' ? 'Ask the client' : a.suggested}
+                          {a.status !== 'unknown' && <AutoTag status="seen" manual={a.manual} />}
                         </td>
                         <td className="text-xs text-slate-500">
                           {a.evidence}
@@ -335,7 +415,7 @@ export function ClientReview() {
           )}
 
           {(review.m365 ?? []).length > 0 && (
-            <Card title="Microsoft 365: suggested answers">
+            <Card title="Microsoft 365: suggested answers" section="m365" summary={open ? openLabel(open.m365, (review.m365 ?? []).length) : undefined} folded={folded} onToggle={toggle}>
               <p className="mb-1 text-sm text-slate-300" data-testid="m365-headline">
                 {m365Headline(review.m365 ?? [])}
               </p>
@@ -362,9 +442,15 @@ export function ClientReview() {
                           ) : (
                             <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS[a.status].className}`}>{STATUS[a.status].label}</span>
                           )}
+                          <AutoTag status={a.status} manual={a.manual} />
                         </td>
                         <td className="text-xs text-slate-500">
                           {a.evidence}
+                          {a.license && (
+                            <span data-testid="licence-note" className="block text-amber-300/80">
+                              {a.license}
+                            </span>
+                          )}
                           <AnswerMarks manual={a.manual} note={a.note} suggested={a.auto_status ? (a.auto_status === 'needs_person' ? 'Needs a person' : STATUS[a.auto_status as ReadinessItem['status']]?.label) : null} />
                           <AnswerEditor clientId={review.client_id} section="m365" questionKey={a.question} status={a.status} note={a.note} manual={a.manual} onSaved={reload} />
                         </td>
@@ -377,7 +463,7 @@ export function ClientReview() {
           )}
 
           {(review.assess ?? []).length > 0 && (
-            <Card title="Infrastructure and security assessment">
+            <Card title="Infrastructure and security assessment" section="assess" summary={open ? openLabel(open.assess, (review.assess ?? []).length) : undefined} folded={folded} onToggle={toggle}>
               <p className="mb-1 text-sm text-slate-300" data-testid="assess-headline">
                 {assessHeadline(review.assess ?? [])}
               </p>
@@ -404,6 +490,7 @@ export function ClientReview() {
                           ) : (
                             <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS[a.status].className}`}>{STATUS[a.status].label}</span>
                           )}
+                          <AutoTag status={a.status} manual={a.manual} />
                         </td>
                         <td className="text-xs text-slate-500">
                           {a.evidence}
