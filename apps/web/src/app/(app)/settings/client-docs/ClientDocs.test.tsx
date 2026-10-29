@@ -68,6 +68,22 @@ describe('ClientDocs', () => {
     expect(results).toHaveTextContent('Onboarding guide');
   });
 
+  it('labels a ticket as a ticket, linking to it in the ticketing tool', async () => {
+    route({
+      '/api/v1/client-documents/summary': () => json(SUMMARY),
+      '/api/v1/client-documents?': () =>
+        json([{ client_id: 'c-1', client: 'Airport Security Park', kind: 'ticket', title: '#1234 Wifi drops', folder: 'Closed', url: 'https://acme.halopsa.com/tickets?id=1234', snippet: 'Moved the AP to the hallway.' }]),
+    });
+    render(<ClientDocs />);
+    await screen.findByTestId('docs-summary');
+    fireEvent.change(screen.getByLabelText('Search the documentation'), { target: { value: 'wifi drops' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    const results = await screen.findByTestId('docs-results');
+    expect(results).toHaveTextContent('Ticket');
+    expect(results).toHaveTextContent('Airport Security Park · Closed');
+    expect(screen.getByRole('link', { name: '#1234 Wifi drops' })).toHaveAttribute('href', 'https://acme.halopsa.com/tickets?id=1234');
+  });
+
   it('asks for one client when one is picked, with the words and a limit', async () => {
     route({ '/api/v1/client-documents/summary': () => json(SUMMARY), '/api/v1/client-documents?': () => json([]) });
     render(<ClientDocs />);

@@ -177,3 +177,46 @@ async def test_a_secret_in_a_record_is_not_stored_or_searchable_but_the_rest_of_
             await conn.execute(text("select body from client_documents where tenant_id = :t and external_id = 'n1'"), {"t": w.park})
         ).scalar_one()
     assert "Zebra" not in body and "[redacted]" in body
+
+
+@pytest.mark.asyncio
+async def test_a_closed_ticket_is_kept_by_the_date_it_last_changed_not_dropped_for_not_being_sent_again(world):
+    app, _, w = world
+    now = datetime.now(UTC)
+    old_send = now - timedelta(days=cd.STALE_DAYS + 20)
+
+    def ticket(i, title, body, updated_days_ago):
+        t = doc(i, title, body, kind="ticket")
+        t.updated_at = now - timedelta(days=updated_days_ago)
+        return t
+
+    await store(
+        app,
+        {
+            w.park: [
+                ticket("t1", "Printer offline", "Rebooted the print server and the queue cleared.", 30),
+                ticket("t2", "Ancient ticket", "From years ago about a fax machine.", cd.TICKET_KEEP_DAYS + 40),
+            ]
+        },
+        vendor="halopsa",
+        now=old_send,
+    )
+    await store(app, {w.park: [doc("other", "Unrelated note", "Nothing to see.")]}, vendor="halopsa", now=now)
+    titles = {h.title for h in await ask(app, w, "printer queue")}
+    assert "Printer offline" in titles, "a ticket received three weeks ago and never sent again is still there"
+    assert not {h.title for h in await ask(app, w, "fax machine")}, "a ticket the tool last touched over two years ago is dropped"
+
+
+@pytest.mark.asyncio
+async def test_a_ticket_result_carries_the_start_of_the_whole_thread_so_the_answer_spread_across_notes_is_there(world):
+    app, _, w = world
+    thread = (
+        "Subject: Wifi drops in the back office\n[Tech] Checked the access point, firmware is old.\n[Customer] It only drops in the afternoon.\n"
+        "[Tech] Found the microwave next to the AP. Moved the AP to the hallway and it has been stable since."
+    )
+    t = doc("t9", "#9 Wifi drops in the back office", thread, kind="ticket")
+    await store(app, {w.park: [t, doc("d1", "Wifi guide", "Wifi password policy and the guest network name.")]}, vendor="halopsa")
+    hits = await ask(app, w, "wifi drops in the afternoon")
+    ticket = next(h for h in hits if h.kind == "ticket")
+    assert "Moved the AP to the hallway" in ticket.snippet, "the fix is in the last note, far from the words that matched"
+    assert "Subject: Wifi drops" in ticket.snippet

@@ -12,13 +12,18 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import column, delete, desc, func, select
+from sqlalchemy import case, column, delete, desc, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.client_document import ClientDocument
 
 MAX_BODY = 30_000
 STALE_DAYS = 14
+# A ticket does not change once it is closed, so CORE does not send it again every week; it is kept by the date the ticketing tool last touched it instead of by when it was last received.
+TICKET_KIND = "ticket"
+TICKET_KEEP_DAYS = 730
+# A ticket's answer is spread across its notes, so a ticket's result carries the start of the whole thread rather than the two best fragments a document gets.
+TICKET_SNIPPET_CHARS = 1500
 MAX_TERMS = 12
 SNIPPET_OPTIONS = 'MaxFragments=2, MaxWords=40, MinWords=15, StartSel="", StopSel="", FragmentDelimiter=" ... "'
 
@@ -114,7 +119,10 @@ async def search_documents(db: Any, tenant_ids: list[uuid.UUID], query: str, lim
                 ClientDocument.title,
                 ClientDocument.folder,
                 ClientDocument.url,
-                func.ts_headline("english", ClientDocument.body, q, SNIPPET_OPTIONS).label("snippet"),
+                case(
+                    (ClientDocument.kind == TICKET_KIND, func.left(ClientDocument.body, TICKET_SNIPPET_CHARS)),
+                    else_=func.ts_headline("english", ClientDocument.body, q, SNIPPET_OPTIONS),
+                ).label("snippet"),
                 func.ts_rank(search, q).label("rank"),
             )
             .where(ClientDocument.tenant_id.in_(tenant_ids), search.op("@@")(q))
@@ -123,7 +131,15 @@ async def search_documents(db: Any, tenant_ids: list[uuid.UUID], query: str, lim
         )
     ).all()
     return [
-        Hit(r.tenant_id, r.kind, r.title, r.folder, r.url, clean_text(r.snippet, 600) or clean_text(r.title, 300), float(r.rank or 0.0))
+        Hit(
+            r.tenant_id,
+            r.kind,
+            r.title,
+            r.folder,
+            r.url,
+            clean_text(r.snippet, TICKET_SNIPPET_CHARS if r.kind == TICKET_KIND else 600) or clean_text(r.title, 300),
+            float(r.rank or 0.0),
+        )
         for r in rows
     ]
 
@@ -168,7 +184,16 @@ async def apply_documents(db: Any, by_tenant: dict[uuid.UUID, list[Any]], vendor
                 delete(ClientDocument).where(
                     ClientDocument.tenant_id == tid,
                     ClientDocument.vendor == vendor,
+                    ClientDocument.kind != TICKET_KIND,
                     ClientDocument.received_at < now - timedelta(days=STALE_DAYS),
+                )
+            )
+            await db.execute(
+                delete(ClientDocument).where(
+                    ClientDocument.tenant_id == tid,
+                    ClientDocument.vendor == vendor,
+                    ClientDocument.kind == TICKET_KIND,
+                    ClientDocument.vendor_updated_at < now - timedelta(days=TICKET_KEEP_DAYS),
                 )
             )
     return accepted

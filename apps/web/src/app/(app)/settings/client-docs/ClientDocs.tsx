@@ -32,6 +32,7 @@ export const KIND_LABELS: Record<string, string> = {
   configuration: "Configuration",
   location: "Location",
   password: "Password entry",
+  ticket: "Ticket",
 };
 
 /** How long ago, in plain words. */

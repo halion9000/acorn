@@ -194,7 +194,7 @@ def format_docs_snapshot(results: list[dict[str, Any]]) -> str | None:
     if not results:
         return None
     lines = [
-        "[Client documentation: passages from IT Glue that match the question. Answer from them when they apply and name the document; if they do not answer the question, say the documentation does not cover it. Do not invent what a document says.]"
+        "[Client documentation and past tickets: passages from IT Glue and the ticketing tool that match the question. Answer from them when they apply and name the document or the ticket number; a ticket's answer may be spread across its notes, so put the thread together (what the problem was, what was tried, what fixed it) and say so when the thread does not show a fix. If they do not answer the question, say the documentation does not cover it. Do not invent what a document or ticket says.]"
     ]
     for r in results:
         where = f"{r['client']}: " if r.get("client") else ""
