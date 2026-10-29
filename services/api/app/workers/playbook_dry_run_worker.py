@@ -24,7 +24,7 @@ async def run_playbook_dry_runs(
     while True:
         try:
             done = await playbook_dry_runs.run_once(session_factory)
-            if done["recorded"] or done["skipped"]:
+            if done["recorded"] or done["skipped"] or done["pruned"]:
                 logger.info("playbook_dry_runs.pass", **done)
         except asyncio.CancelledError:
             raise

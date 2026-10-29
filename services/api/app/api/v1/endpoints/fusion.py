@@ -42,6 +42,7 @@ from app.core.logging import safe_log_value
 from app.db.rls import TenantDBSession
 from app.models.tenant import Tenant
 from app.services.tenant_selection import resolve_requested_tenant
+from app.services.timeutil import as_utc
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +202,7 @@ def _parse_at(value: Any) -> datetime | None:
         moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
-    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+    return as_utc(moment)
 
 
 def trend_of(contributors: list[dict[str, Any]], now: datetime | None = None) -> dict[str, Any]:

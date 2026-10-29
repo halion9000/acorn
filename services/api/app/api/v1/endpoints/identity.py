@@ -31,6 +31,7 @@ from app.services.directory_scoring import directory_features, sensitivity_of
 from app.services.identity_detections import run_audit_detections
 from app.services.mfa_registration import has_second_factor, registration_known, required_of
 from app.services.signin_scoring import HISTORY_DAYS, score_events
+from app.services.timeutil import as_utc
 
 LOG = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ PRUNE_BATCH = 2000
 
 
 def _utc(t: datetime) -> datetime:
-    return t if t.tzinfo else t.replace(tzinfo=UTC)
+    return as_utc(t)
 
 
 # ---- directory audit entries ---------------------------------------------------------------------------------------------------------------------------

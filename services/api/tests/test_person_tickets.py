@@ -213,3 +213,29 @@ def test_the_ticket_line_carries_when_it_was_closed_and_older_senders_still_work
     assert ep.TicketBrief(id="9", summary="s", opened_at=NOW, source="halopsa").closed_at is None
     assert ep.TicketBrief(id="9", summary="s", opened_at=NOW, closed_at=NOW, source="halopsa").closed_at == NOW
     assert item("1").closed_at is None, "a report from a CORE that does not send the field is still accepted"
+
+
+def test_every_stored_time_has_a_zone_even_when_the_tool_sent_none(monkeypatch):
+    """The opened time was made aware, but the updated time was stored as it came, so a naive value met an aware one the first time they were compared."""
+    out, db = apply(
+        monkeypatch,
+        [
+            item(
+                "8",
+                opened_at=datetime(2026, 10, 20, 8, 0),
+                updated_at=datetime(2026, 10, 21, 9, 0),
+                closed_at=datetime(2026, 10, 22, 10, 0),
+            )
+        ],
+    )
+    values = db.statements[0].compile().params
+    times = [v for v in values.values() if isinstance(v, datetime)]
+    assert len(times) >= 4, times  # opened, updated, closed, received
+    assert all(v.tzinfo is not None for v in times), times
+    assert out.accepted == 1
+
+
+def test_a_ticket_with_no_updated_or_closed_time_stores_none_for_them(monkeypatch):
+    _out, db = apply(monkeypatch, [item("9")])
+    values = db.statements[0].compile().params
+    assert [v for k, v in values.items() if k.startswith(("updated_at", "closed_at"))] == [None, None]

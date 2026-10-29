@@ -2,7 +2,7 @@
 External Attack Surface Management (EASM) models (Tier 3.6).
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from uuid import UUID, uuid4
 
@@ -48,8 +48,8 @@ class ExternalAsset(Base):
         nullable=False,
     )
     value: Mapped[str] = mapped_column(String(512), nullable=False)  # domain, IP, cert CN, etc.
-    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default={})
     # e.g. {"ports": [443, 22], "certs": [...], "asn": "...", "org": "..."}
 
@@ -76,7 +76,7 @@ class ExternalAssetDrift(Base):
     )
     drift_type: Mapped[str] = mapped_column(String(64), nullable=False)  # e.g. "new_port", "new_cert"
     details: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
     # Relationships
     tenant = relationship("Tenant", back_populates="external_asset_drift", lazy="selectin")

@@ -220,3 +220,48 @@ async def test_a_ticket_result_carries_the_start_of_the_whole_thread_so_the_answ
     ticket = next(h for h in hits if h.kind == "ticket")
     assert "Moved the AP to the hallway" in ticket.snippet, "the fix is in the last note, far from the words that matched"
     assert "Subject: Wifi drops" in ticket.snippet
+
+
+@pytest.mark.asyncio
+async def test_a_ticket_sent_with_no_updated_date_is_pruned_by_when_it_was_received(world):
+    """NULL < x is not true, so such a ticket used to stay for ever."""
+    app, _, w = world
+    now = datetime.now(UTC)
+    long_ago = now - timedelta(days=cd.TICKET_KEEP_DAYS + 40)
+    undated = doc("u1", "Undated old ticket", "A very old fax machine story.", kind="ticket")
+    undated_recent = doc("u2", "Undated recent ticket", "A recent scanner story.", kind="ticket")
+    await store(app, {w.park: [undated]}, vendor="halopsa", now=long_ago)
+    await store(app, {w.park: [undated_recent]}, vendor="halopsa", now=now - timedelta(days=5))
+    await store(app, {w.park: [doc("other", "Unrelated note", "Nothing to see.")]}, vendor="halopsa", now=now)
+    assert not {h.title for h in await ask(app, w, "fax machine")}, "received over two years ago, never dated: dropped"
+    assert "Undated recent ticket" in {h.title for h in await ask(app, w, "scanner")}, "received five days ago: kept"
+
+
+@pytest.mark.asyncio
+async def test_the_ticket_prune_can_use_its_index(world):
+    """The statement ``apply_documents`` issues, planned with sequential scans off: it must be able to use migration 128's partial index."""
+    from sqlalchemy import delete, func, literal_column
+    from sqlalchemy.dialects import postgresql
+
+    _app, owner, w = world
+    stmt = delete(cd.ClientDocument).where(
+        cd.ClientDocument.tenant_id == w.park,
+        cd.ClientDocument.vendor == "halopsa",
+        cd.ClientDocument.kind == literal_column("'ticket'"),
+        func.coalesce(cd.ClientDocument.vendor_updated_at, cd.ClientDocument.received_at)
+        < datetime.now(UTC) - timedelta(days=cd.TICKET_KEEP_DAYS),
+    )
+    sql = str(stmt.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+    async with owner.begin() as conn:
+        await conn.execute(text("set local enable_seqscan = off"))
+        plan = "\n".join((await conn.execute(text(f"explain {sql}"))).scalars().all())
+    assert "idx_client_documents_ticket_age" in plan, plan
+
+
+@pytest.mark.asyncio
+async def test_an_accented_word_is_found_by_its_accented_spelling(world):
+    app, _, w = world
+    await store(app, {w.park: [doc("c1", "Café Bellevue contact", "Ask René about the résumé of the badge printer.")]})
+    assert [h.title for h in await ask(app, w, "who is René")] == ["Café Bellevue contact"]
+    assert [h.title for h in await ask(app, w, "the résumé")] == ["Café Bellevue contact"]
+    assert [h.title for h in await ask(app, w, "résumé")] == ["Café Bellevue contact"], "e plus a combining accent finds the same document"

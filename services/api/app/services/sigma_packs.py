@@ -84,30 +84,48 @@ def rule_values(entry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def well_formed(entry: Any) -> bool:
+    """An entry that can become a rule: a dict with a text id, a text name and a text rule body (a missing one is a database error at flush time, which would stop every other rule from loading)."""
+    return isinstance(entry, dict) and all(isinstance(entry.get(k), str) and entry[k].strip() for k in ("id", "name", "sigma_yaml"))
+
+
 async def load_packs(session: Any, parent_id: Any, entries: list[dict[str, Any]]) -> dict[str, int]:
-    """Add the rules, packs and memberships that are missing for ONE parent tenant. The caller owns the transaction (and the tenant scope) and commits."""
+    """Add the rules, packs and memberships that are missing for ONE parent tenant. The caller owns the transaction (and the tenant scope) and commits.
+
+    One malformed entry (no id, no name, no rule body) is skipped and counted, not allowed to stop the other 76. Rules and packs are added together and flushed once, and the existing memberships are read in one query,
+    where this used to flush and look up a membership for every rule.
+    """
     from sqlalchemy import select  # noqa: PLC0415
 
     from app.models.detection_rule import DetectionRule  # noqa: PLC0415
     from app.models.mssp import MSSPRulePack, MSSPRulePackRule  # noqa: PLC0415
 
-    report = {"rules_created": 0, "rules_existing": 0, "packs_created": 0, "links_created": 0}
+    report = {"rules_created": 0, "rules_existing": 0, "packs_created": 0, "links_created": 0, "skipped": 0}
     rules = {
         (r.provenance or {}).get("source_id"): r
         for r in (await session.execute(select(DetectionRule).where(DetectionRule.tenant_id == parent_id))).scalars()
         if (r.provenance or {}).get("source") == SOURCE
     }
     packs = {p.name: p for p in (await session.execute(select(MSSPRulePack).where(MSSPRulePack.parent_tenant_id == parent_id))).scalars()}
+    wanted: list[tuple[Any, Any]] = []  # (pack, rule) for every well-formed entry
     for entry in entries:
+        if not well_formed(entry):
+            report["skipped"] += 1
+            continue
+        try:
+            values = None if entry["id"] in rules else rule_values(entry)
+            name, description = PACKS[pack_key(entry)]
+        except (KeyError, TypeError, AttributeError, ValueError):
+            report["skipped"] += 1
+            continue
         rule = rules.get(entry["id"])
         if rule is None:
-            rule = DetectionRule(tenant_id=parent_id, **rule_values(entry))
+            rule = DetectionRule(tenant_id=parent_id, **values)
             session.add(rule)
             rules[entry["id"]] = rule
             report["rules_created"] += 1
         else:
             report["rules_existing"] += 1
-        name, description = PACKS[pack_key(entry)]
         pack = packs.get(name)
         if pack is None:
             pack = MSSPRulePack(
@@ -116,8 +134,23 @@ async def load_packs(session: Any, parent_id: Any, entries: list[dict[str, Any]]
             session.add(pack)
             packs[name] = pack
             report["packs_created"] += 1
-        await session.flush()
-        if await session.get(MSSPRulePackRule, (pack.id, rule.id)) is None:
-            session.add(MSSPRulePackRule(pack_id=pack.id, rule_id=rule.id))
-            report["links_created"] += 1
+        wanted.append((pack, rule))
+    await session.flush()  # once: the new rules and packs get their ids here
+    have = set()
+    if wanted:
+        pack_ids = [pack.id for pack in packs.values()]
+        have = {
+            (row.pack_id, row.rule_id)
+            for row in (
+                await session.execute(
+                    select(MSSPRulePackRule.pack_id, MSSPRulePackRule.rule_id).where(MSSPRulePackRule.pack_id.in_(pack_ids))
+                )
+            )
+        }
+    for pack, rule in wanted:
+        if (pack.id, rule.id) in have:
+            continue
+        have.add((pack.id, rule.id))
+        session.add(MSSPRulePackRule(pack_id=pack.id, rule_id=rule.id))
+        report["links_created"] += 1
     return report

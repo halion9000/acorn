@@ -20,6 +20,7 @@ from app.models.alert import Alert
 from app.models.sla import AlertSLAEvent, TenantSLAConfig
 from app.models.tenant import Tenant
 from app.services.alert_status import FALSE_POSITIVE_STATUSES
+from app.services.timeutil import as_utc
 
 # 2026 published KPI bar defaults (tenants can override via ``settings.kpi_bar``).
 DEFAULT_KPI_BAR_TARGETS: dict[str, float] = {
@@ -29,24 +30,13 @@ DEFAULT_KPI_BAR_TARGETS: dict[str, float] = {
     "mitre_subtechnique_tagging_min_pct": 60.0,
 }
 
-# Default per-severity SLA targets (minutes) used as the fallback when a tenant
-# has not provided overrides via ``tenant_sla_config``. The queue's `sla_due_at`
-# expression also reads ``DEFAULT_SLA_TARGETS["info"]["mttd_target"]`` as a
-# catch-all for severities that fall outside the standard four-tier ladder.
-DEFAULT_SLA_TARGETS: dict[str, dict[str, int]] = {
-    "critical": {"mttd_target": 15, "mttr_target": 60, "mttc_target": 120},
-    "high": {"mttd_target": 30, "mttr_target": 120, "mttc_target": 240},
-    "medium": {"mttd_target": 60, "mttr_target": 240, "mttc_target": 480},
-    "low": {"mttd_target": 120, "mttr_target": 480, "mttc_target": 1440},
-    "info": {"mttd_target": 240, "mttr_target": 960, "mttc_target": 2880},
-}
-
-
 # Default per-severity SLA targets (minutes). These mirror the seed values
 # in migrations 007 (critical/high/medium/low) and 040 (info) — `critical`
 # carries the v1.5 P1 ≤15 min MTTD promise (W2 in the v1.5 SOC Console
 # Parity plan), and `info` is the widest band because info-tier alerts
-# are background context, not work items the analyst is on the clock for.
+# are background context, not work items the analyst is on the clock for. The queue's `sla_due_at` expression also reads
+# ``DEFAULT_SLA_TARGETS["info"]["mttd_target"]`` as a catch-all for severities outside the four-tier ladder.
+# (This was defined twice with different values for "info", and neither matched the migration's seed of 240 / 1440 / 4320; the later one was the one in force. It is one definition now, equal to the seed.)
 #
 # Lifted to a module-level constant so it can be asserted against in
 # tests; the row is also the source of truth used by ``compute_sla_metrics``
@@ -56,7 +46,7 @@ DEFAULT_SLA_TARGETS: dict[str, dict[str, int]] = {
     "high": {"mttd_target": 30, "mttr_target": 120, "mttc_target": 240},
     "medium": {"mttd_target": 60, "mttr_target": 240, "mttc_target": 480},
     "low": {"mttd_target": 120, "mttr_target": 480, "mttc_target": 1440},
-    "info": {"mttd_target": 480, "mttr_target": 1440, "mttc_target": 2880},
+    "info": {"mttd_target": 240, "mttr_target": 1440, "mttc_target": 4320},
 }
 
 
@@ -157,7 +147,8 @@ def _compute_durations(
     events: list[AlertSLAEvent],
 ) -> dict[str, int | None]:
     """Compute MTTD/MTTR/MTTC in minutes for a single alert lifecycle."""
-    by_type: dict[str, datetime] = {e.event_type: e.occurred_at for e in events}
+    # Every time with a zone (a row read back from SQLite or an older table has none): comparing a naive time with an aware one raises, and one such alert broke the whole report.
+    by_type: dict[str, datetime] = {e.event_type: as_utc(e.occurred_at) for e in events}
 
     detected_at = by_type.get("detected")
     acknowledged_at = by_type.get("acknowledged")
@@ -262,7 +253,7 @@ async def compute_sla_metrics(
       - overall: aggregated across all severities
       - targets: per-severity configured targets
     """
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(UTC) - timedelta(days=days)
     configs = await _get_sla_configs(db, tenant_id)
     grouped = await _fetch_alert_events(db, tenant_id, since=since)
 
@@ -332,7 +323,7 @@ async def compute_sla_metrics(
 
     out: dict[str, Any] = {
         "period_days": days,
-        "computed_at": datetime.utcnow().isoformat(),
+        "computed_at": datetime.now(UTC).isoformat(),
         "overall": overall,
         "per_severity": per_severity,
     }

@@ -427,11 +427,11 @@ def test_user_filter_finds_a_persons_alerts_across_client_tenants_by_exact_addre
             x.affected_users = users
             s.add(x)
         await s.commit()
-        got = await call(s, parent.id, user="AMY@acme.com")
+        got = await call(s, parent.id, person="AMY@acme.com")
         assert sorted(i.title for i in got.items) == ["user-0", "user-1"], "a longer or prefixed address is not the same person"
         assert got.total == 2
-        assert (await call(s, parent.id, user="   ")).total == 9, "a blank user is no filter"
-        assert (await call(s, parent.id, user="amy@acme.com", client_id=a.id)).total == 1
+        assert (await call(s, parent.id, person="   ")).total == 9, "a blank user is no filter"
+        assert (await call(s, parent.id, person="amy@acme.com", client_id=a.id)).total == 1
 
     run(go)
 
@@ -443,8 +443,8 @@ def test_user_filter_takes_percent_and_underscore_literally():
         x.affected_users = ["a_b@acme.com"]
         s.add(x)
         await s.commit()
-        assert (await call(s, parent.id, user="a_b@acme.com")).total == 1
-        assert (await call(s, parent.id, user="a%b@acme.com")).total == 0
-        assert (await call(s, parent.id, user="axb@acme.com")).total == 0
+        assert (await call(s, parent.id, person="a_b@acme.com")).total == 1
+        assert (await call(s, parent.id, person="a%b@acme.com")).total == 0
+        assert (await call(s, parent.id, person="axb@acme.com")).total == 0
 
     run(go)

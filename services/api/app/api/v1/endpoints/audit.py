@@ -22,6 +22,7 @@ from app.services.audit_export import (
     render_audit_csv,
     render_audit_html,
 )
+from app.services.like import ESCAPE, escape_like
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
@@ -70,14 +71,14 @@ def _filtered_audit_query(
     """
     q = select(AuditLog).where(AuditLog.tenant_id == tenant_id)
     if action:
-        q = q.where(AuditLog.action.like(f"{action}%"))
+        q = q.where(AuditLog.action.like(f"{escape_like(action)}%", escape=ESCAPE))
     if resource:
         q = q.where(AuditLog.resource == resource)
     if actor_id:
         q = q.where(AuditLog.actor_id == actor_id)
     if search:
-        term = f"%{search}%"
-        q = q.where(AuditLog.action.ilike(term) | AuditLog.actor_email.ilike(term))
+        term = f"%{escape_like(search)}%"
+        q = q.where(AuditLog.action.ilike(term, escape=ESCAPE) | AuditLog.actor_email.ilike(term, escape=ESCAPE))
     return q
 
 
@@ -87,10 +88,10 @@ async def list_audit_events(
     db: TenantDBSession,
     page: int = Query(default=1, ge=1, le=100_000),
     page_size: int = Query(default=50, ge=1, le=200),
-    action: str | None = Query(default=None, description="Filter by action prefix, e.g. 'cases:'"),
+    action: str | None = Query(default=None, max_length=100, description="Filter by action prefix, e.g. 'cases:'"),
     resource: str | None = Query(default=None),
     actor_id: uuid.UUID | None = Query(default=None),
-    search: str | None = Query(default=None, description="Search actor_email or action"),
+    search: str | None = Query(default=None, max_length=200, description="Search actor_email or action"),
 ) -> AuditListResponse:
     """Return a paginated, tenant-scoped audit trail."""
     q = _filtered_audit_query(
@@ -141,10 +142,10 @@ async def export_audit_events(
     current_user: Annotated[AuthUser, Depends(require_permission("audit_log:read"))],
     db: TenantDBSession,
     fmt: str = Query(default="csv", alias="format", pattern="^(csv|html)$"),
-    action: str | None = Query(default=None, description="Filter by action prefix, e.g. 'cases:'"),
+    action: str | None = Query(default=None, max_length=100, description="Filter by action prefix, e.g. 'cases:'"),
     resource: str | None = Query(default=None),
     actor_id: uuid.UUID | None = Query(default=None),
-    search: str | None = Query(default=None, description="Search actor_email or action"),
+    search: str | None = Query(default=None, max_length=200, description="Search actor_email or action"),
     limit: int = Query(default=_EXPORT_MAX_ROWS, ge=1, le=_EXPORT_MAX_ROWS),
 ) -> PlainTextResponse | HTMLResponse:
     """Return the filtered audit trail as a downloadable artefact.

@@ -23,6 +23,10 @@ from typing import Any
 LOG = logging.getLogger(__name__)
 
 WINDOW = timedelta(hours=24)  # alerts older than this are not looked at
+# A dry run is only worth reviewing while it is recent; older ones are deleted at every pass, so the table cannot grow for ever.
+RETENTION = timedelta(days=30)
+# A client's playbooks are asked for over HTTP; they change rarely, so a pass within this many seconds of the last one reuses them.
+PLAYBOOK_CACHE_SECONDS = 300
 MAX_ALERTS_PER_TENANT = 500
 MAX_STEPS = 30
 FINISHED = ("resolved", "closed", "false_positive", "fp", "suppressed")
@@ -107,6 +111,49 @@ async def flagged_tenants(session: Any) -> list[uuid.UUID]:
     return [r[0] for r in rows]
 
 
+_playbook_cache: dict[uuid.UUID, tuple[datetime, list[dict[str, Any]]]] = {}
+
+
+def reset_playbook_cache() -> None:
+    _playbook_cache.clear()
+
+
+async def cached_playbooks(
+    tenant_id: uuid.UUID, fetch: FetchPlaybooks, now: datetime, ttl_seconds: float = PLAYBOOK_CACHE_SECONDS
+) -> list[dict[str, Any]]:
+    """The client's playbooks, from the agents service at most once per ``ttl_seconds`` (a failed fetch raises and is not remembered)."""
+    hit = _playbook_cache.get(tenant_id)
+    if hit is not None and ttl_seconds > 0 and (now - hit[0]).total_seconds() < ttl_seconds:
+        return hit[1]
+    playbooks = await fetch(tenant_id)
+    _playbook_cache[tenant_id] = (now, playbooks)
+    return playbooks
+
+
+async def has_candidates(session: Any, tenant_id: uuid.UUID, now: datetime) -> bool:
+    """Whether the client has any recent unfinished alert at all. With none there is nothing to match, so the playbooks are not even asked for."""
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from app.models.alert import Alert  # noqa: PLC0415
+
+    found = await session.execute(
+        select(Alert.id).where(Alert.tenant_id == tenant_id, Alert.created_at >= now - WINDOW, Alert.status.notin_(FINISHED)).limit(1)
+    )
+    return found.first() is not None
+
+
+async def prune(session: Any, tenant_id: uuid.UUID, now: datetime) -> int:
+    """Delete this client's dry runs older than ``RETENTION``. The caller owns the transaction. Returns how many went."""
+    from sqlalchemy import delete  # noqa: PLC0415
+
+    from app.models.playbook_dry_run import PlaybookDryRun  # noqa: PLC0415
+
+    result = await session.execute(
+        delete(PlaybookDryRun).where(PlaybookDryRun.tenant_id == tenant_id, PlaybookDryRun.created_at < now - RETENTION)
+    )
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 async def record_for_tenant(session: Any, tenant_id: uuid.UUID, playbooks: list[dict[str, Any]], now: datetime) -> int:
     """Record the dry runs missing for one client's recent alerts. The caller owns the transaction (and the tenant scope) and commits. Returns how many were added."""
     from sqlalchemy import select  # noqa: PLC0415
@@ -155,14 +202,19 @@ async def record_for_tenant(session: Any, tenant_id: uuid.UUID, playbooks: list[
     return added
 
 
-async def run_once(session_factory: Any, fetch: FetchPlaybooks = default_fetch, now: datetime | None = None) -> dict[str, int]:
+async def run_once(
+    session_factory: Any,
+    fetch: FetchPlaybooks = default_fetch,
+    now: datetime | None = None,
+    playbook_ttl_seconds: float = PLAYBOOK_CACHE_SECONDS,
+) -> dict[str, int]:
     """One pass over every flagged client. Never raises: a client whose playbooks cannot be read is skipped and tried again next pass."""
     from sqlalchemy import text  # noqa: PLC0415
 
     from app.db.rls_sessions import mark_platform  # noqa: PLC0415
 
     now = now or datetime.now(UTC)
-    report = {"clients": 0, "recorded": 0, "skipped": 0}
+    report = {"clients": 0, "recorded": 0, "skipped": 0, "pruned": 0, "idle": 0}
     try:
         async with session_factory() as session:
             mark_platform(session)  # which clients are ticked is read across tenants
@@ -172,7 +224,16 @@ async def run_once(session_factory: Any, fetch: FetchPlaybooks = default_fetch, 
         return report
     for tenant_id in tenants:
         try:
-            playbooks = await fetch(tenant_id)
+            async with session_factory() as session:
+                await session.execute(text("select set_config('app.current_tenant_id', :t, true)"), {"t": str(tenant_id)})
+                busy = await has_candidates(session, tenant_id, now)
+                report["pruned"] += await prune(session, tenant_id, now)
+                await session.commit()
+            if not busy:
+                report["idle"] += 1
+                report["clients"] += 1
+                continue  # nothing recent and unfinished: no need to ask the agents service for this client's playbooks
+            playbooks = await cached_playbooks(tenant_id, fetch, now, playbook_ttl_seconds)
             async with session_factory() as session:
                 await session.execute(text("select set_config('app.current_tenant_id', :t, true)"), {"t": str(tenant_id)})
                 report["recorded"] += await record_for_tenant(session, tenant_id, playbooks, now)

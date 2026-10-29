@@ -1,6 +1,6 @@
 """connectors:view: see which connectors exist and whether they are healthy, split out of connectors:read.
 
-connectors:read guards 12 routes. Besides the six that list connectors (or their log) it guards POST /federated/search, which runs a free-text or
+connectors:read guards 13 routes. Besides the six that list connectors (or their log) it guards POST /federated/search, which runs a free-text or
 indicator query across the tenant's connected SIEMs (Splunk, Elastic...) with their stored credentials and returns the merged rows:
 telemetry from the customer's own systems. It also guards the federated backend list, the agent tool list, the inbox template and token
 lists and the OAuth app view.
@@ -9,9 +9,9 @@ CORE's key held connectors:read so Cipher could list connectors and read their h
 non-secret, but nothing enforces that.)
 Each claim is tested over the whole application rather than assumed:
   1. NOBODY LOSES ACCESS: whatever held connectors:read (a role, a custom database role, a `connectors:*` wildcard, a key) still reads
-  connectors AND still reaches the six routes that stay.
+  connectors AND still reaches the seven routes that stay.
   2. connectors:view ALONE GRANTS NOTHING ELSE: a key holding only it satisfies exactly the six reads among every route in the application.
-  3. CORE's real key scopes reach none of the six routes that stay, and still reach the three connector routes its tools call.
+  3. CORE's real key scopes reach none of the seven routes that stay, and still reach the three connector routes its tools call.
 NOT VERIFIED LIVE: a real federated search returning real rows needs a connected SIEM; what was shown is that authorization let the key in
 (and that it no longer does).
 """
@@ -50,6 +50,8 @@ STAY_ROUTES = {
     ("GET", "/inbox/templates"),
     ("GET", "/inbox/tokens"),
     ("GET", "/oauth/app/{connector_type}"),
+    # What CORE may do to client Microsoft 365 tenants and the requests it was given (names the people acted on): more than "which connectors exist", so it is not part of the view-only split.
+    ("GET", "/cipp-actions"),
 }
 
 
@@ -131,7 +133,7 @@ class TestTheRoutes:
     def test_a_key_holding_only_connectors_view_can_use_exactly_those_six_routes_in_the_whole_application(self):
         assert _satisfied_by(["connectors:view"]) == VIEW_ROUTES
 
-    def test_exactly_these_six_routes_still_need_connectors_read_and_connectors_view_does_not_reach_them(self):
+    def test_exactly_these_seven_routes_still_need_connectors_read_and_connectors_view_does_not_reach_them(self):
         found = {
             (m, p)
             for p, r in ALL_ROUTES
@@ -142,7 +144,7 @@ class TestTheRoutes:
         assert found == STAY_ROUTES
         assert not (_satisfied_by(["connectors:view"]) & STAY_ROUTES)
 
-    def test_whoever_held_connectors_read_still_reaches_all_eleven_routes(self):
+    def test_whoever_held_connectors_read_still_reaches_all_thirteen_routes(self):
         assert _satisfied_by(["connectors:read"]) == VIEW_ROUTES | STAY_ROUTES
 
     def test_the_federated_search_is_the_one_that_queries_connected_systems_and_stays_behind_connectors_read(self):
@@ -158,7 +160,7 @@ class TestTheRoutes:
 
 
 class TestCoresKeyNoLongerReachesTheFederatedSearch:
-    def test_cores_real_key_scopes_satisfy_none_of_the_six_routes_that_stay(self):
+    def test_cores_real_key_scopes_satisfy_none_of_the_seven_routes_that_stay(self):
         reached = _satisfied_by(bp.CORE_KEY_SCOPES)
         assert not (reached & STAY_ROUTES), sorted(reached & STAY_ROUTES)
 

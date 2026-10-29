@@ -79,7 +79,9 @@ async def list_dry_runs(
     owner = user.tenant_id
     clients = {r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == owner))).all()}
     scope = [owner, *clients]
-    names = {**clients}
+    # The organization's own name too: a dry run for an alert of its own (not a client's) used to show no client at all.
+    own_name = (await db.execute(select(Tenant.name).where(Tenant.id == owner))).scalar_one_or_none()
+    names = {**clients, **({owner: own_name} if own_name else {})}
     async with cross_tenant_reads(db):
         stmt = (
             select(PlaybookDryRun, Alert.title)

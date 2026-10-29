@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -24,6 +24,7 @@ from app.api.v1.deps import AuthUser, require_permission
 from app.db.rls import TenantDBSession
 from app.models.responder import OnCallStatus
 from app.models.tenant import User
+from app.services.timeutil import as_utc
 
 router = APIRouter(prefix="/oncall", tags=["responder", "oncall"])
 
@@ -58,6 +59,14 @@ class OnCallUpdateRequest(BaseModel):
     schedule_ref: str | None = Field(default=None, max_length=200)
 
 
+def effective_status(row: Any, now: datetime | None = None) -> tuple[str, datetime | None]:
+    """The status to show and act on, and when it ends. A snooze whose time has passed is over: the person is available again. It used to stay "snoozed" until they changed it by hand, so the paging list skipped them for ever."""
+    now = now or datetime.now(UTC)
+    if row.status == "snoozed" and row.until is not None and as_utc(row.until) <= now:
+        return "available", None
+    return row.status, row.until
+
+
 @router.get("", response_model=OnCallListResponse, dependencies=[Depends(require_permission("alerts:read"))])
 async def list_oncall(
     user: AuthUser,
@@ -71,27 +80,30 @@ async def list_oncall(
     else for context.
     """
     stmt = select(OnCallStatus, User).join(User, User.id == OnCallStatus.user_id).where(OnCallStatus.tenant_id == user.tenant_id)
-    if status_filter:
-        if status_filter not in _STATUS_VALUES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid status. Must be one of {_STATUS_VALUES}",
-            )
-        stmt = stmt.where(OnCallStatus.status == status_filter)
+    if status_filter and status_filter not in _STATUS_VALUES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status. Must be one of {_STATUS_VALUES}",
+        )
 
     rows = (await db.execute(stmt)).all()
+    now = datetime.now(UTC)
     items: list[OnCallEntry] = []
     for status_row, user_row in rows:
+        shown, until = effective_status(status_row, now)
+        # The filter is applied to what is shown, not to the stored word: someone whose snooze has ended is "available" now.
+        if status_filter and shown != status_filter:
+            continue
         items.append(
             OnCallEntry(
                 user_id=status_row.user_id,
                 user_email=user_row.email,
                 user_name=user_row.username,
-                status=status_row.status,
+                status=shown,
                 schedule_ref=status_row.schedule_ref,
                 rotation=status_row.rotation,
                 note=status_row.note,
-                until=status_row.until,
+                until=until,
                 updated_at=status_row.updated_at,
             )
         )
@@ -140,15 +152,16 @@ async def my_oncall(
         )
 
     status_row, user_row = row
+    shown, until = effective_status(status_row)
     return OnCallEntry(
         user_id=status_row.user_id,
         user_email=user_row.email,
         user_name=user_row.username,
-        status=status_row.status,
+        status=shown,
         schedule_ref=status_row.schedule_ref,
         rotation=status_row.rotation,
         note=status_row.note,
-        until=status_row.until,
+        until=until,
         updated_at=status_row.updated_at,
     )
 

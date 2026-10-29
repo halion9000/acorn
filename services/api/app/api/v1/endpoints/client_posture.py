@@ -20,7 +20,7 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.alerts import FINISHED_STATUSES, has_ticket_expr
 from app.api.v1.endpoints.devices import ClientRollup, _as, _load_cached, _master_of, _scope, rollup_of
 from app.api.v1.endpoints.identity import counts_for_mfa
-from app.db.rls_scope import acting_as_tenant
+from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
 from app.models.identity_source import IdentitySource
@@ -1406,40 +1406,46 @@ class FleetChange(BaseModel):
 async def fleet_changes(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
     db: DBSession,
-    days: Annotated[int, Query(ge=1, le=400)] = 1,
-    limit: Annotated[int, Query(ge=1, le=5000)] = 300,
+    days: Annotated[int, Query(ge=1, le=90)] = 1,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 300,
 ) -> list[FleetChange]:
     owner = current_user.tenant_id
-    days = max(1, min(days, 90))
     ids, names = await _scope(db, owner, None)
+    clients = ids[1:]
+    if not clients:
+        return []
     since = datetime.now(UTC) - timedelta(days=days)
-    out: list[FleetChange] = []
-    for cid in ids[1:]:
-        async with _as(db, owner, cid):
-            rows = (
-                (
-                    await db.execute(
-                        select(ClientCheckHistory).where(ClientCheckHistory.tenant_id == cid, ClientCheckHistory.observed_at >= since)
+    # One query for every client (it used to be one per client, the whole lot sorted in Python): worsening first (a check that became not met), then the newest, cut to the limit in the database.
+    async with cross_tenant_reads(db):
+        rows = (
+            (
+                await db.execute(
+                    select(ClientCheckHistory)
+                    .where(ClientCheckHistory.tenant_id.in_(clients), ClientCheckHistory.observed_at >= since)
+                    .order_by(
+                        (ClientCheckHistory.status != "not_met"),
+                        ClientCheckHistory.observed_at.desc(),
+                        ClientCheckHistory.tenant_id,
+                        ClientCheckHistory.key,
                     )
+                    .limit(limit)
                 )
-                .scalars()
-                .all()
             )
-        out += [
-            FleetChange(
-                client_id=cid,
-                client_name=names.get(cid) or str(cid),
-                key=r.key,
-                source=r.source,
-                status=r.status,
-                previous_status=r.previous_status,
-                observed_at=r.observed_at,
-            )
-            for r in rows
-        ]
-    # Worsening first (a check that became not met), then the newest.
-    out.sort(key=lambda c: (c.status != "not_met", -c.observed_at.timestamp()))
-    return out[: max(1, min(limit, 1000))]
+            .scalars()
+            .all()
+        )
+    return [
+        FleetChange(
+            client_id=r.tenant_id,
+            client_name=names.get(r.tenant_id) or str(r.tenant_id),
+            key=r.key,
+            source=r.source,
+            status=r.status,
+            previous_status=r.previous_status,
+            observed_at=r.observed_at,
+        )
+        for r in rows
+    ]
 
 
 class DigestItem(BaseModel):
@@ -1468,11 +1474,9 @@ class DigestOut(BaseModel):
 async def fleet_digest(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
     db: DBSession,
-    days: Annotated[int, Query(ge=1, le=400)] = 1,
-    limit: Annotated[int, Query(ge=1, le=5000)] = 15,
+    days: Annotated[int, Query(ge=1, le=30)] = 1,
+    limit: Annotated[int, Query(ge=1, le=100)] = 15,
 ) -> DigestOut:
-    days = max(1, min(days, 30))
-    limit = max(1, min(limit, 50))
     now = datetime.now(UTC)
     changes = await fleet_changes(current_user, db, days=days, limit=1000)
     worse, better = [], []
@@ -1541,20 +1545,22 @@ class FleetAcceptance(BaseModel):
 async def fleet_acceptances(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
     db: DBSession,
-    within_days: Annotated[int | None, Query(ge=1, le=3650)] = None,
-    limit: Annotated[int, Query(ge=1, le=5000)] = 300,
+    within_days: Annotated[int | None, Query(ge=1, le=400)] = None,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 300,
 ) -> list[FleetAcceptance]:
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, None)
     now = datetime.now(UTC)
+    clients = ids[1:]
     rows: list[dict[str, Any]] = []
-    for cid in ids[1:]:
-        async with _as(db, owner, cid):
-            found = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id == cid))).scalars().all()
-        rows += [
+    if clients:
+        # One query for every client (it used to be one per client, each in its own scope).
+        async with cross_tenant_reads(db):
+            found = (await db.execute(select(ClientCheckAcceptance).where(ClientCheckAcceptance.tenant_id.in_(clients)))).scalars().all()
+        rows = [
             {
-                "client_id": cid,
-                "client_name": names.get(cid) or str(cid),
+                "client_id": a.tenant_id,
+                "client_name": names.get(a.tenant_id) or str(a.tenant_id),
                 "key": a.key,
                 "reason": a.reason,
                 "accepted_at": a.accepted_at,
@@ -1563,5 +1569,5 @@ async def fleet_acceptances(
             }
             for a in found
         ]
-    kept = expiring_acceptances(rows, now, None if within_days is None else max(1, min(within_days, 400)))
-    return [FleetAcceptance(**r) for r in kept[: max(1, min(limit, 1000))]]
+    kept = expiring_acceptances(rows, now, within_days)
+    return [FleetAcceptance(**r) for r in kept[:limit]]

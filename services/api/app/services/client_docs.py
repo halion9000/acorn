@@ -7,12 +7,13 @@ and a question that names a client looks only in that client's documents. Nothin
 from __future__ import annotations
 
 import re
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import case, column, delete, desc, func, select
+from sqlalchemy import case, column, delete, desc, func, literal_column, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.client_document import ClientDocument
@@ -27,7 +28,8 @@ TICKET_SNIPPET_CHARS = 1500
 MAX_TERMS = 12
 SNIPPET_OPTIONS = 'MaxFragments=2, MaxWords=40, MinWords=15, StartSel="", StopSel="", FragmentDelimiter=" ... "'
 
-_TERM = re.compile(r"[a-z0-9]+")
+# Letters and digits of any language: "café" is one word (the old pattern split it at the accent into "caf" and nothing).
+_TERM = re.compile(r"[^\W_]+")
 _COMPANY_SUFFIXES = {"inc", "llc", "ltd", "co", "corp", "corporation", "company", "pllc", "lp", "llp", "pc"}
 
 
@@ -35,6 +37,7 @@ def clean_text(text: str | None, limit: int = MAX_BODY) -> str:
     """The text with control characters (a NUL stops Postgres) and runs of blank lines removed, cut at ``limit``."""
     if not text:
         return ""
+    text = unicodedata.normalize("NFC", text)  # "e" plus a combining accent and "é" are the same word to a search
     text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
     text = re.sub(r"[ \t]+\n", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
@@ -84,7 +87,7 @@ def redact_secrets(text: str) -> str:
 def search_terms(message: str) -> list[str]:
     """The words of a question worth looking up: letters and digits only (so none can break the query), two or more characters, once each, at most 12."""
     seen: list[str] = []
-    for term in _TERM.findall((message or "").lower()):
+    for term in _TERM.findall(unicodedata.normalize("NFC", message or "").lower()):
         if len(term) >= 2 and term not in seen:
             seen.append(term)
     return seen[:MAX_TERMS]
@@ -98,7 +101,7 @@ def tsquery_text(terms: list[str]) -> str | None:
 
 def _name_key(name: str) -> str:
     """A client's name as words, without a leading "The" and without legal suffixes (Inc, LLC and the like); words inside the name stay, since the question has them too."""
-    words = _TERM.findall(name.lower())
+    words = _TERM.findall(unicodedata.normalize("NFC", name).lower())
     if words and words[0] == "the":
         words = words[1:]
     while words and words[-1] in _COMPANY_SUFFIXES:
@@ -108,7 +111,7 @@ def _name_key(name: str) -> str:
 
 def clients_named(message: str, clients: list[tuple[uuid.UUID, str]]) -> list[uuid.UUID]:
     """The clients whose whole name (without Inc, LLC and the like) appears in the question, in order of appearance. A question that names none gets an empty list."""
-    haystack = " " + " ".join(_TERM.findall((message or "").lower())) + " "
+    haystack = " " + " ".join(_TERM.findall(unicodedata.normalize("NFC", message or "").lower())) + " "
     found: list[tuple[int, uuid.UUID]] = []
     for cid, name in clients:
         key = _name_key(name)
@@ -219,8 +222,10 @@ async def apply_documents(db: Any, by_tenant: dict[uuid.UUID, list[Any]], vendor
                 delete(ClientDocument).where(
                     ClientDocument.tenant_id == tid,
                     ClientDocument.vendor == vendor,
-                    ClientDocument.kind == TICKET_KIND,
-                    ClientDocument.vendor_updated_at < now - timedelta(days=TICKET_KEEP_DAYS),
+                    # The literal (not a bound value) so the planner can use the partial index of migration 128.
+                    ClientDocument.kind == literal_column("'ticket'"),
+                    # A ticket sent with no "updated" date is kept by when it was received: NULL < x is not true, so such tickets used to stay for ever.
+                    func.coalesce(ClientDocument.vendor_updated_at, ClientDocument.received_at) < now - timedelta(days=TICKET_KEEP_DAYS),
                 )
             )
     return accepted

@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import require_permission
 from app.api.v1.endpoints.auth import get_current_user
 from app.db.database import get_db
+from app.models.alert import Alert
 from app.models.insider_threat import InsiderIndicator, InsiderPeerGroup, UserRiskProfile
 from app.models.tenant import User
 
@@ -45,9 +47,18 @@ class RiskProfileOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+MAX_JSON_BYTES = 16_384
+
+
+def _small(v: dict[str, Any]) -> dict[str, Any]:
+    if len(json.dumps(v, default=str)) > MAX_JSON_BYTES:
+        raise ValueError(f"must be under {MAX_JSON_BYTES} bytes")
+    return v
+
+
 class WatchlistUpdate(BaseModel):
     is_watchlisted: bool
-    watchlist_reason: str | None = None
+    watchlist_reason: str | None = Field(default=None, max_length=1000)
 
 
 class IndicatorOut(BaseModel):
@@ -67,21 +78,34 @@ class IndicatorOut(BaseModel):
 
 class IndicatorCreate(BaseModel):
     profile_id: uuid.UUID
-    indicator_type: str
-    severity: str = "medium"
-    description: str
+    indicator_type: str = Field(min_length=1, max_length=100)
+    severity: Literal["info", "low", "medium", "high", "critical"] = "medium"
+    description: str = Field(min_length=1, max_length=4000)
     source_alert_id: uuid.UUID | None = None
     evidence: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime | None = None
 
+    @field_validator("evidence")
+    @classmethod
+    def _evidence_is_small(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return _small(v)
+
 
 class PeerGroupCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=4000)
+    criteria: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("criteria")
+    @classmethod
+    def _criteria_are_small(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return _small(v)
+
+
+class PeerGroupOut(BaseModel):
     name: str
     description: str | None = None
     criteria: dict[str, Any] = Field(default_factory=dict)
-
-
-class PeerGroupOut(PeerGroupCreate):
     id: uuid.UUID
     tenant_id: uuid.UUID
     created_at: datetime
@@ -136,10 +160,15 @@ async def update_watchlist(
     if not profile or profile.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Profile not found")
     profile.is_watchlisted = body.is_watchlisted  # type: ignore[assignment]
-    profile.watchlist_reason = body.watchlist_reason  # type: ignore[assignment]
     if body.is_watchlisted:
+        profile.watchlist_reason = body.watchlist_reason  # type: ignore[assignment]
         profile.watchlisted_at = datetime.now(UTC)  # type: ignore[assignment]
         profile.watchlisted_by = current_user.id  # type: ignore[assignment]
+    else:
+        # Taking a person off the watchlist also forgets why, when and by whom they were put on it: they used to stay, so a person who was not watched showed a watch date and a reason.
+        profile.watchlist_reason = None  # type: ignore[assignment]
+        profile.watchlisted_at = None  # type: ignore[assignment]
+        profile.watchlisted_by = None  # type: ignore[assignment]
     await db.commit()
     await db.refresh(profile)
     return profile
@@ -183,6 +212,11 @@ async def create_indicator(
     profile = await db.get(UserRiskProfile, body.profile_id)
     if not profile or profile.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Profile not found")
+    if body.source_alert_id is not None:
+        # The alert has to be this organization's own: an id from another tenant would link this indicator to an alert the caller cannot see.
+        owned = await db.scalar(select(Alert.id).where(Alert.id == body.source_alert_id, Alert.tenant_id == current_user.tenant_id))
+        if owned is None:
+            raise HTTPException(status_code=404, detail="Alert not found")
     data = body.model_dump()
     if data.get("occurred_at") is None:
         data["occurred_at"] = datetime.now(UTC)

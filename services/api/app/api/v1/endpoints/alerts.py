@@ -40,6 +40,7 @@ from app.services.event_sanitiser import (
 from app.services.narrative_loader import build_narrative
 from app.services.narrative_projection import project_alert_to_narrative_inputs
 from app.services.timestamp_bounds import coerce_with_bounds, now_utc
+from app.services.timeutil import as_utc
 
 logger = logging.getLogger(__name__)
 
@@ -705,7 +706,7 @@ async def submit_alert(
 
 
 def _aware(moment: datetime) -> datetime:
-    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+    return as_utc(moment)
 
 
 def _repeat_key() -> tuple:
@@ -755,7 +756,8 @@ async def list_alerts(
     source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
     client_id: uuid.UUID | None = Query(default=None),
     device: str | None = Query(default=None, max_length=255),
-    user: Annotated[
+    # Named ``person`` (not ``user``): a query parameter called ``user`` reads like the signed-in user object, and a guard test refuses that name.
+    person: Annotated[
         str | None,
         Query(max_length=320, description="Only alerts that name this person (an affected user, matched exactly, ignoring case)."),
     ] = None,
@@ -802,7 +804,7 @@ async def list_alerts(
     )
 
     # The same for a person: affected_users is stored as JSON text like ["amy@acme.com"], so the quoted name is looked for (a part of an address does not match).
-    user_name = (user or "").strip()
+    user_name = (person or "").strip()
     user_like = (
         "%" + json.dumps(user_name.lower(), ensure_ascii=False).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
         if user_name

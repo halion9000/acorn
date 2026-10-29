@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -21,8 +21,10 @@ class TenantSLAConfig(Base):
     mttd_target: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
     mttr_target: Mapped[int] = mapped_column(Integer, nullable=False, default=240)
     mttc_target: Mapped[int] = mapped_column(Integer, nullable=False, default=480)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "severity", name="uq_sla_config_tenant_severity"),
@@ -46,7 +48,7 @@ class AlertSLAEvent(Base):
     alert_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     severity: Mapped[str] = mapped_column(String(16), nullable=False)
     event_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     actor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     # `metadata` is reserved on the Declarative `Base`; map the column to the
     # same DB name but expose it under `metadata_` on the ORM side, mirroring

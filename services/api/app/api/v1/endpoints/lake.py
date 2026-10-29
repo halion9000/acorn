@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -397,7 +397,7 @@ async def execute_lake_sql(
         row_cap=rewrite.row_cap,
         referenced_tables=sorted(rewrite.referenced_tables),
         elapsed_ms=result.elapsed_ms,
-        executed_at=datetime.utcnow(),
+        executed_at=datetime.now(UTC),
     )
 
 

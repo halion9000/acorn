@@ -471,6 +471,7 @@ paths:
         schema:
           anyOf:
           - type: string
+            maxLength: 64
           - type: 'null'
           title: Severity
       - name: status
@@ -479,6 +480,7 @@ paths:
         schema:
           anyOf:
           - type: string
+            maxLength: 64
           - type: 'null'
           title: Status
       - name: category
@@ -487,6 +489,7 @@ paths:
         schema:
           anyOf:
           - type: string
+            maxLength: 128
           - type: 'null'
           title: Category
       - name: assigned_to_me
@@ -502,6 +505,7 @@ paths:
         schema:
           anyOf:
           - type: string
+            maxLength: 200
           - type: 'null'
           title: Search
       - name: min_confidence
@@ -520,6 +524,7 @@ paths:
         schema:
           anyOf:
           - type: string
+            maxLength: 64
           - type: 'null'
           title: Confidence Label
       - name: source
@@ -549,7 +554,7 @@ paths:
             maxLength: 255
           - type: 'null'
           title: Device
-      - name: user
+      - name: person
         in: query
         required: false
         schema:
@@ -559,7 +564,7 @@ paths:
           - type: 'null'
           description: Only alerts that name this person (an affected user, matched
             exactly, ignoring case).
-          title: User
+          title: Person
         description: Only alerts that name this person (an affected user, matched
           exactly, ignoring case).
       - name: ticket
@@ -735,6 +740,7 @@ paths:
       - alerts
       summary: Update Alert
       description: Update alert status, priority, tags, assignment, or case link.
+        A change of status is written to the audit log, as the bulk close does.
       operationId: update_alert_api_v1_alerts__alert_id__patch
       security:
       - HTTPBearer: []
@@ -1302,8 +1308,13 @@ paths:
       tags:
       - alerts
       summary: List Suppressions
-      description: The active rules (and, with ``include_ended``, those lifted or
-        run out), with how many alerts each hides now.
+      description: 'The active rules (and, with ``include_ended``, those lifted or
+        run out), newest first, with how many alerts each hides now (null when that
+        could not be counted).
+
+
+        ``X-Total-Count`` says how many rules match in all, so a list cut at ``limit``
+        is known to be cut (it used to stop at 500 without saying so).'
       operationId: list_suppressions_api_v1_alert_suppressions_get
       security:
       - HTTPBearer: []
@@ -1315,6 +1326,24 @@ paths:
           type: boolean
           default: false
           title: Include Ended
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 2000
+          minimum: 1
+          default: 500
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 0
+          default: 0
+          title: Offset
       responses:
         '200':
           description: Successful Response
@@ -6420,6 +6449,7 @@ paths:
         schema:
           anyOf:
           - type: string
+            maxLength: 100
           - type: 'null'
           description: Filter by action prefix, e.g. 'cases:'
           title: Action
@@ -6447,6 +6477,7 @@ paths:
         schema:
           anyOf:
           - type: string
+            maxLength: 200
           - type: 'null'
           description: Search actor_email or action
           title: Search
@@ -6494,6 +6525,7 @@ paths:
         schema:
           anyOf:
           - type: string
+            maxLength: 100
           - type: 'null'
           description: Filter by action prefix, e.g. 'cases:'
           title: Action
@@ -6521,6 +6553,7 @@ paths:
         schema:
           anyOf:
           - type: string
+            maxLength: 200
           - type: 'null'
           description: Search actor_email or action
           title: Search
@@ -9253,6 +9286,15 @@ paths:
           type: string
           format: uuid
           title: Asset Id
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 200
+          title: Limit
       responses:
         '200':
           description: Successful Response
@@ -11307,7 +11349,7 @@ paths:
         schema:
           anyOf:
           - type: integer
-            maximum: 3650
+            maximum: 400
             minimum: 1
           - type: 'null'
           title: Within Days
@@ -11316,7 +11358,7 @@ paths:
         required: false
         schema:
           type: integer
-          maximum: 5000
+          maximum: 1000
           minimum: 1
           default: 300
           title: Limit
@@ -11688,7 +11730,7 @@ paths:
         required: false
         schema:
           type: integer
-          maximum: 400
+          maximum: 90
           minimum: 1
           default: 1
           title: Days
@@ -11697,7 +11739,7 @@ paths:
         required: false
         schema:
           type: integer
-          maximum: 5000
+          maximum: 1000
           minimum: 1
           default: 300
           title: Limit
@@ -11733,7 +11775,7 @@ paths:
         required: false
         schema:
           type: integer
-          maximum: 400
+          maximum: 30
           minimum: 1
           default: 1
           title: Days
@@ -11742,7 +11784,7 @@ paths:
         required: false
         schema:
           type: integer
-          maximum: 5000
+          maximum: 100
           minimum: 1
           default: 15
           title: Limit
@@ -21146,6 +21188,7 @@ components:
         reason:
           anyOf:
           - type: string
+            maxLength: 500
           - type: 'null'
           title: Reason
       type: object
@@ -21271,11 +21314,14 @@ components:
         status:
           anyOf:
           - type: string
+            maxLength: 30
           - type: 'null'
           title: Status
         priority:
           anyOf:
           - type: integer
+            maximum: 100.0
+            minimum: 0.0
           - type: 'null'
           title: Priority
         tags:
@@ -21283,6 +21329,7 @@ components:
           - items:
               type: string
             type: array
+            maxItems: 50
           - type: 'null'
           title: Tags
         assigned_to_id:
@@ -21988,14 +22035,19 @@ components:
       properties:
         asset_type:
           type: string
+          maxLength: 50
+          minLength: 1
           title: Asset Type
           default: host
         name:
           type: string
+          maxLength: 512
+          minLength: 1
           title: Name
         fqdn:
           anyOf:
           - type: string
+            maxLength: 512
           - type: 'null'
           title: Fqdn
         ip_addresses:
@@ -22008,30 +22060,40 @@ components:
         cloud_provider:
           anyOf:
           - type: string
+            maxLength: 50
           - type: 'null'
           title: Cloud Provider
         cloud_region:
           anyOf:
           - type: string
+            maxLength: 100
           - type: 'null'
           title: Cloud Region
         cloud_account:
           anyOf:
           - type: string
+            maxLength: 255
           - type: 'null'
           title: Cloud Account
         os:
           anyOf:
           - type: string
+            maxLength: 100
           - type: 'null'
           title: Os
         os_version:
           anyOf:
           - type: string
+            maxLength: 100
           - type: 'null'
           title: Os Version
         criticality:
           type: string
+          enum:
+          - low
+          - medium
+          - high
+          - critical
           title: Criticality
           default: medium
         tags:
@@ -22044,6 +22106,7 @@ components:
         owner_email:
           anyOf:
           - type: string
+            maxLength: 255
           - type: 'null'
           title: Owner Email
         metadata:
@@ -22116,10 +22179,6 @@ components:
           - type: string
           - type: 'null'
           title: Owner Email
-        metadata:
-          additionalProperties: true
-          type: object
-          title: Metadata
         id:
           type: string
           format: uuid
@@ -22144,6 +22203,10 @@ components:
           type: string
           format: date-time
           title: First Seen
+        metadata:
+          additionalProperties: true
+          type: object
+          title: Metadata
       type: object
       required:
       - name
@@ -22154,18 +22217,28 @@ components:
       - last_seen
       - first_seen
       title: AssetOut
+      description: 'What the API returns: the stored values as they are (an older
+        row may hold a criticality or a length the create model would now refuse).'
     AssetUpdate:
       properties:
         asset_type:
-          type: string
+          anyOf:
+          - type: string
+            maxLength: 50
+            minLength: 1
+          - type: 'null'
           title: Asset Type
-          default: host
         name:
-          type: string
+          anyOf:
+          - type: string
+            maxLength: 512
+            minLength: 1
+          - type: 'null'
           title: Name
         fqdn:
           anyOf:
           - type: string
+            maxLength: 512
           - type: 'null'
           title: Fqdn
         ip_addresses:
@@ -22178,32 +22251,43 @@ components:
         cloud_provider:
           anyOf:
           - type: string
+            maxLength: 50
           - type: 'null'
           title: Cloud Provider
         cloud_region:
           anyOf:
           - type: string
+            maxLength: 100
           - type: 'null'
           title: Cloud Region
         cloud_account:
           anyOf:
           - type: string
+            maxLength: 255
           - type: 'null'
           title: Cloud Account
         os:
           anyOf:
           - type: string
+            maxLength: 100
           - type: 'null'
           title: Os
         os_version:
           anyOf:
           - type: string
+            maxLength: 100
           - type: 'null'
           title: Os Version
         criticality:
-          type: string
+          anyOf:
+          - type: string
+            enum:
+            - low
+            - medium
+            - high
+            - critical
+          - type: 'null'
           title: Criticality
-          default: medium
         tags:
           anyOf:
           - items:
@@ -22214,16 +22298,20 @@ components:
         owner_email:
           anyOf:
           - type: string
+            maxLength: 255
           - type: 'null'
           title: Owner Email
         metadata:
-          additionalProperties: true
-          type: object
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
           title: Metadata
       type: object
-      required:
-      - name
       title: AssetUpdate
+      description: 'What a PATCH may change. Every field is optional and only the
+        ones sent are applied: this used to be the create model, whose defaults ("host",
+        "medium", an empty metadata) overwrote whatever the caller left out.'
     AttackHeatmapCell:
       properties:
         tactic:
@@ -30045,13 +30133,23 @@ components:
           title: Profile Id
         indicator_type:
           type: string
+          maxLength: 100
+          minLength: 1
           title: Indicator Type
         severity:
           type: string
+          enum:
+          - info
+          - low
+          - medium
+          - high
+          - critical
           title: Severity
           default: medium
         description:
           type: string
+          maxLength: 4000
+          minLength: 1
           title: Description
         source_alert_id:
           anyOf:
@@ -33243,10 +33341,13 @@ components:
       properties:
         name:
           type: string
+          maxLength: 255
+          minLength: 1
           title: Name
         description:
           anyOf:
           - type: string
+            maxLength: 4000
           - type: 'null'
           title: Description
         criteria:
@@ -36175,9 +36276,11 @@ components:
           title: Alert Id
         severity:
           type: string
+          maxLength: 16
           title: Severity
         event_type:
           type: string
+          maxLength: 32
           title: Event Type
         occurred_at:
           anyOf:
@@ -38740,7 +38843,9 @@ components:
           type: boolean
           title: Active
         hidden_alerts:
-          type: integer
+          anyOf:
+          - type: integer
+          - type: 'null'
           title: Hidden Alerts
           default: 0
       type: object
@@ -41686,33 +41791,48 @@ components:
         cve_id:
           anyOf:
           - type: string
+            maxLength: 50
           - type: 'null'
           title: Cve Id
         title:
           type: string
+          maxLength: 512
+          minLength: 1
           title: Title
         description:
           anyOf:
           - type: string
+            maxLength: 20000
           - type: 'null'
           title: Description
         severity:
           type: string
+          enum:
+          - info
+          - low
+          - medium
+          - high
+          - critical
           title: Severity
           default: medium
         cvss_score:
           anyOf:
           - type: number
+            maximum: 10.0
+            minimum: 0.0
           - type: 'null'
           title: Cvss Score
         cvss_vector:
           anyOf:
           - type: string
+            maxLength: 100
           - type: 'null'
           title: Cvss Vector
         epss_score:
           anyOf:
           - type: number
+            maximum: 1.0
+            minimum: 0.0
           - type: 'null'
           title: Epss Score
         is_exploited:
@@ -41721,10 +41841,13 @@ components:
           default: false
         source:
           type: string
+          maxLength: 100
+          minLength: 1
           title: Source
         external_id:
           anyOf:
           - type: string
+            maxLength: 255
           - type: 'null'
           title: External Id
         metadata:
@@ -41787,10 +41910,6 @@ components:
           - type: string
           - type: 'null'
           title: External Id
-        metadata:
-          additionalProperties: true
-          type: object
-          title: Metadata
         id:
           type: string
           format: uuid
@@ -41813,6 +41932,10 @@ components:
             format: date-time
           - type: 'null'
           title: Remediated At
+        metadata:
+          additionalProperties: true
+          type: object
+          title: Metadata
       type: object
       required:
       - asset_id
@@ -41824,6 +41947,7 @@ components:
       - last_found
       - remediated_at
       title: VulnerabilityOut
+      description: 'What the API returns: the stored values as they are.'
     WaitlistEntriesResponse:
       properties:
         entries:
@@ -41974,6 +42098,7 @@ components:
         watchlist_reason:
           anyOf:
           - type: string
+            maxLength: 1000
           - type: 'null'
           title: Watchlist Reason
       type: object

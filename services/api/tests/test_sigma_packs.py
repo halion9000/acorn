@@ -94,8 +94,8 @@ def test_loading_creates_rules_packs_and_memberships_once_and_never_overwrites_a
         return first, second, rules, packs, links
 
     first, second, rules, packs, links = run(body)
-    assert first == {"rules_created": 3, "rules_existing": 0, "packs_created": 2, "links_created": 3}
-    assert second == {"rules_created": 0, "rules_existing": 3, "packs_created": 0, "links_created": 0}
+    assert first == {"rules_created": 3, "rules_existing": 0, "packs_created": 2, "links_created": 3, "skipped": 0}
+    assert second == {"rules_created": 0, "rules_existing": 3, "packs_created": 0, "links_created": 0, "skipped": 0}
     assert len(rules) == 3 and len(packs) == 2 and len(links) == 3
     assert {r.name: r.status for r in rules}["Rule 1"] == "disabled", "a status someone changed is left alone"
     assert {p.name for p in packs} == {"Sigma: Windows", "Sigma: Linux"}
@@ -221,3 +221,51 @@ def test_the_seeded_counts_say_how_many_built_in_rules_and_how_many_are_in_each_
     assert got.builtin == 1, "a tenant's own rule is not a built-in one"
     assert got.imported == 3, "another organization's packs are not counted"
     assert [(p.name, p.rules) for p in got.packs] == [("Sigma: Linux", 1), ("Sigma: Windows", 2)]
+
+
+def test_one_malformed_entry_is_skipped_and_counted_and_the_rest_still_load():
+    good = [entry(1), entry(2, product="linux")]
+    broken = [
+        {"name": "No id"},
+        {"id": "x", "sigma_yaml": "title: x"},
+        "not even a dict",
+        {**entry(9), "sigma_yaml": None} | {"name": None},
+    ]
+
+    async def body(s):
+        parent = await tenant(s, "Parent")
+        report = await sp.load_packs(s, parent.id, [good[0], *broken, good[1]])
+        await s.commit()
+        rules = (await s.execute(select(DetectionRule))).scalars().all()
+        links = (await s.execute(select(MSSPRulePackRule))).scalars().all()
+        return report, rules, links
+
+    report, rules, links = run(body)
+    assert report["skipped"] >= 3 and report["rules_created"] >= 2, report
+    assert {"Rule 1", "Rule 2"} <= {r.name for r in rules}
+    assert len(links) == report["links_created"] == report["rules_created"], "every rule that loaded is in a pack"
+
+
+def test_memberships_are_read_in_one_query_and_flushed_once_however_many_rules():
+    from sqlalchemy import event
+
+    entries = [entry(i, product="windows" if i % 2 else "linux") for i in range(1, 41)]
+    statements: list[str] = []
+
+    async def body(s):
+        parent = await tenant(s, "Parent")
+        engine = s.bind
+        event.listen(engine.sync_engine, "before_cursor_execute", lambda conn, cur, stmt, params, ctx, many: statements.append(stmt))
+        statements.clear()
+        first = await sp.load_packs(s, parent.id, entries)
+        await s.commit()
+        loaded = len(statements)
+        statements.clear()
+        second = await sp.load_packs(s, parent.id, entries)
+        await s.commit()
+        return first, second, loaded, len(statements)
+
+    first, second, with_inserts, rerun = run(body)
+    assert first["rules_created"] == 40 and second["rules_created"] == 0
+    assert rerun <= 6, f"a reload of 40 existing rules took {rerun} statements: it used to be one flush and one lookup per rule"
+    assert with_inserts < 40 * 2, f"{with_inserts} statements to load 40 rules"

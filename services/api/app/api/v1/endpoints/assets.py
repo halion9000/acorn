@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import require_permission
@@ -25,7 +26,94 @@ router = APIRouter(prefix="/assets", tags=["assets"])
 # ---------------------------------------------------------------------------
 
 
+Criticality = Literal["low", "medium", "high", "critical"]
+VulnSeverity = Literal["info", "low", "medium", "high", "critical"]
+MAX_METADATA_BYTES = 16_384
+SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
+# The lengths are the columns' own (migration 001 and the model): a longer value was a database error, which the API answered with a 500.
+
+
+def _small_metadata(v: dict[str, Any]) -> dict[str, Any]:
+    if len(json.dumps(v, default=str)) > MAX_METADATA_BYTES:
+        raise ValueError(f"metadata must be under {MAX_METADATA_BYTES} bytes")
+    return v
+
+
+def _short_items(v: list[str] | None, limit: int, longest: int) -> list[str] | None:
+    if v is None:
+        return None
+    if len(v) > limit or any(len(x) > longest for x in v):
+        raise ValueError(f"at most {limit} entries of up to {longest} characters")
+    return v
+
+
 class AssetCreate(BaseModel):
+    asset_type: str = Field(default="host", min_length=1, max_length=50)
+    name: str = Field(min_length=1, max_length=512)
+    fqdn: str | None = Field(default=None, max_length=512)
+    ip_addresses: list[str] | None = None
+    cloud_provider: str | None = Field(default=None, max_length=50)
+    cloud_region: str | None = Field(default=None, max_length=100)
+    cloud_account: str | None = Field(default=None, max_length=255)
+    os: str | None = Field(default=None, max_length=100)
+    os_version: str | None = Field(default=None, max_length=100)
+    criticality: Criticality = "medium"
+    tags: list[str] | None = None
+    owner_email: str | None = Field(default=None, max_length=255)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("ip_addresses")
+    @classmethod
+    def _ips(cls, v: list[str] | None) -> list[str] | None:
+        return _short_items(v, 64, 64)
+
+    @field_validator("tags")
+    @classmethod
+    def _tags(cls, v: list[str] | None) -> list[str] | None:
+        return _short_items(v, 50, 64)
+
+    @field_validator("metadata")
+    @classmethod
+    def _metadata(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return _small_metadata(v)
+
+
+class AssetUpdate(BaseModel):
+    """What a PATCH may change. Every field is optional and only the ones sent are applied: this used to be the create model, whose defaults ("host", "medium", an empty metadata) overwrote whatever the caller left out."""
+
+    asset_type: str | None = Field(default=None, min_length=1, max_length=50)
+    name: str | None = Field(default=None, min_length=1, max_length=512)
+    fqdn: str | None = Field(default=None, max_length=512)
+    ip_addresses: list[str] | None = None
+    cloud_provider: str | None = Field(default=None, max_length=50)
+    cloud_region: str | None = Field(default=None, max_length=100)
+    cloud_account: str | None = Field(default=None, max_length=255)
+    os: str | None = Field(default=None, max_length=100)
+    os_version: str | None = Field(default=None, max_length=100)
+    criticality: Criticality | None = None
+    tags: list[str] | None = None
+    owner_email: str | None = Field(default=None, max_length=255)
+    metadata: dict[str, Any] | None = None
+
+    @field_validator("ip_addresses")
+    @classmethod
+    def _ips(cls, v: list[str] | None) -> list[str] | None:
+        return _short_items(v, 64, 64)
+
+    @field_validator("tags")
+    @classmethod
+    def _tags(cls, v: list[str] | None) -> list[str] | None:
+        return _short_items(v, 50, 64)
+
+    @field_validator("metadata")
+    @classmethod
+    def _metadata(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return None if v is None else _small_metadata(v)
+
+
+class AssetOut(BaseModel):
+    """What the API returns: the stored values as they are (an older row may hold a criticality or a length the create model would now refuse)."""
+
     asset_type: str = "host"
     name: str
     fqdn: str | None = None
@@ -38,14 +126,6 @@ class AssetCreate(BaseModel):
     criticality: str = "medium"
     tags: list[str] | None = None
     owner_email: str | None = None
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-class AssetUpdate(AssetCreate):
-    pass
-
-
-class AssetOut(AssetCreate):
     id: uuid.UUID
     tenant_id: uuid.UUID
     created_at: datetime
@@ -67,6 +147,28 @@ class AssetOut(AssetCreate):
 
 class VulnerabilityCreate(BaseModel):
     asset_id: uuid.UUID
+    cve_id: str | None = Field(default=None, max_length=50)
+    title: str = Field(min_length=1, max_length=512)
+    description: str | None = Field(default=None, max_length=20_000)
+    severity: VulnSeverity = "medium"
+    cvss_score: float | None = Field(default=None, ge=0, le=10)
+    cvss_vector: str | None = Field(default=None, max_length=100)
+    epss_score: float | None = Field(default=None, ge=0, le=1)
+    is_exploited: bool = False
+    source: str = Field(min_length=1, max_length=100)
+    external_id: str | None = Field(default=None, max_length=255)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata")
+    @classmethod
+    def _metadata(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return _small_metadata(v)
+
+
+class VulnerabilityOut(BaseModel):
+    """What the API returns: the stored values as they are."""
+
+    asset_id: uuid.UUID
     cve_id: str | None = None
     title: str
     description: str | None = None
@@ -77,10 +179,6 @@ class VulnerabilityCreate(BaseModel):
     is_exploited: bool = False
     source: str
     external_id: str | None = None
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-class VulnerabilityOut(VulnerabilityCreate):
     id: uuid.UUID
     tenant_id: uuid.UUID
     first_found: datetime
@@ -182,7 +280,11 @@ async def update_asset(
     asset = await db.get(Asset, asset_id)
     if not asset or asset.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Asset not found")
-    for k, v in body.model_dump(exclude_none=True).items():
+    # Only what the caller sent. A field sent as null is cleared if the column allows it (a name, a type, a criticality and metadata cannot be null, so a null for one of those is left as it is).
+    sent = body.model_dump(exclude_unset=True)
+    for k, v in sent.items():
+        if v is None and k in {"name", "asset_type", "criticality", "metadata"}:
+            continue
         if k == "metadata":
             asset.asset_metadata = v
         else:
@@ -242,16 +344,20 @@ async def create_vulnerability(
 @router.get("/{asset_id}/vulnerabilities", response_model=list[VulnerabilityOut], dependencies=[Depends(require_permission("alerts:read"))])
 async def list_asset_vulnerabilities(
     asset_id: uuid.UUID,
+    limit: int = Query(200, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[AssetVulnerability]:
     asset = await db.get(Asset, asset_id)
     if not asset or asset.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Asset not found")
+    # Worst first (critical, high, medium, low, info): sorting the severity as text put "low" above "medium".
+    rank = case(*[(AssetVulnerability.severity == name, i) for i, name in enumerate(SEVERITY_ORDER)], else_=len(SEVERITY_ORDER))
     q = (
         select(AssetVulnerability)
         .where(AssetVulnerability.asset_id == asset_id)
-        .order_by(AssetVulnerability.severity, AssetVulnerability.last_found.desc())
+        .order_by(rank, AssetVulnerability.last_found.desc())
+        .limit(limit)
     )
     result = await db.execute(q)
     return list(result.scalars().all())

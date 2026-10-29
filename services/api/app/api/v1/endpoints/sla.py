@@ -10,19 +10,22 @@ POST /api/v1/sla/events             — Record a lifecycle event for an alert
 
 from __future__ import annotations
 
+import json
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, require_permission
 from app.core.config import get_settings
 from app.db.rls import TenantDBSession
+from app.models.alert import Alert
 from app.models.sla import AlertSLAEvent, TenantSLAConfig
 from app.services import sla as sla_service
+from app.services.timeutil import as_utc
 
 router = APIRouter(prefix="/sla", tags=["sla"])
 
@@ -55,12 +58,24 @@ class SLAConfigUpdate(BaseModel):
     mttc_target: int = Field(..., ge=1, le=10080, description="Minutes")
 
 
+MAX_EVENT_METADATA_BYTES = 4096
+# A recorded time may be a little ahead of this server's clock, not days.
+MAX_CLOCK_SKEW = timedelta(minutes=5)
+
+
 class SLAEventCreate(BaseModel):
     alert_id: uuid.UUID
-    severity: str
-    event_type: str
+    severity: str = Field(max_length=16)
+    event_type: str = Field(max_length=32)
     occurred_at: datetime | None = None
     metadata: dict = Field(default_factory=dict)
+
+    @field_validator("metadata")
+    @classmethod
+    def _metadata_is_small(cls, v: dict) -> dict:
+        if len(json.dumps(v, default=str)) > MAX_EVENT_METADATA_BYTES:
+            raise ValueError(f"metadata must be under {MAX_EVENT_METADATA_BYTES} bytes")
+        return v
 
 
 class SLAEventOut(BaseModel):
@@ -177,7 +192,7 @@ async def update_sla_config(
     config.mttd_target = body.mttd_target
     config.mttr_target = body.mttr_target
     config.mttc_target = body.mttc_target
-    config.updated_at = datetime.utcnow()
+    config.updated_at = datetime.now(UTC)
 
     await db.commit()
     await db.refresh(config)
@@ -202,12 +217,21 @@ async def record_sla_event(
             detail=f"event_type must be one of {sorted(VALID_EVENT_TYPES)}",
         )
 
+    # The alert has to be one of this organization's own: any id used to be accepted, which filled the SLA tables with events for alerts that do not exist or belong to somebody else.
+    owned = await db.scalar(select(Alert.id).where(Alert.id == body.alert_id, Alert.tenant_id == current_user.tenant_id))
+    if owned is None:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    now = datetime.now(UTC)
+    occurred_at = as_utc(body.occurred_at) if body.occurred_at is not None else now
+    if occurred_at > now + MAX_CLOCK_SKEW:
+        raise HTTPException(status_code=422, detail="occurred_at cannot be in the future")
+
     event = AlertSLAEvent(
         tenant_id=current_user.tenant_id,
         alert_id=body.alert_id,
         severity=body.severity,
         event_type=body.event_type,
-        occurred_at=body.occurred_at or datetime.utcnow(),
+        occurred_at=occurred_at,
         actor_id=current_user.id,
         # ORM attr is `metadata_` (DB column is still `metadata`) — `metadata`
         # itself is reserved on Declarative `Base`.

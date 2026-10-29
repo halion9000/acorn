@@ -38,6 +38,7 @@ from app.services.identity_people import (
     normalize_email,
     sort_people,
 )
+from app.services.timeutil import as_utc, as_utc_or_none
 
 router = APIRouter(prefix="/identities", tags=["identities"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
@@ -682,9 +683,9 @@ async def apply_person_tickets(
                         "ticket_id": it.id,
                         "summary": it.summary,
                         "status": it.status,
-                        "opened_at": it.opened_at if it.opened_at.tzinfo else it.opened_at.replace(tzinfo=UTC),
-                        "updated_at": it.updated_at,
-                        "closed_at": (it.closed_at if it.closed_at.tzinfo else it.closed_at.replace(tzinfo=UTC)) if it.closed_at else None,
+                        "opened_at": as_utc(it.opened_at),
+                        "updated_at": as_utc_or_none(it.updated_at),
+                        "closed_at": as_utc_or_none(it.closed_at),
                         "user_email": email,
                         "user_name": it.user_name,
                         "url": it.url,

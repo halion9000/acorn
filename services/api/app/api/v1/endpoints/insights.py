@@ -61,6 +61,7 @@ from app.db.rls_scope import acting_as_tenant
 from app.models.alert import Alert
 from app.models.tenant import Tenant
 from app.services import case_metrics
+from app.services.timeutil import as_utc
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +207,7 @@ async def _first_alert_at(db, tenant_id: uuid.UUID) -> datetime | None:
     first = await db.scalar(select(func.min(Alert.created_at)).where(Alert.tenant_id == tenant_id))
     if not isinstance(first, datetime):
         return None
-    return first if first.tzinfo else first.replace(tzinfo=UTC)
+    return as_utc(first)
 
 
 async def _fp_rate(db, tenant_id: uuid.UUID, start: datetime, end: datetime) -> float:

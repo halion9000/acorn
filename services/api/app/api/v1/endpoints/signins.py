@@ -26,6 +26,7 @@ from app.models.tenant import Tenant
 from app.services.alias_view import alias_view
 from app.services.identity_detections import run_signin_detections
 from app.services.signin_scoring import HISTORY_DAYS, History, score_events, signin_features
+from app.services.timeutil import as_utc
 
 LOG = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ class SignInsResponse(BaseModel):
 
 
 def _utc(t: datetime) -> datetime:
-    return t if t.tzinfo else t.replace(tzinfo=UTC)
+    return as_utc(t)
 
 
 async def targets_by_tenant(

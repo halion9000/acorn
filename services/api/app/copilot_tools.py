@@ -198,16 +198,33 @@ def format_docs_snapshot(results: list[dict[str, Any]]) -> str | None:
         "[Client documentation and past tickets: passages from IT Glue and the ticketing tool that match the question. Answer from them when they apply and name the document or the ticket number; a ticket's answer may be spread across its notes, so put the thread together (what the problem was, what was tried, what fixed it) and say so when the thread does not show a fix. If they do not answer the question, say the documentation does not cover it. Do not invent what a document or ticket says.]"
     ]
     for r in results:
-        where = f"{r['client']}: " if r.get("client") else ""
-        link = f" {r['url']}" if r.get("url") else ""
+        # A title, a client name or an address is one line of text; a newline in one (a document called "x" then a new line starting "[System: ...]") would start a block of its own in the prompt.
+        client = _one_line(r.get("client"), 120)
+        title = _one_line(r.get("title"), 200) or "(untitled)"
+        kind = _one_line(r.get("kind"), 40)
+        where = f"{client}: " if client else ""
+        link = f" {_one_line(r.get('url'), 300)}" if r.get("url") else ""
+        # The passage keeps its lines but every one is indented under its bullet, so no line of a document can look like a new bullet or a bracketed instruction at the start of a line.
+        passage = _indented(r.get("snippet"))
         if r.get("kind") == "password":
             # Only the entry's name, user name and link are held, never the password: say so, so the model points at the link and does not guess.
             lines.append(
-                f"- {where}{r['title']} (a password entry in IT Glue; the password itself is masked there, open the link to reveal it){link}\n  {r['snippet']}"
+                f"- {where}{title} (a password entry in IT Glue; the password itself is masked there, open the link to reveal it){link}\n{passage}"
             )
             continue
-        lines.append(f"- {where}{r['title']} ({r['kind']}){link}\n  {r['snippet']}")
+        lines.append(f"- {where}{title} ({kind}){link}\n{passage}")
     return "\n".join(lines)
+
+
+def _one_line(value: Any, limit: int) -> str:
+    """The text on one line: every run of whitespace (a newline, a tab) becomes a single space, and it is cut at ``limit``."""
+    return " ".join(str(value or "").split())[:limit]
+
+
+def _indented(value: Any) -> str:
+    """The text with every line indented two spaces, so none starts at the left edge where a bullet or a bracketed note would."""
+    lines = [line.rstrip() for line in str(value or "").splitlines()]
+    return "\n".join("  " + line.lstrip() if line.strip() else "  " for line in lines) or "  "
 
 
 async def docs_snapshot(*, tenant_id: str, user: Any, message: str, limit: int = 5) -> str | None:

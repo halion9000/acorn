@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
@@ -34,6 +34,9 @@ from app.services.device_identity import hostname_key
 
 router = APIRouter(prefix="/alert-suppressions", tags=["alerts"])
 
+DEFAULT_LIMIT = 500
+MAX_LIMIT = 2000
+
 
 class SuppressionIn(BaseModel):
     alert_id: uuid.UUID
@@ -56,10 +59,11 @@ class SuppressionOut(BaseModel):
     indefinite: bool
     created_at: datetime
     active: bool
-    hidden_alerts: int = 0
+    # None when the count could not be read: "hides 0 alerts" would be a statement of fact the page could not back up.
+    hidden_alerts: int | None = 0
 
 
-def _out(rule: AlertSuppression, now: datetime, names: dict[uuid.UUID, str], hidden: int) -> SuppressionOut:
+def _out(rule: AlertSuppression, now: datetime, names: dict[uuid.UUID, str], hidden: int | None) -> SuppressionOut:
     return SuppressionOut(
         id=rule.id,
         scope=rule.scope,
@@ -127,17 +131,31 @@ async def hide_alert_type(body: SuppressionIn, user: AuthUser, db: DBSession) ->
 
 
 @router.get("", response_model=list[SuppressionOut], dependencies=[Depends(require_permission("alerts:read"))])
-async def list_suppressions(user: AuthUser, db: DBSession, include_ended: bool = False) -> list[SuppressionOut]:
-    """The active rules (and, with ``include_ended``, those lifted or run out), with how many alerts each hides now."""
+async def list_suppressions(
+    user: AuthUser,
+    db: DBSession,
+    response: Response,
+    include_ended: bool = False,
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0, le=100_000),
+) -> list[SuppressionOut]:
+    """The active rules (and, with ``include_ended``, those lifted or run out), newest first, with how many alerts each hides now (null when that could not be counted).
+
+    ``X-Total-Count`` says how many rules match in all, so a list cut at ``limit`` is known to be cut (it used to stop at 500 without saying so).
+    """
     now = datetime.now(UTC)
-    q = select(AlertSuppression).where(AlertSuppression.tenant_id == user.tenant_id).order_by(AlertSuppression.created_at.desc()).limit(500)
+    where = [AlertSuppression.tenant_id == user.tenant_id]
     if not include_ended:
-        q = q.where(AlertSuppression.revoked_at.is_(None))
+        where.append(AlertSuppression.revoked_at.is_(None))
+    total = (await db.execute(select(func.count()).select_from(AlertSuppression).where(*where))).scalar_one()
+    response.headers["X-Total-Count"] = str(int(total))
+    q = select(AlertSuppression).where(*where).order_by(AlertSuppression.created_at.desc(), AlertSuppression.id).offset(offset).limit(limit)
     rules = list((await db.execute(q)).scalars().all())
     names = {
         r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()
     }
     counts: dict[uuid.UUID, int] = {}
+    failed: set[uuid.UUID] = set()  # the clients whose count could not be read
     for tid in {r.client_tenant_id or user.tenant_id for r in rules} | {user.tenant_id, *names}:
         try:
             rows = (
@@ -147,12 +165,18 @@ async def list_suppressions(user: AuthUser, db: DBSession, include_ended: bool =
                     .group_by(Alert.suppression_id)
                 )
             ).all()
-        except Exception:  # noqa: BLE001 - a count that cannot be read is shown as zero, not an error
-            rows = []
+        except Exception:  # noqa: BLE001 - one client's count failing must not fail the list, but it must not read as zero either
+            failed.add(tid)
+            continue
         for sid, n in rows:
             if sid is not None:
                 counts[sid] = counts.get(sid, 0) + int(n)
-    return [_out(r, now, names, counts.get(r.id, 0)) for r in rules]
+
+    def counted(rule: AlertSuppression) -> int | None:
+        covered = {rule.client_tenant_id} if rule.client_tenant_id else {user.tenant_id, *names}
+        return None if covered & failed else counts.get(rule.id, 0)
+
+    return [_out(r, now, names, counted(r)) for r in rules]
 
 
 @router.delete("/{suppression_id}", response_model=SuppressionOut, dependencies=[Depends(require_permission("alerts:write"))])
