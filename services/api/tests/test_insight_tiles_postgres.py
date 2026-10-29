@@ -183,8 +183,9 @@ async def test_several_tenants_are_read_together_and_a_tenant_with_its_own_targe
 
 
 async def test_the_endpoint_itself_returns_the_second_row_beside_the_first_seven_on_a_real_database():
-    from app.api.v1.endpoints import insights as ins
     from types import SimpleNamespace
+
+    from app.api.v1.endpoints import insights as ins
 
     engine, tenant = await _tenant()
     now = datetime.now(UTC)

@@ -23,3 +23,32 @@ def registration_known(users: list[Any]) -> bool:
 def has_second_factor(u: Any, known: bool) -> bool:
     """Whether this person has a second factor: what they registered when that is reported, otherwise whether one is required of them."""
     return bool(u.registered or getattr(u, "capable", False)) if known else required_of(u)
+
+
+# Rows that are not Microsoft's: the people of a client's Google Workspace, read by ThreatMate and stored under its name. Google says plainly who enrolled in 2-Step Verification and whether it is enforced,
+# so a Google group is always judged by what it reports, never by the "Microsoft may not say" fallback above, and never mixed into a judgement about Microsoft 365.
+GOOGLE_SOURCES: frozenset[str] = frozenset({"threatmate"})
+DIRECTORY_NAMES = {"threatmate": "Google Workspace"}
+
+
+def directory_of(u: Any) -> str:
+    """The directory a person was read from, as a name: Microsoft 365 unless the row is from a source in GOOGLE_SOURCES."""
+    return DIRECTORY_NAMES.get(getattr(u, "source", None) or "", "Microsoft 365")
+
+
+def microsoft_rows(users: list[Any]) -> list[Any]:
+    """Only the Microsoft 365 people (what the Microsoft-specific answers, such as 'is Microsoft 365 in use', must be read from)."""
+    return [u for u in users if (getattr(u, "source", None) or "") not in GOOGLE_SOURCES]
+
+
+def known_by_source(users: list[Any]) -> dict[str, bool]:
+    """Whether registration is reported, judged for each source on its own: Microsoft's depends on its report; Google's is always reported."""
+    groups: dict[str, list[Any]] = {}
+    for u in users:
+        groups.setdefault(getattr(u, "source", None) or "", []).append(u)
+    return {src: True if src in GOOGLE_SOURCES else registration_known(rows) for src, rows in groups.items()}
+
+
+def second_factor(u: Any, known: dict[str, bool]) -> bool:
+    """``has_second_factor`` with registration judged for the person's own source."""
+    return has_second_factor(u, known.get(getattr(u, "source", None) or "", False))

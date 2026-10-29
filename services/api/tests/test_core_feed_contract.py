@@ -15,13 +15,13 @@ from pathlib import Path
 import pytest
 from app.api.v1.endpoints import billing
 from app.api.v1.endpoints import cipp_actions as cipp_act
-from app.api.v1.endpoints import secureframe as sframe
 from app.api.v1.endpoints import client_documents as cdocs
 from app.api.v1.endpoints import client_review as cr
 from app.api.v1.endpoints import devices as dev
 from app.api.v1.endpoints import identities as idn
 from app.api.v1.endpoints import identity as ident
 from app.api.v1.endpoints import inbox_core_feed as feed
+from app.api.v1.endpoints import secureframe as sframe
 from app.api.v1.endpoints import signins as sig
 from app.api.v1.endpoints import vcio_proposals as vp
 

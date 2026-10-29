@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const authFetch = vi.hoisted(() => vi.fn());
@@ -74,6 +74,27 @@ describe('MfaStatus', () => {
     expect(authFetch).toHaveBeenCalledWith('/api/v1/identity/mfa-users?client_id=c1&which=without');
     await userEvent.click(screen.getByRole('button', { name: 'Show the 1 administrators without Multi-Factor' }));
     expect(screen.queryByTestId('people-admins')).toBeNull();
+  });
+
+  it('tags a client that has Google Workspace people, and each Google person in the list', async () => {
+    authFetch.mockImplementation((url?: string) =>
+      Promise.resolve(
+        (url ?? '').includes('/mfa-users')
+          ? reply([
+              { directory: 'Google Workspace', upn: 'g@acme.com', display_name: null, admin: true, registered: false, required: false, methods: null },
+              { directory: 'Microsoft 365', upn: 'm@acme.com', display_name: null, admin: false, registered: false, required: false, methods: null },
+            ])
+          : reply([client({ directories: ['Microsoft 365', 'Google Workspace'] }), client({ client_id: 'c2', client_name: 'Birch Law', directories: ['Microsoft 365'] })]),
+      ),
+    );
+    render(<MfaStatus />);
+    const tags = await screen.findAllByTestId('google-tag');
+    expect(tags).toHaveLength(1);
+    expect(tags[0]).toHaveTextContent('+ Google Workspace');
+    await userEvent.click(screen.getAllByRole('button', { name: '3' })[0]);
+    const list = await screen.findByTestId('people-without');
+    expect(list.textContent).toContain('g@acme.com');
+    expect(within(list).getAllByText('Google')).toHaveLength(1);
   });
 
   it('can show the people who registered a second factor that nothing requires', async () => {

@@ -29,7 +29,7 @@ from app.models.signin import DirectoryAuditEvent, IdentityMfaUser, IdentitySecu
 from app.models.tenant import Tenant
 from app.services.directory_scoring import directory_features, sensitivity_of
 from app.services.identity_detections import run_audit_detections
-from app.services.mfa_registration import has_second_factor, registration_known, required_of
+from app.services.mfa_registration import GOOGLE_SOURCES, directory_of, known_by_source, required_of, second_factor
 from app.services.signin_scoring import HISTORY_DAYS, score_events
 from app.services.timeutil import as_utc
 
@@ -351,17 +351,17 @@ def counts_for_mfa(users: list[Any]) -> dict[str, int]:
     """The numbers shown for one client's people: those with a second factor that is required, those who registered one that nothing requires, and those with none.
     ``registration_unknown`` is 1 when Microsoft reports no registrations at all for the client (it needs Entra ID P1): then a person counts as covered when something requires it of them."""
     counted = _counted(users)
-    known = registration_known(users)
-    with_mfa = [u for u in counted if has_second_factor(u, known) and _required(u)]
-    not_required = [u for u in counted if known and u.registered and not _required(u)]
-    without = [u for u in counted if not has_second_factor(u, known)]
+    known = known_by_source(users)
+    with_mfa = [u for u in counted if second_factor(u, known) and _required(u)]
+    not_required = [u for u in counted if known.get(getattr(u, "source", None) or "", False) and u.registered and not _required(u)]
+    without = [u for u in counted if not second_factor(u, known)]
     return {
         "people": len(counted),
         "with_mfa": len(with_mfa),
         "not_required": len(not_required),
         "without_mfa": len(without),
         "admins_without_mfa": len([u for u in without if u.admin]),
-        "registration_unknown": 0 if known else 1,
+        "registration_unknown": 0 if all(v for src, v in known.items() if src not in GOOGLE_SOURCES) else 1,
     }
 
 
@@ -376,6 +376,8 @@ class MfaClientSummary(BaseModel):
     admins_without_mfa: int
     # 1 when Microsoft reports no registrations for this client (needs Entra ID P1): the counts then show who is required to use a second factor, not who signed up.
     registration_unknown: int = 0
+    # The directories these people are in, e.g. ["Microsoft 365", "Google Workspace"].
+    directories: list[str] = Field(default_factory=list)
     refreshed_at: datetime | None = None
 
 
@@ -395,7 +397,11 @@ async def mfa_summary(
             continue
         out.append(
             MfaClientSummary(
-                client_id=tid, client_name=names.get(tid), refreshed_at=max(u.refreshed_at for u in users), **counts_for_mfa(list(users))
+                client_id=tid,
+                client_name=names.get(tid),
+                refreshed_at=max(u.refreshed_at for u in users),
+                directories=sorted({directory_of(u) for u in users}),
+                **counts_for_mfa(list(users)),
             )
         )
     out.sort(key=lambda s: (-s.admins_without_mfa, -s.without_mfa, (s.client_name or "").lower()))
@@ -403,6 +409,8 @@ async def mfa_summary(
 
 
 class MfaUserOut(BaseModel):
+    # Which directory the person is in: Microsoft 365 or Google Workspace.
+    directory: str = "Microsoft 365"
     upn: str
     display_name: str | None
     admin: bool
@@ -432,15 +440,27 @@ async def mfa_users(
             .scalars()
             .all()
         )
-    known = registration_known(list(users))
+    known = known_by_source(list(users))
     picked = [
         u
         for u in _counted(list(users))
-        if (not has_second_factor(u, known) if which == "without" else (known and u.registered and not _required(u)))
+        if (
+            not second_factor(u, known)
+            if which == "without"
+            else (known.get(getattr(u, "source", None) or "", False) and u.registered and not _required(u))
+        )
     ]
     picked.sort(key=lambda u: (not u.admin, u.upn))
     return [
-        MfaUserOut(upn=u.upn, display_name=u.display_name, admin=u.admin, registered=u.registered, required=_required(u), methods=u.methods)
+        MfaUserOut(
+            directory=directory_of(u),
+            upn=u.upn,
+            display_name=u.display_name,
+            admin=u.admin,
+            registered=u.registered,
+            required=_required(u),
+            methods=u.methods,
+        )
         for u in picked[:500]
     ]
 

@@ -48,6 +48,7 @@ from app.services.check_history import item_changes
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
 from app.services.infra_review import CIPP_BASELINE_SOURCE, SAAS_SOURCES, TOOL_CHECK_SOURCES
 from app.services.m365_review import M365Answer, m365_answers
+from app.services.mfa_registration import microsoft_rows
 from app.services.review_overrides import (
     MAX_PER_CLIENT,
     clean_answer,
@@ -552,13 +553,15 @@ async def client_review(
     tech_answers = tech_stack(
         shown,
         facts,
-        has_microsoft_365=bool(users),
+        has_microsoft_365=bool(microsoft_rows(list(users))),
         sat=sat_checks,
         saas=saas_checks,
         enrolled_in={v for v, tid in aliases if tid == client_id},
         mapped_tools={v for v, _ in aliases},
     )
-    m365_worked = m365_answers([c for c in (m365_row.checks if m365_row is not None else []) if isinstance(c, dict)], list(users))
+    m365_worked = m365_answers(
+        [c for c in (m365_row.checks if m365_row is not None else []) if isinstance(c, dict)], microsoft_rows(list(users))
+    )
     assess_worked = assessment_answers({**tool_checks, **{c["key"]: c for c in sat_checks if isinstance(c.get("key"), str)}})
     # What A.C.O.R.N worked out, before a person's typed answers are laid over it (the merge changes these objects): kept so each question has a history.
     readings = review_history.snapshot(ready.items, tech_answers, m365_worked, assess_worked)

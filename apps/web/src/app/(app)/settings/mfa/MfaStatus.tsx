@@ -19,10 +19,14 @@ export interface MfaClient {
   admins_without_mfa: number;
   /** 1 when Microsoft reports no registrations for this client (it needs Entra ID P1): the counts show who is required to use a second factor, not who signed up. */
   registration_unknown?: number;
+  /** The directories these people are in ("Microsoft 365", "Google Workspace"). */
+  directories?: string[];
   refreshed_at: string | null;
 }
 
 export interface MfaPerson {
+  /** "Microsoft 365" or "Google Workspace". */
+  directory?: string;
   upn: string;
   display_name: string | null;
   admin: boolean;
@@ -91,6 +95,7 @@ function People({ clientId, which }: { clientId: string; which: Which }) {
           <span className="font-mono text-slate-200">{p.upn}</span>
           {p.display_name ? <span className="text-slate-500">{p.display_name}</span> : null}
           {p.admin ? <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[11px] text-red-300">administrator</span> : null}
+          {p.directory === "Google Workspace" ? <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[11px] text-sky-300">Google</span> : null}
         </li>
       ))}
     </ul>
@@ -103,7 +108,14 @@ function ClientRow({ c, open, setOpen }: { c: MfaClient; open: Open; setOpen: (v
   return (
     <>
       <tr className="border-b border-slate-800" data-testid="client-row">
-        <td className="py-2 text-slate-200">{c.client_name ?? "This organization"}</td>
+        <td className="py-2 text-slate-200">
+          {c.client_name ?? "This organization"}
+          {(c.directories ?? []).includes("Google Workspace") ? (
+            <span className="ml-2 rounded bg-sky-500/15 px-1.5 py-0.5 text-[11px] text-sky-300" data-testid="google-tag" title="Includes the people of this client's Google Workspace, read by ThreatMate">
+              {(c.directories ?? []).length > 1 ? "+ Google Workspace" : "Google Workspace"}
+            </span>
+          ) : null}
+        </td>
         <td className="text-slate-400">{c.people}</td>
         <td className="text-slate-300">
           {coveragePercent(c)}
