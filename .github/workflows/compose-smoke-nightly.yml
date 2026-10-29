@@ -74,6 +74,33 @@ jobs:
             printf '\nAISOC_VERSION=%s\n' "${AISOC_VERSION}" >> .env
           fi
 
+          # Same secrets the PR smoke (compose-smoke.yml) provisions: the production-shaped stack refuses to boot without them (enforce_secure_defaults in
+          # services/api/app/core/config.py), and every service answers 503 without its AISOC_*_SERVICE_TOKEN. The nightly run had none, so the api never started
+          # and every night failed at "dependency api failed to start". Keep the two lists the same.
+          set_env() {  # set_env KEY VALUE: replace an existing KEY= line, else append one (never leave a duplicate)
+            if grep -q "^$1=" .env; then sed -i "s|^$1=.*|$1=$2|" .env; else printf '%s=%s\n' "$1" "$2" >> .env; fi
+          }
+          for key in METRICS_TOKEN JWT_SECRET REALTIME_INTERNAL_TOKEN AISOC_REALTIME_JWT_SECRET \
+              AISOC_ACTIONS_SERVICE_TOKEN \
+              AISOC_API_SERVICE_TOKEN \
+              AISOC_CONNECTORS_SERVICE_TOKEN \
+              AISOC_ENRICHMENT_SERVICE_TOKEN \
+              AISOC_FUSION_SERVICE_TOKEN \
+              AISOC_HONEYTOKENS_SERVICE_TOKEN \
+              AISOC_INGEST_SERVICE_TOKEN \
+              AISOC_PURPLE_TEAM_SERVICE_TOKEN \
+              AISOC_THREATINTEL_SERVICE_TOKEN \
+              AISOC_UEBA_SERVICE_TOKEN; do
+            value="$(openssl rand -hex 32)"
+            echo "::add-mask::${value}"
+            set_env "${key}" "${value}"
+          done
+
+          # AISOC_CREDENTIAL_KEY must be a Fernet key (url-safe base64 of 32 random bytes, with padding); the .env.example placeholder is not one.
+          fernet_key="$(openssl rand -base64 32 | tr '+/' '-_')"
+          echo "::add-mask::${fernet_key}"
+          set_env AISOC_CREDENTIAL_KEY "${fernet_key}"
+
       - name: Validate compose file
         run: docker compose config --quiet
 
