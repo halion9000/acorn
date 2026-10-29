@@ -55,6 +55,15 @@ interface SlowRoute {
   worst_seconds: number;
 }
 
+interface FeedRoute {
+  route: string;
+  last_ok_minutes_ago: number | null;
+  ok: number;
+  errors: number;
+  last_error_minutes_ago: number | null;
+  last_error_status: number | null;
+}
+
 interface Snapshot {
   overall: "ok" | "degraded";
   down: string[];
@@ -64,6 +73,7 @@ interface Snapshot {
   core_feed?: { sources: number; last_report: string | null; minutes_ago: number | null; silent: boolean } | null;
   warnings?: { key: string; level: "error" | "warn"; text: string }[];
   database?: DatabaseSecurity;
+  feed_routes?: { since_minutes_ago: number; routes: FeedRoute[] };
   runtime?: { loop?: { samples: number; max_seconds?: number; typical_seconds?: number; window_seconds: number }; slow_routes?: SlowRoute[] };
   generated_at: string;
 }
@@ -148,6 +158,33 @@ export function PlatformHealth() {
                     <td>{r.typical_seconds}</td>
                     <td>{r.p95_seconds}</td>
                     <td>{r.worst_seconds}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {(snapshot.feed_routes?.routes ?? []).length > 0 && (
+            <table data-testid="feed-routes" className="w-full text-left text-xs text-slate-300">
+              <caption className="pb-1 text-left text-sm text-slate-400">
+                When CORE last reported on each route (since the API started {agoLabel(snapshot.feed_routes?.since_minutes_ago ?? 0)}); the quietest is first
+              </caption>
+              <thead>
+                <tr className="text-slate-500">
+                  <th scope="col">Route</th>
+                  <th scope="col">Last accepted</th>
+                  <th scope="col">Accepted</th>
+                  <th scope="col">Refused</th>
+                  <th scope="col">Last refusal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(snapshot.feed_routes?.routes ?? []).map((r) => (
+                  <tr key={r.route}>
+                    <td className="font-mono">{r.route}</td>
+                    <td>{r.last_ok_minutes_ago === null ? "never" : agoLabel(r.last_ok_minutes_ago)}</td>
+                    <td>{r.ok}</td>
+                    <td>{r.errors}</td>
+                    <td>{r.last_error_minutes_ago === null ? "none" : `${agoLabel(r.last_error_minutes_ago)} (${r.last_error_status})`}</td>
                   </tr>
                 ))}
               </tbody>

@@ -146,6 +146,40 @@ describe('runtime speed', () => {
   });
 });
 
+describe('feed routes', () => {
+  const snapshot = (feed_routes: unknown) => ({
+    ok: true,
+    json: () => Promise.resolve({ overall: 'ok', down: [], services: [{ service: 'fusion', status: 'up', latency_ms: 20, detail: '' }], feed_routes, generated_at: '2026-10-19T10:00:00Z' }),
+  });
+
+  it('lists when each CORE route last reported, the quietest first, with refusals and the status of the last one', async () => {
+    authFetch.mockResolvedValue(
+      snapshot({
+        since_minutes_ago: 90,
+        routes: [
+          { route: 'client-documents', last_ok_minutes_ago: null, ok: 0, errors: 2, last_error_minutes_ago: 3, last_error_status: 401 },
+          { route: 'devices', last_ok_minutes_ago: 4, ok: 12, errors: 0, last_error_minutes_ago: null, last_error_status: null },
+        ],
+      }),
+    );
+    render(<PlatformHealth />);
+    const table = await screen.findByTestId('feed-routes');
+    const rows = Array.from(table.querySelectorAll('tbody tr')).map((r) => r.textContent);
+    expect(rows[0]).toContain('client-documents');
+    expect(rows[0]).toContain('never');
+    expect(rows[0]).toContain('(401)');
+    expect(rows[1]).toContain('devices');
+    expect(rows[1]).toContain('none');
+  });
+
+  it('shows no table when nothing has reported since the API started', async () => {
+    authFetch.mockResolvedValue(snapshot({ since_minutes_ago: 1, routes: [] }));
+    render(<PlatformHealth />);
+    await waitFor(() => expect(screen.getByTestId('overall')).toBeInTheDocument());
+    expect(screen.queryByTestId('feed-routes')).not.toBeInTheDocument();
+  });
+});
+
 describe('CORE feed silence', () => {
   const withFeed = (core_feed: unknown) => ({
     ok: true,

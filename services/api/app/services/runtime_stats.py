@@ -93,6 +93,50 @@ def slow_routes(limit: int = 8) -> list[dict[str, Any]]:
     return out
 
 
+FEED_PREFIX = "/api/v1/inbox/core-feed/{tenant_token}/"
+_started_at = time.time()
+_feed: dict[str, dict[str, Any]] = {}
+
+
+def note_feed_receipt(endpoint: str, status: int, now: float | None = None) -> None:
+    """Note one request to a CORE feed route (by its template, never the URL, so no token is kept): when it last succeeded, when it last failed and with what status, and how many of each."""
+    if not endpoint.startswith(FEED_PREFIX):
+        return
+    route = endpoint[len(FEED_PREFIX) :]
+    row = _feed.setdefault(route, {"ok": 0, "errors": 0, "ok_at": None, "error_at": None, "error_status": None})
+    at = now if now is not None else time.time()
+    if status < 400:
+        row["ok"] += 1
+        row["ok_at"] = at
+    else:
+        row["errors"] += 1
+        row["error_at"] = at
+        row["error_status"] = status
+
+
+def feed_receipts(now: float | None = None) -> dict[str, Any]:
+    """The last receipt per CORE feed route since the API started: oldest success first, so a route that has gone quiet is at the top. A route never seen is not listed (it may simply not be used)."""
+    moment = now if now is not None else time.time()
+
+    def minutes(at: float | None) -> int | None:
+        return None if at is None else max(0, int((moment - at) // 60))
+
+    rows = [
+        {
+            "route": route,
+            "last_ok_minutes_ago": minutes(row["ok_at"]),
+            "ok": row["ok"],
+            "errors": row["errors"],
+            "last_error_minutes_ago": minutes(row["error_at"]),
+            "last_error_status": row["error_status"],
+        }
+        for route, row in _feed.items()
+    ]
+    rows.sort(key=lambda r: (r["last_ok_minutes_ago"] is not None, -(r["last_ok_minutes_ago"] or 0), r["route"]))
+    return {"since_minutes_ago": max(0, int((moment - _started_at) // 60)), "routes": rows}
+
+
 def reset() -> None:
     _lags.clear()
     _routes.clear()
+    _feed.clear()

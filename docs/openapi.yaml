@@ -7148,6 +7148,28 @@ paths:
                 $ref: '#/components/schemas/PipelineHealth'
       security:
       - HTTPBearer: []
+  /api/v1/health/feed-routes:
+    get:
+      tags:
+      - health
+      summary: When each CORE feed route last received a report
+      description: 'The last receipt per CORE feed route since the API started (kept
+        in memory, so it starts over with the process): minutes since the last success,
+        successes and failures, and the last failure''s status. A route
+
+        that has gone quiet is first. Route templates only: no token and no client.'
+      operationId: feed_routes_api_v1_health_feed_routes_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Feed Routes Api V1 Health Feed Routes Get
+      security:
+      - HTTPBearer: []
   /api/v1/health/services:
     get:
       tags:

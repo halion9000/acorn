@@ -88,7 +88,7 @@ from app.core.config import settings
 from app.models.alert import Alert
 from app.models.connector import Connector
 from app.services.connector_freshness import compute_freshness
-from app.services.runtime_stats import loop_lag, slow_routes
+from app.services.runtime_stats import feed_receipts, loop_lag, slow_routes
 
 logger = logging.getLogger(__name__)
 
@@ -922,6 +922,17 @@ def platform_warnings(
 
 
 @router.get(
+    "/feed-routes",
+    summary="When each CORE feed route last received a report",
+    dependencies=[Depends(require_permission("alerts:read"))],
+)
+async def feed_routes() -> dict[str, Any]:
+    """The last receipt per CORE feed route since the API started (kept in memory, so it starts over with the process): minutes since the last success, successes and failures, and the last failure's status. A route
+    that has gone quiet is first. Route templates only: no token and no client."""
+    return feed_receipts()
+
+
+@router.get(
     "/services",
     summary="Is each internal platform service answering its own health probe?",
     dependencies=[Depends(require_permission("alerts:read"))],
@@ -956,6 +967,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
         "disk": disk,
         "pending_migrations": pending or [],
         "runtime": {"loop": loop, "slow_routes": slow_routes()},
+        "feed_routes": feed_receipts(),
         "warnings": platform_warnings(
             down=down, disk=disk, pending=pending, core_feed=core_feed, device_feeds=feeds, signins=signins, loop=loop
         ),

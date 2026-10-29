@@ -64,3 +64,34 @@ async def test_the_sampler_records_readings_and_stops():
         rs.stop_loop_sampler()
         rs.LOOP_TICK_SECONDS = 1.0
     assert rs.loop_lag(__import__("time").time())["samples"] >= 3
+
+
+FEED = "/api/v1/inbox/core-feed/{tenant_token}/"
+
+
+def test_a_feed_route_keeps_when_it_last_succeeded_and_last_failed_by_template_only():
+    rs.note_feed_receipt(FEED + "devices", 200, now=1000.0)
+    rs.note_feed_receipt(FEED + "devices", 200, now=1600.0)
+    rs.note_feed_receipt(FEED + "devices", 500, now=1700.0)
+    rs.note_feed_receipt(FEED + "client-documents", 401, now=1650.0)
+    got = rs.feed_receipts(now=2000.0)
+    by_route = {r["route"]: r for r in got["routes"]}
+    assert by_route["devices"] == {
+        "route": "devices",
+        "last_ok_minutes_ago": 6,
+        "ok": 2,
+        "errors": 1,
+        "last_error_minutes_ago": 5,
+        "last_error_status": 500,
+    }
+    assert by_route["client-documents"]["last_ok_minutes_ago"] is None and by_route["client-documents"]["last_error_status"] == 401
+    assert "tenant_token" not in str(got), "only the route name is kept, never the template's token placeholder or a real token"
+
+
+def test_other_routes_are_not_feed_routes_and_the_quietest_feed_route_is_listed_first():
+    rs.note_feed_receipt("/api/v1/alerts", 200, now=1000.0)
+    rs.note_feed_receipt(FEED + "signins", 200, now=1000.0)
+    rs.note_feed_receipt(FEED + "entities", 200, now=1900.0)
+    rs.note_feed_receipt(FEED + "never-ok", 500, now=1950.0)
+    routes = rs.feed_receipts(now=2000.0)["routes"]
+    assert [r["route"] for r in routes] == ["never-ok", "signins", "entities"], "never succeeded first, then the longest quiet"

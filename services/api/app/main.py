@@ -678,7 +678,7 @@ def _metrics_endpoint_label(request: Request) -> str:
 
 
 from app.api.v1.endpoints.health import sample_pool_now  # noqa: E402
-from app.services.runtime_stats import note_route, start_loop_sampler, stop_loop_sampler  # noqa: E402
+from app.services.runtime_stats import note_feed_receipt, note_route, start_loop_sampler, stop_loop_sampler  # noqa: E402
 
 
 def slow_request_threshold() -> float:
@@ -720,6 +720,7 @@ async def metrics_middleware(request: Request, call_next) -> Response:
     endpoint = _metrics_endpoint_label(request)
     log_if_slow(request.method, endpoint, response.status_code, duration, request_id=request_id)
     note_route(request.method, endpoint, duration)
+    note_feed_receipt(endpoint, response.status_code)
     sample_pool_now()
     REQUEST_COUNT.labels(request.method, endpoint, response.status_code).inc()
     REQUEST_LATENCY.labels(request.method, endpoint).observe(duration)
