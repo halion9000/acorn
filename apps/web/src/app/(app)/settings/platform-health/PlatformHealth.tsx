@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
+import { agoMinutes } from "@/lib/ago";
 
 interface ServiceRow {
   service: string;
@@ -39,11 +40,7 @@ interface DeviceFeed {
 
 /** How long ago, in plain words. */
 export function agoLabel(minutes: number | null): string {
-  if (minutes === null) return "never";
-  if (minutes < 2) return "just now";
-  if (minutes < 120) return `${minutes} minutes ago`;
-  if (minutes < 60 * 48) return `${Math.floor(minutes / 60)} hours ago`;
-  return `${Math.floor(minutes / 1440)} days ago`;
+  return agoMinutes(minutes);
 }
 
 interface SlowRoute {

@@ -210,7 +210,7 @@ function RoleForm({ allPermissions, initial, onClose }: RoleFormProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-2xl rounded-2xl bg-white text-gray-900 shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-label={initial ? 'Edit role' : 'Create role'} className="w-full max-w-2xl rounded-2xl bg-white text-gray-900 shadow-2xl">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-lg font-semibold text-gray-900">{initial ? 'Edit Role' : 'Create Role'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800" aria-label="Close">✕</button>

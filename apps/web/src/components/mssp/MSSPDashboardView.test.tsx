@@ -115,7 +115,9 @@ describe('real tenants', () => {
     overviewMock.mockResolvedValue({ ...none, total_tenants: 1 });
     tenantsMock.mockResolvedValue([quiet]);
     render(<MSSPDashboardView />);
-    const headers = (await within(await screen.findByRole('table')).findAllByRole('columnheader')).map((h) => h.textContent);
+    const headerCells = await within(await screen.findByRole('table')).findAllByRole('columnheader');
+    expect(headerCells.every((h) => h.getAttribute('scope') === 'col'), 'every header cell says it heads a column').toBe(true);
+    const headers = headerCells.map((h) => h.textContent);
     expect(headers).not.toContain('ARR');
     expect(headers).not.toContain('Analysts');
     expect(headers).not.toContain('MTTD (min)');

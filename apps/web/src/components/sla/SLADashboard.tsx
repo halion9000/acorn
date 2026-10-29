@@ -143,7 +143,7 @@ function EditConfigModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm space-y-4">
+      <div role="dialog" aria-modal="true" aria-label={`${config.severity} SLA targets`} className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm space-y-4">
         <h3 className="text-white font-semibold text-lg capitalize">{config.severity} SLA Targets</h3>
         {[
           { label: 'MTTD (min)', val: mttd, set: setMttd },
@@ -228,7 +228,7 @@ function EditKpiBarModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-md space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-6">
+      <div role="dialog" aria-modal="true" aria-label="2026 KPI bar targets" className="w-full max-w-md space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-6">
         <h3 className="text-lg font-semibold text-white">2026 KPI bar targets</h3>
         <p className="text-xs text-gray-500">
           Published defaults apply until you override. Metrics use the same look-back as SLA metrics.

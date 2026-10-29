@@ -37,6 +37,17 @@ describe('alertsApi.list', () => {
     expect(out.alerts.map((a) => a.repeatCount)).toEqual([4, undefined]);
   });
 
+  it('sends the person filter as person (a query parameter called user reads like the signed-in user)', async () => {
+    let url = '';
+    vi.stubGlobal('fetch', async (u: RequestInfo | URL) => {
+      url = String(u);
+      return json({ items: [], total: 0 });
+    });
+    await alertsApi.list({ user: 'amy@acme.com', status: 'all' });
+    expect(url).toContain('person=amy%40acme.com');
+    expect(url).not.toMatch(/[?&]user=/);
+  });
+
   it("still reads rows sent under 'alerts' (older responses)", async () => {
     vi.stubGlobal('fetch', async () => json({ alerts: [{ id: 'old1', title: 'x', severity: 'low', status: 'new', created_at: '2026-10-12T00:00:00Z' }], total: 1 }));
     const out = await alertsApi.list();

@@ -633,13 +633,13 @@ function TabletopPanel() {
       {/* Findings panel */}
       {selectedSession && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 rounded-xl shadow-xl border border-gray-700 w-full max-w-2xl max-h-[80vh] flex flex-col">
+          <div role="dialog" aria-modal="true" aria-label={`Findings for ${selectedSession.name}`} className="bg-gray-900 rounded-xl shadow-xl border border-gray-700 w-full max-w-2xl max-h-[80vh] flex flex-col">
             <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between">
               <div>
                 <h2 className="font-semibold text-gray-100">{selectedSession.name}</h2>
                 <p className="text-xs text-gray-500 mt-0.5">{selectedSession.technique_ids.join(', ')}</p>
               </div>
-              <button onClick={() => setSelectedSession(null)} className="text-gray-500 hover:text-gray-300 text-xl">×</button>
+              <button onClick={() => setSelectedSession(null)} aria-label="Close" className="text-gray-500 hover:text-gray-300 text-xl">×</button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
               {selectedSession.findings.length === 0 && (
@@ -725,10 +725,10 @@ function ReportDetectionModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-900 rounded-xl shadow-xl border border-gray-700 w-full max-w-md">
+      <div role="dialog" aria-modal="true" aria-label="Report detection outcome" className="bg-gray-900 rounded-xl shadow-xl border border-gray-700 w-full max-w-md">
         <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between">
           <h2 className="font-semibold text-gray-100">Report Detection Outcome</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-xl">×</button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-300 text-xl">×</button>
         </div>
         <div className="p-5 space-y-4">
           <p className="text-sm text-gray-400">

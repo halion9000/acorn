@@ -109,7 +109,7 @@ function CreateTokenModal({ onClose, onCreate }: { onClose: () => void; onCreate
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg shadow-xl border border-gray-700 w-full max-w-md p-6">
+      <div role="dialog" aria-modal="true" aria-label="Create honeytoken" className="bg-gray-900 rounded-lg shadow-xl border border-gray-700 w-full max-w-md p-6">
         <h2 className="text-lg font-semibold text-gray-100 mb-4">Create Honeytoken</h2>
         <div className="space-y-4">
           <div>
@@ -204,7 +204,7 @@ function TokenDetails({ token, onClose }: { token: HoneytokenRecord; onClose: ()
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg shadow-xl border border-gray-700 w-full max-w-2xl p-6 max-h-[85vh] flex flex-col">
+      <div role="dialog" aria-modal="true" aria-label={token.name} className="bg-gray-900 rounded-lg shadow-xl border border-gray-700 w-full max-w-2xl p-6 max-h-[85vh] flex flex-col">
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-lg font-semibold text-gray-100">{token.name}</h2>
           <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-300 text-lg">

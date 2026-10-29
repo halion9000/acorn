@@ -52,7 +52,7 @@ describe('the status-checked line', () => {
   it('says when CORE last reported the incident state, and nothing when it never did', async () => {
     vendorActions.mockResolvedValue({ vendor_state: { vendor: 'huntress', at: new Date(Date.now() - 4 * 60_000).toISOString(), status: 'sent', remediations: [], psa_ticket_eids: [] } });
     const first = show();
-    expect(await screen.findByTestId('status-checked')).toHaveTextContent('status checked 4 min ago');
+    expect(await screen.findByTestId('status-checked')).toHaveTextContent('status checked 4m ago');
     first.unmount();
     vendorActions.mockResolvedValue({ vendor_state: null });
     show();
@@ -62,9 +62,9 @@ describe('the status-checked line', () => {
   it('agoLabel reads minutes, hours and days', () => {
     const now = Date.parse('2026-10-20T12:00:00Z');
     expect(agoLabel('2026-10-20T11:59:40Z', now)).toBe('just now');
-    expect(agoLabel('2026-10-20T11:30:00Z', now)).toBe('30 min ago');
-    expect(agoLabel('2026-10-20T07:00:00Z', now)).toBe('5 h ago');
-    expect(agoLabel('2026-10-15T12:00:00Z', now)).toBe('5 days ago');
+    expect(agoLabel('2026-10-20T11:30:00Z', now)).toBe('30m ago');
+    expect(agoLabel('2026-10-20T07:00:00Z', now)).toBe('5h ago');
+    expect(agoLabel('2026-10-15T12:00:00Z', now)).toBe('5d ago');
     expect(agoLabel('nope', now)).toBe('');
     expect(agoLabel(null, now)).toBe('');
   });

@@ -34,6 +34,7 @@ import {
   type InboxTokenListItem,
   type InboxTokenSecret,
 } from '@/lib/api';
+import { ago } from '@/lib/ago';
 
 // ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -69,18 +70,7 @@ const CATEGORY_ORDER: string[] = [
 ];
 
 function formatRelative(iso: string | null): string {
-  if (!iso) return '—';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (Number.isNaN(ms)) return '—';
-  const sec = Math.round(ms / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.round(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.round(min / 60);
-  if (hr < 48) return `${hr}h ago`;
-  const day = Math.round(hr / 24);
-  if (day < 30) return `${day}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return ago(iso, { style: 'short', seconds: true, justNowSeconds: 0, missing: '—', dateAfterDays: 30 });
 }
 
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -121,6 +111,8 @@ function SecretDisclosureModal({
         exit={{ opacity: 0 }}
       >
         <motion.div
+          role="dialog" aria-modal="true"
+          aria-label="Copy this URL, it will not be shown again"
           className="w-full max-w-xl rounded-xl border border-amber-500/30 bg-gray-900 p-5 shadow-2xl"
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

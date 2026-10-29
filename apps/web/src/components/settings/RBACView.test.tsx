@@ -146,6 +146,13 @@ describe('the permission picker', () => {
     return screen.findByText('Create Role');
   }
 
+  it('the form is a modal dialog with a name, so a screen reader knows a window opened and what it is', async () => {
+    await openForm();
+    const dialog = screen.getByRole('dialog', { name: 'Create role' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
+
   it('shows the permissions in that order in the form', async () => {
     await openForm();
     const names = screen.getAllByRole('checkbox').map((c) => c.closest('label')?.textContent ?? '').filter((t) => t.includes(':'));

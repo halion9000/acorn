@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
-import { agoWords } from "../client-docs/ClientDocs";
+import { ago } from "@/lib/ago";
 
 export interface ActionInfo {
   action: string;
@@ -137,7 +137,7 @@ export function CippActions() {
             {modeSentence(r)}
           </p>
           <p className="text-xs text-slate-500">
-            CORE reported {agoWords(view.received_at)}.
+            CORE reported {ago(view.received_at)}.
             {stale && <span data-testid="stale" className="ml-1 text-amber-300">That is a while ago: CORE may not be running, so what is shown may be out of date.</span>}
           </p>
 

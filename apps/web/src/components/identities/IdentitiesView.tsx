@@ -12,6 +12,7 @@ import { identitiesApi, msspApi, type IdentityPerson, type IdentityQuery, type I
 import VendorBadge from '@/components/mssp/VendorBadge';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { safeDistance } from '@/lib/safe-date';
+import { daysAgo } from '@/lib/ago';
 
 const SEVERITY_STYLE: Record<string, string> = {
   critical: 'bg-red-500/15 text-red-300 border-red-500/30',
@@ -47,8 +48,7 @@ const SORT_FOR_COLUMN: Record<string, IdentitySort> = { person: 'email', client:
 
 /** How long ago a ticket was opened, in whole days ("today", "1 day ago", "12 days ago"). */
 export function ticketAge(openedAt: string, now: number = Date.now()): string {
-  const days = Math.max(0, Math.floor((now - new Date(openedAt).getTime()) / 86_400_000));
-  return days === 0 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`;
+  return daysAgo(openedAt, { now, missing: 'date unknown' });
 }
 
 function SortHeader({ col, label, sort, onSort }: { col: keyof typeof SORT_FOR_COLUMN; label: string; sort: IdentitySort; onSort: (s: IdentitySort) => void }) {

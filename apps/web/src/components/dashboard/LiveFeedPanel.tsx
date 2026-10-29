@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useRealtimeChannel, type RealtimeStatus } from '@/lib/realtime';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
+import { ago } from '@/lib/ago';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
@@ -84,15 +85,7 @@ function normalizeSeverity(value: unknown): Severity {
 }
 
 function relativeTime(receivedAt: number, now: number): string {
-  const diff = Math.max(0, Math.floor((now - receivedAt) / 1000));
-  if (diff < 1) return 'just now';
-  if (diff < 60) return `${diff}s ago`;
-  const minutes = Math.floor(diff / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return ago(receivedAt, { now, style: 'short', seconds: true });
 }
 
 export type PillTone = 'live' | 'waiting' | 'reconnect' | 'offline';

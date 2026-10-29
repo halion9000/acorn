@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import useSWR from 'swr';
 import { alertsApi } from '@/lib/api';
+import { ago } from '@/lib/ago';
 
 /** How long after the request the alert is read again: CORE collects a request within about 15 seconds, then reads the tool and reports back. */
 export const REFRESH_CHECKS_MS = [20_000, 40_000, 60_000] as const;
@@ -13,13 +14,7 @@ export const REFRESH_CHECKS_MS = [20_000, 40_000, 60_000] as const;
  */
 /** "just now", "4 min ago", "3 h ago", "2 days ago" for a time in the past; empty for one that cannot be read. */
 export function agoLabel(iso: string | null | undefined, now: number = Date.now()): string {
-  const t = iso ? new Date(iso).getTime() : NaN;
-  if (Number.isNaN(t)) return '';
-  const min = Math.max(0, Math.floor((now - t) / 60_000));
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min} min ago`;
-  if (min < 48 * 60) return `${Math.floor(min / 60)} h ago`;
-  return `${Math.floor(min / 1440)} days ago`;
+  return ago(iso, { now, style: 'short', missing: '' });
 }
 
 export function RefreshStatusButton({ alertId, onRefreshed }: { alertId: string; onRefreshed: () => void }) {

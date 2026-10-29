@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const api = vi.hoisted(() => ({ hideType: vi.fn(), suppressions: vi.fn(), liftSuppression: vi.fn() }));
@@ -128,6 +128,33 @@ describe('the hidden alert types page', () => {
     api.suppressions.mockRejectedValue(new Error('API 500'));
     view();
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the hidden alert types: API 500');
+  });
+
+  it('shows ? for a count that could not be read, and a real 0 as 0', async () => {
+    api.suppressions.mockResolvedValue([out({ id: 'r1', hidden_alerts: null }), out({ id: 'r2', hidden_alerts: 0 })]);
+    view();
+    const rows = await screen.findAllByTestId('rule');
+    expect(rows[0]).toHaveTextContent('?');
+    expect(within(rows[0]).getByTestId('uncounted')).toHaveAttribute('aria-label', 'could not be counted');
+    expect(within(rows[1]).queryByTestId('uncounted')).toBeNull();
+    expect(rows[1]).toHaveTextContent('0');
+  });
+
+  it('says so when the list is as long as the most the API sends', async () => {
+    api.suppressions.mockResolvedValue(Array.from({ length: 500 }, (_, i) => out({ id: `r${i}`, title: `T${i}` })));
+    view();
+    expect(await screen.findByTestId('cut')).toHaveTextContent('Showing the newest 500 rules');
+    api.suppressions.mockResolvedValue([out()]);
+    view();
+    await waitFor(() => expect(screen.getAllByTestId('rule').length).toBeGreaterThan(0));
+  });
+
+  it('lifting a rule whose count was unknown does not say NaN or "alerts" of nothing', async () => {
+    api.suppressions.mockResolvedValue([out({ id: 'r1', hidden_alerts: null })]);
+    api.liftSuppression.mockResolvedValue(out({ hidden_alerts: null, active: false }));
+    view();
+    await userEvent.click(await screen.findByRole('button', { name: /Stop hiding/ }));
+    await waitFor(() => expect(api.liftSuppression).toHaveBeenCalledWith('r1'));
   });
 
   it('describes coverage and timing in words', () => {

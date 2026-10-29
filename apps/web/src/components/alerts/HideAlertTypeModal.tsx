@@ -43,7 +43,8 @@ export function HideAlertTypeModal({ open, onClose, alert, onHidden }: Props) {
     setBusy(true);
     try {
       const out = await alertsApi.hideType({ alertId: alert.id, scope, days: indefinite ? null : parsed, device: scope === 'device' ? device : undefined });
-      toast.success(out.hidden_alerts > 0 ? `Hidden: ${out.hidden_alerts} alert${out.hidden_alerts === 1 ? '' : 's'} of this type` : 'This alert type is hidden');
+      const hidden = out.hidden_alerts ?? 0;
+      toast.success(hidden > 0 ? `Hidden: ${hidden} alert${hidden === 1 ? '' : 's'} of this type` : 'This alert type is hidden');
       onHidden?.();
       onClose();
     } catch (err) {

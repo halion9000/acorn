@@ -37,6 +37,53 @@ describe('summaryLine / agoWords', () => {
   });
 });
 
+describe('ClientDocs, when things go wrong', () => {
+  it('a summary that could not be read says so, not that nothing has been read from IT Glue', async () => {
+    route({ '/api/v1/client-documents/summary': () => json({}, 500) });
+    render(<ClientDocs />);
+    expect(await screen.findByTestId('summary-error')).toHaveTextContent('Could not read what has been synced from IT Glue: The API answered 500');
+    expect(screen.queryByTestId('docs-summary')).toBeNull();
+  });
+
+  it('a refused summary says the person has no access', async () => {
+    route({ '/api/v1/client-documents/summary': () => json({}, 403) });
+    render(<ClientDocs />);
+    expect(await screen.findByTestId('summary-error')).toHaveTextContent("You do not have access to the clients' documentation.");
+  });
+
+  it('a network failure on the summary is shown with its message', async () => {
+    authFetch.mockRejectedValue(new Error('network down'));
+    render(<ClientDocs />);
+    expect(await screen.findByTestId('summary-error')).toHaveTextContent('network down');
+  });
+
+  it('a slower answer to an older search does not replace the newer one', async () => {
+    let releaseSlow: (v: unknown) => void = () => undefined;
+    const slow = new Promise((resolve) => {
+      releaseSlow = resolve;
+    });
+    const hit = (title: string) => [{ client_id: 'c-1', client: 'Airport Security Park', kind: 'document', title, folder: null, url: null, snippet: 's' }];
+    authFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/v1/client-documents/summary')) return json(SUMMARY);
+      if (url.includes('q=first')) return slow;
+      return json(hit('The newer answer'));
+    });
+    render(<ClientDocs />);
+    await screen.findByTestId('docs-summary');
+    const box = screen.getByLabelText('Search the documentation');
+    fireEvent.change(box, { target: { value: 'first search' } });
+    fireEvent.click(screen.getByRole('button', { name: /Search/ }));
+    fireEvent.change(box, { target: { value: 'second search' } });
+    fireEvent.submit(box.closest('form') as HTMLFormElement);
+    expect(await screen.findByText('The newer answer')).toBeInTheDocument();
+    releaseSlow(json(hit('The older answer')));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText('The older answer')).toBeNull();
+    expect(screen.getByText('The newer answer')).toBeInTheDocument();
+    expect(screen.getByTestId('docs-results')).toHaveTextContent('second search');
+  });
+});
+
 describe('ClientDocs', () => {
   it('says nothing has been read yet when there is no documentation, and offers no client picker', async () => {
     route({ '/api/v1/client-documents/summary': () => json([]) });

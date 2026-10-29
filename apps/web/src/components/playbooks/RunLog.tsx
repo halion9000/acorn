@@ -25,11 +25,23 @@ export function playbookChoices(runs: PlaybookRun[]): PlaybookChoice[] {
   return [...by.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** The runs of one playbook (or all of them when none is picked), newest first. */
+/** The runs of one playbook (or all of them when none is picked), newest first. A run with no start time (one still waiting to start) goes last, in the same order every time. */
 export function runsFor(runs: PlaybookRun[], playbookId: string): PlaybookRun[] {
+  const started = (r: PlaybookRun): number | null => {
+    const t = Date.parse(r.started_at ?? '');
+    return Number.isNaN(t) ? null : t;
+  };
   return runs
     .filter((r) => !playbookId || r.playbook_id === playbookId)
-    .sort((a, b) => Date.parse(b.started_at ?? '') - Date.parse(a.started_at ?? '') || 0);
+    .sort((a, b) => {
+      const x = started(a);
+      const y = started(b);
+      // NaN in a comparator makes the order depend on the engine; compare numbers only.
+      if (x !== null && y !== null && x !== y) return y - x;
+      if (x === null && y !== null) return 1;
+      if (x !== null && y === null) return -1;
+      return a.run_id.localeCompare(b.run_id);
+    });
 }
 
 /** "12 s", "3 min 5 s" or "" when the run has not both started and finished. */
@@ -131,7 +143,8 @@ export function RunLog({ runs }: { runs: PlaybookRun[] }) {
                 {run.steps.slice(0, 8).map((s) => {
                   const dot =
                     s.status === 'completed' ? 'bg-green-500' : s.status === 'failed' ? 'bg-red-500' : s.status === 'running' ? 'bg-blue-400 animate-pulse' : s.status === 'skipped' ? 'bg-gray-700' : 'bg-gray-800';
-                  return <div key={s.step_id} className={`w-2 h-2 rounded-full ${dot}`} title={`${s.step_name}: ${s.status}`} />;
+                  // The colour is not the only thing that says how a step went: the dot has a name a screen reader reads.
+                  return <div key={s.step_id} role="img" aria-label={`${s.step_name}: ${s.status}`} className={`w-2 h-2 rounded-full ${dot}`} title={`${s.step_name}: ${s.status}`} />;
                 })}
                 {run.steps.length > 8 && <span className="text-xs text-gray-700">+{run.steps.length - 8}</span>}
               </div>

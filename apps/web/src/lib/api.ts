@@ -1501,7 +1501,8 @@ export interface AlertSuppression {
   indefinite: boolean;
   created_at: string;
   active: boolean;
-  hidden_alerts: number;
+  /** How many alerts the rule hides now; null when that could not be counted (not the same as 0). */
+  hidden_alerts: number | null;
 }
 
 export const alertsApi = {
@@ -1529,8 +1530,9 @@ export const alertsApi = {
     }>('/api/v1/alerts', {
       // The API query names are snake_case; pageSize and clientId would otherwise be ignored. (No apostrophes or backticks in comments inside a call: the B11 parser reads them as quotes.)
       params: (() => {
-        const { pageSize, clientId, ...rest } = filters;
-        return { ...rest, page_size: pageSize, client_id: clientId } as unknown as Record<string, string>;
+        const { pageSize, clientId, user, ...rest } = filters;
+        // The API calls the person filter person: a query parameter named user reads like the signed-in user.
+        return { ...rest, page_size: pageSize, client_id: clientId, person: user } as unknown as Record<string, string>;
       })(),
     });
     return {

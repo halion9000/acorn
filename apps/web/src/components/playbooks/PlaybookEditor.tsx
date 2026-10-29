@@ -614,6 +614,8 @@ export function PlaybookEditor({ playbookId }: PlaybookEditorProps) {
           onClick={() => setShowAddStep(false)}
         >
           <div
+            role="dialog" aria-modal="true"
+            aria-label="Choose step type"
             className="bg-gray-900 border border-gray-700 rounded-xl p-5 w-80 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >

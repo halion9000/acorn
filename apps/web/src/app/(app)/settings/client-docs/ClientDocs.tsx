@@ -5,9 +5,10 @@
  * (GET /api/v1/client-documents) and links back to the record in IT Glue. A password entry shows its name and user name and a link: the password itself is never held, and it is masked in IT Glue until a
  * person with access reveals it.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
+import { ago } from "@/lib/ago";
 
 export interface DocHit {
   client_id: string;
@@ -37,13 +38,7 @@ export const KIND_LABELS: Record<string, string> = {
 
 /** How long ago, in plain words. */
 export function agoWords(iso: string | null, now: number = Date.now()): string {
-  if (!iso) return "never";
-  const minutes = Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000));
-  if (Number.isNaN(minutes)) return "never";
-  if (minutes < 2) return "just now";
-  if (minutes < 120) return `${minutes} minutes ago`;
-  if (minutes < 60 * 48) return `${Math.floor(minutes / 60)} hours ago`;
-  return `${Math.floor(minutes / 1440)} days ago`;
+  return ago(iso, { now, missing: "never" });
 }
 
 /** The totals line: how many records, for how many clients, and when the newest was refreshed. */
@@ -57,6 +52,10 @@ const isHttps = (u: string | null | undefined): u is string => typeof u === "str
 
 export function ClientDocs() {
   const [summary, setSummary] = useState<DocSummary[] | null>(null);
+  // Set when the summary could not be read: that is not the same as "nothing has been read yet".
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  // Which search is the latest: a slower answer to an older one must not replace a newer answer.
+  const latestSearch = useRef(0);
   const [q, setQ] = useState("");
   const [clientId, setClientId] = useState("");
   const [hits, setHits] = useState<DocHit[] | null>(null);
@@ -69,10 +68,14 @@ export function ClientDocs() {
     void (async () => {
       try {
         const res = await authFetch("/api/v1/client-documents/summary");
-        if (res.ok && live) setSummary((await res.json()) as DocSummary[]);
-        else if (live) setSummary([]);
-      } catch {
-        if (live) setSummary([]);
+        if (!res.ok) throw new Error(res.status === 403 ? "You do not have access to the clients' documentation." : `The API answered ${res.status}`);
+        const rows = (await res.json()) as DocSummary[];
+        if (live) setSummary(Array.isArray(rows) ? rows : []);
+      } catch (e) {
+        if (live) {
+          setSummary(null);
+          setSummaryError(e instanceof Error ? e.message : String(e));
+        }
       }
     })();
     return () => {
@@ -85,6 +88,7 @@ export function ClientDocs() {
       event?.preventDefault();
       const text = q.trim();
       if (text.length < 2) return;
+      const mine = ++latestSearch.current;
       setBusy(true);
       setError(null);
       try {
@@ -92,12 +96,14 @@ export function ClientDocs() {
         if (clientId) params.set("client_id", clientId);
         const res = await authFetch(`/api/v1/client-documents?${params.toString()}`);
         if (!res.ok) throw new Error(res.status === 403 ? "You do not have access to the clients' documentation." : `The API answered ${res.status}`);
-        setHits((await res.json()) as DocHit[]);
+        const found = (await res.json()) as DocHit[];
+        if (mine !== latestSearch.current) return; // a newer search has been asked since
+        setHits(found);
         setAsked(text);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        if (mine === latestSearch.current) setError(e instanceof Error ? e.message : String(e));
       } finally {
-        setBusy(false);
+        if (mine === latestSearch.current) setBusy(false);
       }
     },
     [q, clientId],
@@ -112,6 +118,11 @@ export function ClientDocs() {
         <p className="mt-1 max-w-prose text-sm text-slate-400">
           What IT Glue says about each client: documents, runbooks, configurations, locations and password entries. Search by a word, a question, or a client&apos;s name. Password entries show a link, never the password.
         </p>
+        {summaryError !== null && (
+          <p data-testid="summary-error" role="alert" className="mt-1 text-xs text-red-300">
+            Could not read what has been synced from IT Glue: {summaryError}
+          </p>
+        )}
         {summary !== null && (
           <p data-testid="docs-summary" className="mt-1 text-xs text-slate-500">
             {summary.length === 0

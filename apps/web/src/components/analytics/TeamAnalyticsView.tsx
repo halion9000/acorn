@@ -139,13 +139,13 @@ function CasesBehind({ cases, kind, days, now }: { cases: Case[]; kind: CardKind
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-800/60 text-xs uppercase tracking-wider text-gray-500">
-                <th className="pb-2 pr-3 font-medium">Case</th>
-                <th className="pb-2 pr-3 font-medium">Client</th>
-                <th className="pb-2 pr-3 font-medium">Assigned to</th>
-                <th className="pb-2 pr-3 font-medium">Severity</th>
-                <th className="pb-2 pr-3 font-medium">Opened</th>
-                {closedKind ? <th className="pb-2 pr-3 font-medium">Closed</th> : null}
-                {closedKind ? <th className="pb-2 font-medium text-right">Took</th> : null}
+                <th scope="col" className="pb-2 pr-3 font-medium">Case</th>
+                <th scope="col" className="pb-2 pr-3 font-medium">Client</th>
+                <th scope="col" className="pb-2 pr-3 font-medium">Assigned to</th>
+                <th scope="col" className="pb-2 pr-3 font-medium">Severity</th>
+                <th scope="col" className="pb-2 pr-3 font-medium">Opened</th>
+                {closedKind ? <th scope="col" className="pb-2 pr-3 font-medium">Closed</th> : null}
+                {closedKind ? <th scope="col" className="pb-2 font-medium text-right">Took</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800/40">
@@ -361,11 +361,11 @@ export function TeamAnalyticsView() {
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-gray-800/60 text-xs uppercase tracking-wider text-gray-500">
-                      <th className="pb-3 pr-3 font-medium w-12">#</th>
-                      <th className="pb-3 pr-3 font-medium">Analyst</th>
-                      <th className="pb-3 pr-3 font-medium text-right">Closed ({days}d)</th>
-                      <th className="pb-3 pr-3 font-medium text-right">Avg Time</th>
-                      <th className="pb-3 font-medium text-right">Open Now</th>
+                      <th scope="col" className="pb-3 pr-3 font-medium w-12">#</th>
+                      <th scope="col" className="pb-3 pr-3 font-medium">Analyst</th>
+                      <th scope="col" className="pb-3 pr-3 font-medium text-right">Closed ({days}d)</th>
+                      <th scope="col" className="pb-3 pr-3 font-medium text-right">Avg Time</th>
+                      <th scope="col" className="pb-3 font-medium text-right">Open Now</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800/40">

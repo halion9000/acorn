@@ -6,25 +6,12 @@
  * touching desktop console behavior.
  */
 
+import { ago } from '@/lib/ago';
 import type { AlertSeverity, AlertStatus, CaseSeverity, CaseStatus } from '@/lib/api';
 
 /** Compact, human-friendly relative time ("3m ago", "2d ago"). */
 export function formatRelative(timestamp: string | null | undefined): string {
-  if (!timestamp) return '—';
-  const now = Date.now();
-  const then = new Date(timestamp).getTime();
-  if (Number.isNaN(then)) return '—';
-  const delta = Math.max(0, now - then);
-  const seconds = Math.round(delta / 1000);
-  if (seconds < 5) return 'just now';
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(timestamp).toLocaleDateString();
+  return ago(timestamp, { style: 'short', seconds: true, justNowSeconds: 5, missing: '—', dateAfterDays: 7 });
 }
 
 /** Inverse: "until 3:42pm" / "for 25m". */

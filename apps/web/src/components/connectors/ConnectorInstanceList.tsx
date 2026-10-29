@@ -23,6 +23,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import type { Connector } from '@/lib/api';
 import { ConnectorLogDrawer } from './ConnectorLogDrawer';
+import { ago } from '@/lib/ago';
 
 const CONNECTOR_LABELS: Record<string, string> = {
   crowdstrike: 'CS',
@@ -73,15 +74,7 @@ const STATUS_CONFIG: Record<
 };
 
 function formatLastSync(ts?: string): string {
-  if (!ts) return 'never';
-  const diff = Date.now() - new Date(ts).getTime();
-  if (Number.isNaN(diff)) return 'never';
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  return ago(ts, { style: 'short', missing: 'never' });
 }
 
 /**

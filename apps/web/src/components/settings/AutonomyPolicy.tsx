@@ -51,16 +51,16 @@ const BLAST_TONE: Record<AutonomyBlastRadius, string> = {
   unknown: 'bg-gray-500/10 text-gray-300 ring-gray-500/30',
 };
 
-function clamp(n: number, lo = 0, hi = 1): number {
+export function clamp(n: number, lo = 0, hi = 1): number {
   if (Number.isNaN(n)) return lo;
   return Math.min(hi, Math.max(lo, n));
 }
 
-function formatPct(n: number): string {
+export function formatPct(n: number): string {
   return `${(n * 100).toFixed(0)}%`;
 }
 
-function thresholdsEqual(
+export function thresholdsEqual(
   a: AutonomyThresholdTriple,
   b: AutonomyThresholdTriple,
 ): boolean {
@@ -71,14 +71,16 @@ function thresholdsEqual(
   );
 }
 
-function validate(
+export function validate(
   draft: AutonomyThresholdTriple,
 ): { ok: true } | { ok: false; reason: string } {
-  if (draft.auto < 0 || draft.auto > 1)
+  // NaN (an empty or half-typed field) is neither below 0 nor above 1, so it used to pass every comparison and be saved.
+  const outside = (n: number) => !Number.isFinite(n) || n < 0 || n > 1;
+  if (outside(draft.auto))
     return { ok: false, reason: 'auto must be between 0 and 1' };
-  if (draft.review < 0 || draft.review > 1)
+  if (outside(draft.review))
     return { ok: false, reason: 'review must be between 0 and 1' };
-  if (draft.escalation < 0 || draft.escalation > 1)
+  if (outside(draft.escalation))
     return { ok: false, reason: 'escalation must be between 0 and 1' };
   if (draft.review > draft.auto)
     return { ok: false, reason: 'review must be ≤ auto' };

@@ -13,10 +13,18 @@ import VendorBadge from '@/components/mssp/VendorBadge';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
 
 export default function UnmappedDevices() {
-  const { data } = useSWR('devices-unmapped', () => devicesApi.unmapped().catch(() => []), { revalidateOnFocus: false });
+  const { data, error } = useSWR('devices-unmapped', () => devicesApi.unmapped(), { revalidateOnFocus: false });
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const groups = data ?? [];
+  // A failed read is not "nothing is waiting": say so, in one line, where the panel would be.
+  if (error && groups.length === 0) {
+    return (
+      <p role="alert" data-testid="unmapped-error" className="rounded border border-amber-500/40 bg-amber-500/5 px-4 py-2 text-xs text-amber-200">
+        Could not check for devices waiting for a client{error instanceof Error && error.message ? `: ${error.message}` : ''}.
+      </p>
+    );
+  }
   if (groups.length === 0) return null;
   const total = groups.reduce((n, g) => n + g.devices, 0);
 
@@ -34,11 +42,11 @@ export default function UnmappedDevices() {
           <table className="min-w-full text-left text-sm">
             <thead className="text-xs uppercase text-gray-500">
               <tr>
-                <th className="px-2 py-1">Tool</th>
-                <th className="px-2 py-1">Its client</th>
-                <th className="px-2 py-1 text-right">Devices</th>
-                <th className="px-2 py-1">Machines</th>
-                <th className="px-2 py-1" />
+                <th scope="col" className="px-2 py-1">Tool</th>
+                <th scope="col" className="px-2 py-1">Its client</th>
+                <th scope="col" className="px-2 py-1 text-right">Devices</th>
+                <th scope="col" className="px-2 py-1">Machines</th>
+                <th scope="col" className="px-2 py-1"><span className="sr-only">Map clients</span></th>
               </tr>
             </thead>
             <tbody>

@@ -174,13 +174,13 @@ function Worst() {
     <table className="w-full text-left text-sm" data-testid="fleet-worst">
       <thead className="text-xs uppercase text-slate-500">
         <tr>
-          <th className="py-1 pr-3">Client</th>
-          <th className="pr-3">Score</th>
-          <th className="pr-3">Target</th>
-          <th className="pr-3">Problems</th>
-          <th className="pr-3">Need attention</th>
-          <th className="pr-3">Accepted</th>
-          <th>Not updating</th>
+          <th scope="col" className="py-1 pr-3">Client</th>
+          <th scope="col" className="pr-3">Score</th>
+          <th scope="col" className="pr-3">Target</th>
+          <th scope="col" className="pr-3">Problems</th>
+          <th scope="col" className="pr-3">Need attention</th>
+          <th scope="col" className="pr-3">Accepted</th>
+          <th scope="col">Not updating</th>
         </tr>
       </thead>
       <tbody>
@@ -290,11 +290,11 @@ function Board({ board, title, source }: { board: string; title: string; source?
     <table className="w-full text-left text-sm" data-testid={`fleet-board-${board}`}>
       <thead className="text-xs uppercase text-slate-500">
         <tr>
-          <th className="w-6 py-1 print:hidden" />
-          <th className="py-1 pr-3">Client</th>
-          <th className="pr-3">Tool</th>
-          <th className="pr-3">Status</th>
-          <th>What it saw</th>
+          <th scope="col" className="w-6 py-1 print:hidden"><span className="sr-only">Actions</span></th>
+          <th scope="col" className="py-1 pr-3">Client</th>
+          <th scope="col" className="pr-3">Tool</th>
+          <th scope="col" className="pr-3">Status</th>
+          <th scope="col">What it saw</th>
         </tr>
       </thead>
       <tbody>
@@ -354,9 +354,9 @@ function CoverageTab() {
       <table className="text-left text-xs" data-testid="fleet-coverage">
         <thead className="text-slate-500">
           <tr>
-            <th className="py-1 pr-3">Client</th>
+            <th scope="col" className="py-1 pr-3">Client</th>
             {data.tools.map((t) => (
-              <th key={t.vendor} className="px-2 text-center" title={`${t.clients} clients`}>
+              <th scope="col" key={t.vendor} className="px-2 text-center" title={`${t.clients} clients`}>
                 {TOOL_CHECK_LABELS[t.vendor] ?? t.vendor}
               </th>
             ))}
@@ -449,10 +449,10 @@ function Accepted() {
         <table className="w-full text-left text-sm" data-testid="fleet-accepted">
           <thead className="text-xs uppercase text-slate-500">
             <tr>
-              <th className="py-1 pr-3">Client</th>
-              <th className="pr-3">Check</th>
-              <th className="pr-3">Why</th>
-              <th>Until</th>
+              <th scope="col" className="py-1 pr-3">Client</th>
+              <th scope="col" className="pr-3">Check</th>
+              <th scope="col" className="pr-3">Why</th>
+              <th scope="col">Until</th>
             </tr>
           </thead>
           <tbody>
@@ -515,10 +515,10 @@ function Search({ initialQ = "", onAsked }: { initialQ?: string; onAsked?: (q: s
         <table className="w-full text-left text-sm" data-testid="fleet-search">
           <thead className="text-xs uppercase text-slate-500">
             <tr>
-              <th className="py-1 pr-3">Client</th>
-              <th className="pr-3">Tool</th>
-              <th className="pr-3">Status</th>
-              <th>Found in</th>
+              <th scope="col" className="py-1 pr-3">Client</th>
+              <th scope="col" className="pr-3">Tool</th>
+              <th scope="col" className="pr-3">Status</th>
+              <th scope="col">Found in</th>
             </tr>
           </thead>
           <tbody>
@@ -598,11 +598,11 @@ function Tools() {
           <table className="w-full text-left text-sm" data-testid="fleet-tools">
             <thead className="text-xs uppercase text-slate-500">
               <tr>
-                <th className="py-1 pr-3">Tool</th>
-                <th className="pr-3">Fine</th>
-                <th className="pr-3">Problems</th>
-                <th className="pr-3">Need attention</th>
-                <th>Clients affected</th>
+                <th scope="col" className="py-1 pr-3">Tool</th>
+                <th scope="col" className="pr-3">Fine</th>
+                <th scope="col" className="pr-3">Problems</th>
+                <th scope="col" className="pr-3">Need attention</th>
+                <th scope="col">Clients affected</th>
               </tr>
             </thead>
             <tbody>

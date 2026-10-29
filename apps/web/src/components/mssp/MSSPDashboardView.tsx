@@ -296,18 +296,18 @@ export default function MSSPDashboardView() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-800/60 text-left text-gray-400">
-                      <th className="px-5 py-3 font-medium">Tenant</th>
-                      <th className="px-5 py-3 font-medium">Integrations</th>
-                      <th className="px-5 py-3 font-medium text-right">Open Alerts</th>
-                      <th className="px-5 py-3 font-medium text-right">Critical</th>
-                      <th className="px-5 py-3 font-medium text-right">Open Cases</th>
-                      <th className="px-5 py-3 font-medium text-right">MTTR (min)</th>
-                      <th className="px-5 py-3 font-medium text-right">SLA Breaches</th>
-                      <th className="px-5 py-3 font-medium text-right">Connectors</th>
-                      <th className="px-5 py-3 font-medium text-right">Health</th>
-                      <th className="px-5 py-3 font-medium">Last Snapshot</th>
-                      <th className="px-5 py-3 font-medium" title="Which clients automated playbooks may run for. Playbooks do not start by themselves yet; this records the choice.">Automated playbooks</th>
-                      <th className="px-5 py-3 font-medium" />
+                      <th scope="col" className="px-5 py-3 font-medium">Tenant</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Integrations</th>
+                      <th scope="col" className="px-5 py-3 font-medium text-right">Open Alerts</th>
+                      <th scope="col" className="px-5 py-3 font-medium text-right">Critical</th>
+                      <th scope="col" className="px-5 py-3 font-medium text-right">Open Cases</th>
+                      <th scope="col" className="px-5 py-3 font-medium text-right">MTTR (min)</th>
+                      <th scope="col" className="px-5 py-3 font-medium text-right">SLA Breaches</th>
+                      <th scope="col" className="px-5 py-3 font-medium text-right">Connectors</th>
+                      <th scope="col" className="px-5 py-3 font-medium text-right">Health</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Last Snapshot</th>
+                      <th scope="col" className="px-5 py-3 font-medium" title="Which clients automated playbooks may run for. Playbooks do not start by themselves yet; this records the choice.">Automated playbooks</th>
+                      <th scope="col" className="px-5 py-3 font-medium"><span className="sr-only">Actions</span></th>
                     </tr>
                   </thead>
                   <tbody>

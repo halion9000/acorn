@@ -297,7 +297,7 @@ function EntityDetailDrawer({
         onClick={onClose}
         aria-hidden="true"
       />
-      <aside className="w-[480px] max-w-[90vw] bg-gray-950 border-l border-gray-800 overflow-y-auto">
+      <aside role="dialog" aria-modal="true" aria-label="Entity risk details" className="w-[480px] max-w-[90vw] bg-gray-950 border-l border-gray-800 overflow-y-auto">
         <header className="px-5 py-4 border-b border-gray-800 flex items-start justify-between gap-3 sticky top-0 bg-gray-950 z-10">
           <div className="min-w-0">
             <div className="flex items-center gap-2">

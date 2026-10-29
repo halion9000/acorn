@@ -188,12 +188,12 @@ function Totals() {
         <table className="w-full text-left text-sm" data-testid="billing-totals">
           <thead className="text-xs uppercase text-slate-500">
             <tr>
-              <th className="py-1 pr-3">Tool</th>
-              <th className="pr-3">Item</th>
-              <th className="pr-3">Clients</th>
-              <th className="pr-3">Total</th>
-              <th className="pr-3">Not assigned</th>
-              <th>Change</th>
+              <th scope="col" className="py-1 pr-3">Tool</th>
+              <th scope="col" className="pr-3">Item</th>
+              <th scope="col" className="pr-3">Clients</th>
+              <th scope="col" className="pr-3">Total</th>
+              <th scope="col" className="pr-3">Not assigned</th>
+              <th scope="col">Change</th>
             </tr>
           </thead>
           <tbody>
@@ -301,13 +301,13 @@ function ByClient() {
         <table className="w-full text-left text-sm" data-testid="billing-client">
           <thead className="text-xs uppercase text-slate-500">
             <tr>
-              <th className="py-1 pr-3">Tool</th>
-              <th className="pr-3">Item</th>
-              <th className="pr-3">Count</th>
-              <th className="pr-3">Not assigned</th>
-              <th className="pr-3">Change</th>
-              <th className="pr-3">First seen</th>
-              <th className="print:hidden" />
+              <th scope="col" className="py-1 pr-3">Tool</th>
+              <th scope="col" className="pr-3">Item</th>
+              <th scope="col" className="pr-3">Count</th>
+              <th scope="col" className="pr-3">Not assigned</th>
+              <th scope="col" className="pr-3">Change</th>
+              <th scope="col" className="pr-3">First seen</th>
+              <th scope="col" className="print:hidden"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -440,12 +440,12 @@ function Reconcile() {
         <table className="w-full text-left text-sm" data-testid="billing-reconcile">
           <thead className="text-xs uppercase text-slate-500">
             <tr>
-              <th className="py-1 pr-3">Client</th>
-              <th className="pr-3">Invoice line</th>
-              <th className="pr-3">Billed</th>
-              <th className="pr-3">Counted</th>
-              <th className="pr-3">Difference</th>
-              <th className="print:hidden" />
+              <th scope="col" className="py-1 pr-3">Client</th>
+              <th scope="col" className="pr-3">Invoice line</th>
+              <th scope="col" className="pr-3">Billed</th>
+              <th scope="col" className="pr-3">Counted</th>
+              <th scope="col" className="pr-3">Difference</th>
+              <th scope="col" className="print:hidden"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -682,11 +682,11 @@ function Changes() {
         <table className="w-full text-left text-sm" data-testid="billing-changes">
           <thead className="text-xs uppercase text-slate-500">
             <tr>
-              <th className="py-1 pr-3">When</th>
-              <th className="pr-3">Client</th>
-              <th className="pr-3">Tool</th>
-              <th className="pr-3">Item</th>
-              <th>Count</th>
+              <th scope="col" className="py-1 pr-3">When</th>
+              <th scope="col" className="pr-3">Client</th>
+              <th scope="col" className="pr-3">Tool</th>
+              <th scope="col" className="pr-3">Item</th>
+              <th scope="col">Count</th>
             </tr>
           </thead>
           <tbody>
@@ -729,11 +729,11 @@ function DataQuality() {
           <table className="w-full text-left text-sm" data-testid="billing-disagree">
             <thead className="text-xs uppercase text-slate-500">
               <tr>
-                <th className="py-1 pr-3">Client</th>
-                <th className="pr-3">Tool</th>
-                <th className="pr-3">Tool counts</th>
-                <th className="pr-3">NinjaOne manages</th>
-                <th>Gap</th>
+                <th scope="col" className="py-1 pr-3">Client</th>
+                <th scope="col" className="pr-3">Tool</th>
+                <th scope="col" className="pr-3">Tool counts</th>
+                <th scope="col" className="pr-3">NinjaOne manages</th>
+                <th scope="col">Gap</th>
               </tr>
             </thead>
             <tbody>
@@ -778,9 +778,9 @@ function DataQuality() {
           <table className="w-full text-left text-sm" data-testid="billing-silent">
             <thead className="text-xs uppercase text-slate-500">
               <tr>
-                <th className="py-1 pr-3">Client</th>
-                <th className="pr-3">Tool</th>
-                <th>Last reported</th>
+                <th scope="col" className="py-1 pr-3">Client</th>
+                <th scope="col" className="pr-3">Tool</th>
+                <th scope="col">Last reported</th>
               </tr>
             </thead>
             <tbody>

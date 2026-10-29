@@ -7,6 +7,9 @@ import toast from 'react-hot-toast';
 import { alertsApi, type AlertSuppression } from '@/lib/api';
 import { safeFormat } from '@/lib/safe-date';
 
+/** The API lists at most this many rules (newest first): a list that long may be cut. */
+export const RULE_LIST_CAP = 500;
+
 /** Who a rule covers, in words. */
 export function coverage(r: Pick<AlertSuppression, 'scope' | 'client_name' | 'device'>): string {
   if (r.scope === 'all') return 'All clients';
@@ -30,7 +33,8 @@ export function HiddenAlertTypes() {
     setBusy(r.id);
     try {
       const out = await alertsApi.liftSuppression(r.id);
-      toast.success(out.hidden_alerts > 0 ? `Showing ${out.hidden_alerts} alert${out.hidden_alerts === 1 ? '' : 's'} again` : 'No longer hidden');
+      const back = out.hidden_alerts ?? 0;
+      toast.success(back > 0 ? `Showing ${back} alert${back === 1 ? '' : 's'} again` : 'No longer hidden');
       await mutate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not stop hiding this alert type');
@@ -62,15 +66,21 @@ export function HiddenAlertTypes() {
           Nothing is hidden. Open an alert and press &ldquo;Hide alert type&rdquo; to hide that type of alert.
         </p>
       ) : (
+        <>
+        {(data ?? []).length >= RULE_LIST_CAP && (
+          <p data-testid="cut" role="note" className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+            Showing the newest {RULE_LIST_CAP} rules. There may be older ones that are not listed here.
+          </p>
+        )}
         <table className="w-full text-left text-sm">
           <thead className="text-xs uppercase text-gray-500">
             <tr className="border-b border-gray-800">
-              <th className="px-3 py-2">Alert type</th>
-              <th className="px-3 py-2">Tool</th>
-              <th className="px-3 py-2">Hidden for</th>
-              <th className="px-3 py-2">How long</th>
-              <th className="px-3 py-2 text-right">Hiding now</th>
-              <th className="px-3 py-2" />
+              <th scope="col" className="px-3 py-2">Alert type</th>
+              <th scope="col" className="px-3 py-2">Tool</th>
+              <th scope="col" className="px-3 py-2">Hidden for</th>
+              <th scope="col" className="px-3 py-2">How long</th>
+              <th scope="col" className="px-3 py-2 text-right">Hiding now</th>
+              <th scope="col" className="px-3 py-2"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -80,7 +90,15 @@ export function HiddenAlertTypes() {
                 <td className="px-3 py-2 text-gray-300">{r.source ?? '—'}</td>
                 <td className="px-3 py-2 text-gray-300">{coverage(r)}</td>
                 <td className="px-3 py-2 text-gray-400">{lasts(r)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-gray-200">{r.hidden_alerts}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-200">
+                  {r.hidden_alerts === null ? (
+                    <span title="This could not be counted just now" aria-label="could not be counted" data-testid="uncounted">
+                      ?
+                    </span>
+                  ) : (
+                    r.hidden_alerts
+                  )}
+                </td>
                 <td className="px-3 py-2 text-right">
                   <button
                     type="button"
@@ -96,6 +114,7 @@ export function HiddenAlertTypes() {
             ))}
           </tbody>
         </table>
+        </>
       )}
     </div>
   );

@@ -35,6 +35,21 @@ describe('helpers', () => {
     expect(runsFor(RUNS, '').map((r) => r.run_id)).toEqual(['bbbbbbbbbbbb2', 'cccccccccccc3', 'aaaaaaaaaaaa1']);
     expect(runsFor(RUNS, 'p1').map((r) => r.run_id)).toEqual(['bbbbbbbbbbbb2', 'aaaaaaaaaaaa1']);
   });
+  it('a run with no start time goes last, in the same order whatever order the runs arrive in', () => {
+    const waiting1 = run('dddddddddddd4', 'p1', { status: 'pending', started_at: undefined });
+    const waiting2 = run('eeeeeeeeeeee5', 'p2', { status: 'pending', started_at: undefined });
+    const expected = ['bbbbbbbbbbbb2', 'cccccccccccc3', 'aaaaaaaaaaaa1', 'dddddddddddd4', 'eeeeeeeeeeee5'];
+    for (const order of [[...RUNS, waiting2, waiting1], [waiting1, waiting2, ...RUNS], [RUNS[0], waiting2, RUNS[2], waiting1, RUNS[1]], [waiting2, RUNS[1], waiting1, RUNS[0], RUNS[2]]]) {
+      expect(runsFor(order, '').map((r) => r.run_id)).toEqual(expected);
+    }
+    const garbage = run('ffffffffffff6', 'p1', { started_at: 'not a date' });
+    expect(runsFor([garbage, ...RUNS], '').map((r) => r.run_id)).toEqual(['bbbbbbbbbbbb2', 'cccccccccccc3', 'aaaaaaaaaaaa1', 'ffffffffffff6']);
+  });
+  it('two runs that started at the same moment keep a fixed order', () => {
+    const x = run('xxxxxxxxxxxx9', 'p1');
+    const y = run('yyyyyyyyyyyy8', 'p1');
+    expect(runsFor([x, y], '').map((r) => r.run_id)).toEqual(runsFor([y, x], '').map((r) => r.run_id));
+  });
   it('words a duration, and says nothing when the run has not finished', () => {
     expect(durationText('2026-10-28T10:00:00Z', '2026-10-28T10:00:12Z')).toBe('12 s');
     expect(durationText('2026-10-28T10:00:00Z', '2026-10-28T10:03:05Z')).toBe('3 min 5 s');
@@ -76,5 +91,12 @@ describe('RunLog', () => {
     expect(steps).toHaveTextContent('{"code":403}');
     await user.click(screen.getByRole('button', { name: 'Hide steps of run bbbbbbbbbbbb' }));
     expect(screen.queryByTestId('run-steps')).toBeNull();
+  });
+});
+
+describe('how a step went is not told by colour alone', () => {
+  it('each dot is an image with the step name and its status', () => {
+    render(<RunLog runs={[RUNS[1]]} />);
+    expect(screen.getByRole('img', { name: 'Revoke sessions: failed' })).toBeInTheDocument();
   });
 });
