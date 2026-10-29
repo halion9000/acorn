@@ -1,0 +1,70 @@
+{
+  "route": "cipp-actions",
+  "method": "POST",
+  "body": {
+    "live": false,
+    "all_clients": false,
+    "clients": [],
+    "protected_users": 0,
+    "protected_domains": 0,
+    "max_per_hour": 5,
+    "actions": [
+      {
+        "action": "revoke_sessions",
+        "risk": "low",
+        "reversible": true,
+        "summary": "Sign the person out everywhere (they can sign in again with their password)"
+      },
+      {
+        "action": "disable_user",
+        "risk": "high",
+        "reversible": true,
+        "summary": "Block the account from signing in"
+      },
+      {
+        "action": "enable_user",
+        "risk": "medium",
+        "reversible": true,
+        "summary": "Let a blocked account sign in again"
+      },
+      {
+        "action": "disable_mailbox_rule",
+        "risk": "low",
+        "reversible": true,
+        "summary": "Switch off one inbox rule (it stays, switched off)"
+      },
+      {
+        "action": "remove_mailbox_rule",
+        "risk": "medium",
+        "reversible": false,
+        "summary": "Delete one inbox rule"
+      },
+      {
+        "action": "dismiss_risky_user",
+        "risk": "low",
+        "reversible": false,
+        "summary": "Mark a risky sign-in user as safe in Entra ID Protection"
+      },
+      {
+        "action": "contain_user",
+        "risk": "high",
+        "reversible": false,
+        "summary": "Contain a compromised account: block sign-in, sign out everywhere, switch off its inbox rules"
+      }
+    ],
+    "audit": [
+      {
+        "at": "2026-10-29T10:00:00.000Z",
+        "action": "revoke_sessions",
+        "client_id": "c1",
+        "user": "amy@acme.com",
+        "actor": "playbook",
+        "reason": "alert a1",
+        "result": "dry_run",
+        "code": null,
+        "detail": null,
+        "would_refuse": null
+      }
+    ]
+  }
+}

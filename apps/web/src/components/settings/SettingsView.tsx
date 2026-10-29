@@ -252,6 +252,7 @@ export const MORE_SETTINGS: { href: string; label: string; description: string }
   { href: '/settings/platform-health', label: 'Platform health', description: 'Whether every service is answering' },
   { href: '/settings/costs', label: 'Cost dashboard', description: 'AI spend, automation activity and savings from bringing your own key' },
   { href: '/settings/triage', label: 'Auto-close', description: 'How sure AI triage must be to close an alert itself' },
+  { href: '/settings/cipp-actions', label: 'CIPP actions', description: 'What CORE can do to client Microsoft 365 tenants through CIPP, whether it is switched on, and what it has been asked to do' },
   { href: '/settings/tickets', label: 'Tickets', description: 'The HaloPSA status a resolved incident moves its ticket to' },
 ];
 

@@ -10693,6 +10693,55 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/cipp-actions:
+    post:
+      tags:
+      - cipp-actions
+      summary: Report Core Feed Cipp Actions
+      description: Keep CORE's latest report about its CIPP actions (replacing the
+        one before).
+      operationId: report_core_feed_cipp_actions_api_v1_inbox_core_feed__tenant_token__cipp_actions_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionsReport'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/cipp-actions:
+    get:
+      tags:
+      - cipp-actions
+      summary: What CORE can do through CIPP, its rules, and the last requests
+      operationId: cipp_actions_view_api_v1_cipp_actions_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionsView'
+      security:
+      - HTTPBearer: []
   /api/v1/inbox/core-feed/{tenant_token}/client-documents:
     post:
       tags:
@@ -19943,6 +19992,34 @@ components:
       - count
       title: ActionCount
       description: How many of each kind of action SOC operators took.
+    ActionInfo:
+      properties:
+        action:
+          type: string
+          maxLength: 60
+          minLength: 1
+          title: Action
+        risk:
+          type: string
+          enum:
+          - low
+          - medium
+          - high
+          title: Risk
+        reversible:
+          type: boolean
+          title: Reversible
+        summary:
+          type: string
+          maxLength: 300
+          title: Summary
+      type: object
+      required:
+      - action
+      - risk
+      - reversible
+      - summary
+      title: ActionInfo
     ActionPolicy:
       properties:
         action:
@@ -20013,6 +20090,81 @@ components:
       required:
       - recorded
       title: ActionResultResponse
+    ActionsReport:
+      properties:
+        live:
+          type: boolean
+          title: Live
+        all_clients:
+          type: boolean
+          title: All Clients
+        clients:
+          items:
+            type: string
+            maxLength: 80
+          type: array
+          maxItems: 500
+          title: Clients
+        protected_users:
+          type: integer
+          maximum: 100000.0
+          minimum: 0.0
+          title: Protected Users
+        protected_domains:
+          type: integer
+          maximum: 100000.0
+          minimum: 0.0
+          title: Protected Domains
+        max_per_hour:
+          type: integer
+          maximum: 100.0
+          minimum: 1.0
+          title: Max Per Hour
+        actions:
+          items:
+            $ref: '#/components/schemas/ActionInfo'
+          type: array
+          maxItems: 30
+          title: Actions
+        audit:
+          items:
+            $ref: '#/components/schemas/AuditEntry'
+          type: array
+          maxItems: 100
+          title: Audit
+      type: object
+      required:
+      - live
+      - all_clients
+      - protected_users
+      - protected_domains
+      - max_per_hour
+      - actions
+      title: ActionsReport
+    ActionsView:
+      properties:
+        report:
+          anyOf:
+          - $ref: '#/components/schemas/ActionsReport'
+          - type: 'null'
+        received_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Received At
+        client_names:
+          additionalProperties:
+            type: string
+          type: object
+          title: Client Names
+      type: object
+      required:
+      - report
+      - received_at
+      title: ActionsView
+      description: What the Settings page shows. ``report`` is None until CORE has
+        sent one.
     AddAlertsRequest:
       properties:
         alert_ids:
@@ -22112,6 +22264,71 @@ components:
       - node_count
       - edge_count
       title: AttackPathResponse
+    AuditEntry:
+      properties:
+        at:
+          type: string
+          format: date-time
+          title: At
+        action:
+          type: string
+          maxLength: 60
+          title: Action
+        client_id:
+          type: string
+          maxLength: 80
+          title: Client Id
+        user:
+          anyOf:
+          - type: string
+            maxLength: 320
+          - type: 'null'
+          title: User
+        actor:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Actor
+        reason:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Reason
+        result:
+          type: string
+          enum:
+          - executed
+          - dry_run
+          - refused
+          - failed
+          title: Result
+        code:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Code
+        detail:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Detail
+        would_refuse:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Would Refuse
+      type: object
+      required:
+      - at
+      - action
+      - client_id
+      - result
+      title: AuditEntry
     AuditEventOut:
       properties:
         id:
@@ -34880,6 +35097,14 @@ components:
       required:
       - name
       title: ReportDefinitionBody
+    ReportResponse:
+      properties:
+        stored:
+          type: boolean
+          title: Stored
+          default: true
+      type: object
+      title: ReportResponse
     RerouteOut:
       properties:
         moved:

@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 from app.api.v1.endpoints import billing
+from app.api.v1.endpoints import cipp_actions as cipp_act
 from app.api.v1.endpoints import client_documents as cdocs
 from app.api.v1.endpoints import client_review as cr
 from app.api.v1.endpoints import devices as dev
@@ -47,6 +48,7 @@ MODELS = {
     "directory-audits": ident.DirectoryAuditsReport,
     "person-tickets": idn.PersonTicketsReport,
     "client-documents": cdocs.ClientDocsReport,
+    "cipp-actions": cipp_act.ActionsReport,
     "mfa-users": ident.MfaUsersReport,
     "secure-scores": ident.SecureScoreReport,
     "vcio-reviews": cr.VcioReviewReport,
