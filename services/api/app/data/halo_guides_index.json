@@ -1,0 +1,4997 @@
+[
+{
+"id": "2453",
+"title": "Blocked HTML Content in Rich Text Editors",
+"section": "About Halo"
+},
+{
+"id": "2152",
+"title": "CVE-2024-6200 - Stored Cross-Site Scripting in Tickets",
+"section": "About Halo"
+},
+{
+"id": "2153",
+"title": "CVE-2024-6201 - Emailing Template Injection",
+"section": "About Halo"
+},
+{
+"id": "2154",
+"title": "CVE-2024-6202 - SAML XML Signature Wrapping (XSW)",
+"section": "About Halo"
+},
+{
+"id": "2155",
+"title": "CVE-2024-6203 - Password Reset Poisoning",
+"section": "About Halo"
+},
+{
+"id": "1231",
+"title": "Data Storage And Security",
+"section": "About Halo"
+},
+{
+"id": "1693",
+"title": "Enable HTTP strict transport security (HSTS)",
+"section": "About Halo"
+},
+{
+"id": "1879",
+"title": "Enabling Reference Tokens",
+"section": "About Halo"
+},
+{
+"id": "1175",
+"title": "Enabling Secure Cookies in the Web Application",
+"section": "About Halo"
+},
+{
+"id": "1748",
+"title": "Fair Use Policy",
+"section": "About Halo"
+},
+{
+"id": "2565",
+"title": "Google reCAPTCHA Integration",
+"section": "About Halo"
+},
+{
+"id": "2585",
+"title": "HaloPSA - Standard 16-Hour Onboarding SOW",
+"section": "About Halo"
+},
+{
+"id": "1229",
+"title": "How are user passwords stored?",
+"section": "About Halo"
+},
+{
+"id": "779",
+"title": "Http to Https redirect in web app",
+"section": "About Halo"
+},
+{
+"id": "2338",
+"title": "Introduction to Halo Guides",
+"section": "About Halo"
+},
+{
+"id": "1446",
+"title": "IP Addresses for Whitelisting",
+"section": "About Halo"
+},
+{
+"id": "1695",
+"title": "Protect token signing keys with a certificate",
+"section": "About Halo"
+},
+{
+"id": "1696",
+"title": "Read-only connection for reports",
+"section": "About Halo"
+},
+{
+"id": "2357",
+"title": "Release Notes",
+"section": "About Halo"
+},
+{
+"id": "921",
+"title": "Setting up Two Factor Authentication",
+"section": "About Halo"
+},
+{
+"id": "2456",
+"title": "SQL Injection Vulnerability Patched",
+"section": "About Halo"
+},
+{
+"id": "977",
+"title": "Terminology",
+"section": "About Halo"
+},
+{
+"id": "2573",
+"title": "Update to SAML Validation",
+"section": "About Halo"
+},
+{
+"id": "1694",
+"title": "X.509 for encryption",
+"section": "About Halo"
+},
+{
+"id": "2548",
+"title": "Accessing your On-Prem Logs",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1352",
+"title": "Accounts Codes",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2657",
+"title": "Acknowledgement Email Hierarchy",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1419",
+"title": "Action Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1442",
+"title": "Advanced Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1409",
+"title": "Agents",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1843",
+"title": "Agreements (Contracts)",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2328",
+"title": "AI",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2910",
+"title": "AI Agents",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2906",
+"title": "AI Feature Library Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2923",
+"title": "AI General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1836",
+"title": "Appointment Types",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1812",
+"title": "Approval Processes",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1814",
+"title": "Areas",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1369",
+"title": "Asset Fields",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1367",
+"title": "Asset Groups",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1340",
+"title": "Asset Management General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1370",
+"title": "Asset Relationships",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1371",
+"title": "Asset Statuses",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2159",
+"title": "Asset Templates",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1368",
+"title": "Asset Types",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2949",
+"title": "Asset Workflows",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1815",
+"title": "Automated Tickets",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1349",
+"title": "Billing General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1354",
+"title": "Billing Templates",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1386",
+"title": "Budgets Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1837",
+"title": "Calendars and Appointments General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1380",
+"title": "Call Management General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1817",
+"title": "Call Scripts",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1816",
+"title": "Canned Text Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1808",
+"title": "Categorisation Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1818",
+"title": "Change Management",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2424",
+"title": "Changing your Halo URLs",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2181",
+"title": "Charge Type Overrides Explained",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1350",
+"title": "Charge Types",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1841",
+"title": "Chat",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2618",
+"title": "Chat Profile (for Self-Service Portal) Overrides",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1842",
+"title": "Chat Profiles",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2473",
+"title": "Checking your DB Size",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1353",
+"title": "Contract (Agreement) Types",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1798",
+"title": "Country/Region Codes",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1391",
+"title": "CSV Templates",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2575",
+"title": "Currency",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1439",
+"title": "Custom Buttons",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1435",
+"title": "Custom Fields",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1436",
+"title": "Custom Tables",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1437",
+"title": "Custom Tabs",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2128",
+"title": "Customer Relationships",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1794",
+"title": "Customer Types",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1852",
+"title": "Dashboard Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1344",
+"title": "Department Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2752",
+"title": "Distribution Lists",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2129",
+"title": "Document Management",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1454",
+"title": "Email General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1800",
+"title": "Email Rules",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1803",
+"title": "Email Templates",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1834",
+"title": "Expenses Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2625",
+"title": "FAQ Lists",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1811",
+"title": "Field Groups",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1801",
+"title": "Formatted Emails",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1781",
+"title": "Global Organisation Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1790",
+"title": "Holiday Management",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2609",
+"title": "Home Screen Dashboard Overrides",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2599",
+"title": "Invoice Creation",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2791",
+"title": "Invoice Statuses",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1845",
+"title": "Items & Stock Control General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1844",
+"title": "Knowledge Base",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2600",
+"title": "Labor and Travel",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1869",
+"title": "Language",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2753",
+"title": "Mail Campaign Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2463",
+"title": "Mailbox Overrides",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1799",
+"title": "Mailbox Setup",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2911",
+"title": "MCP Server Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2383",
+"title": "Message Group Overrides",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1043",
+"title": "Multiple New Portals with different branding for one customer [On-Prem]",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1848",
+"title": "Notification Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1849",
+"title": "Notification Template Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1847",
+"title": "Notifications General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2450",
+"title": "On-Prem Instance to Instance Refresh",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2510",
+"title": "On-Premise - Pre-requisites",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1855",
+"title": "Opportunity Type Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1339",
+"title": "Organisation Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2613",
+"title": "Password hashing work factor",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1389",
+"title": "PDF Template Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2907",
+"title": "Platform Intelligence",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1355",
+"title": "Pre-Pay",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1819",
+"title": "Problem Management",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2669",
+"title": "Product Bundles",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1850",
+"title": "Project Management General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2515",
+"title": "Providing your On-Prem Halo DB for Debugging",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1457",
+"title": "Purchase Order Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1791",
+"title": "Qualification Matching",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2558",
+"title": "Quotation Approval Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1458",
+"title": "Quotations General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2547",
+"title": "Quote Status Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1835",
+"title": "Recurring Billing Profiles",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1356",
+"title": "Recurring Invoices",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1387",
+"title": "Remote Support General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1851",
+"title": "Reporting General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1838",
+"title": "Resource Booking",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2448",
+"title": "Restoring a DB Backup",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1408",
+"title": "Roles",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1854",
+"title": "Sales General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1404",
+"title": "Sales Mailboxes Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1858",
+"title": "Sales Order Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1856",
+"title": "Sales View Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1822",
+"title": "Scheduled Tickets",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2619",
+"title": "Screen Layout Overrides",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1870",
+"title": "Security & Performance",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2792",
+"title": "Security Questions",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1862",
+"title": "Self Service Portal Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1865",
+"title": "Service Level Agreements",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2808",
+"title": "Service Search - Order Service Search by Relevance",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1863",
+"title": "Services",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2734",
+"title": "Setting up Monaco SQL Editor On-Prem",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1706",
+"title": "SFTP guide - including SSH Key pair generation and Public key transfer",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1795",
+"title": "Site Contact Types",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1796",
+"title": "Site Fields",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1826",
+"title": "SLA General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2620",
+"title": "SLA Hold Reminder Overrides",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2314",
+"title": "SLA Overrides",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1804",
+"title": "SMS Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1373",
+"title": "Software Licensing",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1859",
+"title": "Software Releases",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1411",
+"title": "Statuses",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1868",
+"title": "Supplier Agreements",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1861",
+"title": "Suppliers",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1357",
+"title": "Surcharges",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1828",
+"title": "Surveys",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2574",
+"title": "Tax",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2624",
+"title": "Tax Code Types",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1351",
+"title": "Tax Rates",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1348",
+"title": "Teams",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1829",
+"title": "Templates",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2833",
+"title": "Ticket Category Defaults and Overrides",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1830",
+"title": "Ticket Link Types",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1820",
+"title": "Ticket Rule Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1418",
+"title": "Ticket Status Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2055",
+"title": "Ticket Types",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2718",
+"title": "Ticket View Overrides",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1809",
+"title": "Ticket Views",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1341",
+"title": "Tickets General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1831",
+"title": "Time Management Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "2652",
+"title": "Time zone Overrides",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1839",
+"title": "User - Asset Relationships",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1797",
+"title": "User Roles",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1415",
+"title": "Users General Settings",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1789",
+"title": "Workdays",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1832",
+"title": "Workflows",
+"section": "Configuration Settings Guides"
+},
+{
+"id": "1254",
+"title": "3CX Integration",
+"section": "Integrations"
+},
+{
+"id": "1624",
+"title": "8x8 Integration",
+"section": "Integrations"
+},
+{
+"id": "2571",
+"title": "A Break down of the Automated Statement of Work Generation & AI Project task Creation",
+"section": "Integrations"
+},
+{
+"id": "2187",
+"title": "A Step-by-Step Guide to Make a Bulk Change in the Halo Database Through the API Using JSON in Postman",
+"section": "Integrations"
+},
+{
+"id": "2454",
+"title": "Accounting Integrations Comparison",
+"section": "Integrations"
+},
+{
+"id": "1593",
+"title": "Acronis Integration",
+"section": "Integrations"
+},
+{
+"id": "1095",
+"title": "Active Directory Integration (LDAP)",
+"section": "Integrations"
+},
+{
+"id": "1704",
+"title": "Addigy Integration",
+"section": "Integrations"
+},
+{
+"id": "1039",
+"title": "ADFS Integration",
+"section": "Integrations"
+},
+{
+"id": "2107",
+"title": "Adobe Acrobat Sign Integration",
+"section": "Integrations"
+},
+{
+"id": "2831",
+"title": "Adobe Commerce Integration (Magento)",
+"section": "Integrations"
+},
+{
+"id": "2650",
+"title": "Alemba Migration",
+"section": "Integrations"
+},
+{
+"id": "2384",
+"title": "ALSO Integration",
+"section": "Integrations"
+},
+{
+"id": "2880",
+"title": "Amazon Bedrock Integration",
+"section": "Integrations"
+},
+{
+"id": "939",
+"title": "AnyDesk Integration",
+"section": "Integrations"
+},
+{
+"id": "2642",
+"title": "Armis Integration",
+"section": "Integrations"
+},
+{
+"id": "2580",
+"title": "ArrowSphere Integration",
+"section": "Integrations"
+},
+{
+"id": "2796",
+"title": "Assetbots Integration",
+"section": "Integrations"
+},
+{
+"id": "2499",
+"title": "AT&T Integration",
+"section": "Integrations"
+},
+{
+"id": "1202",
+"title": "Atera RMM Integration",
+"section": "Integrations"
+},
+{
+"id": "2446",
+"title": "Authentication Methods for Microsoft Integrations",
+"section": "Integrations"
+},
+{
+"id": "2468",
+"title": "AuthRocket Integration",
+"section": "Integrations"
+},
+{
+"id": "2482",
+"title": "Automated Statement of Work Generation",
+"section": "Integrations"
+},
+{
+"id": "2649",
+"title": "Autotask Migration",
+"section": "Integrations"
+},
+{
+"id": "1338",
+"title": "Auvik Integration",
+"section": "Integrations"
+},
+{
+"id": "1891",
+"title": "Avalara Integration",
+"section": "Integrations"
+},
+{
+"id": "2394",
+"title": "AWS Integration",
+"section": "Integrations"
+},
+{
+"id": "1107",
+"title": "Azure Automation Integration",
+"section": "Integrations"
+},
+{
+"id": "2392",
+"title": "Azure Consumption Billing (via Halo CSP Integration)",
+"section": "Integrations"
+},
+{
+"id": "2290",
+"title": "Azure Deltas",
+"section": "Integrations"
+},
+{
+"id": "1087",
+"title": "Azure DevOps Integration",
+"section": "Integrations"
+},
+{
+"id": "1715",
+"title": "Azure Key Vault Integration",
+"section": "Integrations"
+},
+{
+"id": "1259",
+"title": "Azure Monitor Integration",
+"section": "Integrations"
+},
+{
+"id": "1258",
+"title": "Azure Sentinel Integration",
+"section": "Integrations"
+},
+{
+"id": "1772",
+"title": "Azure Sentinel Webhooks",
+"section": "Integrations"
+},
+{
+"id": "2586",
+"title": "Barracuda RMM",
+"section": "Integrations"
+},
+{
+"id": "2644",
+"title": "Benji Pays Integration",
+"section": "Integrations"
+},
+{
+"id": "1033",
+"title": "Beyond Trust Integration",
+"section": "Integrations"
+},
+{
+"id": "1623",
+"title": "Bvoip Integration",
+"section": "Integrations"
+},
+{
+"id": "1552",
+"title": "Call Pop-Up for Microsoft Teams",
+"section": "Integrations"
+},
+{
+"id": "2697",
+"title": "CIPP Integration",
+"section": "Integrations"
+},
+{
+"id": "1211",
+"title": "Cisco Meraki Integration",
+"section": "Integrations"
+},
+{
+"id": "2607",
+"title": "Cloudflare Integration",
+"section": "Integrations"
+},
+{
+"id": "2284",
+"title": "Confluence Integration",
+"section": "Integrations"
+},
+{
+"id": "2316",
+"title": "Connect AI to Halo using Azure OpenAI",
+"section": "Integrations"
+},
+{
+"id": "2798",
+"title": "Connecting Claude to Halo's MCP Server",
+"section": "Integrations"
+},
+{
+"id": "2711",
+"title": "Connecting Copilot Studio to Halo's MCP Server",
+"section": "Integrations"
+},
+{
+"id": "2063",
+"title": "Connecting Halo to BI Tools: Publish Profiles & Direct Database Access",
+"section": "Integrations"
+},
+{
+"id": "1035",
+"title": "ConnectWise Automate Integration",
+"section": "Integrations"
+},
+{
+"id": "2893",
+"title": "ConnectWise RMM Integration (Asio Platform)",
+"section": "Integrations"
+},
+{
+"id": "1778",
+"title": "Connectwise RMM Integration Guide",
+"section": "Integrations"
+},
+{
+"id": "2699",
+"title": "Contents of AI Guides",
+"section": "Integrations"
+},
+{
+"id": "2843",
+"title": "Coralogix Integration",
+"section": "Integrations"
+},
+{
+"id": "2789",
+"title": "Cove Usage Billing Sync",
+"section": "Integrations"
+},
+{
+"id": "1823",
+"title": "Creating API Applications",
+"section": "Integrations"
+},
+{
+"id": "2065",
+"title": "CrewHu Integration",
+"section": "Integrations"
+},
+{
+"id": "1321",
+"title": "CyberCNS (Cyber CNS) Integration",
+"section": "Integrations"
+},
+{
+"id": "2283",
+"title": "Datadog Integration",
+"section": "Integrations"
+},
+{
+"id": "2172",
+"title": "Datagate Integration",
+"section": "Integrations"
+},
+{
+"id": "1264",
+"title": "Datto Commerce Integration",
+"section": "Integrations"
+},
+{
+"id": "1084",
+"title": "Datto RMM Integration",
+"section": "Integrations"
+},
+{
+"id": "1137",
+"title": "Delinea (Formerly Centrify) Integration",
+"section": "Integrations"
+},
+{
+"id": "2804",
+"title": "Device42 Integration",
+"section": "Integrations"
+},
+{
+"id": "2664",
+"title": "Dicker Data Integration",
+"section": "Integrations"
+},
+{
+"id": "1265",
+"title": "Domotz Integration",
+"section": "Integrations"
+},
+{
+"id": "1138",
+"title": "Dynamics 365 CRM Integration",
+"section": "Integrations"
+},
+{
+"id": "1478",
+"title": "Dynamics Business Central Integration",
+"section": "Integrations"
+},
+{
+"id": "2120",
+"title": "Dynatrace Integration",
+"section": "Integrations"
+},
+{
+"id": "2567",
+"title": "Email Start Tag being Auto-Filled with your email address (Keeper Browser Extension)",
+"section": "Integrations"
+},
+{
+"id": "1915",
+"title": "Email to SMS",
+"section": "Integrations"
+},
+{
+"id": "2306",
+"title": "Embedding The Self-Service Portal within MS Teams with SSO",
+"section": "Integrations"
+},
+{
+"id": "1269",
+"title": "Embedding your Halo Self-Service Portal into Microsoft Teams",
+"section": "Integrations"
+},
+{
+"id": "2668",
+"title": "Eracent Integration",
+"section": "Integrations"
+},
+{
+"id": "1562",
+"title": "Etilize Integration",
+"section": "Integrations"
+},
+{
+"id": "2305",
+"title": "Event Management",
+"section": "Integrations"
+},
+{
+"id": "2259",
+"title": "Exact Online Integration",
+"section": "Integrations"
+},
+{
+"id": "2492",
+"title": "Example of how to implement Request Signing for Integration Runbook Authentication",
+"section": "Integrations"
+},
+{
+"id": "942",
+"title": "Facebook Integration",
+"section": "Integrations"
+},
+{
+"id": "2358",
+"title": "Filtering responses via the 'datesearch' query parameter",
+"section": "Integrations"
+},
+{
+"id": "2460",
+"title": "Forethought AI Solve Integration",
+"section": "Integrations"
+},
+{
+"id": "1747",
+"title": "Fortnox Integration",
+"section": "Integrations"
+},
+{
+"id": "2447",
+"title": "Freshdesk Migration",
+"section": "Integrations"
+},
+{
+"id": "1952",
+"title": "General Procedure for Integrating with an RMM",
+"section": "Integrations"
+},
+{
+"id": "2874",
+"title": "Genesys Integration",
+"section": "Integrations"
+},
+{
+"id": "2071",
+"title": "Giacom Integration",
+"section": "Integrations"
+},
+{
+"id": "2070",
+"title": "GitHub Integration",
+"section": "Integrations"
+},
+{
+"id": "2111",
+"title": "GoCardless Integration",
+"section": "Integrations"
+},
+{
+"id": "1625",
+"title": "GoIntegrator Integration",
+"section": "Integrations"
+},
+{
+"id": "2307",
+"title": "Google Analytics in the Self-Service Portal",
+"section": "Integrations"
+},
+{
+"id": "2612",
+"title": "Google Business Integration",
+"section": "Integrations"
+},
+{
+"id": "1124",
+"title": "Google Calendar Integration",
+"section": "Integrations"
+},
+{
+"id": "1521",
+"title": "Google Mail Setup (Setting up Google Application)",
+"section": "Integrations"
+},
+{
+"id": "1698",
+"title": "Google Mail Using SMTP error- The SMTP server requires a secure connection or the client was not authenticated.",
+"section": "Integrations"
+},
+{
+"id": "2670",
+"title": "Google Maps Integration",
+"section": "Integrations"
+},
+{
+"id": "1126",
+"title": "Google Workspace Integration",
+"section": "Integrations"
+},
+{
+"id": "2163",
+"title": "GoTo Resolve Integration",
+"section": "Integrations"
+},
+{
+"id": "1273",
+"title": "GoToAssist Remote Integration",
+"section": "Integrations"
+},
+{
+"id": "1636",
+"title": "Halo Accounts Integrator Setup",
+"section": "Integrations"
+},
+{
+"id": "1783",
+"title": "Halo Asset Discovery (Lansweeper Cloud Integration)",
+"section": "Integrations"
+},
+{
+"id": "1766",
+"title": "Halo DB Integrator",
+"section": "Integrations"
+},
+{
+"id": "1062",
+"title": "Halo Integrator",
+"section": "Integrations"
+},
+{
+"id": "1632",
+"title": "HaloITSM Integration",
+"section": "Integrations"
+},
+{
+"id": "2165",
+"title": "Heimdal Integration",
+"section": "Integrations"
+},
+{
+"id": "2475",
+"title": "Hopewiser Integration",
+"section": "Integrations"
+},
+{
+"id": "2714",
+"title": "Hosting your own Halo Integrator",
+"section": "Integrations"
+},
+{
+"id": "1520",
+"title": "HubSpot Integration",
+"section": "Integrations"
+},
+{
+"id": "1740",
+"title": "Hudu Integration",
+"section": "Integrations"
+},
+{
+"id": "2615",
+"title": "Incoming Webhook Processing Service",
+"section": "Integrations"
+},
+{
+"id": "1672",
+"title": "Ingram Micro Cloud (formerly Cloud Blue/Exertis) Integration",
+"section": "Integrations"
+},
+{
+"id": "2084",
+"title": "Integrating Ingram Micro Reseller (Hardware data) with the Etilize Catalogue",
+"section": "Integrations"
+},
+{
+"id": "2173",
+"title": "Integrating Tech Data Reseller (Hardware data) with the Etilize Catalogue",
+"section": "Integrations"
+},
+{
+"id": "2797",
+"title": "Integrating with Other Accounts Tools",
+"section": "Integrations"
+},
+{
+"id": "2757",
+"title": "Intermedia Contact Centre Integration",
+"section": "Integrations"
+},
+{
+"id": "1146",
+"title": "Intune Integration",
+"section": "Integrations"
+},
+{
+"id": "1669",
+"title": "IPECS Integration",
+"section": "Integrations"
+},
+{
+"id": "2845",
+"title": "Iru Integration (Kandji)",
+"section": "Integrations"
+},
+{
+"id": "2507",
+"title": "ISL Online Integration",
+"section": "Integrations"
+},
+{
+"id": "1529",
+"title": "IT Glue Integration",
+"section": "Integrations"
+},
+{
+"id": "2401",
+"title": "ITQuoter Integration",
+"section": "Integrations"
+},
+{
+"id": "1247",
+"title": "Jamf Integration",
+"section": "Integrations"
+},
+{
+"id": "1892",
+"title": "Jira Service Management Integration",
+"section": "Integrations"
+},
+{
+"id": "943",
+"title": "Jira Software Integration",
+"section": "Integrations"
+},
+{
+"id": "2926",
+"title": "Juniper Mist Integration",
+"section": "Integrations"
+},
+{
+"id": "1494",
+"title": "Kaseya VSA Integration",
+"section": "Integrations"
+},
+{
+"id": "2680",
+"title": "Kaseya VSA X Integration",
+"section": "Integrations"
+},
+{
+"id": "2564",
+"title": "KashFlow Integration",
+"section": "Integrations"
+},
+{
+"id": "2593",
+"title": "Keeper Integration",
+"section": "Integrations"
+},
+{
+"id": "2351",
+"title": "KeyCloak Integration",
+"section": "Integrations"
+},
+{
+"id": "1073",
+"title": "Lansweeper Integration",
+"section": "Integrations"
+},
+{
+"id": "2411",
+"title": "LapSafe Integration",
+"section": "Integrations"
+},
+{
+"id": "1500",
+"title": "Liongard Integration",
+"section": "Integrations"
+},
+{
+"id": "1775",
+"title": "Locate your Facebook Business Manager ID (FB BM ID)",
+"section": "Integrations"
+},
+{
+"id": "2731",
+"title": "Log Retention",
+"section": "Integrations"
+},
+{
+"id": "2104",
+"title": "LogicMonitor Integration",
+"section": "Integrations"
+},
+{
+"id": "1085",
+"title": "LogMeIn Rescue Integration",
+"section": "Integrations"
+},
+{
+"id": "1238",
+"title": "Lookups",
+"section": "Integrations"
+},
+{
+"id": "2238",
+"title": "Mailchimp Integration",
+"section": "Integrations"
+},
+{
+"id": "2295",
+"title": "ManageEngine Endpoint Central Integration",
+"section": "Integrations"
+},
+{
+"id": "1189",
+"title": "Microsoft CSP Integration",
+"section": "Integrations"
+},
+{
+"id": "1106",
+"title": "Microsoft Entra ID Integration (Formerly: Azure Active Directory)",
+"section": "Integrations"
+},
+{
+"id": "2925",
+"title": "Microsoft Entra ID: Single Sign-On (B2B)",
+"section": "Integrations"
+},
+{
+"id": "2443",
+"title": "Microsoft Entra ID: Single Sign-On (B2C)",
+"section": "Integrations"
+},
+{
+"id": "1714",
+"title": "Microsoft Power Automate Integration",
+"section": "Integrations"
+},
+{
+"id": "1080",
+"title": "Microsoft Teams Integration",
+"section": "Integrations"
+},
+{
+"id": "1316",
+"title": "Microsoft TeamsBot",
+"section": "Integrations"
+},
+{
+"id": "2493",
+"title": "MYOB Integration",
+"section": "Integrations"
+},
+{
+"id": "1096",
+"title": "N-Able N-Central Integration",
+"section": "Integrations"
+},
+{
+"id": "1055",
+"title": "N-Able N-Sight RMM Integration",
+"section": "Integrations"
+},
+{
+"id": "1287",
+"title": "N-Able Passportal Integration",
+"section": "Integrations"
+},
+{
+"id": "1057",
+"title": "N-Able Take Control Integration",
+"section": "Integrations"
+},
+{
+"id": "2628",
+"title": "Nagios XI Integration",
+"section": "Integrations"
+},
+{
+"id": "2474",
+"title": "New Relic Integration",
+"section": "Integrations"
+},
+{
+"id": "1642",
+"title": "Ninja Systray Icon",
+"section": "Integrations"
+},
+{
+"id": "1222",
+"title": "NinjaOne Integration",
+"section": "Integrations"
+},
+{
+"id": "2584",
+"title": "Nixtla TimeGPT Integration",
+"section": "Integrations"
+},
+{
+"id": "2251",
+"title": "Obtaining API Credentials from AT&T",
+"section": "Integrations"
+},
+{
+"id": "2639",
+"title": "Office 365/Azure Mailbox Setup",
+"section": "Integrations"
+},
+{
+"id": "937",
+"title": "Okta Integration",
+"section": "Integrations"
+},
+{
+"id": "2859",
+"title": "Omnissa Workspace One (VM Workspace One) Integration",
+"section": "Integrations"
+},
+{
+"id": "1667",
+"title": "Open AI Integration",
+"section": "Integrations"
+},
+{
+"id": "2703",
+"title": "Opinyin Integration",
+"section": "Integrations"
+},
+{
+"id": "2849",
+"title": "Opsgenie Integration",
+"section": "Integrations"
+},
+{
+"id": "2348",
+"title": "PagerDuty Integration",
+"section": "Integrations"
+},
+{
+"id": "2487",
+"title": "PandaDocs Integration",
+"section": "Integrations"
+},
+{
+"id": "1532",
+"title": "Pax8 Integration",
+"section": "Integrations"
+},
+{
+"id": "2685",
+"title": "Peppol e-Invoicing via Tickstar",
+"section": "Integrations"
+},
+{
+"id": "946",
+"title": "PowerShell Integration",
+"section": "Integrations"
+},
+{
+"id": "2835",
+"title": "Process Street Integration",
+"section": "Integrations"
+},
+{
+"id": "2478",
+"title": "Prometheus Integration",
+"section": "Integrations"
+},
+{
+"id": "1167",
+"title": "PRTG Integration",
+"section": "Integrations"
+},
+{
+"id": "1270",
+"title": "Pushing the Teams Embedded Self Service Portal to Customers Microsoft Teams Tenants",
+"section": "Integrations"
+},
+{
+"id": "2373",
+"title": "Qualys Integration",
+"section": "Integrations"
+},
+{
+"id": "1291",
+"title": "QuickBooks Desktop Integration",
+"section": "Integrations"
+},
+{
+"id": "1234",
+"title": "QuickBooks Online Integration",
+"section": "Integrations"
+},
+{
+"id": "1540",
+"title": "Quoter Integration",
+"section": "Integrations"
+},
+{
+"id": "2466",
+"title": "Rapid7 Integration",
+"section": "Integrations"
+},
+{
+"id": "2595",
+"title": "Raynet Integration",
+"section": "Integrations"
+},
+{
+"id": "2889",
+"title": "Reconciliation - Order of Precedence for CMDB/Asset Integrations",
+"section": "Integrations"
+},
+{
+"id": "2606",
+"title": "Refreshing an Azure Token",
+"section": "Integrations"
+},
+{
+"id": "2824",
+"title": "Rhipe Integration (Crayon PRISM)",
+"section": "Integrations"
+},
+{
+"id": "1622",
+"title": "RingCentral Integration",
+"section": "Integrations"
+},
+{
+"id": "2654",
+"title": "RMM/Alerting Integrations Comparisons",
+"section": "Integrations"
+},
+{
+"id": "2736",
+"title": "Runbook Level Variables",
+"section": "Integrations"
+},
+{
+"id": "2267",
+"title": "Runbooks - Authorising API Access into Your Own Halo Instance",
+"section": "Integrations"
+},
+{
+"id": "2201",
+"title": "SaaSAlerts Integration",
+"section": "Integrations"
+},
+{
+"id": "1086",
+"title": "Sage 200 Integration",
+"section": "Integrations"
+},
+{
+"id": "1283",
+"title": "Sage 50 Canada Integration",
+"section": "Integrations"
+},
+{
+"id": "1480",
+"title": "Sage 50 UK Integration",
+"section": "Integrations"
+},
+{
+"id": "2459",
+"title": "Sage Business Cloud Integration",
+"section": "Integrations"
+},
+{
+"id": "1444",
+"title": "Sage Intacct Integration",
+"section": "Integrations"
+},
+{
+"id": "2784",
+"title": "SailPoint Identity Now Integration",
+"section": "Integrations"
+},
+{
+"id": "2696",
+"title": "SailPoint Integration",
+"section": "Integrations"
+},
+{
+"id": "1184",
+"title": "Sales Mailboxes - Azure",
+"section": "Integrations"
+},
+{
+"id": "2730",
+"title": "Sales Mailboxes - Google",
+"section": "Integrations"
+},
+{
+"id": "945",
+"title": "Salesforce Integration",
+"section": "Integrations"
+},
+{
+"id": "2285",
+"title": "SAML 2.0",
+"section": "Integrations"
+},
+{
+"id": "1310",
+"title": "ScalePad Integration",
+"section": "Integrations"
+},
+{
+"id": "1060",
+"title": "SCCM Integration",
+"section": "Integrations"
+},
+{
+"id": "1166",
+"title": "SCOM Integration",
+"section": "Integrations"
+},
+{
+"id": "1881",
+"title": "ScreenConnect Integration (Formerly ConnectWise Control)",
+"section": "Integrations"
+},
+{
+"id": "2782",
+"title": "SeatGeek Integration",
+"section": "Integrations"
+},
+{
+"id": "2413",
+"title": "SentinelOne Integration",
+"section": "Integrations"
+},
+{
+"id": "1542",
+"title": "ServiceNow Integration",
+"section": "Integrations"
+},
+{
+"id": "2464",
+"title": "ServiceNow Migration",
+"section": "Integrations"
+},
+{
+"id": "1757",
+"title": "ServiceNow Webhooks",
+"section": "Integrations"
+},
+{
+"id": "1670",
+"title": "Setting Up An API Agent",
+"section": "Integrations"
+},
+{
+"id": "2758",
+"title": "SFTP CSV imports Integration",
+"section": "Integrations"
+},
+{
+"id": "2245",
+"title": "SharePoint Integration",
+"section": "Integrations"
+},
+{
+"id": "2323",
+"title": "Sherweb Integration",
+"section": "Integrations"
+},
+{
+"id": "1763",
+"title": "Shopify Integration",
+"section": "Integrations"
+},
+{
+"id": "2667",
+"title": "Single Sign-On (SSO) in Halo",
+"section": "Integrations"
+},
+{
+"id": "2421",
+"title": "Site24x7 Integration",
+"section": "Integrations"
+},
+{
+"id": "944",
+"title": "Slack Integration",
+"section": "Integrations"
+},
+{
+"id": "2379",
+"title": "SnelStart Integration",
+"section": "Integrations"
+},
+{
+"id": "2503",
+"title": "Snipe-IT Integration",
+"section": "Integrations"
+},
+{
+"id": "1279",
+"title": "Snow Integration",
+"section": "Integrations"
+},
+{
+"id": "2936",
+"title": "SoftwareOne/Crayon Integration (Cloud-iQ)",
+"section": "Integrations"
+},
+{
+"id": "1169",
+"title": "SolarWinds Orion Integration",
+"section": "Integrations"
+},
+{
+"id": "2694",
+"title": "Sophos Integration",
+"section": "Integrations"
+},
+{
+"id": "2053",
+"title": "Splashtop Integration",
+"section": "Integrations"
+},
+{
+"id": "935",
+"title": "Splunk Integration",
+"section": "Integrations"
+},
+{
+"id": "2725",
+"title": "Splunk On Call Integration",
+"section": "Integrations"
+},
+{
+"id": "1567",
+"title": "SQL Imports",
+"section": "Integrations"
+},
+{
+"id": "2116",
+"title": "StreamOne Ion Integration",
+"section": "Integrations"
+},
+{
+"id": "2247",
+"title": "Strety Integration",
+"section": "Integrations"
+},
+{
+"id": "1493",
+"title": "Stripe Integration",
+"section": "Integrations"
+},
+{
+"id": "1824",
+"title": "Super Ops RMM Integration",
+"section": "Integrations"
+},
+{
+"id": "968",
+"title": "Syncing Exchange Calendars (For On-Prem Web Exchange Only)",
+"section": "Integrations"
+},
+{
+"id": "1198",
+"title": "Syncing Exchange Calendars using the Microsoft Graph API",
+"section": "Integrations"
+},
+{
+"id": "2540",
+"title": "SyncroMSP Integration",
+"section": "Integrations"
+},
+{
+"id": "2588",
+"title": "Tanium Integration",
+"section": "Integrations"
+},
+{
+"id": "2112",
+"title": "TD Synnex/StreamOne Stellr Integration",
+"section": "Integrations"
+},
+{
+"id": "938",
+"title": "TeamViewer Integration",
+"section": "Integrations"
+},
+{
+"id": "2279",
+"title": "Tenable Integration",
+"section": "Integrations"
+},
+{
+"id": "2997",
+"title": "ThreatLocker Integration",
+"section": "Integrations"
+},
+{
+"id": "2596",
+"title": "Trigger a Microsoft Power Automate flow using Halo Webhooks",
+"section": "Integrations"
+},
+{
+"id": "2079",
+"title": "Triggering Automation Policies in RMM via Halo",
+"section": "Integrations"
+},
+{
+"id": "2826",
+"title": "Trustpilot Integration",
+"section": "Integrations"
+},
+{
+"id": "1441",
+"title": "Twilio for SMS Integration",
+"section": "Integrations"
+},
+{
+"id": "1664",
+"title": "Twilio for WhatsApp Business Integration",
+"section": "Integrations"
+},
+{
+"id": "2693",
+"title": "UserWay Integration",
+"section": "Integrations"
+},
+{
+"id": "2771",
+"title": "Using Apidog",
+"section": "Integrations"
+},
+{
+"id": "2513",
+"title": "Using HaloDBLookupService to run custom integration methods on internally facing APIs",
+"section": "Integrations"
+},
+{
+"id": "1548",
+"title": "Using HaloDBLookupService to set up a Database Lookup for an external SQL Server Database",
+"section": "Integrations"
+},
+{
+"id": "1499",
+"title": "Using Postman",
+"section": "Integrations"
+},
+{
+"id": "1333",
+"title": "VCIO Toolbox Integration",
+"section": "Integrations"
+},
+{
+"id": "2317",
+"title": "Virima Integration",
+"section": "Integrations"
+},
+{
+"id": "2376",
+"title": "Vorboss Integration",
+"section": "Integrations"
+},
+{
+"id": "2812",
+"title": "WatchGuard Integration",
+"section": "Integrations"
+},
+{
+"id": "838",
+"title": "Webhook Integration",
+"section": "Integrations"
+},
+{
+"id": "1718",
+"title": "Webhooks for Payment Syncing",
+"section": "Integrations"
+},
+{
+"id": "1543",
+"title": "Westcoast Cloud Integration",
+"section": "Integrations"
+},
+{
+"id": "2830",
+"title": "Wordpress.com Integration",
+"section": "Integrations"
+},
+{
+"id": "2828",
+"title": "Wordpress.org Integration",
+"section": "Integrations"
+},
+{
+"id": "2855",
+"title": "Xensam Integration",
+"section": "Integrations"
+},
+{
+"id": "1235",
+"title": "Xero Integration",
+"section": "Integrations"
+},
+{
+"id": "2056",
+"title": "XSOAR Integration",
+"section": "Integrations"
+},
+{
+"id": "1728",
+"title": "Zabbix Integration",
+"section": "Integrations"
+},
+{
+"id": "2762",
+"title": "Zapier Integration",
+"section": "Integrations"
+},
+{
+"id": "2465",
+"title": "Zendesk Migration",
+"section": "Integrations"
+},
+{
+"id": "2205",
+"title": "Zomentum Integration",
+"section": "Integrations"
+},
+{
+"id": "1621",
+"title": "Zoom Integration",
+"section": "Integrations"
+},
+{
+"id": "2944",
+"title": "QuickBooks Errors",
+"section": "Integrations > Accounts and Payment Processing"
+},
+{
+"id": "3034",
+"title": "QuickBooks Online invoice numbering issue (Halo 2.250+) — Ref 1542896",
+"section": "Integrations > Accounts and Payment Processing"
+},
+{
+"id": "2729",
+"title": "Checking your DB Integrator Version",
+"section": "On-Premises Guides"
+},
+{
+"id": "2622",
+"title": "DB Integrator - Troubleshooting",
+"section": "On-Premises Guides"
+},
+{
+"id": "2244",
+"title": "DB integrator error: Decryption check failed - please install the API certificate on this server, or ensure that the Halo DB Integrator is running on the application server",
+"section": "On-Premises Guides"
+},
+{
+"id": "2068",
+"title": "Halo Application Licensing",
+"section": "On-Premises Guides"
+},
+{
+"id": "2832",
+"title": "IronPDF Errors",
+"section": "On-Premises Guides"
+},
+{
+"id": "732",
+"title": "On-Prem Upgrade",
+"section": "On-Premises Guides"
+},
+{
+"id": "2623",
+"title": "On-Prem Upgrade - Troubleshooting",
+"section": "On-Premises Guides"
+},
+{
+"id": "2621",
+"title": "On-Premise Deployment - Troubleshooting",
+"section": "On-Premises Guides"
+},
+{
+"id": "2626",
+"title": "On-Premise Deployment - Windows Authentication",
+"section": "On-Premises Guides"
+},
+{
+"id": "2258",
+"title": "Setting up the \"Instances\" area for On-Prem Halo Instances",
+"section": "On-Premises Guides"
+},
+{
+"id": "2061",
+"title": "Updating On-Prem instance URL",
+"section": "On-Premises Guides"
+},
+{
+"id": "2076",
+"title": "Access Restrictions on Suppliers",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2838",
+"title": "Accounting Tool Not Syncing",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2837",
+"title": "Action Not Showing on a Ticket",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "1618",
+"title": "Agent Check In",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2720",
+"title": "Allow Suppliers to use the Portal",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "930",
+"title": "Application Colour and Theme",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2817",
+"title": "Automatic Logout Issues",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2309",
+"title": "Automating Procurement",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2435",
+"title": "Backend Services Monitoring",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2477",
+"title": "Backend Services: Common Errors, Causes and Resolutions",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "1204",
+"title": "Changing Date and Time Formats",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "1519",
+"title": "Changing your Halo URL",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "1888",
+"title": "Configuration Change Tracking and Instance Pipeline Management",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "1903",
+"title": "Customers and Importing/Migrating Data",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2436",
+"title": "Customising the Agent Application",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2521",
+"title": "Customising the Navigation Menu in Halo",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "1331",
+"title": "DataImporter (Data Importer) for Custom Tables via CSV",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2988",
+"title": "Exchange Calendar Integration Errors",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2801",
+"title": "Finding Missing Entities",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2485",
+"title": "Halo Tab Customisation",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2869",
+"title": "HaloCRM",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2552",
+"title": "HaloCSM",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2434",
+"title": "HaloITSM/ESM",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2370",
+"title": "HaloPSA",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "1479",
+"title": "Importing Additional Fields via CSV",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "866",
+"title": "Importing Data",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2141",
+"title": "Importing Opportunity Tickets",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "960",
+"title": "Languages",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2594",
+"title": "Mail Processing FAQs",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2996",
+"title": "Microsoft Teams Integration Errors",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2300",
+"title": "Navigating the Quotes and Orders module",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "3013",
+"title": "Pax8 Integration Errors",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2429",
+"title": "PDF Templates",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2702",
+"title": "Progressive Web Application",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "1991",
+"title": "Purchase Orders",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2819",
+"title": "Recurring Bills",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "1663",
+"title": "Sending Requests Across 2 Instances",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2865",
+"title": "Services Import - CSV/XLS/Spreadsheet Method",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2605",
+"title": "SQL Imports - Licences and Subscriptions",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2537",
+"title": "Supplier Agreements/Contracts",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2491",
+"title": "Supplier Contacts/Users",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2101",
+"title": "Suppliers",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2455",
+"title": "Syncing Tickets Between Instances",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2240",
+"title": "The Ready For Purchasing Area",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2363",
+"title": "Troubleshooting Issues with CNAME DNS Records",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "2945",
+"title": "Xero Integration Errors",
+"section": "Using and Configuring Halo"
+},
+{
+"id": "3002",
+"title": "Advanced AI Project task Creation",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2721",
+"title": "Agentic AI",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2776",
+"title": "AI Abilities",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2947",
+"title": "AI Ability Use Case: AI Suggested Resolution",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2651",
+"title": "AI Ability Use Case: Auto Triage",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "3032",
+"title": "AI Ability Use Case: Sentiment Analysis and Case Wrap up",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "3008",
+"title": "AI Ability Use Case: Smart Handover Review",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2138",
+"title": "AI Article Creation",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2631",
+"title": "AI Article Summary and Article Duplication Detection",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2169",
+"title": "AI Azure Translator",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2445",
+"title": "AI Client Profiling",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2749",
+"title": "AI Functionalities Available When Using Own Connection vs Default Connection",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2387",
+"title": "AI Insights",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2526",
+"title": "AI Risk Advisory For Change Management",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2386",
+"title": "AI Suggestions (Tickets and Articles)",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2146",
+"title": "AI Surveys",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "3001",
+"title": "Basic AI Project Task Creation",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2823",
+"title": "Best Practices for Claude Code in Halo",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2389",
+"title": "Boost Ticket Processing using AI",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2582",
+"title": "Chat Web Searching with Conversational Agents",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "3015",
+"title": "Conversation Agent Functions",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2336",
+"title": "Conversational Agents",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2633",
+"title": "Halo AI - Security Implications",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2597",
+"title": "Halo MCP Server Connection",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2125",
+"title": "Improve Search Using AI",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2137",
+"title": "Leveraging AI in Halo",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2876",
+"title": "MCP AI Agent: Chat Setup Guide",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "3004",
+"title": "Process Agent Use Case: 1st Line Support Agent",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "3000",
+"title": "Process Agent Use Case: Closure Review Agent",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2999",
+"title": "Process Agent Use Case: Dispatch Agent",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "3010",
+"title": "Process Agent Use Case: Major Incident Detection",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2783",
+"title": "Process Agents",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2469",
+"title": "Use AI to Analyse Business Performance",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2915",
+"title": "Use Case: Procuring & Installing Software In Halo",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2898",
+"title": "Use Case: Triggering N-Central Scripts From Halo",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2875",
+"title": "Using the Halo MCP AI Agent With The ChatBot (Pre-Configured Environments)",
+"section": "Using and Configuring Halo > AI"
+},
+{
+"id": "2794",
+"title": "AI Ticket Clustering",
+"section": "Using and Configuring Halo > AI > Core Configuration"
+},
+{
+"id": "2385",
+"title": "Connecting AI to Halo",
+"section": "Using and Configuring Halo > AI > Core Configuration"
+},
+{
+"id": "2842",
+"title": "Embedding Optimisation",
+"section": "Using and Configuring Halo > AI > Core Configuration"
+},
+{
+"id": "2673",
+"title": "Vector Search Databases and Embeddings (used for AI Search)",
+"section": "Using and Configuring Halo > AI > Core Configuration"
+},
+{
+"id": "2662",
+"title": "Asset Meters",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2085",
+"title": "Automated Tickets - Next Call Date",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2302",
+"title": "Automating Prices in Recurring Invoices",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1970",
+"title": "Automating Quantities in Recurring Invoices",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1960",
+"title": "Awaiting Review/Ticket Review Processing",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2452",
+"title": "Backing Up invoices with Data",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1300",
+"title": "Billing - Agreement Multiplier",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1957",
+"title": "Billing Rules (Formerly Billing Plan Combinations)",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2062",
+"title": "Billing Templates",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2549",
+"title": "Bills",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1627",
+"title": "Bulk Applying Billing Templates",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2220",
+"title": "Calculating Asset Quantities from SQL Query",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1954",
+"title": "Charge Types",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1165",
+"title": "Contract Schedules",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2292",
+"title": "Contract/Agreement Rules",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1975",
+"title": "Creating Agreements and Contracts",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2538",
+"title": "Creating Invoices",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1972",
+"title": "Creation Periods in Recurring Invoices",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2276",
+"title": "Credit Notes",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2241",
+"title": "Custom SQL Query for Licence/Subscription Count on Recurring Invoice Lines",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2263",
+"title": "Customising Invoice lines for a Project",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2175",
+"title": "Deferred Revenue for Pre-Pay",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2590",
+"title": "Down Payments",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2326",
+"title": "Embed XML Attachments to Invoice PDFs",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1968",
+"title": "Example All You Can Eat Agreement Client",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1967",
+"title": "Example Combination Client",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1969",
+"title": "Example Pay As You Go Client",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1966",
+"title": "Example Pre-Pay Client",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2395",
+"title": "Expenses",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2852",
+"title": "Generating Agreement References",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2249",
+"title": "Group Invoice Lines by Product Group",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2583",
+"title": "Invoice Approvals",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2632",
+"title": "Invoice Payments",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1113",
+"title": "Invoicing Explained",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1956",
+"title": "Issuing Products",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2508",
+"title": "Licences/Subscriptions Overview",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2319",
+"title": "Managing a Recurring Invoice's Lines Quantity, Price and Cost for Subscriptions",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2568",
+"title": "Manually adjusting billable time and re-calculating billing for labour",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1974",
+"title": "Merging and Grouping Invoice Lines",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2713",
+"title": "Merging Invoices",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2377",
+"title": "Meter Billing",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2498",
+"title": "Multi-Currency",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1973",
+"title": "Populating Invoice Lines from $-Variables",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1955",
+"title": "Pre-Pay",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2840",
+"title": "Pre-Pay V2",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1971",
+"title": "Pro Rata/Pro Rating on Recurring Invoices",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1976",
+"title": "Recurring Billing Profiles (Import Recurring Invoice Lines)",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1958",
+"title": "Recurring Invoices",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2312",
+"title": "Reviewing Recurring Invoice Lines",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2255",
+"title": "Sending Invoices",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2250",
+"title": "Set which Agents can adjust the Billing Time and Recalculation of Billing on Tickets",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2311",
+"title": "Signing Contracts/Agreements",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1964",
+"title": "Surcharges",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2738",
+"title": "Tax Rates",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2114",
+"title": "Tax Rules",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1961",
+"title": "The Ready For Invoicing Area",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1965",
+"title": "Tracking Travel Time and Time On-Site",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "1565",
+"title": "Using QR Codes on PDF Templates",
+"section": "Using and Configuring Halo > Billing"
+},
+{
+"id": "2946",
+"title": "Asset Actions & Workflows",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "2440",
+"title": "Asset Custom Buttons",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "1785",
+"title": "Asset Fields",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "2428",
+"title": "Asset Management",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "1329",
+"title": "Asset Resource Booking",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "2183",
+"title": "Asset Template Creation",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "1281",
+"title": "Asset Type & Asset Import - CSV/XLS/Spreadsheet Method",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "1784",
+"title": "Asset Types/Groups",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "1951",
+"title": "Asset Views",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "2341",
+"title": "Assets Vs Items",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "2646",
+"title": "Barcode Scanning",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "2439",
+"title": "Batch Updating Asset Fields",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "2891",
+"title": "Configuration Items",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "2378",
+"title": "Device Change History",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "956",
+"title": "Linking Assets",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "1981",
+"title": "Linking Products to Assets",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "2841",
+"title": "Remote Support",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "2304",
+"title": "Restricting Asset Access",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "922",
+"title": "The Asset Catalogue",
+"section": "Using and Configuring Halo > CMDB"
+},
+{
+"id": "2659",
+"title": "API Applications with Organisation access",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2481",
+"title": "Automated New Starter Requests into Microsoft Entra",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "929",
+"title": "Connecting Through the API",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2268",
+"title": "Creating Report Data Within a Runbook (Matching and Merging to Existing Alert Tickets)",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2660",
+"title": "Custom Integrations",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "1630",
+"title": "Custom Integrations/Runbooks",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2511",
+"title": "Execute Automation Runbooks from the Chatbot",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2717",
+"title": "HaloAPI Full Documentation",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2698",
+"title": "Handling Attachments/Files in Runbooks",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "1853",
+"title": "Iterative Runbooks",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2096",
+"title": "Runbook: Append a Recurring Invoice from Sales Order lines",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2100",
+"title": "Runbook: Update Status of Child Tickets",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2105",
+"title": "Runbook: Update the Estimated Time Based on the Category Chosen",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2545",
+"title": "Troubleshooting API Errors",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "1737",
+"title": "Using the Halo API",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2535",
+"title": "Webhook and Integration Runbook Access Control",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "2272",
+"title": "Webhook To Trigger a Runbook",
+"section": "Using and Configuring Halo > Custom Automations"
+},
+{
+"id": "1947",
+"title": "$-Variables (Dollar Sign Variables)",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "2264",
+"title": "Adding Dashboards to Custom Tabs",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "2265",
+"title": "Adding Iframes to Custom Tabs",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "2038",
+"title": "Custom Buttons",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "2512",
+"title": "Custom Field Value Storage",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "1938",
+"title": "Custom Fields",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "1091",
+"title": "Custom Table Examples",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "2380",
+"title": "Custom Table Import via Email and CSV - Scheduled Imports",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "2037",
+"title": "Custom Tables",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "2039",
+"title": "Custom Tabs",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "2041",
+"title": "Dynamic Custom Fields",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "1282",
+"title": "Dynamic SQL Lookup Fields - Customer Specific Lookup",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "2200",
+"title": "Iframe Custom Tabs on Assets",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "2158",
+"title": "Navigation Buttons that Link to a Custom URL",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "1256",
+"title": "Password Storing, Sending and Resets",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "1864",
+"title": "Site Address Lookup Custom Field",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "2640",
+"title": "Statistics Tables",
+"section": "Using and Configuring Halo > Custom Objects"
+},
+{
+"id": "875",
+"title": "Adding a Mailbox Without The Use of Azure or Google",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1912",
+"title": "Additional Email Settings",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1504",
+"title": "Agent Notifications for Errors in the Halo Integrator/Email Processing",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2695",
+"title": "AI Acknowledgement Emails",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1939",
+"title": "Appointments",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2374",
+"title": "Automatic Ticket Updates via Email",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2467",
+"title": "Branding in Halo",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2089",
+"title": "Bulk Sending Emails",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "880",
+"title": "Calendars and Appointments",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2743",
+"title": "Cc and Bcc Email Configuration",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2928",
+"title": "Contents of Campaigns Guides",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2437",
+"title": "Creating a Mailbox Overview",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "900",
+"title": "Creating and Updating Tickets via Email",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1749",
+"title": "Date Formatting on Email Templates Using $-variables",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2433",
+"title": "Disallowing New Tickets via Email",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1547",
+"title": "Double Line Spacing On Emails In Outlook",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2135",
+"title": "Drag and Drop Tickets Onto a Calendar to Create Appointments",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2441",
+"title": "Dynamically Updating Email Lists",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1911",
+"title": "Email Configuration (High Level)",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1257",
+"title": "Email Hashtags",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1910",
+"title": "Email Rules",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1909",
+"title": "Email Templates",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2408",
+"title": "Email Templates and their System Use",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2557",
+"title": "Email Templates and their System Use - A Basic Walkthrough",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2409",
+"title": "Email Threading",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "898",
+"title": "Emailing Users",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2000",
+"title": "Emails with New Ticket Hyperlinks",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2298",
+"title": "Forwarded Emails and Email Updates",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "910",
+"title": "Forwarding an Action",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1713",
+"title": "How to Deal with Out of Office Automatic Replies from customers",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1516",
+"title": "Linking one Appointment to a Ticket to Link all Appointments in the Same Series",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2795",
+"title": "Mail Campaign Flows",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2242",
+"title": "Mail Campaigns",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2541",
+"title": "Notification Templates",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "891",
+"title": "Notifications",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2166",
+"title": "Segments (Distribution Lists)",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "1810",
+"title": "Setting Up Message Approval for Outlook",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2519",
+"title": "System Notifications",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2444",
+"title": "Translating Email Templates",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2750",
+"title": "Triggering Mail Campaigns From Opportunities",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "899",
+"title": "Variables in Email Templates",
+"section": "Using and Configuring Halo > Email Configuration, Calendars and Appointments"
+},
+{
+"id": "2860",
+"title": "Action XLS template fields",
+"section": "Using and Configuring Halo > Importing/Migrating Data"
+},
+{
+"id": "2862",
+"title": "Asset Types XLS template fields",
+"section": "Using and Configuring Halo > Importing/Migrating Data"
+},
+{
+"id": "2861",
+"title": "Asset XLS template fields",
+"section": "Using and Configuring Halo > Importing/Migrating Data"
+},
+{
+"id": "2851",
+"title": "Client & Site XLS template fields",
+"section": "Using and Configuring Halo > Importing/Migrating Data"
+},
+{
+"id": "2850",
+"title": "Client, Sites & Users Import - CSV/XLS/Spreadsheet Method",
+"section": "Using and Configuring Halo > Importing/Migrating Data"
+},
+{
+"id": "2866",
+"title": "Service Catalogue XLS template fields",
+"section": "Using and Configuring Halo > Importing/Migrating Data"
+},
+{
+"id": "2863",
+"title": "Supplier Import - CSV/XLS/Spreadsheet Method",
+"section": "Using and Configuring Halo > Importing/Migrating Data"
+},
+{
+"id": "2864",
+"title": "Supplier XLS template fields",
+"section": "Using and Configuring Halo > Importing/Migrating Data"
+},
+{
+"id": "2858",
+"title": "Ticket XLS template fields",
+"section": "Using and Configuring Halo > Importing/Migrating Data"
+},
+{
+"id": "2854",
+"title": "Ticket/Action Import - CSV/XLS/Spreadsheet Method",
+"section": "Using and Configuring Halo > Importing/Migrating Data"
+},
+{
+"id": "2853",
+"title": "User XLS template fields",
+"section": "Using and Configuring Halo > Importing/Migrating Data"
+},
+{
+"id": "2042",
+"title": "An Introduction to the Knowledge Base",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2047",
+"title": "Article Drafts and Versions",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2044",
+"title": "Article Restrictions - Users",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2846",
+"title": "Contents of Knowledge Base Guides",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2715",
+"title": "Create Knowledge Base Articles using files/documents",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2130",
+"title": "Document Management Area",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2318",
+"title": "Document Management for Customers, Sites and Users",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2043",
+"title": "FAQ Lists in the Knowledge Base",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2666",
+"title": "Knowledge Base Article Feedback",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2486",
+"title": "Knowledge Base Articles in the User Portal",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2045",
+"title": "Linking Assets to Knowledge Base Articles",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2189",
+"title": "News Articles",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "955",
+"title": "Problem/Resolution Finder",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2536",
+"title": "Restricting Agent's Access to Knowledge Base Articles",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2046",
+"title": "Reviewing Articles",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2780",
+"title": "Searching the Knowledge Base",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2520",
+"title": "Style Profiles for Knowledge Base Articles",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "3012",
+"title": "Translating Knowledge Base Articles",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "881",
+"title": "Using your Knowledge Base",
+"section": "Using and Configuring Halo > Knowledge Base and Document Management"
+},
+{
+"id": "2815",
+"title": "Account Managers",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2764",
+"title": "Allow Users to Update their own Details from the Portal",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2678",
+"title": "Creating Users",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2449",
+"title": "Customer Areas",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2127",
+"title": "Customer Relationships",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "878",
+"title": "Customer, Site and User Records",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "903",
+"title": "Followers and Following Tickets",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2353",
+"title": "How To Onboard New Customers",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2366",
+"title": "Important Users/Customers",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2873",
+"title": "Linked Users",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2331",
+"title": "Managing Multiple End User Portals",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2539",
+"title": "Organisation Contracts/Agreements",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "1673",
+"title": "Pop-Up Notes For Customers, Sites, & Users",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2813",
+"title": "Redacting Personal Information on Tickets - PII Data Flagging",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2793",
+"title": "Security Questions",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2576",
+"title": "Service Users",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2506",
+"title": "Site Contacts",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2882",
+"title": "Site Fields",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "1904",
+"title": "Sites",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "1937",
+"title": "Ticket/Client Areas",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2170",
+"title": "Top Levels",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2998",
+"title": "User and Agent Groups",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "962",
+"title": "User Management",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2637",
+"title": "User Out of Office Detection",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2818",
+"title": "User Roles",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "1905",
+"title": "Users",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2287",
+"title": "Using CRM Notes",
+"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+},
+{
+"id": "2406",
+"title": "Adding and Returning Stock Overview",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "2301",
+"title": "Allow Users to Self-Issue Items",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "2398",
+"title": "Automating Product Changes and Updating Recurring Invoices",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "2278",
+"title": "How to add Images to Quotations",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "1978",
+"title": "Items/Products",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "2442",
+"title": "Product Bundles",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "2303",
+"title": "Product Price Overrides",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "1983",
+"title": "Receiving Stock for Serialised Products & Delivering to the Customer",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "1979",
+"title": "Stock Control",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "2427",
+"title": "Stock Locations and Bins",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "2393",
+"title": "Tiered Pricing",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "1984",
+"title": "Worked Example - Receiving & Delivering Stock with Assets Created at The Point of Consignment",
+"section": "Using and Configuring Halo > Products/Items and Stock Control"
+},
+{
+"id": "2057",
+"title": "Adding in a Project Plan",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2027",
+"title": "Budgets",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2035",
+"title": "Creating a Project From a Sales Order",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2028",
+"title": "Creating Projects",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "1982",
+"title": "Creating Projects from Products",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2706",
+"title": "Deferring Project Revenue",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "3018",
+"title": "Gantt View within Projects",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2461",
+"title": "Linking Purchase Orders to Projects",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2032",
+"title": "Milestones",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2403",
+"title": "Parent and Child Projects from Sales Orders",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2033",
+"title": "Planning and Forecasting",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2262",
+"title": "Project Billing - Budget Types vs Charge Types",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2098",
+"title": "Project Billing - Milestone Billing",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2031",
+"title": "Project Billing - Time and Materials",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2404",
+"title": "Project Hierarchies",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2707",
+"title": "Project Management Overview",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2692",
+"title": "Project Setup Wizard",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2368",
+"title": "Project Task Creation Rules Based on a Multi-Select Field",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2029",
+"title": "Project Templates",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2026",
+"title": "Project Types",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2030",
+"title": "Project Views",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "1780",
+"title": "To-Do Lists",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2243",
+"title": "Tracking Project Completion",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2219",
+"title": "Visualising and Bulk Updating Child Ticket Data from The Project Screen",
+"section": "Using and Configuring Halo > Project Management"
+},
+{
+"id": "2086",
+"title": "Ad-Hoc Items on Quotes and Orders",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "1988",
+"title": "Approving Quotes Overview",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "2641",
+"title": "Create a Contract from a Sales Order",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "2887",
+"title": "Creating Dynamic Quotations with Item PDF Templates",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "1986",
+"title": "Creating Quotations",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "2514",
+"title": "Importing Quotation Lines via XLS",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "2327",
+"title": "Internal Quote Approvals",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "2722",
+"title": "Optional Items on Quotations",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "1987",
+"title": "Quotation PDFs",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "1989",
+"title": "Quotation Status",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "2360",
+"title": "Quote Approved Workflow Automation",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "2381",
+"title": "Sales Order Statuses",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "1990",
+"title": "Sales Orders",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "2430",
+"title": "Specifying Decimal Format in PDFs",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "1997",
+"title": "Viewing Quotes in the Portal",
+"section": "Using and Configuring Halo > Quotes and Sales Orders"
+},
+{
+"id": "1492",
+"title": "(HH:MM) Conversion of a field in SQL to Hours and Minutes",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1343",
+"title": "Adding a page break (page-break) in the HTML for PDF documents (IronPDF)",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2608",
+"title": "Agent Cost Tracking and Profitability Reporting",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1777",
+"title": "AI Report Builder",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2517",
+"title": "Automatic HTML Additions to Reporting",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "917",
+"title": "Charts and Graphs in Reports",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2617",
+"title": "Common SQL Tables and Joins",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1940",
+"title": "Composite Reports",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2064",
+"title": "Configuring Custom Appearances in Reports (using HTML)",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1511",
+"title": "Consignment PDFs",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1512",
+"title": "Creating a Report From an Action",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2229",
+"title": "Dashboard Publishing Guide",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2458",
+"title": "Database Reporting Functions",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1249",
+"title": "Halo In-App Dashboard",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2273",
+"title": "How to Restrict Users Access to Reports",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1806",
+"title": "How to Use Custom CSS and HTML on Halo Reports",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1594",
+"title": "HTML for 'Today's Date'",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2320",
+"title": "Link Excel to Halo Report",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1508",
+"title": "Making Dashboards Available to Users on the Self-Service Portal",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1449",
+"title": "Making Reports Show Viewer Specific Information",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1610",
+"title": "Navigating The Reporting Suite",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2616",
+"title": "Optimising Reports to Improve Efficiency",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2256",
+"title": "Pulling Report Data into a PDF template",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1563",
+"title": "Report Builder",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1505",
+"title": "Report Colour Palette Based on Brand Colour",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2375",
+"title": "Report Data Sources",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1771",
+"title": "Report filters in the URI parameters for report links",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2425",
+"title": "Report Online Repository",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2645",
+"title": "Reporting Access Control",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2162",
+"title": "Reporting Variables",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "887",
+"title": "Reports and Scheduling",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2270",
+"title": "Restricting Agent Reporting Access",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2321",
+"title": "Service Desk Incident Reports - Available Out of the Box",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2054",
+"title": "SQL For Auditing Passwords",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2746",
+"title": "Start to Finish: Project Dashboards",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "914",
+"title": "The Report Screen Explained",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "1875",
+"title": "Ticket Dashboards",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2638",
+"title": "Ticket Volumes and Forecasting",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2451",
+"title": "Use AI to Analyse Report Data",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2560",
+"title": "Useful Type lookups for writing SQL reports",
+"section": "Using and Configuring Halo > Reporting and Dashboards"
+},
+{
+"id": "2019",
+"title": "Creating Opportunities",
+"section": "Using and Configuring Halo > Sales and Opportunities"
+},
+{
+"id": "1579",
+"title": "Embedding a Ticket/Form onto your Website",
+"section": "Using and Configuring Halo > Sales and Opportunities"
+},
+{
+"id": "2286",
+"title": "How to configure Statement of Work (SoW) Templates",
+"section": "Using and Configuring Halo > Sales and Opportunities"
+},
+{
+"id": "2274",
+"title": "Managing Prospective Clients in Halo",
+"section": "Using and Configuring Halo > Sales and Opportunities"
+},
+{
+"id": "2018",
+"title": "Opportunity Configuration",
+"section": "Using and Configuring Halo > Sales and Opportunities"
+},
+{
+"id": "2021",
+"title": "Pipeline Stages",
+"section": "Using and Configuring Halo > Sales and Opportunities"
+},
+{
+"id": "2371",
+"title": "Project Sales Process",
+"section": "Using and Configuring Halo > Sales and Opportunities"
+},
+{
+"id": "2022",
+"title": "The Opportunity Workflow",
+"section": "Using and Configuring Halo > Sales and Opportunities"
+},
+{
+"id": "2020",
+"title": "Tracking Opportunities",
+"section": "Using and Configuring Halo > Sales and Opportunities"
+},
+{
+"id": "2023",
+"title": "Tracking Sales Metrics",
+"section": "Using and Configuring Halo > Sales and Opportunities"
+},
+{
+"id": "2073",
+"title": "Anonymous Ticket Logging",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "1994",
+"title": "Appearance/Home Screen",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2293",
+"title": "Changing the Self-Service Portal Language",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2335",
+"title": "Chat Bot and Chat Profiles",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2709",
+"title": "Custom CSS in the Self-Service Portal",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2643",
+"title": "Custom HTML Banner on the Self-Service Portal",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2294",
+"title": "Halo Chat Widget Properties and Examples",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "1462",
+"title": "Halo Live Chat - Embedded on Other Sites",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "1158",
+"title": "How to change the colour of 'How can we help you today?' on the Portal",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2369",
+"title": "How to Create New Request Buttons within a Service",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2509",
+"title": "Live Chat in Halo",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "1995",
+"title": "Menu Buttons",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2524",
+"title": "Navigating the Self-Service Portal (For End Users)",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2705",
+"title": "Optional Services",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2002",
+"title": "Raising a Service Request",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2049",
+"title": "Remove Your Company Details from the Self-Service Portal",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2488",
+"title": "Restricting User Access to Services",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "1070",
+"title": "Self-Service Portal Customisation",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2462",
+"title": "Self-Service Portal Restrictions",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2432",
+"title": "Service Catalogue",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2281",
+"title": "Service Status Monitoring",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2340",
+"title": "Service/Application Availability Management",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2001",
+"title": "Showing your Roadmap",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2816",
+"title": "Start to Finish: Self-Service Portal",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2665",
+"title": "Start to Finish: Service Requests",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2365",
+"title": "The Service Catalogue - Advanced Configuration",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2747",
+"title": "Tickets in the Self-Service Portal",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "1515",
+"title": "Viewing Child Tickets on the Portal",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "2003",
+"title": "Viewing Tickets in the Portal",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "1513",
+"title": "Web Announcement",
+"section": "Using and Configuring Halo > Self Service Portal"
+},
+{
+"id": "1921",
+"title": "Actions",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1943",
+"title": "Actions: System Uses",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1866",
+"title": "Additional Agents",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2289",
+"title": "Advanced SLA Settings",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1523",
+"title": "Agent and User Impersonation",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "876",
+"title": "Altering Ticket Types",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "920",
+"title": "Annotating Images in Actions",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2151",
+"title": "Approval Delegation",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1876",
+"title": "Approval Process Approvers",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1942",
+"title": "Approval Process for a Users Department Manager",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2396",
+"title": "Approval Processes Overview",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1484",
+"title": "Automated Tickets",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1326",
+"title": "Azure Actions",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "959",
+"title": "Call Management",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2733",
+"title": "Call Scripts",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "911",
+"title": "Canned Text",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2490",
+"title": "Change Advise Boards (CABs) (Approval Groups)",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1926",
+"title": "Change Management",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1930",
+"title": "Closure Procedures (End-User Closure Confirmation)",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1936",
+"title": "Column Profiles",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2067",
+"title": "Connected Instances",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2050",
+"title": "Contents of Distributing Tickets guides",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "963",
+"title": "Contents of Incident Management guides",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "919",
+"title": "Creating and Using Quick Actions",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1919",
+"title": "Creating Tickets",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2803",
+"title": "Customising how your Tickets Look",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2739",
+"title": "Customising Ticket Views in Halo",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2178",
+"title": "Database Lookup Example - Attaching the User's Role to a Ticket.",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1931",
+"title": "Dynamic Field/Value Visibility",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1935",
+"title": "Filter Profiles",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2203",
+"title": "Grouping Tickets by Ticket Type in a Column Profile",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1901",
+"title": "Holiday Management",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2204",
+"title": "How To Bulk Update Tickets, Drag and Drop Tickets Into Different Queues and an Explanation of Ticket Symbols",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2257",
+"title": "How to Configure Timesheets",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2867",
+"title": "Intelligent Routing",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1154",
+"title": "Internal Conversations",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1613",
+"title": "Internal Conversations In Halo",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2883",
+"title": "Intune App Protection for the Halo Mobile Application",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2180",
+"title": "Journeys",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2222",
+"title": "Link a User to an Action",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2868",
+"title": "Load Balancing",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2700",
+"title": "Maintenance Windows",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2663",
+"title": "Major Incident Management",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1595",
+"title": "Making Use Of Canned Text and $ Variables",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "904",
+"title": "Merging Tickets",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "888",
+"title": "Missing or Deleted Tickets",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2391",
+"title": "Mobile App",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "933",
+"title": "Modifying and Adding Workflows",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "905",
+"title": "Navigating the Software",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1944",
+"title": "One-Click Feedback",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1871",
+"title": "Operational-Level Agreements (OLAs) on Workflows",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "966",
+"title": "Parent and Child Tickets",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2879",
+"title": "Parent/Child and Related Tickets Comparison",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2345",
+"title": "Performing Ticket Approvals via API",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2083",
+"title": "Problem and Change Management Using Fully Configured Workflows",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "949",
+"title": "Problem Management",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2871",
+"title": "Qualification Matching",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2399",
+"title": "Recurring Invoice Approvals",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2592",
+"title": "Redact Sensitive Audit Logs on a Ticket",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2614",
+"title": "Redacting Card and Social Security Numbers (SSN)",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2878",
+"title": "Related Tickets",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1533",
+"title": "Restricting Field Access & Visibility",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2550",
+"title": "Risk Scoring",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2870",
+"title": "Round Robin",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "961",
+"title": "Scheduled Tickets",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1699",
+"title": "Searching Entities",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2497",
+"title": "Sensitive Tickets",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1927",
+"title": "Service Level Agreements (SLAs)",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2115",
+"title": "Shifts",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2382",
+"title": "SLA and OLA Notifications",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2786",
+"title": "SLA Escalation Rules and Automations",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1928",
+"title": "SLA Workdays",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1155",
+"title": "Software Releases",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2775",
+"title": "Start to Finish: Service Desk Basics",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2359",
+"title": "Starting a Workflow from an Action",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1929",
+"title": "Statuses",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1945",
+"title": "Surveys",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "980",
+"title": "Ticket Area Breakdown",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2419",
+"title": "Ticket Categories",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1893",
+"title": "Ticket Groups",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1923",
+"title": "Ticket Rules",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2604",
+"title": "Ticket Sources",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2544",
+"title": "Ticket Suggestions- without the use of AI",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2364",
+"title": "Ticket Tabs",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "885",
+"title": "Ticket Templates",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1920",
+"title": "Ticket Types (Field Lists)",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1933",
+"title": "Ticket Views",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2059",
+"title": "Tile and Kanban HTML $ Variables",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1924",
+"title": "Time Tracking",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1925",
+"title": "Timesheet Approvals",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2157",
+"title": "Updating Workflow Step Based on the Stage that is Clicked",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2920",
+"title": "Updating/Adding actions to Tickets in Bulk",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "967",
+"title": "Using \"Drag and Drop\"",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1506",
+"title": "Using Category Group as Ticket Rule Criteria",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "934",
+"title": "Using Dollar Variables in Actions",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2355",
+"title": "Workflow Automated Quick Actions",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2356",
+"title": "Workflow Runbook Automations",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2354",
+"title": "Workflow Step Rules",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2362",
+"title": "Workflow To-Do Automation",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1922",
+"title": "Workflows",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "1918",
+"title": "Working on Tickets",
+"section": "Using and Configuring Halo > Service Desk"
+},
+{
+"id": "2426",
+"title": "Access Control",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "1194",
+"title": "Add an external agent to Halo and restrict their access",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "1665",
+"title": "Adding Agent Signatures",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "2546",
+"title": "Admin Mode",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "2496",
+"title": "Agent Access to Services",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "883",
+"title": "Agent Permission Settings",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "1946",
+"title": "Agent Resource Booking",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "2390",
+"title": "Agent Statuses",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "2405",
+"title": "Agent Work Hours",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "1899",
+"title": "Agents",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "2333",
+"title": "Co-Managed IT",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "2239",
+"title": "Concurrent Licensing and Agent App Session Improvements",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "882",
+"title": "Configuring Agent Roles",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "877",
+"title": "Creating Agents and Editing Agent Details",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "1897",
+"title": "Departments",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "860",
+"title": "Departments and Teams",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "2330",
+"title": "Multi-Tenancy",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "979",
+"title": "My Account",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "1895",
+"title": "Organisations",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "884",
+"title": "Organising Teams of Agents",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "2682",
+"title": "Restricting Information Access for Agents",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "2765",
+"title": "Start to Finish: Organisation Structure",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "1898",
+"title": "Teams",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+},
+{
+"id": "918",
+"title": "The Activity Feed",
+"section": "Using and Configuring Halo > Your Organisation Structure"
+}
+]

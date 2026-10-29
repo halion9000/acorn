@@ -90,6 +90,7 @@ from app.api.v1.endpoints import (
     rule_tuning,
     saved_hunts,
     saved_views,
+    secureframe,
     service_gateways,
     shifts,
     signins,
@@ -214,6 +215,8 @@ api_router.include_router(identities.ingest_router)
 api_router.include_router(identity.router)
 api_router.include_router(cipp_actions.ingest_router)
 api_router.include_router(cipp_actions.router)
+api_router.include_router(secureframe.ingest_router)
+api_router.include_router(secureframe.router)
 api_router.include_router(client_documents.ingest_router)
 api_router.include_router(client_documents.router)
 api_router.include_router(client_posture.router)

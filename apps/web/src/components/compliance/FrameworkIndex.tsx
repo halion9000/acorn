@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 import { authFetch } from '@/lib/auth-session';
+import { SecureframeCard } from './SecureframeCard';
 
 export interface FrameworkCard {
   id: string;
@@ -102,6 +103,8 @@ export function FrameworkIndex({ frameworks }: { frameworks: FrameworkCard[] }) 
           <ClientPicker value={clientId} onChange={choose} label="Whose compliance" />
         </div>
       </div>
+
+      {!clientId && <SecureframeCard />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {frameworks.map((fw) => (

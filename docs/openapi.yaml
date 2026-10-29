@@ -10807,6 +10807,55 @@ paths:
                 $ref: '#/components/schemas/ActionsView'
       security:
       - HTTPBearer: []
+  /api/v1/inbox/core-feed/{tenant_token}/secureframe:
+    post:
+      tags:
+      - secureframe
+      summary: Report Core Feed Secureframe
+      description: Keep CORE's latest Secureframe report (replacing the one before).
+      operationId: report_core_feed_secureframe_api_v1_inbox_core_feed__tenant_token__secureframe_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/secureframe:
+    get:
+      tags:
+      - secureframe
+      summary: 'Secureframe''s control tests: how many pass, which fail and who owns
+        them'
+      operationId: secureframe_view_api_v1_secureframe_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecureframeView'
+      security:
+      - HTTPBearer: []
   /api/v1/inbox/core-feed/{tenant_token}/client-documents:
     post:
       tags:
@@ -28215,6 +28264,54 @@ components:
       - api_endpoint
       title: ExternalAssetType
       description: Types of externally-discovered assets.
+    FailingTest:
+      properties:
+        key:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Key
+        title:
+          type: string
+          maxLength: 300
+          minLength: 1
+          title: Title
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Owner
+        failing_since:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Failing Since
+        frameworks:
+          items:
+            type: string
+            maxLength: 80
+          type: array
+          maxItems: 40
+          title: Frameworks
+        domain:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Domain
+        message:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Message
+      type: object
+      required:
+      - title
+      title: FailingTest
     FanoutResult:
       properties:
         connector_id:
@@ -29016,6 +29113,35 @@ components:
       required:
       - formats
       title: FormatsResponse
+    FrameworkCounts:
+      properties:
+        key:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Key
+        name:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Name
+        failing:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Failing
+        passing:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Passing
+      type: object
+      required:
+      - key
+      - failing
+      - passing
+      title: FrameworkCounts
     FrameworksResponse:
       properties:
         frameworks:
@@ -35391,6 +35517,19 @@ components:
       required:
       - name
       title: ReportDefinitionBody
+    ReportIn:
+      properties:
+        vendor:
+          type: string
+          pattern: ^secureframe$
+          title: Vendor
+          default: secureframe
+        report:
+          $ref: '#/components/schemas/SecureframeBody'
+      type: object
+      required:
+      - report
+      title: ReportIn
     ReportResponse:
       properties:
         stored:
@@ -37937,6 +38076,64 @@ components:
       - taken_at
       - refreshed_at
       title: SecureScoreSummary
+    SecureframeBody:
+      properties:
+        tests:
+          $ref: '#/components/schemas/TestCounts'
+        frameworks:
+          items:
+            $ref: '#/components/schemas/FrameworkCounts'
+          type: array
+          maxItems: 60
+          title: Frameworks
+        failing:
+          items:
+            $ref: '#/components/schemas/FailingTest'
+          type: array
+          maxItems: 100
+          title: Failing
+        risks:
+          anyOf:
+          - type: integer
+            maximum: 10000000.0
+            minimum: 0.0
+          - type: 'null'
+          title: Risks
+        policies:
+          anyOf:
+          - type: integer
+            maximum: 10000000.0
+            minimum: 0.0
+          - type: 'null'
+          title: Policies
+      type: object
+      required:
+      - tests
+      title: SecureframeBody
+    SecureframeView:
+      properties:
+        report:
+          anyOf:
+          - $ref: '#/components/schemas/SecureframeBody'
+          - type: 'null'
+        received_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Received At
+        passing_percent:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Passing Percent
+      type: object
+      required:
+      - report
+      - received_at
+      title: SecureframeView
+      description: What the Compliance page shows. ``report`` is None until CORE has
+        sent one (Secureframe not connected, or not read yet).
     SeededCounts:
       properties:
         builtin:
@@ -39831,6 +40028,47 @@ components:
         a separate path (:func:`test_existing_connector`) that decrypts the
 
         stored creds first.'
+    TestCounts:
+      properties:
+        total:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Total
+        enabled:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Enabled
+        passing:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Passing
+        failing:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Failing
+        not_evaluated:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Not Evaluated
+        disabled:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Disabled
+      type: object
+      required:
+      - total
+      - enabled
+      - passing
+      - failing
+      - not_evaluated
+      - disabled
+      title: TestCounts
     TestEmailResult:
       properties:
         sent_to:

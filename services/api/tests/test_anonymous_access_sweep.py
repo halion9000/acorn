@@ -81,6 +81,9 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/cipp-actions"): (
         "CORE's report of the rules and audit lines of the actions it can take through CIPP (never a credential): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only replace that feed's own organization's report, and nothing it holds can change a rule or run an action",
     ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/secureframe"): (
+        "CORE's report of Secureframe's control tests (counts, failing tests with their owner, number of risks and policies; never a credential, policy text or evidence): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only replace that feed's own organization's report"
+    ),
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/client-documents"): (
         "CORE's read-only copy of a client's IT Glue documentation (documents, runbooks, configurations, locations, and password entries as a name and link only, never the password): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only add or update records under that feed's own client tenants, and text that looks like a secret is blanked on arrival",
     ),

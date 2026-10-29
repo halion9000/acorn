@@ -237,6 +237,7 @@ jobs:
             tests/test_pipeline_health_postgres.py \
             tests/test_client_documents_postgres.py \
             tests/test_review_history.py \
+            tests/test_secureframe.py \
             tests/test_insight_tiles_postgres.py \
             tests/test_ioc_alert_summaries_postgres.py \
             tests/test_cipp_actions_postgres.py \

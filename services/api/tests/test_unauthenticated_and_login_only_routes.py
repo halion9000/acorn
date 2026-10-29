@@ -92,6 +92,10 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's report of its CIPP action rules and audit lines (never a credential): authenticated by the core-feed token in the path, checked in the handler (401 without it); can only replace that feed's own organization's report",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/secureframe",
+    ): "CORE's report of Secureframe's control tests (never a credential): authenticated by the core-feed token in the path, checked in the handler (401 without it); can only replace that feed's own organization's report",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/client-documents",
     ): "CORE's read-only copy of a client's IT Glue documentation (never a password): authenticated by the core-feed token in the path, checked in the handler (401 without it); can only write under that feed's own mapped client tenants",
     (

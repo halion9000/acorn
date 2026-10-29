@@ -1,0 +1,40 @@
+{
+  "route": "secureframe",
+  "method": "POST",
+  "body": {
+    "vendor": "secureframe",
+    "report": {
+      "tests": {
+        "total": 2,
+        "enabled": 2,
+        "passing": 1,
+        "failing": 1,
+        "not_evaluated": 0,
+        "disabled": 0
+      },
+      "frameworks": [
+        {
+          "key": "soc2",
+          "name": "SOC 2",
+          "failing": 1,
+          "passing": 1
+        }
+      ],
+      "failing": [
+        {
+          "key": "t-2",
+          "title": "Test 2",
+          "owner": null,
+          "failing_since": null,
+          "frameworks": [
+            "soc2"
+          ],
+          "domain": null,
+          "message": null
+        }
+      ],
+      "risks": 2,
+      "policies": 2
+    }
+  }
+}

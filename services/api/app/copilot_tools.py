@@ -190,6 +190,25 @@ async def search_client_docs(*, tenant_id: str, query: str, limit: int = 6) -> d
     }
 
 
+async def search_halo_guides(*, tenant_id: str, query: str, limit: int = 6) -> dict[str, Any]:
+    """Halo's own guides whose title fits the question: id, title, section and link. Read one with ``read_halo_guide``."""
+    from app.services import halo_guides
+
+    found = halo_guides.search(query, limit)
+    return (
+        {"query": query, "count": len(found), "guides": found}
+        if found
+        else {"query": query, "count": 0, "guides": [], "note": "No guide title matches: try other words (the feature's name in Halo)."}
+    )
+
+
+async def read_halo_guide(*, tenant_id: str, guide_id: str) -> dict[str, Any]:
+    """The text of one Halo guide (from its id in ``search_halo_guides``), read from Halo's site now."""
+    from app.services import halo_guides
+
+    return await halo_guides.read_guide(guide_id)
+
+
 def format_docs_snapshot(results: list[dict[str, Any]]) -> str | None:
     """The matching documentation as text for the model, or None when nothing matched."""
     if not results:
@@ -436,6 +455,36 @@ COPILOT_TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "search_halo_guides",
+            "description": "Find Halo's own guides (HaloPSA, HaloITSM, integrations, billing, automations, configuration settings, security) by what they are about. Use it for any question about HOW HALO WORKS or how to configure something in Halo (a ticket type, a workflow, a billing rule, an integration, a report); do not answer those from memory. Returns guide ids, titles, sections and links; then read the best one with read_halo_guide.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The feature or task in a few words, e.g. 'recurring invoices' or 'custom automations'.",
+                    },
+                    "limit": {"type": "integer", "description": "Maximum number of guides (default 6, max 15)."},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_halo_guide",
+            "description": "Read one Halo guide by the id search_halo_guides returned. Answer from what it says and give the guide's link; say so if it does not cover the question.",
+            "parameters": {
+                "type": "object",
+                "properties": {"guide_id": {"type": "string", "description": "The guide's numeric id from search_halo_guides."}},
+                "required": ["guide_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_alert",
             "description": "Get full details of a single alert by its ID.",
             "parameters": {
@@ -511,6 +560,8 @@ COPILOT_TOOL_SCHEMAS = [
 _COPILOT_TOOL_DISPATCH: dict[str, Any] = {
     "search_alerts": search_alerts,
     "search_client_docs": search_client_docs,
+    "search_halo_guides": search_halo_guides,
+    "read_halo_guide": read_halo_guide,
     "get_alert": get_alert,
     "delete_alert": delete_alert,
     "search_cases": search_cases,
@@ -602,6 +653,8 @@ CONFIRMED_ACTIONS: dict[str, Any] = {"delete_alert": perform_delete_alert}
 TOOL_PERMISSIONS: dict[str, str] = {
     "search_alerts": "alerts:read",
     "search_client_docs": "alerts:read",
+    "search_halo_guides": "alerts:read",
+    "read_halo_guide": "alerts:read",
     "get_alert": "alerts:read",
     "delete_alert": "alerts:delete",
     "search_cases": "cases:read",
