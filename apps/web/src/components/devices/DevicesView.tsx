@@ -22,7 +22,8 @@ const MASTER_CHOICES = ['ninjaone', 'addigy', 'threatmate'];
 /** Every tool that can report devices, so the filter offers it before any of its devices is stored (a tool whose clients are not mapped yet has none to show). */
 export const KNOWN_DEVICE_TOOLS = ['addigy', 'autoelevate', 'auvik', 'blumira', 'datto-bcdr', 'dnsfilter', 'fieldeffect', 'huntress', 'meraki', 'ninjaone', 'screenconnect', 'slide', 'threatmate', 'unifi'];
 
-type Missing = 'addigy' | 'threatmate' | 'huntress' | 'screenconnect' | 'fieldeffect';
+type Missing = 'addigy' | 'threatmate' | 'huntress' | 'screenconnect' | 'fieldeffect' | 'ninjaone' | 'dnsfilter' | 'autoelevate';
+const MISSING_TOOLS: Missing[] = ['addigy', 'threatmate', 'huntress', 'screenconnect', 'fieldeffect', 'ninjaone', 'dnsfilter', 'autoelevate'];
 
 export function toolsOf(d: DeviceRow): string[] {
   return [...new Set(d.sources.map((s) => s.vendor))].sort();
@@ -70,7 +71,7 @@ export function filtersFromParams(params: URLSearchParams | null): Partial<Saved
   const kindName = params.get('kind');
   if (kindName && KIND_VALUES.includes(kindName)) out.kind = kindName;
   const missing = params.get('missing');
-  if (missing === 'addigy' || missing === 'threatmate' || missing === 'huntress' || missing === 'screenconnect' || missing === 'fieldeffect') out.missing = missing;
+  if (MISSING_TOOLS.includes(missing as Missing)) out.missing = missing as Missing;
   if (params.get('attention') === '1') out.attentionOnly = true;
   if (params.get('stale') === '1') out.staleOnly = true;
   if (params.get('encryption') === 'not_encrypted') out.notEncryptedOnly = true;
@@ -152,7 +153,7 @@ export default function DevicesView() {
       setVendor(pickString(saved.vendor));
       setOs(pickString(saved.os, OS_CHOICES.map((o) => o.value)));
       setKind(pickString(saved.kind, KIND_VALUES));
-      setMissing((pickString(saved.missing, ['addigy', 'threatmate', 'huntress', 'screenconnect', 'fieldeffect']) || null) as Missing | null);
+      setMissing((pickString(saved.missing, MISSING_TOOLS) || null) as Missing | null);
       setGapsOnly(saved.gapsOnly === true);
       setAttentionOnly(saved.attentionOnly === true);
       setStaleOnly(saved.staleOnly === true);
@@ -329,11 +330,11 @@ export default function DevicesView() {
             {data?.summary.needs_attention ?? '—'}
           </div>
         </button>
-        {(['addigy', 'threatmate', 'huntress', 'screenconnect', 'fieldeffect'] as const)
+        {MISSING_TOOLS
           // The ScreenConnect tile only means something once that tool feeds devices. Field Effect is one of the two EDRs, so its tile is always there.
-          .filter((tool) => tool !== 'screenconnect' || (data?.summary.reporting_tools ?? []).includes(tool))
+          .filter((tool) => !(['screenconnect', 'ninjaone', 'dnsfilter', 'autoelevate'] as Missing[]).includes(tool) || (data?.summary.reporting_tools ?? []).includes(tool) || missing === tool)
           .map((tool) => {
-          const count = data?.summary[({ addigy: 'not_in_addigy', threatmate: 'not_in_threatmate', huntress: 'not_in_huntress', screenconnect: 'not_in_screenconnect', fieldeffect: 'not_in_fieldeffect' } as const)[tool]];
+          const count = data?.summary[({ addigy: 'not_in_addigy', threatmate: 'not_in_threatmate', huntress: 'not_in_huntress', screenconnect: 'not_in_screenconnect', fieldeffect: 'not_in_fieldeffect', ninjaone: 'not_in_ninjaone', dnsfilter: 'not_in_dnsfilter', autoelevate: 'not_in_autoelevate' } as const)[tool]];
           const on = missing === tool;
           // Until Field Effect has devices stored, "not in Field Effect" would be every computer: show a dash and say why.
           const waiting = tool === 'fieldeffect' && !!data && !(data.summary.reporting_tools ?? []).includes('fieldeffect');

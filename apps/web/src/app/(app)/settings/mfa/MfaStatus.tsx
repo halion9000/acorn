@@ -164,7 +164,7 @@ export function MfaStatus() {
   // A link (from the Client posture page, say) can name one client and which list to open: ?client=<id>&which=without|not_required&admins=1
   const params = useSearchParams();
   const linkedClient = params?.get("client") || null;
-  const linkedWhich = params?.get("which") === "not_required" ? "not_required" : params?.get("which") === "without" ? "without" : null;
+  const linkedWhich = (["not_required", "without", "admins"] as const).find((w) => w === params?.get("which")) ?? null;
   const [open, setOpen] = useState<Open>(linkedClient && linkedWhich ? { id: linkedClient, which: linkedWhich } : null);
   const [adminsOnly, setAdminsOnly] = useState(params?.get("admins") === "1");
   const [query, setQuery] = useState("");

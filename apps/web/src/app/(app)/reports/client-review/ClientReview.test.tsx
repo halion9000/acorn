@@ -87,6 +87,20 @@ describe('ClientReview', () => {
     expect(authFetch).toHaveBeenCalledWith('/api/v1/client-review/c1');
   });
 
+  it('links a readiness answer that needs work to what is behind it, and gives none to one nothing shows', async () => {
+    authFetch.mockImplementation((url?: string) =>
+      Promise.resolve(String(url).startsWith('/api/v1/client-review/') ? reply(review()) : reply([{ id: 'c1', name: 'Acme Dental' }])),
+    );
+    const user = userEvent.setup();
+    render(<ClientReview />);
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Acme Dental' })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText('Client'), 'c1');
+    const link = await screen.findByTestId('link-edr');
+    expect(link).toHaveTextContent('See the computers missing Huntress');
+    expect(link).toHaveAttribute('href', '/devices?client=c1&missing=huntress');
+    expect(screen.queryByTestId('link-backups')).toBeNull();
+  });
+
   it('opens straight on the client named in the address and says so plainly when data is missing', async () => {
     routerParams.current = new URLSearchParams('client=c1');
     authFetch.mockImplementation((url?: string) =>

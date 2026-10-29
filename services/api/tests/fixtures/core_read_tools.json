@@ -305,7 +305,10 @@
         "threatmate",
         "huntress",
         "screenconnect",
-        "fieldeffect"
+        "fieldeffect",
+        "ninjaone",
+        "dnsfilter",
+        "autoelevate"
       ],
       "os": [
         "windows",

@@ -5,11 +5,13 @@
  * Backed by GET /api/v1/client-review/{client}. Every answer is evidence from the connected tools; what A.C.O.R.N does not hold is shown as "Not known", never guessed.
  */
 import { Fragment, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { authFetch } from "@/lib/auth-session";
 import { VcioSuggestions } from "./VcioSuggestions";
 import { AnswerEditor, AnswerMarks } from "./AnswerEditor";
+import { reviewLink } from "./review-links";
 import { answeredAutomatically, csvFileName, loadFolded, openCounts, openLabel, reviewCsv, saveFolded } from "./reviewExport";
 
 export interface Coverage {
@@ -234,6 +236,17 @@ function Card({
   );
 }
 
+/** The link to what is behind an answer that needs work (the people without Multi-Factor, the computers missing a tool), when there is a page that shows exactly that. */
+function ReadinessLink({ item, clientId, mfa }: { item: ReadinessItem; clientId: string; mfa: { without_mfa?: number; admins_without_mfa?: number } | null }) {
+  const link = reviewLink(item.key, item.status, clientId, { mfa });
+  if (!link) return null;
+  return (
+    <Link href={link.href} className="block text-xs text-sky-300 underline hover:text-sky-200" data-testid={`link-${item.key}`}>
+      {link.label} →
+    </Link>
+  );
+}
+
 export function ClientReview() {
   const params = useSearchParams();
   const [clients, setClients] = useState<ClientChoice[] | null>(null);
@@ -371,6 +384,7 @@ export function ClientReview() {
                   <span className="flex-1">
                     <span className="text-slate-200">{i.question}</span>
                     <span className="block text-xs text-slate-500">{i.evidence}</span>
+                    <ReadinessLink item={i} clientId={review.client_id} mfa={review.mfa} />
                     <AnswerMarks manual={i.manual} note={i.note} suggested={i.auto_status ? STATUS[i.auto_status as ReadinessItem["status"]]?.label : null} />
                     <AnswerEditor clientId={review.client_id} section="readiness" questionKey={i.key} status={i.status} note={i.note} manual={i.manual} onSaved={reload} />
                   </span>

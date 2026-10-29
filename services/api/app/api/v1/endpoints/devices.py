@@ -204,6 +204,9 @@ class DeviceSummary(BaseModel):
     # ConnectWise Control (ScreenConnect) runs on Windows and Linux machines only: iPhones, iPads and Macs are not counted. Field Effect: every machine but phones and tablets.
     not_in_screenconnect: int = 0
     not_in_fieldeffect: int = 0
+    not_in_ninjaone: int = 0
+    not_in_dnsfilter: int = 0
+    not_in_autoelevate: int = 0
     # Windows machines a tool reports are not fully BitLocker-encrypted, and how many have any reading (a tool reports it for some machines only). Servers carry no reading.
     not_encrypted: int = 0
     encryption_known: int = 0
@@ -761,7 +764,7 @@ async def list_devices(
     not_in_master: bool = Query(default=False, description="Only devices the master tool does not report."),
     missing: str | None = Query(
         default=None,
-        pattern="^(addigy|threatmate|huntress|screenconnect|fieldeffect)$",
+        pattern="^(addigy|threatmate|huntress|screenconnect|fieldeffect|ninjaone|dnsfilter|autoelevate)$",
         description="Only devices this tool should report but does not.",
     ),
     offline: bool = Query(default=False, description="Only devices no tool has seen online for a week or more."),
@@ -802,6 +805,9 @@ async def list_devices(
         not_in_huntress=sum(1 for d in counted if is_missing_from(d, "huntress")),
         not_in_screenconnect=sum(1 for d in counted if is_missing_from(d, "screenconnect")),
         not_in_fieldeffect=sum(1 for d in counted if is_missing_from(d, "fieldeffect")),
+        not_in_ninjaone=sum(1 for d in counted if is_missing_from(d, "ninjaone")),
+        not_in_dnsfilter=sum(1 for d in counted if is_missing_from(d, "dnsfilter")),
+        not_in_autoelevate=sum(1 for d in counted if is_missing_from(d, "autoelevate")),
         not_encrypted=sum(1 for d in counted if d.encrypted is False),
         encryption_known=sum(1 for d in counted if d.encrypted is not None),
         reporting_tools=sorted({s.vendor for d in loaded for s in d.sources}),
@@ -867,7 +873,7 @@ async def export_devices(
     search: str | None = Query(default=None, max_length=100),
     vendor: str | None = Query(default=None, pattern=_VENDOR),
     not_in_master: bool = Query(default=False),
-    missing: str | None = Query(default=None, pattern="^(addigy|threatmate|huntress|screenconnect|fieldeffect)$"),
+    missing: str | None = Query(default=None, pattern="^(addigy|threatmate|huntress|screenconnect|fieldeffect|ninjaone|dnsfilter|autoelevate)$"),
     offline: bool = Query(default=False),
     has_alerts: bool = Query(default=False),
     attention: bool = Query(default=False),

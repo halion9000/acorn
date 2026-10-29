@@ -619,7 +619,7 @@ export interface DeviceAlert {
 
 export interface DeviceList {
   master_vendor: string | null;
-  summary: { total: number; not_in_master: number; not_in_addigy?: number; not_in_threatmate?: number; not_in_huntress?: number; not_in_screenconnect?: number; not_in_fieldeffect?: number; not_encrypted?: number; encryption_known?: number; reporting_tools?: string[]; needs_attention?: number; stale_agents?: number; offline?: number; with_alerts?: number; hidden?: number; long_offline?: number; kinds?: Partial<Record<DeviceKind, number>> };
+  summary: { total: number; not_in_master: number; not_in_addigy?: number; not_in_threatmate?: number; not_in_huntress?: number; not_in_screenconnect?: number; not_in_fieldeffect?: number; not_in_ninjaone?: number; not_in_dnsfilter?: number; not_in_autoelevate?: number; not_encrypted?: number; encryption_known?: number; reporting_tools?: string[]; needs_attention?: number; stale_agents?: number; offline?: number; with_alerts?: number; hidden?: number; long_offline?: number; kinds?: Partial<Record<DeviceKind, number>> };
   items: DeviceRow[];
   total: number;
   page: number;
@@ -635,7 +635,7 @@ export interface DeviceQuery {
   vendor?: string;
   notInMaster?: boolean;
   /** Only devices this tool should report but does not (Addigy counts Macs only). */
-  missing?: 'addigy' | 'threatmate' | 'huntress' | 'screenconnect' | 'fieldeffect';
+  missing?: 'addigy' | 'threatmate' | 'huntress' | 'screenconnect' | 'fieldeffect' | 'ninjaone' | 'dnsfilter' | 'autoelevate';
   /** Only devices a tool reports a problem with. */
   attention?: boolean;
   /** Only devices whose protection agent has not checked in for two weeks or more. */

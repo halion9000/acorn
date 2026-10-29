@@ -9447,7 +9447,7 @@ paths:
         schema:
           anyOf:
           - type: string
-            pattern: ^(addigy|threatmate|huntress|screenconnect|fieldeffect)$
+            pattern: ^(addigy|threatmate|huntress|screenconnect|fieldeffect|ninjaone|dnsfilter|autoelevate)$
           - type: 'null'
           description: Only devices this tool should report but does not.
           title: Missing
@@ -9600,7 +9600,7 @@ paths:
         schema:
           anyOf:
           - type: string
-            pattern: ^(addigy|threatmate|huntress|screenconnect|fieldeffect)$
+            pattern: ^(addigy|threatmate|huntress|screenconnect|fieldeffect|ninjaone|dnsfilter|autoelevate)$
           - type: 'null'
           title: Missing
       - name: offline
@@ -26788,6 +26788,18 @@ components:
         not_in_fieldeffect:
           type: integer
           title: Not In Fieldeffect
+          default: 0
+        not_in_ninjaone:
+          type: integer
+          title: Not In Ninjaone
+          default: 0
+        not_in_dnsfilter:
+          type: integer
+          title: Not In Dnsfilter
+          default: 0
+        not_in_autoelevate:
+          type: integer
+          title: Not In Autoelevate
           default: 0
         not_encrypted:
           type: integer
