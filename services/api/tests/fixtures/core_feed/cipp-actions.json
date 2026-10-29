@@ -65,6 +65,7 @@
         "detail": null,
         "would_refuse": null
       }
-    ]
+    ],
+    "audit_failures": 0
   }
 }

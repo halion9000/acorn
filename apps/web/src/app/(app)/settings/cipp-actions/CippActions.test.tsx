@@ -43,6 +43,9 @@ describe('the sentences', () => {
     expect(modeSentence(report({ live: true, clients: [] }))).toContain('NO client');
     expect(modeSentence(report({ live: true, all_clients: true }))).toContain('ALL clients');
   });
+  it('say when the cap is 0, that every real request is refused', () => {
+    expect(modeSentence(report({ live: true, max_per_hour: 0 }))).toBe('Real actions are ON for 2 opted-in clients, but the hourly cap is 0, so every real request is refused.');
+  });
   it('say what would happen if they were switched on', () => {
     expect(wouldSentence(report())).toBe('Switched on, an action could run for only the 2 opted-in clients, at most 5 per client per hour, and never on the 3 protected accounts and domains.');
     expect(wouldSentence(report({ all_clients: true, protected_users: 1, protected_domains: 0 }))).toContain('any client');
@@ -90,6 +93,17 @@ describe('CippActions', () => {
     expect(await screen.findByTestId('mode')).toHaveTextContent('Real actions are ON for ALL clients');
     expect(screen.getByTestId('mode').className).toMatch(/red/);
     expect(screen.getByTestId('stale')).toHaveTextContent('CORE may not be running');
+  });
+
+  it('warns in red when CORE could not write audit lines, and says nothing when it could', async () => {
+    authFetch.mockResolvedValue(json(view(report({ audit_failures: 3 }))));
+    const first = render(<CippActions />);
+    expect(await screen.findByTestId('audit-failures')).toHaveTextContent('CORE could not write 3 audit lines');
+    first.unmount();
+    authFetch.mockResolvedValue(json(view(report())));
+    render(<CippActions />);
+    await screen.findByTestId('mode');
+    expect(screen.queryByTestId('audit-failures')).toBeNull();
   });
 
   it('narrows the audit to one outcome and says when none has it', async () => {

@@ -20118,7 +20118,7 @@ components:
         max_per_hour:
           type: integer
           maximum: 100.0
-          minimum: 1.0
+          minimum: 0.0
           title: Max Per Hour
         actions:
           items:
@@ -20132,6 +20132,12 @@ components:
           type: array
           maxItems: 100
           title: Audit
+        audit_failures:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Audit Failures
+          default: 0
       type: object
       required:
       - live

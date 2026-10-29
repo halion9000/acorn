@@ -146,4 +146,8 @@ def test_a_report_with_an_unknown_outcome_or_risk_or_too_many_lines_is_refused()
     with pytest.raises(ValidationError):
         report(audit=[{"at": NOW.isoformat(), "action": "x", "client_id": "c", "result": "refused"}] * (ep.MAX_AUDIT + 1))
     with pytest.raises(ValidationError):
-        report(max_per_hour=0)
+        report(max_per_hour=101)
+    with pytest.raises(ValidationError):
+        report(audit_failures=-1)
+    assert report(max_per_hour=0).max_per_hour == 0, "a cap of 0 (no executed action) is a real setting"
+    assert report().audit_failures == 0, "an older CORE that sends no count is still accepted"

@@ -52,9 +52,12 @@ class ActionsReport(BaseModel):
     clients: list[Annotated[str, Field(max_length=80)]] = Field(default_factory=list, max_length=500)
     protected_users: int = Field(ge=0, le=100_000)
     protected_domains: int = Field(ge=0, le=100_000)
-    max_per_hour: int = Field(ge=1, le=100)
+    # 0 is a real setting: it blocks every executed action.
+    max_per_hour: int = Field(ge=0, le=100)
     actions: list[ActionInfo] = Field(max_length=30)
     audit: list[AuditEntry] = Field(default_factory=list, max_length=MAX_AUDIT)
+    # Audit lines CORE could not write since it started: an action can have been taken with no line to show for it.
+    audit_failures: int = Field(default=0, ge=0, le=10_000_000)
 
 
 class ReportResponse(BaseModel):

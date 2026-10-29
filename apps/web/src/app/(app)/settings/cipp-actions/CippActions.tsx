@@ -38,6 +38,8 @@ export interface ActionsReport {
   max_per_hour: number;
   actions: ActionInfo[];
   audit: AuditEntry[];
+  /** Audit lines CORE could not write since it started. Absent from an older CORE. */
+  audit_failures?: number;
 }
 
 export interface ActionsView {
@@ -64,6 +66,7 @@ export function clientLabel(id: string, names: Record<string, string>): string {
 export function modeSentence(r: ActionsReport): string {
   if (!r.live) return "Real actions are OFF: every request CORE receives is a dry run, and nothing is sent to CIPP.";
   const who = r.all_clients ? "ALL clients" : r.clients.length === 0 ? "NO client (none is opted in, so every real request is refused)" : `${r.clients.length} opted-in client${r.clients.length === 1 ? "" : "s"}`;
+  if (r.max_per_hour === 0) return `Real actions are ON for ${who}, but the hourly cap is 0, so every real request is refused.`;
   return `Real actions are ON for ${who}, at most ${r.max_per_hour} per client per hour.`;
 }
 
@@ -137,6 +140,12 @@ export function CippActions() {
             CORE reported {agoWords(view.received_at)}.
             {stale && <span data-testid="stale" className="ml-1 text-amber-300">That is a while ago: CORE may not be running, so what is shown may be out of date.</span>}
           </p>
+
+          {(r.audit_failures ?? 0) > 0 && (
+            <p data-testid="audit-failures" role="alert" className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
+              CORE could not write {r.audit_failures} audit line{r.audit_failures === 1 ? "" : "s"} since it started, so an action may have been taken with no line below to show for it. Check the disk CORE writes to.
+            </p>
+          )}
 
           <section aria-label="Rules" className="space-y-1 text-sm text-slate-300">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rules</h2>
