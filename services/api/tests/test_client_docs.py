@@ -225,3 +225,12 @@ def test_a_client_with_an_accent_in_its_name_is_found_in_a_question():
 
 def test_clean_text_makes_one_spelling_of_an_accented_word():
     assert cd.clean_text("café") == "café"
+
+
+def test_only_a_script_written_flexible_asset_counts_as_automated():
+    assert cd.is_automated("asset", "Workstation (auto)")
+    assert cd.is_automated("asset", "  network details (AUTO) ")
+    assert cd.is_automated("asset", "Rewst") and cd.is_automated("asset", "User Count Verification")
+    assert not cd.is_automated("asset", "Backup") and not cd.is_automated("asset", None) and not cd.is_automated("asset", "")
+    for kind in ("document", "password", "location", "ticket", "configuration"):
+        assert not cd.is_automated(kind, "Workstation (auto)"), "a document or password is never automated, whatever its folder is called"

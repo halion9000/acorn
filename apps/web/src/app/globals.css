@@ -162,6 +162,13 @@ select {
   padding-right: 32px;
 }
 
+/* The list a select opens is drawn by the browser from the options' own colours; without these it was pale text on a white list in dark mode. */
+select option,
+select optgroup {
+  background-color: var(--surface-card);
+  color: var(--fg-primary);
+}
+
 /* Animated pulse dot */
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }

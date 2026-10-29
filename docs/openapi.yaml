@@ -27131,6 +27131,10 @@ components:
         snippet:
           type: string
           title: Snippet
+        automated:
+          type: boolean
+          title: Automated
+          default: false
       type: object
       required:
       - client_id

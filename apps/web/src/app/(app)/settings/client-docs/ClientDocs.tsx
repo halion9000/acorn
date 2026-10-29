@@ -10,6 +10,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { authFetch } from "@/lib/auth-session";
 import { ago } from "@/lib/ago";
 
+const AUTOMATED_SNIPPET_CHARS = 200;
+
 export interface DocHit {
   client_id: string;
   client: string | null;
@@ -18,6 +20,8 @@ export interface DocHit {
   folder?: string | null;
   url?: string | null;
   snippet: string;
+  /** Written by a script (an "(auto)" inventory, Rewst's variables), not by a person: listed after the documentation and shown smaller. */
+  automated?: boolean;
 }
 
 export interface DocSummary {
@@ -171,7 +175,7 @@ export function ClientDocs() {
             {hits.map((h, i) => (
               <li key={`${h.client_id}-${h.url ?? h.title}-${i}`} className="rounded-lg border border-slate-700 bg-slate-900/50 p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-200">{KIND_LABELS[h.kind] ?? h.kind}</span>
+                  <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-200">{h.automated ? "Automated inventory" : (KIND_LABELS[h.kind] ?? h.kind)}</span>
                   {isHttps(h.url) ? (
                     <a href={h.url} target="_blank" rel="noreferrer" className="font-medium text-sky-300 hover:underline">
                       {h.title}
@@ -186,7 +190,11 @@ export function ClientDocs() {
                 {h.kind === "password" && (
                   <p className="mt-1 text-xs text-amber-200">The password is masked in IT Glue. Open the link to reveal it if you have access.</p>
                 )}
-                {h.snippet && <p className="mt-1 whitespace-pre-line text-sm text-slate-300">{h.snippet}</p>}
+                {h.snippet && (
+                  <p className={h.automated ? "mt-1 whitespace-pre-line text-xs text-slate-500" : "mt-1 whitespace-pre-line text-sm text-slate-300"}>
+                    {h.automated && h.snippet.length > AUTOMATED_SNIPPET_CHARS ? `${h.snippet.slice(0, AUTOMATED_SNIPPET_CHARS)}…` : h.snippet}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

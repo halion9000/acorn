@@ -115,6 +115,29 @@ describe('ClientDocs', () => {
     expect(results).toHaveTextContent('Onboarding guide');
   });
 
+  it('labels a script-written record as an automated inventory and cuts its long snippet, but leaves a written document whole', async () => {
+    const long = 'auvik_tenant_id | 1032909532193166077 | '.repeat(20);
+    route({
+      '/api/v1/client-documents/summary': () => json(SUMMARY),
+      '/api/v1/client-documents?': () =>
+        json([
+          { client_id: 'c-2', client: 'Tecovas, Inc.', kind: 'document', title: 'Hiring checklist', folder: 'HR', url: null, snippet: 'Remember the badge. '.repeat(15) },
+          { client_id: 'c-2', client: 'Tecovas, Inc.', kind: 'asset', title: 'Rewst', folder: 'Rewst', url: null, snippet: long, automated: true },
+        ]),
+    });
+    render(<ClientDocs />);
+    await screen.findByTestId('docs-summary');
+    fireEvent.change(screen.getByLabelText('Search the documentation'), { target: { value: 'onboarding' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    const results = await screen.findByTestId('docs-results');
+    expect(results).toHaveTextContent('Automated inventory');
+    expect(results).not.toHaveTextContent('Runbook or asset');
+    expect(results).toHaveTextContent('Hiring checklist');
+    expect(results.textContent).not.toContain(long.trim());
+    expect(results.textContent).toContain('…');
+    expect(results.textContent).toContain('Remember the badge. '.repeat(15).trim());
+  });
+
   it('labels a ticket as a ticket, linking to it in the ticketing tool', async () => {
     route({
       '/api/v1/client-documents/summary': () => json(SUMMARY),

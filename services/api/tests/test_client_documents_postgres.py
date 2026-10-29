@@ -265,3 +265,28 @@ async def test_an_accented_word_is_found_by_its_accented_spelling(world):
     assert [h.title for h in await ask(app, w, "who is René")] == ["Café Bellevue contact"]
     assert [h.title for h in await ask(app, w, "the résumé")] == ["Café Bellevue contact"]
     assert [h.title for h in await ask(app, w, "résumé")] == ["Café Bellevue contact"], "e plus a combining accent finds the same document"
+
+
+@pytest.mark.asyncio
+async def test_a_record_a_script_wrote_is_listed_after_documentation_a_person_wrote_even_when_it_matches_better(world):
+    app, _, w = world
+    await store(
+        app,
+        {
+            w.park: [
+                doc(
+                    "a1",
+                    "Workstation inventory",
+                    "onboarding onboarding onboarding onboarding onboarding",
+                    kind="asset",
+                    folder="Workstation (auto)",
+                ),
+                doc("a2", "Rewst", "onboarding_requirements onboarding onboarding", kind="asset", folder="Rewst"),
+                doc("h1", "Hiring checklist", "Remember the onboarding badge.", kind="document", folder="HR"),
+            ]
+        },
+    )
+    hits = await ask(app, w, "onboarding")
+    assert [h.title for h in hits][0] == "Hiring checklist" and [h.automated for h in hits] == [False, True, True]
+    only = await ask(app, w, "workstation inventory")
+    assert [h.title for h in only] == ["Workstation inventory"], "when only automated records match they are still found"

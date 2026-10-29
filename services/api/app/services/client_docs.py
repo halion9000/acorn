@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import case, column, delete, desc, func, literal_column, select
+from sqlalchemy import and_, case, column, delete, desc, func, literal_column, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.client_document import ClientDocument
@@ -26,6 +26,30 @@ TICKET_KEEP_DAYS = 730
 # A ticket's answer is spread across its notes, so a ticket's result carries the start of the whole thread rather than the two best fragments a document gets.
 TICKET_SNIPPET_CHARS = 1500
 MAX_TERMS = 12
+
+# Records a script writes into IT Glue rather than a person: the "(auto)" inventories (Workstation (auto), Server (auto), Network Details (auto), ...), Rewst's variable dump and the
+# user-count checks. They make up most of what is stored and answer "how many" rather than "how do I", so a search lists them after the documentation a person wrote.
+AUTOMATED_FOLDER_SUFFIX = "(auto)"
+AUTOMATED_FOLDERS = frozenset({"rewst", "user count verification"})
+
+
+def is_automated(kind: str, folder: str | None) -> bool:
+    """True for a flexible asset a script generated; documents, passwords, locations and tickets are never automated."""
+    if kind != "asset" or not folder:
+        return False
+    name = folder.strip().lower()
+    return name.endswith(AUTOMATED_FOLDER_SUFFIX) or name in AUTOMATED_FOLDERS
+
+
+def _automated_sql():
+    """The same test as :func:`is_automated`, for the search query."""
+    name = func.lower(func.trim(func.coalesce(ClientDocument.folder, "")))
+    return and_(
+        ClientDocument.kind == "asset",
+        or_(name.like("%" + AUTOMATED_FOLDER_SUFFIX), name.in_(sorted(AUTOMATED_FOLDERS))),
+    )
+
+
 SNIPPET_OPTIONS = 'MaxFragments=2, MaxWords=40, MinWords=15, StartSel="", StopSel="", FragmentDelimiter=" ... "'
 
 # Letters and digits of any language: "café" is one word (the old pattern split it at the accent into "caf" and nothing).
@@ -132,6 +156,7 @@ class Hit:
     url: str | None
     snippet: str
     rank: float
+    automated: bool = False
 
 
 async def search_documents(db: Any, tenant_ids: list[uuid.UUID], query: str, limit: int = 8) -> list[Hit]:
@@ -156,7 +181,7 @@ async def search_documents(db: Any, tenant_ids: list[uuid.UUID], query: str, lim
                 func.ts_rank(search, q).label("rank"),
             )
             .where(ClientDocument.tenant_id.in_(tenant_ids), search.op("@@")(q))
-            .order_by(desc("rank"), ClientDocument.title)
+            .order_by(_automated_sql().asc(), desc("rank"), ClientDocument.title)
             .limit(max(1, min(limit, 30)))
         )
     ).all()
@@ -169,6 +194,7 @@ async def search_documents(db: Any, tenant_ids: list[uuid.UUID], query: str, lim
             r.url,
             clean_text(r.snippet, TICKET_SNIPPET_CHARS if r.kind == TICKET_KIND else 600) or clean_text(r.title, 300),
             float(r.rank or 0.0),
+            is_automated(r.kind, r.folder),
         )
         for r in rows
     ]

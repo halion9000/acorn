@@ -65,6 +65,7 @@ class DocHit(BaseModel):
     folder: str | None = None
     url: str | None = None
     snippet: str
+    automated: bool = False
 
 
 class DocSummary(BaseModel):
@@ -112,7 +113,14 @@ async def find(db: Any, owner: uuid.UUID, query: str, client_id: uuid.UUID | Non
         hits = await client_docs.search_documents(db, ids, query, limit=limit)
     return [
         DocHit(
-            client_id=h.tenant_id, client=names.get(h.tenant_id), kind=h.kind, title=h.title, folder=h.folder, url=h.url, snippet=h.snippet
+            client_id=h.tenant_id,
+            client=names.get(h.tenant_id),
+            kind=h.kind,
+            title=h.title,
+            folder=h.folder,
+            url=h.url,
+            snippet=h.snippet,
+            automated=h.automated,
         )
         for h in hits
     ]
