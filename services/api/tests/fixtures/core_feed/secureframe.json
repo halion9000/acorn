@@ -34,7 +34,63 @@
         }
       ],
       "risks": 2,
-      "policies": 2
+      "policies": 2,
+      "requirements": [
+        {
+          "framework": "CIS_IG1",
+          "key": "9.2",
+          "title": "Use DNS Filtering Services",
+          "health": "unhealthy",
+          "controls": [
+            {
+              "key": "DNS-01",
+              "health": "unhealthy",
+              "passing": 1,
+              "failing": 3
+            },
+            {
+              "key": "DNS-02",
+              "health": "healthy",
+              "passing": 2,
+              "failing": 0
+            }
+          ]
+        },
+        {
+          "framework": "CIS_IG1",
+          "key": "10.1",
+          "title": "Deploy and Maintain Anti-Malware Software",
+          "health": "not_tested",
+          "controls": []
+        },
+        {
+          "framework": "NIST_CSF_2",
+          "key": "GV.OC-01",
+          "title": null,
+          "health": "unhealthy",
+          "controls": [
+            {
+              "key": "DNS-01",
+              "health": "unhealthy",
+              "passing": 1,
+              "failing": 3
+            },
+            {
+              "key": "ORG-01",
+              "health": "unhealthy",
+              "passing": 0,
+              "failing": 1
+            }
+          ]
+        },
+        {
+          "framework": "NIST_CSF_2",
+          "key": "PR.AA-01",
+          "title": null,
+          "health": "healthy",
+          "controls": []
+        }
+      ]
     }
   }
 }

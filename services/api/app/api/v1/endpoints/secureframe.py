@@ -24,6 +24,9 @@ ingest_router = APIRouter(prefix="/inbox", tags=["secureframe"])
 
 MAX_FAILING = 100
 MAX_FRAMEWORKS = 60
+MAX_REQUIREMENTS = 400
+# A.C.O.R.N's compliance catalog key -> Secureframe's framework key, for the frameworks that have a page here.
+FRAMEWORK_KEYS = {"NIST-CSF": "NIST_CSF_2", "CIS-IG1": "CIS_IG1"}
 _COUNT = Field(ge=0, le=10_000_000)
 
 
@@ -53,6 +56,23 @@ class FailingTest(BaseModel):
     message: str | None = Field(default=None, max_length=300)
 
 
+class RequirementControl(BaseModel):
+    key: str = Field(min_length=1, max_length=60)
+    health: str | None = Field(default=None, max_length=20)
+    passing: int = _COUNT
+    failing: int = _COUNT
+
+
+class MappedRequirement(BaseModel):
+    """One requirement of NIST CSF 2.0 or CIS IG1 as Secureframe sees it: its verdict and the controls that answer it."""
+
+    framework: str = Field(pattern="^(NIST_CSF_2|CIS_IG1)$")
+    key: str = Field(min_length=1, max_length=40)
+    title: str | None = Field(default=None, max_length=300)
+    health: str | None = Field(default=None, max_length=20)
+    controls: list[RequirementControl] = Field(default_factory=list, max_length=30)
+
+
 class SecureframeBody(BaseModel):
     tests: TestCounts
     frameworks: list[FrameworkCounts] = Field(default_factory=list, max_length=MAX_FRAMEWORKS)
@@ -60,6 +80,8 @@ class SecureframeBody(BaseModel):
     # None: the key's role may not read that list, so the number is not known (not zero).
     risks: int | None = Field(default=None, ge=0, le=10_000_000)
     policies: int | None = Field(default=None, ge=0, le=10_000_000)
+    # Empty when the key's role may not read the framework requirements or controls.
+    requirements: list[MappedRequirement] = Field(default_factory=list, max_length=MAX_REQUIREMENTS)
 
 
 class ReportIn(BaseModel):
@@ -106,3 +128,48 @@ async def secureframe_view(user: Annotated[AuthUser, Depends(require_permission(
         return SecureframeView(report=None, received_at=None)
     report = SecureframeBody.model_validate(row.report)
     return SecureframeView(report=report, received_at=row.received_at, passing_percent=passing_percent(report.tests))
+
+
+class RequirementView(BaseModel):
+    title: str | None = None
+    health: str | None = None
+    controls: list[RequirementControl] = Field(default_factory=list)
+
+
+class FrameworkMapping(BaseModel):
+    """Secureframe's verdict on each requirement of one framework, by the requirement's id in A.C.O.R.N's catalog (GV.OC-01, 9.2)."""
+
+    framework: str
+    mapped: bool
+    received_at: datetime | None
+    requirements: dict[str, RequirementView] = Field(default_factory=dict)
+    # Requirements by Secureframe's health: healthy, unhealthy, not_tested, not_applicable (and anything else it says).
+    summary: dict[str, int] = Field(default_factory=dict)
+
+
+def mapping_for(report: SecureframeBody | None, framework: str, received_at: datetime | None) -> FrameworkMapping:
+    """The requirements of one catalog framework from the stored report. ``mapped`` is false for a framework Secureframe is not mapped to here."""
+    sf_key = FRAMEWORK_KEYS.get(framework)
+    if sf_key is None or report is None:
+        return FrameworkMapping(framework=framework, mapped=sf_key is not None and report is not None, received_at=received_at)
+    reqs = {
+        r.key: RequirementView(title=r.title, health=r.health, controls=r.controls) for r in report.requirements if r.framework == sf_key
+    }
+    summary: dict[str, int] = {}
+    for r in reqs.values():
+        summary[r.health or "unknown"] = summary.get(r.health or "unknown", 0) + 1
+    return FrameworkMapping(framework=framework, mapped=True, received_at=received_at, requirements=reqs, summary=summary)
+
+
+@router.get(
+    "/requirements/{framework}",
+    response_model=FrameworkMapping,
+    summary="Secureframe's verdict on each requirement of NIST CSF 2.0 or CIS IG1, and the controls behind it",
+)
+async def secureframe_requirements(
+    framework: str, user: Annotated[AuthUser, Depends(require_permission("reports:read"))], db: DBSession
+) -> FrameworkMapping:
+    row = (await db.execute(select(SecureframeReport).where(SecureframeReport.tenant_id == user.tenant_id))).scalar_one_or_none()
+    if row is None:
+        return mapping_for(None, framework, None)
+    return mapping_for(SecureframeBody.model_validate(row.report), framework, row.received_at)

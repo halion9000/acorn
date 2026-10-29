@@ -11,6 +11,7 @@ const FRAMEWORK_NAMES: Record<string, string> = {
   nist_csf: 'NIST CSF',
   pci_dss: 'PCI DSS',
   hipaa: 'HIPAA',
+  cis_ig1: 'CIS Controls v8 IG1',
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

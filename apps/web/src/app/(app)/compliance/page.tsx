@@ -36,6 +36,12 @@ const FRAMEWORKS = [
     description: 'Administrative, physical, and technical safeguards for protected health information.',
     badge: 'Healthcare',
   },
+  {
+    id: 'cis_ig1',
+    name: 'CIS Controls v8, IG1',
+    description: 'The 56 safeguards of Implementation Group 1: essential cyber hygiene for every organization.',
+    badge: 'Essential hygiene',
+  },
 ];
 
 export default function CompliancePage() {

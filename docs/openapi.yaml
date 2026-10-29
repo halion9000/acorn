@@ -7323,14 +7323,8 @@ paths:
       tags:
       - insights
       summary: SOC Insights dashboard aggregate (T3.1)
-      description: 'Return the seven-tile SOC Insights payload for the tenant.
-
-
-        Tenant scoping is enforced by ``current_user.tenant_id`` plus an
-
-        explicit ``tenant_id`` predicate in every aggregate, so the payload
-
-        is safe to render for any role that can read the dashboard.'
+      description: Return the SOC Insights tiles for the tenant (kept for ``CACHE_SECONDS``
+        per organization, window and client).
       operationId: get_soc_insights_api_v1_insights_soc_get
       security:
       - HTTPBearer: []
@@ -10856,6 +10850,35 @@ paths:
                 $ref: '#/components/schemas/SecureframeView'
       security:
       - HTTPBearer: []
+  /api/v1/secureframe/requirements/{framework}:
+    get:
+      tags:
+      - secureframe
+      summary: Secureframe's verdict on each requirement of NIST CSF 2.0 or CIS IG1,
+        and the controls behind it
+      operationId: secureframe_requirements_api_v1_secureframe_requirements__framework__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: framework
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Framework
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkMapping'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/client-documents:
     post:
       tags:
@@ -29142,6 +29165,38 @@ components:
       - failing
       - passing
       title: FrameworkCounts
+    FrameworkMapping:
+      properties:
+        framework:
+          type: string
+          title: Framework
+        mapped:
+          type: boolean
+          title: Mapped
+        received_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Received At
+        requirements:
+          additionalProperties:
+            $ref: '#/components/schemas/RequirementView'
+          type: object
+          title: Requirements
+        summary:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Summary
+      type: object
+      required:
+      - framework
+      - mapped
+      - received_at
+      title: FrameworkMapping
+      description: Secureframe's verdict on each requirement of one framework, by
+        the requirement's id in A.C.O.R.N's catalog (GV.OC-01, 9.2).
     FrameworksResponse:
       properties:
         frameworks:
@@ -31778,6 +31833,42 @@ components:
       - invoice_item
       - counted
       title: MapRow
+    MappedRequirement:
+      properties:
+        framework:
+          type: string
+          pattern: ^(NIST_CSF_2|CIS_IG1)$
+          title: Framework
+        key:
+          type: string
+          maxLength: 40
+          minLength: 1
+          title: Key
+        title:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Title
+        health:
+          anyOf:
+          - type: string
+            maxLength: 20
+          - type: 'null'
+          title: Health
+        controls:
+          items:
+            $ref: '#/components/schemas/RequirementControl'
+          type: array
+          maxItems: 30
+          title: Controls
+      type: object
+      required:
+      - framework
+      - key
+      title: MappedRequirement
+      description: 'One requirement of NIST CSF 2.0 or CIS IG1 as Secureframe sees
+        it: its verdict and the controls that answer it.'
     MaturityConfig:
       properties:
         maturity_tier:
@@ -31921,6 +32012,11 @@ components:
           type: integer
           title: Registration Unknown
           default: 0
+        directories:
+          items:
+            type: string
+          type: array
+          title: Directories
         refreshed_at:
           anyOf:
           - type: string
@@ -32008,6 +32104,10 @@ components:
       title: MfaUserIn
     MfaUserOut:
       properties:
+        directory:
+          type: string
+          title: Directory
+          default: Microsoft 365
         upn:
           type: string
           title: Upn
@@ -35538,6 +35638,54 @@ components:
           default: true
       type: object
       title: ReportResponse
+    RequirementControl:
+      properties:
+        key:
+          type: string
+          maxLength: 60
+          minLength: 1
+          title: Key
+        health:
+          anyOf:
+          - type: string
+            maxLength: 20
+          - type: 'null'
+          title: Health
+        passing:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Passing
+        failing:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Failing
+      type: object
+      required:
+      - key
+      - passing
+      - failing
+      title: RequirementControl
+    RequirementView:
+      properties:
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+        health:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Health
+        controls:
+          items:
+            $ref: '#/components/schemas/RequirementControl'
+          type: array
+          title: Controls
+      type: object
+      title: RequirementView
     RerouteOut:
       properties:
         moved:
@@ -38106,6 +38254,12 @@ components:
             minimum: 0.0
           - type: 'null'
           title: Policies
+        requirements:
+          items:
+            $ref: '#/components/schemas/MappedRequirement'
+          type: array
+          maxItems: 400
+          title: Requirements
       type: object
       required:
       - tests

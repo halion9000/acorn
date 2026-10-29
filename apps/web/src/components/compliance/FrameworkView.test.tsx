@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SWRConfig } from 'swr';
 
-import { FrameworkView } from './FrameworkView';
+import { FrameworkView, sfLabel, sfTally, type SecureframeMapping } from './FrameworkView';
 
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
@@ -166,5 +166,68 @@ describe('groupControls and matchControls', () => {
     expect(matchControls(list, 'ALPHA').map((c) => c.control_id)).toEqual(['a']);
     expect(matchControls(list, 'g1').length).toBe(2);
     expect(matchControls(list, '  ').length).toBe(3);
+  });
+});
+
+const MAPPING: SecureframeMapping = {
+  mapped: true,
+  received_at: '2026-10-29T12:00:00Z',
+  requirements: {
+    '9.2': { title: 'Use DNS Filtering Services', health: 'unhealthy', controls: [{ key: 'DNS-01', health: 'unhealthy', passing: 1, failing: 3 }, { key: 'DNS-02', health: 'healthy', passing: 2, failing: 0 }] },
+    '10.1': { title: 'Deploy and Maintain Anti-Malware Software', health: 'healthy', controls: [] },
+    '4.4': { title: 'Firewall on servers', health: 'not_tested', controls: [] },
+  },
+  summary: { unhealthy: 1, healthy: 1, not_tested: 1 },
+};
+
+describe('Secureframe on a framework page', () => {
+  it('sfLabel reads Secureframe words as people do, and sfTally counts only controls with a verdict', () => {
+    expect(sfLabel('not_tested')).toBe('Not tested');
+    expect(sfLabel('unhealthy')).toBe('Unhealthy');
+    expect(sfLabel('something_new')).toBe('something new');
+    expect(sfLabel(null)).toBe('No verdict');
+    expect(sfTally(['9.2', '10.1', '4.4', '99.9'], MAPPING)).toEqual({ healthy: 1, unhealthy: 1 });
+    expect(sfTally(['4.4'], MAPPING)).toBeNull();
+    expect(sfTally(['9.2'], null)).toBeNull();
+    expect(sfTally(['9.2'], { ...MAPPING, mapped: false })).toBeNull();
+  });
+
+  it('shows each CIS control with Secureframe\'s verdict and its controls, and a tally on the group', async () => {
+    authFetch.mockImplementation((url: string) => {
+      if (url.includes('/secureframe/requirements/CIS-IG1')) return json(MAPPING);
+      if (url.includes('/controls')) return json({ controls: [{ control_id: '9.2', title: 'Use DNS Filtering Services', group: '9. Email and Web Browser Protections' }, { control_id: '10.1', title: 'Anti-malware', group: '10. Malware Defenses' }] });
+      if (url.includes('/report')) return json([{ total_evidence: 0, accepted: 0, pending: 0, rejected: 0, coverage_pct: 0, controls_covered: [], controls_missing: ['9.2', '10.1'] }]);
+      return json([]);
+    });
+    render(<FrameworkView framework="cis_ig1" />);
+    expect(await screen.findByTestId('sf-9.2')).toHaveTextContent('Secureframe: Unhealthy');
+    expect(screen.getByTestId('sf-10.1')).toHaveTextContent('Secureframe: Healthy');
+    expect(screen.getByTestId('sf-controls-9.2')).toHaveTextContent('DNS-01 (3 failing, 1 passing), DNS-02 (0 failing, 2 passing)');
+    expect(screen.queryByTestId('sf-controls-10.1')).toBeNull();
+    expect(screen.getByTestId('sf-tally-9. Email and Web Browser Protections')).toHaveTextContent('Secureframe: 1 unhealthy, 0 healthy');
+    expect(authFetch).toHaveBeenCalledWith('/api/v1/secureframe/requirements/CIS-IG1');
+  });
+
+  it('asks Secureframe nothing for a framework it is not mapped to, or for a client, and shows nothing when it cannot be read', async () => {
+    authFetch.mockImplementation((url: string) => {
+      if (url.includes('/controls')) return json({ controls: [{ control_id: 'CC6.1', title: 'Access', group: 'CC6' }] });
+      if (url.includes('/report')) return json([{ total_evidence: 0, accepted: 0, pending: 0, rejected: 0, coverage_pct: 0, controls_covered: [], controls_missing: ['CC6.1'] }]);
+      return json([]);
+    });
+    render(<FrameworkView framework="soc2" />);
+    await screen.findByText('Access');
+    expect(authFetch.mock.calls.some((c) => String(c[0]).includes('/secureframe/'))).toBe(false);
+    cleanup();
+    authFetch.mockReset();
+    authFetch.mockImplementation((url: string) => {
+      if (url.includes('/secureframe/')) return Promise.resolve({ ok: false, status: 403, json: () => Promise.resolve({}) });
+      if (url.includes('/controls')) return json({ controls: [{ control_id: 'GV.OC-01', title: 'Mission', group: 'Govern' }] });
+      if (url.includes('/report')) return json([{ total_evidence: 0, accepted: 0, pending: 0, rejected: 0, coverage_pct: 0, controls_covered: [], controls_missing: ['GV.OC-01'] }]);
+      return json([]);
+    });
+    render(<FrameworkView framework="nist_csf" />);
+    await screen.findByText('Mission');
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]).includes('/secureframe/requirements/NIST-CSF'))).toBe(true));
+    expect(screen.queryByTestId('sf-GV.OC-01')).toBeNull();
   });
 });

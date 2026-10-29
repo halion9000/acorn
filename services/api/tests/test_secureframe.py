@@ -101,3 +101,60 @@ async def test_the_latest_report_replaces_the_one_before_and_each_organization_r
             await conn.execute(text("delete from secureframe_reports where tenant_id = any(:t)"), {"t": [mine, other]})
             await conn.execute(text("delete from tenants where id = any(:t)"), {"t": [mine, other]})
         await engine.dispose()
+
+
+REQUIREMENTS = [
+    {
+        "framework": "CIS_IG1",
+        "key": "9.2",
+        "title": "Use DNS Filtering Services",
+        "health": "unhealthy",
+        "controls": [{"key": "DNS-01", "health": "unhealthy", "passing": 1, "failing": 3}],
+    },
+    {"framework": "CIS_IG1", "key": "10.1", "title": "Deploy and Maintain Anti-Malware Software", "health": "healthy", "controls": []},
+    {"framework": "NIST_CSF_2", "key": "GV.OC-01", "title": None, "health": "unhealthy", "controls": []},
+    {"framework": "NIST_CSF_2", "key": "PR.AA-01", "title": None, "health": None, "controls": []},
+]
+
+
+def test_the_requirements_are_accepted_limited_to_the_two_frameworks_and_default_to_none():
+    assert sf.ReportIn.model_validate(body()).report.requirements == []
+    ok = sf.ReportIn.model_validate(body(requirements=REQUIREMENTS))
+    assert len(ok.report.requirements) == 4
+    for bad in (
+        {**REQUIREMENTS[0], "framework": "SOC2"},
+        {**REQUIREMENTS[0], "key": ""},
+        {**REQUIREMENTS[0], "controls": [{"key": "x", "passing": -1, "failing": 0}]},
+    ):
+        with pytest.raises(ValidationError):
+            sf.ReportIn.model_validate(body(requirements=[bad]))
+
+
+def test_a_catalog_framework_gets_its_own_requirements_keyed_by_the_catalog_id_and_counted_by_health():
+    report = sf.ReportIn.model_validate(body(requirements=REQUIREMENTS)).report
+    cis = sf.mapping_for(report, "CIS-IG1", None)
+    assert cis.mapped and set(cis.requirements) == {"9.2", "10.1"}
+    assert cis.requirements["9.2"].health == "unhealthy" and cis.requirements["9.2"].controls[0].failing == 3
+    assert cis.summary == {"unhealthy": 1, "healthy": 1}
+    nist = sf.mapping_for(report, "NIST-CSF", None)
+    assert set(nist.requirements) == {"GV.OC-01", "PR.AA-01"} and nist.summary == {"unhealthy": 1, "unknown": 1}
+
+
+def test_a_framework_secureframe_is_not_mapped_to_here_or_no_report_yet_is_not_an_error():
+    report = sf.ReportIn.model_validate(body(requirements=REQUIREMENTS)).report
+    assert sf.mapping_for(report, "SOC2", None).mapped is False
+    assert sf.mapping_for(None, "NIST-CSF", None).mapped is False
+    assert sf.mapping_for(None, "NIST-CSF", None).requirements == {}
+
+
+def test_the_cis_ig1_catalog_has_the_56_safeguards_in_their_controls_and_the_framework_is_known_to_the_api():
+    from app.api.v1.endpoints.compliance import FRAMEWORKS
+    from app.services.compliance_catalog import CATALOGS
+
+    cis = CATALOGS["CIS-IG1"]
+    assert len(cis) == 56 and len({c[1] for c in cis}) == 56
+    assert {c[0].split(".")[0] for c in cis} == {
+        str(n) for n in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 17)
+    }, "IG1 has no control 13, 16 or 18 safeguards"
+    assert FRAMEWORKS["CIS-IG1"]["9.2"] == "Use DNS Filtering Services"
+    assert set(sf.FRAMEWORK_KEYS) <= set(CATALOGS)

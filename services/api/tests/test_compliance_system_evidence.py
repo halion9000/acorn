@@ -39,9 +39,10 @@ def test_an_unknown_framework_yields_nothing():
 def test_dora_is_gone_and_every_other_framework_lists_all_of_its_controls():
     assert "DORA" not in c.FRAMEWORKS and c.system_evidence_for("DORA", FACTS) == []
     sizes = {fw: len(controls) for fw, controls in c.FRAMEWORKS.items()}
-    assert sizes == {"SOC2": 61, "ISO27001": 93, "NIST-CSF": 106, "PCI-DSS": 75, "HIPAA": 63}
+    assert sizes == {"SOC2": 61, "ISO27001": 93, "NIST-CSF": 106, "PCI-DSS": 75, "HIPAA": 63, "CIS-IG1": 56}
     assert "A.8.15" in c.FRAMEWORKS["ISO27001"] and "GV.OC-01" in c.FRAMEWORKS["NIST-CSF"] and "Req-10.2" in c.FRAMEWORKS["PCI-DSS"]
     assert "164.312(a)(2)(i)" in c.FRAMEWORKS["HIPAA"] and "CC9.2" in c.FRAMEWORKS["SOC2"]
+    assert "9.2" in c.FRAMEWORKS["CIS-IG1"] and "5.1" in c.FRAMEWORKS["CIS-IG1"]
 
 
 def test_every_control_has_a_group_and_a_title_and_the_platform_evidences_only_a_small_part_of_each_framework():

@@ -24,7 +24,7 @@ export function frameworkHref(frameworkId: string, clientId: string): string {
 }
 
 /** The framework keys the API reports by, for the ids on this page. */
-export const FRAMEWORK_KEYS: Record<string, string> = { soc2: 'SOC2', iso27001: 'ISO27001', nist_csf: 'NIST-CSF', pci_dss: 'PCI-DSS', hipaa: 'HIPAA' };
+export const FRAMEWORK_KEYS: Record<string, string> = { soc2: 'SOC2', iso27001: 'ISO27001', nist_csf: 'NIST-CSF', pci_dss: 'PCI-DSS', hipaa: 'HIPAA', cis_ig1: 'CIS-IG1' };
 
 interface PostureRow {
   framework: string;

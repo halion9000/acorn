@@ -246,6 +246,7 @@ _USER_CONTROLS = {
     ("ISO27001", "A.5.18"),
     ("NIST-CSF", "PR.AA-01"),
     ("NIST-CSF", "PR.AA-05"),
+    ("CIS-IG1", "5.1"),
 }
 _MONITORING_CONTROLS = {
     ("SOC2", "CC7.2"),
@@ -258,6 +259,7 @@ _MONITORING_CONTROLS = {
     ("NIST-CSF", "DE.CM-01"),
     ("NIST-CSF", "DE.CM-09"),
     ("NIST-CSF", "DE.AE-02"),
+    ("CIS-IG1", "8.2"),
 }
 _RESPONSE_CONTROLS = {
     ("SOC2", "CC7.3"),
@@ -271,6 +273,7 @@ _RESPONSE_CONTROLS = {
     ("ISO27001", "A.6.8"),
     ("NIST-CSF", "RS.MA-02"),
     ("NIST-CSF", "RS.AN-03"),
+    ("CIS-IG1", "17.3"),
 }
 
 

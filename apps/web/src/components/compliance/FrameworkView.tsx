@@ -23,7 +23,42 @@ const API_KEYS: Record<string, string> = {
   nist_csf: 'NIST-CSF',
   pci_dss: 'PCI-DSS',
   hipaa: 'HIPAA',
+  cis_ig1: 'CIS-IG1',
 };
+
+/** Secureframe's verdict on each requirement of a framework it is mapped to (NIST CSF 2.0, CIS IG1), by the control's id here (GET /api/v1/secureframe/requirements/{framework}). */
+export interface SecureframeMapping {
+  mapped: boolean;
+  received_at: string | null;
+  requirements: Record<string, { title: string | null; health: string | null; controls: { key: string; health: string | null; passing: number; failing: number }[] }>;
+  summary: Record<string, number>;
+}
+
+const SF_LABEL: Record<string, string> = { healthy: 'Healthy', unhealthy: 'Unhealthy', not_tested: 'Not tested', not_applicable: 'Not applicable' };
+const SF_CLASS: Record<string, string> = {
+  healthy: 'border-emerald-500/40 text-emerald-300',
+  unhealthy: 'border-red-500/40 text-red-300',
+  not_tested: 'border-gray-600 text-gray-400',
+  not_applicable: 'border-gray-600 text-gray-500',
+};
+
+/** Secureframe's health word as people read it ("not_tested" is "Not tested"). */
+export function sfLabel(health: string | null | undefined): string {
+  return health ? (SF_LABEL[health] ?? health.replace(/_/g, ' ')) : 'No verdict';
+}
+
+/** How many of these controls Secureframe calls healthy and unhealthy; controls it has no verdict on are not counted. */
+export function sfTally(controlIds: string[], mapping: SecureframeMapping | null): { healthy: number; unhealthy: number } | null {
+  if (!mapping || !mapping.mapped) return null;
+  let healthy = 0;
+  let unhealthy = 0;
+  for (const id of controlIds) {
+    const h = mapping.requirements[id]?.health;
+    if (h === 'healthy') healthy++;
+    else if (h === 'unhealthy') unhealthy++;
+  }
+  return healthy + unhealthy === 0 ? null : { healthy, unhealthy };
+}
 
 interface Control {
   control_id: string;
@@ -108,6 +143,8 @@ export function FrameworkView({ framework }: Props) {
   const [kind, setKind] = useState<EvidenceKind>('attestation');
   const [summary, setSummary] = useState('');
   const [filter, setFilter] = useState('');
+  // Secureframe's verdicts for the frameworks it is mapped to. It is the organization's own account, so it is not shown against a client.
+  const [sf, setSf] = useState<SecureframeMapping | null>(null);
 
   const load = useCallback(async () => {
     if (!key) return;
@@ -122,6 +159,15 @@ export function FrameworkView({ framework }: Props) {
       setPosture(r[0] ?? null);
       setEvidence(e);
       setError(null);
+      if ((key === 'NIST-CSF' || key === 'CIS-IG1') && !clientId) {
+        getJson<SecureframeMapping>(`/api/v1/secureframe/requirements/${encodeURIComponent(key)}`)
+          .then((m) => {
+            if (chosen.current === clientId) setSf(m.mapped ? m : null);
+          })
+          .catch(() => setSf(null));
+      } else {
+        setSf(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this framework');
     }
@@ -261,6 +307,14 @@ export function FrameworkView({ framework }: Props) {
             <details key={g.name} open={controls.length <= 20 || filter.trim() !== ''} className="rounded-xl border border-gray-800 bg-gray-900/40 p-3" data-testid={`group-${g.name}`}>
               <summary className="cursor-pointer select-none text-sm font-medium text-gray-200">
                 {g.name} <span className="ml-2 text-xs font-normal text-gray-500">{withEvidence} of {g.controls.length} with accepted evidence</span>
+                {(() => {
+                  const t = sfTally(g.controls.map((c) => c.control_id), sf);
+                  return t ? (
+                    <span className="ml-2 text-xs font-normal text-sky-300" data-testid={`sf-tally-${g.name}`}>
+                      Secureframe: {t.unhealthy} unhealthy, {t.healthy} healthy
+                    </span>
+                  ) : null;
+                })()}
               </summary>
               <div className="mt-3 space-y-3">
         {g.controls.map((c) => {
@@ -272,8 +326,26 @@ export function FrameworkView({ framework }: Props) {
                   <span className="font-mono text-sm text-gray-200">{c.control_id}</span>
                   <span className="ml-2 text-sm text-gray-400">{c.title}</span>
                 </div>
-                <span className={`text-xs ${STATUS_TEXT[state] ?? 'text-gray-500'}`}>{state === 'none' ? 'No evidence' : state}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  {sf?.requirements[c.control_id] ? (
+                    <span className={`rounded border px-1.5 py-0.5 text-[11px] ${SF_CLASS[sf.requirements[c.control_id].health ?? ''] ?? 'border-gray-600 text-gray-400'}`} data-testid={`sf-${c.control_id}`} title="Secureframe's verdict on this requirement">
+                      Secureframe: {sfLabel(sf.requirements[c.control_id].health)}
+                    </span>
+                  ) : null}
+                  <span className={`text-xs ${STATUS_TEXT[state] ?? 'text-gray-500'}`}>{state === 'none' ? 'No evidence' : state}</span>
+                </span>
               </div>
+              {(sf?.requirements[c.control_id]?.controls ?? []).length > 0 && (
+                <p className="mt-2 text-xs text-gray-400" data-testid={`sf-controls-${c.control_id}`}>
+                  Secureframe controls:{' '}
+                  {sf!.requirements[c.control_id].controls.map((k, i) => (
+                    <span key={k.key}>
+                      {i > 0 ? ', ' : ''}
+                      {k.key} <span className={k.failing > 0 ? 'text-red-300' : 'text-gray-500'}>({k.failing} failing, {k.passing} passing)</span>
+                    </span>
+                  ))}
+                </p>
+              )}
               {evidenceFor(c.control_id).map((e) => (
                 <div key={e.id} className="mt-3 flex items-start justify-between gap-3 border-t border-gray-700/60 pt-3">
                   <p className="text-sm text-gray-300">
