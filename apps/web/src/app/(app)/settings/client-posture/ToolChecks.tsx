@@ -92,6 +92,7 @@ const TITLE: Record<string, string> = {
   threatmate_pentest: 'Vulnerability scans',
   threatmate_m365_controls: 'Microsoft 365 identity controls',
   threatmate_cloud_identity: 'Cloud accounts without MFA',
+  threatmate_deep_dark_web: 'Leaked data on the deep and dark web',
   threatmate_google_admins: 'Google super administrators without 2-Step',
   threatmate_google_stale_accounts: 'Google accounts nobody uses',
   threatmate_google_failed_logins: 'Google accounts with many failed sign-ins',

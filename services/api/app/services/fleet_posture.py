@@ -23,7 +23,10 @@ BOARDS: dict[str, tuple[str, tuple[str, ...]]] = {
             "slide_appliance",
         ),
     ),
-    "licences": ("Licence waste and unused accounts", ("cipp_unused_licences", "cipp_inactive_accounts", "liongard_stale_licensed_users")),
+    "licences": (
+        "Licence waste and unused accounts",
+        ("cipp_unused_licences", "cipp_inactive_accounts", "liongard_stale_licensed_users", "threatmate_google_stale_accounts"),
+    ),
     "windows": (
         "Windows support and updates",
         ("ninjaone_unsupported_os", "ninjaone_patching", "threatmate_end_of_life", "threatmate_patching"),
@@ -51,8 +54,11 @@ BOARDS: dict[str, tuple[str, tuple[str, ...]]] = {
             "cipp_inactive_accounts",
             "liongard_ad_bad_logins",
             "fieldeffect_account_risk",
+            "threatmate_google_admins",
+            "threatmate_google_failed_logins",
         ),
     ),
+    "leaks": ("Leaked credentials and documents", ("threatmate_deep_dark_web",)),
     "endpoints": (
         "Endpoint protection",
         (
