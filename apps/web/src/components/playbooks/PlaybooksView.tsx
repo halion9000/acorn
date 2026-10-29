@@ -25,6 +25,7 @@ import { SavedViewsBar } from '@/components/saved-views/SavedViewsBar';
 import { DraftFromPromptDialog } from './DraftFromPromptDialog';
 import { authFetch } from '@/lib/auth-session';
 import { DryRunsTab } from './DryRuns';
+import { RunLog } from './RunLog';
 
 /** Filter snapshot stored by the backend as a saved-view preset. */
 type PlaybookFilterSnapshot = PlaybookGalleryFilters;
@@ -45,14 +46,6 @@ const fetcher = (url: string) =>
   });
 
 /* ─────────────────────────── Run History Tab ─────────────────────────── */
-
-const STATUS_BADGE: Record<string, string> = {
-  pending:   'bg-yellow-900/40 text-yellow-400 border-yellow-800',
-  running:   'bg-blue-900/40 text-blue-400 border-blue-800',
-  completed: 'bg-green-900/40 text-green-400 border-green-800',
-  failed:    'bg-red-900/40 text-red-400 border-red-800',
-  cancelled: 'bg-gray-800 text-gray-500 border-gray-700',
-};
 
 function RunHistoryTab() {
   const { data, isLoading, error } = useSWR<PlaybookRun[]>(
@@ -76,38 +69,7 @@ function RunHistoryTab() {
         className="bg-transparent py-12"
       />
     );
-  return (
-    <div className="space-y-2">
-      {data.map((run) => (
-        <div key={run.run_id} className="bg-gray-900/60 border border-gray-800 rounded-xl px-5 py-3 flex items-center gap-4">
-          <span className={`text-xs px-2 py-0.5 rounded border ${STATUS_BADGE[run.status] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
-            {run.status}
-          </span>
-          <div className="flex-1 min-w-0">
-            <div className="text-white text-sm font-medium truncate">{run.playbook_name}</div>
-            <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-600">
-              <span className="font-mono">{run.run_id.slice(0, 12)}…</span>
-              <span>{run.steps.length} steps</span>
-              {run.dry_run && <span className="text-yellow-700 border border-yellow-900 px-1.5 rounded">dry run</span>}
-              {run.started_at && <span suppressHydrationWarning>{new Date(run.started_at).toLocaleString()}</span>}
-            </div>
-          </div>
-          {/* Step progress dots */}
-          <div className="flex items-center gap-1">
-            {run.steps.slice(0, 8).map((s) => {
-              const dot =
-                s.status === 'completed' ? 'bg-green-500' :
-                s.status === 'failed'    ? 'bg-red-500' :
-                s.status === 'running'   ? 'bg-blue-400 animate-pulse' :
-                s.status === 'skipped'   ? 'bg-gray-700' : 'bg-gray-800';
-              return <div key={s.step_id} className={`w-2 h-2 rounded-full ${dot}`} title={`${s.step_name}: ${s.status}`} />;
-            })}
-            {run.steps.length > 8 && <span className="text-xs text-gray-700">+{run.steps.length - 8}</span>}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  return <RunLog runs={data} />;
 }
 
 /* ─────────────────────────── Main ─────────────────────────── */
