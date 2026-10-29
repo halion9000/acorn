@@ -110,6 +110,8 @@ describe('filters from the address', () => {
     expect(filtersFromUrl(new URLSearchParams(''))).toEqual({ page: 1, pageSize: 25, status: 'open' });
     expect(filtersFromUrl(new URLSearchParams('device=Mac&status=all'))).toEqual({ page: 1, pageSize: 25, device: 'Mac' });
     expect(filtersFromUrl(new URLSearchParams('status=all&source=huntress&q=Malicious%20Process'))).toEqual({ page: 1, pageSize: 25, source: 'huntress', search: 'Malicious Process' });
+    expect(filtersFromUrl(new URLSearchParams('status=all&user=amy%40acme.com'))).toEqual({ page: 1, pageSize: 25, user: 'amy@acme.com' });
+    expect(filtersFromUrl(new URLSearchParams('status=all&user=%20%20'))).toEqual({ page: 1, pageSize: 25 });
     expect(filtersFromUrl(new URLSearchParams('status=resolved'))).toEqual({ page: 1, pageSize: 25, status: 'resolved' });
     expect(filtersFromUrl(new URLSearchParams('status=bogus'))).toEqual({ page: 1, pageSize: 25, status: 'open' });
   });

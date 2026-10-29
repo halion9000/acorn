@@ -165,6 +165,22 @@ describe('the Identities page', () => {
     expect(within(detail).getByTestId('person-changes')).not.toHaveTextContent(' on amy@acme.com');
   });
 
+  it('copies the address to the clipboard and says so, or says plainly when the browser refuses', async () => {
+    const base = { person: person(), alerts: [], signins: { last_30_days: 0, failed: 0, unusual: 0, countries: [], last_at: null } };
+    api.detail.mockResolvedValue(base);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    show();
+    await userEvent.click((await screen.findAllByTestId('identity-row'))[0]);
+    const detail = await screen.findByTestId('identity-detail');
+    await userEvent.click(within(detail).getByRole('button', { name: 'Copy amy@acme.com' }));
+    expect(writeText).toHaveBeenCalledWith('amy@acme.com');
+    expect(await within(detail).findByRole('button', { name: 'Copy amy@acme.com' })).toHaveTextContent('Copied');
+    writeText.mockRejectedValue(new Error('denied'));
+    await userEvent.click(within(detail).getByRole('button', { name: 'Copy amy@acme.com' }));
+    expect(await within(detail).findByRole('button', { name: 'Copy amy@acme.com' })).toHaveTextContent('Could not copy');
+  });
+
   it('says when a ticket was closed, and says nothing of it for an open ticket or an older answer', async () => {
     const base = { person: person(), alerts: [], signins: { last_30_days: 0, failed: 0, unusual: 0, countries: [], last_at: null } };
     api.detail.mockResolvedValue({

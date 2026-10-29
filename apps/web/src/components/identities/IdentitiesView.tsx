@@ -65,6 +65,25 @@ function SortHeader({ col, label, sort, onSort }: { col: keyof typeof SORT_FOR_C
   );
 }
 
+/** Copies the person's address to the clipboard and says so for a moment; says so plainly when the browser will not let it. */
+export function CopyAddress({ email }: { email: string }) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(email);
+      setState('copied');
+    } catch {
+      setState('failed');
+    }
+    setTimeout(() => setState('idle'), 2000);
+  }
+  return (
+    <button type="button" onClick={() => void copy()} className="text-xs text-blue-300 hover:text-blue-200" aria-label={`Copy ${email}`}>
+      {state === 'copied' ? 'Copied' : state === 'failed' ? 'Could not copy' : 'Copy address'}
+    </button>
+  );
+}
+
 function Detail({ person }: { person: IdentityPerson }) {
   const { data, error } = useSWR(['identity', person.client_id, person.email], () => identitiesApi.detail(person.client_id, person.email), { revalidateOnFocus: false });
   if (error) return <p className="text-sm text-red-300">Could not load this person.</p>;
@@ -73,7 +92,9 @@ function Detail({ person }: { person: IdentityPerson }) {
   return (
     <div className="grid gap-4 md:grid-cols-3" data-testid="identity-detail">
       <section>
-        <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">Known to</h4>
+        <h4 className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-gray-500">
+          Known to <CopyAddress email={data.person.email} />
+        </h4>
         <ul className="space-y-1">
           {data.person.sources.map((src) => (
             <li key={`${src.vendor}:${src.external_id}`} className="flex items-center gap-2 text-sm text-gray-200">

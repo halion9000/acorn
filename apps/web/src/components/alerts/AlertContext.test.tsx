@@ -50,6 +50,12 @@ describe('AlertContext', () => {
     expect(screen.getByText('203.0.113.9')).toBeInTheDocument();
   });
 
+  it('links each user to every alert that names that person', async () => {
+    renderCtx(alert({ affectedUsers: ['kevin@acme.com', 'amy+it@acme.com'] }));
+    expect(screen.getByRole('link', { name: 'kevin@acme.com' })).toHaveAttribute('href', '/alerts?status=all&user=kevin%40acme.com');
+    expect(screen.getByRole('link', { name: 'amy+it@acme.com' })).toHaveAttribute('href', '/alerts?status=all&user=amy%2Bit%40acme.com');
+  });
+
   it('says plainly when the alert names no device or user, rather than leaving a blank', async () => {
     renderCtx(alert());
     expect(screen.getByText('This alert names no device')).toBeInTheDocument();

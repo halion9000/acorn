@@ -257,6 +257,16 @@ export function FiltersBar({
           Device: {filters.device} ×
         </button>
       )}
+      {filters.user && (
+        <button
+          type="button"
+          aria-label={`Remove person filter ${filters.user}`}
+          onClick={() => onChange({ ...filters, user: undefined, page: 1 })}
+          className="text-xs px-2 py-1 rounded-lg border border-blue-500/40 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20"
+        >
+          Person: {filters.user} ×
+        </button>
+      )}
       <span className="ml-auto text-xs text-gray-600">{total} total</span>
     </div>
   );
@@ -388,6 +398,7 @@ export function filtersFromUrl(params: URLSearchParams | null): AlertFilters {
     return typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get(name) ?? '');
   };
   const device = read('device').trim() || undefined;
+  const user = read('user').trim().slice(0, 320) || undefined;
   const client = read('client').trim().slice(0, 64) || undefined;
   const severityWanted = read('severity');
   const severity = ['critical', 'high', 'medium', 'low', 'info'].includes(severityWanted) ? severityWanted : undefined;
@@ -399,13 +410,13 @@ export function filtersFromUrl(params: URLSearchParams | null): AlertFilters {
   let status: string | undefined = 'open';
   if (wanted === 'all') status = undefined;
   else if (['open', 'new', 'investigating', 'resolved', 'false_positive'].includes(wanted)) status = wanted;
-  return { page: 1, pageSize: 25, ...(status ? { status } : {}), ...(device ? { device } : {}), ...(client ? { clientId: client } : {}), ...(severity ? { severity } : {}), ...(ticket ? { ticket } : {}), ...(source ? { source } : {}), ...(search ? { search } : {}) };
+  return { page: 1, pageSize: 25, ...(status ? { status } : {}), ...(device ? { device } : {}), ...(user ? { user } : {}), ...(client ? { clientId: client } : {}), ...(severity ? { severity } : {}), ...(ticket ? { ticket } : {}), ...(source ? { source } : {}), ...(search ? { search } : {}) };
 }
 
 export function AlertsView() {
   // Reading window.location during a client-side navigation gives the PREVIOUS page's address, so the router's parameters are used.
   const urlParams = useSearchParams();
-  const urlKey = `${urlParams?.get('device') ?? ''}|${urlParams?.get('status') ?? ''}|${urlParams?.get('client') ?? ''}|${urlParams?.get('severity') ?? ''}|${urlParams?.get('ticket') ?? ''}|${urlParams?.get('source') ?? ''}|${urlParams?.get('q') ?? ''}`;
+  const urlKey = `${urlParams?.get('user') ?? ''}|${urlParams?.get('device') ?? ''}|${urlParams?.get('status') ?? ''}|${urlParams?.get('client') ?? ''}|${urlParams?.get('severity') ?? ''}|${urlParams?.get('ticket') ?? ''}|${urlParams?.get('source') ?? ''}|${urlParams?.get('q') ?? ''}`;
   const [filters, setFilters] = useState<AlertFilters>(() => filtersFromUrl(urlParams));
   const [seenUrlKey, setSeenUrlKey] = useState(urlKey);
   if (seenUrlKey !== urlKey) {
@@ -414,7 +425,7 @@ export function AlertsView() {
     setFilters(filtersFromUrl(urlParams));
   }
   // The filters picked last time come back, unless this visit came from a link that names a device or a status (those links must open exactly what they say).
-  const deepLinked = !!(urlParams?.get('device') || urlParams?.get('status') || urlParams?.get('client') || urlParams?.get('severity') || urlParams?.get('ticket') || urlParams?.get('source') || urlParams?.get('q'));
+  const deepLinked = !!(urlParams?.get('user') || urlParams?.get('device') || urlParams?.get('status') || urlParams?.get('client') || urlParams?.get('severity') || urlParams?.get('ticket') || urlParams?.get('source') || urlParams?.get('q'));
   const [filtersRestored, setFiltersRestored] = useState(false);
   useEffect(() => {
     if (!deepLinked) {
@@ -731,7 +742,7 @@ export function AlertsTableGrid({
             filter-aware copy is the difference between an analyst thinking
             "the system is broken" and "I should clear my filters".
           */}
-          {filters.severity || filters.status || filters.source || filters.clientId || filters.device || filters.search ? (
+          {filters.severity || filters.status || filters.source || filters.clientId || filters.device || filters.user || filters.search ? (
             <EmptyState
               icon={EmptyStateIcons.search}
               title="No alerts match these filters"

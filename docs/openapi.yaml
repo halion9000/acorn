@@ -549,6 +549,19 @@ paths:
             maxLength: 255
           - type: 'null'
           title: Device
+      - name: user
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 320
+          - type: 'null'
+          description: Only alerts that name this person (an affected user, matched
+            exactly, ignoring case).
+          title: User
+        description: Only alerts that name this person (an affected user, matched
+          exactly, ignoring case).
       - name: ticket
         in: query
         required: false

@@ -193,7 +193,14 @@ export function AlertContext({ alert }: { alert: Alert }) {
             none('This alert names no user')
           ) : (
             <span>
-              {users.join(', ')}
+              {users.map((u, i) => (
+                <span key={u}>
+                  {i > 0 ? ', ' : ''}
+                  <Link href={`/alerts?status=all&user=${encodeURIComponent(u)}`} className="text-blue-400 hover:text-blue-300" title="Every alert that names this person">
+                    {u}
+                  </Link>
+                </span>
+              ))}
               {tool.user && (
                 <>
                   {' '}

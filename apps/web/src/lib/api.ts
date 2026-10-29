@@ -1406,6 +1406,8 @@ export interface AlertFilters {
   clientId?: string;
   /** Only alerts about this machine (the host name the alert carries). */
   device?: string;
+  /** Only alerts that name this person (an affected user, matched exactly on the address, ignoring case). */
+  user?: string;
   /** linked: only alerts with a HaloPSA ticket (from CORE or entered by hand); none: only alerts without one. */
   ticket?: 'linked' | 'none';
   /** One row for each group of repeat alerts (same rule, machines and users): the newest, with its repeatCount. */

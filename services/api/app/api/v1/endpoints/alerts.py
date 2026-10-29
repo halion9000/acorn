@@ -719,6 +719,10 @@ async def list_alerts(
     source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
     client_id: uuid.UUID | None = Query(default=None),
     device: str | None = Query(default=None, max_length=255),
+    user: Annotated[
+        str | None,
+        Query(max_length=320, description="Only alerts that name this person (an affected user, matched exactly, ignoring case)."),
+    ] = None,
     ticket: str | None = Query(
         default=None, pattern="^(linked|none)$", description="linked: only alerts with a HaloPSA ticket; none: only alerts without one."
     ),
@@ -761,6 +765,14 @@ async def list_alerts(
         else ""
     )
 
+    # The same for a person: affected_users is stored as JSON text like ["amy@acme.com"], so the quoted name is looked for (a part of an address does not match).
+    user_name = (user or "").strip()
+    user_like = (
+        "%" + json.dumps(user_name.lower(), ensure_ascii=False).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        if user_name
+        else ""
+    )
+
     def filters_for(tenant_id: uuid.UUID) -> list:
         filters = [Alert.tenant_id == tenant_id]
         if severity:
@@ -785,6 +797,8 @@ async def list_alerts(
         if device_name:
             # affected_hosts is a JSON list of names; match one element exactly, ignoring case.
             filters.append(func.lower(cast(Alert.affected_hosts, Text)).like(device_like, escape="\\"))
+        if user_name:
+            filters.append(func.lower(cast(Alert.affected_users, Text)).like(user_like, escape="\\"))
         if min_confidence is not None:
             filters.append(Alert.confidence >= min_confidence)
         if confidence_label is not None:
