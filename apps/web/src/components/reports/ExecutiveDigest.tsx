@@ -16,6 +16,7 @@ import useSWR from 'swr';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 import { ClientSnapshot } from './ClientSnapshot';
+import { OrgSnapshot } from './OrgSnapshot';
 
 import { reportsApi, type ExecutiveDigest as ExecutiveDigestPayload } from '@/lib/api';
 
@@ -204,6 +205,7 @@ export function ExecutiveDigest() {
       )}
 
       <ClientSnapshot clientId={clientId} />
+      {!clientId && <OrgSnapshot />}
 
       {data && <DigestBody digest={data} />}
     </div>
