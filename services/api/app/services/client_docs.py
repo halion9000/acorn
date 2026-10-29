@@ -41,9 +41,15 @@ def clean_text(text: str | None, limit: int = MAX_BODY) -> str:
     return text[:limit]
 
 
-_SECRET_LINE = re.compile(
-    r"(?im)(\b(?:pass(?:word|wd|phrase|code)?|pwd|secret|api[ _-]?key|token|private[ _-]?key|recovery[ _-]?key|otp|2fa)\b\s*(?:is|are)?\s*[:=]\s*)(\S.*)$"
+# Mirrors CORE's aisoc-text-clean.ts: what a secret is called, and the layouts a value follows it in ("label: v", "label = v", "label | v |", "label - v").
+_LABEL = (
+    r"(?:pass(?:word|words|wd|phrase|code)?|pwd|pw|pin|psk|secrets?|tokens?|api[ _-]?key|private[ _-]?key|recovery[ _-]?key|otp|2fa"
+    r"|(?:wi-?fi|wpa2?|wep|license|product|encryption|bitlocker|ssh|security|network|master|admin|shared|activation|registration|pre-?shared)[ _-]key)"
 )
+_SEPARATOR = r"(?:[ \t]+(?:is|are))?(?:[ \t]*[:=|][ \t]*|[ \t]+[-–—][ \t]+)"
+_SECRET_LINE = re.compile(r"(?im)(\b" + _LABEL + r"\b" + _SEPARATOR + r")(\S[^\n]*)$")
+# The value on the line after a label ("Temporary Password:" then "Summer2025!").
+_NEXT_LINE = re.compile(r"(?im)(^[^\n]{0,30}?\b" + _LABEL + r"[ \t]*[:=|]?[ \t]*\n[ \t]*)(\S+)[ \t]*$")
 _PRIVATE_KEY = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.DOTALL)
 
 
@@ -71,6 +77,7 @@ def redact_secrets(text: str) -> str:
     password entries themselves are never sent (only their name and link), and this is the second layer behind CORE's own."""
     text = _PRIVATE_KEY.sub("[private key redacted]", text)
     text = _SECRET_LINE.sub(lambda m: m.group(1) + "[redacted]", text)
+    text = _NEXT_LINE.sub(lambda m: m.group(1) + "[redacted]" if _looks_like_secret(m.group(2)) else m.group(0), text)
     return _NATURAL.sub(lambda m: m.group(1) + "[redacted]" if _looks_like_secret(m.group(2)) else m.group(0), text)
 
 

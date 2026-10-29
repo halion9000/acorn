@@ -160,3 +160,27 @@ def test_a_secret_written_into_a_sentence_is_blanked_and_ordinary_sentences_abou
         "pin is not set",
     ):
         assert cd.redact_secrets(text) == text, text
+
+
+def test_secrets_in_table_cells_dash_layouts_plurals_and_on_the_next_line_are_blanked_like_in_core():
+    blanked = {
+        "Wi-Fi key: Summer2025!": "Wi-Fi key: [redacted]",
+        "Passwords: Welcome1": "Passwords: [redacted]",
+        "admin pw: Abc12345": "admin pw: [redacted]",
+        "PIN: 482913": "PIN: [redacted]",
+        "Password | Summer2025! |": "Password | [redacted]",
+        "wifi key - Summer2025!": "wifi key - [redacted]",
+        "Password\nSummer2025!\nNotes": "Password\n[redacted]\nNotes",
+        "Temporary Password:\nWelcome1\nComputer Name:": "Temporary Password:\n[redacted]\nComputer Name:",
+    }
+    for text, expected in blanked.items():
+        assert cd.redact_secrets(text) == expected, text
+    for text in (
+        "Password policy | 12 characters |",
+        "Password policy: 12 characters minimum",
+        "Password\nReset it from the admin portal",
+        "PIN\nrequired",
+        "Registry key: HKLM",
+        "Keyboard layout: US",
+    ):
+        assert cd.redact_secrets(text) == text, text
