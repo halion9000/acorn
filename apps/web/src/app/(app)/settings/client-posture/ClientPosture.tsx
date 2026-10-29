@@ -33,6 +33,7 @@ export interface Posture {
 /** How each tool that sends checks is named on the page, in the order shown. A tool not listed here is shown under its source name. */
 export const TOOL_CHECK_LABELS: Record<string, string> = {
   threatmate: "ThreatMate",
+  "threatmate-google": "Google Workspace (ThreatMate)",
   liongard: "Liongard",
   itglue: "IT Glue",
   fieldeffect: "Field Effect",

@@ -239,6 +239,8 @@ CIPP_BASELINE_SOURCE = "cipp"
 # own source (so one tool can never replace another's rows, or the baseline); CIPP's extra checks use "cipp-health" because "cipp" is the baseline.
 TOOL_CHECK_SOURCES = {
     "threatmate": "threatmate",
+    # ThreatMate's checks on a client's Google Workspace (super administrators without 2-Step Verification, unused accounts, failed sign-ins), kept apart from its other checks so neither replaces the other.
+    "threatmate-google": "threatmate",
     "liongard": "liongard",
     "itglue": "itglue",
     "fieldeffect": "fieldeffect",
