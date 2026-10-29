@@ -196,3 +196,20 @@ class OneRowDB(FailingDB):
 def test_a_section_an_older_database_cannot_read_is_empty_and_the_rest_of_the_panel_still_loads():
     assert asyncio.run(ep._tolerant(FailingDB(), object())) == []
     assert asyncio.run(ep._tolerant(OneRowDB(), object())) == ["row"]
+
+
+def test_a_closed_date_is_stored_with_its_zone_and_an_open_ticket_stores_none(monkeypatch):
+    out, db = apply(monkeypatch, [item("7", closed_at=datetime(2026, 10, 27, 9, 30)), item("8")])
+    params = db.statements[0].compile().params
+    closed = [v for k, v in params.items() if k.startswith("closed_at")]
+    assert len(closed) == 2
+    stored = [v for v in closed if v is not None]
+    assert len(stored) == 1 and stored[0].tzinfo is not None and stored[0].hour == 9, "a date with no zone is UTC"
+    assert [v for v in closed if v is None] == [None], "an open ticket has no closed date"
+    assert out.accepted == 2
+
+
+def test_the_ticket_line_carries_when_it_was_closed_and_older_senders_still_work():
+    assert ep.TicketBrief(id="9", summary="s", opened_at=NOW, source="halopsa").closed_at is None
+    assert ep.TicketBrief(id="9", summary="s", opened_at=NOW, closed_at=NOW, source="halopsa").closed_at == NOW
+    assert item("1").closed_at is None, "a report from a CORE that does not send the field is still accepted"

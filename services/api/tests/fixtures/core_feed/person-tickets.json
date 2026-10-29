@@ -11,6 +11,7 @@
         "status": "New",
         "opened_at": "2026-10-27T09:30:00.123Z",
         "updated_at": "2026-10-27T10:00:00.000Z",
+        "closed_at": null,
         "user_email": "amy@acme.com",
         "user_name": "Amy Adams",
         "url": "https://acme.halopsa.com/tickets?id=1"

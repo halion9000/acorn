@@ -22,6 +22,8 @@ class PersonTicket(Base):
     status: Mapped[str | None] = mapped_column(String(80), nullable=True)
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When the ticketing tool says the ticket was closed (migration 125); None while open, or when the tool does not say.
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     user_email: Mapped[str] = mapped_column(String(320), nullable=False)
     user_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     url: Mapped[str | None] = mapped_column(String(500), nullable=True)

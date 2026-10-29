@@ -165,6 +165,25 @@ describe('the Identities page', () => {
     expect(within(detail).getByTestId('person-changes')).not.toHaveTextContent(' on amy@acme.com');
   });
 
+  it('says when a ticket was closed, and says nothing of it for an open ticket or an older answer', async () => {
+    const base = { person: person(), alerts: [], signins: { last_30_days: 0, failed: 0, unusual: 0, countries: [], last_at: null } };
+    api.detail.mockResolvedValue({
+      ...base,
+      tickets: [
+        { id: '101', summary: 'Cannot print', status: 'Closed', opened_at: '2026-10-22T00:00:00Z', closed_at: '2026-10-23T00:00:00Z', url: null, source: 'halopsa' },
+        { id: '102', summary: 'Slow laptop', status: 'Open', opened_at: '2026-10-24T00:00:00Z', closed_at: null, url: null, source: 'halopsa' },
+        { id: '103', summary: 'Old answer', status: 'Open', opened_at: '2026-10-25T00:00:00Z', url: null, source: 'halopsa' },
+      ],
+    });
+    show();
+    await userEvent.click((await screen.findAllByTestId('identity-row'))[0]);
+    const tickets = within(await screen.findByTestId('identity-detail')).getByTestId('person-tickets');
+    const items = within(tickets).getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent(/Closed · .* · closed .*ago/);
+    expect(items[1]).not.toHaveTextContent('closed ');
+    expect(items[2]).not.toHaveTextContent('closed ');
+  });
+
   it('shows no sign-in or change sections for an older answer that has neither, and says when there are no tickets', async () => {
     api.detail.mockResolvedValue({ person: person(), alerts: [], signins: { last_30_days: 0, failed: 0, unusual: 0, countries: [], last_at: null } });
     show();

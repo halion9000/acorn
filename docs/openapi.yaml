@@ -33176,6 +33176,12 @@ components:
             format: date-time
           - type: 'null'
           title: Updated At
+        closed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Closed At
         user_email:
           type: string
           maxLength: 320
@@ -39467,6 +39473,12 @@ components:
           type: string
           format: date-time
           title: Opened At
+        closed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Closed At
         url:
           anyOf:
           - type: string

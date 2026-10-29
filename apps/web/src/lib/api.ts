@@ -713,7 +713,7 @@ export interface IdentityDetail {
   alerts: { id: string; title: string; severity: string; status: string; source: string | null; created_at: string | null }[];
   signins: { last_30_days: number; failed: number; unusual: number; countries: string[]; last_at: string | null };
   /** The latest few tickets that name this person in the ticketing tool, newest first. */
-  tickets?: { id: string; summary: string; status: string | null; opened_at: string; url: string | null; source: string }[];
+  tickets?: { id: string; summary: string; status: string | null; opened_at: string; closed_at?: string | null; url: string | null; source: string }[];
   /** The person's latest sign-ins, newest first. */
   recent_signins?: { at: string; app: string | null; country: string | null; city: string | null; ip: string | null; success: boolean; mfa: boolean | null; unusual: boolean }[];
   /** Recent directory changes that name the person as the actor or the target. */

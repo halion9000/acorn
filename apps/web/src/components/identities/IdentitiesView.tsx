@@ -160,6 +160,7 @@ function Detail({ person }: { person: IdentityPerson }) {
                 <span className="ml-2 text-xs text-gray-400">
                   {t.status ? `${t.status} · ` : ''}
                   {safeDistance(t.opened_at, { addSuffix: true })}
+                  {t.closed_at ? ` · closed ${safeDistance(t.closed_at, { addSuffix: true })}` : ''}
                 </span>
               </li>
             ))}

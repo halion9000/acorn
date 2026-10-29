@@ -375,6 +375,7 @@ class TicketBrief(BaseModel):
     summary: str
     status: str | None = None
     opened_at: datetime
+    closed_at: datetime | None = None
     url: str | None = None
     source: str
 
@@ -545,7 +546,9 @@ async def identity_detail(
             for c in change_rows
         ],
         tickets=[
-            TicketBrief(id=t.ticket_id, summary=t.summary, status=t.status, opened_at=t.opened_at, url=t.url, source=t.source)
+            TicketBrief(
+                id=t.ticket_id, summary=t.summary, status=t.status, opened_at=t.opened_at, closed_at=t.closed_at, url=t.url, source=t.source
+            )
             for t in ticket_rows
         ],
     )
@@ -636,6 +639,7 @@ class PersonTicketIn(BaseModel):
     status: str | None = Field(default=None, max_length=80)
     opened_at: datetime
     updated_at: datetime | None = None
+    closed_at: datetime | None = None
     user_email: str = Field(min_length=3, max_length=320)
     user_name: str | None = Field(default=None, max_length=255)
     url: str | None = Field(default=None, max_length=500)
@@ -680,6 +684,7 @@ async def apply_person_tickets(
                         "status": it.status,
                         "opened_at": it.opened_at if it.opened_at.tzinfo else it.opened_at.replace(tzinfo=UTC),
                         "updated_at": it.updated_at,
+                        "closed_at": (it.closed_at if it.closed_at.tzinfo else it.closed_at.replace(tzinfo=UTC)) if it.closed_at else None,
                         "user_email": email,
                         "user_name": it.user_name,
                         "url": it.url,
