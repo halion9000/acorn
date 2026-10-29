@@ -140,3 +140,23 @@ async def test_a_failed_documentation_lookup_never_breaks_the_chat():
     user = SimpleNamespace(tenant_id=uuid.uuid4())
     with patch.object(ct, "execute_copilot_tool", AsyncMock(side_effect=ConnectionError("database down"))):
         assert await ct.docs_snapshot(tenant_id=str(user.tenant_id), user=user, message="how do we onboard a new hire") is None
+
+
+def test_a_secret_written_into_a_sentence_is_blanked_and_ordinary_sentences_about_passwords_are_not():
+    blanked = {
+        "the wifi key is Summer2025!": "the wifi key is [redacted]",
+        "changed the password to Welcome1.": "changed the password to [redacted]",
+        "pin is 4821": "pin is [redacted]",
+        "the secret was SummerSun": "the secret was [redacted]",
+        "token = AbC123xyz": "token = [redacted]",
+    }
+    for text, expected in blanked.items():
+        assert cd.redact_secrets(text) == expected, text
+    for text in (
+        "Password is required for every account.",
+        "the password is stored in IT Glue",
+        "The key is in the safe",
+        "reset the password to expire in 90 days",
+        "pin is not set",
+    ):
+        assert cd.redact_secrets(text) == text, text

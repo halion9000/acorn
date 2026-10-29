@@ -47,11 +47,31 @@ _SECRET_LINE = re.compile(
 _PRIVATE_KEY = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.DOTALL)
 
 
+# A secret written into a sentence: "the wifi key is Summer2025!", "changed the password to Welcome1". The word after is blanked when it looks like a secret (a digit or symbol in it, or mixed capitals) and is not an
+# ordinary word ("password is required").
+_NATURAL = re.compile(
+    r"(\b(?:password|passcode|passphrase|passwd|pwd|pw|pin|psk|token|secret|key)\s+(?:is|was|to|=)\s+)([^\s,;]+)", re.IGNORECASE
+)
+_NOT_SECRET = frozenset(
+    "required,expire,expires,expired,expiry,expiration,changed,reset,correct,incorrect,wrong,invalid,enabled,disabled,blank,empty,stored,saved,shared,unknown,unchanged,managed,needed,protected,policy,complexity,locked,unlocked,working,fine,good,default,none,same,different,unique,strong,weak,longer,shorter,sufficient,hidden".split(
+        ","
+    )
+)
+
+
+def _looks_like_secret(word: str) -> bool:
+    w = re.sub(r"[.!?)\"']+$", "", word)
+    if not w or w.lower() in _NOT_SECRET:
+        return False
+    return bool(re.search(r"[0-9!@#$%^&*_+=-]", w)) or (bool(re.search(r"[a-z]", w)) and bool(re.search(r"[A-Z]", w)) and len(w) >= 6)
+
+
 def redact_secrets(text: str) -> str:
     """The text with what looks like a secret blanked: a private key block, and whatever follows "password:", "token =", "api key:" and the like on a line. Documentation pasted from a person's notes can hold one; the
     password entries themselves are never sent (only their name and link), and this is the second layer behind CORE's own."""
     text = _PRIVATE_KEY.sub("[private key redacted]", text)
-    return _SECRET_LINE.sub(lambda m: m.group(1) + "[redacted]", text)
+    text = _SECRET_LINE.sub(lambda m: m.group(1) + "[redacted]", text)
+    return _NATURAL.sub(lambda m: m.group(1) + "[redacted]" if _looks_like_secret(m.group(2)) else m.group(0), text)
 
 
 def search_terms(message: str) -> list[str]:
