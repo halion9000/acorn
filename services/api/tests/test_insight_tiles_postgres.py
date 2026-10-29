@@ -91,7 +91,7 @@ async def test_every_number_is_read_from_the_database_as_the_tile_says():
             await conn.execute(text("set local session_replication_role = replica"))
             await _seed(conn, tenant, now)
         async with AsyncSession(engine) as db:
-            part = await it.gather_tenant(db, tenant, now - timedelta(days=1), now, now - timedelta(days=2))
+            (part,) = await it.gather_all(db, [tenant], now - timedelta(days=1), now, now - timedelta(days=2))
         assert part["open_now"] == 3, "the two new alerts and the one whose tickets field is not a list"
         assert part["sla_breached"] == 1, "only the critical alert three hours old is past its 15-minute target"
         assert part["now"]["alerts"] == 6 and part["now"]["finished"] == 3
@@ -128,11 +128,95 @@ async def test_a_tenant_with_nothing_has_tiles_that_say_so_instead_of_zero_resul
     now = datetime.now(UTC)
     try:
         async with AsyncSession(engine) as db:
-            part = await it.gather_tenant(db, tenant, now - timedelta(days=1), now, now - timedelta(days=2))
+            (part,) = await it.gather_all(db, [tenant], now - timedelta(days=1), now, now - timedelta(days=2))
         tiles = {t["key"]: t for t in it.build_tiles(it.merge([part]), now=now, ready=True, sparkline=[], client_names=None, sources=None)}
         assert tiles["open_alerts"]["value"] == 0 and tiles["open_alerts"]["detail"] == "Oldest: none open"
         for key in ("sla_breaches", "noisy_alert_types", "automation_rate", "unusual_signins", "playbook_coverage", "ticket_linkage"):
             assert tiles[key]["has_data"] is False and tiles[key]["delta_pct"] is None, key
         assert "noisiest_clients" not in tiles and "silent_sources" not in tiles
     finally:
+        await _cleanup(engine, tenant)
+
+
+async def test_several_tenants_are_read_together_and_a_tenant_with_its_own_targets_is_judged_by_them():
+    engine, first = await _tenant()
+    second = uuid.uuid4()
+    now = datetime.now(UTC)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            await conn.execute(
+                text("insert into tenants (id, name, slug) values (:t, 'tiles-two', :s)"), {"t": second, "s": f"tiles-{second.hex[:10]}"}
+            )
+            await _seed(conn, first, now)
+            await _seed(conn, second, now)
+            # The second tenant allows a critical alert 1000 minutes before it is late (the default is 15): its three-hour-old critical alert is not past its target.
+            await conn.execute(
+                text(
+                    "insert into tenant_sla_config (id, tenant_id, severity, mttd_target, mttr_target, mttc_target) values (:i, :t, 'critical', 1000, 2000, 3000)"
+                ),
+                {"i": uuid.uuid4(), "t": second},
+            )
+        async with AsyncSession(engine) as db:
+            parts = await it.gather_all(db, [first, second], now - timedelta(days=1), now, now - timedelta(days=2))
+        by = {p["tid"]: p for p in parts}
+        assert by[first]["sla_breached"] == 1 and by[second]["sla_breached"] == 0
+        merged = it.merge(parts)
+        assert merged["open_now"] == 6 and merged["sla_breached"] == 1
+        assert merged["now"]["alerts"] == 12 and merged["now"]["finished_without_person"] == 4 and merged["now"]["signins_unusual"] == 2
+        assert merged["types"] == {"Printer offline": 6, "Other": 6}, "the top titles of both tenants added up"
+        assert merged["by_tenant"] == {first: 6, second: 6}
+        tiles = {
+            t["key"]: t
+            for t in it.build_tiles(merged, now=now, ready=True, sparkline=[], client_names={first: "One", second: "Two"}, sources=None)
+        }
+        assert [i["label"] for i in tiles["noisiest_clients"]["items"]] == ["One", "Two"] or [
+            i["label"] for i in tiles["noisiest_clients"]["items"]
+        ] == ["Two", "One"]
+    finally:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            for table in ("tenant_sla_config", "playbook_dry_runs", "signin_events", "alerts"):
+                await conn.execute(text(f"delete from {table} where tenant_id = :t"), {"t": second})
+            await conn.execute(text("delete from tenants where id = :t"), {"t": second})
+        await _cleanup(engine, first)
+
+
+async def test_the_endpoint_itself_returns_the_second_row_beside_the_first_seven_on_a_real_database():
+    from app.api.v1.endpoints import insights as ins
+    from types import SimpleNamespace
+
+    engine, tenant = await _tenant()
+    now = datetime.now(UTC)
+    ins._cache.clear()
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            await _seed(conn, tenant, now)
+        async with AsyncSession(engine) as db:
+            out = await ins.get_soc_insights(SimpleNamespace(tenant_id=tenant), db, "24h", None)
+        keys = [t.key for t in out.tiles]
+        assert keys[:7] == [
+            "mtta",
+            "mttr",
+            "fp_rate",
+            "alerts_per_day",
+            "cases_per_day",
+            "agent_cost_per_investigation",
+            "analyst_hours_saved",
+        ]
+        assert {
+            "open_alerts",
+            "sla_breaches",
+            "noisy_alert_types",
+            "automation_rate",
+            "unusual_signins",
+            "playbook_coverage",
+            "ticket_linkage",
+        } <= set(keys)
+        by = {t.key: t for t in out.tiles}
+        assert by["open_alerts"].value == 3 and by["sla_breaches"].value == 1
+        assert by["mtta"].has_data is False, "no alert here was ever acted on by a person: a dash, not 0.0h"
+    finally:
+        ins._cache.clear()
         await _cleanup(engine, tenant)

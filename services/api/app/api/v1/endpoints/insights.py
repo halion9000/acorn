@@ -46,7 +46,9 @@ keep the two endpoints distinct rather than overloading
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
@@ -57,7 +59,7 @@ from sqlalchemy import and_, func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
-from app.db.rls_scope import acting_as_tenant
+from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.tenant import Tenant
@@ -452,15 +454,14 @@ def _merge_parts(parts: list[dict]) -> dict:
     return m
 
 
-async def _gather_extras(db, tid, start, now, prev_start, out: list[dict]) -> bool:
-    """The second row of tiles for one tenant. A failure here drops that row, never the page: the first seven tiles are the ones the page cannot do without."""
+async def _gather_extras(db, ids: list[uuid.UUID], start, now, prev_start) -> list[dict]:
+    """The second row of tiles for the whole scope, in a few grouped statements. A failure here drops that row, never the page: the first seven tiles are the ones the page cannot do without."""
     try:
-        async with db.begin_nested():
-            out.append(await insight_tiles.gather_tenant(db, tid, start, now, prev_start))
-        return True
+        async with db.begin_nested(), cross_tenant_reads(db):
+            return await insight_tiles.gather_all(db, ids, start, now, prev_start)
     except Exception:  # noqa: BLE001
         logger.warning("insights.extra_tiles_unavailable", exc_info=True)
-        return False
+        return []
 
 
 async def _source_health(db, owner: uuid.UUID, now: datetime) -> dict | None:
@@ -492,6 +493,19 @@ async def _source_health(db, owner: uuid.UUID, now: datetime) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
+# The page asks again every 30 seconds and on every case change, and computing the numbers for a few hundred clients takes seconds: the same answer is kept for a short while and a burst of
+# identical requests shares one computation. (Without this a few open tabs kept the API busy enough for CORE's calls to time out.)
+CACHE_SECONDS = 25.0
+_CACHE_MAX = 64
+_cache: dict[tuple, tuple[float, SOCInsightsResponse]] = {}
+_locks: dict[tuple, asyncio.Lock] = {}
+
+
+def _fresh(key: tuple) -> SOCInsightsResponse | None:
+    hit = _cache.get(key)
+    return hit[1] if hit is not None and time.monotonic() - hit[0] < CACHE_SECONDS else None
+
+
 @router.get(
     "/soc",
     response_model=SOCInsightsResponse,
@@ -512,11 +526,25 @@ async def get_soc_insights(
         ),
     ] = None,
 ) -> SOCInsightsResponse:
-    """Return the seven-tile SOC Insights payload for the tenant.
+    """Return the SOC Insights tiles for the tenant (kept for ``CACHE_SECONDS`` per organization, window and client)."""
+    key = (user.tenant_id, window, client_id)
+    if (hit := _fresh(key)) is not None:
+        return hit
+    lock = _locks.setdefault(key, asyncio.Lock())
+    async with lock:
+        if (hit := _fresh(key)) is not None:
+            return hit
+        response = await _build_soc_insights(user, db, window, client_id)
+        if len(_cache) >= _CACHE_MAX:
+            _cache.pop(min(_cache, key=lambda k: _cache[k][0]))
+        _cache[key] = (time.monotonic(), response)
+        return response
 
-    Tenant scoping is enforced by ``current_user.tenant_id`` plus an
-    explicit ``tenant_id`` predicate in every aggregate, so the payload
-    is safe to render for any role that can read the dashboard.
+
+async def _build_soc_insights(user: AuthUser, db: DBSession, window: str, client_id: uuid.UUID | None) -> SOCInsightsResponse:
+    """The tiles for the tenant.
+
+    Tenant scoping is enforced by ``current_user.tenant_id`` plus an explicit ``tenant_id`` predicate in every aggregate, so the payload is safe to render for any role that can read the dashboard.
     """
     tenant_id = user.tenant_id
     now = datetime.now(UTC)
@@ -535,17 +563,14 @@ async def get_soc_insights(
             raise HTTPException(status_code=404, detail="client not found")
         scope_ids = [client_id]
     parts = []
-    extra_parts: list[dict] = []
-    extras_ok = True
     for tid in scope_ids:
         if tid == tenant_id:
             parts.append(await _tenant_parts(db, tid, start, now, prev_start))
-            extras_ok = await _gather_extras(db, tid, start, now, prev_start, extra_parts) and extras_ok
         else:
             async with acting_as_tenant(db, tid):
                 parts.append(await _tenant_parts(db, tid, start, now, prev_start))
-                extras_ok = await _gather_extras(db, tid, start, now, prev_start, extra_parts) and extras_ok
     total = _merge_parts(parts)
+    extra_parts = await _gather_extras(db, scope_ids, start, now, prev_start)
 
     history_since = total["first_alert"]
     comparison_ready = history_since is not None and history_since <= prev_start
@@ -652,7 +677,7 @@ async def get_soc_insights(
         ),
     ]
 
-    if extras_ok and extra_parts:
+    if extra_parts:
         merged = insight_tiles.merge(extra_parts)
         client_names = None
         if client_id is None:

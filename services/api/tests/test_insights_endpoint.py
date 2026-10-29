@@ -22,12 +22,14 @@ Coverage targets:
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from app.api.v1.endpoints import insights as ins
 from app.api.v1.endpoints.insights import (
     MANUAL_INVESTIGATION_MINUTES,
     SOCInsightsResponse,
@@ -87,6 +89,22 @@ def test_window_to_timedelta_rejects_unknown() -> None:
 # ---------------------------------------------------------------------------
 # End-to-end endpoint shape
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _no_cache(monkeypatch):
+    """The endpoint keeps an answer for a few seconds; each test here must compute its own. The second row of tiles reads the database in grouped statements a mock cannot answer: it has its
+    own tests on a real Postgres (test_insight_tiles_postgres.py), so here it is switched off and these tests are about the first seven tiles."""
+
+    async def no_extras(*_a, **_k):
+        return []
+
+    monkeypatch.setattr(ins, "_gather_extras", no_extras)
+    ins._cache.clear()
+    ins._locks.clear()
+    yield
+    ins._cache.clear()
+    ins._locks.clear()
 
 
 def _stub_user() -> SimpleNamespace:
@@ -360,3 +378,25 @@ async def test_a_client_that_is_not_this_organizations_is_a_404() -> None:
         # the organization's own id is not a client either
         user = _stub_user()
         await get_soc_insights(user=user, db=_db_with_clients(clients), window="7d", client_id=user.tenant_id)
+
+
+@pytest.mark.asyncio
+async def test_a_second_request_for_the_same_view_within_seconds_is_the_kept_answer_and_a_burst_shares_one_computation(monkeypatch):
+    calls = []
+
+    async def fake_build(user, db, window, client_id):
+        calls.append((window, client_id))
+        await asyncio.sleep(0.05)
+        return SimpleNamespace(window=window, n=len(calls))
+
+    monkeypatch.setattr(ins, "_build_soc_insights", fake_build)
+    user = SimpleNamespace(tenant_id=uuid.uuid4())
+    burst = await asyncio.gather(*[ins.get_soc_insights(user, None, "24h", None) for _ in range(5)])
+    assert len(calls) == 1 and {b.n for b in burst} == {1}, "five identical requests at once are one computation"
+    assert (await ins.get_soc_insights(user, None, "24h", None)).n == 1, "and the next one is the kept answer"
+    assert (await ins.get_soc_insights(user, None, "7d", None)).n == 2, "another window is its own answer"
+    assert (
+        await ins.get_soc_insights(SimpleNamespace(tenant_id=uuid.uuid4()), None, "24h", None)
+    ).n == 3, "another organization never sees this one's"
+    monkeypatch.setattr(ins, "CACHE_SECONDS", 0.0)
+    assert (await ins.get_soc_insights(user, None, "24h", None)).n == 4, "after the time is up it is computed again"

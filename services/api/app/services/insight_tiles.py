@@ -14,13 +14,15 @@ from collections import Counter
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import case, func, or_, select
 
 from app.models.alert import Alert
 from app.models.playbook_dry_run import PlaybookDryRun
 from app.models.signin import SigninEvent
+from app.models.sla import TenantSLAConfig
 from app.services.alert_queue import load_sla_targets, sla_due_at_expression
 from app.services.alert_status import FINISHED_ALERT_STATUSES, SUPPRESSED
+from app.services.sla import DEFAULT_SLA_TARGETS
 
 TOP_N = 5
 # Sign-in scores are z-scores from the UEBA service, which calls 4.0 and above "high" (services/ueba/app/services/scoring.py).
@@ -28,7 +30,7 @@ UNUSUAL_SIGNIN_SCORE = 4.0
 # A source that has not reported for this long is "silent" on the sources tile.
 STALE_SOURCE_MINUTES = 60
 # Titles counted per tenant before the roll-up; more than this per client never reaches the top of the whole organization.
-TYPES_PER_TENANT = 25
+TYPES_PER_TENANT = 25  # titles kept for the whole scope
 
 
 def _unfinished():
@@ -41,53 +43,104 @@ def _ticket_count_expr():
     return case((func.jsonb_typeof(tickets) == "array", func.jsonb_array_length(tickets)), else_=0)
 
 
-async def _window_parts(db: Any, tid: uuid.UUID, start: datetime, end: datetime) -> dict[str, Any]:
-    """Counts over alerts created in [start, end) and sign-ins that happened in it."""
-    in_window = and_(Alert.tenant_id == tid, Alert.created_at >= start, Alert.created_at < end)
-    finished = in_window & Alert.status.in_(FINISHED_ALERT_STATUSES)
+async def _grouped_window(
+    db: Any, ids: list[uuid.UUID], start: datetime, end: datetime, parts: dict[uuid.UUID, dict[str, Any]], tag: str
+) -> None:
+    """Counts per tenant over alerts created in [start, end) and sign-ins that happened in it: one grouped statement for each kind, whatever the number of tenants."""
+    in_window = [Alert.tenant_id.in_(ids), Alert.created_at >= start, Alert.created_at < end]
+    finished = Alert.status.in_(FINISHED_ALERT_STATUSES)
     without_person = or_(Alert.status == SUPPRESSED, Alert.enrichment_data.has_key("closed_in_vendor"))
-    out: dict[str, Any] = {}
-    out["alerts"] = int(await db.scalar(select(func.count()).where(in_window)) or 0)
-    out["finished"] = int(await db.scalar(select(func.count()).where(finished)) or 0)
-    out["finished_without_person"] = int(await db.scalar(select(func.count()).where(finished, without_person)) or 0)
-    out["ticketed"] = int(await db.scalar(select(func.count()).where(in_window, _ticket_count_expr() > 0)) or 0)
-    out["playbook_matched"] = int(
-        await db.scalar(
-            select(func.count(func.distinct(PlaybookDryRun.alert_id))).where(
-                PlaybookDryRun.tenant_id == tid, PlaybookDryRun.created_at >= start, PlaybookDryRun.created_at < end
+    rows = (
+        await db.execute(
+            select(
+                Alert.tenant_id,
+                func.count(),
+                func.count().filter(finished),
+                func.count().filter(finished, without_person),
+                func.count().filter(_ticket_count_expr() > 0),
             )
+            .where(*in_window)
+            .group_by(Alert.tenant_id)
         )
-        or 0
-    )
-    sign = and_(SigninEvent.tenant_id == tid, SigninEvent.occurred_at >= start, SigninEvent.occurred_at < end)
-    out["signins_scored"] = int(await db.scalar(select(func.count()).where(sign, SigninEvent.anomaly_score.is_not(None))) or 0)
-    out["signins_unusual"] = int(await db.scalar(select(func.count()).where(sign, SigninEvent.anomaly_score >= UNUSUAL_SIGNIN_SCORE)) or 0)
-    return out
+    ).all()
+    for tid, alerts, fin, fin_np, ticketed in rows:
+        parts[tid][tag].update(
+            {"alerts": int(alerts), "finished": int(fin), "finished_without_person": int(fin_np), "ticketed": int(ticketed)}
+        )
+    matched = (
+        await db.execute(
+            select(PlaybookDryRun.tenant_id, func.count(func.distinct(PlaybookDryRun.alert_id)))
+            .where(PlaybookDryRun.tenant_id.in_(ids), PlaybookDryRun.created_at >= start, PlaybookDryRun.created_at < end)
+            .group_by(PlaybookDryRun.tenant_id)
+        )
+    ).all()
+    for tid, n in matched:
+        parts[tid][tag]["playbook_matched"] = int(n)
+    signins = (
+        await db.execute(
+            select(
+                SigninEvent.tenant_id,
+                func.count().filter(SigninEvent.anomaly_score.is_not(None)),
+                func.count().filter(SigninEvent.anomaly_score >= UNUSUAL_SIGNIN_SCORE),
+            )
+            .where(SigninEvent.tenant_id.in_(ids), SigninEvent.occurred_at >= start, SigninEvent.occurred_at < end)
+            .group_by(SigninEvent.tenant_id)
+        )
+    ).all()
+    for tid, scored, unusual in signins:
+        parts[tid][tag].update({"signins_scored": int(scored), "signins_unusual": int(unusual)})
 
 
-async def gather_tenant(db: Any, tid: uuid.UUID, start: datetime, now: datetime, prev_start: datetime) -> dict[str, Any]:
-    """Raw, mergeable numbers for one tenant."""
-    out: dict[str, Any] = {
-        "tid": tid,
-        "now": await _window_parts(db, tid, start, now),
-        "prev": await _window_parts(db, tid, prev_start, start),
+async def gather_all(db: Any, ids: list[uuid.UUID], start: datetime, now: datetime, prev_start: datetime) -> list[dict[str, Any]]:
+    """Raw, mergeable numbers for every tenant in ``ids`` (the organization and its clients) with a few grouped statements, not a handful per tenant: 224 clients made the per-tenant version take 20 seconds.
+
+    The caller has put ``db`` in a block that may read several tenants (``cross_tenant_reads``); every statement is limited to ``ids``.
+    """
+    parts: dict[uuid.UUID, dict[str, Any]] = {
+        tid: {"tid": tid, "now": Counter(), "prev": Counter(), "open_now": 0, "oldest_open": None, "sla_breached": 0, "types": {}}
+        for tid in ids
     }
-    out["open_now"] = int(await db.scalar(select(func.count()).where(Alert.tenant_id == tid, _unfinished())) or 0)
-    oldest = await db.scalar(select(func.min(Alert.created_at)).where(Alert.tenant_id == tid, _unfinished()))
-    out["oldest_open"] = oldest if isinstance(oldest, datetime) else None
-    due = sla_due_at_expression(await load_sla_targets(db, tid))
-    out["sla_breached"] = int(await db.scalar(select(func.count()).where(Alert.tenant_id == tid, _unfinished(), due < now)) or 0)
+    await _grouped_window(db, ids, start, now, parts, "now")
+    await _grouped_window(db, ids, prev_start, start, parts, "prev")
+    unfinished = _unfinished()
+    for tid, n, oldest in (
+        await db.execute(
+            select(Alert.tenant_id, func.count(), func.min(Alert.created_at))
+            .where(Alert.tenant_id.in_(ids), unfinished)
+            .group_by(Alert.tenant_id)
+        )
+    ).all():
+        parts[tid]["open_now"] = int(n)
+        parts[tid]["oldest_open"] = oldest if isinstance(oldest, datetime) else None
+    # Past the response target: the defaults in one grouped statement, and the few tenants that set their own targets one by one.
+    own = {r[0] for r in (await db.execute(select(TenantSLAConfig.tenant_id).where(TenantSLAConfig.tenant_id.in_(ids)).distinct())).all()}
+    default_due = sla_due_at_expression({sev: cfg["mttd_target"] for sev, cfg in DEFAULT_SLA_TARGETS.items()})
+    rest = [t for t in ids if t not in own]
+    if rest:
+        for tid, n in (
+            await db.execute(
+                select(Alert.tenant_id, func.count())
+                .where(Alert.tenant_id.in_(rest), unfinished, default_due < now)
+                .group_by(Alert.tenant_id)
+            )
+        ).all():
+            parts[tid]["sla_breached"] = int(n)
+    for tid in own:
+        due = sla_due_at_expression(await load_sla_targets(db, tid))
+        parts[tid]["sla_breached"] = int(await db.scalar(select(func.count()).where(Alert.tenant_id == tid, unfinished, due < now)) or 0)
+    # The noisiest alert types of the whole scope: the top few of all the titles together, which is what the tile shows.
     rows = (
         await db.execute(
             select(Alert.title, func.count().label("n"))
-            .where(Alert.tenant_id == tid, Alert.created_at >= start, Alert.created_at < now)
+            .where(Alert.tenant_id.in_(ids), Alert.created_at >= start, Alert.created_at < now)
             .group_by(Alert.title)
             .order_by(func.count().desc())
             .limit(TYPES_PER_TENANT)
         )
     ).all()
-    out["types"] = {str(r[0]): int(r[1]) for r in rows}
-    return out
+    first = parts[ids[0]]
+    first["types"] = {str(r[0]): int(r[1]) for r in rows}
+    return list(parts.values())
 
 
 def merge(parts: list[dict[str, Any]]) -> dict[str, Any]:
