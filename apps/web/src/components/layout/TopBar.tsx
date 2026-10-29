@@ -21,6 +21,7 @@ const ACRONYMS = new Set(['mssp', 'sla', 'siem', 'edr', 'soar', 'ueba', 'api', '
 
 const routeLabels: Record<string, { title: string; description: string }> = {
   '/detection/vendor-detections': { title: 'Vendor Detections', description: 'What your connected tools have detected' },
+  '/settings/guide': { title: 'ACORN Setup Guide', description: 'How to set up and use A.C.O.R.N, page by page' },
   '/settings/rbac': { title: 'Roles & Permissions', description: 'Access control and team management' },
   '/settings/client-posture': { title: 'Client Posture', description: 'Devices, Multi-Factor, alerts and cases for one client' },
   '/settings/billing': { title: 'Licences & Counts', description: 'What each tool counts for each client, and every change, to check an invoice against' },
@@ -51,7 +52,6 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/sla': { title: 'SLA Tracking', description: 'Response time targets and breach risk' },
   '/settings/audit': { title: 'Audit Log', description: 'Platform activity and security events' },
   '/settings': { title: 'Settings', description: 'Platform configuration' },
-  '/guide': { title: 'User guide', description: 'How to use A.C.O.R.N, page by page' },
   '/': { title: 'Dashboard', description: 'SOC overview and metrics' },
 };
 
@@ -262,17 +262,17 @@ export function TopBar({ demoOffset = false }: TopBarProps) {
           <p className="text-xs text-fg-subtle" suppressHydrationWarning>{dateStr}</p>
         </div>
 
-        {/* User guide: one click from anywhere. The word waits for xl: so a narrow window (the CORE desktop panel) keeps its room. */}
+        {/* ACORN Setup Guide (under Settings): one click from anywhere. The word waits for xl: so a narrow window (the CORE desktop panel) keeps its room. */}
         <Link
-          href="/guide"
-          aria-label="Open the user guide"
-          title="User guide"
+          href="/settings/guide"
+          aria-label="Open the ACORN Setup Guide"
+          title="ACORN Setup Guide"
           className="flex items-center gap-1.5 rounded-lg border border-surface-border px-2 py-1.5 text-sm text-fg-secondary transition-colors hover:border-brand-500/40 hover:bg-surface-hover hover:text-fg-primary"
         >
           <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
           </svg>
-          <span className="hidden xl:inline">Guide</span>
+          <span className="hidden xl:inline">Setup Guide</span>
         </Link>
 
         {/* Theme toggle (WS-F1) */}

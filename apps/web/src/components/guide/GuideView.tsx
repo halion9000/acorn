@@ -167,7 +167,7 @@ export function GuideView() {
       <header className="mb-6 rounded-2xl border border-surface-border bg-gradient-to-br from-brand-500/10 via-surface-card/60 to-surface-card/60 p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-brand-400">User guide</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-brand-400">ACORN Setup Guide</p>
             <h1 className="mt-1 text-2xl font-bold text-fg-primary">{guide.title}</h1>
             {lead && lead.type === 'p' && (
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-secondary">

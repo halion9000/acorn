@@ -253,6 +253,7 @@ export const MORE_SETTINGS: { href: string; label: string; description: string }
   { href: '/settings/costs', label: 'Cost dashboard', description: 'AI spend, automation activity and savings from bringing your own key' },
   { href: '/settings/triage', label: 'Auto-close', description: 'How sure AI triage must be to close an alert itself' },
   { href: '/settings/cipp-actions', label: 'CIPP actions', description: 'What CORE can do to client Microsoft 365 tenants through CIPP, whether it is switched on, and what it has been asked to do' },
+  { href: '/settings/guide', label: 'ACORN Setup Guide', description: 'How to set up and use A.C.O.R.N, page by page (the former User guide)' },
   { href: '/settings/tickets', label: 'Tickets', description: 'The HaloPSA status a resolved incident moves its ticket to' },
 ];
 

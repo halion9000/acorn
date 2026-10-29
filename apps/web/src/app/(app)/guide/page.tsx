@@ -1,11 +1,6 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { GuideView } from "@/components/guide/GuideView";
-
-export const metadata: Metadata = {
-  title: "User guide | A.C.O.R.N",
-};
-
-export default function GuidePage() {
-  return <GuideView />;
+/** The guide lives under Settings now (/settings/guide); this keeps old links and bookmarks working. */
+export default function GuidePage(): never {
+  redirect("/settings/guide");
 }

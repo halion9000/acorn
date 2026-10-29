@@ -24,10 +24,10 @@ The left sidebar groups the console:
 
 | Area | Pages |
 |---|---|
-| Platform (top) | SOC Dashboard, SOC Insights, Get started, User guide, **MSSP Dashboard**, Team Analytics, SLA Tracking |
+| Platform (top) | SOC Dashboard, SOC Insights, Get started, Leafy, **MSSP Dashboard**, Team Analytics, SLA Tracking |
 | Work | **Alerts**, **Devices**, Investigation Queue, **Cases**, Hunt, Explore |
 | Detection | Detection Rules (with Rule packs), Vendor Detections, MITRE Coverage, Detection Tuning, Shifts |
-| Intelligence | Threat Intel, Attack Graph, Leafy, Investigation Chat, Coverage Advisor, EASM |
+| Intelligence | Threat Intel, Attack Graph, Investigation Chat, Coverage Advisor, EASM |
 | Client Security | **Client Posture**, **Fleet Posture**, **Client Docs**, **Licences & Counts**, **Multi-Factor**, **Secure Score**, **Sign-in Scores**, **Client Cleanup**, **Platform Health** |
 | Response and testing | Playbooks (with Dry Runs), File Integrity, Honeytokens, Purple Team |
 | vCIO | Compliance, Executive Digest, Client Review |

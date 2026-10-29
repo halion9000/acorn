@@ -5,13 +5,17 @@ import { NAV_CATALOG } from './Sidebar';
 describe('the sidebar order', () => {
   it('starts with Platform (the SOC dashboards first) and ends with Settings on its own', () => {
     expect(NAV_CATALOG[0].title).toBe('Platform');
-    expect(NAV_CATALOG[0].items.map((i) => i.label)).toEqual(['SOC Dashboard', 'SOC Insights', 'Get started', 'User guide', 'MSSP Dashboard', 'Team Analytics', 'SLA Tracking']);
+    expect(NAV_CATALOG[0].items.map((i) => i.label)).toEqual(['SOC Dashboard', 'SOC Insights', 'Get started', 'Leafy', 'MSSP Dashboard', 'Team Analytics', 'SLA Tracking']);
     expect(NAV_CATALOG[0].items[0].href).toBe('/dashboard');
     const last = NAV_CATALOG[NAV_CATALOG.length - 1];
     expect(last.title).toBeUndefined();
     expect(last.items.map((i) => i.label)).toEqual(['Settings']);
     const all = NAV_CATALOG.flatMap((s) => s.items.map((i) => i.label));
     expect(all).not.toContain('Dashboard');
+    expect(all.filter((l) => l === 'Leafy')).toHaveLength(1);
+    expect(NAV_CATALOG.find((s) => s.title === 'Intelligence')?.items.map((i) => i.label)).not.toContain('Leafy');
+    expect(all).not.toContain('User guide');
+    expect(NAV_CATALOG.flatMap((s) => s.items).some((i) => i.href === '/guide')).toBe(false);
   });
 });
 

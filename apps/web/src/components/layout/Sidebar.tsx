@@ -164,8 +164,8 @@ const navSections: NavSection[] = [
         icon: <SparklesIcon />,
       },
       {
-        label: 'User guide',
-        href: '/guide',
+        label: 'Leafy',
+        href: '/copilot',
         icon: <SparklesIcon />,
       },
       {
@@ -265,11 +265,6 @@ const navSections: NavSection[] = [
         label: 'Attack Graph',
         href: '/graph',
         icon: <GraphIcon />,
-      },
-      {
-        label: 'Leafy',
-        href: '/copilot',
-        icon: <SparklesIcon />,
       },
       {
         label: 'Investigation Chat',

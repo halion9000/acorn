@@ -77,7 +77,7 @@ const NAV_ITEMS: { label: string; href: string; keywords: string[] }[] = [
   { label: 'Client mapping',  href: '/settings/client-mapping', keywords: ['map', 'unmapped', 'clients', 'tools'] },
   { label: 'Audit Log',       href: '/settings/audit', keywords: ['activity', 'events'] },
   { label: 'Settings',        href: '/settings',     keywords: ['preferences', 'profile', 'tenant'] },
-  { label: 'User guide',      href: '/guide',        keywords: ['help', 'how to', 'docs', 'documentation', 'manual'] },
+  { label: 'ACORN Setup Guide', href: '/settings/guide', keywords: ['help', 'how to', 'docs', 'documentation', 'manual', 'user guide', 'setup'] },
 ];
 
 export function CommandPalette() {
