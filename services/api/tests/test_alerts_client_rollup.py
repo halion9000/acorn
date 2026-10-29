@@ -5,6 +5,7 @@ import contextlib
 import uuid
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from app.api.v1.endpoints import alerts as ep
@@ -206,8 +207,14 @@ def test_a_parent_can_open_and_update_a_client_alert_but_not_a_strangers():
         from app.api.v1.endpoints.alerts import AlertUpdateRequest, update_alert
 
         user = SimpleNamespace(tenant_id=parent.id, user_id=uuid.uuid4())
-        out = await update_alert(rows["setpoint-new"].id, AlertUpdateRequest(status="resolved"), user, s)
+        audited = AsyncMock()
+        with patch.object(
+            ep, "emit_audit", audited
+        ):  # the audit table has a Postgres-only column type, so this SQLite database does not have it
+            out = await update_alert(rows["setpoint-new"].id, AlertUpdateRequest(status="resolved"), user, s)
         assert out.status == "resolved"
+        assert audited.await_args.kwargs["changes"]["status_to"] == "resolved"
+        assert audited.await_args.kwargs["tenant_id"] == a.id, "the audit line is written under the client's tenant, where the alert is"
 
     run(go)
 
@@ -364,11 +371,48 @@ def test_a_client_with_no_alerts_adds_nothing_and_is_not_asked_for_a_list_but_th
 
 
 def test_the_counts_and_the_list_see_each_client_in_one_scope_not_two():
+    """Each client is entered once for its counts and the page's newest alerts. A client that has rows on the page is entered once more, to read those rows in full (the first read is only of times and ids)."""
+
     async def go(s):
         parent, a, b, _other = await seed(s)
         scoped.clear()
-        await call(s, parent.id)
-        assert sorted(map(str, scoped)) == sorted(map(str, [parent.id, a.id, b.id])), "each tenant entered once"
+        got = await call(s, parent.id)
+        entered = {tid: scoped.count(tid) for tid in set(scoped)}
+        assert set(entered) == {parent.id, a.id, b.id}
+        on_the_page = {i.client_name for i in got.items}
+        assert len(on_the_page) == 3
+        assert all(n <= 2 for n in entered.values()), entered
+        assert sum(entered.values()) == 3 + 3, "three for the counts and the list, three more to read the page's rows"
+
+    run(go)
+
+
+def test_a_rolled_up_page_reads_in_full_only_the_alerts_on_that_page():
+    """It used to read ``offset + page_size`` full alerts (raw events and all) from EVERY client for every page, and throw most away."""
+    from sqlalchemy import event
+
+    loaded: list[str] = []
+
+    async def go(s):
+        parent, a, b, _ = await seed(s)
+        for i in range(12):
+            s.add(alert(a if i % 2 else b, f"extra-{i}", 100 + i))
+        await s.commit()
+        s.expunge_all()
+        event.listen(Alert, "load", lambda target, _ctx: loaded.append(target.title))
+        loaded.clear()
+        first = await call(s, parent.id, page=1, page_size=3)
+        assert len(first.items) == 3 and len(loaded) == 3, loaded
+        loaded.clear()
+        s.expunge_all()
+        third = await call(s, parent.id, page=3, page_size=3)
+        assert len(third.items) == 3 and len(loaded) == 3, loaded
+        titles: list[str] = []
+        for page in (1, 2, 3, 4, 5, 6):
+            s.expunge_all()
+            titles += [i.title for i in (await call(s, parent.id, page=page, page_size=3)).items]
+        expected = ["setpoint-new", "tecovas", "own", "setpoint-old"] + [f"extra-{i}" for i in range(12)]
+        assert titles == expected, "newest first, and no alert repeated or skipped across the pages"
 
     run(go)
 

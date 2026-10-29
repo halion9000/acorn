@@ -19,6 +19,7 @@ from sqlalchemy import text
 
 from app.api.v1.deps import AuthUser, require_permission
 from app.db.rls import TenantDBSession
+from app.services.alert_status import FINISHED_ALERT_STATUSES, sql_in
 
 router = APIRouter(prefix="/shifts", tags=["shifts"])
 
@@ -241,7 +242,7 @@ async def list_handoff_items(
             text(f"""
             SELECT id, title, severity AS priority, status, assigned_to_id, ai_summary AS notes
             FROM alerts
-            WHERE tenant_id = :tenant_id AND status NOT IN ('resolved', 'fp', 'closed') {priority_clause}
+            WHERE tenant_id = :tenant_id AND status NOT IN ({sql_in(FINISHED_ALERT_STATUSES)}) {priority_clause}
             ORDER BY created_at DESC
             LIMIT :limit
         """),

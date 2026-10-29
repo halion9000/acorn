@@ -21,6 +21,7 @@ from typing import Any
 from sqlalchemy import text
 
 from app.db.rls_scope import acting_as_tenant
+from app.services.alert_status import FINISHED_ALERT_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ LOOK_BACK = timedelta(hours=24)
 PER_RUN_CAP = 50
 
 
-FINISHED_ALERT = ("resolved", "closed", "false_positive", "fp")
+FINISHED_ALERT = FINISHED_ALERT_STATUSES
 CLOSE_PER_RUN_CAP = 1000
 AUTO_CLOSE_NOTE = "Closed automatically: every alert in this case is closed, and nobody had taken it."
 

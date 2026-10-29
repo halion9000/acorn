@@ -21,12 +21,12 @@ from app.db.rls_scope import acting_as_tenant
 from app.models.alert import Alert
 from app.models.alert_suppression import AlertSuppression
 from app.models.tenant import Tenant
+from app.services.alert_status import FINISHED_ALERT_STATUSES, SUPPRESSED
 from app.services.device_identity import hostname_key
 
-SUPPRESSED = "suppressed"
 SCOPES = ("device", "client", "all")
 MAX_DAYS = 3650
-_FINISHED = ("resolved", "closed", "false_positive", "fp", SUPPRESSED)
+_FINISHED = FINISHED_ALERT_STATUSES
 _CHUNK = 500
 
 

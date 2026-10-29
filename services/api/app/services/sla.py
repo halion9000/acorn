@@ -19,6 +19,7 @@ from app.core.config import get_settings
 from app.models.alert import Alert
 from app.models.sla import AlertSLAEvent, TenantSLAConfig
 from app.models.tenant import Tenant
+from app.services.alert_status import FALSE_POSITIVE_STATUSES
 
 # 2026 published KPI bar defaults (tenants can override via ``settings.kpi_bar``).
 DEFAULT_KPI_BAR_TARGETS: dict[str, float] = {
@@ -188,7 +189,7 @@ async def _compute_kpi_bar(
     total_r = await db.execute(select(func.count()).select_from(Alert).where(*base))
     total = int(total_r.scalar_one() or 0)
 
-    fp_r = await db.execute(select(func.count()).select_from(Alert).where(*base, Alert.status == "fp"))
+    fp_r = await db.execute(select(func.count()).select_from(Alert).where(*base, Alert.status.in_(FALSE_POSITIVE_STATUSES)))
     fp = int(fp_r.scalar_one() or 0)
 
     cases_r = await db.execute(select(func.count(func.distinct(Alert.case_id))).select_from(Alert).where(*base, Alert.case_id.is_not(None)))

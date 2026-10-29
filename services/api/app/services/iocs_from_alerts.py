@@ -55,7 +55,7 @@ async def sync_in_scope(db: Any, tenant_id: uuid.UUID, now: datetime) -> int:
         await db.execute(
             text(
                 "SELECT id, severity, affected_ips, raw_event, raw_event->>'source' AS vendor FROM alerts WHERE tenant_id = :t AND created_at >= :since "
-                "AND status <> 'fp' AND coalesce(disposition, '') NOT IN ('false_positive', 'fp') ORDER BY created_at DESC LIMIT :n"
+                "AND status NOT IN ('false_positive', 'fp') AND coalesce(disposition, '') NOT IN ('false_positive', 'fp') ORDER BY created_at DESC LIMIT :n"
             ),
             {"t": tenant_id, "since": now - LOOK_BACK, "n": PER_TENANT_ALERTS},
         )

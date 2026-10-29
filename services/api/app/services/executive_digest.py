@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.alert import Alert
 from app.models.remediation import RemediationGateLog
 from app.services import case_metrics
+from app.services.alert_status import FINISHED_ALERT_STATUSES
 
 # ---------------------------------------------------------------------------
 # Output schemas (Pydantic) — what the endpoint actually returns.
@@ -586,9 +587,7 @@ async def _count_open_alerts(db: AsyncSession, tenant_id: uuid.UUID, at: datetim
             and_(
                 Alert.tenant_id == tenant_id,
                 Alert.created_at < at,
-                Alert.status != "resolved",
-                Alert.status != "fp",
-                Alert.status != "closed",
+                Alert.status.notin_(FINISHED_ALERT_STATUSES),
             )
         )
     )

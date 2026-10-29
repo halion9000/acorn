@@ -32,6 +32,7 @@ from sqlalchemy import select, text
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.db.rls_scope import acting_as_tenant
 from app.models.tenant import Tenant
+from app.services.alert_status import HANDLED_ALERT_STATUSES, sql_in
 from app.services.compliance_catalog import CATALOGS
 
 logger = logging.getLogger(__name__)
@@ -298,7 +299,7 @@ async def _system_facts(db: DBSession, tenant_id: uuid.UUID) -> dict[str, dict[s
     alerts = (
         await db.execute(
             text(
-                "SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status IN ('resolved','closed','false_positive')) AS handled"
+                "SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status IN (" + sql_in(HANDLED_ALERT_STATUSES) + ")) AS handled"
                 " FROM alerts WHERE tenant_id = :t AND created_at > NOW() - INTERVAL '30 days'"
             ).bindparams(t=tenant_id)
         )

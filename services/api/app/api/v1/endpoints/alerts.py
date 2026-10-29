@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Text, and_, cast, func, not_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
@@ -31,6 +31,7 @@ from app.services.alert_rail import (
     build_rail_envelope,
 )
 from app.services.alert_scope import alert_scope
+from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.audit import emit_audit
 from app.services.event_sanitiser import (
     SubmitPayloadTooLarge,
@@ -149,7 +150,7 @@ class AlertSnoozeRequest(BaseModel):
 
     duration_minutes: int | None = None
     until: datetime | None = None
-    reason: str | None = None
+    reason: str | None = Field(default=None, max_length=500)
 
 
 def _tool_of(alert: Alert) -> str | None:
@@ -184,7 +185,7 @@ def has_ticket_expr() -> Any:
 
 # ``status=open`` on the list means every alert that is not finished (resolved, closed or a false positive): the console's "Open all" tab.
 OPEN_STATUS = "open"
-FINISHED_STATUSES = ("resolved", "closed", "false_positive", "fp", "suppressed")
+FINISHED_STATUSES = FINISHED_ALERT_STATUSES
 _UNRESOLVED = {"new", "triaging", "in_progress", "investigating"}
 
 
@@ -197,12 +198,42 @@ class AlertListResponse(BaseModel):
     pages: int
 
 
+# The statuses an analyst can set by hand. "suppressed" is set only by a suppression rule (it remembers the status it replaced), so it is not here.
+SETTABLE_STATUSES = ("new", "triaged", "triaging", "investigating", "in_progress", "resolved", "closed", "false_positive", "fp")
+MAX_TAGS = 50
+MAX_TAG_LENGTH = 64
+
+
 class AlertUpdateRequest(BaseModel):
-    status: str | None = None
-    priority: int | None = None
-    tags: list[str] | None = None
+    status: str | None = Field(default=None, max_length=30)
+    priority: int | None = Field(default=None, ge=0, le=100)
+    tags: list[str] | None = Field(default=None, max_length=MAX_TAGS)
     assigned_to_id: uuid.UUID | None = None
     case_id: uuid.UUID | None = None
+
+    @field_validator("status")
+    @classmethod
+    def _known_status(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip().lower()
+        if v not in SETTABLE_STATUSES:
+            raise ValueError(f"status must be one of: {', '.join(SETTABLE_STATUSES)}")
+        return v
+
+    @field_validator("tags")
+    @classmethod
+    def _clean_tags(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        out: list[str] = []
+        for tag in v:
+            tag = " ".join(str(tag).split())
+            if not tag or len(tag) > MAX_TAG_LENGTH:
+                raise ValueError(f"each tag must be 1 to {MAX_TAG_LENGTH} characters")
+            if tag not in out:
+                out.append(tag)
+        return out
 
 
 class AlertStatsResponse(BaseModel):
@@ -673,6 +704,10 @@ async def submit_alert(
     return AlertResponse.model_validate(alert)
 
 
+def _aware(moment: datetime) -> datetime:
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+
+
 def _repeat_key() -> tuple:
     """What makes two alerts repeats of each other: the same rule (or title) about the same machines and the same users."""
     return (func.lower(func.coalesce(Alert.rule_name, Alert.title)), cast(Alert.affected_hosts, Text), cast(Alert.affected_users, Text))
@@ -710,13 +745,13 @@ async def list_alerts(
     db: TenantDBSession,
     page: int = Query(default=1, ge=1, le=100_000),
     page_size: int = Query(default=25, ge=1, le=200),
-    severity: str | None = Query(default=None),
-    status: str | None = Query(default=None),
-    category: str | None = Query(default=None),
+    severity: str | None = Query(default=None, max_length=64),
+    status: str | None = Query(default=None, max_length=64),
+    category: str | None = Query(default=None, max_length=128),
     assigned_to_me: bool = Query(default=False),
-    search: str | None = Query(default=None),
+    search: str | None = Query(default=None, max_length=200),
     min_confidence: int | None = Query(default=None, ge=0, le=100),
-    confidence_label: str | None = Query(default=None),
+    confidence_label: str | None = Query(default=None, max_length=64),
     source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
     client_id: uuid.UUID | None = Query(default=None),
     device: str | None = Query(default=None, max_length=255),
@@ -866,6 +901,8 @@ async def list_alerts(
         # Several tenants: each is read as itself (row-level security keeps every read inside one tenant), then merged newest first.
         total = 0
         merged: list[Alert] = []
+        # Without collapsing, only the (time, id) of each client's newest ``offset + page_size`` alerts is read to find the page; the full alerts (with their raw events) are then read for the page's own rows only.
+        heads: list[tuple[datetime, uuid.UUID, uuid.UUID]] = []
         for tid in scope:
             flt = and_(*filters_for(tid))
             async with acting_as_tenant(db, tid):
@@ -880,11 +917,27 @@ async def list_alerts(
                     repeats.update({alert.id: n for alert, n in found})
                     continue
                 total += (await db.execute(select(func.count()).select_from(Alert).where(flt))).scalar_one()
-                merged.extend(
-                    (await db.execute(select(Alert).where(flt).order_by(Alert.created_at.desc()).limit(offset + page_size))).scalars().all()
-                )
-        merged.sort(key=lambda a: a.created_at if a.created_at.tzinfo else a.created_at.replace(tzinfo=UTC), reverse=True)
-        rows = merged[offset : offset + page_size]
+                newest = (
+                    await db.execute(
+                        select(Alert.created_at, Alert.id).where(flt).order_by(Alert.created_at.desc(), Alert.id).limit(offset + page_size)
+                    )
+                ).all()
+                heads.extend((_aware(created), alert_id, tid) for created, alert_id in newest)
+        if collapse:
+            merged.sort(key=lambda a: _aware(a.created_at), reverse=True)
+            rows = merged[offset : offset + page_size]
+        else:
+            heads.sort(key=lambda h: (h[0], h[1].int), reverse=True)
+            page_heads = heads[offset : offset + page_size]
+            by_tenant: dict[uuid.UUID, list[uuid.UUID]] = {}
+            for _created, alert_id, tid in page_heads:
+                by_tenant.setdefault(tid, []).append(alert_id)
+            loaded: dict[uuid.UUID, Alert] = {}
+            for tid, ids in by_tenant.items():
+                async with acting_as_tenant(db, tid):
+                    for alert in (await db.execute(select(Alert).where(Alert.tenant_id == tid, Alert.id.in_(ids)))).scalars().all():
+                        loaded[alert.id] = alert
+            rows = [loaded[alert_id] for _created, alert_id, _tid in page_heads if alert_id in loaded]
 
     # The tally covers the whole scope, so it doesn't change as the severity / status buttons are used.
     for tid in scope:
@@ -1069,11 +1122,12 @@ def _links_of(alert: Any) -> dict[str, str]:
     return {
         k: v
         for k in ("device_url", "user_url")
-        if isinstance(v := found.get(k), str) and len(v) <= 1000 and re.match(r"^https://[^\s]+$", v, re.IGNORECASE)
+        if isinstance(v := found.get(k), str) and len(v) <= 1000 and re.fullmatch(r"https://\S+", v, re.IGNORECASE)
     }
 
 
-_HTTPS = re.compile(r"^https://[^\s]+$", re.IGNORECASE)
+# A full match, not ``$``: ``$`` also matches before a trailing newline, so "https://x" + newline passed.
+_HTTPS = re.compile(r"https://\S+", re.IGNORECASE)
 _THREATMATE_ALERTS = "https://app.threatmate.com/alerts"
 
 
@@ -1085,7 +1139,7 @@ def _source_url_of(alert: Any, huntress_base: str | None = None) -> str | None:
     """
     raw = alert.raw_event if isinstance(getattr(alert, "raw_event", None), dict) else {}
     url = raw.get("url")
-    if isinstance(url, str) and len(url) <= 1000 and _HTTPS.match(url):
+    if isinstance(url, str) and len(url) <= 1000 and _HTTPS.fullmatch(url):
         return url
     unmapped = raw.get("unmapped")
     context = unmapped.get("context") if isinstance(unmapped, dict) else None
@@ -1126,7 +1180,7 @@ async def _huntress_base(db: Any, tenant_ids: set) -> str | None:
         ).scalar_one_or_none()
     except Exception:  # noqa: BLE001 - a missing convenience link must never fail the alert
         return None
-    if not isinstance(found, str) or not _HTTPS.match(found):
+    if not isinstance(found, str) or not _HTTPS.fullmatch(found):
         return None
     return found.rsplit("/", 1)[0]
 
@@ -1204,8 +1258,9 @@ async def update_alert(
     request: AlertUpdateRequest,
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:write"))],
     db: DBSession,
+    http_request: Request = None,  # type: ignore[assignment]  # FastAPI injects it; None only for a direct call
 ) -> AlertResponse:
-    """Update alert status, priority, tags, assignment, or case link."""
+    """Update alert status, priority, tags, assignment, or case link. A change of status is written to the audit log, as the bulk close does."""
     async with alert_scope(db, current_user.tenant_id, alert_id) as tid:
         result = await db.execute(select(Alert).where(Alert.id == alert_id, Alert.tenant_id == tid))
         alert = result.scalar_one_or_none()
@@ -1229,7 +1284,19 @@ async def update_alert(
 
         if updates:
             updates["updated_at"] = datetime.now(UTC)
+            before = alert.status
             await db.execute(update(Alert).where(Alert.id == alert_id).values(**updates))
+            if "status" in updates and updates["status"] != before:
+                await emit_audit(
+                    db=db,
+                    tenant_id=tid,
+                    actor_id=current_user.user_id,
+                    action="alerts:status_change",
+                    resource="alert",
+                    resource_id=str(alert_id),
+                    changes={"status_from": before, "status_to": updates["status"]},
+                    request=http_request,
+                )
             await db.commit()
             await db.refresh(alert)
 
@@ -1295,6 +1362,7 @@ async def snooze_alert(
     body: AlertSnoozeRequest,
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:triage"))],
     db: TenantDBSession,
+    http_request: Request = None,  # type: ignore[assignment]  # FastAPI injects it; None only for a direct call
 ) -> AlertResponse:
     """Defer an alert for a fixed window from the mobile responder PWA.
 
@@ -1311,6 +1379,11 @@ async def snooze_alert(
 
     if body.until is not None:
         snoozed_until = body.until.astimezone(UTC) if body.until.tzinfo else body.until.replace(tzinfo=UTC)
+        now = datetime.now(UTC)
+        if snoozed_until <= now:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="until must be in the future")
+        if snoozed_until > now + timedelta(days=30):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="until must be within 30 days")
     else:
         if (body.duration_minutes or 0) <= 0 or (body.duration_minutes or 0) > 60 * 24 * 30:
             raise HTTPException(
@@ -1333,6 +1406,18 @@ async def snooze_alert(
                 snoozed_by_id=current_user.user_id,
                 updated_at=datetime.now(UTC),
             )
+        )
+        # The reason has no column of its own: it is kept in the audit log against the alert.
+        reason = " ".join((body.reason or "").split())
+        await emit_audit(
+            db=db,
+            tenant_id=tid,
+            actor_id=current_user.user_id,
+            action="alerts:snooze",
+            resource="alert",
+            resource_id=str(alert_id),
+            changes={"snoozed_until": snoozed_until.isoformat(), **({"reason": reason} if reason else {})},
+            request=http_request,
         )
         await db.commit()
         await db.refresh(alert)

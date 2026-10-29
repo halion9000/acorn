@@ -28,6 +28,7 @@ from app.db.database import AsyncSessionLocal
 from app.db.rls import set_rls_context
 from app.db.rls_sessions import mark_tenant
 from app.models.alert import Alert
+from app.services.alert_status import FINISHED_ALERT_STATUSES
 
 
 def _like_pattern(query: str) -> str:
@@ -47,7 +48,7 @@ async def _get_session(tenant_id: uuid.UUID) -> AsyncSession:
 
 
 _SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
-_CLOSED_STATUSES = ("resolved", "closed", "false_positive")
+_CLOSED_STATUSES = FINISHED_ALERT_STATUSES
 
 
 async def _scope_tenants(tid: uuid.UUID) -> list[tuple[uuid.UUID, str | None]]:

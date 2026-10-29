@@ -32,6 +32,7 @@ from app.models.alert import Alert
 from app.models.client_alias import ClientAlias, ClientDeviceHint
 from app.models.device import Device, DeviceMergeDismissal, DeviceMergeLog, DeviceSnooze, DeviceSource
 from app.models.tenant import Tenant
+from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.client_mapping import IncomingClient, auto_link_by_devices, record_device_hints, tenant_hidden, upsert_clients
 from app.services.device_merge import DeviceMergeError, auto_merge_same_name, can_undo, dismiss_pair, merge_devices, undo_merge
 from app.services.device_upsert import DeviceReport, duplicate_pairs, preload_known, upsert_device
@@ -444,7 +445,7 @@ def _as(db: Any, owner: uuid.UUID, tid: uuid.UUID) -> Any:
     return contextlib.nullcontext() if tid == owner else acting_as_tenant(db, tid)
 
 
-_CLOSED = ("resolved", "false_positive", "fp", "closed", "suppressed")
+_CLOSED = FINISHED_ALERT_STATUSES
 _ALERTS_PER_DEVICE = 5
 _SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 

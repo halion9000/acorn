@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import Alert
 from app.models.sla import TenantSLAConfig
+from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.sla import DEFAULT_SLA_TARGETS
 
 # Severities that show up in the *unassigned* bucket of the queue.
@@ -49,13 +50,7 @@ QUEUE_UNASSIGNED_SEVERITIES: tuple[str, ...] = ("critical", "high")
 # Alert statuses that *exit* the queue. Anything in this set is
 # considered done — claim/snooze/assign must not return it to the
 # queue, and the queue endpoint hides it.
-QUEUE_CLOSED_STATUSES: tuple[str, ...] = (
-    "resolved",
-    "closed",
-    "false_positive",
-    "fp",
-    "suppressed",
-)
+QUEUE_CLOSED_STATUSES: tuple[str, ...] = FINISHED_ALERT_STATUSES
 
 # Maximum page size for the queue endpoint. The workbench paginates
 # locally; this cap exists to keep one bad client from yanking

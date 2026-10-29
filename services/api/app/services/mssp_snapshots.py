@@ -22,10 +22,11 @@ from app.models.client_alias import ClientAlias
 from app.models.mssp import MSSPTenantMetrics
 from app.models.tenant import Tenant
 from app.services import case_metrics
+from app.services.alert_status import FINISHED_ALERT_STATUSES
 
 logger = logging.getLogger(__name__)
 
-FINISHED_ALERT = ("resolved", "closed", "fp", "false_positive", "suppressed")
+FINISHED_ALERT = FINISHED_ALERT_STATUSES
 OPEN_CASES = case_metrics.OPEN + case_metrics.IN_PROGRESS
 MTTR_WINDOW = timedelta(days=30)
 REUSE_WITHIN = timedelta(hours=1)  # a snapshot newer than this is updated in place, so history is hourly, not one row per push
