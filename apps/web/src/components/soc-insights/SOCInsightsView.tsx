@@ -126,7 +126,7 @@ function Header({ window, onWindowChange, generatedAt, manualMinutes, comparison
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">SOC Insights</h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          Seven operational tiles for the SOC, refreshed every 30 seconds and
+          Operational tiles for the SOC, refreshed every 30 seconds and
           on case changes. Deltas compare against the immediately preceding
           window. Hours-saved assumes {manualMinutes ?? 45} minutes of analyst
           time per auto-closed case. Click a tile to see what is behind it.
@@ -208,7 +208,7 @@ interface TileGridProps {
 function TileGrid({ tiles, clientId }: TileGridProps) {
   return (
     <div
-      // 7 tiles fit comfortably as a 4×2 grid at lg, 2×4 at md, 1 per
+      // the tiles fit as a 4-wide grid at lg, 2-wide at md, 1 per
       // row on phones. The grid keeps a constant ratio so the
       // sparkline width doesn't jump between window changes.
       className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"

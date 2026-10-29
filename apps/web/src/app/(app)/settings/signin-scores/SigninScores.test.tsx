@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { SigninScores, placeLabel, resultLabel } from './SigninScores';
+import { SigninScores, placeLabel, regionLabel, resultLabel } from './SigninScores';
 
 const reply = (body: unknown, ok = true) => ({ ok, status: ok ? 200 : 500, json: () => Promise.resolve(body) });
 const row = (over: Record<string, unknown> = {}) => ({
@@ -26,6 +26,17 @@ const row = (over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => authFetch.mockReset());
+
+describe('regionLabel', () => {
+  it('says US, Outside US or Unknown, whatever the case or spelling of the country', () => {
+    expect(regionLabel({ country: 'US' })).toBe('US');
+    expect(regionLabel({ country: ' us ' })).toBe('US');
+    expect(regionLabel({ country: 'United States' })).toBe('US');
+    expect(regionLabel({ country: 'GB' })).toBe('Outside US');
+    expect(regionLabel({ country: null })).toBe('Unknown');
+    expect(regionLabel({ country: '' })).toBe('Unknown');
+  });
+});
 
 describe('placeLabel', () => {
   it('joins city and country and falls back when neither is known', () => {
@@ -103,6 +114,27 @@ describe('SigninScores', () => {
     expect(await people()).toHaveLength(3);
     await user.type(screen.getByLabelText('Minimum Score'), '0.8');
     expect(await people()).toEqual(['bob@acme.com']);
+  });
+
+  it('filters by Region: all, only US, or only outside the US', async () => {
+    const rows = [
+      row({ user: 'amy@acme.com', score: 0.9, country: 'US' }),
+      row({ user: 'bob@acme.com', score: 0.8, country: 'RO' }),
+      row({ user: 'cat@acme.com', score: 0.7, country: null }),
+    ];
+    authFetch.mockImplementation((url?: string) => Promise.resolve((url ?? '').includes('/identity/top') ? reply([]) : reply(rows)));
+    const user = userEvent.setup();
+    render(<SigninScores />);
+    const people = async () => (await screen.findAllByTestId('signin-row')).map((r) => r.querySelectorAll('td')[1].textContent);
+    expect(await people()).toEqual(['amy@acme.com', 'bob@acme.com', 'cat@acme.com']);
+    const region = screen.getByLabelText('Filter Region');
+    expect(Array.from(region.querySelectorAll('option')).map((o) => o.textContent)).toEqual(['All', 'Outside US', 'Unknown', 'US']);
+    await user.selectOptions(region, 'Outside US');
+    expect(await people()).toEqual(['bob@acme.com']);
+    await user.selectOptions(region, 'US');
+    expect(await people()).toEqual(['amy@acme.com']);
+    await user.selectOptions(region, 'All');
+    expect(await people()).toHaveLength(3);
   });
 
   it('names a result in one phrase for sorting and filtering', () => {

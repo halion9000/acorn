@@ -31,7 +31,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import AuthUser, require_permission
 from app.db.database import get_db
+from app.db.rls_scope import cross_tenant_reads
 from app.models.alert import Alert
+from app.models.tenant import Tenant
 from app.models.threat_intel import ThreatActor, ThreatIntelFeed, ThreatIntelIOC
 
 router = APIRouter(prefix="/threat-intel", tags=["threat-intel"])
@@ -63,6 +65,11 @@ class LinkedAlertOut(BaseModel):
     id: uuid.UUID
     title: str
     severity: str
+    status: str | None = None
+    client: str | None = None
+    host: str | None = None
+    user: str | None = None
+    created_at: datetime | None = None
 
 
 class IOCOut(IOCCreate):
@@ -160,15 +167,51 @@ async def list_iocs(
 LINKED_SUMMARY_COUNT = 2
 
 
+def _first_text(values: Any) -> str | None:
+    for v in values if isinstance(values, list) else []:
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return None
+
+
 async def with_alert_summaries(db: AsyncSession, tenant_id: uuid.UUID, rows: list[ThreatIntelIOC]) -> list[IOCOut]:
-    """The indicators as API objects, each with the titles of its first ``LINKED_SUMMARY_COUNT`` linked alerts (one query for the whole page)."""
+    """The indicators as API objects, each with what its first ``LINKED_SUMMARY_COUNT`` linked alerts were about (one query for the whole page).
+
+    The alerts are looked for in the workspace AND its clients: an indicator held by the workspace is often seen on a client's alert, and a lookup that only searched the workspace found nothing, so the
+    row showed a bare hash.
+    """
     wanted = {a for r in rows for a in (r.linked_alerts or [])[:LINKED_SUMMARY_COUNT]}
     found: dict[uuid.UUID, LinkedAlertOut] = {}
     if wanted:
-        for alert_id, title, severity in (
-            await db.execute(select(Alert.id, Alert.title, Alert.severity).where(Alert.tenant_id == tenant_id, Alert.id.in_(wanted)))
-        ).all():
-            found[alert_id] = LinkedAlertOut(id=alert_id, title=title, severity=severity)
+        names = {tenant_id: None}
+        for cid, cname in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == tenant_id))).all():
+            names[cid] = cname
+        async with cross_tenant_reads(db):
+            fetched = (
+                await db.execute(
+                    select(
+                        Alert.id,
+                        Alert.title,
+                        Alert.severity,
+                        Alert.status,
+                        Alert.tenant_id,
+                        Alert.affected_hosts,
+                        Alert.affected_users,
+                        Alert.created_at,
+                    ).where(Alert.tenant_id.in_(list(names)), Alert.id.in_(wanted))
+                )
+            ).all()
+        for alert_id, title, severity, status_, owner, hosts, users, created in fetched:
+            found[alert_id] = LinkedAlertOut(
+                id=alert_id,
+                title=title,
+                severity=severity,
+                status=status_,
+                client=names.get(owner),
+                host=_first_text(hosts),
+                user=_first_text(users),
+                created_at=created,
+            )
     out: list[IOCOut] = []
     for r in rows:
         item = IOCOut.model_validate(r)

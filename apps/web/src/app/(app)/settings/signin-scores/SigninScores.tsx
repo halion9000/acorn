@@ -42,6 +42,7 @@ const SIGNIN_COLUMNS: Column<ScoredSignin>[] = [
   { key: "client", label: "Client", value: (r) => r.client_name ?? "This organization", filter: "text" },
   { key: "when", label: "When", value: (r) => new Date(r.occurred_at).toLocaleString(), sortValue: (r) => when(r.occurred_at), filter: "text" },
   { key: "where", label: "Where", value: (r) => [placeLabel(r), r.ip_address].filter(Boolean).join(" "), filter: "text" },
+  { key: "region", label: "Region", value: (r) => regionLabel(r), filter: "choice" },
   { key: "app", label: "App", value: (r) => r.app ?? null, filter: "choice" },
   { key: "result", label: "Result", value: (r) => resultLabel(r), filter: "choice" },
 ];
@@ -66,6 +67,13 @@ function ClearFilters({ active, shown, total, onClear }: { active: boolean; show
 }
 
 /** "Dallas, US" / "US" / "unknown place". */
+/** Where a sign-in came from for the Region filter: "US", "Outside US", or "Unknown" when the country is not known. Pick one choice to see only those, or All for everything. */
+export function regionLabel(s: Pick<ScoredSignin, "country">): string {
+  const country = (s.country ?? "").trim().toUpperCase();
+  if (!country) return "Unknown";
+  return country === "US" || country === "USA" || country === "UNITED STATES" ? "US" : "Outside US";
+}
+
 export function placeLabel(s: Pick<ScoredSignin, "city" | "country">): string {
   const parts = [s.city, s.country].filter((p): p is string => !!p);
   return parts.length ? parts.join(", ") : "unknown place";

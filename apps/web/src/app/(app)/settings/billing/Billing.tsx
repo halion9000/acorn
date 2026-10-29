@@ -608,16 +608,13 @@ function Mapping() {
                         {u.suggestion.length > 0 && u.confidence ? <span className={`ml-2 rounded border px-1 ${u.confidence === "high" ? "border-emerald-500/40 text-emerald-300" : u.confidence === "medium" ? "border-amber-500/40 text-amber-300" : "border-red-500/40 text-red-300"}`}>{u.confidence}</span> : null}
                       </td>
                       <td>
-                        {u.suggestion.length > 0 ? (
-                          <span className="flex items-center gap-3">
+                        <span className="flex flex-wrap items-center gap-3">
+                          {u.suggestion.length > 0 && (
                             <button type="button" className="text-xs text-sky-300 underline hover:text-sky-200" onClick={() => void save(u.invoice_item, u.suggestion)}>
                               Use suggestion
                             </button>
-                            <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300" onClick={() => void save(u.invoice_item, [])}>
-                              No tool counts this
-                            </button>
-                          </span>
-                        ) : (
+                          )}
+                          {/* The picker is on every row: a suggestion is a guess, and when it is wrong the person must be able to choose the right count. */}
                           <select
                             aria-label={`Map ${u.invoice_item} to`}
                             className="max-w-[16rem] rounded border border-slate-700 bg-slate-900 px-1 py-0.5 text-xs text-slate-300"
@@ -628,7 +625,7 @@ function Mapping() {
                               if (source) void save(u.invoice_item, [{ source, item: rest.join("|") }]);
                             }}
                           >
-                            <option value="">Map to…</option>
+                            <option value="">{u.suggestion.length > 0 ? "Choose another…" : "Map to…"}</option>
                             <option value={NO_TOOL}>No tool counts this</option>
                             {groupedCounts(data.counted_items ?? [], find).map(([tool, items]) => (
                               <optgroup key={tool} label={tool}>
@@ -640,7 +637,7 @@ function Mapping() {
                               </optgroup>
                             ))}
                           </select>
-                        )}
+                        </span>
                       </td>
                     </tr>
                   ))}

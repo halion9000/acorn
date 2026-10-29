@@ -31,4 +31,20 @@ describe('questionToAlertSearch', () => {
   it('is not confused by a trailing question mark, extra spaces or capitals', () => {
     expect(q('   Any   SUSPICIOUS   Logins??  ')).toBe('suspicious login');
   });
+  it('asking about every client is no client filter', () => {
+    expect(q('any weird logins from out the country for any clients')).toBe('country');
+    expect(q('failed logins across all clients')).toBe('failed login');
+    expect(q('malware for every client')).toBe('malware');
+    expect(q('phishing at each of the clients')).toBe('phishing');
+  });
+  it('turns "outside the country" into the word the alerts use, and leaves out login words that would hide them', () => {
+    expect(q('logins from outside the country')).toBe('country');
+    expect(q('sign-ins from abroad')).toBe('country');
+    expect(q('overseas logins at live oak')).toBe('country client:"live oak"');
+    expect(q('high severity foreign access')).toBe('severity:high country');
+  });
+  it('drops words about how something feels, and still keeps a login word when there is no country idea', () => {
+    expect(q('strange logins')).toBe('login');
+    expect(q('weird odd activity')).toBe('activity');
+  });
 });

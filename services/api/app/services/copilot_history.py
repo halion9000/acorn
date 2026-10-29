@@ -138,6 +138,19 @@ async def get_conversation(db: AsyncSession, tenant_id: uuid.UUID, owner: str, c
     }
 
 
+async def delete_conversation(db: AsyncSession, tenant_id: uuid.UUID, owner: str, conversation_id: str) -> bool:
+    """Delete one of this owner's conversations. False when there is none (an id that belongs to someone else is simply unknown, so nobody can delete another person's chat). The caller commits."""
+    await set_rls_context(db, tenant_id)
+    result = await db.execute(
+        delete(CopilotConversation).where(
+            CopilotConversation.tenant_id == tenant_id,
+            CopilotConversation.owner_key == owner,
+            CopilotConversation.conversation_id == conversation_id,
+        )
+    )
+    return (result.rowcount or 0) > 0
+
+
 async def _prune(db: AsyncSession, tenant_id: uuid.UUID, owner: str) -> None:
     """Keep this owner's newest MAX_CONVERSATIONS_PER_OWNER conversations."""
     stale = (

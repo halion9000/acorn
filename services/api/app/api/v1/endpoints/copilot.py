@@ -207,6 +207,25 @@ async def get_copilot_conversation(
     return ConversationDetail(**found)
 
 
+@router.delete(
+    "/conversations/{conversation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="Delete one of the signed-in person's conversations.",
+)
+async def delete_copilot_conversation(
+    conversation_id: str, user: Annotated[AuthUser, Depends(require_permission("copilot:use"))], db: TenantDBSession
+) -> None:
+    removed = (
+        await copilot_history.delete_conversation(db, user.tenant_id, copilot_history.owner_key(user), conversation_id)
+        if copilot_history.valid_conversation_id(conversation_id)
+        else False
+    )
+    if not removed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    await db.commit()
+
+
 @router.post(
     "/chat",
     response_model=CopilotChatResponse,

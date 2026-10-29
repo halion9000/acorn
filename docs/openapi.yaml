@@ -7008,6 +7008,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - copilot
+      summary: Delete one of the signed-in person's conversations.
+      operationId: delete_copilot_conversation_api_v1_copilot_conversations__conversation_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Conversation Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/copilot/chat:
     post:
       tags:
@@ -30296,6 +30319,26 @@ components:
       - email
       - role
       title: InitialAdminUserWire
+    InsightItem:
+      properties:
+        label:
+          type: string
+          title: Label
+        value:
+          type: number
+          title: Value
+        display:
+          type: string
+          title: Display
+          description: What to show beside the label, e.g. ``42 (12%)``.
+      type: object
+      required:
+      - label
+      - value
+      - display
+      title: InsightItem
+      description: One line of a tile that lists things (a noisy alert type, a client,
+        a silent source).
     InsightSparkline:
       properties:
         points:
@@ -30342,6 +30385,25 @@ components:
             than misleadingly infinite).
         sparkline:
           $ref: '#/components/schemas/InsightSparkline'
+        has_data:
+          type: boolean
+          title: Has Data
+          description: 'False when there was nothing to measure in the window (the
+            UI shows a dash): a zero here would read as a good result.'
+          default: true
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+          description: One line saying exactly what the number counts.
+        items:
+          items:
+            $ref: '#/components/schemas/InsightItem'
+          type: array
+          title: Items
+          description: The top few things behind the number, for the tiles that list
+            them.
       type: object
       required:
       - key
@@ -30868,6 +30930,32 @@ components:
         severity:
           type: string
           title: Severity
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+        client:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client
+        host:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Host
+        user:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: User
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Created At
       type: object
       required:
       - id

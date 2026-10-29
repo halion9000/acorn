@@ -200,6 +200,35 @@ class TestRecentChats:
         assert c.get("/copilot/conversations/anything").status_code == 403
 
 
+class TestDeletingAChat:
+    def test_a_deleted_conversation_leaves_the_list_and_cannot_be_opened_and_the_others_stay(self):
+        c = client_as()
+        keep = chat(c, "keep this one").json()["conversationId"]
+        drop = chat(c, "delete this one").json()["conversationId"]
+        assert c.delete(f"/copilot/conversations/{drop}").status_code == 204
+        assert [r["id"] for r in c.get("/copilot/conversations").json()["conversations"]] == [keep]
+        assert c.get(f"/copilot/conversations/{drop}").status_code == 404
+        assert stored(c.tenant_id, str(c.user_id), drop) in (None, []), "the messages are gone, not only hidden from the list"
+
+    def test_deleting_twice_or_an_unknown_or_malformed_id_is_a_404(self):
+        c = client_as()
+        cid = chat(c, "once").json()["conversationId"]
+        assert c.delete(f"/copilot/conversations/{cid}").status_code == 204
+        for bad in (cid, "nope", "bad id!"):
+            assert c.delete(f"/copilot/conversations/{bad}").status_code == 404
+
+    def test_nobody_can_delete_another_persons_or_tenants_conversation(self):
+        tenant = uuid.uuid4()
+        mine, colleague, outsider = client_as(tenant), client_as(tenant), client_as()
+        cid = chat(mine, "private question").json()["conversationId"]
+        for other in (colleague, outsider):
+            assert other.delete(f"/copilot/conversations/{cid}").status_code == 404
+        assert [r["id"] for r in mine.get("/copilot/conversations").json()["conversations"]] == [cid], "still there"
+
+    def test_a_role_without_copilot_access_cannot_delete(self):
+        assert client_as(role="viewer").delete("/copilot/conversations/anything").status_code == 403
+
+
 class TestIsolation:
     """The key used to be the client-supplied id alone."""
 

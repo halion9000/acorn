@@ -8,6 +8,7 @@ import {
   threatIntelApi,
   type AlertSeverity,
   type IndicatorType,
+  type LinkedAlertSummary,
   type ThreatIndicator,
 } from '@/lib/api';
 import { clsx } from 'clsx';
@@ -132,6 +133,12 @@ export function iocIdentifiers(ioc: Pick<ThreatIndicator, 'malwareFamily' | 'thr
   return out;
 }
 
+/** The facts about the first alert an indicator was seen on, on one line: severity, status, client, device, person and when. Empty parts are left out. */
+export function alertFacts(a: Pick<LinkedAlertSummary, 'severity' | 'status' | 'client' | 'host' | 'user' | 'created_at'>): string {
+  const when = a.created_at ? safeFormat(a.created_at, 'MMM dd HH:mm', '') : null;
+  return [a.severity, a.status, a.client, a.host, a.user, when].filter((x): x is string => typeof x === 'string' && x.trim() !== '' && x !== '—').join(' · ');
+}
+
 // ─── IOC Row ──────────────────────────────────────────────────────────────────
 
 function IOCRow({ ioc }: { ioc: ThreatIndicator }) {
@@ -174,6 +181,11 @@ function IOCRow({ ioc }: { ioc: ThreatIndicator }) {
             <p className="text-xs text-gray-300 mt-0.5 truncate" data-testid="ioc-alert-issue" title={(ioc.linkedAlertSummaries ?? []).map((a) => a.title).join(' | ')}>
               {ioc.linkedAlertSummaries![0].title}
               {(ioc.linkedAlerts?.length ?? 0) > 1 && <span className="text-gray-500"> {`+${(ioc.linkedAlerts?.length ?? 1) - 1} more`}</span>}
+            </p>
+          )}
+          {(ioc.linkedAlertSummaries ?? []).length > 0 && alertFacts(ioc.linkedAlertSummaries![0]) && (
+            <p className="text-xs text-gray-500 mt-0.5 truncate" data-testid="ioc-alert-facts" title={alertFacts(ioc.linkedAlertSummaries![0])}>
+              {alertFacts(ioc.linkedAlertSummaries![0])}
             </p>
           )}
           <p className="text-xs text-gray-600 mt-0.5 truncate">{ioc.description ?? ''}</p>

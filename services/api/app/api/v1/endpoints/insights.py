@@ -59,8 +59,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.db.rls_scope import acting_as_tenant
 from app.models.alert import Alert
+from app.models.connector import Connector
 from app.models.tenant import Tenant
-from app.services import case_metrics
+from app.services import case_metrics, insight_tiles
 from app.services.timeutil import as_utc
 
 logger = logging.getLogger(__name__)
@@ -106,6 +107,14 @@ class InsightSparkline(BaseModel):
     )
 
 
+class InsightItem(BaseModel):
+    """One line of a tile that lists things (a noisy alert type, a client, a silent source)."""
+
+    label: str
+    value: float
+    display: str = Field(description="What to show beside the label, e.g. ``42 (12%)``.")
+
+
 class InsightTile(BaseModel):
     """One tile on the SOC Insights dashboard."""
 
@@ -131,6 +140,14 @@ class InsightTile(BaseModel):
         ),
     )
     sparkline: InsightSparkline = Field(default_factory=InsightSparkline)
+    has_data: bool = Field(
+        default=True,
+        description="False when there was nothing to measure in the window (the UI shows a dash): a zero here would read as a good result.",
+    )
+    detail: str | None = Field(default=None, description="One line saying exactly what the number counts.")
+    items: list[InsightItem] = Field(
+        default_factory=list, description="The top few things behind the number, for the tiles that list them."
+    )
 
 
 class SOCInsightsResponse(BaseModel):
@@ -422,6 +439,7 @@ def _merge_parts(parts: list[dict]) -> dict:
         for k in ("mtta", "mttr"):
             n = sum(p[tag + k][1] for p in parts)
             m[tag + k] = round(sum(p[tag + k][0] * p[tag + k][1] for p in parts) / n, 2) if n else 0.0
+            m[tag + k + "_n"] = n
         fp, tot = sum(p[tag + "fp"][0] for p in parts), sum(p[tag + "fp"][1] for p in parts)
         m[tag + "fp"] = round(fp / tot, 4) if tot else 0.0
         for k in ("alerts", "cases", "runs", "auto_closed"):
@@ -432,6 +450,41 @@ def _merge_parts(parts: list[dict]) -> dict:
     for k in ("alert_spark", "case_spark", "cost_spark"):
         m[k] = [sum(col) for col in zip(*[p[k] for p in parts], strict=True)]
     return m
+
+
+async def _gather_extras(db, tid, start, now, prev_start, out: list[dict]) -> bool:
+    """The second row of tiles for one tenant. A failure here drops that row, never the page: the first seven tiles are the ones the page cannot do without."""
+    try:
+        async with db.begin_nested():
+            out.append(await insight_tiles.gather_tenant(db, tid, start, now, prev_start))
+        return True
+    except Exception:  # noqa: BLE001
+        logger.warning("insights.extra_tiles_unavailable", exc_info=True)
+        return False
+
+
+async def _source_health(db, owner: uuid.UUID, now: datetime) -> dict | None:
+    """``{"total": n, "silent": [(name, minutes_ago)]}`` for the tools CORE reports on, or None when CORE has never been connected."""
+    try:
+        rows = (
+            await db.execute(
+                select(Connector.name, Connector.last_health_check).where(
+                    Connector.tenant_id == owner, Connector.connector_type == "core_feed"
+                )
+            )
+        ).all()
+    except Exception:  # noqa: BLE001
+        logger.warning("insights.source_health_unavailable", exc_info=True)
+        return None
+    if not rows:
+        return None
+    silent = []
+    for name, seen in rows:
+        mins = None if seen is None else max(0, int((now - as_utc(seen)).total_seconds() // 60))
+        if mins is None or mins > insight_tiles.STALE_SOURCE_MINUTES:
+            silent.append((name, mins))
+    silent.sort(key=lambda r: (r[1] is not None, -(r[1] or 0), r[0]))
+    return {"total": len(rows), "silent": silent}
 
 
 # ---------------------------------------------------------------------------
@@ -482,12 +535,16 @@ async def get_soc_insights(
             raise HTTPException(status_code=404, detail="client not found")
         scope_ids = [client_id]
     parts = []
+    extra_parts: list[dict] = []
+    extras_ok = True
     for tid in scope_ids:
         if tid == tenant_id:
             parts.append(await _tenant_parts(db, tid, start, now, prev_start))
+            extras_ok = await _gather_extras(db, tid, start, now, prev_start, extra_parts) and extras_ok
         else:
             async with acting_as_tenant(db, tid):
                 parts.append(await _tenant_parts(db, tid, start, now, prev_start))
+                extras_ok = await _gather_extras(db, tid, start, now, prev_start, extra_parts) and extras_ok
     total = _merge_parts(parts)
 
     history_since = total["first_alert"]
@@ -518,6 +575,7 @@ async def get_soc_insights(
     hours_saved = round((auto_closed * MANUAL_INVESTIGATION_MINUTES) / 60.0, 2)
     prev_hours_saved = round((prev_auto_closed * MANUAL_INVESTIGATION_MINUTES) / 60.0, 2)
 
+    mtta_has, mttr_has = total["mtta_n"] > 0, total["mttr_n"] > 0
     tiles: list[InsightTile] = [
         InsightTile(
             key="mtta",
@@ -525,8 +583,14 @@ async def get_soc_insights(
             value=mtta_hours,
             unit="hours",
             previous_value=prev_mtta,
-            delta_pct=_change(mtta_hours, prev_mtta),
+            delta_pct=_change(mtta_hours, prev_mtta) if mtta_has else None,
             sparkline=InsightSparkline(points=alert_spark),
+            has_data=mtta_has,
+            detail=(
+                f"Average time from an alert arriving to a person first acting on it, over {total['mtta_n']} alerts"
+                if mtta_has
+                else "No alert in this window has been acted on by a person yet; the time is recorded when someone changes an alert's status or assigns it"
+            ),
         ),
         InsightTile(
             key="mttr",
@@ -534,8 +598,12 @@ async def get_soc_insights(
             value=mttr_hours,
             unit="hours",
             previous_value=prev_mttr,
-            delta_pct=_change(mttr_hours, prev_mttr),
+            delta_pct=_change(mttr_hours, prev_mttr) if mttr_has else None,
             sparkline=InsightSparkline(points=alert_spark),
+            has_data=mttr_has,
+            detail=f"Average time from an alert arriving to it being finished, over {total['mttr_n']} alerts"
+            if mttr_has
+            else "No alert from this window has been finished yet",
         ),
         InsightTile(
             key="fp_rate",
@@ -583,6 +651,22 @@ async def get_soc_insights(
             sparkline=InsightSparkline(points=case_spark),
         ),
     ]
+
+    if extras_ok and extra_parts:
+        merged = insight_tiles.merge(extra_parts)
+        client_names = None
+        if client_id is None:
+            client_names = {tenant_id: "This organization"}
+            client_names.update(
+                {r[0]: r[1] for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == tenant_id))).all()}
+            )
+        sources = await _source_health(db, tenant_id, now) if client_id is None else None
+        tiles.extend(
+            InsightTile(**t)
+            for t in insight_tiles.build_tiles(
+                merged, now=now, ready=comparison_ready, sparkline=alert_spark, client_names=client_names, sources=sources
+            )
+        )
 
     return SOCInsightsResponse(
         window=window,

@@ -34,7 +34,7 @@ export interface MfaPerson {
 export type SortKey = "client" | "people" | "covered" | "not_required" | "without" | "admins";
 export type Sort = { key: SortKey; dir: "asc" | "desc" } | null;
 
-type Which = "without" | "not_required";
+type Which = "without" | "not_required" | "admins";
 type Open = { id: string; which: Which } | null;
 
 /** Clients A to Z by name (the organization's own entry, which has no name, goes first), optionally only those whose name contains ``query``, only those with administrators lacking Multi-Factor, or only one client. */
@@ -64,14 +64,15 @@ async function getJson<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** "admins" is the people with no Multi-Factor who are administrators: the same list as "without", cut to the administrators. */
 function People({ clientId, which }: { clientId: string; which: Which }) {
   const [people, setPeople] = useState<MfaPerson[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
-    getJson<MfaPerson[]>(`/api/v1/identity/mfa-users?client_id=${encodeURIComponent(clientId)}&which=${which}`)
+    getJson<MfaPerson[]>(`/api/v1/identity/mfa-users?client_id=${encodeURIComponent(clientId)}&which=${which === "admins" ? "without" : which}`)
       .then((p) => {
-        if (live) setPeople(p);
+        if (live) setPeople(which === "admins" ? p.filter((x) => x.admin) : p);
       })
       .catch((e: unknown) => {
         if (live) setError(e instanceof Error ? e.message : "Could not load the people");
@@ -135,12 +136,20 @@ function ClientRow({ c, open, setOpen }: { c: MfaClient; open: Open; setOpen: (v
             <span className="text-slate-500">0</span>
           )}
         </td>
-        <td className={c.admins_without_mfa > 0 ? "text-red-300" : "text-slate-500"}>{c.admins_without_mfa}</td>
+        <td>
+          {c.admins_without_mfa > 0 ? (
+            <button type="button" onClick={() => toggle("admins")} className="text-red-300 hover:underline" aria-label={`Show the ${c.admins_without_mfa} administrators without Multi-Factor`}>
+              {c.admins_without_mfa}
+            </button>
+          ) : (
+            <span className="text-slate-500">0</span>
+          )}
+        </td>
       </tr>
       {shown && (
         <tr className="border-b border-slate-800 bg-slate-900/40">
           <td colSpan={6} className="px-3 py-2">
-            <p className="mb-1 text-xs uppercase text-slate-500">{shown === "without" ? "No Multi-Factor" : "Registered for Multi-Factor, but nothing requires it"}</p>
+            <p className="mb-1 text-xs uppercase text-slate-500">{shown === "without" ? "No Multi-Factor" : shown === "admins" ? "Administrators with no Multi-Factor" : "Registered for Multi-Factor, but nothing requires it"}</p>
             <People clientId={c.client_id} which={shown} />
           </td>
         </tr>

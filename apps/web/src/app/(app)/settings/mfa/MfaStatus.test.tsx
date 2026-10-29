@@ -55,6 +55,27 @@ describe('MfaStatus', () => {
     expect(authFetch).toHaveBeenCalledWith('/api/v1/identity/mfa-users?client_id=c1&which=without');
   });
 
+  it('opens only the administrators when their count is clicked', async () => {
+    authFetch.mockImplementation((url?: string) =>
+      Promise.resolve(
+        (url ?? '').includes('/mfa-users')
+          ? reply([
+              { upn: 'admin@acme.com', display_name: 'The Admin', admin: true, registered: false, required: false, methods: null },
+              { upn: 'bob@acme.com', display_name: null, admin: false, registered: false, required: false, methods: null },
+            ])
+          : reply([client()]),
+      ),
+    );
+    render(<MfaStatus />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Show the 1 administrators without Multi-Factor' }));
+    const list = await screen.findByTestId('people-admins');
+    expect(list).toHaveTextContent('admin@acme.com');
+    expect(list).not.toHaveTextContent('bob@acme.com');
+    expect(authFetch).toHaveBeenCalledWith('/api/v1/identity/mfa-users?client_id=c1&which=without');
+    await userEvent.click(screen.getByRole('button', { name: 'Show the 1 administrators without Multi-Factor' }));
+    expect(screen.queryByTestId('people-admins')).toBeNull();
+  });
+
   it('can show the people who registered a second factor that nothing requires', async () => {
     authFetch.mockImplementation((url?: string) => Promise.resolve((url ?? '').includes('/mfa-users') ? reply([]) : reply([client()])));
     render(<MfaStatus />);

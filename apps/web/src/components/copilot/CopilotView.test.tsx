@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { SWRConfig } from 'swr';
 import userEvent from '@testing-library/user-event';
 
-const copilotApi = vi.hoisted(() => ({ listConversations: vi.fn(), getConversation: vi.fn(), chat: vi.fn(), confirmAction: vi.fn() }));
+const copilotApi = vi.hoisted(() => ({ listConversations: vi.fn(), getConversation: vi.fn(), chat: vi.fn(), confirmAction: vi.fn(), deleteConversation: vi.fn() }));
 vi.mock('@/lib/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/api')>()), copilotApi }));
 
 import { ApiError } from '@/lib/api';
@@ -96,5 +97,42 @@ describe('when the copilot asks to delete something', () => {
     await ask('what is this domain?');
     expect(await screen.findByText(/The sender domain was registered yesterday/)).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Confirmation required' })).not.toBeInTheDocument();
+  });
+});
+
+describe('deleting a conversation from Recent', () => {
+  const convo = (id: string, title: string) => ({ id, title, updatedAt: '2026-10-29T00:00:00Z', messageCount: 2 });
+  const view = () =>
+    render(
+      <SWRConfig value={{ provider: () => new Map() }}>
+        <CopilotView />
+      </SWRConfig>,
+    );
+
+  it('asks first, deletes it, and the list is read again without it', async () => {
+    copilotApi.listConversations.mockResolvedValueOnce({ conversations: [convo('c1', 'Host WS-1'), convo('c2', 'Phishing')] });
+    copilotApi.listConversations.mockResolvedValue({ conversations: [convo('c2', 'Phishing')] });
+    copilotApi.deleteConversation.mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    view();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete conversation: Host WS-1' }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Host WS-1'));
+    expect(copilotApi.deleteConversation).toHaveBeenCalledWith('c1');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Host WS-1' })).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Phishing' })).toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it('does nothing when the person says no, and keeps the chat when the delete fails', async () => {
+    copilotApi.listConversations.mockResolvedValue({ conversations: [convo('c1', 'Host WS-1')] });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    view();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete conversation: Host WS-1' }));
+    expect(copilotApi.deleteConversation).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    copilotApi.deleteConversation.mockRejectedValue(new Error('boom'));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete conversation: Host WS-1' }));
+    expect(screen.getByRole('button', { name: 'Host WS-1' })).toBeInTheDocument();
+    confirm.mockRestore();
   });
 });

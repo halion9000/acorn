@@ -70,7 +70,7 @@ def test_the_window_is_at_least_a_day_and_at_most_400():
     assert window_start(now, 9999) == now - timedelta(days=400)
 
 
-from app.services.license_counts import reconcile, suggest  # noqa: E402
+from app.services.license_counts import reconcile, suggest, suggestion_confidence  # noqa: E402
 
 
 def test_suggestions_match_the_specific_words_first():
@@ -361,3 +361,10 @@ def test_a_part_that_was_not_yet_tracked_leaves_the_start_as_far_back_as_it_can_
     current = {_BILLED: (10, _day(0)), _PART: (14, _day(10))}
     since, complete = disagreement_since(_BILLED, [_PART], history, current, {"halopsa": _day(0), "huntress": _day(10)}, _day(30))
     assert (since, complete) == (_day(10), False)
+
+
+def test_a_huntress_siem_or_identity_line_is_not_offered_the_agent_count():
+    assert suggest("Huntress SIEM (Passthru)") == [{"source": "huntress", "item": "SIEM log sources"}]
+    assert suggest("Huntress ITDR (Included)") == [{"source": "huntress", "item": "Billable identities"}]
+    assert suggest("Huntress MDR (PassThru)") == [{"source": "huntress", "item": "Agents"}], "the managed endpoint line still is"
+    assert suggestion_confidence("Huntress SIEM (Included)") == "medium" and suggestion_confidence("Huntress MDR (Included)") == "high"

@@ -1232,6 +1232,8 @@ async def bulk_close_alerts(
                 before = alert.status
                 now = datetime.now(UTC)
                 values: dict = {"status": body.status, "resolved_at": now, "updated_at": now}
+                if alert.first_seen_at is None:
+                    values["first_seen_at"] = now  # the first time a person acted on it: what MTTA is measured to
                 if body.status == "false_positive":
                     values["disposition"] = "false_positive"
                 await db.execute(update(Alert).where(Alert.id == alert_id).values(**values))
@@ -1286,6 +1288,8 @@ async def update_alert(
 
         if updates:
             updates["updated_at"] = datetime.now(UTC)
+            if alert.first_seen_at is None and ("assigned_at" in updates or updates.get("status", alert.status) != alert.status):
+                updates["first_seen_at"] = updates["updated_at"]  # the first time a person acted on it: what MTTA is measured to
             before = alert.status
             await db.execute(update(Alert).where(Alert.id == alert_id).values(**updates))
             if "status" in updates and updates["status"] != before:

@@ -89,3 +89,39 @@ async def test_each_indicator_gets_the_titles_of_its_first_two_alerts_and_nothin
     assert out[0].linked_alert_summaries[0].severity == "medium"
     assert out[1].linked_alert_summaries == []
     assert out[2].linked_alert_summaries == [], "an alert of another tenant is never named"
+
+
+@pytest.mark.asyncio
+async def test_an_indicator_held_by_the_workspace_names_the_clients_alert_with_its_client_host_and_person(world):
+    mine, _other, engine = world
+    kid, alert_id = uuid.uuid4(), uuid.UUID(int=77)
+    tag = uuid.uuid4().hex[:8]
+    now = datetime.now(UTC)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            await conn.execute(
+                text("insert into tenants (id, name, slug, parent_tenant_id, mssp_role) values (:i, :n, :n, :p, 'child')"),
+                {"i": kid, "n": f"Pirkey Barber {tag}", "p": mine},
+            )
+            await conn.execute(
+                text(
+                    "insert into alerts (id, tenant_id, title, severity, status, affected_hosts, affected_users, event_time, first_seen, last_seen) "
+                    "values (:i, :t, 'Malware blocked', 'high', 'new', cast(:h as jsonb), cast(:u as jsonb), :n, :n, :n)"
+                ),
+                {"i": alert_id, "t": kid, "h": '["", "PC-01"]', "u": '["amy@acme.com"]', "n": now},
+            )
+        db = async_sessionmaker(engine, expire_on_commit=False)()
+        await db.execute(text("select set_config('app.rls_fail_closed', 'off', false)"))
+        await set_rls_context(db, mine)
+        out = await with_alert_summaries(db, mine, [ioc(mine, [alert_id])])
+        await db.close()
+        (a,) = out[0].linked_alert_summaries
+        assert (a.title, a.severity, a.status) == ("Malware blocked", "high", "new")
+        assert (a.client, a.host, a.user) == (f"Pirkey Barber {tag}", "PC-01", "amy@acme.com"), "the first host that is not blank"
+        assert a.created_at is not None
+    finally:
+        async with engine.begin() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            await conn.execute(text("delete from alerts where tenant_id = :t"), {"t": kid})
+            await conn.execute(text("delete from tenants where id = :t"), {"t": kid})

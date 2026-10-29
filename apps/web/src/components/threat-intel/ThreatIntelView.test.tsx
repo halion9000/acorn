@@ -33,7 +33,7 @@ vi.mock('swr', async () => {
   };
 });
 
-import { ThreatIntelView, externalCheckUrl } from './ThreatIntelView';
+import { ThreatIntelView, alertFacts, externalCheckUrl } from './ThreatIntelView';
 
 const HASH = '84ed030762b11dc4d29e7cf02812b7d4a3a578f25ac1a8a3ae51002627644c07';
 
@@ -83,6 +83,27 @@ describe('the indicator list', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0].textContent).toBe('Endpoint Risk - Suspicious Process Detected +2 more');
     expect(issues[0].getAttribute('title')).toBe('Endpoint Risk - Suspicious Process Detected | Second alert');
+  });
+
+  it('shows the severity, status, client, device and person on the closed row, leaving out what is missing', async () => {
+    list.mockResolvedValue({
+      indicators: [
+        indicator({
+          linkedAlerts: ['a1'],
+          linkedAlertSummaries: [
+            { id: 'a1', title: 'Malware blocked', severity: 'high', status: 'new', client: 'Pirkey Barber', host: 'PC-01', user: null, created_at: '2026-10-25T12:15:00' },
+          ],
+        }),
+      ],
+      total: 1,
+    });
+    render(<ThreatIntelView />);
+    const facts = await screen.findByTestId('ioc-alert-facts');
+    expect(facts.textContent).toBe('high · new · Pirkey Barber · PC-01 · Oct 25 12:15');
+  });
+
+  it('alertFacts leaves out blank parts and a date that cannot be read', () => {
+    expect(alertFacts({ severity: 'low', status: '', client: null, host: ' ', user: 'amy@acme.com', created_at: 'not a date' })).toBe('low · amy@acme.com');
   });
 
   it('opens an indicator on click and shows what is known about it, instead of a dead row', async () => {

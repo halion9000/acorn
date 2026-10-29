@@ -115,6 +115,11 @@ def window_start(now: datetime, days: int) -> datetime:
 # What an invoice line most likely counts, matched on its description (lower case). A suggestion is only offered for a line nobody has mapped; a person confirms it.
 SUGGESTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     ("huntress sat", (("huntress", "Awareness training learners"),)),
+    # SIEM is billed on the log sources it reads, and identity protection on the Microsoft 365 users it watches: neither is an agent count (a SIEM line was being offered "Agents").
+    ("huntress siem", (("huntress", "SIEM log sources"),)),
+    ("huntress itdr", (("huntress", "Billable identities"),)),
+    ("huntress identity", (("huntress", "Billable identities"),)),
+    ("huntress m365", (("huntress", "Billable identities"),)),
     ("huntress", (("huntress", "Agents"),)),
     ("ninjaone", (("ninjaone", "Windows workstations"), ("ninjaone", "Windows servers"), ("ninjaone", "Macs"))),
     ("threatmate", (("threatmate", "Internal assets"),)),
@@ -131,6 +136,10 @@ SUGGESTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
 # things that are not billed (NinjaOne's workstations, servers and Macs, Slide's protected systems, Field Effect's devices); "low" when the line may be priced on something else (ThreatMate's assets).
 SUGGESTION_CONFIDENCE: dict[str, str] = {
     "huntress sat": "high",
+    "huntress siem": "medium",
+    "huntress itdr": "medium",
+    "huntress identity": "medium",
+    "huntress m365": "medium",
     "huntress": "high",
     "ninjaone": "medium",
     "threatmate": "low",

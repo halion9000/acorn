@@ -274,12 +274,15 @@ export function RecentConversations({
   conversations,
   selectedId,
   onSelect,
+  onDelete,
 }: {
   isLoading: boolean;
   failed: boolean;
   conversations: CopilotConversation[];
   selectedId?: string;
   onSelect: (id: string) => void;
+  /** When given, each row has a delete button; the caller deletes it and refreshes the list. */
+  onDelete?: (c: CopilotConversation) => void;
 }) {
   if (isLoading) {
     return (
@@ -301,10 +304,11 @@ export function RecentConversations({
   return (
     <ul className="space-y-1">
       {conversations.slice(0, 8).map((c) => (
-        <li key={c.id}>
+        <li key={c.id} className="group relative">
           <button
             className={clsx(
               'block w-full truncate rounded-md px-2 py-1.5 text-left text-sm transition-colors',
+              onDelete && 'pr-8',
               c.id === selectedId ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800/60',
             )}
             onClick={() => onSelect(c.id)}
@@ -312,6 +316,17 @@ export function RecentConversations({
           >
             {c.title}
           </button>
+          {onDelete && (
+            <button
+              type="button"
+              aria-label={`Delete conversation: ${c.title}`}
+              title="Delete this conversation"
+              onClick={() => onDelete(c)}
+              className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 opacity-0 transition-opacity hover:bg-slate-700 hover:text-rose-300 focus:opacity-100 group-hover:opacity-100"
+            >
+              ×
+            </button>
+          )}
         </li>
       ))}
     </ul>
@@ -382,6 +397,23 @@ export function CopilotView() {
     }
   };
 
+  const deleteConversation = async (c: CopilotConversation) => {
+    if (!window.confirm(`Delete this conversation?
+
+${c.title}`)) return;
+    try {
+      await copilotApi.deleteConversation(c.id);
+    } catch (err) {
+      setError(err);
+      return;
+    }
+    if (c.id === conversationId) {
+      setMessages([]);
+      setConversationId(undefined);
+    }
+    await conversationsState.mutate();
+  };
+
   const startNew = () => {
     setMessages([]);
     setConversationId(undefined);
@@ -429,6 +461,7 @@ export function CopilotView() {
             conversations={conversations}
             selectedId={conversationId}
             onSelect={setConversationId}
+            onDelete={(c) => void deleteConversation(c)}
           />
         </div>
       </aside>

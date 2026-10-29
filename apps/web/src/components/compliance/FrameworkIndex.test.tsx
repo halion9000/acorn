@@ -5,9 +5,11 @@ import { SWRConfig } from 'swr';
 
 const listChildren = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/api', () => ({ msspApi: { listChildren } }));
+const authFetch = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/auth-session', () => ({ authFetch }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
-import { FrameworkIndex, frameworkHref } from './FrameworkIndex';
+import { FrameworkIndex, completion, frameworkHref } from './FrameworkIndex';
 
 const frameworks = [
   { id: 'soc2', name: 'SOC 2 Type II', description: 'Trust criteria.', badge: 'Enterprise' },
@@ -23,6 +25,8 @@ function renderIndex() {
 }
 
 beforeEach(() => {
+  authFetch.mockReset();
+  authFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
   listChildren.mockReset();
   window.history.replaceState(null, '', '/compliance');
 });
@@ -69,5 +73,37 @@ describe('the compliance index', () => {
     renderIndex();
     await waitFor(() => expect(screen.getByRole('link', { name: /SOC 2 Type II/ }).getAttribute('href')).toBe('/compliance/soc2?client=c1'));
     expect((await screen.findByLabelText('Client') as HTMLSelectElement).value).toBe('c1');
+  });
+});
+
+describe('how far along each framework is', () => {
+  it('completion is the controls with accepted evidence over all the controls, rounded, or null when there are none', () => {
+    expect(completion({ controls_covered: ['a', 'b'], controls_missing: ['c', 'd', 'e', 'f'] })).toEqual({ pct: 33, covered: 2, total: 6 });
+    expect(completion({ controls_covered: [], controls_missing: ['a'] })).toEqual({ pct: 0, covered: 0, total: 1 });
+    expect(completion({ controls_covered: [], controls_missing: [] })).toBeNull();
+    expect(completion(undefined)).toBeNull();
+  });
+
+  it('shows a percentage complete bar on each card, for the framework the API names, and says when it cannot be read', async () => {
+    listChildren.mockResolvedValue([]);
+    authFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([{ framework: 'SOC2', controls_covered: ['CC1', 'CC2', 'CC3'], controls_missing: ['CC4'] }]),
+    });
+    renderIndex();
+    const bar = await screen.findByRole('progressbar', { name: 'Controls with accepted evidence' });
+    expect(bar).toHaveAttribute('aria-valuenow', '75');
+    expect(screen.getByText('75% complete')).toBeInTheDocument();
+    expect(screen.getByText('3 of 4 controls have accepted evidence')).toBeInTheDocument();
+    expect(screen.getByText('Progress is not available.')).toBeInTheDocument();
+    expect(authFetch).toHaveBeenCalledWith('/api/v1/compliance/report');
+  });
+
+  it('says progress is not available when the report fails', async () => {
+    listChildren.mockResolvedValue([]);
+    authFetch.mockResolvedValue({ ok: false, status: 500, json: () => Promise.resolve({}) });
+    renderIndex();
+    await waitFor(() => expect(screen.getAllByText('Progress is not available.')).toHaveLength(2));
+    expect(screen.queryByRole('progressbar')).toBeNull();
   });
 });

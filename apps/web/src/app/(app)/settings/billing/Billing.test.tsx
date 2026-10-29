@@ -199,11 +199,26 @@ describe('Billing reconcile and mapping', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Invoice mapping' }));
     const unmapped = await screen.findByTestId('unmapped-lines');
     mapCalls.push(1);
-    await userEvent.click(within(unmapped).getAllByText('No tool counts this')[0]);
+    await userEvent.selectOptions(within(unmapped).getByLabelText('Map Huntress for Workstations (Included) to'), '__none__');
     await waitFor(() => expect(authFetch.mock.calls.some((c) => c[1]?.method === 'PUT')).toBe(true));
     const put = JSON.parse(authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')![1].body);
     expect(put.invoice_item).toBe('Huntress for Workstations (Included)');
     expect(put.counted).toEqual([]);
+  });
+
+  it('lets a person choose a different count when the suggestion is wrong', async () => {
+    render(<Billing />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Invoice mapping' }));
+    const unmapped = await screen.findByTestId('unmapped-lines');
+    mapCalls.push(1);
+    const picker = within(unmapped).getByLabelText('Map Huntress for Workstations (Included) to') as HTMLSelectElement;
+    expect(picker.querySelector('option')!.textContent).toBe('Choose another…');
+    await userEvent.selectOptions(picker, 'ninjaone|Macs');
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => c[1]?.method === 'PUT')).toBe(true));
+    expect(JSON.parse(authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')![1].body)).toEqual({
+      invoice_item: 'Huntress for Workstations (Included)',
+      counted: [{ source: 'ninjaone', item: 'Macs' }],
+    });
   });
 
   it('finds a tool count by typing part of its tool or item name, and groups the list by tool', async () => {

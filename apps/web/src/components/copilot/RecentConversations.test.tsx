@@ -60,4 +60,13 @@ describe('RecentConversations', () => {
     expect(screen.getByRole('button', { name: 'Investigation 1' })).toBeInTheDocument();
     expect(screen.queryByText(/isn.t available/i)).not.toBeInTheDocument();
   });
+
+  it('has a delete button on each row only when the page can delete, and reports which conversation', async () => {
+    const onDelete = vi.fn();
+    const { rerender } = render(<RecentConversations {...base} conversations={[convo(1), convo(2)]} />);
+    expect(screen.queryByRole('button', { name: /^Delete conversation/ })).not.toBeInTheDocument();
+    rerender(<RecentConversations {...base} conversations={[convo(1), convo(2)]} onDelete={onDelete} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Delete conversation: Investigation 2' }));
+    expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: 'c2' }));
+  });
 });

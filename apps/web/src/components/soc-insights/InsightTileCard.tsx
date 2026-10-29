@@ -35,6 +35,20 @@ export function tileHref(key: string, clientId?: string): string | null {
     case 'cases_per_day':
     case 'analyst_hours_saved':
       return '/cases';
+    case 'open_alerts':
+    case 'sla_breaches':
+      return alerts('open');
+    case 'noisy_alert_types':
+    case 'noisiest_clients':
+      return '/noise-tuning';
+    case 'unusual_signins':
+      return '/settings/signin-scores';
+    case 'silent_sources':
+      return '/settings/platform-health';
+    case 'playbook_coverage':
+      return '/playbooks';
+    case 'ticket_linkage':
+      return alerts('all');
     case 'agent_cost_per_investigation':
       return '/costs';
     default:
@@ -57,7 +71,7 @@ export function InsightTileCard({ tile, sparkline, clientId }: InsightTileCardPr
       // The `aria-label` rolls the value + delta into one string so a
       // screen reader announces the change without us shipping a
       // table-with-headers.
-      aria-label={`${tile.label}: ${formatValue(tile)}, ${deltaTitle}`}
+      aria-label={`${tile.label}: ${formatValue(tile)}, ${deltaTitle}${tile.detail ? ` ${tile.detail}.` : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -81,6 +95,23 @@ export function InsightTileCard({ tile, sparkline, clientId }: InsightTileCardPr
         <span className="text-2xl font-semibold tabular-nums">{formatValue(tile)}</span>
         <div className="text-muted-foreground">{sparkline}</div>
       </div>
+      {tile.detail ? (
+        <p className="mt-2 text-xs text-muted-foreground" data-testid={`tile-detail-${tile.key}`}>
+          {tile.detail}
+        </p>
+      ) : null}
+      {tile.items && tile.items.length > 0 ? (
+        <ul className="mt-2 space-y-0.5 text-xs" data-testid={`tile-items-${tile.key}`}>
+          {tile.items.map((item) => (
+            <li key={item.label} className="flex justify-between gap-2">
+              <span className="truncate text-foreground" title={item.label}>
+                {item.label}
+              </span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{item.display}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
   if (!href) return card;
@@ -95,7 +126,9 @@ export function InsightTileCard({ tile, sparkline, clientId }: InsightTileCardPr
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatValue(tile: InsightTile): string {
+export function formatValue(tile: InsightTile): string {
+  // Nothing to measure: a dash, never a 0.0h or 0% that reads as a good result.
+  if (tile.has_data === false) return '—';
   switch (tile.unit) {
     case 'hours':
       return `${tile.value.toFixed(1)}h`;
@@ -135,6 +168,6 @@ function formatDelta(delta: number | null): string {
 function deltaDirection(tile: InsightTile): 'up' | 'down' | 'flat' {
   if (tile.delta_pct === null || tile.delta_pct === 0) return 'flat';
   const positive = tile.delta_pct > 0;
-  const goodWhenUp = tile.key === 'analyst_hours_saved';
+  const goodWhenUp = ['analyst_hours_saved', 'automation_rate', 'playbook_coverage', 'ticket_linkage'].includes(tile.key);
   return positive === goodWhenUp ? 'up' : 'down';
 }

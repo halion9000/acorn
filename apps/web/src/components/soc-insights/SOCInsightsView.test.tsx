@@ -145,7 +145,7 @@ describe('SOCInsightsView', () => {
     expect(screen.getByLabelText(/loading soc insights/i)).toBeInTheDocument();
   });
 
-  it('renders all seven tile labels once data arrives', async () => {
+  it('renders every tile label once data arrives', async () => {
     (insightsApi.getSOC as ReturnType<typeof vi.fn>).mockResolvedValue(
       sampleResponse,
     );
@@ -162,11 +162,11 @@ describe('SOCInsightsView', () => {
       expect(screen.getByText(tile.label)).toBeInTheDocument();
     }
 
-    // The tile grid should contain exactly the 7 tiles — guards
+    // The tile grid should contain exactly the tiles sent — guards
     // against accidental duplication if SWR reshuffles a re-fetch
     // mid-render.
     const grid = screen.getByTestId('soc-insights-tiles');
-    expect(grid.children.length).toBe(7);
+    expect(grid.children.length).toBe(sampleResponse.tiles.length);
   });
 
   it('says why there are no change figures while the history is too short, and says nothing once it is long enough', async () => {
@@ -262,5 +262,36 @@ describe('tileHref', () => {
     expect(tileHref('analyst_hours_saved')).toBe('/cases');
     expect(tileHref('agent_cost_per_investigation')).toBe('/costs');
     expect(tileHref('something_new')).toBeNull();
+  });
+
+  it('shows a dash and the reason for a tile with nothing to measure, and the list behind a tile that has one', async () => {
+    const base = sampleResponse.tiles[0];
+    (insightsApi.getSOC as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...sampleResponse,
+      tiles: [
+        { ...base, key: 'mtta', label: 'MTTA', value: 0, has_data: false, detail: 'No alert in this window has been acted on by a person yet' },
+        {
+          ...base,
+          key: 'noisy_alert_types',
+          label: 'Noisiest alert types',
+          value: 0.4,
+          unit: 'pct',
+          detail: 'The top 2 types are this share of the 10 alerts in the window',
+          items: [
+            { label: 'Printer offline', value: 3, display: '3 (30%)' },
+            { label: 'Other', value: 1, display: '1 (10%)' },
+          ],
+        },
+        { ...base, key: 'open_alerts', label: 'Open alerts now', value: 12, unit: 'count', detail: 'Oldest: 3 days' },
+      ],
+    });
+    renderIsolated(<SOCInsightsView />);
+    await waitFor(() => expect(screen.getByText('MTTA')).toBeInTheDocument());
+    expect(screen.getByLabelText(/^MTTA: —/)).toBeInTheDocument();
+    expect(screen.getByTestId('tile-detail-mtta')).toHaveTextContent('acted on by a person');
+    expect(screen.getByTestId('tile-items-noisy_alert_types')).toHaveTextContent('Printer offline');
+    expect(screen.getByTestId('tile-items-noisy_alert_types')).toHaveTextContent('3 (30%)');
+    expect(screen.getByTestId('tile-detail-open_alerts')).toHaveTextContent('Oldest: 3 days');
+    expect(screen.getByText('12')).toBeInTheDocument();
   });
 });

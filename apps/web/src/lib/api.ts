@@ -2865,6 +2865,12 @@ export interface InsightTile {
   previous_value: number;
   delta_pct: number | null;
   sparkline: InsightSparkline;
+  /** False when there was nothing to measure in the window: show a dash, not a zero that reads as a good result. */
+  has_data?: boolean;
+  /** One line saying exactly what the number counts. */
+  detail?: string | null;
+  /** The top few things behind the number, for the tiles that list them. */
+  items?: { label: string; value: number; display: string }[];
 }
 
 export interface SOCInsightsResponse {
@@ -3615,6 +3621,18 @@ export type IndicatorType = 'ip' | 'domain' | 'hash' | 'url' | 'email';
  * Carries the analyst-facing fields used by the IOC inbox (severity,
  * confidence, tags) plus the raw lookup data (sources, geo, ASN).
  */
+/** What an alert an indicator was seen on was about, so a list row can say so without opening it. */
+export interface LinkedAlertSummary {
+  id: string;
+  title: string;
+  severity: string;
+  status?: string | null;
+  client?: string | null;
+  host?: string | null;
+  user?: string | null;
+  created_at?: string | null;
+}
+
 export interface ThreatIndicator {
   id: string;
   type: IndicatorType;
@@ -3640,7 +3658,7 @@ export interface ThreatIndicator {
   /** Ids of the alerts this indicator was seen on. */
   linkedAlerts?: string[];
   /** The first of those alerts, with titles, so a list row can say what they were about. */
-  linkedAlertSummaries?: { id: string; title: string; severity: string }[];
+  linkedAlertSummaries?: LinkedAlertSummary[];
   /** Where the indicator came from, when the feed says (an alert id, a feed reference). */
   sourceRef?: string;
   expiresAt?: string;
@@ -3684,7 +3702,7 @@ export const threatIntelApi = {
       source_ref: string | null;
       expires_at: string | null;
       linked_alerts: string[] | null;
-      linked_alert_summaries?: { id: string; title: string; severity: string }[];
+      linked_alert_summaries?: LinkedAlertSummary[];
       context: Record<string, unknown>;
       tenant_id: string;
       is_active: boolean;
@@ -5082,6 +5100,10 @@ export const copilotApi = {
     request<{ id: string; title: string; messages: CopilotMessage[] }>(
       `/api/v1/copilot/conversations/${id}`,
     ),
+
+  /** Delete one of the signed-in person's conversations. */
+  deleteConversation: (id: string) =>
+    request<void>(`/api/v1/copilot/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
   /** One-shot chat call. UI should support optimistic append + rollback. */
   chat: (req: CopilotChatRequest) =>
