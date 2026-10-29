@@ -7,7 +7,7 @@ vi.mock('@/lib/auth-session', () => ({ authFetch }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
 import type { Review } from '@/app/(app)/reports/client-review/ClientReview';
-import { ClientSnapshot, snapshotLines } from './ClientSnapshot';
+import { ClientSnapshot, readinessThemes, snapshotLines } from './ClientSnapshot';
 
 const review = (over: Partial<Review> = {}): Review =>
   ({
@@ -90,5 +90,61 @@ describe('ClientSnapshot', () => {
     authFetch.mockResolvedValue({ ok: false, status: 500, json: () => Promise.resolve({}) });
     view('c1');
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not read this client: The API answered 500');
+  });
+});
+
+describe('readinessThemes', () => {
+  const item = (key: string, status: 'met' | 'partly' | 'not_met' | 'unknown', evidence = '') => ({ key, question: `Question ${key}?`, status, evidence });
+  it('groups the answers by area, counts the met ones of those that could be answered, and lists what is not met first', () => {
+    const themes = readinessThemes([
+      item('mailbox_backup_coverage', 'met'),
+      item('backups_verified', 'partly', 'one system not test-booted.'),
+      item('backup_appliance_current', 'not_met', 'two systems stale.'),
+      item('backups', 'unknown'),
+      item('mfa_everyone', 'not_met', '7 have none.'),
+      item('ir_plan', 'not_met'),
+    ]);
+    expect(themes.map((t) => t.title)).toEqual(['Backups and recovery', 'Identity and sign-in']);
+    const backups = themes[0];
+    expect([backups.met, backups.known]).toEqual([1, 3]);
+    expect(backups.problems.map((p) => p.key)).toEqual(['backup_appliance_current', 'backups_verified']);
+    expect(themes[1].problems.map((p) => p.key)).toEqual(['mfa_everyone']);
+  });
+  it('has no area when none of its answers is known', () => {
+    expect(readinessThemes([item('edr', 'unknown'), item('ir_plan', 'met')])).toEqual([]);
+    expect(readinessThemes([])).toEqual([]);
+  });
+});
+
+describe('the snapshot shows the areas', () => {
+  it('lists each area with its problems and the links behind them', async () => {
+    authFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve(
+          review({
+            readiness: {
+              met: 0,
+              partly: 0,
+              not_met: 2,
+              unknown: 0,
+              items: [
+                { key: 'edr', question: 'Is endpoint detection on every computer?', status: 'partly', evidence: '17 of 20.' },
+                { key: 'backup_appliance_current', question: 'Does every system back up daily?', status: 'not_met', evidence: 'Two systems stale.' },
+              ],
+            },
+          }),
+        ),
+    });
+    render(
+      <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
+        <ClientSnapshot clientId="c1" />
+      </SWRConfig>,
+    );
+    const themes = await screen.findByTestId('snapshot-themes');
+    expect(themes).toHaveTextContent('Backups and recovery: 0 of 1 met');
+    expect(themes).toHaveTextContent('Not met · Does every system back up daily? Two systems stale.');
+    expect(themes).toHaveTextContent('Computers: patching and protection: 0 of 1 met');
+    expect(screen.getAllByRole('link', { name: 'See the computers missing Huntress →' }).some((a) => a.getAttribute('href') === '/devices?client=c1&missing=huntress')).toBe(true);
   });
 });

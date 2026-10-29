@@ -9,7 +9,8 @@
 import Link from 'next/link';
 import useSWR from 'swr';
 
-import { TOOL_NAMES, type Review } from '@/app/(app)/reports/client-review/ClientReview';
+import { TOOL_NAMES, type ReadinessItem, type Review } from '@/app/(app)/reports/client-review/ClientReview';
+import { reviewLink } from '@/app/(app)/reports/client-review/review-links';
 import { authFetch } from '@/lib/auth-session';
 
 async function readReview(id: string): Promise<Review> {
@@ -82,6 +83,70 @@ export function snapshotLines(r: Review): SnapshotLine[] {
   return lines;
 }
 
+/** The readiness answers an executive reads together, by theme. An answer in no theme is not shown here (the Client Review has them all). */
+export const THEMES: { title: string; keys: string[] }[] = [
+  { title: 'Backups and recovery', keys: ['backups', 'mailbox_backup_coverage', 'backup_appliance_current', 'backups_verified'] },
+  { title: 'Computers: patching and protection', keys: ['critical_updates', 'supported_os', 'antivirus_current', 'protection_healthy', 'edr', 'management', 'agents_reporting', 'hardening', 'admin_rights_control', 'privilege', 'disk_encryption', 'dns', 'dns_threat_blocking'] },
+  { title: 'Identity and sign-in', keys: ['mfa_everyone', 'mfa_admins', 'network_admin_mfa', 'account_risk', 'secure_score'] },
+  { title: 'Email and domains', keys: ['email_domain_records', 'domain_expiry', 'certificate_expiry'] },
+  { title: 'Exposure and insurance', keys: ['external_exposure', 'cyber_insurance_baseline', 'ai_tool_governance', 'patching'] },
+];
+
+export interface Theme {
+  title: string;
+  met: number;
+  known: number;
+  problems: ReadinessItem[];
+}
+
+/** Each theme with how many of its answers are met out of those A.C.O.R.N could answer, and the ones that are not met or only partly (not met first). Themes with no answer at all are left out. */
+export function readinessThemes(items: ReadinessItem[]): Theme[] {
+  const out: Theme[] = [];
+  for (const t of THEMES) {
+    const mine = items.filter((i) => t.keys.includes(i.key) && i.status !== 'unknown');
+    if (mine.length === 0) continue;
+    const problems = mine.filter((i) => i.status !== 'met').sort((a, b) => (a.status === b.status ? 0 : a.status === 'not_met' ? -1 : 1));
+    out.push({ title: t.title, met: mine.length - problems.length, known: mine.length, problems });
+  }
+  return out;
+}
+
+function Themes({ review }: { review: Review }) {
+  const themes = readinessThemes(review.readiness.items);
+  if (themes.length === 0) return null;
+  return (
+    <div className="mt-4 border-t border-gray-800 pt-3" data-testid="snapshot-themes">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Where it stands, by area</h3>
+      <ul className="space-y-2.5 text-sm">
+        {themes.map((t) => (
+          <li key={t.title}>
+            <p className="text-gray-200">
+              {t.title}: <span className={t.problems.length === 0 ? 'text-emerald-300' : 'text-amber-300'}>{t.met} of {t.known} met</span>
+            </p>
+            {t.problems.slice(0, 4).map((p) => {
+              const link = reviewLink(p.key, p.status, review.client_id, { mfa: review.mfa });
+              return (
+                <p key={p.key} className="ml-3 text-xs text-gray-400">
+                  <span className={p.status === 'not_met' ? 'text-red-300' : 'text-amber-300'}>{p.status === 'not_met' ? 'Not met' : 'Partly'}</span> · {p.question} {p.evidence}
+                  {link ? (
+                    <>
+                      {' '}
+                      <Link href={link.href} className="text-sky-300 underline hover:text-sky-200">
+                        {link.label} →
+                      </Link>
+                    </>
+                  ) : null}
+                </p>
+              );
+            })}
+            {t.problems.length > 4 ? <p className="ml-3 text-xs text-gray-500">{t.problems.length - 4} more in the Client Review.</p> : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function ClientSnapshot({ clientId }: { clientId: string }) {
   const { data, error, isLoading } = useSWR(clientId ? ['client-snapshot', clientId] : null, () => readReview(clientId), { revalidateOnFocus: false });
   if (!clientId) return null;
@@ -112,6 +177,7 @@ export function ClientSnapshot({ clientId }: { clientId: string }) {
           ))}
         </dl>
       ) : null}
+      {data ? <Themes review={data} /> : null}
     </section>
   );
 }
