@@ -3644,6 +3644,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/rules/seeded-counts:
+    get:
+      tags:
+      - detection_rules
+      summary: How many built-in rules and imported rule-pack rules there are
+      description: Built-in rules (platform-wide, not a tenant's own) and, for this
+        organization, each rule pack with how many rules it holds. A rule in two packs
+        counts once in ``imported``.
+      operationId: seeded_counts_api_v1_rules_seeded_counts_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeededCounts'
+      security:
+      - HTTPBearer: []
   /api/v1/rules/{rule_id}:
     get:
       tags:
@@ -32693,6 +32711,19 @@ components:
       required:
       - enabled
       title: PackClientRequest
+    PackCount:
+      properties:
+        name:
+          type: string
+          title: Name
+        rules:
+          type: integer
+          title: Rules
+      type: object
+      required:
+      - name
+      - rules
+      title: PackCount
     PackOverview:
       properties:
         id:
@@ -37273,6 +37304,28 @@ components:
       - taken_at
       - refreshed_at
       title: SecureScoreSummary
+    SeededCounts:
+      properties:
+        builtin:
+          type: integer
+          title: Builtin
+        imported:
+          type: integer
+          title: Imported
+        packs:
+          items:
+            $ref: '#/components/schemas/PackCount'
+          type: array
+          title: Packs
+      type: object
+      required:
+      - builtin
+      - imported
+      - packs
+      title: SeededCounts
+      description: 'What the platform ships, so Settings can say what is there to
+        switch on: the built-in rules, and the imported Sigma rules grouped into rule
+        packs.'
     SelectableTenant:
       properties:
         id:

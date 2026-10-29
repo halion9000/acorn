@@ -184,6 +184,49 @@ async def create_rule(
     return DetectionRuleResponse.model_validate(rule)
 
 
+class PackCount(BaseModel):
+    name: str
+    rules: int
+
+
+class SeededCounts(BaseModel):
+    """What the platform ships, so Settings can say what is there to switch on: the built-in rules, and the imported Sigma rules grouped into rule packs."""
+
+    builtin: int
+    imported: int
+    packs: list[PackCount]
+
+
+@router.get("/seeded-counts", response_model=SeededCounts, summary="How many built-in rules and imported rule-pack rules there are")
+async def seeded_counts(
+    current_user: Annotated[AuthUser, Depends(require_permission("rules:view"))],
+    db: DBSession,
+) -> SeededCounts:
+    """Built-in rules (platform-wide, not a tenant's own) and, for this organization, each rule pack with how many rules it holds. A rule in two packs counts once in ``imported``."""
+    from sqlalchemy import func
+
+    from app.models.mssp import MSSPRulePack, MSSPRulePackRule
+
+    builtin = await db.scalar(
+        select(func.count()).select_from(DetectionRule).where(DetectionRule.tenant_id.is_(None), DetectionRule.is_builtin.is_(True))
+    )
+    rows = (
+        await db.execute(
+            select(MSSPRulePack.name, func.count(MSSPRulePackRule.rule_id))
+            .outerjoin(MSSPRulePackRule, MSSPRulePackRule.pack_id == MSSPRulePack.id)
+            .where(MSSPRulePack.parent_tenant_id == current_user.tenant_id)
+            .group_by(MSSPRulePack.id, MSSPRulePack.name)
+            .order_by(MSSPRulePack.name)
+        )
+    ).all()
+    imported = await db.scalar(
+        select(func.count(func.distinct(MSSPRulePackRule.rule_id)))
+        .join(MSSPRulePack, MSSPRulePack.id == MSSPRulePackRule.pack_id)
+        .where(MSSPRulePack.parent_tenant_id == current_user.tenant_id)
+    )
+    return SeededCounts(builtin=int(builtin or 0), imported=int(imported or 0), packs=[PackCount(name=r[0], rules=int(r[1])) for r in rows])
+
+
 @router.get("/{rule_id}", response_model=DetectionRuleResponse)
 async def get_rule(
     rule_id: uuid.UUID,

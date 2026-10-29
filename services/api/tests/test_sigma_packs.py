@@ -174,3 +174,50 @@ def test_a_pack_or_client_that_is_not_yours_is_a_404_and_nothing_is_written():
 
     errors, rows = run(body)
     assert errors == [404, 404, 404] and rows == []
+
+
+def test_the_seeded_counts_say_how_many_built_in_rules_and_how_many_are_in_each_pack():
+    from app.api.v1.endpoints.detection_rules import seeded_counts
+
+    async def body(s):
+        parent, other = await tenant(s, "Parent"), await tenant(s, "Other parent")
+        s.add(
+            DetectionRule(
+                id=uuid.uuid4(),
+                tenant_id=None,
+                name="Built in",
+                description="d",
+                rule_language="sigma",
+                rule_body="x",
+                category="endpoint",
+                status="active",
+                severity="low",
+                confidence=50,
+                is_builtin=True,
+            )
+        )
+        s.add(
+            DetectionRule(
+                id=uuid.uuid4(),
+                tenant_id=parent.id,
+                name="Own rule",
+                description="d",
+                rule_language="sigma",
+                rule_body="x",
+                category="endpoint",
+                status="active",
+                severity="low",
+                confidence=50,
+                is_builtin=False,
+            )
+        )
+        await sp.load_packs(s, parent.id, [entry(1), entry(2), entry(3, product="linux")])
+        await sp.load_packs(s, other.id, [entry(9)])
+        await s.commit()
+        who = SimpleNamespace(tenant_id=parent.id, id=uuid.uuid4())
+        return await seeded_counts(current_user=who, db=s)
+
+    got = run(body)
+    assert got.builtin == 1, "a tenant's own rule is not a built-in one"
+    assert got.imported == 3, "another organization's packs are not counted"
+    assert [(p.name, p.rules) for p in got.packs] == [("Sigma: Linux", 1), ("Sigma: Windows", 2)]

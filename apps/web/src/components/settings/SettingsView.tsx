@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { docs } from '@/lib/docs';
 import Link from 'next/link';
+import { SeededDetections } from './SeededDetections';
 import useSWR from 'swr';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -268,6 +269,7 @@ function MoreSettings() {
           </li>
         ))}
       </ul>
+      <SeededDetections />
     </div>
   );
 }
