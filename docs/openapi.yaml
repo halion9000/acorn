@@ -765,6 +765,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alerts/bulk-close:
+    post:
+      tags:
+      - alerts
+      summary: Bulk Close Alerts
+      description: 'Close up to 200 alerts at once, with one reason. An alert that
+        is already finished is left as it is (and counted); one the caller cannot
+        see is counted as not found.
+
+
+        The reason and the status before and after are written to the audit log for
+        each alert closed. A false-positive close also sets the alert''s verdict,
+        so the false-positive rate counts it. This changes
+
+        nothing the AI learns from (no override is recorded): a bulk close is housekeeping,
+        not a correction of a verdict.'
+      operationId: bulk_close_alerts_api_v1_alerts_bulk_close_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkCloseRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkCloseResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/alerts/{alert_id}/escalate:
     post:
       tags:
@@ -22581,6 +22619,61 @@ components:
       - accepted
       - skipped
       title: BulkAcceptOut
+    BulkCloseRequest:
+      properties:
+        alert_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Alert Ids
+        status:
+          type: string
+          enum:
+          - resolved
+          - false_positive
+          - closed
+          title: Status
+          default: resolved
+        reason:
+          type: string
+          maxLength: 500
+          minLength: 3
+          title: Reason
+          description: Why these alerts are being closed. Kept in the audit log against
+            each alert.
+      type: object
+      required:
+      - alert_ids
+      - reason
+      title: BulkCloseRequest
+    BulkCloseResponse:
+      properties:
+        closed:
+          type: integer
+          title: Closed
+        already_finished:
+          type: integer
+          title: Already Finished
+        not_found:
+          type: integer
+          title: Not Found
+        status:
+          type: string
+          title: Status
+        reason:
+          type: string
+          title: Reason
+      type: object
+      required:
+      - closed
+      - already_finished
+      - not_found
+      - status
+      - reason
+      title: BulkCloseResponse
     BulkError:
       properties:
         ioc:

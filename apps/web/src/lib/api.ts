@@ -528,6 +528,14 @@ export interface AlertScriptRun {
   finished_at: string | null;
 }
 
+export interface BulkCloseResult {
+  closed: number;
+  already_finished: number;
+  not_found: number;
+  status: string;
+  reason: string;
+}
+
 export interface BulkScriptRun {
   batch_id: string | null;
   preview: boolean;
@@ -1574,6 +1582,9 @@ export const alertsApi = {
     request<{ id: string; status: string; runs_at_once: boolean }>(`/api/v1/alerts/${id}/scripts/run`, { method: 'POST', body: JSON.stringify(body) }),
 
   /** One script for the machines of many alerts: one request (and one new HaloPSA ticket) per machine, one approval in CORE. `preview` queues nothing and says what would happen. */
+  /** Close up to 200 alerts at once with one reason (kept in the audit log against each). */
+  bulkClose: (body: { alert_ids: string[]; status: 'resolved' | 'false_positive' | 'closed'; reason: string }) =>
+    request<BulkCloseResult>('/api/v1/alerts/bulk-close', { method: 'POST', body: JSON.stringify(body) }),
   runScriptBulk: (body: { script_id: number; alert_ids: string[]; preview?: boolean }) =>
     request<BulkScriptRun>('/api/v1/alerts/scripts/run-bulk', { method: 'POST', body: JSON.stringify(body) }),
 

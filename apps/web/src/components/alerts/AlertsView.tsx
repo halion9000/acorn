@@ -15,6 +15,7 @@ import { CreateAlertModal } from './CreateAlertModal';
 import { SavedViewsBar } from '@/components/saved-views/SavedViewsBar';
 import BulkTicketBar from './BulkTicketBar';
 import BulkScriptBar from './BulkScriptBar';
+import BulkCloseBar from './BulkCloseBar';
 import { loadFilters, saveFilters } from '@/lib/remembered-filters';
 import { rememberable, restoreFilters } from '@/lib/alert-filter-memory';
 import { sourceLink } from './AlertContext';
@@ -708,6 +709,7 @@ export function AlertsTableGrid({
   return (
     <div className="bg-gray-900/60 border border-gray-800/60 rounded-xl overflow-hidden">
       <BulkTicketBar alertIds={tickedIds} onDone={onChanged} onClear={() => setTicked(new Set())} />
+      <BulkCloseBar alertIds={tickedIds} onDone={onChanged} onClear={() => setTicked(new Set())} />
       <BulkScriptBar
         alertIds={tickedIds}
         onDone={() => {

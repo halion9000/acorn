@@ -7,8 +7,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy import Text, and_, cast, func, not_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
@@ -31,6 +31,7 @@ from app.services.alert_rail import (
     build_rail_envelope,
 )
 from app.services.alert_scope import alert_scope
+from app.services.audit import emit_audit
 from app.services.event_sanitiser import (
     SubmitPayloadTooLarge,
     sanitise_event_batch,
@@ -1128,6 +1129,73 @@ async def _huntress_base(db: Any, tenant_ids: set) -> str | None:
     if not isinstance(found, str) or not _HTTPS.match(found):
         return None
     return found.rsplit("/", 1)[0]
+
+
+class BulkCloseRequest(BaseModel):
+    alert_ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+    status: Literal["resolved", "false_positive", "closed"] = "resolved"
+    reason: str = Field(
+        min_length=3, max_length=500, description="Why these alerts are being closed. Kept in the audit log against each alert."
+    )
+
+
+class BulkCloseResponse(BaseModel):
+    closed: int
+    already_finished: int
+    not_found: int
+    status: str
+    reason: str
+
+
+@router.post("/bulk-close", response_model=BulkCloseResponse)
+async def bulk_close_alerts(
+    body: BulkCloseRequest,
+    request: Request,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:write"))],
+    db: DBSession,
+) -> BulkCloseResponse:
+    """Close up to 200 alerts at once, with one reason. An alert that is already finished is left as it is (and counted); one the caller cannot see is counted as not found.
+
+    The reason and the status before and after are written to the audit log for each alert closed. A false-positive close also sets the alert's verdict, so the false-positive rate counts it. This changes
+    nothing the AI learns from (no override is recorded): a bulk close is housekeeping, not a correction of a verdict.
+    """
+    reason = " ".join(body.reason.split())
+    if len(reason) < 3:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Give a reason of at least three characters.")
+    closed = already = missing = 0
+    for alert_id in dict.fromkeys(body.alert_ids):
+        try:
+            async with alert_scope(db, current_user.tenant_id, alert_id) as tid:
+                alert = (await db.execute(select(Alert).where(Alert.id == alert_id, Alert.tenant_id == tid))).scalar_one_or_none()
+                if alert is None:
+                    missing += 1
+                    continue
+                if alert.status in FINISHED_STATUSES:
+                    already += 1
+                    continue
+                before = alert.status
+                now = datetime.now(UTC)
+                values: dict = {"status": body.status, "resolved_at": now, "updated_at": now}
+                if body.status == "false_positive":
+                    values["disposition"] = "false_positive"
+                await db.execute(update(Alert).where(Alert.id == alert_id).values(**values))
+                await emit_audit(
+                    db=db,
+                    tenant_id=tid,
+                    actor_id=current_user.user_id,
+                    action="alerts:bulk_close",
+                    resource="alert",
+                    resource_id=str(alert_id),
+                    changes={"status_from": before, "status_to": body.status, "reason": reason},
+                    request=request,
+                )
+                closed += 1
+        except HTTPException as exc:
+            if exc.status_code != status.HTTP_404_NOT_FOUND:
+                raise
+            missing += 1
+    await db.commit()
+    return BulkCloseResponse(closed=closed, already_finished=already, not_found=missing, status=body.status, reason=reason)
 
 
 @router.patch("/{alert_id}", response_model=AlertResponse)
