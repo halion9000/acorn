@@ -12456,6 +12456,55 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-review/{client_id}/history:
+    get:
+      tags:
+      - posture
+      summary: 'The changes to one question of a client''s review over time: A.C.O.R.N''s
+        own readings and what people typed'
+      operationId: question_history_api_v1_client_review__client_id__history_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: section
+        in: query
+        required: true
+        schema:
+          type: string
+          pattern: ^(readiness|tech|m365|assess)$
+          title: Section
+      - name: key
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 400
+          title: Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HistoryEntry'
+                title: Response Question History Api V1 Client Review  Client Id  History
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/client-review/{client_id}:
     get:
       tags:
@@ -29426,6 +29475,40 @@ components:
       - device_id
       - hidden_since
       title: HideOut
+    HistoryEntry:
+      properties:
+        at:
+          type: string
+          format: date-time
+          title: At
+        source:
+          type: string
+          title: Source
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+        actor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Actor
+      type: object
+      required:
+      - at
+      - source
+      title: HistoryEntry
     HuntHit:
       properties:
         id:

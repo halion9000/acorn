@@ -665,6 +665,7 @@ function DeviceRowView({ d, master, open, onToggle, onHide }: { d: DeviceRow; ma
         <tr className="border-t border-gray-800 bg-gray-900/40">
           <td colSpan={7} className="px-4 py-3 text-sm text-gray-300">
             <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+              <Field label="Serial number" value={d.serial_number} />
               <Field label="Manufacturer" value={d.manufacturer} />
               <Field label="Model" value={d.model} />
               <Field label="OS version" value={d.os_version} />

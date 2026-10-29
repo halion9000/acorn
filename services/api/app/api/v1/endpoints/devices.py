@@ -873,7 +873,9 @@ async def export_devices(
     search: str | None = Query(default=None, max_length=100),
     vendor: str | None = Query(default=None, pattern=_VENDOR),
     not_in_master: bool = Query(default=False),
-    missing: str | None = Query(default=None, pattern="^(addigy|threatmate|huntress|screenconnect|fieldeffect|ninjaone|dnsfilter|autoelevate)$"),
+    missing: str | None = Query(
+        default=None, pattern="^(addigy|threatmate|huntress|screenconnect|fieldeffect|ninjaone|dnsfilter|autoelevate)$"
+    ),
     offline: bool = Query(default=False),
     has_alerts: bool = Query(default=False),
     attention: bool = Query(default=False),

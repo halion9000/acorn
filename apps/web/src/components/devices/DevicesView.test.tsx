@@ -608,6 +608,23 @@ describe('Show alerts button', () => {
   });
 });
 
+describe('the expanded row', () => {
+  it('names the serial number, as well as the column does', async () => {
+    listMock.mockResolvedValue(list([device({ hostname: 'MBA-1', serial_number: 'HXJJP1NR1WFY' })]));
+    render(<DevicesView />);
+    await userEvent.click(await screen.findByText('MBA-1'));
+    const term = screen.getByText('Serial number', { selector: 'dt' });
+    expect(term.nextElementSibling).toHaveTextContent('HXJJP1NR1WFY');
+  });
+
+  it('shows a dash when there is no serial number', async () => {
+    listMock.mockResolvedValue(list([device({ hostname: 'NOSN-1', serial_number: null })]));
+    render(<DevicesView />);
+    await userEvent.click(await screen.findByText('NOSN-1'));
+    expect(screen.getByText('Serial number', { selector: 'dt' }).nextElementSibling).toHaveTextContent('—');
+  });
+});
+
 describe('opening from a link with ?search=', () => {
   it('starts filtered on the device named in the address the ROUTER gives (window.location lags during a client-side navigation)', async () => {
     routerParams.current = new URLSearchParams('search=Mac');

@@ -13,7 +13,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy import and_, bindparam, delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -41,7 +41,7 @@ from app.models.signin import (
     IdentitySecureScore,
 )
 from app.models.tenant import Tenant
-from app.services import fleet_cache
+from app.services import fleet_cache, review_history
 from app.services.assessment_review import AssessAnswer, assessment_answers
 from app.services.check_history import changes as check_changes
 from app.services.check_history import item_changes
@@ -295,6 +295,9 @@ async def save_review_answer(
         if st is None and ans is None and note is None:
             if existing is not None:
                 await db.delete(existing)
+                await review_history.record_manual(
+                    db, client_id, body.section, body.key, status=None, answer=None, note=None, actor=current_user.email, cleared=True
+                )
                 await db.commit()
             return AnswerOut(section=body.section, key=body.key, cleared=True)
         if existing is None:
@@ -317,6 +320,9 @@ async def save_review_answer(
         stmt = pg_insert(ClientReviewAnswer).values(values)
         update = {c: stmt.excluded[c] for c in values if c not in ("tenant_id", "section", "key")}
         await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "section", "key"], set_=update))
+        await review_history.record_manual(
+            db, client_id, body.section, body.key, status=st, answer=ans, note=note, actor=current_user.email, now=now
+        )
         await db.commit()
     return AnswerOut(section=body.section, key=body.key, status=st, answer=ans, note=note, updated_at=now)
 
@@ -401,6 +407,33 @@ class ClientReview(BaseModel):
     m365_refreshed_at: datetime | None = None
     # Suggested answers to the template's infrastructure, workstation, backup and Google Workspace questions, only where a check A.C.O.R.N runs speaks to one; the rest are needs_person.
     assess: list[AssessAnswer] = Field(default_factory=list)
+
+
+class HistoryEntry(BaseModel):
+    at: datetime
+    source: str  # automatic: A.C.O.R.N's own reading changed; manual: a person typed
+    status: str | None = None
+    detail: str | None = None
+    note: str | None = None
+    actor: str | None = None
+
+
+@router.get(
+    "/{client_id}/history",
+    response_model=list[HistoryEntry],
+    summary="The changes to one question of a client's review over time: A.C.O.R.N's own readings and what people typed",
+)
+async def question_history(
+    client_id: uuid.UUID,
+    section: Annotated[str, Query(pattern="^(readiness|tech|m365|assess)$")],
+    key: Annotated[str, Query(min_length=1, max_length=400)],
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+) -> list[HistoryEntry]:
+    await _own_or_client(db, current_user.tenant_id, client_id)
+    async with contextlib.nullcontext() if client_id == current_user.tenant_id else acting_as_tenant(db, client_id):
+        rows = await review_history.history(db, client_id, section, key)
+    return [HistoryEntry(**r) for r in rows]
 
 
 @router.get(
@@ -516,6 +549,27 @@ async def client_review(
         enrolled_in={v for v, tid in aliases if tid == client_id},
         tool_checks=tool_checks,
     )
+    tech_answers = tech_stack(
+        shown,
+        facts,
+        has_microsoft_365=bool(users),
+        sat=sat_checks,
+        saas=saas_checks,
+        enrolled_in={v for v, tid in aliases if tid == client_id},
+        mapped_tools={v for v, _ in aliases},
+    )
+    m365_worked = m365_answers([c for c in (m365_row.checks if m365_row is not None else []) if isinstance(c, dict)], list(users))
+    assess_worked = assessment_answers({**tool_checks, **{c["key"]: c for c in sat_checks if isinstance(c.get("key"), str)}})
+    # What A.C.O.R.N worked out, before a person's typed answers are laid over it (the merge changes these objects): kept so each question has a history.
+    readings = review_history.snapshot(ready.items, tech_answers, m365_worked, assess_worked)
+    try:
+        async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
+            async with db.begin_nested():
+                written = await review_history.record_automatic(db, client_id, readings, now)
+            if written:
+                await db.commit()
+    except Exception:  # noqa: BLE001 - the history is a convenience; the review itself must still load
+        logger.warning("client_review.history_not_recorded", exc_info=True)
     merge_readiness(ready.items, typed)
     counts = readiness_counts(ready.items)
     ready.met, ready.partly, ready.not_met, ready.unknown = counts["met"], counts["partly"], counts["not_met"], counts["unknown"]
@@ -530,25 +584,10 @@ async def client_review(
         alerts=ReviewAlerts(open=a[0], critical_open=a[1], high_open=a[2], opened_30d=a[3], closed_30d=a[4]),
         cases=ReviewCases(open=c[0], opened_30d=c[1], resolved_30d=c[2]),
         readiness=ready,
-        tech_stack=merge_tech(
-            tech_stack(
-                shown,
-                facts,
-                has_microsoft_365=bool(users),
-                sat=sat_checks,
-                saas=saas_checks,
-                enrolled_in={v for v, tid in aliases if tid == client_id},
-                mapped_tools={v for v, _ in aliases},
-            ),
-            typed,
-        ),
-        m365=merge_m365(
-            m365_answers([c for c in (m365_row.checks if m365_row is not None else []) if isinstance(c, dict)], list(users)), typed
-        ),
+        tech_stack=merge_tech(tech_answers, typed),
+        m365=merge_m365(m365_worked, typed),
         m365_refreshed_at=m365_row.refreshed_at if m365_row is not None else None,
-        assess=merge_assess(
-            assessment_answers({**tool_checks, **{c["key"]: c for c in sat_checks if isinstance(c.get("key"), str)}}), typed
-        ),
+        assess=merge_assess(assess_worked, typed),
         vcio=(
             ReviewVcio(
                 recommendations=VcioRecommendations(**(vcio_row.recommendations or {})),

@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
+import { ClientSnapshot } from './ClientSnapshot';
 
 import { reportsApi, type ExecutiveDigest as ExecutiveDigestPayload } from '@/lib/api';
 
@@ -201,6 +202,8 @@ export function ExecutiveDigest() {
           Computing digest…
         </div>
       )}
+
+      <ClientSnapshot clientId={clientId} />
 
       {data && <DigestBody digest={data} />}
     </div>

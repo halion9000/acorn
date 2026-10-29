@@ -8,6 +8,8 @@ import { useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
 
+import { QuestionHistory } from "./QuestionHistory";
+
 export type Section = "readiness" | "tech" | "m365" | "assess";
 
 const OPTIONS: Record<Section, { value: string; label: string }[]> = {
@@ -96,19 +98,22 @@ export function AnswerEditor({ clientId, section, questionKey, status, answer, n
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setState(manual ? status : "");
-          setText(manual ? (answer ?? "") : "");
-          setMemo(note ?? "");
-          setOpen(true);
-        }}
-        className="rounded border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-slate-800 print:hidden"
-        aria-label={`Edit the answer to: ${questionKey}`}
-      >
-        {note || manual ? "Edit" : "Answer / note"}
-      </button>
+      <span className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setState(manual ? status : "");
+            setText(manual ? (answer ?? "") : "");
+            setMemo(note ?? "");
+            setOpen(true);
+          }}
+          className="rounded border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-slate-800 print:hidden"
+          aria-label={`Edit the answer to: ${questionKey}`}
+        >
+          {note || manual ? "Edit" : "Answer / note"}
+        </button>
+        <QuestionHistory clientId={clientId} section={section} questionKey={questionKey} />
+      </span>
     );
   }
 

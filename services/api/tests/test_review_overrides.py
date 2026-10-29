@@ -146,7 +146,7 @@ def test_rows_of_another_section_or_question_do_nothing():
 class FakeDB:
     def __init__(self, existing=None, count=0, tenant_found=True):
         self.existing, self.count, self.tenant_found = existing, count, tenant_found
-        self.deleted, self.commits, self.statements = [], 0, []
+        self.deleted, self.commits, self.statements, self.added = [], 0, [], []
 
     async def execute(self, statement):
         self.statements.append(statement)
@@ -161,6 +161,9 @@ class FakeDB:
 
     async def delete(self, obj):
         self.deleted.append(obj)
+
+    def add(self, obj):
+        self.added.append(obj)
 
     async def commit(self):
         self.commits += 1
@@ -179,7 +182,9 @@ def no_scoping(monkeypatch):
 
 def put(db, **over):
     body = cr.AnswerIn(**{"section": "readiness", "key": "backups", "status": "met", "note": "n", **over})
-    return asyncio.run(cr.save_review_answer(CLIENT, body, SimpleNamespace(tenant_id=OWNER, user_id=uuid.uuid4()), db))
+    return asyncio.run(
+        cr.save_review_answer(CLIENT, body, SimpleNamespace(tenant_id=OWNER, user_id=uuid.uuid4(), email="tech@liveoak.test"), db)
+    )
 
 
 def test_saving_stores_the_typed_values_and_says_when():
@@ -187,6 +192,15 @@ def test_saving_stores_the_typed_values_and_says_when():
     out = put(db)
     assert (out.status, out.note, out.cleared) == ("met", "n", False)
     assert out.updated_at is not None and db.commits == 1
+    (row_added,) = db.added
+    assert (row_added.source, row_added.section, row_added.key, row_added.status, row_added.note, row_added.actor) == (
+        "manual",
+        "readiness",
+        "backups",
+        "met",
+        "n",
+        "tech@liveoak.test",
+    ), "what a person typed is a row in the question's history, with who typed it"
 
 
 def test_saving_nothing_removes_an_existing_answer_and_goes_back_to_the_automatic_one():
@@ -194,6 +208,9 @@ def test_saving_nothing_removes_an_existing_answer_and_goes_back_to_the_automati
     db = FakeDB(existing=existing)
     out = put(db, status=None, note=None)
     assert out.cleared is True and db.deleted == [existing] and db.commits == 1
+    assert [(h.source, h.status, h.detail.startswith("Typed answer removed")) for h in db.added] == [
+        ("manual", None, True)
+    ], "clearing is in the history too"
 
 
 def test_clearing_something_that_was_never_typed_is_harmless():
