@@ -32,6 +32,7 @@ from app.copilot_tools import (
     alert_snapshot,
     docs_snapshot,
     execute_copilot_tool,
+    halo_snapshot,
     split_pending,
     verify_confirmation,
     wants_alert_data,
@@ -40,6 +41,7 @@ from app.db.rls import TenantDBSession
 from app.llm.contract import safe_ainvoke
 from app.llm.factory import llm_override, make_chat_model
 from app.services import copilot_history
+from app.services.copilot_textcalls import parse_text_tool_calls
 from app.services.llm_resolver import LlmConfig, resolve_llm_config
 
 logger = logging.getLogger(__name__)
@@ -280,6 +282,11 @@ async def copilot_chat(
     await db.rollback()
     if docs:
         messages.append(SystemMessage(content=docs))
+    # A question about Halo gets its best matching guides up front, for the same reason.
+    halo = await halo_snapshot(tenant_id=str(user.tenant_id), user=user, message=body.message)
+    await db.rollback()
+    if halo:
+        messages.append(SystemMessage(content=halo))
     messages.extend(history)
     messages.append(HumanMessage(content=body.message))
 
@@ -298,6 +305,20 @@ async def copilot_chat(
             tool_calls = getattr(result, "tool_calls", None) or []
             if not tool_calls:
                 content = getattr(result, "content", "") or ""
+                # A model that cannot call tools may WRITE the call as text (a ```tool_use block): run it, hand back the result and let the model answer, instead of showing the analyst the block.
+                text_calls = parse_text_tool_calls(content) if _iteration < max_tool_iters - 1 else []
+                if text_calls:
+                    for name, args in text_calls:
+                        shown = await execute_copilot_tool(name, args, str(user.tenant_id), user=user)
+                        messages.append(
+                            HumanMessage(
+                                content=(
+                                    f"[Result of {name}]\n{json.dumps(shown, default=str)[:4000]}\n"
+                                    "[Answer the analyst's question from this result. Do not write another tool call unless you need one more.]"
+                                )
+                            )
+                        )
+                    continue
                 break
             for call in tool_calls:
                 name = call.get("name", "")

@@ -200,6 +200,30 @@ class TestRecentChats:
         assert c.get("/copilot/conversations/anything").status_code == 403
 
 
+class TestAToolCallWrittenAsText:
+    """The screenshot: a model that cannot call tools answered with its own ```tool_use block, and the analyst saw that as the reply."""
+
+    BLOCK = '```tool_use\nsearch_halo_guides\n{"query": "recurring invoices"}\n```'
+
+    def test_the_block_is_run_and_the_analyst_gets_the_answer_not_the_block(self):
+        c = client_as()
+        LLM.replies = [self.BLOCK, "Recurring invoices are set up under Configuration > Billing."]
+        out = chat(c, "how do recurring invoices work in halo").json()
+        assert out["reply"]["content"] == "Recurring invoices are set up under Configuration > Billing."
+        assert LLM.tool_calls == 1, "the tool the model asked for was run, once"
+        second = LLM.sent[1]
+        assert any(
+            isinstance(m, HumanMessage) and m.content.startswith("[Result of search_halo_guides]") for m in second
+        ), "and its result was handed back to the model"
+
+    def test_a_destructive_tool_written_as_text_is_not_run(self):
+        c = client_as()
+        LLM.replies = ['```tool_use\ndelete_alert\n{"alert_id": "a1"}\n```']
+        out = chat(c, "delete alert a1").json()
+        assert LLM.tool_calls == 0
+        assert "delete_alert" in out["reply"]["content"], "shown as it was written: only a real tool call reaches the confirmation step"
+
+
 class TestDeletingAChat:
     def test_a_deleted_conversation_leaves_the_list_and_cannot_be_opened_and_the_others_stay(self):
         c = client_as()

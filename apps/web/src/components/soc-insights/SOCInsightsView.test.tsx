@@ -35,6 +35,7 @@ vi.mock('@/lib/realtime', () => ({
 }));
 
 import { insightsApi, msspApi, type SOCInsightsResponse } from '@/lib/api';
+import { useRealtimeChannel } from '@/lib/realtime';
 import { SOCInsightsView } from './SOCInsightsView';
 import { tileHref } from './InsightTileCard';
 import { pointsToPath } from './Sparkline';
@@ -293,5 +294,27 @@ describe('tileHref', () => {
     expect(screen.getByTestId('tile-items-noisy_alert_types')).toHaveTextContent('3 (30%)');
     expect(screen.getByTestId('tile-detail-open_alerts')).toHaveTextContent('Oldest: 3 days');
     expect(screen.getByText('12')).toBeInTheDocument();
+  });
+
+  it('keeps the tiles on screen while a realtime poke fetches the new numbers, instead of blanking to the loading outline', async () => {
+    const mock = insightsApi.getSOC as ReturnType<typeof vi.fn>;
+    mock.mockResolvedValueOnce(sampleResponse);
+    const cache = new Map();
+    const tree = (last: unknown) => {
+      (useRealtimeChannel as ReturnType<typeof vi.fn>).mockReturnValue({ status: 'open', last, history: [], send: vi.fn(), reset: vi.fn() });
+      return (
+        <SWRConfig value={{ provider: () => cache, dedupingInterval: 0 }}>
+          <SOCInsightsView />
+        </SWRConfig>
+      );
+    };
+    const view = render(tree(null));
+    await waitFor(() => expect(screen.getByText('MTTA')).toBeInTheDocument());
+    mock.mockReturnValue(new Promise(() => {})); // the refetch never answers: whatever is shown now is all there is
+    view.rerender(tree({ type: 'insights_updated' }));
+    await waitFor(() => expect(mock.mock.calls.length).toBeGreaterThanOrEqual(2));
+    expect(screen.getByText('MTTA')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/loading soc insights/i)).toBeNull();
+    (useRealtimeChannel as ReturnType<typeof vi.fn>).mockReturnValue({ status: 'open', last: null, history: [], send: vi.fn(), reset: vi.fn() });
   });
 });

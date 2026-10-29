@@ -60,10 +60,9 @@ export function SOCInsightsView() {
 
   useEffect(() => {
     if (last?.type === 'insights_updated' || last?.type === 'case.updated') {
-      // Force a re-fetch — pass false to suppress the optimistic
-      // "loading" flash; users keep seeing the old tiles for the
-      // 100-200ms until the new ones arrive.
-      mutate(undefined, { revalidate: true });
+      // Ask again, keeping what is on screen until the new numbers arrive. (mutate(undefined, ...) used to be here: it sets the cached data to
+      // undefined, so every poke blanked the page to its loading outline for as long as the API took to answer.)
+      void mutate();
     }
   }, [last, mutate]);
 
@@ -226,8 +225,11 @@ function TileGrid({ tiles, clientId }: TileGridProps) {
   );
 }
 
+// About as many outlines as there are tiles (the API sends 14 or 15), so the page does not jump when they arrive.
+const LOADING_TILES = 14;
+
 function LoadingSkeleton() {
-  // 7 skeleton tiles arranged on the same grid. The fixed heights
+  // Skeleton tiles arranged on the same grid. The fixed heights
   // mean the layout doesn't reflow when the real data arrives.
   return (
     <div
@@ -235,7 +237,7 @@ function LoadingSkeleton() {
       aria-busy="true"
       aria-label="Loading SOC insights"
     >
-      {Array.from({ length: 7 }).map((_, i) => (
+      {Array.from({ length: LOADING_TILES }).map((_, i) => (
         <div
           key={i}
           className="h-32 animate-pulse rounded-lg border border-border bg-card"
