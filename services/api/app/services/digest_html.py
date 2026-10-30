@@ -127,7 +127,7 @@ def _source_rows(sources: list[TopSourceHighlight]) -> str:
     if not sources:
         return '<p style="color:#64748b;font-size:13px;">No connector activity in this period.</p>'
     body = "".join(
-        f'<tr><td style="padding:6px 8px;">{_esc(s.connector_type)}</td>'
+        f'<tr><td style="padding:6px 8px;">{_esc(s.label or s.connector_type)}</td>'
         f'<td style="padding:6px 8px;text-align:right;font-weight:600;">{s.count}</td></tr>'
         for s in sources
     )

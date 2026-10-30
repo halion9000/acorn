@@ -40,6 +40,7 @@ from app.models.alert import Alert
 from app.models.remediation import RemediationGateLog
 from app.services import case_metrics
 from app.services.alert_status import FINISHED_ALERT_STATUSES
+from app.services.source_labels import source_label
 
 # ---------------------------------------------------------------------------
 # Output schemas (Pydantic) — what the endpoint actually returns.
@@ -90,8 +91,10 @@ class TacticHighlight(BaseModel):
 
 
 class TopSourceHighlight(BaseModel):
+    # The tool or feed's key (huntress, aisoc-checks) and its readable name (Huntress, A.C.O.R.N posture checks).
     connector_type: str
     count: int
+    label: str = ""
 
 
 class HighRiskAlertHighlight(BaseModel):
@@ -154,6 +157,8 @@ class AlertRow:
     title: str
     alert_id: str
     event_time: datetime
+    # The tool that raised it as the alert itself says (``raw_event.source``); the connector type is often a generic ingest name instead.
+    source: str | None = None
 
 
 @dataclass(frozen=True)
@@ -276,9 +281,10 @@ def _top_tactics(
 def _top_sources(rows: list[AlertRow], *, limit: int = 5) -> list[TopSourceHighlight]:
     counter: Counter[str] = Counter()
     for r in rows:
-        if r.connector_type:
-            counter[r.connector_type] += 1
-    return [TopSourceHighlight(connector_type=ct, count=cnt) for ct, cnt in counter.most_common(limit)]
+        key = r.source or r.connector_type
+        if key:
+            counter[key] += 1
+    return [TopSourceHighlight(connector_type=ct, count=cnt, label=source_label(ct)) for ct, cnt in counter.most_common(limit)]
 
 
 def _high_risk_alerts(rows: list[AlertRow], *, limit: int = 5) -> list[HighRiskAlertHighlight]:
@@ -518,6 +524,7 @@ async def _fetch_alerts(
             Alert.disposition,
             Alert.mitre_tactics,
             Alert.connector_type,
+            Alert.raw_event["source"].as_string().label("tool"),
             Alert.ai_score,
             Alert.event_time,
         ).where(
@@ -541,6 +548,7 @@ async def _fetch_alerts(
                 disposition=r.disposition,
                 mitre_tactics=list(r.mitre_tactics or []),
                 connector_type=r.connector_type,
+                source=r.tool,
                 ai_score=float(r.ai_score) if r.ai_score is not None else None,
                 event_time=r.event_time or r.created_at,
             )

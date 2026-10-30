@@ -5891,6 +5891,8 @@ export interface TacticHighlight {
 export interface TopSourceHighlight {
   connector_type: string;
   count: number;
+  /** The tool's readable name (absent from an older API). */
+  label?: string;
 }
 
 export interface HighRiskAlertHighlight {

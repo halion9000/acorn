@@ -191,6 +191,16 @@ describe('ExecutiveDigest for a client', () => {
   });
 });
 
+describe('ExecutiveDigest top alert sources', () => {
+  it('shows each source by its readable name, with the key on hover, and falls back to the key from an older API', async () => {
+    api.weeklyDigest.mockResolvedValue(digest({ top_sources: [{ connector_type: 'aisoc-checks', count: 40, label: 'A.C.O.R.N posture checks' }, { connector_type: 'huntress', count: 3 }] }));
+    renderIt();
+    const name = await screen.findByText('A.C.O.R.N posture checks');
+    expect(name).toHaveAttribute('title', 'aisoc-checks');
+    expect(screen.getByText('huntress')).toBeInTheDocument();
+  });
+});
+
 describe('ExecutiveDigest links', () => {
   it('sends the alert, open alert and case tiles to their pages and each top alert to its own page', async () => {
     api.weeklyDigest.mockResolvedValue(digest());

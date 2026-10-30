@@ -100,12 +100,19 @@ class _Failing:
         self.title, self.failing_since, self.key, self.owner = title, since, key, owner
 
 
-def test_a_secureframe_test_failing_for_two_weeks_raises_one_alert_naming_its_owner():
-    old = _Failing("MFA on all accounts", datetime(2026, 10, 1, tzinfo=UTC), key="mfa-1", owner="Dale")
-    out = ca.secureframe_alerts([old], NOW)
-    assert len(out) == 1 and out[0]["title"] == "Secureframe test failing for 28 days: MFA on all accounts"
+def test_a_secureframe_test_that_has_just_passed_two_weeks_raises_one_alert_naming_its_owner():
+    fresh = _Failing("MFA on all accounts", datetime(2026, 10, 12, tzinfo=UTC), key="mfa-1", owner="Dale")
+    out = ca.secureframe_alerts([fresh], NOW)
+    assert len(out) == 1 and out[0]["title"] == "Secureframe test failing for 17 days: MFA on all accounts"
     assert "Owner: Dale." in out[0]["description"] and out[0]["idempotency_key"] == "secureframe:mfa-1:14d"
-    assert "It has no owner." in ca.secureframe_alerts([_Failing("x", datetime(2026, 9, 1, tzinfo=UTC))], NOW)[0]["description"]
+    assert "It has no owner." in ca.secureframe_alerts([_Failing("x", datetime(2026, 10, 14, tzinfo=UTC))], NOW)[0]["description"]
+
+
+def test_a_chronic_failure_is_a_backlog_not_news_and_raises_nothing():
+    chronic = [_Failing(f"old {i}", datetime(2025, 12, 1, tzinfo=UTC)) for i in range(40)]
+    assert ca.secureframe_alerts(chronic, NOW) == []
+    assert ca.secureframe_alerts([_Failing("edge", datetime(2026, 10, 8, 12, tzinfo=UTC))], NOW) == [], "21 days is past the window"
+    assert len(ca.secureframe_alerts([_Failing("edge", datetime(2026, 10, 9, 12, tzinfo=UTC))], NOW)) == 1, "20 days is still inside it"
 
 
 def test_a_young_or_undated_failing_test_raises_nothing():

@@ -320,7 +320,7 @@ function DigestBody({ digest, clientId }: { digest: ExecutiveDigestPayload; clie
             <ul className="divide-y divide-gray-800">
               {digest.top_sources.map((s) => (
                 <li key={s.connector_type} className="flex items-center justify-between py-2 text-sm">
-                  <span className="text-gray-200">{s.connector_type}</span>
+                  <span className="text-gray-200" title={s.connector_type}>{s.label || s.connector_type}</span>
                   <span className="text-white tabular-nums">{s.count}</span>
                 </li>
               ))}

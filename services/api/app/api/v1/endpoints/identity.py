@@ -29,7 +29,14 @@ from app.models.signin import DirectoryAuditEvent, IdentityMfaUser, IdentitySecu
 from app.models.tenant import Tenant
 from app.services.directory_scoring import directory_features, sensitivity_of
 from app.services.identity_detections import run_audit_detections
-from app.services.mfa_registration import GOOGLE_SOURCES, directory_of, known_by_source, required_of, second_factor
+from app.services.mfa_registration import (
+    REGISTRATION_REPORTED,
+    THREATMATE_MICROSOFT,
+    directory_of,
+    known_by_source,
+    required_of,
+    second_factor,
+)
 from app.services.signin_scoring import HISTORY_DAYS, score_events
 from app.services.timeutil import as_utc
 
@@ -261,6 +268,8 @@ class MfaUserIn(BaseModel):
 
 class MfaUsersReport(BaseModel):
     vendor: str = Field(pattern=_VENDOR)
+    # The source the people are stored under when it is not the vendor's own name: ThreatMate (the vendor, used to find the client) sends its Microsoft 365 people as ``threatmate-microsoft``.
+    source: str | None = Field(default=None, pattern=r"^(threatmate-microsoft)$")
     vendor_client_id: str = Field(min_length=1, max_length=200)
     snapshot_id: uuid.UUID = Field(description="One id for every chunk of one tenant's snapshot.")
     last: bool = Field(default=True, description="True on the final chunk: people not in this snapshot are then removed.")
@@ -288,13 +297,31 @@ async def apply_mfa_users(db: Any, owner: uuid.UUID, report: MfaUsersReport, now
     now = now or datetime.now(UTC)
     by_tenant, unmapped, ignored, waiting = await targets_by_tenant(db, owner, _MfaView(report))
     accepted = removed = 0
+    source = report.source or report.vendor
     for tid in by_tenant:
         async with acting_as_tenant(db, tid):
+            if source == THREATMATE_MICROSOFT:
+                # CIPP is the fuller source of a client's Microsoft people: where it reports any, ThreatMate's copy would count the same people twice, so it is not kept.
+                has_cipp = (
+                    await db.execute(
+                        select(IdentityMfaUser.user_id).where(IdentityMfaUser.tenant_id == tid, IdentityMfaUser.source == "cipp").limit(1)
+                    )
+                ).first() is not None
+                if has_cipp:
+                    await db.execute(
+                        delete(IdentityMfaUser).where(IdentityMfaUser.tenant_id == tid, IdentityMfaUser.source == THREATMATE_MICROSOFT)
+                    )
+                    ignored += 1
+                    continue
+            elif source == "cipp":
+                await db.execute(
+                    delete(IdentityMfaUser).where(IdentityMfaUser.tenant_id == tid, IdentityMfaUser.source == THREATMATE_MICROSOFT)
+                )
             if report.items:
                 values = [
                     {
                         "tenant_id": tid,
-                        "source": report.vendor,
+                        "source": source,
                         "user_id": u.id,
                         "upn": u.upn.lower(),
                         "display_name": u.display_name,
@@ -321,7 +348,7 @@ async def apply_mfa_users(db: Any, owner: uuid.UUID, report: MfaUsersReport, now
                 res = await db.execute(
                     delete(IdentityMfaUser).where(
                         IdentityMfaUser.tenant_id == tid,
-                        IdentityMfaUser.source == report.vendor,
+                        IdentityMfaUser.source == source,
                         IdentityMfaUser.snapshot_id != report.snapshot_id,
                     )
                 )
@@ -361,7 +388,7 @@ def counts_for_mfa(users: list[Any]) -> dict[str, int]:
         "not_required": len(not_required),
         "without_mfa": len(without),
         "admins_without_mfa": len([u for u in without if u.admin]),
-        "registration_unknown": 0 if all(v for src, v in known.items() if src not in GOOGLE_SOURCES) else 1,
+        "registration_unknown": 0 if all(v for src, v in known.items() if src not in REGISTRATION_REPORTED) else 1,
     }
 
 

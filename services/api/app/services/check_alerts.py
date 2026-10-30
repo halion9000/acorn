@@ -109,13 +109,15 @@ async def raise_alerts(db: Any, tenant_id: uuid.UUID, source: str, changes: list
 
 
 SECUREFRAME_STALE_DAYS = 14
+SECUREFRAME_NEW_WINDOW_DAYS = 7
 
 
 def secureframe_alerts(failing: list[Any], now: datetime, days: int = SECUREFRAME_STALE_DAYS) -> list[dict[str, Any]]:
     """One alert spec per Secureframe test that has been failing for ``days`` days or more (``failing`` are the report's failing tests with ``key``, ``title``, ``owner`` and ``failing_since``).
 
-    The idempotency key is the test and the threshold, with no date, so a test raises its alert once however long it keeps failing; fixing it and failing again later does not raise a second one (the
-    first is still the record of it).
+    Only a test that has just crossed the threshold raises one: failing for ``days`` days or more but less than ``days`` plus ``SECUREFRAME_NEW_WINDOW_DAYS``. A test that has failed for months is a known
+    backlog, not news (the first report after this was added found forty of them, up to two years old), and the Compliance page already lists it. The idempotency key is the test and the threshold, with no
+    date, so a test raises its alert once however long it keeps failing.
     """
     out: list[dict[str, Any]] = []
     for t in failing:
@@ -125,7 +127,7 @@ def secureframe_alerts(failing: list[Any], now: datetime, days: int = SECUREFRAM
         if since.tzinfo is None:
             since = since.replace(tzinfo=now.tzinfo)
         age = (now - since).days
-        if age < days:
+        if age < days or age >= days + SECUREFRAME_NEW_WINDOW_DAYS:
             continue
         ident = t.key or t.title
         owner = f" Owner: {t.owner}." if t.owner else " It has no owner."

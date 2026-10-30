@@ -32195,6 +32195,12 @@ components:
           type: string
           pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
           title: Vendor
+        source:
+          anyOf:
+          - type: string
+            pattern: ^(threatmate-microsoft)$
+          - type: 'null'
+          title: Source
         vendor_client_id:
           type: string
           maxLength: 200
