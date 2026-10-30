@@ -99,6 +99,7 @@ async def test_the_latest_report_replaces_the_one_before_and_each_organization_r
     finally:
         async with engine.begin() as conn:
             await conn.execute(text("set local session_replication_role = replica"))
+            await conn.execute(text("delete from alerts where tenant_id = any(:t)"), {"t": [mine, other]})
             await conn.execute(text("delete from secureframe_reports where tenant_id = any(:t)"), {"t": [mine, other]})
             await conn.execute(text("delete from tenants where id = any(:t)"), {"t": [mine, other]})
         await engine.dispose()
@@ -218,6 +219,7 @@ async def test_a_day_is_recorded_once_with_the_latest_counts_and_the_view_report
         async with engine.begin() as conn:
             await conn.execute(text("set local session_replication_role = replica"))
             await conn.execute(text("delete from secureframe_history where tenant_id = :t"), {"t": tid})
+            await conn.execute(text("delete from alerts where tenant_id = :t"), {"t": tid})
             await conn.execute(text("delete from secureframe_reports where tenant_id = :t"), {"t": tid})
             await conn.execute(text("delete from tenants where id = :t"), {"t": tid})
         await engine.dispose()

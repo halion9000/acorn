@@ -6,6 +6,7 @@ framework, the oldest failing tests with their owner, and the number of risks an
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
@@ -18,7 +19,9 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
 from app.db.rls_sessions import adopt_tenant
 from app.models.secureframe_report import SecureframeHistory, SecureframeReport
+from app.services.check_alerts import raise_secureframe_alerts
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/secureframe", tags=["secureframe"])
 ingest_router = APIRouter(prefix="/inbox", tags=["secureframe"])
 
@@ -154,6 +157,11 @@ async def report_core_feed_secureframe(tenant_token: str, body: ReportIn, db: DB
             },
         )
     )
+    try:
+        async with db.begin_nested():  # an alert that cannot be raised must not lose the report
+            await raise_secureframe_alerts(db, owner, body.report.failing, datetime.now(UTC))
+    except Exception:  # noqa: BLE001
+        logger.warning("secureframe alerts not raised", exc_info=True)
     await db.commit()
     return ReportResponse()
 

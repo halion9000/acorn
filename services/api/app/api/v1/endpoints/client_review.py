@@ -43,6 +43,8 @@ from app.models.signin import (
 from app.models.tenant import Tenant
 from app.services import fleet_cache, review_history
 from app.services.assessment_review import AssessAnswer, assessment_answers
+from app.services.check_alerts import raise_alerts as raise_check_alerts
+from app.services.check_alerts import raise_score_drop
 from app.services.check_history import changes as check_changes
 from app.services.check_history import item_changes
 from app.services.client_review import DeviceFacts, Readiness, device_facts, readiness
@@ -224,8 +226,14 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
             previous = (
                 await db.execute(select(ClientM365Check.checks).where(ClientM365Check.tenant_id == tid, ClientM365Check.source == source))
             ).scalar_one_or_none()
-            for change in check_changes(previous, new_checks, source):
+            changed = check_changes(previous, new_checks, source)
+            for change in changed:
                 db.add(ClientCheckHistory(tenant_id=tid, observed_at=now, **change))
+            try:
+                async with db.begin_nested():  # an alert that cannot be raised must not lose the checks
+                    await raise_check_alerts(db, tid, source, changed, now)
+            except Exception:  # noqa: BLE001
+                logger.warning("check alerts not raised for %s", tid, exc_info=True)
             try:
                 async with db.begin_nested():  # an older database without the table must not lose the checks
                     for event in item_changes(previous, new_checks):
@@ -241,6 +249,7 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
                     db.begin_nested()
                 ):  # a failure to keep the daily score (an older database without the table) must not lose the checks
                     await record_today(db, tid, now, weights)
+                    await raise_score_drop(db, tid, now)
             except Exception:  # noqa: BLE001
                 logger.warning("score history not recorded for %s", tid, exc_info=True)
             accepted += 1
