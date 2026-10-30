@@ -39,6 +39,23 @@ _BLOCK = re.compile(r"```\s*(?:tool_use|tool_call|tool)\s*\n\s*([A-Za-z_][A-Za-z
 _XML_BLOCK = re.compile(r"<function_calls>.*?</function_calls>|<invoke\s+name=.*?</invoke>", re.DOTALL | re.IGNORECASE)
 _XML_INVOKE = re.compile(r"<invoke\s+name=[\"']([A-Za-z_][A-Za-z0-9_]*)[\"']\s*>(.*?)</invoke>", re.DOTALL | re.IGNORECASE)
 _XML_PARAM = re.compile(r"<parameter\s+name=[\"']([A-Za-z_][A-Za-z0-9_]*)[\"']\s*>(.*?)</parameter>", re.DOTALL | re.IGNORECASE)
+# A line a model wrote to look like the chat's own record of a call, instead of making one: "Tool call: client_changes — Waterloo Sparkling Water Corp." (also bold, or with the argument in brackets).
+_PSEUDO = re.compile(
+    r"^[ \t>*_#-]*tool[ _]call:?[ \t]*\**[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]*\**[ \t]*(?:[\u2014\u2013:-]+|\()[ \t]*(.+?)[ \t]*\)?[ \t*_]*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+# The one argument such a line carries, by tool: what the tool's first parameter is.
+_PSEUDO_ARG: dict[str, str] = {
+    "client_changes": "client",
+    "client_overview": "client",
+    "client_checks": "client",
+    "search_alerts": "query",
+    "search_cases": "query",
+    "search_client_docs": "query",
+    "search_halo_guides": "query",
+    "related_alerts": "alert_id",
+    "get_alert": "alert_id",
+}
 _BARE = re.compile(r"^\s*<?(?:tool_use|tool_call)>?\s*\n\s*([A-Za-z_][A-Za-z0-9_]*)\s*\n(\{.*\})\s*$", re.DOTALL)
 
 
@@ -64,6 +81,7 @@ def strip_text_tool_calls(content: str) -> str:
     """``content`` without any tool call a model wrote as text (a ```tool_use block or an XML ``function_calls`` block), so the analyst never reads one as the answer."""
     cleaned = _XML_BLOCK.sub("", content or "")
     cleaned = _BLOCK.sub("", cleaned)
+    cleaned = _PSEUDO.sub(lambda m: "" if m.group(1) in TEXT_CALLABLE else m.group(0), cleaned)
     return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
 
 
@@ -77,6 +95,17 @@ def parse_text_tool_calls(content: str) -> list[tuple[str, dict[str, Any]]]:
             if call not in unique:
                 unique.append(call)
         return unique[:MAX_TEXT_CALLS]
+    pseudo = [
+        (m.group(1), {_PSEUDO_ARG[m.group(1)]: m.group(2).strip(" *_`\"'")})
+        for m in _PSEUDO.finditer(content or "")
+        if m.group(1) in _PSEUDO_ARG
+    ]
+    if pseudo and not _BLOCK.search(content or ""):
+        unique_pseudo: list[tuple[str, dict[str, Any]]] = []
+        for call in pseudo:
+            if call not in unique_pseudo:
+                unique_pseudo.append(call)
+        return unique_pseudo[:MAX_TEXT_CALLS]
     found: list[tuple[str, str]] = [(m.group(1), m.group(2)) for m in _BLOCK.finditer(content or "")]
     if not found:
         bare = _BARE.match(content or "")

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
 from app import copilot_tools as ct
 from app.services import halo_guides as hg
-from app.services.copilot_textcalls import MAX_TEXT_CALLS, parse_text_tool_calls
+from app.services.copilot_textcalls import MAX_TEXT_CALLS, parse_text_tool_calls, strip_text_tool_calls
 
 SCREENSHOT = '```tool_use\nsearch_halo_guides\n{"query": "recurring invoices"}\n```'
 
@@ -111,3 +112,34 @@ def test_a_call_written_as_text_is_cut_out_of_what_the_analyst_reads():
     assert strip_text_tool_calls(SCREENSHOT + "\nDone.") == "Done."
     assert strip_text_tool_calls("Plain answer.") == "Plain answer."
     assert strip_text_tool_calls(XML_CALL) == ""
+
+
+class TestACallWrittenAsTheChatsOwnRecordLine:
+    """A model sometimes writes "Tool call: client_changes - Acme" as plain text, as the chat shows its calls, instead of making the call; the analyst was left with that line as the answer."""
+
+    def test_the_line_from_the_chat_runs_the_tool_with_the_client_and_is_not_shown_as_the_answer(self):
+        text = "Let me check that now.\n\n**Tool call: client_changes** — Waterloo Sparkling Water Corp."
+        assert parse_text_tool_calls(text) == [("client_changes", {"client": "Waterloo Sparkling Water Corp."})]
+        assert strip_text_tool_calls(text) == "Let me check that now."
+
+    @pytest.mark.parametrize(
+        ("line", "expected"),
+        [
+            ("Tool call: client_overview (Acme Dental)", ("client_overview", {"client": "Acme Dental"})),
+            ("> Tool call: search_alerts - phishing", ("search_alerts", {"query": "phishing"})),
+            ("tool call: client_checks: Birch Law", ("client_checks", {"client": "Birch Law"})),
+        ],
+    )
+    def test_other_spellings_of_the_line(self, line, expected):
+        assert parse_text_tool_calls(line) == [expected]
+
+    def test_a_tool_that_changes_something_or_an_ordinary_sentence_is_never_run(self):
+        assert parse_text_tool_calls("Tool call: delete_alert — 123") == []
+        assert parse_text_tool_calls("The tool call: client_changes is handy for this") == []
+        assert strip_text_tool_calls("Tool call: delete_alert — 123") == "Tool call: delete_alert — 123"
+
+    def test_the_same_line_twice_runs_once_and_a_real_block_wins(self):
+        twice = "Tool call: client_overview (Acme)\nTool call: client_overview (Acme)"
+        assert parse_text_tool_calls(twice) == [("client_overview", {"client": "Acme"})]
+        block = 'Tool call: client_overview (Acme)\n```tool_use\nsearch_halo_guides\n{"query": "x"}\n```'
+        assert parse_text_tool_calls(block) == [("search_halo_guides", {"query": "x"})]
