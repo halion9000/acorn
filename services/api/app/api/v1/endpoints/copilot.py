@@ -139,7 +139,7 @@ when the guides do not cover something.
 and stale accounts, failed sign-ins, leaked credentials on the dark web, \
 backups, endpoint tools) call client_checks; for our own company's \
 compliance (Secureframe tests, risks, policies, NIST CSF or CIS IG1 \
-requirements) call secureframe_status. Answer from what they return.
+requirements) call secureframe_status. For "how is <client> doing" or a comparison of two clients call client_overview once per client; for "what changed" or "what got worse" call client_changes. A check a person accepted as a risk is not a problem: do not raise it again. Answer from what the tools return, and end by saying which tool and client it came from.
 - If the analyst's message is not about the SOC environment (a greeting, \
 a question about who or what you are, small talk), answer that plainly \
 and briefly. Only produce security analysis when there is real alert, \

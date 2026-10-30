@@ -155,3 +155,105 @@ def test_both_tools_are_registered_permissioned_and_callable_from_text():
         assert any(t["function"]["name"] == name for t in ct.COPILOT_TOOL_SCHEMAS)
         assert name in TEXT_CALLABLE
     assert parse_text_tool_calls('```tool_use\nclient_checks\n{"client": "Acme"}\n```') == [("client_checks", {"client": "Acme"})]
+
+
+ACME, BIRCH, BIRCHWOOD = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+NAMES = {ACME: "Acme Dental", BIRCH: "Birch Law", BIRCHWOOD: "Birchwood Farms"}
+
+
+def _change(cid, key, now, was, hours_ago=1):
+    return SimpleNamespace(
+        client_id=cid,
+        client_name=NAMES[cid],
+        key=key,
+        source="threatmate",
+        status=now,
+        previous_status=was,
+        observed_at=datetime(2026, 10, 29, 12 - hours_ago, tzinfo=UTC),
+    )
+
+
+def _scope_patch():
+    return patch("app.api.v1.endpoints.client_posture._scope", AsyncMock(return_value=([uuid.uuid4(), ACME, BIRCH, BIRCHWOOD], NAMES)))
+
+
+@pytest.mark.asyncio
+async def test_client_changes_lists_what_moved_for_one_client_or_all_and_refuses_an_unclear_name():
+    rows = [_change(ACME, "threatmate_patching", "not_met", "met"), _change(BIRCH, "threatmate_dmarc", "met", "partly", 2)]
+    fleet = AsyncMock(return_value=rows)
+    with (
+        patch.object(ct, "_get_session", AsyncMock(return_value=_Session())),
+        _scope_patch(),
+        patch("app.api.v1.endpoints.client_posture.fleet_changes", fleet),
+    ):
+        one = await ct.client_changes(tenant_id=TID, client="acme")
+        everyone = await ct.client_changes(tenant_id=TID, days=3)
+        several = await ct.client_changes(tenant_id=TID, client="birch")
+        nobody = await ct.client_changes(tenant_id=TID, client="zzz")
+    assert one["count"] == 1 and one["changes"][0] == {
+        "client": "Acme Dental",
+        "check": "threatmate_patching",
+        "source": "threatmate",
+        "now": "not_met",
+        "was": "met",
+        "when": "2026-10-29T11:00:00+00:00",
+    }
+    assert everyone["count"] == 2 and everyone["days"] == 3
+    assert several["error"] == "several clients fit that name" and several["clients"] == ["Birch Law", "Birchwood Farms"]
+    assert "no client is named like" in nobody["error"]
+
+
+@pytest.mark.asyncio
+async def test_client_changes_says_so_when_nothing_changed():
+    with (
+        patch.object(ct, "_get_session", AsyncMock(return_value=_Session())),
+        _scope_patch(),
+        patch("app.api.v1.endpoints.client_posture.fleet_changes", AsyncMock(return_value=[])),
+    ):
+        out = await ct.client_changes(tenant_id=TID)
+    assert out["changes"] == [] and "note" in out
+
+
+class _Posture:
+    def model_dump(self, mode="json"):
+        return {
+            "devices": {"total": 20, "needs_attention": 3},
+            "identity": {"people": 40, "without_mfa": 2},
+            "alerts": {"open": 5, "critical": 1},
+            "open_cases": 1,
+            "tools": [{"vendor": "huntress"}, {"vendor": "ninjaone"}, {"vendor": "huntress"}],
+            "tool_checks": {
+                "threatmate": {
+                    "checks": [
+                        {"key": "a_met", "status": "met", "evidence": "fine"},
+                        {"key": "b_partly", "status": "partly", "evidence": "so so"},
+                        {"key": "c_bad", "status": "not_met", "evidence": "x" * 500},
+                        {"key": "d_accepted", "status": "not_met", "evidence": "", "accepted": {"reason": "ok"}},
+                    ]
+                }
+            },
+        }
+
+
+@pytest.mark.asyncio
+async def test_client_overview_summarises_one_client_with_its_worst_checks_first():
+    posture = AsyncMock(return_value=_Posture())
+    with (
+        patch.object(ct, "_get_session", AsyncMock(return_value=_Session())),
+        _scope_patch(),
+        patch("app.api.v1.endpoints.client_posture.client_posture", posture),
+    ):
+        out = await ct.client_overview(tenant_id=TID, client="Acme Dental")
+        unclear = await ct.client_overview(tenant_id=TID, client="birch")
+        missing = await ct.client_overview(tenant_id=TID, client="")
+    assert out["client"] == "Acme Dental" and out["tools"] == ["huntress", "ninjaone"] and out["checks_not_fine"] == 2
+    assert [c["check"] for c in out["worst_checks"]] == ["c_bad", "b_partly"] and len(out["worst_checks"][0]["evidence"]) == 200
+    assert out["devices"]["needs_attention"] == 3 and out["open_cases"] == 1
+    assert posture.await_args.args[0] == ACME
+    assert unclear["error"] == "several clients fit that name" and missing == {"error": "client is required"}
+
+
+def test_the_new_tools_are_registered_permissioned_and_callable_from_text():
+    for name in ("client_changes", "client_overview"):
+        assert ct.TOOL_PERMISSIONS[name] == "alerts:read" and name in ct._COPILOT_TOOL_DISPATCH and name in TEXT_CALLABLE
+        assert any(t["function"]["name"] == name for t in ct.COPILOT_TOOL_SCHEMAS)

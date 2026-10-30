@@ -27,6 +27,8 @@ TEXT_CALLABLE: frozenset[str] = frozenset(
         "search_halo_guides",
         "read_halo_guide",
         "client_checks",
+        "client_changes",
+        "client_overview",
         "secureframe_status",
     }
 )

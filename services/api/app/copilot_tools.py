@@ -244,6 +244,97 @@ async def client_checks(
     }
 
 
+async def _client_by_name(db: AsyncSession, owner: uuid.UUID, name: str) -> tuple[uuid.UUID, str] | list[str] | None:
+    """The one client whose name contains ``name`` (case ignored): ``(id, name)``; a list of the names when several fit; None when none does."""
+    from app.api.v1.endpoints.client_posture import _scope
+
+    _ids, names = await _scope(db, owner, None)
+    needle = name.strip().lower()
+    exact = [(i, n) for i, n in names.items() if n and n.lower() == needle]
+    if len(exact) == 1:
+        return exact[0]
+    fits = [(i, n) for i, n in names.items() if n and needle in n.lower()]
+    if len(fits) == 1:
+        return fits[0]
+    return sorted(n for _, n in fits)[:10] if fits else None
+
+
+async def client_changes(*, tenant_id: str, client: str = "", days: int = 7, limit: int = 25) -> dict[str, Any]:
+    """What changed in the checks the tools report: checks that appeared or moved to a better or worse status in the last days, worst first, for one client (by name) or for all."""
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints.client_posture import fleet_changes
+
+    try:
+        tid = uuid.UUID(tenant_id)
+    except ValueError:
+        return {"error": "invalid tenant_id"}
+    days, limit = max(1, min(int(days or 7), 90)), max(1, min(int(limit or 25), 50))
+    async with await _get_session(tid) as db:
+        wanted: tuple[uuid.UUID, str] | None = None
+        if client and client.strip():
+            found = await _client_by_name(db, tid, client)
+            if found is None:
+                return {"error": f"no client is named like {client!r}"}
+            if isinstance(found, list):
+                return {"error": "several clients fit that name", "clients": found}
+            wanted = found
+        rows = await fleet_changes(SimpleNamespace(tenant_id=tid), db, days=days, limit=1000)
+    if wanted:
+        rows = [r for r in rows if r.client_id == wanted[0]]
+    shown = [
+        {
+            "client": r.client_name,
+            "check": r.key,
+            "source": r.source,
+            "now": r.status,
+            "was": r.previous_status,
+            "when": r.observed_at.isoformat(),
+        }
+        for r in rows[:limit]
+    ]
+    return {"days": days, "count": len(rows), "changes": shown, **({} if shown else {"note": "No check changed in that time."})}
+
+
+async def client_overview(*, tenant_id: str, client: str) -> dict[str, Any]:
+    """One client at a glance: devices, Multi-Factor coverage, open alerts and cases, the tools mapped, and the checks that are not fine."""
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints.client_posture import client_posture
+
+    try:
+        tid = uuid.UUID(tenant_id)
+    except ValueError:
+        return {"error": "invalid tenant_id"}
+    if not client or not client.strip():
+        return {"error": "client is required"}
+    async with await _get_session(tid) as db:
+        found = await _client_by_name(db, tid, client)
+        if found is None:
+            return {"error": f"no client is named like {client!r}"}
+        if isinstance(found, list):
+            return {"error": "several clients fit that name", "clients": found}
+        posture = await client_posture(found[0], SimpleNamespace(tenant_id=tid), db)
+    data = posture.model_dump(mode="json")
+    problems = [
+        {"source": source, "check": c["key"], "status": c["status"], "evidence": _trim(c.get("evidence"), 200)}
+        for source, group in (data.get("tool_checks") or {}).items()
+        for c in group.get("checks", [])
+        if c["status"] != "met" and not c.get("accepted")
+    ]
+    problems.sort(key=lambda p: (p["status"] != "not_met", p["source"], p["check"]))
+    return {
+        "client": found[1],
+        "devices": data.get("devices"),
+        "multi_factor": data.get("identity"),
+        "alerts": data.get("alerts"),
+        "open_cases": data.get("open_cases"),
+        "tools": sorted({t["vendor"] for t in data.get("tools", [])}),
+        "checks_not_fine": len(problems),
+        "worst_checks": problems[:12],
+    }
+
+
 async def secureframe_status(*, tenant_id: str, framework: str = "", limit: int = 15) -> dict[str, Any]:
     """Our own company's Secureframe state: test counts, failing tests, risks, policies, and for NIST CSF 2.0 or CIS IG1 the requirements that are not healthy."""
     from app.api.v1.endpoints.secureframe import FRAMEWORK_KEYS, SecureframeBody, mapping_for, passing_percent
@@ -616,6 +707,34 @@ COPILOT_TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "client_changes",
+            "description": "What changed lately in the checks the tools report: checks that got worse or better or appeared in the last days, worst first. Use it for 'what changed at <client> this week' or 'what got worse across the clients'. Leave client empty for all clients.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "client": {"type": "string", "description": "Part of a client's name (optional)."},
+                    "days": {"type": "integer", "description": "How many days back (default 7, max 90)."},
+                    "limit": {"type": "integer", "description": "Maximum rows (default 25, max 50)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "client_overview",
+            "description": "One client at a glance: devices needing attention, Multi-Factor coverage, open alerts and cases, the tools mapped to it and its worst failing checks. Use it for 'how is <client> doing' or before comparing two clients (call it once per client).",
+            "parameters": {
+                "type": "object",
+                "properties": {"client": {"type": "string", "description": "Part of the client's name."}},
+                "required": ["client"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "secureframe_status",
             "description": "Our own company's Secureframe compliance state: how many control tests pass, the oldest failing tests and their owners, risks, policies, and for NIST CSF 2.0 or CIS IG1 the requirements that are not healthy. Not about clients.",
             "parameters": {
@@ -737,6 +856,8 @@ _COPILOT_TOOL_DISPATCH: dict[str, Any] = {
     "search_alerts": search_alerts,
     "search_client_docs": search_client_docs,
     "client_checks": client_checks,
+    "client_changes": client_changes,
+    "client_overview": client_overview,
     "secureframe_status": secureframe_status,
     "search_halo_guides": search_halo_guides,
     "read_halo_guide": read_halo_guide,
@@ -832,6 +953,8 @@ TOOL_PERMISSIONS: dict[str, str] = {
     "search_alerts": "alerts:read",
     "search_client_docs": "alerts:read",
     "client_checks": "alerts:read",
+    "client_changes": "alerts:read",
+    "client_overview": "alerts:read",
     "secureframe_status": "reports:read",
     "search_halo_guides": "alerts:read",
     "read_halo_guide": "alerts:read",
