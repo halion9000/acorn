@@ -246,7 +246,7 @@ class TestTheRealHandlersAreWiredToIt:
 
         db = RecordingDB(self.ANSWERS)
         await metrics.get_dashboard_metrics(user=user(), db=db)
-        assert db.case_sql and all(params.get("tid") == TID for _, params in db.case_sql)
+        assert db.case_sql and all(params.get("tids") == [TID] for _, params in db.case_sql)
 
     async def test_the_soc_metrics_report_cases_opened_and_closed(self):
         from app.api.v1.endpoints import metrics

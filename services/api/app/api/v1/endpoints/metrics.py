@@ -20,6 +20,7 @@ v1.5 (SOC Console parity) adds:
     dashboard.
 """
 
+import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -299,9 +300,9 @@ async def _get_dashboard_metrics_impl(
 
     # ── Case counts ───────────────────────────────────────────────────────────
     # Read from aisoc_cases with its real statuses (see app.services.case_metrics): this counted the old `cases` table and the words 'open' / 'in_progress', so it always showed zero.
-    open_cases_q = await _sum_cases(case_counts.count_with_status, db, tenant_ids, case_counts.OPEN)
-    in_progress_q = await _sum_cases(case_counts.count_with_status, db, tenant_ids, case_counts.IN_PROGRESS)
-    resolved_week_q = await _sum_cases(case_counts.count_finished_since, db, tenant_ids, week_start)
+    open_cases_q = await case_counts.count_with_status_many(db, tenant_ids, case_counts.OPEN)
+    in_progress_q = await case_counts.count_with_status_many(db, tenant_ids, case_counts.IN_PROGRESS)
+    resolved_week_q = await case_counts.count_finished_since_many(db, tenant_ids, week_start)
 
     case_metrics = CaseMetrics(
         open=open_cases_q or 0,
@@ -579,8 +580,8 @@ async def _get_soc_metrics_impl(
         )
         or 0
     )
-    cases_opened = await _sum_cases(case_counts.count_created, db, tenant_ids, week_start)
-    cases_closed = await _sum_cases(case_counts.count_finished_since, db, tenant_ids, week_start)
+    cases_opened = await case_counts.count_created_many(db, tenant_ids, week_start)
+    cases_closed = await case_counts.count_finished_since_many(db, tenant_ids, week_start)
 
     # ── Analyst overrides (7d) ────────────────────────────────────────────────
     # Any alert with a disposition set in the last 7 days = analyst weighed in.
@@ -778,6 +779,52 @@ def _pct_delta(current: float, previous: float) -> float:
     return round(((current - previous) / previous) * 100.0, 2)
 
 
+async def _events_of_interest_total(db, tenant_ids, start, end) -> int:
+    """Events of interest summed over every tenant in scope.
+
+    An MSSP parent has a couple of hundred client tenants, and the lake can only be asked one tenant at a time: asking in turn made the funnel take minutes. The lake queries now run eight at a time, and the first one that fails
+    (the lake is down or slow) stops the rest and the whole total comes from Postgres in a single query, so the number is never a mix of two sources."""
+    if getattr(settings, "AISOC_DISABLE_CLICKHOUSE", False):
+        return await _events_of_interest_from_alerts(db, tenant_ids[0], start, end, tenant_ids)
+    gate = asyncio.Semaphore(8)
+    failed = False
+
+    async def one(tid):
+        nonlocal failed
+        async with gate:
+            if failed:
+                return 0
+            count = await _events_from_lake(tid, start, end)
+            if count is None:
+                failed = True
+                return 0
+            return count
+
+    counts = await asyncio.gather(*[one(t) for t in tenant_ids])
+    if failed:
+        return await _events_of_interest_from_alerts(db, tenant_ids[0], start, end, tenant_ids)
+    return sum(counts)
+
+
+async def _events_from_lake(tenant_id, start, end) -> int | None:
+    """One tenant's raw events from ClickHouse, or None when the lake cannot answer (not configured, an error, a timeout)."""
+    try:
+        from app.db.clickhouse import execute_lake_query
+        from app.services.lake_sql import rewrite_for_tenant
+
+        sql = (
+            "SELECT count() AS cnt "
+            "FROM aisoc.raw_events "
+            f"WHERE ingested_at >= toDateTime('{start.strftime('%Y-%m-%d %H:%M:%S')}') "
+            f"AND ingested_at < toDateTime('{end.strftime('%Y-%m-%d %H:%M:%S')}')"
+        )
+        result = await execute_lake_query(rewrite_for_tenant(sql, tenant_id, row_cap=1).sql, timeout_seconds=5.0)
+        return int(result.rows[0][0] or 0) if result.rows else 0
+    except Exception as exc:  # noqa: BLE001 - any failure means "ask Postgres instead"
+        logger.warning("events_of_interest ClickHouse fallback: %s", exc)
+        return None
+
+
 async def _events_of_interest(db, tenant_id, start, end) -> int:
     """Count tenant raw events that landed in the analytical lake.
 
@@ -849,6 +896,23 @@ async def _events_of_interest_from_alerts(db, tenant_id, start, end, tenant_ids=
     return int(val or 0)
 
 
+async def _repeat_alerts_suppressed_total(db, tenant_ids, start, end) -> int:
+    """The same count over every tenant in scope in one query (it used to be one query per client tenant)."""
+    try:
+        result = await db.scalar(
+            text(
+                """
+                SELECT count(*) FROM aisoc_outcome_suppressions
+                 WHERE tenant_id = ANY(:tids) AND created_at >= :start AND created_at < :end
+                """
+            ),
+            {"tids": list(tenant_ids), "start": start, "end": end},
+        )
+        return int(result or 0)
+    except Exception:  # noqa: BLE001 - analytics table optional; never break the funnel
+        return 0
+
+
 async def _repeat_alerts_suppressed(db, tenant_id, start, end) -> int:
     """Measured count of repeat alerts auto-suppressed from prior outcome memory
     in [start, end). Tenant-scoped at the query layer. Returns 0 when the table
@@ -871,9 +935,7 @@ async def _repeat_alerts_suppressed(db, tenant_id, start, end) -> int:
 async def _funnel_window(db, tenant_id, start, end, *, mitre_total: int, tenant_ids=None) -> dict:
     """Compute the funnel for a single [start, end) window."""
     tenant_ids = tenant_ids or [tenant_id]
-    events_of_interest = 0
-    for _tid in tenant_ids:
-        events_of_interest += await _events_of_interest(db, _tid, start, end)
+    events_of_interest = await _events_of_interest_total(db, tenant_ids, start, end)
 
     # Correlation instances = alerts whose source_event_ids has >= 2 events
     # (i.e. multiple raw events fused into a single alert). Single-event
@@ -990,9 +1052,7 @@ async def _funnel_window(db, tenant_id, start, end, *, mitre_total: int, tenant_
     ratio = round(min(covered / mitre_total, 1.0), 4) if mitre_total > 0 else 0.0
     coverage = MitreCoverage(covered=covered, total=mitre_total, ratio=ratio)
 
-    suppressed = 0
-    for _tid in tenant_ids:
-        suppressed += await _repeat_alerts_suppressed(db, _tid, start, end)
+    suppressed = await _repeat_alerts_suppressed_total(db, tenant_ids, start, end)
     # Compounding reduction: of everything the loop *could* have queued
     # (generated + suppressed), what share did prior outcomes suppress?
     denom = alerts_generated + suppressed

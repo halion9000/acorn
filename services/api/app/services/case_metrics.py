@@ -65,6 +65,38 @@ async def count_finished_since(db: Any, tenant_id: uuid.UUID, since: datetime) -
     )
 
 
+async def count_with_status_many(db: Any, tenant_ids: list[uuid.UUID], statuses: tuple[str, ...]) -> int:
+    """`count_with_status` over every tenant in `tenant_ids` in one query (a parent with a couple of hundred clients used to cost one query each)."""
+    return int(
+        await db.scalar(
+            text(f"SELECT count(*) FROM aisoc_cases WHERE tenant_id = ANY(:tids) AND {_in(statuses)}"), {"tids": list(tenant_ids)}
+        )
+        or 0
+    )
+
+
+async def count_finished_since_many(db: Any, tenant_ids: list[uuid.UUID], since: datetime) -> int:
+    """`count_finished_since` over every tenant in `tenant_ids` in one query."""
+    return int(
+        await db.scalar(
+            text(f"SELECT count(*) FROM aisoc_cases WHERE tenant_id = ANY(:tids) AND {FINISHED_AT} >= :since"),
+            {"tids": list(tenant_ids), "since": since},
+        )
+        or 0
+    )
+
+
+async def count_created_many(db: Any, tenant_ids: list[uuid.UUID], start: datetime) -> int:
+    """`count_created` (open-ended) over every tenant in `tenant_ids` in one query."""
+    return int(
+        await db.scalar(
+            text("SELECT count(*) FROM aisoc_cases WHERE tenant_id = ANY(:tids) AND created_at >= :start"),
+            {"tids": list(tenant_ids), "start": start},
+        )
+        or 0
+    )
+
+
 async def created_timestamps(db: Any, tenant_id: uuid.UUID, start: datetime, end: datetime) -> list[datetime]:
     rows = (
         await db.execute(
