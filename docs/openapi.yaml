@@ -3742,6 +3742,43 @@ paths:
                 $ref: '#/components/schemas/SeededCounts'
       security:
       - HTTPBearer: []
+  /api/v1/rules/silent:
+    get:
+      tags:
+      - detection_rules
+      summary: Rules that have not fired for a long time, to tune or retire
+      description: 'This organization''s own rules that have not fired for ``days``
+        days (default 90) and are not retired. Built-in and pack rules are not listed:
+        they are not this organization''s to retire.'
+      operationId: silent_rules_view_api_v1_rules_silent_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 3650
+          minimum: 1
+          default: 90
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SilentRule'
+                title: Response Silent Rules View Api V1 Rules Silent Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/rules/{rule_id}:
     get:
       tags:
@@ -38792,6 +38829,41 @@ components:
       - unscored
       - users_last_24h
       title: SigninSummary
+    SilentRule:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        status:
+          type: string
+          title: Status
+        severity:
+          type: string
+          title: Severity
+        last_triggered:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Triggered
+        days_silent:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Days Silent
+      type: object
+      required:
+      - id
+      - name
+      - status
+      - severity
+      - last_triggered
+      - days_silent
+      title: SilentRule
     SourceOut:
       properties:
         vendor:

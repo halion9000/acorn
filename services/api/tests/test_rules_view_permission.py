@@ -32,6 +32,7 @@ MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations"
 VIEW_ROUTES = {
     ("GET", "/rules"),
     ("GET", "/rules/seeded-counts"),
+    ("GET", "/rules/silent"),
     ("GET", "/rules/{rule_id}"),
     ("GET", "/detection/rules"),
     ("GET", "/detection/rules/{rule_id}"),
@@ -123,7 +124,7 @@ class TestTheRoutes:
         found = {
             (m, p) for p, r in ALL_ROUTES if required_permissions(r) == {"rules:view"} for m in r.methods if m not in {"HEAD", "OPTIONS"}
         }
-        assert found == VIEW_ROUTES and len(found) == 14 and all(m == "GET" for m, _ in found)
+        assert found == VIEW_ROUTES and len(found) == 15 and all(m == "GET" for m, _ in found)
 
     def test_a_key_holding_only_rules_view_can_use_exactly_those_thirteen_routes_in_the_whole_application(self):
         assert _satisfied_by(["rules:view"]) == VIEW_ROUTES

@@ -140,7 +140,7 @@ All **Ready** unless marked; none has been started. Where a vendor API is involv
 111. Rule test bench - Ready
 112. Weekly hit counts per rule - Ready
 113. Single-rule Sigma import - Ready
-114. Show rules that never fired in 90 days - Ready
+114. Show rules that never fired in 90 days - Done (API: GET /rules/silent; no page yet)
 115. Show rules that fire over 100 times a day - Ready
 116. Per-client rule overrides - Ready
 117. Rule change history - Ready

@@ -227,6 +227,61 @@ async def seeded_counts(
     return SeededCounts(builtin=int(builtin or 0), imported=int(imported or 0), packs=[PackCount(name=r[0], rules=int(r[1])) for r in rows])
 
 
+class SilentRule(BaseModel):
+    id: uuid.UUID
+    name: str
+    status: str
+    severity: str
+    last_triggered: datetime | None
+    days_silent: int | None
+
+
+def silent_rules(rules: list[Any], now: datetime, days: int) -> list[SilentRule]:
+    """The rules that have not fired for ``days`` days (or never did, and are older than that), longest silent first. A rule that never fired is dated from when it was created, so a new rule is not called silent."""
+    out: list[tuple[float, SilentRule]] = []
+    for r in rules:
+        last = r.last_triggered
+        if last is not None and last.tzinfo is None:
+            last = last.replace(tzinfo=UTC)
+        since = last or (r.created_at.replace(tzinfo=UTC) if r.created_at.tzinfo is None else r.created_at)
+        age = (now - since).total_seconds() / 86400
+        if age < days:
+            continue
+        out.append(
+            (
+                age,
+                SilentRule(
+                    id=r.id,
+                    name=r.name,
+                    status=r.status,
+                    severity=r.severity,
+                    last_triggered=last,
+                    days_silent=int(age) if last is not None else None,
+                ),
+            )
+        )
+    return [rule for _, rule in sorted(out, key=lambda t: (-t[0], t[1].name.lower()))]
+
+
+@router.get("/silent", response_model=list[SilentRule], summary="Rules that have not fired for a long time, to tune or retire")
+async def silent_rules_view(
+    current_user: Annotated[AuthUser, Depends(require_permission("rules:view"))],
+    db: DBSession,
+    days: Annotated[int, Query(ge=1, le=3650)] = 90,
+) -> list[SilentRule]:
+    """This organization's own rules that have not fired for ``days`` days (default 90) and are not retired. Built-in and pack rules are not listed: they are not this organization's to retire."""
+    rules = (
+        (
+            await db.execute(
+                select(DetectionRule).where(DetectionRule.tenant_id == current_user.tenant_id, DetectionRule.status != "retired")
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return silent_rules(list(rules), datetime.now(UTC), days)
+
+
 @router.get("/{rule_id}", response_model=DetectionRuleResponse)
 async def get_rule(
     rule_id: uuid.UUID,
