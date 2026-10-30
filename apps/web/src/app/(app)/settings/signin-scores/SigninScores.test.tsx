@@ -92,6 +92,21 @@ describe('SigninScores', () => {
     expect(screen.getByRole('columnheader', { name: /^Person/ })).toBeInTheDocument();
   });
 
+  it('has one cell under every column header, with the region in its own column between Where and App', async () => {
+    authFetch.mockImplementation((url?: string) => Promise.resolve((url ?? '').includes('/identity/top') ? reply([]) : reply([row({ country: 'MA', city: 'Rabat', app: 'Exchange' })])));
+    render(<SigninScores />);
+    const tr = await screen.findByTestId('signin-row');
+    const cells = within(tr).getAllByRole('cell');
+    // The header has two rows (names, then a filter box under each), so the names are the first row.
+    const table = tr.closest('table') as HTMLElement;
+    const headers = within(table.querySelector('thead tr') as HTMLElement).getAllByRole('columnheader');
+    expect(cells).toHaveLength(headers.length);
+    const at = (label: RegExp) => headers.findIndex((h) => label.test(h.textContent ?? ''));
+    expect(cells[at(/^Region/)]).toHaveTextContent('Outside US');
+    expect(cells[at(/^Where/)]).toHaveTextContent('Rabat, MA');
+    expect(cells[at(/^App/)]).toHaveTextContent('Exchange');
+  });
+
   it('sorts by a clicked column and filters by person, app and result', async () => {
     const rows = [
       row({ user: 'amy@acme.com', score: 0.5, app: 'Teams', success: true, mfa: true, risk: 'none' }),

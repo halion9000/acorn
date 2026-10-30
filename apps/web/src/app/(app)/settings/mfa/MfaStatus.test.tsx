@@ -90,11 +90,19 @@ describe('MfaStatus', () => {
     render(<MfaStatus />);
     const tags = await screen.findAllByTestId('google-tag');
     expect(tags).toHaveLength(1);
-    expect(tags[0]).toHaveTextContent('+ Google Workspace');
+    expect(tags[0]).toHaveTextContent('Google');
+    // Both tags for a client with both, M365 alone for a Microsoft-only client, and a column for them.
+    const rows = screen.getAllByTestId('client-row');
+    expect(within(rows[0]).getByTestId('m365-tag')).toHaveTextContent('M365');
+    expect(within(rows[0]).getByTestId('google-tag')).toBeInTheDocument();
+    expect(within(rows[1]).getByTestId('m365-tag')).toBeInTheDocument();
+    expect(within(rows[1]).queryByTestId('google-tag')).toBeNull();
+    expect(screen.getByTestId('tools-header')).toHaveTextContent('Tools');
     await userEvent.click(screen.getAllByRole('button', { name: '3' })[0]);
     const list = await screen.findByTestId('people-without');
     expect(list.textContent).toContain('g@acme.com');
     expect(within(list).getAllByText('Google')).toHaveLength(1);
+    expect(within(list).getAllByText('M365')).toHaveLength(1);
   });
 
   it('can show the people who registered a second factor that nothing requires', async () => {

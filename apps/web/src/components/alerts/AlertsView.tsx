@@ -655,13 +655,14 @@ function AlertsTable({
 
       {/*
         v1.5 W6 — two-pane layout. On wide screens the queue takes the left
-        seven cols and the Investigation Rail takes the right five; on narrow
+        seven cols and the Investigation Rail takes the right five once an alert
+        is selected; until then the queue has the whole width; on narrow
         screens they stack so the rail sits beneath the queue rather than
         squeezing the columns into illegibility. The rail is `sticky` so it
         stays in view while the analyst scrolls the queue.
       */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-        <div className="xl:col-span-7 space-y-4">
+        <div className={selectedAlertId ? 'xl:col-span-7 space-y-4' : 'xl:col-span-12 space-y-4'} data-testid="alerts-queue">
           <AlertsTableGrid
             alerts={alerts}
             isLoading={isLoading}
@@ -679,14 +680,16 @@ function AlertsTable({
             onFilterChange={onFilterChange}
           />
         </div>
-        <div className="xl:col-span-5">
-          <div className="xl:sticky xl:top-4 xl:max-h-[calc(100vh-7rem)] xl:overflow-hidden xl:flex xl:flex-col">
-            <InvestigationRail
-              alertId={selectedAlertId}
-              onClose={() => setSelectedAlertId(null)}
-            />
+        {selectedAlertId && (
+          <div className="xl:col-span-5" data-testid="alerts-rail">
+            <div className="xl:sticky xl:top-4 xl:max-h-[calc(100vh-7rem)] xl:overflow-hidden xl:flex xl:flex-col">
+              <InvestigationRail
+                alertId={selectedAlertId}
+                onClose={() => setSelectedAlertId(null)}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

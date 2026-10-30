@@ -1016,6 +1016,45 @@ TOOL_PERMISSIONS: dict[str, str] = {
 }
 
 
+# Names a model tends to give an argument that a tool calls something else; mapped before the call so a reasonable guess still works.
+_ARG_ALIASES: dict[str, str] = {
+    "client_name": "client",
+    "customer": "client",
+    "customer_name": "client",
+    "company": "client",
+    "organization": "client",
+    "organisation": "client",
+    "name": "client",
+    "hours": "days",
+    "period_days": "days",
+    "max_results": "limit",
+    "top": "limit",
+    "id": "alert_id",
+}
+
+
+def tolerant_args(fn: Any, args: dict[str, Any] | None) -> dict[str, Any]:
+    """The arguments ``fn`` accepts out of what a model sent: a known alias is renamed (``client_name`` to ``client``), a name the tool does not take is dropped, and an exact name always wins over an alias.
+
+    A model behind the gateway guesses at argument names; refusing the whole call over one of them gave an error, and the model then told the analyst the tool returned nothing.
+    """
+    import inspect
+
+    params = inspect.signature(fn).parameters
+    if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return dict(args or {})  # a function that takes anything is given everything, as before
+    accepted = set(params) - {"tenant_id"}
+    out: dict[str, Any] = {}
+    for key, value in (args or {}).items():
+        if key in accepted:
+            out[key] = value
+    for key, value in (args or {}).items():
+        target = _ARG_ALIASES.get(key)
+        if key not in accepted and target in accepted and target not in out:
+            out[target] = value
+    return out
+
+
 async def execute_copilot_tool(name: str, args: dict[str, Any], tenant_id: str, *, user: Any) -> Any:
     """Execute a copilot tool by name, as `user`, with tenant isolation.
 
@@ -1035,7 +1074,7 @@ async def execute_copilot_tool(name: str, args: dict[str, Any], tenant_id: str, 
     except HTTPException:
         return {"error": f"permission denied: {name} requires {needed}"}
     try:
-        result = await fn(tenant_id=tenant_id, **(args or {}))
+        result = await fn(tenant_id=tenant_id, **tolerant_args(fn, args))
     except Exception as exc:  # noqa: BLE001
         return {"error": f"{type(exc).__name__}: {exc}"}
     if isinstance(result, dict) and _CONFIRM_KEY in result:

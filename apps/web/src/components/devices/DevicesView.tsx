@@ -262,7 +262,7 @@ export default function DevicesView() {
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:max-w-5xl sm:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))]" data-testid="devices-tiles">
         <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-3">
           <div className="text-xs text-gray-400">Devices</div>
           <div className="text-2xl font-semibold text-white" data-testid="devices-total">

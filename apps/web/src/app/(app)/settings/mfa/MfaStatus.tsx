@@ -88,6 +88,8 @@ function People({ clientId, which }: { clientId: string; which: Which }) {
   if (error) return <p className="text-sm text-red-300">{error}</p>;
   if (people === null) return <p className="text-sm text-slate-500">Loading...</p>;
   if (people.length === 0) return <p className="text-sm text-slate-500">Nobody.</p>;
+  // Each person is tagged with their directory only when the list holds both, so a client with one directory is not covered in tags.
+  const mixed = people.some((p) => p.directory === "Google Workspace") && people.some((p) => p.directory !== "Google Workspace");
   return (
     <ul className="space-y-0.5 text-sm" data-testid={`people-${which}`}>
       {people.map((p) => (
@@ -95,6 +97,7 @@ function People({ clientId, which }: { clientId: string; which: Which }) {
           <span className="font-mono text-slate-200">{p.upn}</span>
           {p.display_name ? <span className="text-slate-500">{p.display_name}</span> : null}
           {p.admin ? <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[11px] text-red-300">administrator</span> : null}
+          {mixed && p.directory === "Microsoft 365" ? <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[11px] text-indigo-300">M365</span> : null}
           {p.directory === "Google Workspace" ? <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[11px] text-sky-300">Google</span> : null}
         </li>
       ))}
@@ -110,9 +113,16 @@ function ClientRow({ c, open, setOpen }: { c: MfaClient; open: Open; setOpen: (v
       <tr className="border-b border-slate-800" data-testid="client-row">
         <td className="py-2 text-slate-200">
           {c.client_name ?? "This organization"}
+        </td>
+        <td className="whitespace-nowrap" data-testid="directory-tags">
+          {(c.directories ?? []).includes("Microsoft 365") ? (
+            <span className="mr-1 rounded bg-indigo-500/15 px-1.5 py-0.5 text-[11px] text-indigo-300" data-testid="m365-tag" title="Includes the people of this client's Microsoft 365, read through CIPP">
+              M365
+            </span>
+          ) : null}
           {(c.directories ?? []).includes("Google Workspace") ? (
-            <span className="ml-2 rounded bg-sky-500/15 px-1.5 py-0.5 text-[11px] text-sky-300" data-testid="google-tag" title="Includes the people of this client's Google Workspace, read by ThreatMate">
-              {(c.directories ?? []).length > 1 ? "+ Google Workspace" : "Google Workspace"}
+            <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[11px] text-sky-300" data-testid="google-tag" title="Includes the people of this client's Google Workspace, read by ThreatMate">
+              Google
             </span>
           ) : null}
         </td>
@@ -160,7 +170,7 @@ function ClientRow({ c, open, setOpen }: { c: MfaClient; open: Open; setOpen: (v
       </tr>
       {shown && (
         <tr className="border-b border-slate-800 bg-slate-900/40">
-          <td colSpan={6} className="px-3 py-2">
+          <td colSpan={7} className="px-3 py-2">
             <p className="mb-1 text-xs uppercase text-slate-500">{shown === "without" ? "No Multi-Factor" : shown === "admins" ? "Administrators with no Multi-Factor" : "Registered for Multi-Factor, but nothing requires it"}</p>
             <People clientId={c.client_id} which={shown} />
           </td>
@@ -256,6 +266,9 @@ export function MfaStatus() {
                     Client{arrow("client")}
                   </button>
                 </th>
+                <th className="font-medium" data-testid="tools-header">
+                  Tools
+                </th>
                 <th className="" aria-sort={sort?.key === "people" ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
                   <button type="button" onClick={() => toggleSort("people")} className="font-medium hover:text-slate-200" data-testid="sort-people">
                     People{arrow("people")}
@@ -289,7 +302,7 @@ export function MfaStatus() {
               ))}
               {shownClients.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-4 text-slate-500" data-testid="no-match">
+                  <td colSpan={7} className="py-4 text-slate-500" data-testid="no-match">
                     No client matches.
                   </td>
                 </tr>

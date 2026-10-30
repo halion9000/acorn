@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import useSWR from 'swr';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
@@ -207,12 +208,12 @@ export function ExecutiveDigest() {
       <ClientSnapshot clientId={clientId} />
       {!clientId && <OrgSnapshot />}
 
-      {data && <DigestBody digest={data} />}
+      {data && <DigestBody digest={data} clientId={clientId} />}
     </div>
   );
 }
 
-function DigestBody({ digest }: { digest: ExecutiveDigestPayload }) {
+function DigestBody({ digest, clientId }: { digest: ExecutiveDigestPayload; clientId: string }) {
   return (
     <>
       {/* Period + headline */}
@@ -228,13 +229,15 @@ function DigestBody({ digest }: { digest: ExecutiveDigestPayload }) {
 
       {/* KPI strip */}
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <KpiCard label="New alerts" value={digest.alerts.new} sub={`${digest.alerts.total} total in window`} />
+        <KpiCard label="New alerts" value={digest.alerts.new} sub={`${digest.alerts.total} total in window`} href={digestHref('/alerts?status=new', clientId)} />
         <KpiCard
+          href={digestHref('/alerts?status=open', clientId)}
           label="Open alerts"
           value={digest.alerts.open_at_period_end}
           sub={`${digest.alerts.resolved} resolved this period`}
         />
         <KpiCard
+          href="/cases"
           label="Cases opened"
           value={digest.cases.opened}
           sub={`${digest.cases.closed} closed · ${digest.cases.sla_breached} SLA breaches`}
@@ -348,7 +351,11 @@ function DigestBody({ digest }: { digest: ExecutiveDigestPayload }) {
               <tbody>
                 {digest.high_risk_alerts.map((a) => (
                   <tr key={a.alert_id} className="border-b border-gray-800/80">
-                    <td className="py-2.5 pr-4 text-gray-100">{a.title || a.alert_id}</td>
+                    <td className="py-2.5 pr-4 text-gray-100">
+                      <Link href={`/alerts/${a.alert_id}`} className="text-sky-300 hover:underline" data-testid="digest-alert-link">
+                        {a.title || a.alert_id}
+                      </Link>
+                    </td>
                     <td className={`py-2.5 pr-4 capitalize ${SEVERITY_TEXT[a.severity] ?? 'text-gray-300'}`}>
                       {a.severity}
                     </td>
@@ -416,22 +423,37 @@ function Card({
   );
 }
 
+/** The page behind a digest tile, narrowed to the chosen client (the alerts pages take it as ``client``). */
+export function digestHref(path: string, clientId: string): string {
+  return clientId ? `${path}${path.includes('?') ? '&' : '?'}client=${encodeURIComponent(clientId)}` : path;
+}
+
 function KpiCard({
   label,
   value,
   sub,
+  href,
 }: {
   label: string;
   value: number | string;
   sub?: string;
+  href?: string;
 }) {
-  return (
-    <div className="rounded-lg border border-gray-700 bg-gray-800 p-4">
+  const body = (
+    <>
       <p className="text-xs text-gray-400">{label}</p>
       <p className="mt-1 text-2xl font-semibold text-white tabular-nums">{value}</p>
       {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} data-testid={`kpi-${label}`} className="block rounded-lg border border-gray-700 bg-gray-800 p-4 transition-colors hover:border-sky-500/60">
+        {body}
+      </Link>
+    );
+  }
+  return <div className="rounded-lg border border-gray-700 bg-gray-800 p-4">{body}</div>;
 }
 
 function Stat({

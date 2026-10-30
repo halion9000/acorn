@@ -306,3 +306,29 @@ def test_related_alerts_is_registered_permissioned_and_callable_from_text():
         and "related_alerts" in TEXT_CALLABLE
     )
     assert any(t["function"]["name"] == "related_alerts" for t in ct.COPILOT_TOOL_SCHEMAS)
+
+
+def test_a_guessed_argument_name_is_renamed_and_an_unknown_one_is_dropped_so_the_call_still_runs():
+    assert ct.tolerant_args(ct.client_changes, {"client_name": "waterloo", "time_range": "7d", "hours": 3}) == {
+        "client": "waterloo",
+        "days": 3,
+    }
+    assert ct.tolerant_args(ct.client_overview, {"company": "Acme", "client": "Birch"}) == {
+        "client": "Birch"
+    }, "the exact name wins over an alias"
+    assert ct.tolerant_args(ct.related_alerts, {"id": "abc"}) == {"alert_id": "abc"}
+    assert ct.tolerant_args(ct.client_checks, None) == {}
+    assert ct.tolerant_args(ct.client_checks, {"tenant_id": "x", "limit": 5}) == {"limit": 5}, "the tenant is never taken from the model"
+
+
+@pytest.mark.asyncio
+async def test_a_tool_call_with_a_guessed_argument_runs_instead_of_returning_an_error():
+    fleet = AsyncMock(return_value=[_change(ACME, "threatmate_patching", "not_met", "met")])
+    user = SimpleNamespace(tenant_id=TID, require_permission=lambda _p: None)
+    with (
+        patch.object(ct, "_get_session", AsyncMock(return_value=_Session())),
+        _scope_patch(),
+        patch("app.api.v1.endpoints.client_posture.fleet_changes", fleet),
+    ):
+        out = await ct.execute_copilot_tool("client_changes", {"client_name": "acme", "timeframe": "this week"}, TID, user=user)
+    assert "error" not in out and out["changes"][0]["client"] == "Acme Dental"

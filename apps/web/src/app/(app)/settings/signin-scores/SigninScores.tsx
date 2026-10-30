@@ -203,6 +203,9 @@ function SigninsTable({ rows }: { rows: ScoredSignin[] }) {
                 {placeLabel(r)}
                 {r.ip_address ? <span className="ml-1 font-mono text-slate-500">{r.ip_address}</span> : null}
               </td>
+              <td className={`px-3 ${regionLabel(r) === "Outside US" ? "text-amber-300" : "text-slate-400"}`} data-testid="signin-region">
+                {regionLabel(r)}
+              </td>
               <td className="px-3 text-slate-400">{r.app ?? "—"}</td>
               <td className={`px-3 ${r.success ? "text-slate-400" : "text-red-300"}`}>
                 {r.success ? "Signed in" : "Failed"}

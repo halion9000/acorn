@@ -103,7 +103,7 @@ class TestThePermissionGate:
         with pytest.raises(TypeError):
             await ct.execute_copilot_tool("search_alerts", {}, str(TID))
 
-    async def test_a_model_supplied_tenant_id_cannot_override_the_users(self):
+    async def test_a_model_supplied_tenant_id_cannot_override_the_users(self, ran):
         """args are splatted after tenant_id=...: a duplicate raises instead of overriding, and that is reported, not run."""
         res = await ct.execute_copilot_tool("search_alerts", {"tenant_id": str(uuid.uuid4())}, str(TID), user=user("admin"))
         assert "TypeError" in res["error"]

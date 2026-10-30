@@ -6,8 +6,9 @@ import { SWRConfig } from 'swr';
 const api = vi.hoisted(() => ({ weeklyDigest: vi.fn(), weeklyDigestHtml: vi.fn() }));
 const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
 vi.mock('@/lib/api', () => ({ reportsApi: api, msspApi: mssp }));
+vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a> }));
 
-import { ExecutiveDigest } from './ExecutiveDigest';
+import { ExecutiveDigest, digestHref } from './ExecutiveDigest';
 
 const digest = (over: Record<string, unknown> = {}) => ({
   period: { label: 'Oct 1 to Oct 7', start: '2026-10-01T00:00:00Z', end: '2026-10-07T00:00:00Z' },
@@ -187,5 +188,24 @@ describe('ExecutiveDigest for a client', () => {
     await userEvent.click(screen.getByRole('button', { name: /Print/ }));
     await waitFor(() => expect(api.weeklyDigestHtml).toHaveBeenCalled());
     expect(api.weeklyDigestHtml.mock.calls[0][0].client_id).toBe('c1');
+  });
+});
+
+describe('ExecutiveDigest links', () => {
+  it('sends the alert, open alert and case tiles to their pages and each top alert to its own page', async () => {
+    api.weeklyDigest.mockResolvedValue(digest());
+    renderIt();
+    await screen.findByText('Mass mailbox forwarding rule');
+    expect(screen.getByTestId('kpi-New alerts')).toHaveAttribute('href', '/alerts?status=new');
+    expect(screen.getByTestId('kpi-Open alerts')).toHaveAttribute('href', '/alerts?status=open');
+    expect(screen.getByTestId('kpi-Cases opened')).toHaveAttribute('href', '/cases');
+    expect(screen.queryByTestId('kpi-Mean MTTR')).toBeNull();
+    expect(screen.getAllByTestId('digest-alert-link')[0]).toHaveAttribute('href', '/alerts/a1');
+  });
+
+  it('digestHref keeps a chosen client on the link', () => {
+    expect(digestHref('/alerts?status=open', 'c-1')).toBe('/alerts?status=open&client=c-1');
+    expect(digestHref('/alerts', 'c 2')).toBe('/alerts?client=c%202');
+    expect(digestHref('/alerts?status=new', '')).toBe('/alerts?status=new');
   });
 });
