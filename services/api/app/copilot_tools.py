@@ -335,6 +335,43 @@ async def client_overview(*, tenant_id: str, client: str) -> dict[str, Any]:
     }
 
 
+async def related_alerts(*, tenant_id: str, alert_id: str) -> dict[str, Any]:
+    """Other recent alerts about the same device or user as this alert (any tool), newest first."""
+    from types import SimpleNamespace
+
+    from fastapi import HTTPException
+
+    from app.api.v1.endpoints.alert_related import related_alerts as read_related
+
+    try:
+        tid, aid = uuid.UUID(tenant_id), uuid.UUID(alert_id)
+    except ValueError:
+        return {"error": "invalid id"}
+    async with await _get_session(tid) as db:
+        try:
+            out = await read_related(aid, SimpleNamespace(tenant_id=tid), db)
+        except HTTPException as exc:
+            return {"error": str(exc.detail)}
+    items = [
+        {
+            "id": str(r.id),
+            "title": r.title,
+            "severity": r.severity,
+            "status": r.status,
+            "tool": r.source,
+            "when": r.created_at.isoformat(),
+            "same": r.matched,
+        }
+        for r in out.items
+    ]
+    return {
+        "count": len(items),
+        "more_not_shown": bool(out.more),
+        "related": items,
+        **({} if items else {"note": "No other recent alert names the same device or user."}),
+    }
+
+
 async def secureframe_status(*, tenant_id: str, framework: str = "", limit: int = 15) -> dict[str, Any]:
     """Our own company's Secureframe state: test counts, failing tests, risks, policies, and for NIST CSF 2.0 or CIS IG1 the requirements that are not healthy."""
     from app.api.v1.endpoints.secureframe import FRAMEWORK_KEYS, SecureframeBody, mapping_for, passing_percent
@@ -735,6 +772,18 @@ COPILOT_TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "related_alerts",
+            "description": "Other recent alerts about the same device or user as one alert, from any tool, newest first. Use it to see whether an alert is part of something bigger.",
+            "parameters": {
+                "type": "object",
+                "properties": {"alert_id": {"type": "string", "description": "The alert's id."}},
+                "required": ["alert_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "secureframe_status",
             "description": "Our own company's Secureframe compliance state: how many control tests pass, the oldest failing tests and their owners, risks, policies, and for NIST CSF 2.0 or CIS IG1 the requirements that are not healthy. Not about clients.",
             "parameters": {
@@ -858,6 +907,7 @@ _COPILOT_TOOL_DISPATCH: dict[str, Any] = {
     "client_checks": client_checks,
     "client_changes": client_changes,
     "client_overview": client_overview,
+    "related_alerts": related_alerts,
     "secureframe_status": secureframe_status,
     "search_halo_guides": search_halo_guides,
     "read_halo_guide": read_halo_guide,
@@ -955,6 +1005,7 @@ TOOL_PERMISSIONS: dict[str, str] = {
     "client_checks": "alerts:read",
     "client_changes": "alerts:read",
     "client_overview": "alerts:read",
+    "related_alerts": "alerts:read",
     "secureframe_status": "reports:read",
     "search_halo_guides": "alerts:read",
     "read_halo_guide": "alerts:read",

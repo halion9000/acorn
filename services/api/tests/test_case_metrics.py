@@ -5,6 +5,7 @@ weekly digest showed no cases. Checked on real Postgres with nine cases of known
 closed 4 / SLA breaches 2, tenant B all zeros. Running the real dashboard handler also caught a bug in the first version of this change (a module import named case_metrics collided with a local variable of the same name there, an UnboundLocalError neither pyflakes nor the old tests could see).
 """
 
+import contextlib
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -31,6 +32,11 @@ class RecordingDB:
     def __init__(self, answers=(), rows=()):
         self.answers, self.rows, self.case_sql = list(answers), list(rows), []
 
+    @contextlib.asynccontextmanager
+    async def begin_nested(self):
+        """A savepoint, as the real session gives: nothing to roll back here, so entering and leaving it does nothing."""
+        yield
+
     def _note(self, stmt, params):
         sql = norm(stmt)
         if "aisoc_cases" in sql:
@@ -45,8 +51,11 @@ class RecordingDB:
         return 0
 
     async def execute(self, stmt, params=None, *a, **k):
-        self._note(stmt, params)
+        sql = self._note(stmt, params)
         res = MagicMock()
+        for needle, value in self.answers:
+            if needle in sql and isinstance(value, tuple):  # a statement that returns one row of counts
+                res.one.return_value = value
         res.all.return_value = res.fetchall.return_value = list(self.rows)
         res.first.return_value = None
         res.scalar.return_value = res.scalar_one.return_value = 0
@@ -248,11 +257,12 @@ class TestTheRealHandlersAreWiredToIt:
     async def test_insights_use_aisoc_cases_for_the_count_and_the_hours_saved(self):
         from app.api.v1.endpoints.insights import get_soc_insights
 
-        db = RecordingDB([("status IN ('resolved', 'closed')", 4), ("created_at >= :start", 9)])
+        # The window's cases come back from ONE grouped statement as (created, finished), read for the organization's own id.
+        db = RecordingDB([("FROM aisoc_cases WHERE tenant_id IN (__[POSTCOMPILE_ids])", (9, 4))])
         out = await get_soc_insights(user=user(), db=db, window="24h")
         assert {t.key: t.value for t in out.tiles}["analyst_hours_saved"] == round(4 * 45 / 60.0, 2)
-        assert any("status IN ('resolved', 'closed')" in sql for sql, _ in db.case_sql) and all(
-            params.get("tid") == TID for _, params in db.case_sql
+        assert any("FILTER (WHERE status IN" in sql for sql, _ in db.case_sql) and all(
+            params.get("ids") == [TID] for _, params in db.case_sql
         )
 
     async def test_the_digest_builds_its_case_section_from_aisoc_cases(self):

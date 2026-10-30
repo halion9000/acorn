@@ -45,6 +45,10 @@ export function tileHref(key: string, clientId?: string): string | null {
       return '/settings/signin-scores';
     case 'silent_sources':
       return '/settings/platform-health';
+    case 'leaked_credentials':
+    case 'google_admins_without_2step':
+    case 'google_failed_sign_ins':
+      return '/settings/fleet-posture';
     case 'playbook_coverage':
       return '/playbooks';
     case 'ticket_linkage':

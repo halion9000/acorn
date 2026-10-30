@@ -77,7 +77,7 @@ async def _tenant():
 async def _cleanup(engine, tenant: uuid.UUID) -> None:
     async with engine.begin() as conn:
         await conn.execute(text("set local session_replication_role = replica"))
-        for table in ("playbook_dry_runs", "signin_events", "alerts"):
+        for table in ("playbook_dry_runs", "signin_events", "alerts", "client_m365_checks"):
             await conn.execute(text(f"delete from {table} where tenant_id = :t"), {"t": tenant})
         await conn.execute(text("delete from tenants where id = :t"), {"t": tenant})
     await engine.dispose()
@@ -134,6 +134,8 @@ async def test_a_tenant_with_nothing_has_tiles_that_say_so_instead_of_zero_resul
         for key in ("sla_breaches", "noisy_alert_types", "automation_rate", "unusual_signins", "playbook_coverage", "ticket_linkage"):
             assert tiles[key]["has_data"] is False and tiles[key]["delta_pct"] is None, key
         assert "noisiest_clients" not in tiles and "silent_sources" not in tiles
+        for key in ("leaked_credentials", "google_admins_without_2step", "google_failed_sign_ins"):
+            assert tiles[key]["has_data"] is False, key
     finally:
         await _cleanup(engine, tenant)
 
@@ -309,5 +311,50 @@ async def test_the_grouped_totals_equal_the_per_tenant_numbers_they_replace():
             await conn.execute(text("delete from aisoc_run_costs where tenant_id = any(:t)"), {"t": [str(first), str(second)]})
             for table in ("investigation_runs", "aisoc_cases", "alerts"):
                 await conn.execute(text(f"delete from {table} where tenant_id = any(:t)"), {"t": [first, second]})
+            await conn.execute(text("delete from tenants where id = :t"), {"t": second})
+        await _cleanup(engine, first)
+
+
+async def _check(conn, tenant, source, checks):
+    await conn.execute(
+        text("insert into client_m365_checks (tenant_id, source, checks, refreshed_at) values (:t, :s, cast(:c as jsonb), now())"),
+        {"t": tenant, "s": source, "c": json.dumps(checks)},
+    )
+
+
+async def test_the_check_tiles_count_the_clients_whose_tool_reported_a_failing_check_and_leave_out_the_rest():
+    engine, first = await _tenant()
+    second = uuid.uuid4()
+    now = datetime.now(UTC)
+    async with engine.begin() as conn:
+        await conn.execute(text("set local session_replication_role = replica"))
+        await conn.execute(
+            text("insert into tenants (id, name, slug) values (:t, 'tiles-two', :s)"), {"t": second, "s": f"tiles-{second.hex[:10]}"}
+        )
+        await _check(conn, first, "threatmate", [{"key": "threatmate_deep_dark_web", "status": "partly", "evidence": "1 finding"}])
+        await _check(
+            conn,
+            first,
+            "threatmate-google",
+            [{"key": "threatmate_google_admins", "status": "met"}, {"key": "threatmate_google_failed_logins", "status": "not_met"}],
+        )
+        await _check(conn, second, "threatmate", [{"key": "threatmate_deep_dark_web", "status": "met"}])
+    try:
+        async with AsyncSession(engine) as db:
+            parts = await it.gather_all(db, [first, second], now - timedelta(days=1), now, now - timedelta(days=2))
+        tiles = {
+            t["key"]: t
+            for t in it.build_tiles(
+                it.merge(parts), now=now, ready=True, sparkline=[], client_names={first: "One", second: "Two"}, sources=None
+            )
+        }
+        assert tiles["leaked_credentials"]["value"] == 1 and tiles["leaked_credentials"]["detail"].startswith("1 of 2 clients")
+        assert [i["label"] for i in tiles["leaked_credentials"]["items"]] == ["One"]
+        assert tiles["google_admins_without_2step"]["value"] == 0 and tiles["google_admins_without_2step"]["has_data"] is True
+        assert tiles["google_failed_sign_ins"]["value"] == 1 and tiles["google_failed_sign_ins"]["detail"].startswith("1 of 1 clients")
+    finally:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            await conn.execute(text("delete from client_m365_checks where tenant_id = :t"), {"t": second})
             await conn.execute(text("delete from tenants where id = :t"), {"t": second})
         await _cleanup(engine, first)

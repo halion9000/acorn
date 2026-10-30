@@ -254,6 +254,10 @@ describe('pointsToPath', () => {
 });
 
 describe('tileHref', () => {
+  it('sends the check tiles to Fleet Posture', () => {
+    for (const key of ['leaked_credentials', 'google_admins_without_2step', 'google_failed_sign_ins']) expect(tileHref(key)).toBe('/settings/fleet-posture');
+  });
+
   it('sends each tile to the page that lists what is behind it, for one client when one is picked', () => {
     expect(tileHref('mtta')).toBe('/alerts?status=all');
     expect(tileHref('mttr')).toBe('/alerts?status=resolved');

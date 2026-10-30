@@ -29,6 +29,7 @@ TEXT_CALLABLE: frozenset[str] = frozenset(
         "client_checks",
         "client_changes",
         "client_overview",
+        "related_alerts",
         "secureframe_status",
     }
 )

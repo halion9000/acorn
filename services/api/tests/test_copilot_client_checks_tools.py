@@ -257,3 +257,52 @@ def test_the_new_tools_are_registered_permissioned_and_callable_from_text():
     for name in ("client_changes", "client_overview"):
         assert ct.TOOL_PERMISSIONS[name] == "alerts:read" and name in ct._COPILOT_TOOL_DISPATCH and name in TEXT_CALLABLE
         assert any(t["function"]["name"] == name for t in ct.COPILOT_TOOL_SCHEMAS)
+
+
+@pytest.mark.asyncio
+async def test_related_alerts_lists_what_shares_a_device_or_user_and_reports_a_missing_alert():
+    from fastapi import HTTPException
+
+    rel = SimpleNamespace(
+        id=uuid.uuid4(),
+        title="Impossible travel",
+        severity="high",
+        status="new",
+        source="huntress",
+        created_at=datetime(2026, 10, 29, 9, tzinfo=UTC),
+        matched="user",
+    )
+    found = AsyncMock(return_value=SimpleNamespace(items=[rel], more=1))
+    with (
+        patch.object(ct, "_get_session", AsyncMock(return_value=_Session())),
+        patch("app.api.v1.endpoints.alert_related.related_alerts", found),
+    ):
+        out = await ct.related_alerts(tenant_id=TID, alert_id=str(uuid.uuid4()))
+    assert (
+        out["count"] == 1
+        and out["more_not_shown"] is True
+        and out["related"][0]["same"] == "user"
+        and out["related"][0]["tool"] == "huntress"
+    )
+    missing = AsyncMock(side_effect=HTTPException(status_code=404, detail="Alert not found"))
+    with (
+        patch.object(ct, "_get_session", AsyncMock(return_value=_Session())),
+        patch("app.api.v1.endpoints.alert_related.related_alerts", missing),
+    ):
+        assert (await ct.related_alerts(tenant_id=TID, alert_id=str(uuid.uuid4()))) == {"error": "Alert not found"}
+    assert (await ct.related_alerts(tenant_id=TID, alert_id="nope")) == {"error": "invalid id"}
+    empty = AsyncMock(return_value=SimpleNamespace(items=[], more=0))
+    with (
+        patch.object(ct, "_get_session", AsyncMock(return_value=_Session())),
+        patch("app.api.v1.endpoints.alert_related.related_alerts", empty),
+    ):
+        assert "note" in await ct.related_alerts(tenant_id=TID, alert_id=str(uuid.uuid4()))
+
+
+def test_related_alerts_is_registered_permissioned_and_callable_from_text():
+    assert (
+        ct.TOOL_PERMISSIONS["related_alerts"] == "alerts:read"
+        and "related_alerts" in ct._COPILOT_TOOL_DISPATCH
+        and "related_alerts" in TEXT_CALLABLE
+    )
+    assert any(t["function"]["name"] == "related_alerts" for t in ct.COPILOT_TOOL_SCHEMAS)

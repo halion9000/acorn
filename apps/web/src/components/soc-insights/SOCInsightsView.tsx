@@ -226,7 +226,7 @@ function TileGrid({ tiles, clientId }: TileGridProps) {
 }
 
 // About as many outlines as there are tiles (the API sends 14 or 15), so the page does not jump when they arrive.
-const LOADING_TILES = 14;
+const LOADING_TILES = 17;
 
 function LoadingSkeleton() {
   // Skeleton tiles arranged on the same grid. The fixed heights

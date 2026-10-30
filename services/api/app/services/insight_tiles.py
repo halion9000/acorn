@@ -18,7 +18,7 @@ from sqlalchemy import case, func, or_, select
 
 from app.models.alert import Alert
 from app.models.playbook_dry_run import PlaybookDryRun
-from app.models.signin import SigninEvent
+from app.models.signin import ClientM365Check, SigninEvent
 from app.models.sla import TenantSLAConfig
 from app.services.alert_queue import load_sla_targets, sla_due_at_expression
 from app.services.alert_status import FINISHED_ALERT_STATUSES, SUPPRESSED
@@ -140,7 +140,29 @@ async def gather_all(db: Any, ids: list[uuid.UUID], start: datetime, now: dateti
     ).all()
     first = parts[ids[0]]
     first["types"] = {str(r[0]): int(r[1]) for r in rows}
+    for tid, source, checks in (
+        await db.execute(
+            select(ClientM365Check.tenant_id, ClientM365Check.source, ClientM365Check.checks).where(
+                ClientM365Check.tenant_id.in_(ids), ClientM365Check.source.in_(sorted({s for s, _ in WATCHED_CHECKS.values()}))
+            )
+        )
+    ).all():
+        parts[tid].setdefault("flagged", {}).update(_flags_of(source, checks))
     return list(parts.values())
+
+
+# tile key -> (the tool source that sends the check, the check key). A client "reports" the check when the tool sent it; it is "flagged" when the check is not fine.
+WATCHED_CHECKS: dict[str, tuple[str, str]] = {
+    "leaked_credentials": ("threatmate", "threatmate_deep_dark_web"),
+    "google_admins_without_2step": ("threatmate-google", "threatmate_google_admins"),
+    "google_failed_sign_ins": ("threatmate-google", "threatmate_google_failed_logins"),
+}
+
+
+def _flags_of(source: str, checks: Any) -> dict[str, bool]:
+    """For one client's checks from one tool: ``{tile key: flagged}`` for each watched check the tool sent (a check it did not send is left out, so it is not counted as fine)."""
+    by_key = {str(c.get("key")): str(c.get("status")) for c in (checks or []) if isinstance(c, dict)}
+    return {tile: by_key[key] != "met" for tile, (src, key) in WATCHED_CHECKS.items() if src == source and key in by_key}
 
 
 def merge(parts: list[dict[str, Any]]) -> dict[str, Any]:
@@ -158,6 +180,8 @@ def merge(parts: list[dict[str, Any]]) -> dict[str, Any]:
         types.update(p["types"])
     m["types"] = types
     m["by_tenant"] = {p["tid"]: p["now"]["alerts"] for p in parts}
+    # tile key -> {client id: flagged}: only the clients whose tool reported the check.
+    m["flagged"] = {tile: {p["tid"]: p["flagged"][tile] for p in parts if tile in p.get("flagged", {})} for tile in WATCHED_CHECKS}
     return m
 
 
@@ -301,6 +325,25 @@ def build_tiles(
                 {"label": name, "value": float(mins or 0), "display": "never reported" if mins is None else f"{mins} min ago"}
                 for name, mins in silent[:TOP_N]
             ],
+        )
+    flagged = m.get("flagged") or {}
+    for key, label, noun in (
+        ("leaked_credentials", "Clients with leaked credentials", "have open dark web findings"),
+        ("google_admins_without_2step", "Clients with Google admins lacking 2-Step", "have a super admin without 2-Step"),
+        ("google_failed_sign_ins", "Clients with many failed Google sign-ins", "had many failed sign-ins in the last week"),
+    ):
+        reported = flagged.get(key, {})
+        bad = sorted((t for t, v in reported.items() if v), key=str)
+        tile(
+            key,
+            label,
+            float(len(bad)),
+            "count",
+            has_data=len(reported) > 0,
+            detail=f"{len(bad)} of {len(reported)} clients that report this {noun}",
+            items=[{"label": (client_names or {}).get(t, str(t)), "value": 1.0, "display": "flagged"} for t in bad[:TOP_N]]
+            if client_names
+            else [],
         )
     pb, pb_prev = _share(cur["playbook_matched"], total), _share(prev["playbook_matched"], prev["alerts"])
     tile(
