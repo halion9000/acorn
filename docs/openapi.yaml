@@ -11024,6 +11024,22 @@ paths:
           minimum: 1
           default: 50
           title: Page Size
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(name|client|serial|category|model|quantity|status|person|site|date)$
+          default: name
+          title: Sort
+      - name: direction
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(asc|desc)$
+          default: asc
+          title: Direction
       responses:
         '200':
           description: Successful Response
@@ -11248,6 +11264,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SyncOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/inventory/sync-nucs:
+    post:
+      tags:
+      - inventory
+      summary: Add the NinjaOne devices with NUC in the name to the NUC list when
+        they are missing
+      operationId: sync_nucs_endpoint_api_v1_inventory_sync_nucs_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NucSyncOut'
         '422':
           description: Validation Error
           content:
@@ -34298,6 +34342,44 @@ components:
       - note
       - difference
       title: NoteIn
+    NucSyncOut:
+      properties:
+        dry_run:
+          type: boolean
+          title: Dry Run
+        devices:
+          type: integer
+          title: Devices
+          description: NinjaOne devices with NUC in the name.
+        matched:
+          type: integer
+          title: Matched
+          description: 'Already on the NUC list (same serial number, same NinjaOne
+            device, or the same name at the same client): left as they are.'
+        created:
+          type: integer
+          title: Created
+          description: New NUCs added.
+        no_serial:
+          type: integer
+          title: No Serial
+          description: Of the new ones, how many have no usable serial number.
+        names:
+          items:
+            type: string
+          type: array
+          title: Names
+          description: The first of the NUCs that are (or would be) added, to check
+            the name filter caught the right machines.
+      type: object
+      required:
+      - dry_run
+      - devices
+      - matched
+      - created
+      - no_serial
+      - names
+      title: NucSyncOut
     OAuthAppRegistration:
       properties:
         client_id:

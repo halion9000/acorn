@@ -867,6 +867,9 @@ export interface InventoryQuery {
   search?: string;
   page?: number;
   pageSize?: number;
+  /** A column: name, client, serial, category, model, quantity, status, person, site or date. */
+  sort?: string;
+  direction?: 'asc' | 'desc';
 }
 
 export type InventoryInput = Partial<Omit<InventoryItem, 'id' | 'client_name' | 'source' | 'updated_at' | 'device'>> & { name: string };
@@ -904,8 +907,17 @@ export interface InventorySyncResult {
   no_serial: number;
 }
 
+export interface InventoryNucSyncResult {
+  dry_run: boolean;
+  devices: number;
+  matched: number;
+  created: number;
+  no_serial: number;
+  names: string[];
+}
+
 export const inventoryApi = {
-  list: (q: InventoryQuery = {}) => request<InventoryList>('/api/v1/inventory', { params: { ...inventoryParams(q), page: q.page ?? 1, page_size: q.pageSize ?? 50 } }),
+  list: (q: InventoryQuery = {}) => request<InventoryList>('/api/v1/inventory', { params: { ...inventoryParams(q), page: q.page ?? 1, page_size: q.pageSize ?? 50, sort: q.sort, direction: q.direction } }),
   create: (body: InventoryInput) => request<InventoryItem>('/api/v1/inventory', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: Partial<InventoryInput> & { move_to_own?: boolean }) => request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) }),
   checkOut: (id: string, body: { person?: string; site?: string; ticket_url?: string; note?: string }) =>
@@ -914,6 +926,8 @@ export const inventoryApi = {
   events: (id: string) => request<InventoryEvent[]>(`/api/v1/inventory/${encodeURIComponent(id)}/events`),
   /** The Windows computers, Macs, iPads and iPhones NinjaOne and Addigy report: a dry run says what would be added; the real one adds them as checked out. */
   syncDevices: (dry_run: boolean) => request<InventorySyncResult>('/api/v1/inventory/sync-devices', { method: 'POST', body: JSON.stringify({ dry_run }) }),
+  /** NinjaOne devices with NUC in the name that are not on the NUC list: a dry run says what would be added; the real one adds them. */
+  syncNucs: (dry_run: boolean) => request<InventoryNucSyncResult>('/api/v1/inventory/sync-nucs', { method: 'POST', body: JSON.stringify({ dry_run }) }),
   /** The same change for many items: the client they belong to (or Live Oak's own), a category, a site, tags to add. */
   bulk: (body: { ids: string[]; client_id?: string; move_to_own?: boolean; category?: string; site?: string; add_tags?: string[] }) =>
     request<{ changed: number; unchanged: number; not_found: number }>('/api/v1/inventory/bulk', { method: 'POST', body: JSON.stringify(body) }),

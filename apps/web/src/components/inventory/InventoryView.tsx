@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 
-import { inventoryApi, msspApi, type InventoryImportResult, type InventorySyncResult, type InventoryItem, type InventoryKind, type InventoryQuery, type InventoryStatus } from '@/lib/api';
+import { inventoryApi, msspApi, type InventoryImportResult, type InventorySyncResult, type InventoryNucSyncResult, type InventoryItem, type InventoryKind, type InventoryQuery, type InventoryStatus } from '@/lib/api';
 import { safeDistance } from '@/lib/safe-date';
 
 export const STATUS_LABEL: Record<InventoryStatus, string> = { checked_in: 'Checked in', checked_out: 'Checked out', offline: 'Offline', retired: 'Retired' };
@@ -544,7 +544,76 @@ function SyncForm({ onDone, onClose }: { onDone: () => void; onClose: () => void
   );
 }
 
-type Dialog = { type: 'add' } | { type: 'edit'; item: InventoryItem } | { type: 'out' | 'in'; item: InventoryItem } | { type: 'history'; item: InventoryItem } | { type: 'import' } | { type: 'bulk' } | { type: 'sync' } | null;
+function NucSyncForm({ onDone, onClose }: { onDone: () => void; onClose: () => void }) {
+  const [preview, setPreview] = useState<InventoryNucSyncResult | null>(null);
+  const [result, setResult] = useState<InventoryNucSyncResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const run = async (dry: boolean) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await inventoryApi.syncNucs(dry);
+      if (dry) setPreview(r);
+      else {
+        setResult(r);
+        onDone();
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not read the device list.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => void run(true), []);
+  const shown = result ?? preview;
+  return (
+    <Modal title="Import NUCs from NinjaOne" onClose={onClose}>
+      <p className="mb-3 text-xs text-gray-400">
+        Looks at every NinjaOne device with NUC in its name. One already on this list (same serial number, same NinjaOne device, or the same name at the same client) is left alone. Any other is added under its client, as checked out, or as offline when NinjaOne has not seen it for a month.
+      </p>
+      {!shown && !error && <p className="text-sm text-gray-400">Reading the device list...</p>}
+      {shown && (
+        <div className="space-y-2 text-sm text-gray-200" data-testid={result ? 'nuc-result' : 'nuc-preview'}>
+          <p>{shown.devices} NinjaOne devices have NUC in the name.</p>
+          <p>{shown.matched} already on the list.</p>
+          <p>{result ? `Added ${shown.created}` : `${shown.created} would be added`}{shown.no_serial > 0 ? `, ${shown.no_serial} with no usable serial number` : ''}.</p>
+          {shown.names.length > 0 && <p className="text-xs text-gray-400">{result ? 'Added' : 'Would add'}: {shown.names.join(', ')}{shown.created > shown.names.length ? ', ...' : ''}</p>}
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-red-300">
+          {error}
+        </p>
+      )}
+      <div className="mt-4 flex justify-end gap-2">
+        <button type="button" onClick={onClose} className={`${input} hover:bg-gray-800`}>
+          {result ? 'Close' : 'Cancel'}
+        </button>
+        {!result && (
+          <button type="button" disabled={busy || !preview || preview.created === 0} onClick={() => void run(false)} className="rounded-md bg-sky-600 px-3 py-1.5 text-sm text-white hover:bg-sky-500 disabled:opacity-40">
+            {busy ? 'Working...' : 'Add them'}
+          </button>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function SortHead({ label, field, sort, dir, onSort, className = 'px-3 py-2' }: { label: string; field: string; sort: string; dir: 'asc' | 'desc'; onSort: (f: string) => void; className?: string }) {
+  const active = sort === field;
+  return (
+    <th className={className} aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" onClick={() => onSort(field)} className="inline-flex items-center gap-1 uppercase hover:text-white" aria-label={`Sort by ${label}`}>
+        {label}
+        <span aria-hidden="true" className={active ? 'text-sky-300' : 'text-gray-600'}>{active ? (dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+      </button>
+    </th>
+  );
+}
+
+type Dialog = { type: 'add' } | { type: 'edit'; item: InventoryItem } | { type: 'out' | 'in'; item: InventoryItem } | { type: 'history'; item: InventoryItem } | { type: 'import' } | { type: 'bulk' } | { type: 'sync' } | { type: 'nucsync' } | null;
 
 export function InventoryView() {
   const [kind, setKind] = useState<InventoryKind>('stock');
@@ -553,12 +622,14 @@ export function InventoryView() {
   const [category, setCategory] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState('name');
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc');
   const [dialog, setDialog] = useState<Dialog>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const query: InventoryQuery = useMemo(
-    () => ({ kind, client: client || undefined, status: status || undefined, category: category || undefined, search: search.trim() || undefined, page, pageSize: 100 }),
-    [kind, client, status, category, search, page],
+    () => ({ kind, client: client || undefined, status: status || undefined, category: category || undefined, search: search.trim() || undefined, page, pageSize: 100, sort, direction: dir }),
+    [kind, client, status, category, search, page, sort, dir],
   );
   const { data, error, isLoading, mutate } = useSWR(['inventory', query], () => inventoryApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
   const { data: children } = useSWR('mssp-children', () => msspApi.listChildren().catch(() => []), { revalidateOnFocus: false });
@@ -572,6 +643,14 @@ export function InventoryView() {
     setDialog(null);
     setPicked(new Set());
     void mutate();
+  };
+  const onSort = (field: string) => {
+    if (field === sort) setDir(dir === 'asc' ? 'desc' : 'asc');
+    else {
+      setSort(field);
+      setDir('asc');
+    }
+    setPage(1);
   };
   const pageIds = (data?.items ?? []).map((i) => i.id);
   const allPicked = pageIds.length > 0 && pageIds.every((id) => picked.has(id));
@@ -605,9 +684,15 @@ export function InventoryView() {
           <p className="mt-1 text-sm text-gray-400">Stock we hold for clients, who has each item, and what has happened to it. Each item is filed under its client.</p>
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={() => setDialog({ type: 'sync' })} className={`${input} hover:bg-gray-800`}>
-            Add devices from NinjaOne and Addigy
-          </button>
+          {kind === 'nuc' ? (
+            <button type="button" onClick={() => setDialog({ type: 'nucsync' })} className={`${input} hover:bg-gray-800`}>
+              Import NUCs from NinjaOne
+            </button>
+          ) : (
+            <button type="button" onClick={() => setDialog({ type: 'sync' })} className={`${input} hover:bg-gray-800`}>
+              Add devices from NinjaOne and Addigy
+            </button>
+          )}
           <button type="button" onClick={() => setDialog({ type: 'import' })} className={`${input} hover:bg-gray-800`}>
             Import CSV
           </button>
@@ -627,7 +712,7 @@ export function InventoryView() {
             type="button"
             role="tab"
             aria-selected={kind === k}
-            onClick={() => reset(() => { setKind(k); setStatus(''); setCategory(''); })}
+            onClick={() => reset(() => { setKind(k); setStatus(''); setCategory(''); setSort('name'); setDir('asc'); })}
             className={`px-4 py-2 text-sm ${kind === k ? 'border-b-2 border-sky-400 text-white' : 'text-gray-400 hover:text-white'}`}
           >
             {k === 'stock' ? 'Stock' : 'NUCs'}
@@ -707,14 +792,14 @@ export function InventoryView() {
               <th className="w-8 px-3 py-2">
                 <input type="checkbox" aria-label="Select all on this page" checked={allPicked} onChange={() => setPicked(allPicked ? new Set() : new Set(pageIds))} />
               </th>
-              <th className="px-3 py-2">{kind === 'nuc' ? 'Computer' : 'Item'}</th>
-              <th className="px-3 py-2">Client</th>
-              <th className="px-3 py-2">Serial</th>
-              {kind === 'nuc' ? <th className="px-3 py-2">Model</th> : <th className="px-3 py-2">Category</th>}
-              {kind === 'stock' && <th className="px-3 py-2">Qty</th>}
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">{kind === 'nuc' ? 'Site and person' : 'With'}</th>
-              <th className="px-3 py-2">{kind === 'nuc' ? 'Deployed' : 'Last moved'}</th>
+              <SortHead label={kind === 'nuc' ? 'Computer' : 'Item'} field="name" sort={sort} dir={dir} onSort={onSort} />
+              <SortHead label="Client" field="client" sort={sort} dir={dir} onSort={onSort} />
+              <SortHead label="Serial" field="serial" sort={sort} dir={dir} onSort={onSort} />
+              {kind === 'nuc' ? <SortHead label="Model" field="model" sort={sort} dir={dir} onSort={onSort} /> : <SortHead label="Category" field="category" sort={sort} dir={dir} onSort={onSort} />}
+              {kind === 'stock' && <SortHead label="Qty" field="quantity" sort={sort} dir={dir} onSort={onSort} />}
+              <SortHead label="Status" field="status" sort={sort} dir={dir} onSort={onSort} />
+              <SortHead label={kind === 'nuc' ? 'Site and person' : 'With'} field={kind === 'nuc' ? 'site' : 'person'} sort={sort} dir={dir} onSort={onSort} />
+              <SortHead label={kind === 'nuc' ? 'Deployed' : 'Last moved'} field="date" sort={sort} dir={dir} onSort={onSort} />
               <th className="px-3 py-2 text-right">Actions</th>
             </tr>
           </thead>
@@ -812,6 +897,7 @@ export function InventoryView() {
       {(dialog?.type === 'out' || dialog?.type === 'in') && <MoveForm item={dialog.item} mode={dialog.type} onDone={changed} onClose={() => setDialog(null)} />}
       {dialog?.type === 'bulk' && <BulkForm ids={[...picked]} clients={clients} onDone={changed} onClose={() => setDialog(null)} />}
       {dialog?.type === 'sync' && <SyncForm onDone={() => void mutate()} onClose={() => setDialog(null)} />}
+      {dialog?.type === 'nucsync' && <NucSyncForm onDone={() => void mutate()} onClose={() => setDialog(null)} />}
       {dialog?.type === 'history' && <History item={dialog.item} onClose={() => setDialog(null)} />}
       {dialog?.type === 'import' && <ImportForm kind={kind} clients={clients} onDone={() => void mutate()} onClose={() => setDialog(null)} />}
     </div>

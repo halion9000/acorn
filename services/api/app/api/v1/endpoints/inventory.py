@@ -18,7 +18,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
@@ -233,6 +233,13 @@ async def _device_links(db: Any, scope: list[uuid.UUID], items: list[InventoryIt
         held_twice = {inv.serial_key(r[0]) for r in shared}
         serials = {k: v for k, v in serials.items() if k not in held_twice}
     ninja_ids = {m.group(1): i for i in items if i.ninja_url and (m := re.search(r"deviceDashboard/(\d+)", i.ninja_url))}
+    ninja_ids.update(
+        {
+            i.external_ref[6:]: i
+            for i in items
+            if i.external_ref and i.external_ref.startswith("ninja:") and i.external_ref[6:] not in ninja_ids
+        }
+    )
     out: dict[uuid.UUID, DeviceLink] = {}
     if not serials and not ninja_ids:
         return out
@@ -305,6 +312,28 @@ def _filters(
     return f
 
 
+def _order(kind: str, sort: str, direction: str) -> list[Any]:
+    """The ORDER BY for a column heading. Empty values go last whichever way it runs, and ties fall back to name, serial and id so a page boundary never repeats or skips a row."""
+    columns: dict[str, Any] = {
+        "name": InventoryItem.name,
+        "client": func.lower(func.coalesce(Tenant.name, InventoryItem.customer_name, "")),
+        "serial": func.lower(InventoryItem.serial),
+        "category": func.lower(InventoryItem.category),
+        "model": func.lower(InventoryItem.model),
+        "quantity": InventoryItem.quantity,
+        "status": InventoryItem.status,
+        "person": func.lower(InventoryItem.person),
+        "site": func.lower(InventoryItem.site),
+        # NUCs: when it was deployed (or redeployed); stock: when it last moved.
+        "date": func.coalesce(InventoryItem.redeployed_at, InventoryItem.deployed_at)
+        if kind == "nuc"
+        else case((InventoryItem.status == "checked_out", InventoryItem.checked_out_at), else_=InventoryItem.checked_in_at),
+    }
+    col = columns[sort]
+    first = col.desc().nulls_last() if direction == "desc" else col.asc().nulls_last()
+    return [first, InventoryItem.name, InventoryItem.serial, InventoryItem.id]
+
+
 @router.get("", response_model=ItemList, summary="The stock held for clients, filtered, with who has each item")
 async def list_items(
     user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
@@ -323,6 +352,8 @@ async def list_items(
     search: str | None = Query(default=None, max_length=100),
     page: Annotated[int, Query(ge=1, le=10_000)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 50,
+    sort: Annotated[str, Query(pattern=r"^(name|client|serial|category|model|quantity|status|person|site|date)$")] = "name",
+    direction: Annotated[str, Query(pattern=r"^(asc|desc)$")] = "asc",
 ) -> ItemList:
     owner = user.tenant_id
     names = await _tenants(db, owner)
@@ -333,16 +364,11 @@ async def list_items(
     base = _filters(kind, scope, owner, client, None, None, None, None)
     async with cross_tenant_reads(db):
         total = (await db.execute(select(func.count()).select_from(InventoryItem).where(and_(*flt)))).scalar_one()
+        query = select(InventoryItem).where(and_(*flt))
+        if sort == "client":
+            query = query.outerjoin(Tenant, Tenant.id == InventoryItem.tenant_id)
         rows = (
-            (
-                await db.execute(
-                    select(InventoryItem)
-                    .where(and_(*flt))
-                    .order_by(InventoryItem.name, InventoryItem.serial, InventoryItem.id)
-                    .offset((page - 1) * page_size)
-                    .limit(page_size)
-                )
-            )
+            (await db.execute(query.order_by(*_order(kind, sort, direction)).offset((page - 1) * page_size).limit(page_size)))
             .scalars()
             .all()
         )
@@ -719,6 +745,115 @@ async def sync_devices_endpoint(
 ) -> SyncOut:
     names = await _tenants(db, user.tenant_id)
     return await sync_devices(db, user.tenant_id, names, user.email, body.dry_run)
+
+
+class NucSyncOut(BaseModel):
+    dry_run: bool
+    devices: int = Field(description="NinjaOne devices with NUC in the name.")
+    matched: int = Field(
+        description="Already on the NUC list (same serial number, same NinjaOne device, or the same name at the same client): left as they are."
+    )
+    created: int = Field(description="New NUCs added.")
+    no_serial: int = Field(description="Of the new ones, how many have no usable serial number.")
+    names: list[str] = Field(
+        description="The first of the NUCs that are (or would be) added, to check the name filter caught the right machines."
+    )
+
+
+NUC_ONLINE_DAYS = 30
+
+
+async def sync_nucs(db: Any, owner: uuid.UUID, names: dict[uuid.UUID, str], actor: str | None, dry_run: bool) -> NucSyncOut:
+    """Add the NinjaOne devices with NUC in their name to the NUC list when they are not on it.
+
+    A device is already on the list when its serial number is on a NUC (a serial held by more than one NUC, like the maker's name or "Default string", is not an identifier), when a NUC carries its NinjaOne device number, or when a NUC at the same client has
+    the same name. Anything else is added under the device's client as checked out (a NUC is listed once it is deployed), or as offline when NinjaOne has not seen it for a month. Syncing again adds nothing that is already there."""
+    scope = [owner, *names]
+    async with cross_tenant_reads(db):
+        devices = (
+            await db.execute(
+                select(
+                    Device.id,
+                    Device.tenant_id,
+                    Device.hostname,
+                    Device.serial_number,
+                    Device.model,
+                    Device.manufacturer,
+                    Device.last_seen,
+                    Device.first_seen,
+                    func.min(DeviceSource.external_id).label("ninja_id"),
+                )
+                .join(DeviceSource, DeviceSource.device_id == Device.id)
+                .where(Device.tenant_id.in_(scope), DeviceSource.vendor == "ninjaone", Device.hostname.ilike("%nuc%"))
+                .group_by(Device.id)
+            )
+        ).all()
+        existing = (
+            (await db.execute(select(InventoryItem).where(InventoryItem.tenant_id.in_(scope), InventoryItem.kind == "nuc"))).scalars().all()
+        )
+    held_twice = inv.shared_serials([{"serial": e.serial} for e in existing])
+    by_serial = {
+        inv.usable_serial(e.serial): e for e in existing if inv.usable_serial(e.serial) and inv.usable_serial(e.serial) not in held_twice
+    }
+    by_ninja = {m.group(1): e for e in existing if e.ninja_url and (m := re.search(r"deviceDashboard/(\d+)", e.ninja_url))}
+    by_ref = {e.external_ref for e in existing if e.external_ref}
+    by_name = {(e.tenant_id, (e.name or "").strip().lower()) for e in existing}
+    matched = created = no_serial = 0
+    shown: list[str] = []
+    fresh: dict[uuid.UUID, list[Any]] = {}
+    for d in devices:
+        key = inv.usable_serial(d.serial_number)
+        ref = f"ninja:{d.ninja_id}"
+        if (
+            (key and key in by_serial)
+            or str(d.ninja_id) in by_ninja
+            or ref in by_ref
+            or (d.tenant_id, (d.hostname or "").strip().lower()) in by_name
+        ):
+            matched += 1
+            continue
+        created += 1
+        no_serial += not key
+        if len(shown) < 15:
+            shown.append(d.hostname)
+        fresh.setdefault(d.tenant_id, []).append(d)
+    if not dry_run:
+        now = datetime.now(UTC)
+        for tid, group in fresh.items():
+            async with _acting(db, owner, tid):
+                for d in group:
+                    stale = d.last_seen is not None and (now - d.last_seen).days > NUC_ONLINE_DAYS
+                    day = d.first_seen.date() if d.first_seen else None
+                    row = InventoryItem(
+                        tenant_id=tid,
+                        kind="nuc",
+                        source="device",
+                        external_ref=f"ninja:{d.ninja_id}",
+                        name=(d.hostname or "NUC")[:300],
+                        serial=d.serial_number if inv.usable_serial(d.serial_number) else None,
+                        model=d.model,
+                        manufacturer=d.manufacturer,
+                        customer_name=names.get(tid),
+                        status="offline" if stale else "checked_out",
+                        deployed_at=day,
+                        quantity=1,
+                        tags=["NinjaOne"],
+                    )
+                    db.add(row)
+                    await db.flush()
+                    db.add(_event(row, "created", actor, note="found in NinjaOne by its name; not on the NUC list yet"))
+                await db.commit()
+    return NucSyncOut(dry_run=dry_run, devices=len(devices), matched=matched, created=created, no_serial=no_serial, names=shown)
+
+
+@router.post(
+    "/sync-nucs", response_model=NucSyncOut, summary="Add the NinjaOne devices with NUC in the name to the NUC list when they are missing"
+)
+async def sync_nucs_endpoint(
+    body: SyncIn, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+) -> NucSyncOut:
+    names = await _tenants(db, user.tenant_id)
+    return await sync_nucs(db, user.tenant_id, names, user.email, body.dry_run)
 
 
 class ImportIn(BaseModel):

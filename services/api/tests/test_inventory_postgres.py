@@ -63,6 +63,8 @@ def ls(user, db, **kw):
         "search": None,
         "page": 1,
         "page_size": 50,
+        "sort": "name",
+        "direction": "asc",
         **kw,
     }
     return ep.list_items(user, db, **args)
@@ -498,5 +500,103 @@ async def test_a_device_item_that_a_list_import_later_covers_becomes_a_list_item
             assert (again.created, again.matched) == (0, 1)
             rows = (await ls(user, db)).items
             assert len(rows) == 1 and rows[0].source == "csv" and rows[0].status == "checked_in"
+    finally:
+        await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])
+
+
+async def test_the_list_sorts_by_any_column_either_way_with_empty_values_last_and_a_stable_order():
+    engine, user, w = await world()
+    try:
+        async with AsyncSession(engine) as db:
+            await ep.create_item(item(name="Cable", serial=None, category="Parts", client_id=w.birch, quantity=9, person="Zed"), user, db)
+            await ep.create_item(
+                item(name="Adapter", serial="B-200", category="Parts", client_id=w.acme, quantity=2, person="amy"), user, db
+            )
+            await ep.create_item(item(name="Battery", serial="a-100", category="Power", quantity=5), user, db)
+
+            async def names(**kw):
+                return [i.name for i in (await ls(user, db, **kw)).items]
+
+            assert await names() == ["Adapter", "Battery", "Cable"]
+            assert await names(sort="name", direction="desc") == ["Cable", "Battery", "Adapter"]
+            assert await names(sort="serial") == ["Battery", "Adapter", "Cable"], "case is ignored and the item with no serial goes last"
+            assert await names(sort="serial", direction="desc") == ["Adapter", "Battery", "Cable"], "empty values go last either way"
+            assert await names(sort="client") == ["Adapter", "Cable", "Battery"], "Acme, Birch, then Live Oak's own"
+            assert await names(sort="quantity", direction="desc") == ["Cable", "Battery", "Adapter"]
+            assert await names(sort="person") == ["Adapter", "Cable", "Battery"], "amy, Zed, then nobody"
+            assert await names(sort="category", direction="desc") == ["Battery", "Adapter", "Cable"]
+            assert len(await names(sort="date")) == 3
+            first = [i.name for i in (await ls(user, db, sort="quantity", page_size=2)).items]
+            second = [i.name for i in (await ls(user, db, sort="quantity", page_size=2, page=2)).items]
+            assert first + second == ["Adapter", "Battery", "Cable"], "pages follow the same order"
+    finally:
+        await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])
+
+
+async def test_the_nuc_sync_adds_ninja_devices_named_nuc_that_are_not_on_the_list_and_matches_the_rest():
+    engine, user, w = await world()
+    try:
+        async with engine.begin() as conn:
+            await add_device(conn, w.acme, "ACME-NUC-01", "SN-NUC-1", "Windows 11 Pro", "NUC11", "ninjaone")
+            await add_device(conn, w.acme, "ACME-NUC-02", "SN-NUC-2", "Windows 11 Pro", "NUC12", "ninjaone")
+            await add_device(conn, w.birch, "birch nuc", None, "Windows 10 Pro", "NUC8", "ninjaone")
+            await add_device(conn, w.birch, "BIRCH-NUC-3", "KAMRUI", "Windows 10 Pro", "NUC8", "ninjaone")
+            await add_device(conn, w.birch, "BIRCH-NUC-OLD", "SN-NUC-5", "Windows 10 Pro", "NUC7", "ninjaone")
+            await add_device(conn, w.birch, "BIRCH-LAP-1", "SN-LAP", "Windows 11 Pro", "Latitude", "ninjaone")
+            await add_device(conn, w.birch, "BIRCH-NUC-HUNT", "SN-NUC-9", "Windows 11 Pro", "NUC", "huntress")
+            await conn.execute(text("update devices set last_seen = now() - interval '90 days' where hostname = 'BIRCH-NUC-OLD'"))
+        async with AsyncSession(engine) as db:
+            # What the NUC list already has: one matched by serial, one by name at the same client, one by its NinjaOne device number.
+            await ep.create_item(item(name="Front desk", serial="sn-nuc-1", client_id=w.acme, kind="nuc"), user, db)
+            await ep.create_item(item(name="Birch NUC", serial=None, client_id=w.birch, kind="nuc"), user, db)
+            await ep.create_item(item(name="Shared one", serial="KAMRUI", client_id=w.birch, kind="nuc"), user, db)
+            await ep.create_item(item(name="Shared two", serial="KAMRUI", client_id=w.birch, kind="nuc"), user, db)
+            numbered = await ep.create_item(
+                item(
+                    name="Called something else",
+                    serial=None,
+                    client_id=w.acme,
+                    kind="nuc",
+                    ninja_url="https://app.ninjarmm.com/#/deviceDashboard/777/overview",
+                ),
+                user,
+                db,
+            )
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "update device_sources set external_id = '777' where device_id = (select id from devices where hostname = 'ACME-NUC-02')"
+                    )
+                )
+            preview = await ep.sync_nucs_endpoint(ep.SyncIn(dry_run=True), user, db)
+            assert (preview.devices, preview.matched, preview.created) == (
+                5,
+                3,
+                2,
+            ), "a laptop and another tool's NUC-named device are not NinjaOne NUCs"
+            assert (await ls(user, db, kind="nuc")).total == 5, "a preview adds nothing"
+
+            done = await ep.sync_nucs_endpoint(ep.SyncIn(dry_run=False), user, db)
+            assert (done.created, done.matched, done.no_serial) == (2, 3, 0)
+            rows = {i.name: i for i in (await ls(user, db, kind="nuc", page_size=100)).items}
+            assert {"BIRCH-NUC-3", "BIRCH-NUC-OLD"} <= set(rows) and len(rows) == 7
+            fresh = rows["BIRCH-NUC-OLD"]
+            assert (fresh.kind, fresh.source, fresh.client_id, fresh.status, fresh.serial) == (
+                "nuc",
+                "device",
+                w.birch,
+                "offline",
+                "SN-NUC-5",
+            )
+            assert (
+                rows["BIRCH-NUC-3"].status == "checked_out" and rows["BIRCH-NUC-3"].serial == "KAMRUI"
+            ), "a serial two NUCs already share does not match, so the device is added as its own NUC"
+            assert numbered.id in {i.id for i in rows.values()}
+            again = await ep.sync_nucs_endpoint(ep.SyncIn(dry_run=False), user, db)
+            assert (again.created, again.matched) == (0, 5), "running it again adds nothing"
+            assert (await ls(user, db, kind="nuc", page_size=100)).total == 7
+            assert (await ls(user, db, kind="stock")).total == 0
+            linked = {i.name: i.device for i in (await ls(user, db, kind="nuc", page_size=100)).items}
+            assert linked["BIRCH-NUC-OLD"] is not None, "an added NUC links straight to its machine"
     finally:
         await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])

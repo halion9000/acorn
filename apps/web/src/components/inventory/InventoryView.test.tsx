@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), update: vi.fn(), checkOut: vi.fn(), checkIn: vi.fn(), events: vi.fn(), import: vi.fn(), exportCsv: vi.fn(), bulk: vi.fn(), syncDevices: vi.fn() }));
+const api = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), update: vi.fn(), checkOut: vi.fn(), checkIn: vi.fn(), events: vi.fn(), import: vi.fn(), exportCsv: vi.fn(), bulk: vi.fn(), syncDevices: vi.fn(), syncNucs: vi.fn() }));
 const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
 vi.mock('@/lib/api', () => ({ inventoryApi: api, msspApi: mssp }));
 
@@ -308,5 +308,65 @@ describe('InventoryView device sync', () => {
     api.syncDevices.mockRejectedValueOnce(new Error('Forbidden'));
     await userEvent.click(screen.getByRole('button', { name: 'Add devices from NinjaOne and Addigy' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
+  });
+});
+
+describe('InventoryView sorting', () => {
+  it('sorts by a heading, flips on a second click, starts a new column ascending and goes back to page one', async () => {
+    view();
+    await screen.findAllByTestId('inventory-row');
+    expect(lastQuery()).toMatchObject({ sort: 'name', direction: 'asc' });
+    await userEvent.click(screen.getByRole('button', { name: 'Sort by Serial' }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ sort: 'serial', direction: 'asc', page: 1 }));
+    expect(screen.getByRole('columnheader', { name: /Serial/ })).toHaveAttribute('aria-sort', 'ascending');
+    await userEvent.click(screen.getByRole('button', { name: 'Sort by Serial' }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ sort: 'serial', direction: 'desc' }));
+    expect(screen.getByRole('columnheader', { name: /Serial/ })).toHaveAttribute('aria-sort', 'descending');
+    await userEvent.click(screen.getByRole('button', { name: 'Sort by Client' }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ sort: 'client', direction: 'asc' }));
+  });
+
+  it('offers the columns of each list and returns to name order when the list changes', async () => {
+    view();
+    await screen.findAllByTestId('inventory-row');
+    expect(screen.getByRole('button', { name: 'Sort by Qty' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Sort by Category' }));
+    await waitFor(() => expect(lastQuery().sort).toBe('category'));
+    await userEvent.click(screen.getByRole('tab', { name: 'NUCs' }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ kind: 'nuc', sort: 'name', direction: 'asc' }));
+    expect(screen.getByRole('button', { name: 'Sort by Model' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort by Deployed' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sort by Qty' })).toBeNull();
+  });
+});
+
+describe('InventoryView NUC import', () => {
+  const nuc = (over: Record<string, unknown> = {}) => ({ dry_run: true, devices: 30, matched: 26, created: 4, no_serial: 1, names: ['ACME-NUC-04', 'BIRCH-NUC-2'], ...over });
+
+  it('is on the NUC tab only, previews what would be added with their names, then adds them', async () => {
+    api.syncNucs.mockResolvedValueOnce(nuc()).mockResolvedValueOnce(nuc({ dry_run: false }));
+    view();
+    await screen.findAllByTestId('inventory-row');
+    expect(screen.queryByRole('button', { name: 'Import NUCs from NinjaOne' })).toBeNull();
+    await userEvent.click(screen.getByRole('tab', { name: 'NUCs' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Import NUCs from NinjaOne' }));
+    const preview = await screen.findByTestId('nuc-preview');
+    expect(preview).toHaveTextContent('30 NinjaOne devices have NUC in the name');
+    expect(preview).toHaveTextContent('26 already on the list');
+    expect(preview).toHaveTextContent('4 would be added, 1 with no usable serial number');
+    expect(preview).toHaveTextContent('ACME-NUC-04, BIRCH-NUC-2, ...');
+    await userEvent.click(screen.getByRole('button', { name: 'Add them' }));
+    expect(await screen.findByTestId('nuc-result')).toHaveTextContent('Added 4');
+    expect(api.syncNucs.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it('has nothing to add when every NUC is already listed', async () => {
+    api.syncNucs.mockResolvedValueOnce(nuc({ created: 0, matched: 30, no_serial: 0, names: [] }));
+    view();
+    await screen.findAllByTestId('inventory-row');
+    await userEvent.click(screen.getByRole('tab', { name: 'NUCs' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Import NUCs from NinjaOne' }));
+    await screen.findByTestId('nuc-preview');
+    expect(screen.getByRole('button', { name: 'Add them' })).toBeDisabled();
   });
 });
