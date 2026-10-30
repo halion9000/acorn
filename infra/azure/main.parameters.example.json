@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "value": "centralus" },
+    "prefix": { "value": "liveoak" },
+    "sshPublicKey": { "value": "ssh-ed25519 AAAA...replace-with-your-public-key... you@example" },
+    "budgetEmail": { "value": "hal@goliveoak.com" },
+    "budgetStart": { "value": "2026-11-01" },
+    "monthlyBudget": { "value": 450 }
+  }
+}
