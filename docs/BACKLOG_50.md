@@ -99,7 +99,7 @@ All **Ready** unless marked; none has been started. Where a vendor API is involv
 74. Mute a rule for one client for N days - Ready
 75. Show how often this rule fired for this client - Ready
 76. Suggest 'close as false positive' when a user did the same 3 times - Ready
-77. Alert age badge for anything open over 7 days - Ready
+77. Alert age badge for anything open over 7 days - Done
 78. Group alerts by device on the list - Ready
 79. Keyboard shortcuts for next/previous alert - Ready
 80. Remember the last filter on the alert list - Ready

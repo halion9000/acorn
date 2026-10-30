@@ -91,6 +91,18 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
+const FINISHED = new Set(['resolved', 'closed', 'false_positive', 'auto_closed']);
+export const STALE_ALERT_DAYS = 7;
+
+/** How many whole days an alert has been open when that is a week or more, otherwise null (finished alerts, young alerts and unreadable dates give null). */
+export function openDays(createdAt: string | undefined, status: string, now: number = Date.now()): number | null {
+  if (FINISHED.has(status)) return null;
+  const t = createdAt ? Date.parse(createdAt) : NaN;
+  if (!Number.isFinite(t)) return null;
+  const days = Math.floor((now - t) / 86_400_000);
+  return days >= STALE_ALERT_DAYS ? days : null;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.new;
   return (
@@ -381,6 +393,11 @@ export function AlertRow({
         {alert.confidenceLabel && <ConfidencePill label={alert.confidenceLabel} />}
         <SeverityBadge severity={alert.severity} />
         <StatusBadge status={alert.status} />
+        {openDays(alert.createdAt, alert.status) !== null && (
+          <span data-testid="alert-open-days" title="Open for a week or more" className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] text-amber-300" suppressHydrationWarning>
+            {openDays(alert.createdAt, alert.status)}d open
+          </span>
+        )}
         <span className="text-xs text-gray-600 w-24 text-right" suppressHydrationWarning>
           {safeDistance(alert.createdAt, { addSuffix: true })}
         </span>
