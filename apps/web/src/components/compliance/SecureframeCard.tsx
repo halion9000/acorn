@@ -18,6 +18,8 @@ export interface SecureframeView {
   } | null;
   received_at: string | null;
   passing_percent: number | null;
+  /** Percentage points the pass rate moved in the last 30 days; absent or null until there is a week of history. */
+  change_30_days?: number | null;
 }
 
 async function read(): Promise<SecureframeView> {
@@ -30,6 +32,14 @@ async function read(): Promise<SecureframeView> {
 export function failingDays(since: string | null, now: number = Date.now()): number | null {
   const t = since ? Date.parse(since) : NaN;
   return Number.isFinite(t) ? Math.max(0, Math.floor((now - t) / 86_400_000)) : null;
+}
+
+/** "Up 3.2 points in 30 days", "down 1 point in 30 days", "unchanged in 30 days"; null when the change is not known. */
+export function changePhrase(change: number | null | undefined): string | null {
+  if (change === null || change === undefined) return null;
+  if (change === 0) return 'unchanged in 30 days';
+  const size = Math.abs(change);
+  return `${change > 0 ? 'up' : 'down'} ${size} ${size === 1 ? 'point' : 'points'} in 30 days`;
 }
 
 export function SecureframeCard() {
@@ -52,6 +62,11 @@ export function SecureframeCard() {
         {data.report.policies !== null ? `${data.report.risks !== null ? ',' : ''} ${data.report.policies} policies` : ''}
         {data.report.risks !== null || data.report.policies !== null ? '.' : ''}
       </p>
+      {changePhrase(data.change_30_days) && (
+        <p className="mt-0.5 text-xs text-gray-400" data-testid="secureframe-change">
+          Pass rate {changePhrase(data.change_30_days)}.
+        </p>
+      )}
       {pct !== null && (
         <div role="progressbar" aria-label="Secureframe tests passing" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-700">
           <div className="h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />

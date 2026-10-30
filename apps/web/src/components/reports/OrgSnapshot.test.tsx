@@ -116,7 +116,7 @@ describe('secureframeLine', () => {
   });
 
   it('counts tests when none was evaluated, and says nothing when Secureframe has not reported', () => {
-    expect(secureframeLine({ report: view().report, received_at: null, passing_percent: null } as never)).toContain('7 tests pass, 2 fail');
+    expect(secureframeLine({ ...(view() as object), passing_percent: null } as never)).toContain('7 tests pass, 2 fail');
     expect(secureframeLine(undefined)).toBeNull();
     expect(secureframeLine({ report: null, received_at: null, passing_percent: null })).toBeNull();
   });

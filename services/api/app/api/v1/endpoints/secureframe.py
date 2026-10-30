@@ -6,7 +6,7 @@ framework, the oldest failing tests with their owner, and the number of risks an
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
 from app.db.rls_sessions import adopt_tenant
-from app.models.secureframe_report import SecureframeReport
+from app.models.secureframe_report import SecureframeHistory, SecureframeReport
 
 router = APIRouter(prefix="/secureframe", tags=["secureframe"])
 ingest_router = APIRouter(prefix="/inbox", tags=["secureframe"])
@@ -100,6 +100,23 @@ class SecureframeView(BaseModel):
     received_at: datetime | None
     # enabled tests that pass, as a percentage of the enabled tests that were evaluated; None when none were.
     passing_percent: float | None = None
+    # Percentage points the pass rate moved over the last 30 days (positive: better); None until a day at least a week old is on record.
+    change_30_days: float | None = None
+
+
+def change_over(points: list[tuple[date, int, int]], today: date, days: int = 30, min_age_days: int = 7) -> float | None:
+    """How far the pass rate moved, in percentage points, between the oldest day inside the window and the newest day on record.
+
+    ``points`` are ``(day, passing, failing)``. Days with nothing evaluated are ignored. None when there is no day at least ``min_age_days`` older than the newest one (a few days of data is not a trend).
+    """
+    usable = sorted((d, p, f) for d, p, f in points if p + f > 0 and d >= today - timedelta(days=days))
+    if len(usable) < 2:
+        return None
+    first, last = usable[0], usable[-1]
+    if (last[0] - first[0]).days < min_age_days:
+        return None
+    rate = lambda p: 100 * p[1] / (p[1] + p[2])  # noqa: E731
+    return round(rate(last) - rate(first), 1)
 
 
 def passing_percent(tests: TestCounts) -> float | None:
@@ -117,6 +134,26 @@ async def report_core_feed_secureframe(tenant_token: str, body: ReportIn, db: DB
     await db.execute(
         stmt.on_conflict_do_update(index_elements=["tenant_id"], set_={"report": stmt.excluded.report, "received_at": func.now()})
     )
+    counts = body.report.tests
+    day = pg_insert(SecureframeHistory).values(
+        tenant_id=owner,
+        day=datetime.now(UTC).date(),
+        passing=counts.passing,
+        failing=counts.failing,
+        risks=body.report.risks,
+        policies=body.report.policies,
+    )
+    await db.execute(
+        day.on_conflict_do_update(
+            index_elements=["tenant_id", "day"],
+            set_={
+                "passing": day.excluded.passing,
+                "failing": day.excluded.failing,
+                "risks": day.excluded.risks,
+                "policies": day.excluded.policies,
+            },
+        )
+    )
     await db.commit()
     return ReportResponse()
 
@@ -127,7 +164,20 @@ async def secureframe_view(user: Annotated[AuthUser, Depends(require_permission(
     if row is None:
         return SecureframeView(report=None, received_at=None)
     report = SecureframeBody.model_validate(row.report)
-    return SecureframeView(report=report, received_at=row.received_at, passing_percent=passing_percent(report.tests))
+    today = datetime.now(UTC).date()
+    history = (
+        await db.execute(
+            select(SecureframeHistory.day, SecureframeHistory.passing, SecureframeHistory.failing).where(
+                SecureframeHistory.tenant_id == user.tenant_id, SecureframeHistory.day >= today - timedelta(days=30)
+            )
+        )
+    ).all()
+    return SecureframeView(
+        report=report,
+        received_at=row.received_at,
+        passing_percent=passing_percent(report.tests),
+        change_30_days=change_over(list(history), today),
+    )
 
 
 class RequirementView(BaseModel):

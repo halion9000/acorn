@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -158,3 +159,65 @@ def test_the_cis_ig1_catalog_has_the_56_safeguards_in_their_controls_and_the_fra
     }, "IG1 has no control 13, 16 or 18 safeguards"
     assert FRAMEWORKS["CIS-IG1"]["9.2"] == "Use DNS Filtering Services"
     assert set(sf.FRAMEWORK_KEYS) <= set(CATALOGS)
+
+
+TODAY = date(2026, 10, 29)
+
+
+def day(days_ago, passing, failing):
+    return (TODAY - timedelta(days=days_ago), passing, failing)
+
+
+def test_the_change_is_the_newest_pass_rate_minus_the_oldest_in_the_window_in_points():
+    assert sf.change_over([day(29, 50, 50), day(10, 60, 40), day(0, 80, 20)], TODAY) == 30.0
+    assert sf.change_over([day(20, 90, 10), day(0, 80, 20)], TODAY) == -10.0
+
+
+def test_there_is_no_change_to_report_from_too_little_or_too_young_a_history():
+    assert sf.change_over([], TODAY) is None
+    assert sf.change_over([day(0, 8, 2)], TODAY) is None
+    assert sf.change_over([day(3, 5, 5), day(0, 8, 2)], TODAY) is None, "three days is not a trend"
+    assert sf.change_over([day(0, 0, 0), day(20, 0, 0)], TODAY) is None, "days with nothing evaluated are ignored"
+    assert sf.change_over([day(40, 1, 9), day(0, 9, 1)], TODAY) is None, "a day outside the 30 day window is ignored"
+
+
+@pg
+@pytest.mark.asyncio
+async def test_a_day_is_recorded_once_with_the_latest_counts_and_the_view_reports_the_change(monkeypatch):
+    engine = create_async_engine(PG_URL, poolclass=NullPool)
+    tid = uuid.uuid4()
+    async with engine.begin() as conn:
+        await conn.execute(text("set local session_replication_role = replica"))
+        await conn.execute(text("insert into tenants (id, name, slug) values (:t, 'sf', :s)"), {"t": tid, "s": f"sf-{tid.hex[:10]}"})
+        await conn.execute(
+            text("insert into secureframe_history (tenant_id, day, passing, failing) values (:t, :d, 50, 50)"),
+            {"t": tid, "d": datetime.now(UTC).date() - timedelta(days=20)},
+        )
+    try:
+        async with AsyncSession(engine) as db:
+
+            async def verify(_db, _token):
+                return tid
+
+            async def adopt(_db, _owner):
+                return None
+
+            monkeypatch.setattr(sf, "_verify_core_feed_token", verify)
+            monkeypatch.setattr(sf, "adopt_tenant", adopt)
+            first = body(tests={**COUNTS, "passing": 6, "failing": 4})
+            await sf.report_core_feed_secureframe("t", sf.ReportIn.model_validate(first), db)
+            second = body(tests={**COUNTS, "passing": 8, "failing": 2})
+            await sf.report_core_feed_secureframe("t", sf.ReportIn.model_validate(second), db)
+            rows = (
+                await db.execute(text("select passing, failing from secureframe_history where tenant_id = :t order by day"), {"t": tid})
+            ).all()
+            assert [tuple(r) for r in rows] == [(50, 50), (8, 2)], "twice on one day is one row, with the latest counts"
+            view = await sf.secureframe_view(SimpleNamespace(tenant_id=tid), db)
+            assert view.change_30_days == 30.0
+    finally:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            await conn.execute(text("delete from secureframe_history where tenant_id = :t"), {"t": tid})
+            await conn.execute(text("delete from secureframe_reports where tenant_id = :t"), {"t": tid})
+            await conn.execute(text("delete from tenants where id = :t"), {"t": tid})
+        await engine.dispose()

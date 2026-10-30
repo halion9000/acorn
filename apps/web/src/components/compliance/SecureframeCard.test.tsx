@@ -5,7 +5,7 @@ import { SWRConfig } from 'swr';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { SecureframeCard, failingDays, type SecureframeView } from './SecureframeCard';
+import { SecureframeCard, changePhrase, failingDays, type SecureframeView } from './SecureframeCard';
 
 const VIEW: SecureframeView = {
   report: {
@@ -67,5 +67,30 @@ describe('SecureframeCard', () => {
     view();
     await waitFor(() => expect(authFetch).toHaveBeenCalledTimes(2));
     expect(screen.queryByTestId('secureframe-card')).toBeNull();
+  });
+});
+
+describe('changePhrase', () => {
+  it('says up, down or unchanged with the right singular, and nothing when unknown', () => {
+    expect(changePhrase(3.2)).toBe('up 3.2 points in 30 days');
+    expect(changePhrase(-1)).toBe('down 1 point in 30 days');
+    expect(changePhrase(0)).toBe('unchanged in 30 days');
+    expect(changePhrase(null)).toBeNull();
+    expect(changePhrase(undefined)).toBeNull();
+  });
+});
+
+describe('SecureframeCard trend', () => {
+  const answer = (v: SecureframeView) => authFetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(v) });
+
+  it('shows how the pass rate moved when there is history, and nothing about it when there is not', async () => {
+    answer({ ...VIEW, change_30_days: 4.5 });
+    view();
+    expect(await screen.findByTestId('secureframe-change')).toHaveTextContent('Pass rate up 4.5 points in 30 days.');
+    cleanup();
+    answer({ ...VIEW, change_30_days: null });
+    view();
+    await screen.findByTestId('secureframe-card');
+    expect(screen.queryByTestId('secureframe-change')).toBeNull();
   });
 });

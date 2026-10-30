@@ -38318,6 +38318,11 @@ components:
           - type: number
           - type: 'null'
           title: Passing Percent
+        change_30_days:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Change 30 Days
       type: object
       required:
       - report
