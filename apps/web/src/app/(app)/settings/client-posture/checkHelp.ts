@@ -8,6 +8,7 @@ export interface CheckHelp {
 
 export const CHECK_HELP: Record<string, CheckHelp> = {
   threatmate_security_score: { why: "ThreatMate's overall score rolls up what it sees inside and outside the network, so a drop means something new is wrong.", fix: "Open ThreatMate for the client and work down its highest-impact findings." },
+  threatmate_agents_online: { why: "A ThreatMate agent that is silent is a machine ThreatMate no longer scans, so its patching and exposure are unknown.", fix: "Find the machines whose agent is silent (powered off, uninstalled or blocked), switch them on or reinstall the agent, and retire the ones that are gone." },
   threatmate_patching: { why: "Unpatched machines are the usual way in. This is the share of machines ThreatMate sees fully patched.", fix: "Find the machines that are behind in ThreatMate or NinjaOne and install the updates, or retire machines that are gone." },
   threatmate_end_of_life: { why: "Software that no longer gets security fixes stays vulnerable for good.", fix: "Plan the upgrade or replacement of each end-of-life system or application, and get it on the client's budget." },
   threatmate_hardening: { why: "Hardening settings (CIS-based) close doors that a default Windows leaves open.", fix: "Apply the hardening policy to the machines that fail, starting with servers." },

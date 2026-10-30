@@ -45,6 +45,7 @@ export function checkTitle(key: string): string {
 const TITLE: Record<string, string> = {
   threatmate_security_score: 'Security score',
   threatmate_patching: 'Patching',
+  threatmate_agents_online: 'ThreatMate agents online',
   threatmate_end_of_life: 'End-of-life software',
   itglue_domain_expiry: 'Domain names',
   itglue_certificate_expiry: 'SSL certificates',
