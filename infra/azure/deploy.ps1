@@ -50,12 +50,30 @@ $vault = $out.keyVaultName.value
 $me = az ad signed-in-user show --query id -o tsv
 $vaultId = az keyvault show --name $vault --query id -o tsv
 az role assignment create --assignee-object-id $me --assignee-principal-type User --role 'Key Vault Secrets Officer' --scope $vaultId | Out-Null
-Start-Sleep -Seconds 60   # role assignments take a moment to apply
+if ($LASTEXITCODE) { throw 'could not grant yourself Key Vault Secrets Officer' }
 
-az keyvault secret set --vault-name $vault --name core-vm-admin-password --value $core | Out-Null
-az keyvault secret set --vault-name $vault --name postgres-admin-password --value $pg | Out-Null
-# The limited database account the application connects as (so row-level security is enforced); the runbook creates the role with this password.
-az keyvault secret set --vault-name $vault --name aisoc-app-db-password --value (New-Secret 40) | Out-Null
+# The vault firewall denies everything but the private network, so this machine is allowed in for the length of the writes only. (A first run skipped this: the secrets
+# were never stored, the script still said Done, and the passwords had to be reset. Every az call below is checked for that reason.)
+$ip = Invoke-RestMethod -Uri 'https://api.ipify.org'
+az keyvault network-rule add --name $vault --ip-address "$ip/32" | Out-Null
+if ($LASTEXITCODE) { throw 'could not add this machine to the vault firewall' }
+try {
+    $stored = $false
+    foreach ($attempt in 1..8) {   # role assignments and firewall rules take a minute or two to apply
+        Start-Sleep -Seconds 20
+        az keyvault secret set --vault-name $vault --name core-vm-admin-password --value $core --query name -o none 2>$null
+        if ($LASTEXITCODE -eq 0) { $stored = $true; break }
+    }
+    if (-not $stored) { throw 'the vault would not accept a secret after 8 tries: the passwords were NOT stored' }
+    az keyvault secret set --vault-name $vault --name postgres-admin-password --value $pg --query name -o none
+    if ($LASTEXITCODE) { throw 'could not store postgres-admin-password' }
+    # The limited database account the application connects as (so row-level security is enforced); the runbook creates the role with this password.
+    az keyvault secret set --vault-name $vault --name aisoc-app-db-password --value (New-Secret 40) --query name -o none
+    if ($LASTEXITCODE) { throw 'could not store aisoc-app-db-password' }
+}
+finally {
+    az keyvault network-rule remove --name $vault --ip-address "$ip/32" | Out-Null
+}
 
 Write-Host "Done. Key Vault: $vault"
 Write-Host "A.C.O.R.N VM private IP: $($out.acornPrivateIp.value)"

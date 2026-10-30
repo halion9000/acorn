@@ -19,6 +19,12 @@ Written 2026-10-30, **before anything was deployed**. Every step below is a plan
 
 Check afterwards: both VMs show Running; the Recovery Services vault lists both VMs; the budget alert exists; no public inbound rule exists on the network security group.
 
+### Deployed 2026-10-30 (checked afterwards)
+
+Resource group `rg-liveoak-ops` (Central US): `liveoak-acorn-vm` (Linux, D4s_v6, 10.20.1.4), `liveoak-core-vm` (Windows, B2ms, 10.20.2.4), Postgres `liveoak-pg-dnzpna3fw56s4` (private only, Standard_B2s, no high availability), Key Vault `liveoak-kv-dnzpna3fw56s4`, Recovery Services vault `liveoak-rsv` (both VMs on the daily 14-day policy; the first backup was still pending), budget `liveoak-monthly` ($450). Verified: no public IP addresses, no inbound allow rules on any of the three network security groups, Postgres public access disabled.
+
+**What went wrong, and the rule that comes from it.** The Key Vault firewall denies everything except the private network, so the first run could not store the three passwords, and the script printed "Done" anyway. The passwords were reset and stored (this machine allowed in for the length of the writes, then removed); `deploy.ps1` now does that itself and stops on any failure. To read a secret from a laptop, allow its address briefly (`az keyvault network-rule add` ... then `remove`), or read it from a VM, which can reach the vault privately through its own identity.
+
 ## 2. Reach the machines
 
 Install the NinjaOne agent on both VMs through each VM's Run Command (Azure portal > the VM > Run command), using the organisation's installer. From then on use the NinjaOne remote session. Add NordLayer or Tailscale later; neither is needed for the steps below.
