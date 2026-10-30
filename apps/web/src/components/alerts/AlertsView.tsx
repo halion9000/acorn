@@ -672,6 +672,7 @@ function AlertsTable({
             onSelect={setSelectedAlertId}
             onFilterChange={onFilterChange}
             onChanged={onChanged}
+            total={total}
           />
           <AlertsPagination
             alerts={alerts}
@@ -706,6 +707,7 @@ export function AlertsTableGrid({
   onSelect,
   onFilterChange,
   onChanged,
+  total,
 }: {
   alerts: Alert[];
   isLoading: boolean;
@@ -715,10 +717,16 @@ export function AlertsTableGrid({
   onSelect: (id: string) => void;
   onFilterChange: (f: AlertFilters) => void;
   onChanged: () => void;
+  /** How many alerts match the filters in all (more than the page when there are several pages). */
+  total?: number;
 }) {
   // Ticked rows (for linking one ticket to several alerts). Only ids still on this page count, so paging or filtering never leaves a hidden alert selected.
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const tickedIds = alerts.filter((a) => ticked.has(a.id)).map((a) => a.id);
+  const allTicked = alerts.length > 0 && tickedIds.length === alerts.length;
+  const someTicked = tickedIds.length > 0 && !allTicked;
+  /** Tick every alert on this page, or clear them when all are already ticked. */
+  const toggleAll = () => setTicked(allTicked ? new Set() : new Set(alerts.map((a) => a.id)));
   const toggle = (id: string) =>
     setTicked((prev) => {
       const next = new Set(prev);
@@ -738,12 +746,37 @@ export function AlertsTableGrid({
         }}
       />
       <div className="flex items-center px-4 py-2 border-b border-gray-800/60 bg-gray-900/80">
+        <input
+          type="checkbox"
+          aria-label="Select all alerts on this page"
+          data-testid="select-all"
+          checked={allTicked}
+          ref={(el) => {
+            if (el) el.indeterminate = someTicked;
+          }}
+          onChange={toggleAll}
+          disabled={alerts.length === 0}
+          className="mr-3 shrink-0"
+        />
         <span className="text-xs text-gray-500 flex-1 pl-2">ALERT</span>
         <span className="text-xs text-gray-500 w-20">CONFIDENCE</span>
         <span className="text-xs text-gray-500 w-20">SEVERITY</span>
         <span className="text-xs text-gray-500 w-24">STATUS</span>
         <span className="text-xs text-gray-500 w-24 text-right">TIME</span>
       </div>
+
+      {allTicked && total !== undefined && total > alerts.length && (
+        <div className="border-b border-gray-800/60 bg-sky-500/10 px-4 py-2 text-xs text-sky-200" data-testid="select-more">
+          The {alerts.length} alerts on this page are selected, and {total} match.{' '}
+          {total <= 200 ? (
+            <button type="button" className="underline hover:text-white" onClick={() => onFilterChange({ ...filters, pageSize: total, page: 1 })}>
+              Show all {total} on one page
+            </button>
+          ) : (
+            <span>Narrow the search to 200 or fewer to select them all at once.</span>
+          )}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center h-32">

@@ -16,8 +16,8 @@ import type { Alert } from '@/lib/api';
 
 const alert = (id: string, title: string) => ({ id, title, description: '', severity: 'high', status: 'new', source: 'huntress', tenantId: 't', riskScore: 5, createdAt: '2026-10-19T10:00:00Z' }) as unknown as Alert;
 
-function show(alerts: Alert[], onChanged = vi.fn()) {
-  render(<AlertsTableGrid alerts={alerts} isLoading={false} error={null} filters={{ page: 1, pageSize: 25 }} selectedAlertId={null} onSelect={() => {}} onFilterChange={() => {}} onChanged={onChanged} />);
+function show(alerts: Alert[], onChanged = vi.fn(), extra: { total?: number; onFilterChange?: (f: unknown) => void } = {}) {
+  render(<AlertsTableGrid alerts={alerts} isLoading={false} error={null} filters={{ page: 1, pageSize: 25 }} selectedAlertId={null} onSelect={() => {}} onFilterChange={extra.onFilterChange ?? (() => {})} onChanged={onChanged} total={extra.total} />);
   return onChanged;
 }
 
@@ -81,5 +81,40 @@ describe('ticking alerts to run a script on their machines', () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(runScriptBulk.mock.calls[1][0]).toEqual({ script_id: 7, alert_ids: ['a', 'c'], preview: false });
     await waitFor(() => expect(screen.queryByTestId('bulk-script-bar')).not.toBeInTheDocument());
+  });
+});
+
+describe('select all', () => {
+  it('ticks every alert on the page, shows a partly-ticked state, and clears them again', async () => {
+    show([alert('a', 'Alert A'), alert('b', 'Alert B'), alert('c', 'Alert C')]);
+    const all = screen.getByTestId('select-all') as HTMLInputElement;
+    await userEvent.click(screen.getByLabelText('Select alert Alert A'));
+    expect([all.checked, all.indeterminate]).toEqual([false, true]);
+    await userEvent.click(all);
+    expect(screen.getByTestId('bulk-ticket-bar')).toHaveTextContent('3 selected');
+    expect([all.checked, all.indeterminate]).toEqual([true, false]);
+    await userEvent.click(all);
+    expect(screen.queryByTestId('bulk-ticket-bar')).not.toBeInTheDocument();
+  });
+
+  it('says when more alerts match than the page holds, and offers one page of them (up to 200)', async () => {
+    const onFilterChange = vi.fn();
+    show([alert('a', 'Alert A'), alert('b', 'Alert B')], vi.fn(), { total: 40, onFilterChange });
+    expect(screen.queryByTestId('select-more')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('select-all'));
+    expect(screen.getByTestId('select-more')).toHaveTextContent('The 2 alerts on this page are selected, and 40 match.');
+    await userEvent.click(screen.getByRole('button', { name: 'Show all 40 on one page' }));
+    expect(onFilterChange).toHaveBeenCalledWith({ page: 1, pageSize: 40 });
+  });
+
+  it('asks for a narrower search above 200 matches, and says nothing extra when the page holds them all', async () => {
+    show([alert('a', 'Alert A')], vi.fn(), { total: 500 });
+    await userEvent.click(screen.getByTestId('select-all'));
+    expect(screen.getByTestId('select-more')).toHaveTextContent('Narrow the search to 200 or fewer');
+  });
+
+  it('is disabled with nothing to select and shows no hint when the page holds every match', async () => {
+    show([], vi.fn(), { total: 0 });
+    expect(screen.getByTestId('select-all')).toBeDisabled();
   });
 });
