@@ -177,3 +177,34 @@ def test_a_placeholder_or_shared_serial_is_never_an_identifier():
     assert inv.shared_serials(items) == {
         "kamrui"
     }, "the maker's name on two NUCs is shared; a real serial held once is not; a placeholder was never a serial"
+
+
+@pytest.mark.parametrize(
+    ("os_name", "model", "expected"),
+    [
+        ("Windows 11 Pro", "Latitude", "Windows computer"),
+        ("Microsoft Windows 10 Home", None, "Windows computer"),
+        ("Windows Server 2022", "PowerEdge", None),
+        ("macOS 14.5", "MacBookPro18,3", "Mac"),
+        ("Mac OS X 10.15", None, "Mac"),
+        (None, "Mac mini", "Mac"),
+        (None, "iMac21,1", "Mac"),
+        ("iPadOS 17.5", "iPad13,1", "iPad"),
+        (None, "iPad Air", "iPad"),
+        ("iOS 17.5", "iPhone14,2", "iPhone"),
+        (None, "iPhone15,3", "iPhone"),
+        ("tvOS 17", "AppleTV", None),
+        ("Ubuntu 24.04.1 LTS", "x", None),
+        (None, None, None),
+        ("n/a", "Machine X", None),
+    ],
+)
+def test_device_category_separates_workstations_and_handhelds_from_everything_else(os_name, model, expected):
+    assert inv.device_category(os_name, model) == expected
+
+
+def test_a_device_ref_is_stable_and_fits_the_external_ref_column():
+    import uuid
+
+    d = uuid.uuid4()
+    assert inv.device_ref(d) == inv.device_ref(str(d)) and len(inv.device_ref(d)) <= 60

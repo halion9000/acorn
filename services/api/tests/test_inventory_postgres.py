@@ -361,3 +361,142 @@ async def test_nucs_that_share_a_placeholder_serial_or_have_none_stay_separate_t
             assert all(i.device is None for i in names.values())
     finally:
         await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])
+
+
+async def test_a_bulk_edit_moves_many_items_to_one_client_with_their_history_and_changes_only_what_was_sent():
+    engine, user, w = await world()
+    try:
+        async with AsyncSession(engine) as db:
+            a = await ep.create_item(item(name="A1", serial="S-A1", category="Drives", tags=["keep"]), user, db)
+            b = await ep.create_item(item(name="B1", serial="S-B1", client_id=w.birch, site="Austin"), user, db)
+            c = await ep.create_item(item(name="C1", serial="S-C1"), user, db)
+            out = await ep.bulk_update(ep.BulkIn(ids=[a.id, b.id, uuid.uuid4()], client_id=w.acme, add_tags=["moved", "keep"]), user, db)
+            assert (out.changed, out.unchanged, out.not_found) == (2, 0, 1)
+            rows = {i.name: i for i in (await ls(user, db)).items}
+            assert rows["A1"].client_id == w.acme and rows["B1"].client_id == w.acme and rows["C1"].client_id is None
+            assert rows["A1"].tags == ["keep", "moved"], "a tag already there is not added twice"
+            assert rows["A1"].category == "Drives" and rows["B1"].site == "Austin", "fields that were not sent are untouched"
+            only_acme = await ls(user, db, client=str(w.acme))
+            assert only_acme.total == 2
+            history = await ep.item_events(a.id, user, db)
+            assert history[0].event == "moved" and "bulk edit" in (history[0].note or ""), "the history follows the item to its new client"
+            again = await ep.bulk_update(ep.BulkIn(ids=[a.id, b.id], client_id=w.acme), user, db)
+            assert (again.changed, again.unchanged) == (0, 2)
+            home = await ep.bulk_update(ep.BulkIn(ids=[a.id], move_to_own=True), user, db)
+            assert home.changed == 1 and (await ls(user, db, client="own")).total == 2
+            with pytest.raises(HTTPException) as nobody:
+                await ep.bulk_update(ep.BulkIn(ids=[c.id]), user, db)
+            assert nobody.value.status_code == 422
+            with pytest.raises(HTTPException) as stranger:
+                await ep.bulk_update(ep.BulkIn(ids=[c.id], client_id=w.stranger_client), user, db)
+            assert stranger.value.status_code == 404
+    finally:
+        await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])
+
+
+async def test_the_unmatched_filter_lists_items_whose_customer_was_not_matched_to_a_client():
+    engine, user, w = await world()
+    try:
+        async with AsyncSession(engine) as db:
+            await ep.create_item(item(name="Mystery", serial="S-M1", customer_name="Acme Dntl"), user, db)
+            await ep.create_item(item(name="Ours", serial="S-M2"), user, db)
+            await ep.create_item(item(name="Theirs", serial="S-M3", client_id=w.acme, customer_name="Acme Dental"), user, db)
+            unmatched = await ls(user, db, client="unmatched")
+            assert [i.name for i in unmatched.items] == ["Mystery"]
+            assert (await exp(user, db, client="unmatched")).body.decode().count("Mystery") == 1
+    finally:
+        await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])
+
+
+async def add_device(conn, tenant, hostname, serial, os_name, model, *vendors):
+    did = uuid.uuid4()
+    await conn.execute(
+        text(
+            "insert into devices (id, tenant_id, serial_number, hostname, os, model, last_seen, first_seen, created_at) "
+            "values (:i, :t, :s, :h, :o, :m, now(), now() - interval '40 days', now())"
+        ),
+        {"i": did, "t": tenant, "s": serial, "h": hostname, "o": os_name, "m": model},
+    )
+    for n, v in enumerate(vendors):
+        await conn.execute(
+            text(
+                "insert into device_sources (id, tenant_id, device_id, vendor, external_id, details, last_seen, created_at) "
+                "values (gen_random_uuid(), :t, :d, :v, :x, '{}'::jsonb, now(), now())"
+            ),
+            {"t": tenant, "d": did, "v": v, "x": f"{hostname}-{n}"},
+        )
+    return did
+
+
+async def test_syncing_devices_adds_what_is_not_on_the_lists_as_checked_out_and_matches_what_is():
+    engine, user, w = await world()
+    try:
+        async with engine.begin() as conn:
+            await add_device(conn, w.acme, "ACME-LAP-1", "SN-LISTED-1", "Windows 11 Pro", "Latitude 5440", "ninjaone")
+            await add_device(conn, w.acme, "ACME-LAP-2", "SN-NEW-2", "Windows 10 Pro", "OptiPlex 7010", "ninjaone")
+            await add_device(conn, w.acme, "Acme-Mac", "SN-MAC-3", "macOS 14.5", "MacBookPro18,3", "addigy", "ninjaone")
+            await add_device(conn, w.birch, "Birch-iPad", "SN-IPAD-4", "iPadOS 17.5", "iPad13,1", "addigy")
+            await add_device(conn, w.birch, "Birch-iPhone", "SN-PHONE-5", None, "iPhone14,2", "addigy")
+            await add_device(conn, w.birch, "BIRCH-DC", "SN-SERVER-6", "Windows Server 2022", "PowerEdge", "ninjaone")
+            await add_device(conn, w.birch, "birch-tv", "SN-TV-7", "tvOS 17", "AppleTV", "addigy")
+            await add_device(conn, w.birch, "NO-SERIAL-PC", None, "Windows 11 Pro", "Custom", "ninjaone")
+            await add_device(conn, w.birch, "huntress-only", "SN-H-8", "Windows 11 Pro", "X", "huntress")
+        async with AsyncSession(engine) as db:
+            await ep.create_item(item(name="Dell from the list", serial="sn-listed-1", status="checked_in", client_id=w.acme), user, db)
+            preview = await ep.sync_devices_endpoint(ep.SyncIn(dry_run=True), user, db)
+            assert (preview.devices, preview.matched, preview.matched_in_stock, preview.created, preview.no_serial) == (6, 1, 1, 5, 1)
+            assert preview.by_category == {"Mac": 1, "Windows computer": 3, "iPad": 1, "iPhone": 1}
+            assert (await ls(user, db)).total == 1, "a preview adds nothing"
+
+            done = await ep.sync_devices_endpoint(ep.SyncIn(dry_run=False), user, db)
+            assert (done.created, done.matched) == (5, 1)
+            everything = await ls(user, db, page_size=200)
+            by_name = {i.name: i for i in everything.items}
+            assert everything.total == 6 and "Dell from the list" in by_name
+            assert by_name["Dell from the list"].status == "checked_in", "a listed item is left exactly as it was"
+            mac = by_name["Acme-Mac"]
+            assert (mac.status, mac.source, mac.category, mac.client_id, mac.tags) == (
+                "checked_out",
+                "device",
+                "Mac",
+                w.acme,
+                ["Addigy", "NinjaOne"],
+            )
+            assert mac.checked_out_at is not None and mac.serial == "SN-MAC-3"
+            assert by_name["Birch-iPad"].client_id == w.birch and by_name["Birch-iPhone"].category == "iPhone"
+            assert by_name["NO-SERIAL-PC"].serial is None
+            assert {"BIRCH-DC", "birch-tv", "huntress-only"}.isdisjoint(
+                by_name
+            ), "servers, TV boxes and other tools' devices are not workstations"
+            history = await ep.item_events(mac.id, user, db)
+            assert history[0].event == "created" and "NinjaOne" in (history[0].note or "")
+
+            # A second sync adds nothing, refreshes what the tool says, and never overwrites what a person did.
+            await ep.check_in(mac.id, ep.MoveIn(note="back in the shop"), user, db)
+            async with engine.begin() as conn:
+                await conn.execute(text("update devices set hostname = 'Acme-Mac-Renamed' where hostname = 'Acme-Mac'"))
+            second = await ep.sync_devices_endpoint(ep.SyncIn(dry_run=False), user, db)
+            assert (second.created, second.refreshed, second.matched) == (0, 5, 1)
+            after = {i.name: i for i in (await ls(user, db, page_size=200)).items}
+            assert "Acme-Mac-Renamed" in after and after["Acme-Mac-Renamed"].status == "checked_in", "a person's check-in survives a sync"
+            assert (await ls(user, db, page_size=200)).total == 6
+    finally:
+        await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])
+
+
+async def test_a_device_item_that_a_list_import_later_covers_becomes_a_list_item_and_is_not_added_again():
+    engine, user, w = await world()
+    try:
+        async with engine.begin() as conn:
+            await add_device(conn, w.acme, "ACME-LAP-9", "SN-LATE-9", "Windows 11 Pro", "Latitude", "ninjaone")
+        async with AsyncSession(engine) as db:
+            await ep.sync_devices_endpoint(ep.SyncIn(dry_run=False), user, db)
+            csv_text = '"Customer","EntryName","Serial","Status"\n"Acme Dental","Latitude from the list","SN-LATE-9","CheckedIn"\n'
+            done = await ep.import_items(ep.ImportIn(kind="stock", csv_text=csv_text, dry_run=False), user, db)
+            assert (done.created, done.updated) == (0, 1), "found by serial, so the list row and the device are one item"
+            again = await ep.sync_devices_endpoint(ep.SyncIn(dry_run=False), user, db)
+            assert (again.created, again.matched) == (0, 1)
+            rows = (await ls(user, db)).items
+            assert len(rows) == 1 and rows[0].source == "csv" and rows[0].status == "checked_in"
+    finally:
+        await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])

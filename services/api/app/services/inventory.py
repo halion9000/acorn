@@ -302,3 +302,31 @@ def shared_serials(items: list[dict[str, Any]]) -> set[str]:
         if key:
             seen[key] = seen.get(key, 0) + 1
     return {k for k, n in seen.items() if n > 1}
+
+
+_MAC_MODEL = re.compile(r"\b(macbook|imac|mac ?mini|macmini|mac ?pro|macpro|mac ?studio|macstudio)|^mac\d")
+
+
+def device_category(os_name: Any, model: Any) -> str | None:
+    """The inventory category of a device from its operating system and model, or None when it is not a workstation or a handheld (a server, a TV box, a Linux box, a device nothing is known about).
+
+    ``Windows computer``, ``Mac``, ``iPad``, ``iPhone``. The OS decides; the model decides when the OS is missing (Addigy reports some Apple devices with no OS)."""
+    o = str(os_name or "").strip().lower()
+    m = str(model or "").strip().lower()
+    if "windows" in o:
+        return None if "server" in o else "Windows computer"
+    if "ipados" in o or (not o and "ipad" in m):
+        return "iPad"
+    if re.search(r"(^|[^a-z])ios", o) or (not o and "iphone" in m):
+        return "iPhone"
+    if "macos" in o or "mac os" in o or "darwin" in o or (not o and _MAC_MODEL.search(m)):
+        return "Mac"
+    return None
+
+
+DEVICE_VENDORS = {"ninjaone": "NinjaOne", "addigy": "Addigy"}
+
+
+def device_ref(device_id: Any) -> str:
+    """The ``external_ref`` a device-made item carries, so a second sync refreshes it instead of adding it twice."""
+    return f"dev:{device_id}"

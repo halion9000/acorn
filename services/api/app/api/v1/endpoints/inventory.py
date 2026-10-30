@@ -281,6 +281,8 @@ def _filters(
     f: list[Any] = [InventoryItem.kind == kind, InventoryItem.tenant_id.in_(scope)]
     if client == "own":
         f.append(and_(InventoryItem.tenant_id == owner))
+    elif client == "unmatched":
+        f.append(and_(InventoryItem.tenant_id == owner, InventoryItem.customer_name.is_not(None), InventoryItem.customer_name != ""))
     elif client:
         f.append(InventoryItem.tenant_id == uuid.UUID(client))
     if status:
@@ -309,7 +311,11 @@ async def list_items(
     db: DBSession,
     kind: Kind = "stock",
     client: Annotated[
-        str | None, Query(description="A client's id, or 'own' for Live Oak's own stock.", pattern=r"^(own|[0-9a-fA-F-]{36})$")
+        str | None,
+        Query(
+            description="A client's id, 'own' for Live Oak's own stock, or 'unmatched' for items whose customer is not matched to a client yet.",
+            pattern=r"^(own|unmatched|[0-9a-fA-F-]{36})$",
+        ),
     ] = None,
     status: Status | None = None,
     category: str | None = Query(default=None, max_length=80),
@@ -321,7 +327,7 @@ async def list_items(
     owner = user.tenant_id
     names = await _tenants(db, owner)
     scope = [owner, *names]
-    if client and client != "own" and uuid.UUID(client) not in names:
+    if client and client not in ("own", "unmatched") and uuid.UUID(client) not in names:
         raise HTTPException(status_code=404, detail="Client not found")
     flt = _filters(kind, scope, owner, client, status, category, tag, search)
     base = _filters(kind, scope, owner, client, None, None, None, None)
@@ -441,6 +447,68 @@ async def update_item(
     return _out(row, owner, names)
 
 
+class BulkIn(BaseModel):
+    """The same change for many items: move them to a client (or to Live Oak's own), and/or set a category or site, and/or add tags."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    client_id: uuid.UUID | None = None
+    move_to_own: bool = False
+    category: str | None = Field(default=None, max_length=80)
+    site: str | None = Field(default=None, max_length=200)
+    add_tags: list[Annotated[str, Field(min_length=1, max_length=40)]] = Field(default_factory=list, max_length=12)
+
+
+class BulkOut(BaseModel):
+    changed: int
+    unchanged: int
+    not_found: int
+
+
+@router.post("/bulk", response_model=BulkOut, summary="Change many items at once: the client they belong to, a category, a site, tags")
+async def bulk_update(body: BulkIn, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> BulkOut:
+    owner = user.tenant_id
+    names = await _tenants(db, owner)
+    target = owner if body.move_to_own else body.client_id
+    if target is not None and target != owner and target not in names:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if target is None and body.category is None and body.site is None and not body.add_tags:
+        raise HTTPException(status_code=422, detail="Nothing to change: choose a client, a category, a site or tags")
+    ids = list(dict.fromkeys(body.ids))
+    async with cross_tenant_reads(db):
+        found = (
+            (await db.execute(select(InventoryItem).where(InventoryItem.id.in_(ids), InventoryItem.tenant_id.in_([owner, *names]))))
+            .scalars()
+            .all()
+        )
+    changed = unchanged = 0
+    for seen in found:
+        async with _acting(db, owner, seen.tenant_id):
+            row = (await db.execute(select(InventoryItem).where(InventoryItem.id == seen.id))).scalar_one()
+            notes: list[str] = []
+            if body.category is not None and body.category != row.category:
+                row.category = body.category or None
+                notes.append("category")
+            if body.site is not None and body.site != row.site:
+                row.site = body.site or None
+                notes.append("site")
+            fresh = [t for t in body.add_tags if t not in (row.tags or [])]
+            if fresh:
+                row.tags = [*(row.tags or []), *fresh][:12]
+                notes.append("tags")
+            if target is not None and target != row.tenant_id:
+                row.tenant_id = target
+                notes.append("moved to " + ("Live Oak" if target == owner else names[target]))
+                await db.execute(InventoryEvent.__table__.update().where(InventoryEvent.item_id == row.id).values(tenant_id=target))
+            if not notes:
+                unchanged += 1
+                continue
+            moved = any(n.startswith("moved") for n in notes)
+            db.add(_event(row, "moved" if moved else "updated", user.email, note=", ".join(notes) + " (bulk edit)"))
+            changed += 1
+    await db.commit()
+    return BulkOut(changed=changed, unchanged=unchanged, not_found=len(ids) - len(found))
+
+
 async def _move(item_id: uuid.UUID, body: MoveIn, user: AuthUser, db: Any, to: str) -> ItemOut:
     owner = user.tenant_id
     item, names = await _find(db, user, item_id)
@@ -499,6 +567,158 @@ async def item_events(
             .all()
         )
     return [EventOut(id=r.id, at=r.at, event=r.event, actor=r.actor, person=r.person, ticket_url=r.ticket_url, note=r.note) for r in rows]
+
+
+class SyncIn(BaseModel):
+    dry_run: bool = True
+
+
+class SyncOut(BaseModel):
+    dry_run: bool
+    devices: int = Field(description="Workstations and handhelds NinjaOne and Addigy report.")
+    by_category: dict[str, int]
+    matched: int = Field(description="Already in the inventory (same serial number): left exactly as they are.")
+    matched_in_stock: int = Field(
+        description="Of those, how many the inventory says are checked in although a tool reports them: worth a look."
+    )
+    created: int = Field(description="New items, added as checked out at the device's client.")
+    refreshed: int = Field(description="Items made by an earlier sync, brought up to date.")
+    no_serial: int = Field(description="Devices without a usable serial number (added by device id, never matched to a list item).")
+
+
+async def sync_devices(db: Any, owner: uuid.UUID, names: dict[uuid.UUID, str], actor: str | None, dry_run: bool) -> SyncOut:
+    """Put the Windows computers, Macs, iPads and iPhones NinjaOne and Addigy report into the inventory.
+
+    A device whose serial number is already on an item (from the imported lists, or added by hand) is matched and left alone. Any other device is an item that has already gone out to its client, so it is added as checked out under the
+    device's own client; syncing again refreshes what the tools say (name, model) and never touches status, person or notes. Serial numbers held by more than one item are not identifiers (see ``inv.shared_serials``)."""
+    scope = [owner, *names]
+    async with cross_tenant_reads(db):
+        devices = (
+            await db.execute(
+                select(
+                    Device.id,
+                    Device.tenant_id,
+                    Device.hostname,
+                    Device.serial_number,
+                    Device.os,
+                    Device.model,
+                    Device.manufacturer,
+                    Device.first_seen,
+                    func.array_agg(func.distinct(DeviceSource.vendor)).label("vendors"),
+                )
+                .join(DeviceSource, DeviceSource.device_id == Device.id)
+                .where(Device.tenant_id.in_(scope), DeviceSource.vendor.in_(list(inv.DEVICE_VENDORS)))
+                .group_by(Device.id)
+            )
+        ).all()
+        existing = (
+            (await db.execute(select(InventoryItem).where(InventoryItem.tenant_id.in_(scope), InventoryItem.kind == "stock")))
+            .scalars()
+            .all()
+        )
+    listed_rows = [e for e in existing if e.source != "device"]
+    held_twice = inv.shared_serials([{"serial": e.serial} for e in listed_rows])
+    listed = {
+        inv.usable_serial(e.serial): e for e in listed_rows if inv.usable_serial(e.serial) and inv.usable_serial(e.serial) not in held_twice
+    }
+    made_by_ref = {e.external_ref: e for e in existing if e.source == "device" and e.external_ref}
+    by_category: dict[str, int] = {}
+    matched = matched_in_stock = created = refreshed = no_serial = total = 0
+    fresh: dict[uuid.UUID, list[tuple[Any, dict[str, Any]]]] = {}
+    refresh: dict[uuid.UUID, list[tuple[uuid.UUID, dict[str, Any]]]] = {}
+    for d in devices:
+        category = inv.device_category(d.os, d.model)
+        if category is None:
+            continue
+        total += 1
+        by_category[category] = by_category.get(category, 0) + 1
+        key = inv.usable_serial(d.serial_number)
+        if not key:
+            no_serial += 1
+        listed_item = listed.get(key) if key else None
+        if listed_item is not None:
+            matched += 1
+            matched_in_stock += listed_item.status == "checked_in"
+            continue
+        values = {
+            "name": (d.hostname or d.serial_number or category)[:300],
+            "category": category,
+            "serial": d.serial_number if key else None,
+            "model": d.model,
+            "manufacturer": d.manufacturer,
+            "tags": sorted(inv.DEVICE_VENDORS[v] for v in (d.vendors or []) if v in inv.DEVICE_VENDORS),
+        }
+        row = made_by_ref.get(inv.device_ref(d.id))
+        if row is not None:
+            refreshed += 1
+            refresh.setdefault(row.tenant_id, []).append((row.id, values))
+            continue
+        created += 1
+        fresh.setdefault(d.tenant_id, []).append((d, values))
+    if not dry_run:
+        for tid, group in fresh.items():
+            async with _acting(db, owner, tid):
+                for d, values in group:
+                    day = d.first_seen.date() if d.first_seen else None
+                    row = InventoryItem(
+                        tenant_id=tid,
+                        kind="stock",
+                        source="device",
+                        external_ref=inv.device_ref(d.id),
+                        status="checked_out",
+                        customer_name=names.get(tid),
+                        quantity=1,
+                        deployed_at=day,
+                        checked_out_at=day,
+                        **values,
+                    )
+                    db.add(row)
+                    await db.flush()
+                    db.add(
+                        _event(
+                            row,
+                            "created",
+                            actor,
+                            note="reported by " + " and ".join(values["tags"]) + "; not on the imported lists, so checked out",
+                        )
+                    )
+                await db.commit()
+        for tid, group in refresh.items():
+            async with _acting(db, owner, tid):
+                rows = {
+                    r.id: r
+                    for r in (await db.execute(select(InventoryItem).where(InventoryItem.id.in_([i for i, _v in group])))).scalars().all()
+                }
+                for item_id, values in group:
+                    row = rows.get(item_id)
+                    if row is None:
+                        continue
+                    # What the tools say is refreshed; status, person, notes and any tag a person added are not touched.
+                    for k, v in values.items():
+                        setattr(row, k, sorted({*(row.tags or []), *v})[:12] if k == "tags" else v)
+                await db.commit()
+    return SyncOut(
+        dry_run=dry_run,
+        devices=total,
+        by_category=dict(sorted(by_category.items())),
+        matched=matched,
+        matched_in_stock=matched_in_stock,
+        created=created,
+        refreshed=refreshed,
+        no_serial=no_serial,
+    )
+
+
+@router.post(
+    "/sync-devices",
+    response_model=SyncOut,
+    summary="Add the Windows computers, Macs, iPads and iPhones NinjaOne and Addigy report, as checked out",
+)
+async def sync_devices_endpoint(
+    body: SyncIn, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+) -> SyncOut:
+    names = await _tenants(db, user.tenant_id)
+    return await sync_devices(db, user.tenant_id, names, user.email, body.dry_run)
 
 
 class ImportIn(BaseModel):
@@ -628,6 +848,8 @@ async def import_items(body: ImportIn, user: Annotated[AuthUser, Depends(require
                             if k in ("kind",):
                                 continue
                             setattr(row, k, v)
+                        # A device the tools reported that the list now also carries is a list item from here on: a later device sync matches it by serial instead of adding it again.
+                        row.source = "csv"
                         db.add(_event(row, "updated", user.email, note="re-imported from a SharePoint list"))
                         updated += 1
             await db.commit()
@@ -682,7 +904,7 @@ async def export_items(
     user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
     db: DBSession,
     kind: Kind = "stock",
-    client: Annotated[str | None, Query(pattern=r"^(own|[0-9a-fA-F-]{36})$")] = None,
+    client: Annotated[str | None, Query(pattern=r"^(own|unmatched|[0-9a-fA-F-]{36})$")] = None,
     status: Status | None = None,
     category: str | None = Query(default=None, max_length=80),
     tag: str | None = Query(default=None, max_length=40),

@@ -893,6 +893,17 @@ export interface InventoryImportResult {
 
 const inventoryParams = (q: InventoryQuery) => ({ kind: q.kind ?? 'stock', client: q.client, status: q.status, category: q.category, tag: q.tag, search: q.search });
 
+export interface InventorySyncResult {
+  dry_run: boolean;
+  devices: number;
+  by_category: Record<string, number>;
+  matched: number;
+  matched_in_stock: number;
+  created: number;
+  refreshed: number;
+  no_serial: number;
+}
+
 export const inventoryApi = {
   list: (q: InventoryQuery = {}) => request<InventoryList>('/api/v1/inventory', { params: { ...inventoryParams(q), page: q.page ?? 1, page_size: q.pageSize ?? 50 } }),
   create: (body: InventoryInput) => request<InventoryItem>('/api/v1/inventory', { method: 'POST', body: JSON.stringify(body) }),
@@ -901,6 +912,11 @@ export const inventoryApi = {
     request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}/check-out`, { method: 'POST', body: JSON.stringify(body) }),
   checkIn: (id: string, body: { note?: string; ticket_url?: string } = {}) => request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}/check-in`, { method: 'POST', body: JSON.stringify(body) }),
   events: (id: string) => request<InventoryEvent[]>(`/api/v1/inventory/${encodeURIComponent(id)}/events`),
+  /** The Windows computers, Macs, iPads and iPhones NinjaOne and Addigy report: a dry run says what would be added; the real one adds them as checked out. */
+  syncDevices: (dry_run: boolean) => request<InventorySyncResult>('/api/v1/inventory/sync-devices', { method: 'POST', body: JSON.stringify({ dry_run }) }),
+  /** The same change for many items: the client they belong to (or Live Oak's own), a category, a site, tags to add. */
+  bulk: (body: { ids: string[]; client_id?: string; move_to_own?: boolean; category?: string; site?: string; add_tags?: string[] }) =>
+    request<{ changed: number; unchanged: number; not_found: number }>('/api/v1/inventory/bulk', { method: 'POST', body: JSON.stringify(body) }),
   import: (body: { kind: InventoryKind; csv_text: string; default_client_id?: string; mapping?: Record<string, string>; dry_run: boolean }) =>
     request<InventoryImportResult>('/api/v1/inventory/import', { method: 'POST', body: JSON.stringify(body) }),
   /** The filtered list as CSV text. */

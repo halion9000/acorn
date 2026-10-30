@@ -10959,11 +10959,13 @@ paths:
         schema:
           anyOf:
           - type: string
-            pattern: ^(own|[0-9a-fA-F-]{36})$
+            pattern: ^(own|unmatched|[0-9a-fA-F-]{36})$
           - type: 'null'
-          description: A client's id, or 'own' for Live Oak's own stock.
+          description: A client's id, 'own' for Live Oak's own stock, or 'unmatched'
+            for items whose customer is not matched to a client yet.
           title: Client
-        description: A client's id, or 'own' for Live Oak's own stock.
+        description: A client's id, 'own' for Live Oak's own stock, or 'unmatched'
+          for items whose customer is not matched to a client yet.
       - name: status
         in: query
         required: false
@@ -11096,6 +11098,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inventory/bulk:
+    post:
+      tags:
+      - inventory
+      summary: 'Change many items at once: the client they belong to, a category,
+        a site, tags'
+      operationId: bulk_update_api_v1_inventory_bulk_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/inventory/{item_id}/check-out:
     post:
       tags:
@@ -11198,6 +11228,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inventory/sync-devices:
+    post:
+      tags:
+      - inventory
+      summary: Add the Windows computers, Macs, iPads and iPhones NinjaOne and Addigy
+        report, as checked out
+      operationId: sync_devices_endpoint_api_v1_inventory_sync_devices_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/inventory/import:
     post:
       tags:
@@ -11251,7 +11309,7 @@ paths:
         schema:
           anyOf:
           - type: string
-            pattern: ^(own|[0-9a-fA-F-]{36})$
+            pattern: ^(own|unmatched|[0-9a-fA-F-]{36})$
           - type: 'null'
           title: Client
       - name: status
@@ -23569,6 +23627,69 @@ components:
       - ioc
       - error
       title: BulkError
+    BulkIn:
+      properties:
+        ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 500
+          minItems: 1
+          title: Ids
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        move_to_own:
+          type: boolean
+          title: Move To Own
+          default: false
+        category:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Category
+        site:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Site
+        add_tags:
+          items:
+            type: string
+            maxLength: 40
+            minLength: 1
+          type: array
+          maxItems: 12
+          title: Add Tags
+      type: object
+      required:
+      - ids
+      title: BulkIn
+      description: 'The same change for many items: move them to a client (or to Live
+        Oak''s own), and/or set a category or site, and/or add tags.'
+    BulkOut:
+      properties:
+        changed:
+          type: integer
+          title: Changed
+        unchanged:
+          type: integer
+          title: Unchanged
+        not_found:
+          type: integer
+          title: Not Found
+      type: object
+      required:
+      - changed
+      - unchanged
+      - not_found
+      title: BulkOut
     BulkRequest:
       properties:
         iocs:
@@ -40655,6 +40776,62 @@ components:
       required:
       - vendors
       title: SyncClaimResponse
+    SyncIn:
+      properties:
+        dry_run:
+          type: boolean
+          title: Dry Run
+          default: true
+      type: object
+      title: SyncIn
+    SyncOut:
+      properties:
+        dry_run:
+          type: boolean
+          title: Dry Run
+        devices:
+          type: integer
+          title: Devices
+          description: Workstations and handhelds NinjaOne and Addigy report.
+        by_category:
+          additionalProperties:
+            type: integer
+          type: object
+          title: By Category
+        matched:
+          type: integer
+          title: Matched
+          description: 'Already in the inventory (same serial number): left exactly
+            as they are.'
+        matched_in_stock:
+          type: integer
+          title: Matched In Stock
+          description: 'Of those, how many the inventory says are checked in although
+            a tool reports them: worth a look.'
+        created:
+          type: integer
+          title: Created
+          description: New items, added as checked out at the device's client.
+        refreshed:
+          type: integer
+          title: Refreshed
+          description: Items made by an earlier sync, brought up to date.
+        no_serial:
+          type: integer
+          title: No Serial
+          description: Devices without a usable serial number (added by device id,
+            never matched to a list item).
+      type: object
+      required:
+      - dry_run
+      - devices
+      - by_category
+      - matched
+      - matched_in_stock
+      - created
+      - refreshed
+      - no_serial
+      title: SyncOut
     TAXIICollection:
       properties:
         id:

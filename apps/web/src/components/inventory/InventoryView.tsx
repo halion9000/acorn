@@ -4,10 +4,10 @@
  * The stock Live Oak holds for clients (parts, drives, workstations held for a client) and the NUCs, with who has each one and what has happened to it. Replaces the SharePoint inventory lists. Every item belongs to a client's
  * own tenant (or Live Oak's), so this is also the page a client portal will show a client, for that client only. Reading needs alerts:read; changing things needs mssp:manage (the API says no, and the page shows its message).
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 
-import { inventoryApi, msspApi, type InventoryImportResult, type InventoryItem, type InventoryKind, type InventoryQuery, type InventoryStatus } from '@/lib/api';
+import { inventoryApi, msspApi, type InventoryImportResult, type InventorySyncResult, type InventoryItem, type InventoryKind, type InventoryQuery, type InventoryStatus } from '@/lib/api';
 import { safeDistance } from '@/lib/safe-date';
 
 export const STATUS_LABEL: Record<InventoryStatus, string> = { checked_in: 'Checked in', checked_out: 'Checked out', offline: 'Offline', retired: 'Retired' };
@@ -412,7 +412,139 @@ function ImportForm({ kind, clients, onDone, onClose }: { kind: InventoryKind; c
   );
 }
 
-type Dialog = { type: 'add' } | { type: 'edit'; item: InventoryItem } | { type: 'out' | 'in'; item: InventoryItem } | { type: 'history'; item: InventoryItem } | { type: 'import' } | null;
+function BulkForm({ ids, clients, onDone, onClose }: { ids: string[]; clients: Clients; onDone: () => void; onClose: () => void }) {
+  const [client, setClient] = useState('');
+  const [category, setCategory] = useState('');
+  const [site, setSite] = useState('');
+  const [tag, setTag] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const nothing = !client && !category.trim() && !site.trim() && !tag.trim();
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await inventoryApi.bulk({
+        ids,
+        ...(client === 'own' ? { move_to_own: true } : client ? { client_id: client } : {}),
+        ...(category.trim() ? { category: category.trim() } : {}),
+        ...(site.trim() ? { site: site.trim() } : {}),
+        ...(tag.trim() ? { add_tags: [tag.trim()] } : {}),
+      });
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save the changes.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal title={`Edit ${ids.length} items`} onClose={onClose}>
+      <p className="mb-3 text-xs text-gray-400">Only the fields you fill in change. Everything else on each item stays as it is.</p>
+      <div className="space-y-3">
+        <Field label="Move to client">
+          <select aria-label="Move to client" value={client} onChange={(e) => setClient(e.target.value)} className={`${input} w-full`}>
+            <option value="">Leave as it is</option>
+            <option value="own">Live Oak (own stock)</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Set category">
+          <input aria-label="Set category" value={category} onChange={(e) => setCategory(e.target.value)} className={`${input} w-full`} />
+        </Field>
+        <Field label="Set site">
+          <input aria-label="Set site" value={site} onChange={(e) => setSite(e.target.value)} className={`${input} w-full`} />
+        </Field>
+        <Field label="Add a tag">
+          <input aria-label="Add a tag" value={tag} onChange={(e) => setTag(e.target.value)} className={`${input} w-full`} />
+        </Field>
+      </div>
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-red-300">
+          {error}
+        </p>
+      )}
+      <div className="mt-4 flex justify-end gap-2">
+        <button type="button" onClick={onClose} className={`${input} hover:bg-gray-800`}>
+          Cancel
+        </button>
+        <button type="button" disabled={busy || nothing} onClick={() => void save()} className="rounded-md bg-sky-600 px-3 py-1.5 text-sm text-white hover:bg-sky-500 disabled:opacity-40">
+          {busy ? 'Saving...' : `Save ${ids.length} items`}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function SyncForm({ onDone, onClose }: { onDone: () => void; onClose: () => void }) {
+  const [preview, setPreview] = useState<InventorySyncResult | null>(null);
+  const [result, setResult] = useState<InventorySyncResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const run = async (dry: boolean) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await inventoryApi.syncDevices(dry);
+      if (dry) setPreview(r);
+      else {
+        setResult(r);
+        onDone();
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not read the device list.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => void run(true), []);
+  const shown = result ?? preview;
+  return (
+    <Modal title="Add devices from NinjaOne and Addigy" onClose={onClose}>
+      <p className="mb-3 text-xs text-gray-400">
+        Windows computers, Macs, iPads and iPhones the tools report. One already in the inventory (same serial number) is matched and left alone. Any other is added as checked out at its client, because it is already out there.
+      </p>
+      {!shown && !error && <p className="text-sm text-gray-400">Reading the device list...</p>}
+      {shown && (
+        <div className="space-y-2 text-sm text-gray-200" data-testid={result ? 'sync-result' : 'sync-preview'}>
+          <p>
+            {shown.devices} devices reported ({Object.entries(shown.by_category).map(([c, n]) => `${n} ${c}`).join(', ') || 'none'}).
+          </p>
+          <p>
+            {shown.matched} already in the inventory{shown.matched_in_stock > 0 ? `, ${shown.matched_in_stock} of them marked checked in although a tool reports them` : ''}.
+          </p>
+          <p>
+            {result ? `Added ${shown.created} as checked out` : `${shown.created} would be added as checked out`}
+            {shown.refreshed > 0 ? `, ${shown.refreshed} from an earlier sync ${result ? 'refreshed' : 'would be refreshed'}` : ''}.
+          </p>
+          {shown.no_serial > 0 && <p className="text-xs text-amber-300">{shown.no_serial} devices have no usable serial number, so they cannot be matched to a list item.</p>}
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-red-300">
+          {error}
+        </p>
+      )}
+      <div className="mt-4 flex justify-end gap-2">
+        <button type="button" onClick={onClose} className={`${input} hover:bg-gray-800`}>
+          {result ? 'Close' : 'Cancel'}
+        </button>
+        {!result && (
+          <button type="button" disabled={busy || !preview || (preview.created === 0 && preview.refreshed === 0)} onClick={() => void run(false)} className="rounded-md bg-sky-600 px-3 py-1.5 text-sm text-white hover:bg-sky-500 disabled:opacity-40">
+            {busy ? 'Working...' : 'Add them'}
+          </button>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+type Dialog = { type: 'add' } | { type: 'edit'; item: InventoryItem } | { type: 'out' | 'in'; item: InventoryItem } | { type: 'history'; item: InventoryItem } | { type: 'import' } | { type: 'bulk' } | { type: 'sync' } | null;
 
 export function InventoryView() {
   const [kind, setKind] = useState<InventoryKind>('stock');
@@ -423,8 +555,9 @@ export function InventoryView() {
   const [page, setPage] = useState(1);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const query: InventoryQuery = useMemo(
-    () => ({ kind, client: client || undefined, status: status || undefined, category: category || undefined, search: search.trim() || undefined, page, pageSize: 50 }),
+    () => ({ kind, client: client || undefined, status: status || undefined, category: category || undefined, search: search.trim() || undefined, page, pageSize: 100 }),
     [kind, client, status, category, search, page],
   );
   const { data, error, isLoading, mutate } = useSWR(['inventory', query], () => inventoryApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
@@ -433,11 +566,22 @@ export function InventoryView() {
   const reset = (fn: () => void) => {
     fn();
     setPage(1);
+    setPicked(new Set());
   };
   const changed = () => {
     setDialog(null);
+    setPicked(new Set());
     void mutate();
   };
+  const pageIds = (data?.items ?? []).map((i) => i.id);
+  const allPicked = pageIds.length > 0 && pageIds.every((id) => picked.has(id));
+  const toggle = (id: string) =>
+    setPicked((p) => {
+      const n = new Set(p);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   const exportCsv = async () => {
     setExportError(null);
     try {
@@ -461,6 +605,9 @@ export function InventoryView() {
           <p className="mt-1 text-sm text-gray-400">Stock we hold for clients, who has each item, and what has happened to it. Each item is filed under its client.</p>
         </div>
         <div className="flex gap-2">
+          <button type="button" onClick={() => setDialog({ type: 'sync' })} className={`${input} hover:bg-gray-800`}>
+            Add devices from NinjaOne and Addigy
+          </button>
           <button type="button" onClick={() => setDialog({ type: 'import' })} className={`${input} hover:bg-gray-800`}>
             Import CSV
           </button>
@@ -507,6 +654,7 @@ export function InventoryView() {
         <select aria-label="Client" value={client} onChange={(e) => reset(() => setClient(e.target.value))} className={input}>
           <option value="">All clients</option>
           <option value="own">Live Oak (own stock)</option>
+          <option value="unmatched">Not matched to a client</option>
           {clients.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -540,10 +688,25 @@ export function InventoryView() {
         </p>
       )}
 
+      {picked.size > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm text-white" data-testid="bulk-bar">
+          <span>{picked.size} selected</span>
+          <button type="button" onClick={() => setDialog({ type: 'bulk' })} className="rounded-md bg-sky-600 px-3 py-1 text-sm text-white hover:bg-sky-500">
+            Edit selected
+          </button>
+          <button type="button" onClick={() => setPicked(new Set())} className="text-gray-300 hover:underline">
+            Clear
+          </button>
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-lg border border-gray-800">
         <table className="w-full text-left text-sm" data-testid="inventory-table">
           <thead className="bg-gray-900 text-xs uppercase text-gray-400">
             <tr>
+              <th className="w-8 px-3 py-2">
+                <input type="checkbox" aria-label="Select all on this page" checked={allPicked} onChange={() => setPicked(allPicked ? new Set() : new Set(pageIds))} />
+              </th>
               <th className="px-3 py-2">{kind === 'nuc' ? 'Computer' : 'Item'}</th>
               <th className="px-3 py-2">Client</th>
               <th className="px-3 py-2">Serial</th>
@@ -558,20 +721,23 @@ export function InventoryView() {
           <tbody>
             {isLoading && !data && (
               <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-gray-500">
+                <td colSpan={10} className="px-3 py-6 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             )}
             {data && data.items.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-gray-500" data-testid="empty">
+                <td colSpan={10} className="px-3 py-6 text-center text-gray-500" data-testid="empty">
                   {data.summary.total === 0 && !search && !client ? 'Nothing here yet. Add an item, or import a SharePoint list with Import CSV.' : 'Nothing matches those filters.'}
                 </td>
               </tr>
             )}
             {(data?.items ?? []).map((i) => (
               <tr key={i.id} className="border-t border-gray-800 align-top hover:bg-gray-900/40" data-testid="inventory-row">
+                <td className="px-3 py-2">
+                  <input type="checkbox" aria-label={`Select ${i.name}`} checked={picked.has(i.id)} onChange={() => toggle(i.id)} />
+                </td>
                 <td className="px-3 py-2">
                   <div className="font-medium text-gray-100">{i.name}</div>
                   {i.kind === 'stock' && i.model && i.model !== i.name && <div className="text-xs text-gray-500">{i.model}</div>}
@@ -644,6 +810,8 @@ export function InventoryView() {
       {dialog?.type === 'add' && <ItemForm kind={kind} clients={clients} onDone={changed} onClose={() => setDialog(null)} />}
       {dialog?.type === 'edit' && <ItemForm kind={dialog.item.kind} item={dialog.item} clients={clients} onDone={changed} onClose={() => setDialog(null)} />}
       {(dialog?.type === 'out' || dialog?.type === 'in') && <MoveForm item={dialog.item} mode={dialog.type} onDone={changed} onClose={() => setDialog(null)} />}
+      {dialog?.type === 'bulk' && <BulkForm ids={[...picked]} clients={clients} onDone={changed} onClose={() => setDialog(null)} />}
+      {dialog?.type === 'sync' && <SyncForm onDone={() => void mutate()} onClose={() => setDialog(null)} />}
       {dialog?.type === 'history' && <History item={dialog.item} onClose={() => setDialog(null)} />}
       {dialog?.type === 'import' && <ImportForm kind={kind} clients={clients} onDone={() => void mutate()} onClose={() => setDialog(null)} />}
     </div>
