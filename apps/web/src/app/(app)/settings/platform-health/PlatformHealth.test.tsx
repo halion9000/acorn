@@ -193,6 +193,25 @@ describe('CORE feed silence', () => {
     expect(await screen.findByTestId('core-silent')).toHaveTextContent('CORE has not reported to A.C.O.R.N since 60 minutes ago');
   });
 
+  it('shortly after going quiet, says a restarted CORE is still on its first round instead of warning', async () => {
+    authFetch.mockResolvedValue(withFeed({ sources: 7, last_report: '2026-10-19T01:40:00Z', minutes_ago: 20, silent: true }));
+    render(<PlatformHealth />);
+    expect(await screen.findByTestId('core-restarting')).toHaveTextContent('first round after a start can take about 20 minutes');
+    expect(screen.queryByTestId('core-silent')).not.toBeInTheDocument();
+  });
+
+  it('keeps the warning when CORE has never reported, and once the quiet outlasts a restart', async () => {
+    authFetch.mockResolvedValue(withFeed({ sources: 7, last_report: null, minutes_ago: null, silent: true }));
+    const { unmount } = render(<PlatformHealth />);
+    expect(await screen.findByTestId('core-silent')).toHaveTextContent('has not reported to A.C.O.R.N yet');
+    expect(screen.queryByTestId('core-restarting')).not.toBeInTheDocument();
+    unmount();
+    authFetch.mockResolvedValue(withFeed({ sources: 7, last_report: '2026-10-19T01:00:00Z', minutes_ago: 46, silent: true }));
+    render(<PlatformHealth />);
+    expect(await screen.findByTestId('core-silent')).toBeInTheDocument();
+    expect(screen.queryByTestId('core-restarting')).not.toBeInTheDocument();
+  });
+
   it('says nothing while CORE is reporting', async () => {
     authFetch.mockResolvedValue(withFeed({ sources: 7, last_report: '2026-10-19T01:58:00Z', minutes_ago: 2, silent: false }));
     render(<PlatformHealth />);

@@ -135,6 +135,11 @@ system). For any question about how Halo works or how to configure it, \
 use search_halo_guides then read_halo_guide, answer from the guide, and \
 give its link. Never answer Halo setup questions from memory, and say so \
 when the guides do not cover something.
+- For what is wrong at a client (Microsoft 365 or Google Workspace admins \
+and stale accounts, failed sign-ins, leaked credentials on the dark web, \
+backups, endpoint tools) call client_checks; for our own company's \
+compliance (Secureframe tests, risks, policies, NIST CSF or CIS IG1 \
+requirements) call secureframe_status. Answer from what they return.
 - If the analyst's message is not about the SOC environment (a greeting, \
 a question about who or what you are, small talk), answer that plainly \
 and briefly. Only produce security analysis when there is real alert, \

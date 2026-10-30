@@ -9,6 +9,15 @@ import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "@/lib/auth-session";
 import { agoMinutes } from "@/lib/ago";
 
+/** A restarted CORE takes about this long to finish its first round and report; a quiet spell shorter than the grace period is shown as a note, not a warning. */
+export const RESTART_ROUND_MINUTES = 20;
+export const RESTART_GRACE_MINUTES = 45;
+
+/** True when CORE has been quiet long enough to be flagged but not so long that a restart no longer explains it (never when it has never reported). */
+export function isRestarting(minutesAgo: number | null): boolean {
+  return minutesAgo !== null && minutesAgo <= RESTART_GRACE_MINUTES;
+}
+
 interface ServiceRow {
   service: string;
   status: "up" | "down";
@@ -198,7 +207,13 @@ export function PlatformHealth() {
                 ))}
             </ul>
           )}
-          {snapshot.core_feed?.silent && (
+          {snapshot.core_feed?.silent && isRestarting(snapshot.core_feed.minutes_ago) && (
+            <p role="note" data-testid="core-restarting" className="rounded border border-slate-600 bg-slate-800/60 p-3 text-sm text-slate-300">
+              CORE has been quiet for {snapshot.core_feed.minutes_ago} minutes. If it was just restarted, that is normal: its first round after a start can take about {RESTART_ROUND_MINUTES} minutes. If it is still silent after{" "}
+              {RESTART_GRACE_MINUTES} minutes, check that CORE is running and can reach A.C.O.R.N.
+            </p>
+          )}
+          {snapshot.core_feed?.silent && !isRestarting(snapshot.core_feed.minutes_ago) && (
             <p role="note" data-testid="core-silent" className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
               CORE has not reported to A.C.O.R.N {snapshot.core_feed.minutes_ago === null ? "yet" : `since ${agoLabel(snapshot.core_feed.minutes_ago).replace(" ago", "")} ago`}. While it is silent, no new alerts, devices or
               links arrive from Huntress, Petra, NinjaOne and the other tools. Check that CORE is running and can reach A.C.O.R.N.

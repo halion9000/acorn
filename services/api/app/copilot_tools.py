@@ -191,6 +191,106 @@ async def search_client_docs(*, tenant_id: str, query: str, limit: int = 6) -> d
     }
 
 
+def _trim(text_: Any, size: int) -> str:
+    s = str(text_ or "")
+    return s if len(s) <= size else s[: size - 1] + "…"
+
+
+async def client_checks(
+    *, tenant_id: str, client: str = "", source: str = "", query: str = "", include_met: bool = False, limit: int = 20
+) -> dict[str, Any]:
+    """The checks the connected tools reported for the clients (Microsoft 365, Google Workspace, backups, dark web, Huntress...), the ones that are not fine unless asked: by client name, tool source or a word in the evidence."""
+    from app.api.v1.endpoints.client_posture import _fleet_checks
+    from app.services.fleet_posture import STATUS_ORDER, search_checks
+
+    try:
+        tid = uuid.UUID(tenant_id)
+    except ValueError:
+        return {"error": "invalid tenant_id"}
+    limit = max(1, min(int(limit or 20), 50))
+    async with await _get_session(tid) as db:
+        checks, _names, _refreshed = await _fleet_checks(db, tid)
+    if query and query.strip():
+        hits = search_checks(checks, query, 300)
+        wanted = {(h["client_id"], h.get("source"), h.get("key")) for h in hits}
+        checks = [c for c in checks if (c.client_id, c.source, c.key) in wanted]
+    if client and client.strip():
+        needle = client.strip().lower()
+        checks = [c for c in checks if needle in c.client_name.lower()]
+    if source and source.strip():
+        checks = [c for c in checks if c.source == source.strip()]
+    if not include_met:
+        checks = [c for c in checks if c.status != "met"]
+    checks = sorted(checks, key=lambda c: (c.accepted, STATUS_ORDER.get(c.status, 3), c.client_name.lower(), c.key))
+    rows = [
+        {
+            "client": c.client_name,
+            "source": c.source,
+            "check": c.key,
+            "status": c.status,
+            "evidence": _trim(c.evidence, 300),
+            "items": [_trim(i, 80) for i in c.items[:10]],
+            "more_items": max(0, len(c.items) - 10),
+            "accepted_by_a_person": c.accepted,
+            "since": c.since.isoformat() if c.since else None,
+        }
+        for c in checks[:limit]
+    ]
+    return {
+        "count": len(checks),
+        "shown": len(rows),
+        "checks": rows,
+        **({} if rows else {"note": "No such checks. The client may not be mapped to that tool, or the tool has not reported yet."}),
+    }
+
+
+async def secureframe_status(*, tenant_id: str, framework: str = "", limit: int = 15) -> dict[str, Any]:
+    """Our own company's Secureframe state: test counts, failing tests, risks, policies, and for NIST CSF 2.0 or CIS IG1 the requirements that are not healthy."""
+    from app.api.v1.endpoints.secureframe import FRAMEWORK_KEYS, SecureframeBody, mapping_for, passing_percent
+    from app.models.secureframe_report import SecureframeReport
+
+    try:
+        tid = uuid.UUID(tenant_id)
+    except ValueError:
+        return {"error": "invalid tenant_id"}
+    limit = max(1, min(int(limit or 15), 50))
+    async with await _get_session(tid) as db:
+        row = (await db.execute(select(SecureframeReport).where(SecureframeReport.tenant_id == tid))).scalar_one_or_none()
+    if row is None:
+        return {"connected": False, "note": "Secureframe has not reported yet (not connected in CORE, or not read yet)."}
+    report = SecureframeBody.model_validate(row.report)
+    out: dict[str, Any] = {
+        "connected": True,
+        "received_at": row.received_at.isoformat() if row.received_at else None,
+        "tests": report.tests.model_dump(),
+        "passing_percent": passing_percent(report.tests),
+        "risks": report.risks,
+        "policies": report.policies,
+        "frameworks": [f.model_dump() for f in report.frameworks],
+        "oldest_failing_tests": [
+            {
+                "title": t.title,
+                "owner": t.owner,
+                "failing_since": t.failing_since.isoformat() if t.failing_since else None,
+                "frameworks": t.frameworks,
+            }
+            for t in report.failing[:limit]
+        ],
+    }
+    key = (framework or "").strip().upper().replace("_", "-")
+    catalog = next((k for k in FRAMEWORK_KEYS if k.upper() == key or key in k.upper().replace("-", "")), None) if key else None
+    if catalog:
+        mapping = mapping_for(report, catalog, row.received_at)
+        out["framework"] = catalog
+        out["requirements_by_health"] = mapping.summary
+        out["requirements_not_healthy"] = [
+            {"id": rid, "title": _trim(r.title, 120), "health": r.health}
+            for rid, r in mapping.requirements.items()
+            if r.health in ("unhealthy", "not_tested")
+        ][:limit]
+    return out
+
+
 async def search_halo_guides(*, tenant_id: str, query: str, limit: int = 6) -> dict[str, Any]:
     """Halo's own guides whose title fits the question: id, title, section and link. Read one with ``read_halo_guide``."""
     from app.services import halo_guides
@@ -498,6 +598,39 @@ COPILOT_TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "client_checks",
+            "description": "The checks run from the clients' connected tools (Microsoft 365 and Google Workspace admins and stale accounts, failed sign-ins, backups, dark web leaks, Huntress, DNS filtering and more): which are failing and why. Use it for 'what is wrong at <client>', 'which clients have leaked credentials', 'who has Google admins without 2-Step'. Filter by client name, tool source (e.g. threatmate-google, threatmate) or a word in the evidence.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "client": {"type": "string", "description": "Part of a client's name."},
+                    "source": {"type": "string", "description": "A tool source such as threatmate-google, threatmate, cipp, huntress."},
+                    "query": {"type": "string", "description": "A word, machine or account to find in the evidence."},
+                    "include_met": {"type": "boolean", "description": "Also list checks that are fine (default false)."},
+                    "limit": {"type": "integer", "description": "Maximum rows (default 20, max 50)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "secureframe_status",
+            "description": "Our own company's Secureframe compliance state: how many control tests pass, the oldest failing tests and their owners, risks, policies, and for NIST CSF 2.0 or CIS IG1 the requirements that are not healthy. Not about clients.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "framework": {"type": "string", "description": "NIST-CSF or CIS-IG1 to list that framework's unhealthy requirements."},
+                    "limit": {"type": "integer", "description": "Maximum rows per list (default 15, max 50)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "search_halo_guides",
             "description": "Find Halo's own guides (HaloPSA, HaloITSM, integrations, billing, automations, configuration settings, security) by what they are about. Use it for any question about HOW HALO WORKS or how to configure something in Halo (a ticket type, a workflow, a billing rule, an integration, a report); do not answer those from memory. Returns guide ids, titles, sections and links; then read the best one with read_halo_guide.",
             "parameters": {
@@ -603,6 +736,8 @@ COPILOT_TOOL_SCHEMAS = [
 _COPILOT_TOOL_DISPATCH: dict[str, Any] = {
     "search_alerts": search_alerts,
     "search_client_docs": search_client_docs,
+    "client_checks": client_checks,
+    "secureframe_status": secureframe_status,
     "search_halo_guides": search_halo_guides,
     "read_halo_guide": read_halo_guide,
     "get_alert": get_alert,
@@ -696,6 +831,8 @@ CONFIRMED_ACTIONS: dict[str, Any] = {"delete_alert": perform_delete_alert}
 TOOL_PERMISSIONS: dict[str, str] = {
     "search_alerts": "alerts:read",
     "search_client_docs": "alerts:read",
+    "client_checks": "alerts:read",
+    "secureframe_status": "reports:read",
     "search_halo_guides": "alerts:read",
     "read_halo_guide": "alerts:read",
     "get_alert": "alerts:read",

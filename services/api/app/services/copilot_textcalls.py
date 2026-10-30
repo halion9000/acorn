@@ -19,7 +19,16 @@ from typing import Any
 
 # The tools a text-written call may run: all read-only.
 TEXT_CALLABLE: frozenset[str] = frozenset(
-    {"search_alerts", "search_cases", "get_alert", "search_client_docs", "search_halo_guides", "read_halo_guide"}
+    {
+        "search_alerts",
+        "search_cases",
+        "get_alert",
+        "search_client_docs",
+        "search_halo_guides",
+        "read_halo_guide",
+        "client_checks",
+        "secureframe_status",
+    }
 )
 MAX_TEXT_CALLS = 3
 _BLOCK = re.compile(r"```\s*(?:tool_use|tool_call|tool)\s*\n\s*([A-Za-z_][A-Za-z0-9_]*)\s*\n(.*?)```", re.DOTALL)
