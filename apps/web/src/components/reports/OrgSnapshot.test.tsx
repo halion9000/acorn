@@ -6,7 +6,7 @@ const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
-import { OrgSnapshot, clientsWithProblems, orgSummary, type FleetSummary } from './OrgSnapshot';
+import { OrgSnapshot, clientsWithProblems, orgSummary, secureframeLine, type FleetSummary } from './OrgSnapshot';
 
 const client = (id: string, name: string, score: number | null, over: Record<string, unknown> = {}) => ({ client_id: id, client_name: name, score, met: 5, partly: 1, not_met: 2, ...over });
 const FLEET: FleetSummary = { average_score: 71, clients: [client('a', 'Acme', 90), client('b', 'Birch', 40, { not_met: 9 }), client('c', 'Cedar', 40, { not_met: 12, below_target: true }), client('d', 'No score', null)] };
@@ -102,5 +102,40 @@ describe('OrgSnapshot', () => {
     await waitFor(() => expect(screen.getByTestId('org-boards')).toBeInTheDocument());
     expect(screen.getByTestId('org-boards')).toHaveTextContent('Windows: 1 client');
     expect(screen.getByTestId('org-boards')).not.toHaveTextContent('Backups');
+  });
+});
+
+describe('secureframeLine', () => {
+  const tests = { total: 10, enabled: 9, passing: 7, failing: 2, not_evaluated: 0, disabled: 1 };
+  const view = (over: Record<string, unknown> = {}) =>
+    ({ report: { tests, frameworks: [], failing: [], risks: 6, policies: 1, ...over }, received_at: null, passing_percent: 77.8 }) as never;
+
+  it('gives the pass rate, the failing count, risks and policies, with singular and plural right', () => {
+    expect(secureframeLine(view())).toBe('Our own compliance in Secureframe: 77.8% of evaluated tests pass (2 failing), 6 risks, 1 policy.');
+    expect(secureframeLine(view({ risks: 1, policies: null }))).toBe('Our own compliance in Secureframe: 77.8% of evaluated tests pass (2 failing), 1 risk.');
+  });
+
+  it('counts tests when none was evaluated, and says nothing when Secureframe has not reported', () => {
+    expect(secureframeLine({ report: view().report, received_at: null, passing_percent: null } as never)).toContain('7 tests pass, 2 fail');
+    expect(secureframeLine(undefined)).toBeNull();
+    expect(secureframeLine({ report: null, received_at: null, passing_percent: null })).toBeNull();
+  });
+});
+
+describe('OrgSnapshot and Secureframe', () => {
+  it('shows our own compliance line with a link when Secureframe has reported', async () => {
+    answer({
+      '/fleet/summary': () => json(FLEET),
+      '/api/v1/secureframe': () =>
+        json({ report: { tests: { total: 4, enabled: 4, passing: 3, failing: 1, not_evaluated: 0, disabled: 0 }, frameworks: [], failing: [], risks: 2, policies: 5 }, received_at: null, passing_percent: 75 }),
+    });
+    render(
+      <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
+        <OrgSnapshot />
+      </SWRConfig>,
+    );
+    const line = await screen.findByTestId('org-secureframe');
+    expect(line).toHaveTextContent('75% of evaluated tests pass (1 failing), 2 risks, 5 policies.');
+    expect(screen.getByRole('link', { name: /Open Compliance/ })).toHaveAttribute('href', '/compliance');
   });
 });

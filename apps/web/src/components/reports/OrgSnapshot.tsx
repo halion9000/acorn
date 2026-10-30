@@ -8,6 +8,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 
 import { authFetch } from '@/lib/auth-session';
+import type { SecureframeView } from '@/components/compliance/SecureframeCard';
 
 export interface FleetClient {
   client_id: string;
@@ -48,6 +49,18 @@ export function clientsWithProblems(rows: BoardRow[]): number {
   return new Set(rows.filter((r) => r.status !== 'met' && !r.accepted).map((r) => r.client_id)).size;
 }
 
+/** One sentence on our own compliance from Secureframe's report, or null when Secureframe has not reported (not connected, or not read yet). */
+export function secureframeLine(view: SecureframeView | undefined): string | null {
+  const report = view?.report;
+  if (!report) return null;
+  const { passing, failing } = report.tests;
+  const pct = view?.passing_percent;
+  const parts = [pct === null || pct === undefined ? `${passing} tests pass, ${failing} fail` : `${pct}% of evaluated tests pass (${failing} failing)`];
+  if (report.risks !== null) parts.push(`${report.risks} ${report.risks === 1 ? 'risk' : 'risks'}`);
+  if (report.policies !== null) parts.push(`${report.policies} ${report.policies === 1 ? 'policy' : 'policies'}`);
+  return `Our own compliance in Secureframe: ${parts.join(', ')}.`;
+}
+
 async function readBoards(): Promise<{ name: string; title: string; clients: number }[]> {
   const boards = await getJson<Record<string, { title: string }>>('/api/v1/client-posture/fleet/boards');
   const out = await Promise.all(
@@ -66,6 +79,7 @@ async function readBoards(): Promise<{ name: string; title: string; clients: num
 export function OrgSnapshot() {
   const fleet = useSWR('org-fleet', () => getJson<FleetSummary>('/api/v1/client-posture/fleet/summary'), { revalidateOnFocus: false, shouldRetryOnError: false });
   const boards = useSWR('org-boards', readBoards, { revalidateOnFocus: false, shouldRetryOnError: false });
+  const secureframe = useSWR('org-secureframe', () => getJson<SecureframeView>('/api/v1/secureframe'), { revalidateOnFocus: false, shouldRetryOnError: false });
   // Nothing to say when the fleet cannot be read (the page may not be allowed to, or there are no clients).
   if (fleet.error || !fleet.data || fleet.data.clients.length === 0) return null;
   const s = orgSummary(fleet.data);
@@ -80,6 +94,14 @@ export function OrgSnapshot() {
           Open Fleet Posture →
         </Link>
       </p>
+      {secureframeLine(secureframe.data) && (
+        <p className="mt-2 text-sm text-gray-300" data-testid="org-secureframe">
+          {secureframeLine(secureframe.data)}{' '}
+          <Link href="/compliance" className="text-sky-300 underline hover:text-sky-200">
+            Open Compliance →
+          </Link>
+        </p>
+      )}
       {s.worst.length > 0 && (
         <div className="mt-3">
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Lowest scores</h3>
