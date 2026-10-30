@@ -69,6 +69,7 @@ BOARDS: dict[str, tuple[str, tuple[str, ...]]] = {
             "autoelevate_enforcing",
             "threatmate_hardening",
             "threatmate_agents_online",
+            "threatmate_firmware",
         ),
     ),
 }
