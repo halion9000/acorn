@@ -100,6 +100,8 @@ def _no_cache(monkeypatch):
         return []
 
     monkeypatch.setattr(ins, "_gather_extras", no_extras)
+    # The mocked database here answers the per-tenant statements; the grouped ones are checked against these on a real Postgres (test_insight_tiles_postgres.py).
+    monkeypatch.setattr(ins, "_scope_totals", ins._scope_totals_per_tenant)
     ins._cache.clear()
     ins._locks.clear()
     yield

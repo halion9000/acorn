@@ -55,7 +55,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, func, select, text
+from sqlalchemy import and_, bindparam, func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -493,6 +493,143 @@ async def _source_health(db, owner: uuid.UUID, now: datetime) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
+async def _scope_totals_per_tenant(
+    db, tenant_id: uuid.UUID, scope_ids: list[uuid.UUID], start: datetime, now: datetime, prev_start: datetime
+) -> dict:
+    """The numbers of the first seven tiles for the whole scope, one tenant at a time (about 25 statements per tenant). Kept as the reference ``_scope_totals`` is checked against; the endpoint uses ``_scope_totals``."""
+    parts = []
+    for tid in scope_ids:
+        if tid == tenant_id:
+            parts.append(await _tenant_parts(db, tid, start, now, prev_start))
+        else:
+            async with acting_as_tenant(db, tid):
+                parts.append(await _tenant_parts(db, tid, start, now, prev_start))
+    return _merge_parts(parts)
+
+
+async def _alert_window(db, ids: list[uuid.UUID], start: datetime, end: datetime) -> dict:
+    """What the alerts created in [start, end) say, for all these tenants at once."""
+    hours = lambda col: func.avg(func.extract("epoch", col - Alert.created_at) / 3600)  # noqa: E731
+    row = (
+        await db.execute(
+            select(
+                func.count(),
+                hours(Alert.first_seen_at),
+                func.count(Alert.first_seen_at),
+                hours(Alert.resolved_at),
+                func.count(Alert.resolved_at),
+                func.count(Alert.disposition),
+                func.count().filter(Alert.disposition == "false_positive"),
+            ).where(Alert.tenant_id.in_(ids), Alert.created_at >= start, Alert.created_at < end)
+        )
+    ).one()
+    return {
+        "alerts": int(row[0]),
+        "mtta": round(float(row[1] or 0.0), 2),
+        "mtta_n": int(row[2]),
+        "mttr": round(float(row[3] or 0.0), 2),
+        "mttr_n": int(row[4]),
+        "dispositioned": int(row[5]),
+        "fp": int(row[6]),
+    }
+
+
+def _bucket_index(column, start: datetime, bucket_seconds: float):
+    """The sparkline bucket (0 to 23) a timestamp column falls into, in SQL."""
+    return func.least(_SPARKLINE_BUCKETS - 1, func.floor(func.extract("epoch", column - start) / bucket_seconds))
+
+
+def _to_spark(rows) -> list[float]:
+    buckets = [0.0] * _SPARKLINE_BUCKETS
+    for idx, value in rows:
+        if idx is not None and 0 <= int(idx) < _SPARKLINE_BUCKETS:
+            buckets[int(idx)] += float(value or 0.0)
+    return buckets
+
+
+async def _scope_totals(db, tenant_id: uuid.UUID, scope_ids: list[uuid.UUID], start: datetime, now: datetime, prev_start: datetime) -> dict:
+    """The numbers of the first seven tiles for the whole scope in a dozen grouped statements, not about 25 per tenant (224 clients made that take ten seconds or more).
+
+    The tiles only ever add the tenants up (counts, a mean weighted by its sample size, a ratio of two counts), so the totals are taken across all the tenants at once. Same keys as ``_merge_parts``;
+    ``test_insight_tiles_postgres`` checks the two against each other on real data. The caller has not entered a tenant scope: this reads several tenants inside ``cross_tenant_reads``.
+    """
+    ids = list(scope_ids)
+    out: dict = {}
+    bucket_seconds = max((now - start).total_seconds(), 1.0) / _SPARKLINE_BUCKETS
+    async with cross_tenant_reads(db):
+        for tag, (a, b) in (("", (start, now)), ("prev_", (prev_start, start))):
+            w = await _alert_window(db, ids, a, b)
+            out[tag + "mtta"], out[tag + "mtta_n"], out[tag + "mttr"], out[tag + "mttr_n"] = w["mtta"], w["mtta_n"], w["mttr"], w["mttr_n"]
+            out[tag + "fp"] = round(w["fp"] / w["dispositioned"], 4) if w["dispositioned"] else 0.0
+            out[tag + "alerts"] = w["alerts"]
+            cases = (
+                await db.execute(
+                    text(
+                        "SELECT count(*), count(*) FILTER (WHERE status IN :done) FROM aisoc_cases WHERE tenant_id IN :ids AND created_at >= :a AND created_at < :b"
+                    ).bindparams(bindparam("ids", expanding=True), bindparam("done", expanding=True)),
+                    {"ids": ids, "done": list(case_metrics.FINISHED), "a": a, "b": b},
+                )
+            ).one()
+            out[tag + "cases"], out[tag + "auto_closed"] = int(cases[0]), int(cases[1])
+            out[tag + "cost"], out[tag + "runs"] = await _scope_cost(db, ids, a, b)
+        out["first_alert"] = await db.scalar(select(func.min(Alert.created_at)).where(Alert.tenant_id.in_(ids)))
+        out["first_alert"] = as_utc(out["first_alert"]) if isinstance(out["first_alert"], datetime) else None
+        idx = _bucket_index(Alert.created_at, start, bucket_seconds)
+        out["alert_spark"] = _to_spark(
+            (
+                await db.execute(
+                    select(idx, func.count())
+                    .where(Alert.tenant_id.in_(ids), Alert.created_at >= start, Alert.created_at < now)
+                    .group_by(idx)
+                )
+            ).all()
+        )
+        case_idx = "LEAST(:top, floor(extract(epoch FROM created_at - :start) / :bs))"
+        out["case_spark"] = _to_spark(
+            (
+                await db.execute(
+                    text(
+                        f"SELECT {case_idx} AS i, count(*) FROM aisoc_cases WHERE tenant_id IN :ids AND created_at >= :start AND created_at < :end GROUP BY i"
+                    ).bindparams(bindparam("ids", expanding=True)),
+                    {"ids": ids, "top": _SPARKLINE_BUCKETS - 1, "start": start, "end": now, "bs": bucket_seconds},
+                )
+            ).all()
+        )
+        out["cost_spark"] = await _scope_cost_spark(db, ids, start, now, bucket_seconds)
+    return out
+
+
+async def _scope_cost(db, ids: list[uuid.UUID], start: datetime, end: datetime) -> tuple[float, int]:
+    """Total agent cost and distinct runs for all these tenants in [start, end). Zeroes when the cost table is not deployed (its own savepoint, so a missing table does not end the transaction)."""
+    sql = text(
+        "SELECT COALESCE(SUM(c.total_cost_usd), 0.0), COUNT(DISTINCT c.run_id) FROM aisoc_run_costs c JOIN investigation_runs r ON r.id::text = c.run_id "
+        "WHERE r.tenant_id IN :ids AND r.started_at >= :a AND r.started_at < :b"
+    ).bindparams(bindparam("ids", expanding=True))
+    try:
+        async with db.begin_nested():
+            row = (await db.execute(sql, {"ids": ids, "a": start, "b": end})).one()
+        return float(row[0] or 0.0), int(row[1] or 0)
+    except SQLAlchemyError:
+        logger.debug("insights.cost_aggregate_unavailable", exc_info=True)
+        return 0.0, 0
+
+
+async def _scope_cost_spark(db, ids: list[uuid.UUID], start: datetime, end: datetime, bucket_seconds: float) -> list[float]:
+    sql = text(
+        "SELECT LEAST(:top, floor(extract(epoch FROM r.started_at - :start) / :bs)) AS i, COALESCE(SUM(c.total_cost_usd), 0.0) FROM aisoc_run_costs c "
+        "JOIN investigation_runs r ON r.id::text = c.run_id WHERE r.tenant_id IN :ids AND r.started_at >= :start AND r.started_at < :end GROUP BY i"
+    ).bindparams(bindparam("ids", expanding=True))
+    try:
+        async with db.begin_nested():
+            rows = (
+                await db.execute(sql, {"ids": ids, "top": _SPARKLINE_BUCKETS - 1, "start": start, "end": end, "bs": bucket_seconds})
+            ).all()
+        return _to_spark(rows)
+    except SQLAlchemyError:
+        logger.debug("insights.cost_sparkline_unavailable", exc_info=True)
+        return [0.0] * _SPARKLINE_BUCKETS
+
+
 # The page asks again every 30 seconds and on every case change, and computing the numbers for a few hundred clients takes seconds: the same answer is kept for a short while and a burst of
 # identical requests shares one computation. (Without this a few open tabs kept the API busy enough for CORE's calls to time out.)
 CACHE_SECONDS = 25.0
@@ -562,14 +699,7 @@ async def _build_soc_insights(user: AuthUser, db: DBSession, window: str, client
         if client_id not in scope_ids[1:]:
             raise HTTPException(status_code=404, detail="client not found")
         scope_ids = [client_id]
-    parts = []
-    for tid in scope_ids:
-        if tid == tenant_id:
-            parts.append(await _tenant_parts(db, tid, start, now, prev_start))
-        else:
-            async with acting_as_tenant(db, tid):
-                parts.append(await _tenant_parts(db, tid, start, now, prev_start))
-    total = _merge_parts(parts)
+    total = await _scope_totals(db, tenant_id, scope_ids, start, now, prev_start)
     extra_parts = await _gather_extras(db, scope_ids, start, now, prev_start)
 
     history_since = total["first_alert"]

@@ -221,3 +221,93 @@ async def test_the_endpoint_itself_returns_the_second_row_beside_the_first_seven
     finally:
         ins._cache.clear()
         await _cleanup(engine, tenant)
+
+
+async def _seed_first_seven(conn, tenant: uuid.UUID, now: datetime, salt: int) -> None:
+    """Alerts in this window and the one before, with every kind of timestamp and verdict; cases; and agent runs with costs. ``salt`` makes the two tenants differ."""
+    rows = [
+        # (hours old, first seen after (h) or None, resolved after (h) or None, disposition, severity)
+        (1, 0.5, None, None, "high"),
+        (3, 1.0, 2.0, "false_positive", "low"),
+        (5, None, 4.0, "true_positive", "medium"),
+        (9, 2.0, 6.5, "false_positive", "info"),
+        (13, None, None, None, "low"),
+        (23, 4.0, 10.0, "true_positive", "critical"),
+        (30, 1.0, 3.0, "false_positive", "low"),  # the window before
+        (40, None, 5.0, "true_positive", "high"),
+        (47, 2.5, None, None, "medium"),
+    ]
+    for i, (age, seen, resolved, disposition, severity) in enumerate(rows):
+        at = now - timedelta(hours=age + salt * 0.25)
+        await conn.execute(
+            text(
+                "insert into alerts (id, tenant_id, title, severity, status, priority, event_time, first_seen, last_seen, created_at, updated_at, first_seen_at, resolved_at, disposition) "
+                "values (:i, :t, :title, :sev, 'new', 50, :at, :at, :at, :at, :at, :fs, :rs, :d)"
+            ),
+            {
+                "i": uuid.uuid4(),
+                "t": tenant,
+                "title": f"Alert {i}",
+                "sev": severity,
+                "at": at,
+                "fs": at + timedelta(hours=seen) if seen is not None else None,
+                "rs": at + timedelta(hours=resolved) if resolved is not None else None,
+                "d": disposition,
+            },
+        )
+    for age, status in ((2, "new"), (6, "resolved"), (20, "closed"), (33, "resolved"), (44, "new")):
+        await conn.execute(
+            text("insert into aisoc_cases (id, tenant_id, title, status, created_at) values (:i, :t, 'case', :s, :at)"),
+            {"i": uuid.uuid4(), "t": tenant, "s": status, "at": now - timedelta(hours=age + salt)},
+        )
+    for age, cost in ((4, 0.25 + salt / 100), (10, 0.5), (35, 0.125)):
+        run = uuid.uuid4()
+        await conn.execute(
+            text("insert into investigation_runs (id, tenant_id, case_id, started_at) values (:i, :t, 'c', :at)"),
+            {"i": run, "t": tenant, "at": now - timedelta(hours=age)},
+        )
+        await conn.execute(
+            text("insert into aisoc_run_costs (run_id, tenant_id, model, total_cost_usd) values (:r, :t, 'm', :c)"),
+            {"r": str(run), "t": str(tenant), "c": cost},
+        )
+
+
+async def test_the_grouped_totals_equal_the_per_tenant_numbers_they_replace():
+    """The first seven tiles used to be added up one tenant at a time (about 25 statements each); they are now a dozen grouped statements over all the tenants. Same data, same answer."""
+    from app.api.v1.endpoints import insights as ins
+
+    engine, first = await _tenant()
+    second = uuid.uuid4()
+    now = datetime.now(UTC)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            await conn.execute(
+                text("insert into tenants (id, name, slug) values (:t, 'tiles-eq', :s)"), {"t": second, "s": f"tiles-{second.hex[:10]}"}
+            )
+            await _seed_first_seven(conn, first, now, 0)
+            await _seed_first_seven(conn, second, now, 3)
+        start, prev_start = now - timedelta(days=1), now - timedelta(days=2)
+        async with AsyncSession(engine) as db:
+            old = await ins._scope_totals_per_tenant(db, first, [first, second], start, now, prev_start)
+        async with AsyncSession(engine) as db:
+            new = await ins._scope_totals(db, first, [first, second], start, now, prev_start)
+        assert set(new) == set(old), set(new) ^ set(old)
+        for key, expected in old.items():
+            got = new[key]
+            if isinstance(expected, list):
+                assert got == pytest.approx(expected, abs=1e-6), key
+            elif isinstance(expected, float):
+                assert got == pytest.approx(expected, abs=0.02), key  # the old way rounded each tenant's mean before weighting them
+            else:
+                assert got == expected, key
+        assert old["alerts"] == 12 and old["prev_alerts"] == 6, "the data really covers both windows and both tenants"
+        assert sum(old["alert_spark"]) == 12 and sum(old["case_spark"]) > 0 and sum(old["cost_spark"]) > 0
+    finally:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            await conn.execute(text("delete from aisoc_run_costs where tenant_id = any(:t)"), {"t": [str(first), str(second)]})
+            for table in ("investigation_runs", "aisoc_cases", "alerts"):
+                await conn.execute(text(f"delete from {table} where tenant_id = any(:t)"), {"t": [first, second]})
+            await conn.execute(text("delete from tenants where id = :t"), {"t": second})
+        await _cleanup(engine, first)
