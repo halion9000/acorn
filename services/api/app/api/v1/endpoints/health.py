@@ -858,6 +858,43 @@ async def pending_migrations(db: Any) -> list[str] | None:
     return sorted(files - applied)
 
 
+CONNECTOR_FAILING_AFTER = timedelta(hours=24)
+
+
+def failing_connectors(rows: list[Any], now: datetime) -> list[str]:
+    """Names of enabled connectors that are not healthy and have not synced for over a day (or never did), sorted. CORE's own feed rows and connectors still being set up are left out. ``rows`` have
+    ``name``, ``is_enabled``, ``health_status``, ``last_sync`` and ``created_at``."""
+    out: list[str] = []
+    for r in rows:
+        if not r.is_enabled or r.health_status in ("healthy", "configuring"):
+            continue
+        since = r.last_sync or r.created_at
+        if since is None:
+            continue
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=UTC)
+        if now - since > CONNECTOR_FAILING_AFTER:
+            out.append(r.name)
+    return sorted(out)
+
+
+async def _failing_connectors_or_none(db: Any, user: Any) -> list[str] | None:
+    """The unhealthy connectors that have gone quiet for over a day, or None when they cannot be read."""
+    try:
+        from app.models.connector import Connector
+
+        rows = (
+            await db.execute(
+                select(Connector.name, Connector.is_enabled, Connector.health_status, Connector.last_sync, Connector.created_at).where(
+                    Connector.tenant_id == user.tenant_id, Connector.connector_type != "core_feed"
+                )
+            )
+        ).all()
+        return failing_connectors(rows, datetime.now(UTC))
+    except Exception:  # noqa: BLE001 - extra detail on a health page must not take it down
+        return None
+
+
 def platform_warnings(
     *,
     down: list[str],
@@ -867,6 +904,7 @@ def platform_warnings(
     device_feeds: list[dict[str, Any]],
     signins: dict[str, Any] | None,
     loop: dict[str, Any] | None = None,
+    failing_connectors: list[str] | None = None,
 ) -> list[dict[str, str]]:
     """Plain-language problems worth a person's attention, worst first, built only from what the page already knows (pure; unit-tested)."""
     out: list[dict[str, str]] = []
@@ -898,6 +936,9 @@ def platform_warnings(
         )
     if disk and disk["used_percent"] >= DISK_WARN_PERCENT:
         out.append({"key": "disk", "level": "warn", "text": f"Disk is {disk['used_percent']}% full ({disk['free_gb']} GB free)"})
+    if failing_connectors:
+        shown = ", ".join(failing_connectors[:5]) + (f" and {len(failing_connectors) - 5} more" if len(failing_connectors) > 5 else "")
+        out.append({"key": "connectors", "level": "warn", "text": f"Connector not healthy and not synced for over a day: {shown}"})
     stalled = [f["vendor"] for f in device_feeds if f.get("stalled")]
     if stalled:
         out.append({"key": "feeds", "level": "warn", "text": f"Device feed stalled (nothing for 3+ hours): {', '.join(stalled)}"})
@@ -956,6 +997,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
     disk = disk_row()
     pending = await pending_migrations(db)
     loop = loop_lag(time.time())
+    failing = await _failing_connectors_or_none(db, user)
     return {
         "overall": "degraded" if down else "ok",
         "down": down,
@@ -969,7 +1011,14 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
         "runtime": {"loop": loop, "slow_routes": slow_routes()},
         "feed_routes": feed_receipts(),
         "warnings": platform_warnings(
-            down=down, disk=disk, pending=pending, core_feed=core_feed, device_feeds=feeds, signins=signins, loop=loop
+            down=down,
+            disk=disk,
+            pending=pending,
+            core_feed=core_feed,
+            device_feeds=feeds,
+            signins=signins,
+            loop=loop,
+            failing_connectors=failing,
         ),
         "generated_at": datetime.now(UTC),
     }

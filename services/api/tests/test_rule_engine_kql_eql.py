@@ -151,3 +151,26 @@ def test_a_single_event_condition_still_works():
             'process where process.name == "cmd.exe"', [ev(1, 1, "A", process={"name": "cmd.exe"}), ev(2, 2, "A", process={"name": "x"})]
         )
     ) == [1]
+
+
+def test_in_lists_match_any_listed_value_ignoring_case_and_allowing_wildcards():
+    assert ids(_run_kql('user in ("alice", "bob")', EVENTS)) == [1, 2, 3]
+    assert ids(_run_kql("user in (BOB)", EVENTS)) == [2]
+    assert ids(_run_kql('process.name in ("cmd.exe","power*")', EVENTS)) == [1, 2, 3]
+    assert ids(_run_kql('host in ("ws-9")', EVENTS)) == []
+
+
+def test_not_in_negates_and_combines_with_and_or():
+    assert ids(_run_kql('user not in ("alice")', EVENTS)) == [2]
+    assert ids(_run_kql('process.name in ("powershell.exe") and user not in ("bob")', EVENTS)) == [1]
+    assert ids(_run_kql('user in ("bob") or host in ("ws-1")', EVENTS)) == [1, 2, 3]
+
+
+def test_in_works_in_eql_and_a_word_in_free_text_is_still_free_text():
+    assert ids(_run_eql('process where process.name in ("cmd.exe")', EVENTS)) == [3]
+    assert ids(_run_kql("dir", EVENTS)) == [3]
+
+
+def test_an_in_list_that_is_never_closed_is_an_error():
+    matched, error = _run_kql('user in ("alice"', EVENTS)
+    assert matched == [] and error and "never closed" in error

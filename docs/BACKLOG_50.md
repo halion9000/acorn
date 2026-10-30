@@ -34,7 +34,7 @@ Status as of this file: **Done** = built, tested, pushed. **Ready** = safe to bu
 25. Container import check — Done
 26. Health page: last 24 h of pool peaks as a small chart — Ready
 27. Warn when the API's migration table is behind the files on disk — Ready
-28. Warn when a connector's last sync failed for more than a day — Ready
+28. Warn when a connector's last sync failed for more than a day — Done
 29. Daily self-check job that posts the smoke result to the health page — Ready
 
 ## Detections
@@ -116,8 +116,8 @@ All **Ready** unless marked; none has been started. Where a vendor API is involv
 
 ## Operations
 91. Pool peaks chart for 24 hours - Ready
-92. Warn when migrations on disk are ahead of the database - Ready
-93. Warn when a connector failed for over a day - Ready
+92. Warn when migrations on disk are ahead of the database - Done (already worked)
+93. Warn when a connector failed for over a day - Done
 94. Daily self-check posting the smoke result - Ready
 95. Disk space warning for the Postgres volume - Ready
 96. Redis memory warning - Ready
@@ -133,7 +133,7 @@ All **Ready** unless marked; none has been started. Where a vendor API is involv
 106. One-command rebuild-and-verify script - Ready
 107. Compose file check for services without health checks - Ready
 108. Dump of diagnostics for a support request with secrets removed - Ready
-109. Warn when the credential key is the default - Ready
+109. Warn when the credential key is the default - Done (startup check already existed)
 110. Document the restore procedure with a tested example - Ready
 
 ## Detections
@@ -153,9 +153,9 @@ All **Ready** unless marked; none has been started. Where a vendor API is involv
 124. Tag rules by data source - Ready
 125. Warn when a rule references a field no source provides - Ready
 126. EQL: support 'until' clauses - Ready
-127. EQL: support wildcards in values - Ready
-128. KQL: support 'in' lists - Ready
-129. KQL: case-insensitive operators - Ready
+127. EQL: support wildcards in values - Done (already worked)
+128. KQL: support 'in' lists - Done
+129. KQL: case-insensitive operators - Done (already worked)
 130. Rule syntax check in the editor as you type - Ready
 
 ## CORE and Cipher

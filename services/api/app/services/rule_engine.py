@@ -404,6 +404,29 @@ def _term_matches(term: str, flat_event: dict[str, Any]) -> bool:
     return needle in " ".join(str(v) for v in flat_event.values()).lower()
 
 
+_LIST_VALUE = re.compile(r'"((?:[^"\\]|\\.)*)"|([^\s,"]+)')
+
+
+def _in_list_values(tokens: list[tuple[str, str]]) -> list[str]:
+    """The values of an ``in (...)`` list from the tokens between the parentheses: quoted strings and bare words, commas ignored."""
+    values: list[str] = []
+    for kind, text in tokens:
+        if kind == "quoted":
+            values.append(text.lower())
+            continue
+        for m in _LIST_VALUE.finditer(text):
+            values.append((m.group(1) if m.group(1) is not None else m.group(2)).lower())
+    return values
+
+
+def _value_matches(field_name: str, value: str, flat_event: dict[str, Any]) -> bool:
+    """The field equals ``value`` (case ignored; ``*`` matches any run of characters)."""
+    actual = str(flat_event.get(field_name, "")).lower()
+    if "*" in value:
+        return bool(re.fullmatch(".*".join(re.escape(part) for part in value.split("*")), actual))
+    return actual == value
+
+
 def _eval_query(tokens: list[tuple[str, str]], flat_event: dict[str, Any]) -> bool:
     pos = 0
 
@@ -454,6 +477,20 @@ def _eval_query(tokens: list[tuple[str, str]], flat_event: dict[str, Any]) -> bo
             raise ValueError("a ) has no matching (")
         pos += 1
         text = tok[1]
+        # ``field in ("a", "b")`` and ``field not in (...)``: true when the field equals any listed value (``*`` wildcards allowed, case ignored).
+        if tok[0] == "word" and is_word(peek(), "in", "not") and not text.endswith(":"):
+            ahead = pos
+            negate = False
+            if is_word(tokens[ahead], "not"):
+                negate, ahead = True, ahead + 1
+            if ahead + 1 < len(tokens) and is_word(tokens[ahead], "in") and tokens[ahead + 1][0] == "(":
+                close = next((i for i in range(ahead + 2, len(tokens)) if tokens[i][0] == ")"), None)
+                if close is None:
+                    raise ValueError("a ( is never closed")
+                values = _in_list_values(tokens[ahead + 2 : close])
+                pos = close + 1
+                hit = any(_value_matches(text.strip().lower(), v, flat_event) for v in values)
+                return (not hit) if negate else hit
         # EQL writes comparisons with spaces: ``field == "value"``.
         if tok[0] == "word" and is_word(peek(), "==", "!=") and pos + 1 < len(tokens):
             text = f"{text}{tokens[pos][1]}{tokens[pos + 1][1]}"
