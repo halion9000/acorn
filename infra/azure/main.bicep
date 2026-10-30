@@ -19,7 +19,7 @@ param prefix string = 'liveoak'
 param vnetAddressPrefix string = '10.20.0.0/16'
 
 @description('Size of the A.C.O.R.N Linux VM (about 5 GB of memory is used today, so 16 GB leaves room to grow).')
-param acornVmSize string = 'Standard_D4s_v5'
+param acornVmSize string = 'Standard_D4s_v6'
 
 @description('Size of the CORE Windows VM. A burstable size is enough: CORE is mostly idle with short busy periods.')
 param coreVmSize string = 'Standard_B2ms'
