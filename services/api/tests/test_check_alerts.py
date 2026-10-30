@@ -130,3 +130,10 @@ def test_a_small_drop_a_rise_no_old_enough_score_or_no_score_today_raises_nothin
     assert ca.score_drop_spec(d(0), [(d(20), 95), (d(0), 60)]) is None, "twenty days back is out of range"
     assert ca.score_drop_spec(d(0), [(d(8), 90), (d(1), 60)]) is None, "no score today"
     assert ca.score_drop_spec(d(0), [(d(8), None), (d(0), 50)]) is None
+
+
+def test_a_surge_of_failed_google_sign_ins_raises_a_medium_alert():
+    out = specs(
+        [check("threatmate_google_failed_logins", "met")], [check("threatmate_google_failed_logins", "not_met", "63 failed sign-ins")]
+    )
+    assert [(a["key"], a["severity"]) for a in out] == [("threatmate_google_failed_logins", "medium")]

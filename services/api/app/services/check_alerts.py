@@ -23,6 +23,7 @@ CONNECTOR_TYPE = "aisoc-checks"
 # key -> (title, severity, the least bad status that raises it). A check that goes from met to "partly" is not always news; for the dark web it is (new findings), for the others only "not_met" is.
 WATCHED: dict[str, tuple[str, str, str]] = {
     "threatmate_google_admins": ("Google super administrators without 2-Step Verification", "high", "not_met"),
+    "threatmate_google_failed_logins": ("Many failed Google sign-ins for this client", "medium", "not_met"),
     "threatmate_deep_dark_web": ("New deep and dark web findings for this client", "high", "partly"),
     "meraki_admin_2fa": ("Meraki administrators without two-factor sign-in", "high", "not_met"),
     "dnsfilter_org_mfa": ("DNSFilter organization without multi-factor sign-in", "medium", "not_met"),
