@@ -97,6 +97,12 @@ About 2 to 4 days for Phases 1 to 3 if nothing surprising turns up; add a few da
 - Save all the API information for the integrated tools as a skill for Leafy and for JAX.
 - Teach JAX the way Leafy was taught about HaloPSA: JAX should know every integrated tool and what it can read.
 
+## Decisions (2026-10-30)
+
+- **AI path:** try the normal Claude plan first (Claude Code signed in on the CORE VM); move to an API key if that is not allowed or does not hold up.
+- **Access:** NinjaOne remote session now; NordLayer or Tailscale later; public HTTPS for the client portal only, long term.
+- **Region:** Central US. The step-by-step is in `docs/AZURE_RUNBOOK.md`; `infra/azure/deploy.ps1` previews by default and creates nothing until run with `-Deploy`.
+
 ## What I need from you
 
 1. The AI path decision (API key, Azure's model service, or check the plan terms first).
