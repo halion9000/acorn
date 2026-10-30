@@ -5,10 +5,12 @@
 # Safe to run twice: it never formats a disk that already holds a filesystem.
 set -euo pipefail
 
+# SCSI sizes name the disk under scsi1; the newer NVMe sizes (the v6 series) name it under data/by-lun.
 DISK=/dev/disk/azure/scsi1/lun0
+[ -e "$DISK" ] || DISK=/dev/disk/azure/data/by-lun/0
 MOUNT=/srv/acorn
 
-[ -e "$DISK" ] || { echo "Data disk not found at $DISK (is it attached at LUN 0?)" >&2; exit 1; }
+[ -e "$DISK" ] || { echo "Data disk not found (is it attached at LUN 0?)" >&2; exit 1; }
 
 if ! blkid "$DISK" >/dev/null 2>&1; then
   mkfs.ext4 -L acorn-data "$DISK"

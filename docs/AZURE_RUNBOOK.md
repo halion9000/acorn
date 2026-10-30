@@ -25,6 +25,14 @@ Resource group `rg-liveoak-ops` (Central US): `liveoak-acorn-vm` (Linux, D4s_v6,
 
 **What went wrong, and the rule that comes from it.** The Key Vault firewall denies everything except the private network, so the first run could not store the three passwords, and the script printed "Done" anyway. The passwords were reset and stored (this machine allowed in for the length of the writes, then removed); `deploy.ps1` now does that itself and stops on any failure. To read a secret from a laptop, allow its address briefly (`az keyvault network-rule add` ... then `remove`), or read it from a VM, which can reach the vault privately through its own identity.
 
+### Linux VM prepared (2026-10-30, through Azure Run Command; nothing was installed by hand)
+
+`acorn-vm-bootstrap.sh` ran on `liveoak-acorn-vm`: the 128 GB data disk is mounted at `/srv/acorn`, Docker 29 runs with its storage there (`docker run hello-world` works), `vm.max_map_count` is 262144. Two corrections came out of checking it:
+
+- **The disk path.** The v6 sizes present the data disk as NVMe (`/dev/disk/azure/data/by-lun/0`), not `scsi1`; the script handles both now.
+- **The Postgres address.** The server's address is `liveoak-pg-dnzpna3fw56s4.postgres.database.azure.com` (it resolves to 10.20.3.4 from inside the network and port 5432 answers there). The `...liveoak.private...` name the template first printed does not resolve; the template output now gives the right one.
+- **Key Vault from the VMs.** The vault firewall blocked the VMs too, because they reach it over the public path. Both VM subnets now carry a Key Vault service endpoint and the vault allows exactly those two subnets (done with the CLI and written into `main.bicep`). Checked from the Linux VM: its identity reads `postgres-admin-password` and `aisoc-app-db-password` (HTTP 200). The Windows VM has not been checked yet. **Do not re-run `deploy.ps1 -Deploy` on this resource group as it is:** it would generate new admin passwords and overwrite the stored ones.
+
 ## 2. Reach the machines
 
 Install the NinjaOne agent on both VMs through each VM's Run Command (Azure portal > the VM > Run command), using the organisation's installer. From then on use the NinjaOne remote session. Add NordLayer or Tailscale later; neither is needed for the steps below.

@@ -130,6 +130,8 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
         properties: {
           addressPrefix: cidrSubnet(vnetAddressPrefix, 24, 1)
           networkSecurityGroup: { id: nsgApp.id }
+          // Lets the VM reach Key Vault with its own identity while the vault's firewall stays closed to the internet.
+          serviceEndpoints: [{ service: 'Microsoft.KeyVault' }]
         }
       }
       {
@@ -137,6 +139,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
         properties: {
           addressPrefix: cidrSubnet(vnetAddressPrefix, 24, 2)
           networkSecurityGroup: { id: nsgCore.id }
+          serviceEndpoints: [{ service: 'Microsoft.KeyVault' }]
         }
       }
       {
@@ -257,6 +260,11 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     networkAcls: {
       defaultAction: 'Deny'
       bypass: 'AzureServices'
+      // The two VM subnets (see their service endpoints); nothing else, and no address on the internet.
+      virtualNetworkRules: [
+        { id: '${vnet.id}/subnets/snet-app' }
+        { id: '${vnet.id}/subnets/snet-core' }
+      ]
     }
   }
 }
@@ -536,5 +544,6 @@ resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
 
 output acornPrivateIp string = acornNic.properties.ipConfigurations[0].properties.privateIPAddress
 output corePrivateIp string = coreNic.properties.ipConfigurations[0].properties.privateIPAddress
-output postgresHost string = '${postgres.name}.${prefix}.private.postgres.database.azure.com'
+// The server's own name: it resolves to the private address from inside the network (the private DNS zone is linked to it). The zone's own names are not the address to use.
+output postgresHost string = postgres.properties.fullyQualifiedDomainName
 output keyVaultName string = keyVault.name
