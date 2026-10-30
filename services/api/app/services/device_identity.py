@@ -212,3 +212,48 @@ def ip_brand_pairs(
             seen.add((lo, hi))
             out.append((lo, hi))
     return out
+
+
+def pair_confidence(a: Any, b: Any) -> tuple[int, list[str]]:
+    """How likely two devices of one client are the same machine, 0 to 100, and the reasons in plain words (for the person who decides on a merge).
+
+    ``a`` and ``b`` need ``hostname``, ``serial_number``, ``ip_addresses`` and ``manufacturer``. A name that is the same is the main evidence; an address both carry and a maker that does not disagree add to it;
+    two different serials or two different makers take it away. This ranks the pairs a person is shown, it never merges anything.
+    """
+    score, why = 0, []
+    ka, kb = hostname_key(a.hostname), hostname_key(b.hostname)
+    la, lb = loose_name_key(a.hostname), loose_name_key(b.hostname)
+    if ka and ka == kb:
+        score += 45
+        why.append("same name")
+    elif la and la == lb:
+        score += 35
+        why.append("same name apart from punctuation or a (1) suffix")
+    elif any(len(x) in _NETBIOS_LENGTHS and y != x and y.startswith(x) for x, y in ((ka, kb), (kb, ka))):
+        score += 30
+        why.append("one name is the other cut to 15 characters (NetBIOS)")
+    sa, sb = normalize_serial(getattr(a, "serial_number", None)), normalize_serial(getattr(b, "serial_number", None))
+    if sa and sb:
+        if sa == sb:
+            score += 50
+            why.append("same serial number")
+        else:
+            score -= 100
+            why.append("different serial numbers")
+    shared = usable_ips(getattr(a, "ip_addresses", None)) & usable_ips(getattr(b, "ip_addresses", None))
+    if shared:
+        score += 20
+        why.append(f"shares the address {sorted(shared)[0]}")
+    if brand_key(getattr(a, "manufacturer", None)) and brand_key(getattr(b, "manufacturer", None)):
+        if same_brand(a.manufacturer, b.manufacturer):
+            score += 10
+            why.append("same maker")
+        else:
+            score -= 30
+            why.append("different makers")
+    return max(0, min(100, score)), why
+
+
+def confidence_label(score: int) -> str:
+    """high (70 and up), medium (40 and up) or low."""
+    return "high" if score >= 70 else "medium" if score >= 40 else "low"

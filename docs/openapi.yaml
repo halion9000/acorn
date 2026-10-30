@@ -27598,6 +27598,19 @@ components:
           $ref: '#/components/schemas/DeviceOut'
         b:
           $ref: '#/components/schemas/DeviceOut'
+        confidence:
+          type: integer
+          title: Confidence
+          default: 0
+        confidence_label:
+          type: string
+          title: Confidence Label
+          default: low
+        reasons:
+          items:
+            type: string
+          type: array
+          title: Reasons
       type: object
       required:
       - a

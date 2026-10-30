@@ -34,6 +34,7 @@ from app.models.device import Device, DeviceMergeDismissal, DeviceMergeLog, Devi
 from app.models.tenant import Tenant
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.client_mapping import IncomingClient, auto_link_by_devices, record_device_hints, tenant_hidden, upsert_clients
+from app.services.device_identity import confidence_label, pair_confidence
 from app.services.device_merge import DeviceMergeError, auto_merge_same_name, can_undo, dismiss_pair, merge_devices, undo_merge
 from app.services.device_upsert import DeviceReport, duplicate_pairs, preload_known, upsert_device
 from app.services.infra_review import encryption_state
@@ -849,6 +850,10 @@ async def list_devices(
 class DuplicatePairOut(BaseModel):
     a: DeviceOut
     b: DeviceOut
+    # How likely they are one machine (0 to 100), its band (high, medium, low) and the reasons in words. The most likely pairs come first.
+    confidence: int = 0
+    confidence_label: str = "low"
+    reasons: list[str] = Field(default_factory=list)
 
 
 class DuplicatesOut(BaseModel):
@@ -1015,8 +1020,13 @@ async def list_duplicates(
         tools = {d.id: {s.vendor for s in d.sources} for d in devices}
         only_screenconnect = {d.id for d in devices if d.sources and all(s.vendor == "screenconnect" for s in d.sources)}
         pairs = duplicate_pairs(devices, tools, dismissed, only_screenconnect)
-        items.extend(DuplicatePairOut(a=by_id[a], b=by_id[b]) for a, b in pairs if a in by_id and b in by_id)
-    items.sort(key=lambda p: ((p.a.client_name or ""), p.a.hostname.lower()))
+        for a, b in pairs:
+            if a in by_id and b in by_id:
+                score, why = pair_confidence(by_id[a], by_id[b])
+                items.append(
+                    DuplicatePairOut(a=by_id[a], b=by_id[b], confidence=score, confidence_label=confidence_label(score), reasons=why)
+                )
+    items.sort(key=lambda p: (-p.confidence, (p.a.client_name or ""), p.a.hostname.lower()))
     return DuplicatesOut(items=items)
 
 

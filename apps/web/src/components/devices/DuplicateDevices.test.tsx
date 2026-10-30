@@ -197,3 +197,20 @@ describe('undoing a merge', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('the likelihood of a pair', () => {
+  it('shows how likely a pair is one machine, with the reasons on hover, and nothing from an older API', async () => {
+    api.duplicates.mockResolvedValue({ items: [{ ...pair, confidence: 75, confidence_label: 'high', reasons: ['same name', 'same maker'] }] });
+    const { unmount } = render(<DuplicateDevices onChanged={vi.fn()} />);
+    await openPairs();
+    const badge = await screen.findByTestId('pair-confidence');
+    expect(badge).toHaveTextContent('75% likely');
+    expect(badge).toHaveAttribute('title', 'same name; same maker');
+    unmount();
+    api.duplicates.mockResolvedValue({ items: [pair] });
+    render(<DuplicateDevices onChanged={vi.fn()} />);
+    await openPairs();
+    await screen.findAllByText('FRONT-DESK');
+    expect(screen.queryByTestId('pair-confidence')).toBeNull();
+  });
+});

@@ -657,6 +657,10 @@ export interface DeviceQuery {
 export interface DuplicatePair {
   a: DeviceRow;
   b: DeviceRow;
+  /** How likely they are one machine, 0 to 100, its band and the reasons in words (absent from an older API). */
+  confidence?: number;
+  confidence_label?: 'high' | 'medium' | 'low';
+  reasons?: string[];
 }
 
 export interface MergeEntry {

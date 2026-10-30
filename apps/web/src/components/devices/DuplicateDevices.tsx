@@ -232,7 +232,7 @@ export default function DuplicateDevices({ clientId, onChanged }: { clientId?: s
       {pairsOpen && <p className="mt-1 text-xs text-gray-400">Same name, and no serial number to tell whether they are one machine. Nothing is merged until you say so.</p>}
       {pairsOpen && (
       <ul className="mt-3 space-y-2">
-        {pairs.map(({ a, b }) => {
+        {pairs.map(({ a, b, confidence, confidence_label: band, reasons }) => {
           const key = `${a.id}:${b.id}`;
           const expanded = open === key;
           return (
@@ -254,6 +254,15 @@ export default function DuplicateDevices({ clientId, onChanged }: { clientId?: s
                 {expanded ? '▾' : '▸'}
               </button>
               <span className="w-28 shrink-0 truncate text-xs text-gray-400">{a.client_name}</span>
+              {confidence !== undefined && (
+                <span
+                  data-testid="pair-confidence"
+                  title={(reasons ?? []).join('; ')}
+                  className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${band === 'high' ? 'bg-emerald-500/15 text-emerald-300' : band === 'medium' ? 'bg-amber-500/15 text-amber-300' : 'bg-gray-700 text-gray-300'}`}
+                >
+                  {confidence}% likely
+                </span>
+              )}
               <Side d={a} />
               <Side d={b} />
               <div className="flex shrink-0 flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
