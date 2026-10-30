@@ -59,6 +59,7 @@ from app.api.v1.endpoints import (
     inbox_itsm,
     insider_threat,
     insights,
+    inventory,
     investigations,
     knowledge_base,
     lake,
@@ -217,6 +218,7 @@ api_router.include_router(cipp_actions.ingest_router)
 api_router.include_router(cipp_actions.router)
 api_router.include_router(secureframe.ingest_router)
 api_router.include_router(secureframe.router)
+api_router.include_router(inventory.router)
 api_router.include_router(client_documents.ingest_router)
 api_router.include_router(client_documents.router)
 api_router.include_router(client_posture.router)

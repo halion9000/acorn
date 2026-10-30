@@ -302,6 +302,11 @@ const navSections: NavSection[] = [
         icon: <FolderIcon />,
       },
       {
+        label: 'Inventory',
+        href: '/inventory',
+        icon: <FolderIcon />,
+      },
+      {
         label: 'Licences & Counts',
         href: '/settings/billing',
         icon: <ShieldIcon />,

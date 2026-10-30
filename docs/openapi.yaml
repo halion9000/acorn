@@ -7808,7 +7808,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/EventOut'
+                  $ref: '#/components/schemas/app__api__v1__endpoints__investigations__EventOut'
                 title: Response Replay Run Api V1 Investigations  Run Id  Replay Get
         '422':
           description: Validation Error
@@ -10928,6 +10928,378 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FrameworkMapping'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inventory:
+    get:
+      tags:
+      - inventory
+      summary: The stock held for clients, filtered, with who has each item
+      operationId: list_items_api_v1_inventory_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: kind
+        in: query
+        required: false
+        schema:
+          enum:
+          - stock
+          - nuc
+          type: string
+          default: stock
+          title: Kind
+      - name: client
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(own|[0-9a-fA-F-]{36})$
+          - type: 'null'
+          description: A client's id, or 'own' for Live Oak's own stock.
+          title: Client
+        description: A client's id, or 'own' for Live Oak's own stock.
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - checked_in
+            - checked_out
+            - offline
+            - retired
+            type: string
+          - type: 'null'
+          title: Status
+      - name: category
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Category
+      - name: tag
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Tag
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Search
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 10000
+          minimum: 1
+          default: 1
+          title: Page
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Page Size
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - inventory
+      summary: Add an item to the stock
+      operationId: create_item_api_v1_inventory_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inventory/{item_id}:
+    patch:
+      tags:
+      - inventory
+      summary: Change an item, or move it to another client
+      operationId: update_item_api_v1_inventory__item_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inventory/{item_id}/check-out:
+    post:
+      tags:
+      - inventory
+      summary: Check an item out to a person or a site
+      operationId: check_out_api_v1_inventory__item_id__check_out_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inventory/{item_id}/check-in:
+    post:
+      tags:
+      - inventory
+      summary: Check an item back in
+      operationId: check_in_api_v1_inventory__item_id__check_in_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inventory/{item_id}/events:
+    get:
+      tags:
+      - inventory
+      summary: Everything that has happened to an item, newest first
+      operationId: item_events_api_v1_inventory__item_id__events_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/app__api__v1__endpoints__inventory__EventOut'
+                title: Response Item Events Api V1 Inventory  Item Id  Events Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inventory/import:
+    post:
+      tags:
+      - inventory
+      summary: Import an exported SharePoint list; a dry run first says where each
+        customer would go
+      operationId: import_items_api_v1_inventory_import_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__inventory__ImportOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/inventory/export:
+    get:
+      tags:
+      - inventory
+      summary: The filtered stock as a CSV file
+      operationId: export_items_api_v1_inventory_export_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: kind
+        in: query
+        required: false
+        schema:
+          enum:
+          - stock
+          - nuc
+          type: string
+          default: stock
+          title: Kind
+      - name: client
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(own|[0-9a-fA-F-]{36})$
+          - type: 'null'
+          title: Client
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - checked_in
+            - checked_out
+            - offline
+            - retired
+            type: string
+          - type: 'null'
+          title: Status
+      - name: category
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Category
+      - name: tag
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Tag
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Search
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
         '422':
           description: Validation Error
           content:
@@ -14078,7 +14450,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ImportOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__mssp_clients__ImportOut'
         '422':
           description: Validation Error
           content:
@@ -26225,6 +26597,43 @@ components:
       - summary
       - evidence
       title: CspmScanResponse
+    CustomerPlacement:
+      properties:
+        name:
+          type: string
+          title: Name
+        rows:
+          type: integer
+          title: Rows
+        placed:
+          type: string
+          title: Placed
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        suggestions:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Suggestions
+      type: object
+      required:
+      - name
+      - rows
+      - placed
+      - client_id
+      - client_name
+      - suggestions
+      title: CustomerPlacement
     DashboardMetrics:
       properties:
         alerts:
@@ -26735,6 +27144,34 @@ components:
       - uid
       - hostname
       title: DeviceItem
+    DeviceLink:
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        hostname:
+          type: string
+          title: Hostname
+        last_seen:
+          type: string
+          format: date-time
+          title: Last Seen
+        how:
+          type: string
+          enum:
+          - serial
+          - ninjaone
+          title: How
+      type: object
+      required:
+      - device_id
+      - hostname
+      - last_seen
+      - how
+      title: DeviceLink
+      description: 'The machine in the Devices page that this item is: matched on
+        serial number, or on the NinjaOne device page the list carried.'
     DeviceListOut:
       properties:
         master_vendor:
@@ -27995,7 +28432,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/EventOut'
+            $ref: '#/components/schemas/app__api__v1__endpoints__investigations__EventOut'
           type: array
           title: Items
         total:
@@ -28018,65 +28455,6 @@ components:
       - since
       - next_seq
       title: EventListResponse
-    EventOut:
-      properties:
-        id:
-          type: string
-          format: uuid
-          title: Id
-        run_id:
-          type: string
-          format: uuid
-          title: Run Id
-        seq:
-          type: integer
-          title: Seq
-        ts:
-          type: string
-          format: date-time
-          title: Ts
-        kind:
-          type: string
-          title: Kind
-        agent:
-          type: string
-          title: Agent
-        summary:
-          type: string
-          title: Summary
-        payload:
-          anyOf:
-          - additionalProperties: true
-            type: object
-          - type: 'null'
-          title: Payload
-        input_hash:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Input Hash
-        output_hash:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Output Hash
-        duration_ms:
-          type: integer
-          title: Duration Ms
-      type: object
-      required:
-      - id
-      - run_id
-      - seq
-      - ts
-      - kind
-      - agent
-      - summary
-      - payload
-      - input_hash
-      - output_hash
-      - duration_ms
-      title: EventOut
     EvidenceReport:
       properties:
         case_id:
@@ -28281,13 +28659,13 @@ components:
           $ref: '#/components/schemas/RunSummary'
         previous:
           anyOf:
-          - $ref: '#/components/schemas/EventOut'
+          - $ref: '#/components/schemas/app__api__v1__endpoints__investigations__EventOut'
           - type: 'null'
         focus:
-          $ref: '#/components/schemas/EventOut'
+          $ref: '#/components/schemas/app__api__v1__endpoints__investigations__EventOut'
         next:
           anyOf:
-          - $ref: '#/components/schemas/EventOut'
+          - $ref: '#/components/schemas/app__api__v1__endpoints__investigations__EventOut'
           - type: 'null'
         artifacts:
           items:
@@ -30272,25 +30650,42 @@ components:
           default: true
       type: object
       title: IgnoreRequest
-    ImportOut:
+    ImportIn:
       properties:
-        created:
-          type: integer
-          title: Created
-        linked:
-          type: integer
-          title: Linked
-        skipped:
-          items:
+        kind:
+          type: string
+          enum:
+          - stock
+          - nuc
+          title: Kind
+        csv_text:
+          type: string
+          maxLength: 8000000
+          title: Csv Text
+        default_client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Default Client Id
+          description: 'For a per-client list that has no Customer column: the client
+            the whole file is for.'
+        mapping:
+          additionalProperties:
             type: string
-          type: array
-          title: Skipped
-          default: []
+          type: object
+          title: Mapping
+          description: 'A choice per customer name as written (lower case): a client''s
+            id, ''own'' or ''skip''.'
+        dry_run:
+          type: boolean
+          title: Dry Run
+          default: true
       type: object
       required:
-      - created
-      - linked
-      title: ImportOut
+      - kind
+      - csv_text
+      title: ImportIn
     ImportRequest:
       properties:
         vendor:
@@ -30805,6 +31200,537 @@ components:
       - key
       - events
       title: ItemHistoryOut
+    ItemIn:
+      properties:
+        kind:
+          type: string
+          enum:
+          - stock
+          - nuc
+          title: Kind
+          default: stock
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        customer_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Customer Name
+        name:
+          type: string
+          maxLength: 300
+          minLength: 1
+          title: Name
+        category:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Category
+        serial:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Serial
+        model:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Model
+        manufacturer:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Manufacturer
+        quantity:
+          type: integer
+          maximum: 100000.0
+          minimum: 0.0
+          title: Quantity
+          default: 1
+        status:
+          type: string
+          enum:
+          - checked_in
+          - checked_out
+          - offline
+          - retired
+          title: Status
+          default: checked_in
+        site:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Site
+        person:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Person
+        part_no:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Part No
+        has_charger:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Has Charger
+        cpu:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Cpu
+        memory:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Memory
+        storage:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Storage
+        ninja_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+            pattern: ^https?://
+          - type: 'null'
+          title: Ninja Url
+        accounting_treatment:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Accounting Treatment
+        deployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Deployed At
+        redeployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Redeployed At
+        notes:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Notes
+        tags:
+          items:
+            type: string
+            maxLength: 40
+          type: array
+          maxItems: 12
+          title: Tags
+        ticket_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+            pattern: ^https?://
+          - type: 'null'
+          title: Ticket Url
+      type: object
+      required:
+      - name
+      title: ItemIn
+    ItemList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ItemOut'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        page:
+          type: integer
+          title: Page
+        pages:
+          type: integer
+          title: Pages
+        summary:
+          $ref: '#/components/schemas/Summary'
+      type: object
+      required:
+      - items
+      - total
+      - page
+      - pages
+      - summary
+      title: ItemList
+    ItemOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        kind:
+          type: string
+          enum:
+          - stock
+          - nuc
+          title: Kind
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+          description: The client it is held for; None when it is Live Oak's own or
+            its customer has not been matched to a client yet.
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        customer_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Customer Name
+        name:
+          type: string
+          title: Name
+        category:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+        serial:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Serial
+        model:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model
+        manufacturer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Manufacturer
+        quantity:
+          type: integer
+          title: Quantity
+        status:
+          type: string
+          enum:
+          - checked_in
+          - checked_out
+          - offline
+          - retired
+          title: Status
+        site:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Site
+        person:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Person
+        part_no:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Part No
+        has_charger:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Has Charger
+        cpu:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cpu
+        memory:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Memory
+        storage:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Storage
+        ninja_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ninja Url
+        accounting_treatment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Accounting Treatment
+        deployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Deployed At
+        redeployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Redeployed At
+        checked_out_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Checked Out At
+        checked_in_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Checked In At
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+        tags:
+          items:
+            type: string
+          type: array
+          title: Tags
+        ticket_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ticket Url
+        source:
+          type: string
+          title: Source
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        device:
+          anyOf:
+          - $ref: '#/components/schemas/DeviceLink'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - kind
+      - client_id
+      - client_name
+      - customer_name
+      - name
+      - category
+      - serial
+      - model
+      - manufacturer
+      - quantity
+      - status
+      - site
+      - person
+      - part_no
+      - has_charger
+      - cpu
+      - memory
+      - storage
+      - ninja_url
+      - accounting_treatment
+      - deployed_at
+      - redeployed_at
+      - checked_out_at
+      - checked_in_at
+      - notes
+      - tags
+      - ticket_url
+      - source
+      - updated_at
+      title: ItemOut
+    ItemPatch:
+      properties:
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        move_to_own:
+          type: boolean
+          title: Move To Own
+          default: false
+        customer_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Customer Name
+        name:
+          anyOf:
+          - type: string
+            maxLength: 300
+            minLength: 1
+          - type: 'null'
+          title: Name
+        category:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Category
+        serial:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Serial
+        model:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Model
+        manufacturer:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Manufacturer
+        quantity:
+          anyOf:
+          - type: integer
+            maximum: 100000.0
+            minimum: 0.0
+          - type: 'null'
+          title: Quantity
+        status:
+          anyOf:
+          - type: string
+            enum:
+            - checked_in
+            - checked_out
+            - offline
+            - retired
+          - type: 'null'
+          title: Status
+        site:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Site
+        person:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Person
+        part_no:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Part No
+        has_charger:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Has Charger
+        cpu:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Cpu
+        memory:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Memory
+        storage:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Storage
+        ninja_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+            pattern: ^https?://
+          - type: 'null'
+          title: Ninja Url
+        accounting_treatment:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Accounting Treatment
+        deployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Deployed At
+        redeployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Redeployed At
+        notes:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Notes
+        tags:
+          anyOf:
+          - items:
+              type: string
+              maxLength: 40
+            type: array
+            maxItems: 12
+          - type: 'null'
+          title: Tags
+        ticket_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+            pattern: ^https?://
+          - type: 'null'
+          title: Ticket Url
+      type: object
+      title: ItemPatch
+      description: Any of an item's fields; only those sent change. Moving it to another
+        client is ``client_id`` (``own`` is expressed by sending ``move_to_own``).
     KBChunk:
       properties:
         doc_id:
@@ -32662,6 +33588,35 @@ components:
         agents service). Lets operators audit which model drove spend on a
 
         given investigation.'
+    MoveIn:
+      properties:
+        person:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Person
+        site:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Site
+        ticket_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+            pattern: ^https?://
+          - type: 'null'
+          title: Ticket Url
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Note
+      type: object
+      title: MoveIn
     NLDetectionRequest:
       properties:
         description:
@@ -39406,6 +40361,36 @@ components:
       - proposal_id
       - created_at
       title: SuggestionResponse
+    Summary:
+      properties:
+        total:
+          type: integer
+          title: Total
+        by_status:
+          additionalProperties:
+            type: integer
+          type: object
+          title: By Status
+        categories:
+          items:
+            prefixItems:
+            - type: string
+            - type: integer
+            type: array
+            maxItems: 2
+            minItems: 2
+          type: array
+          title: Categories
+        unmatched_customers:
+          type: integer
+          title: Unmatched Customers
+      type: object
+      required:
+      - total
+      - by_status
+      - categories
+      - unmatched_customers
+      title: Summary
     SuppressRequest:
       properties:
         reason:
@@ -43663,6 +44648,145 @@ components:
       - occurred_at
       - acknowledged_at
       title: IndicatorOut
+    app__api__v1__endpoints__inventory__EventOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        at:
+          type: string
+          format: date-time
+          title: At
+        event:
+          type: string
+          title: Event
+        actor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Actor
+        person:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Person
+        ticket_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ticket Url
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+      type: object
+      required:
+      - id
+      - at
+      - event
+      - actor
+      - person
+      - ticket_url
+      - note
+      title: EventOut
+    app__api__v1__endpoints__inventory__ImportOut:
+      properties:
+        dry_run:
+          type: boolean
+          title: Dry Run
+        rows:
+          type: integer
+          title: Rows
+        created:
+          type: integer
+          title: Created
+        updated:
+          type: integer
+          title: Updated
+        skipped:
+          type: integer
+          title: Skipped
+        problems:
+          items:
+            type: string
+          type: array
+          title: Problems
+        customers:
+          items:
+            $ref: '#/components/schemas/CustomerPlacement'
+          type: array
+          title: Customers
+      type: object
+      required:
+      - dry_run
+      - rows
+      - created
+      - updated
+      - skipped
+      - problems
+      - customers
+      title: ImportOut
+    app__api__v1__endpoints__investigations__EventOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        run_id:
+          type: string
+          format: uuid
+          title: Run Id
+        seq:
+          type: integer
+          title: Seq
+        ts:
+          type: string
+          format: date-time
+          title: Ts
+        kind:
+          type: string
+          title: Kind
+        agent:
+          type: string
+          title: Agent
+        summary:
+          type: string
+          title: Summary
+        payload:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Payload
+        input_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Input Hash
+        output_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Hash
+        duration_ms:
+          type: integer
+          title: Duration Ms
+      type: object
+      required:
+      - id
+      - run_id
+      - seq
+      - ts
+      - kind
+      - agent
+      - summary
+      - payload
+      - input_hash
+      - output_hash
+      - duration_ms
+      title: EventOut
     app__api__v1__endpoints__investigations__TimelineResponse:
       properties:
         run_id:
@@ -43703,6 +44827,25 @@ components:
         wall-clock span from first to last event. ``attempt_count`` counts unique
 
         retry attempts inferred from ``agent_start`` events.'
+    app__api__v1__endpoints__mssp_clients__ImportOut:
+      properties:
+        created:
+          type: integer
+          title: Created
+        linked:
+          type: integer
+          title: Linked
+        skipped:
+          items:
+            type: string
+          type: array
+          title: Skipped
+          default: []
+      type: object
+      required:
+      - created
+      - linked
+      title: ImportOut
     app__api__v1__endpoints__mssp_clients__MergeOut:
       properties:
         source:

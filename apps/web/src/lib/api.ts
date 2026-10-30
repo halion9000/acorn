@@ -802,6 +802,118 @@ export const identitiesApi = {
   detail: (clientId: string, email: string) => request<IdentityDetail>('/api/v1/identities/detail', { params: { client_id: clientId, email } }),
 };
 
+// ---- inventory: the stock Live Oak holds for clients ----------------------------------------------------------------------------------------------------
+
+export type InventoryKind = 'stock' | 'nuc';
+export type InventoryStatus = 'checked_in' | 'checked_out' | 'offline' | 'retired';
+
+export interface InventoryDeviceLink {
+  device_id: string;
+  hostname: string;
+  last_seen: string;
+  how: 'serial' | 'ninjaone';
+}
+
+export interface InventoryItem {
+  id: string;
+  kind: InventoryKind;
+  /** The client it is held for; null when it is Live Oak's own or its customer has not been matched to a client yet. */
+  client_id: string | null;
+  client_name: string | null;
+  customer_name: string | null;
+  name: string;
+  category: string | null;
+  serial: string | null;
+  model: string | null;
+  manufacturer: string | null;
+  quantity: number;
+  status: InventoryStatus;
+  site: string | null;
+  person: string | null;
+  part_no: string | null;
+  has_charger: boolean | null;
+  cpu: string | null;
+  memory: string | null;
+  storage: string | null;
+  ninja_url: string | null;
+  accounting_treatment: string | null;
+  deployed_at: string | null;
+  redeployed_at: string | null;
+  checked_out_at: string | null;
+  checked_in_at: string | null;
+  notes: string | null;
+  tags: string[];
+  ticket_url: string | null;
+  source: string;
+  updated_at: string;
+  device: InventoryDeviceLink | null;
+}
+
+export interface InventoryList {
+  items: InventoryItem[];
+  total: number;
+  page: number;
+  pages: number;
+  summary: { total: number; by_status: Record<string, number>; categories: [string, number][]; unmatched_customers: number };
+}
+
+export interface InventoryQuery {
+  kind?: InventoryKind;
+  /** A client's id, or 'own' for Live Oak's own stock. */
+  client?: string;
+  status?: InventoryStatus;
+  category?: string;
+  tag?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export type InventoryInput = Partial<Omit<InventoryItem, 'id' | 'client_name' | 'source' | 'updated_at' | 'device'>> & { name: string };
+
+export interface InventoryEvent {
+  id: string;
+  at: string;
+  event: string;
+  actor: string | null;
+  person: string | null;
+  ticket_url: string | null;
+  note: string | null;
+}
+
+export interface InventoryImportResult {
+  dry_run: boolean;
+  rows: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  problems: string[];
+  customers: { name: string; rows: number; placed: 'exact' | 'own' | 'chosen' | 'unmatched' | 'skipped'; client_id: string | null; client_name: string | null; suggestions: { client_id: string; client_name: string; score: number }[] }[];
+}
+
+const inventoryParams = (q: InventoryQuery) => ({ kind: q.kind ?? 'stock', client: q.client, status: q.status, category: q.category, tag: q.tag, search: q.search });
+
+export const inventoryApi = {
+  list: (q: InventoryQuery = {}) => request<InventoryList>('/api/v1/inventory', { params: { ...inventoryParams(q), page: q.page ?? 1, page_size: q.pageSize ?? 50 } }),
+  create: (body: InventoryInput) => request<InventoryItem>('/api/v1/inventory', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: string, body: Partial<InventoryInput> & { move_to_own?: boolean }) => request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  checkOut: (id: string, body: { person?: string; site?: string; ticket_url?: string; note?: string }) =>
+    request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}/check-out`, { method: 'POST', body: JSON.stringify(body) }),
+  checkIn: (id: string, body: { note?: string; ticket_url?: string } = {}) => request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}/check-in`, { method: 'POST', body: JSON.stringify(body) }),
+  events: (id: string) => request<InventoryEvent[]>(`/api/v1/inventory/${encodeURIComponent(id)}/events`),
+  import: (body: { kind: InventoryKind; csv_text: string; default_client_id?: string; mapping?: Record<string, string>; dry_run: boolean }) =>
+    request<InventoryImportResult>('/api/v1/inventory/import', { method: 'POST', body: JSON.stringify(body) }),
+  /** The filtered list as CSV text. */
+  async exportCsv(q: InventoryQuery = {}): Promise<string> {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(inventoryParams(q))) if (v) p.set(k, String(v));
+    const response = await authFetch(`${API_BASE}/api/v1/inventory/export?${p.toString()}`);
+    if (!response.ok) throw new Error(`Export failed (${response.status})`);
+    return response.text();
+  },
+};
+
+
 export const devicesApi = {
   /** Merges from the last two weeks that can still be undone. */
   async merges(): Promise<MergeEntry[]> {

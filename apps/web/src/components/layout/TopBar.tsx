@@ -27,6 +27,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/settings/billing': { title: 'Licences & Counts', description: 'What each tool counts for each client, and every change, to check an invoice against' },
   '/settings/fleet-posture': { title: 'Fleet Posture', description: 'Every client\'s tool checks side by side, with what is about to lapse and what changed' },
   '/settings/cipp-actions': { title: 'CIPP actions', description: 'What CORE can do through CIPP, whether it is on, and what it was asked to do' },
+  '/inventory': { title: 'Inventory', description: 'Stock we hold for clients and the NUCs: who has each item, and what has happened to it' },
   '/settings/client-docs': { title: 'Client Docs', description: 'Search the IT Glue documentation, runbooks, configurations and password entries of every client (links only)' },
   '/settings/mfa': { title: 'Multi-Factor', description: 'Who has Multi-Factor sign-in, per client' },
   '/reports/client-review': { title: 'Client Review', description: 'Coverage, identity, alerts and insurance readiness for one client' },
