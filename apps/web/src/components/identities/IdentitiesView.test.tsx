@@ -70,6 +70,17 @@ describe('the Identities page', () => {
     expect(screen.getByTestId('identities-total')).toHaveTextContent('2');
   });
 
+  it('opens on the people of one client when the address names the client (the People button on Client Posture)', async () => {
+    window.history.pushState({}, '', '/identities?client=c2');
+    try {
+      show();
+      await screen.findAllByTestId('identity-row');
+      await waitFor(() => expect(lastQuery().clientId).toBe('c2'));
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
+  });
+
   it('filters by search, client, tool and multi-factor, asking the server and starting again at page 1', async () => {
     show();
     await screen.findAllByTestId('identity-row');

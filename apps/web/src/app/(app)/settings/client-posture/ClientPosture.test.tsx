@@ -63,7 +63,10 @@ describe('ClientPosture', () => {
     expect(hrefOf(/^No Multi-Factor: 3/)).toBe('/settings/mfa?client=c1&which=without');
     expect(hrefOf(/^Open, no ticket: 4/)).toBe('/alerts?client=c1&ticket=none');
     expect(hrefOf(/^Open cases: 2/)).toBe('/cases?scope=all&client=c1');
-    expect(within(page).getAllByRole("link")).toHaveLength(15);
+    // Fifteen numbers, plus the one button that opens this client's people.
+    expect(within(page).getAllByRole("link")).toHaveLength(16);
+    expect(within(page).getByTestId('people-button')).toHaveAttribute('href', '/identities?client=c1');
+    expect(within(page).getByTestId('people-button')).toHaveTextContent('People in this client');
   });
 
   it('says so when a client has no second-factor data', async () => {

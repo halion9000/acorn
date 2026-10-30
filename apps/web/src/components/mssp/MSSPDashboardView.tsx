@@ -3,6 +3,7 @@
 import VendorBadge, { orderSources } from './VendorBadge';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { EmptyState, EmptyStateIcons } from '@/components/ui/EmptyState';
@@ -126,7 +127,13 @@ function AddClient({ onAdded }: { onAdded: () => void }) {
   );
 }
 
+/** Where a client's line on this dashboard leads: its Client Posture page. */
+export function postureHref(tenantId: string): string {
+  return `/settings/client-posture?client=${encodeURIComponent(tenantId)}`;
+}
+
 export default function MSSPDashboardView() {
+  const router = useRouter();
   const [overview, setOverview] = useState<MsspOverview | null>(null);
   const [tenants, setTenants] = useState<ManagedTenantRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -312,9 +319,20 @@ export default function MSSPDashboardView() {
                   </thead>
                   <tbody>
                     {visible.map((t) => (
-                      <tr key={t.tenant_id} className="border-b border-gray-800/40 hover:bg-gray-800/30 transition-colors">
+                      <tr
+                        key={t.tenant_id}
+                        data-testid="client-line"
+                        onClick={(e) => {
+                          // A click on the line opens the client's posture; a click on a button, link or box inside it does its own job.
+                          if ((e.target as HTMLElement).closest('a,button,input,select,label')) return;
+                          router.push(postureHref(t.tenant_id));
+                        }}
+                        className="cursor-pointer border-b border-gray-800/40 hover:bg-gray-800/30 transition-colors"
+                      >
                         <td className={clsx('px-5 py-3 font-medium', t.hidden ? 'text-gray-500' : 'text-white')}>
-                          {t.name}
+                          <Link href={postureHref(t.tenant_id)} className="hover:text-sky-300 hover:underline" title="Open this client's posture">
+                            {t.name}
+                          </Link>
                           {t.hidden ? <span className="ml-2 text-xs font-normal text-gray-500">hidden</span> : null}
                         </td>
                         <td className="px-5 py-3">

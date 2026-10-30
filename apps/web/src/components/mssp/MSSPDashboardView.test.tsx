@@ -13,10 +13,12 @@ vi.mock('@/lib/api', () => ({
   msspApi: { overview: () => overviewMock(), tenants: (h?: boolean) => tenantsMock(h), setClientHidden: (...a: unknown[]) => hiddenMock(...a), setPlaybookAutomation: (...a: unknown[]) => playbooksMock(...a), clients: async () => ({ clients: [], unmapped: unmapped.n }), createClient: (n: string) => createClientMock(n) },
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
+const push = vi.hoisted(() => vi.fn());
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
 import toast from 'react-hot-toast';
 import { orderSources } from './VendorBadge';
-import MSSPDashboardView, { figure, matchesFilter, tenantsToCsv } from './MSSPDashboardView';
+import MSSPDashboardView, { figure, matchesFilter, postureHref, tenantsToCsv } from './MSSPDashboardView';
 
 // The page used to render six invented tenants ("Acme Financial", "GlobalRetail Corp", ...) with invented alert counts, ARR and analyst
 // allocation to every workspace, and an "Export Report" button that only showed a toast. These tests pin that it shows real data or an honest
@@ -46,6 +48,7 @@ beforeEach(() => {
   playbooksMock.mockResolvedValue(undefined);
   hiddenMock.mockResolvedValue(undefined);
   unmapped.n = 0;
+  push.mockReset();
 });
 
 describe('the client mapping (it moved to Settings)', () => {
@@ -370,5 +373,24 @@ describe('orderSources', () => {
       'addigy',
       'zzz',
     ]);
+  });
+});
+
+describe('a client line opens its Client Posture page', () => {
+  it('has the name as a link and opens the posture when the line itself is clicked, but not when a control inside it is', async () => {
+    overviewMock.mockResolvedValue(none);
+    tenantsMock.mockResolvedValue([reporting, quiet]);
+    render(<MSSPDashboardView />);
+    const lines = await screen.findAllByTestId('client-line');
+    expect(within(lines[0]).getByRole('link', { name: 'Reporting Co' })).toHaveAttribute('href', '/settings/client-posture?client=id-Reporting%20Co');
+    await userEvent.click(within(lines[0]).getAllByRole('cell')[1]);
+    expect(push).toHaveBeenCalledWith('/settings/client-posture?client=id-Reporting%20Co');
+    push.mockReset();
+    await userEvent.click(within(lines[0]).getAllByRole('checkbox')[0]);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('postureHref escapes the id', () => {
+    expect(postureHref('a b/c')).toBe('/settings/client-posture?client=a%20b%2Fc');
   });
 });

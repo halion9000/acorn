@@ -13,6 +13,7 @@ import VendorBadge from '@/components/mssp/VendorBadge';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { safeDistance } from '@/lib/safe-date';
 import { daysAgo } from '@/lib/ago';
+import { clientFromAddress } from '@/components/mssp/ClientPicker';
 
 const SEVERITY_STYLE: Record<string, string> = {
   critical: 'bg-red-500/15 text-red-300 border-red-500/30',
@@ -247,6 +248,11 @@ export function IdentitiesView() {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [clientId, setClientId] = useState('');
+  // A link can open the list of one client's people (?client=<id>), as Client Posture's People button does.
+  useEffect(() => {
+    const wanted = clientFromAddress(window.location.search);
+    if (wanted) setClientId(wanted);
+  }, []);
   const [tool, setTool] = useState('');
   const [alertTool, setAlertTool] = useState('');
   const [mfa, setMfa] = useState('');

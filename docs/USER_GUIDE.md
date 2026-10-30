@@ -217,7 +217,7 @@ CIPP tenants appear under Client mapping like every other tool; data for an unma
 
 ## 10. Client posture (new)
 
-**Client Security > Client Posture.** Pick a client to see, side by side: devices (total, needing attention, stale agents, not in Huntress, offline), Multi-Factor coverage, open alerts (total, critical, high, **open with no ticket**) and open cases. **Print** produces a page for a client review. **Every number is a link** to the list behind it, already filtered to that client: devices needing attention (Devices page), people with no Multi-Factor (Multi-Factor page), critical alerts or open alerts with no ticket (Alerts page), open cases (Cases page). A client with no CIPP data says "No Multi-Factor data yet".
+**Client Security > Client Posture.** Pick a client to see, side by side: devices (total, needing attention, stale agents, not in Huntress, offline), Multi-Factor coverage, open alerts (total, critical, high, **open with no ticket**) and open cases. **Print** produces a page for a client review. A **People in this client** button opens that client's people on the Identities page, and on the MSSP Dashboard a click on a client's line opens its Client Posture. **Every number is a link** to the list behind it, already filtered to that client: devices needing attention (Devices page), people with no Multi-Factor (Multi-Factor page), critical alerts or open alerts with no ticket (Alerts page), open cases (Cases page). A client with no CIPP data says "No Multi-Factor data yet".
 
 ## 11. Platform health
 

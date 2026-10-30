@@ -226,9 +226,18 @@ export function ClientPosture() {
       )}
       {shown && (
         <div className="space-y-5" data-testid="posture">
-          <h2 className="text-lg font-semibold text-slate-100">
-            {shown.client_name ?? "This organization"} <span className="text-sm font-normal text-slate-500">as of {new Date(shown.generated_at).toLocaleString()}</span>
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-slate-100">
+              {shown.client_name ?? "This organization"} <span className="text-sm font-normal text-slate-500">as of {new Date(shown.generated_at).toLocaleString()}</span>
+            </h2>
+            <Link
+              href={`/identities?client=${encodeURIComponent(shown.client_id)}`}
+              data-testid="people-button"
+              className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 hover:border-sky-500/60 hover:bg-slate-800/60 print:hidden"
+            >
+              People in this client →
+            </Link>
+          </div>
           <LinkedTools tools={shown.tools ?? []} />
           <section>
             <h3 className="mb-2 text-sm uppercase text-slate-500">Devices</h3>
