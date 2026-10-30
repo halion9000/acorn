@@ -65,6 +65,7 @@ BOARDS: dict[str, tuple[str, tuple[str, ...]]] = {
             "ninjaone_antivirus",
             "huntress_protection",
             "huntress_quiet_agents",
+            "ninjaone_huntress_service",
             "liongard_edr_coverage",
             "autoelevate_enforcing",
             "threatmate_hardening",
