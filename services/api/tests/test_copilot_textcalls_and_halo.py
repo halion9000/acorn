@@ -76,3 +76,38 @@ def test_no_guides_found_means_no_snapshot(monkeypatch):
     monkeypatch.setattr(hg, "index", lambda: [])
     assert asyncio.run(ct.halo_snapshot(tenant_id="t", user=object(), message="halo purple elephants")) is None
     assert ct.format_halo_snapshot([]) is None
+
+
+XML_CALL = (
+    '<function_calls>\n<invoke name="client_changes">\n<parameter name="client_name">Waterloo Sparkling Water Corp</parameter>\n'
+    '<parameter name="days">7</parameter>\n</invoke>\n</function_calls>'
+)
+
+
+def test_the_xml_style_call_a_model_wrote_in_the_screenshot_is_found_with_numbers_as_numbers():
+    assert parse_text_tool_calls(XML_CALL) == [("client_changes", {"client_name": "Waterloo Sparkling Water Corp", "days": 7})]
+    assert parse_text_tool_calls("Let me check.\n" + XML_CALL + "\nOne moment.") == [
+        ("client_changes", {"client_name": "Waterloo Sparkling Water Corp", "days": 7})
+    ]
+
+
+def test_the_same_xml_call_written_three_times_runs_once_and_a_tool_not_allowed_from_text_does_not_run():
+    assert len(parse_text_tool_calls(XML_CALL * 3)) == 1
+    other = XML_CALL.replace("Waterloo Sparkling Water Corp", "Acme")
+    assert len(parse_text_tool_calls(XML_CALL + other)) == 2
+    delete = '<function_calls><invoke name="delete_alert"><parameter name="alert_id">x</parameter></invoke></function_calls>'
+    assert parse_text_tool_calls(delete) == []
+
+
+def test_booleans_and_plain_text_parameters_are_read_as_such():
+    call = '<invoke name="client_checks"><parameter name="include_met">true</parameter><parameter name="query">jsmith</parameter><parameter name="limit">5</parameter></invoke>'
+    assert parse_text_tool_calls(call) == [("client_checks", {"include_met": True, "query": "jsmith", "limit": 5})]
+
+
+def test_a_call_written_as_text_is_cut_out_of_what_the_analyst_reads():
+    from app.services.copilot_textcalls import strip_text_tool_calls
+
+    assert strip_text_tool_calls("I will look.\n\n" + XML_CALL + "\n\nHere is the answer.") == "I will look.\n\nHere is the answer."
+    assert strip_text_tool_calls(SCREENSHOT + "\nDone.") == "Done."
+    assert strip_text_tool_calls("Plain answer.") == "Plain answer."
+    assert strip_text_tool_calls(XML_CALL) == ""

@@ -243,6 +243,7 @@ async def list_identities(
     mfa: str | None = Query(default=None, pattern="^(covered|registered_not_required|none|unknown)$"),
     admin: bool = Query(default=False),
     disabled: bool = Query(default=False),
+    enabled: bool = Query(default=False, description="Only accounts that are not disabled."),
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
     sort: str = Query(default="alerts"),
 ) -> IdentityList:
@@ -263,6 +264,7 @@ async def list_identities(
             mfa=mfa,
             admin=admin,
             disabled=disabled,
+            enabled=enabled,
             kind=kind,
         ),
         sort,
@@ -324,6 +326,7 @@ async def export_identities(
     mfa: str | None = Query(default=None, pattern="^(covered|registered_not_required|none|unknown)$"),
     admin: bool = Query(default=False),
     disabled: bool = Query(default=False),
+    enabled: bool = Query(default=False, description="Only accounts that are not disabled."),
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
     sort: str = Query(default="alerts"),
 ) -> Response:
@@ -343,6 +346,7 @@ async def export_identities(
             mfa=mfa,
             admin=admin,
             disabled=disabled,
+            enabled=enabled,
             kind=kind,
         ),
         sort,

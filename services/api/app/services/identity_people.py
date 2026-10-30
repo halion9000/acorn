@@ -314,6 +314,7 @@ def filter_people(
     mfa: str | None = None,
     admin: bool = False,
     disabled: bool = False,
+    enabled: bool = False,
     kind: str | None = None,
     only_in: str | None = None,
     alert_source: str | None = None,
@@ -349,6 +350,9 @@ def filter_people(
         rows = [p for p in rows if p.admin]
     if disabled:
         rows = [p for p in rows if p.enabled is False]
+    if enabled:
+        # Every account that is not known to be disabled: an account whose tools say nothing about it is not called disabled.
+        rows = [p for p in rows if p.enabled is not False]
     if kind:
         rows = [p for p in rows if p.kind == kind]
     return rows

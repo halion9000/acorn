@@ -205,6 +205,10 @@ def test_filters_each_narrow_the_list_and_combine():
     assert emails(ip.filter_people(people, mfa="covered")) == ["amy@acme.com"]
     assert emails(ip.filter_people(people, admin=True)) == ["amy@acme.com"]
     assert emails(ip.filter_people(people, disabled=True)) == ["cy@beta.com"]
+    assert sorted(emails(ip.filter_people(people, enabled=True))) == sorted(
+        p.email for p in people if p.email != "cy@beta.com"
+    ), "enabled-only is everyone but the disabled account"
+    assert emails(ip.filter_people(people, enabled=True, disabled=True)) == [], "both at once match nobody"
     assert emails(ip.filter_people(people, kind="guest")) == []
     assert emails(ip.filter_people(people, source="dropsuite", mfa="covered")) == ["amy@acme.com"]
 

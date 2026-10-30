@@ -10337,6 +10337,15 @@ paths:
           type: boolean
           default: false
           title: Disabled
+      - name: enabled
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Only accounts that are not disabled.
+          default: false
+          title: Enabled
+        description: Only accounts that are not disabled.
       - name: kind
         in: query
         required: false
@@ -10468,6 +10477,15 @@ paths:
           type: boolean
           default: false
           title: Disabled
+      - name: enabled
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Only accounts that are not disabled.
+          default: false
+          title: Enabled
+        description: Only accounts that are not disabled.
       - name: kind
         in: query
         required: false

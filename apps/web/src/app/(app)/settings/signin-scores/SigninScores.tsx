@@ -273,7 +273,8 @@ export function SigninScores() {
         </p>
       )}
       {rows !== null && rows.length > 0 && <SigninsTable rows={rows} />}
-      <IdentityChanges days={days} />
+      {/* Held back until the sign-ins above have loaded: the two tables have different columns, and showing the second alone looked like the first with the wrong headings. */}
+      {(rows !== null || error) && <IdentityChanges days={days} />}
     </div>
   );
 }

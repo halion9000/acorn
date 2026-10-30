@@ -107,6 +107,20 @@ describe('SigninScores', () => {
     expect(cells[at(/^App/)]).toHaveTextContent('Exchange');
   });
 
+  it('shows no identity changes table while the sign-ins are still loading, and shows it once they have', async () => {
+    let finish: (v: unknown) => void = () => {};
+    const pending = new Promise((resolve) => {
+      finish = resolve;
+    });
+    authFetch.mockImplementation((url?: string) => ((url ?? '').includes('/identity/top') ? Promise.resolve(reply([])) : pending));
+    render(<SigninScores />);
+    await screen.findByText('Loading...');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByTestId('identity-changes')).toBeNull();
+    finish(reply([]));
+    expect(await screen.findByTestId('identity-changes')).toBeInTheDocument();
+  });
+
   it('sorts by a clicked column and filters by person, app and result', async () => {
     const rows = [
       row({ user: 'amy@acme.com', score: 0.5, app: 'Teams', success: true, mfa: true, risk: 'none' }),

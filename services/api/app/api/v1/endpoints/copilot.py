@@ -41,7 +41,7 @@ from app.db.rls import TenantDBSession
 from app.llm.contract import safe_ainvoke
 from app.llm.factory import llm_override, make_chat_model
 from app.services import copilot_history
-from app.services.copilot_textcalls import parse_text_tool_calls
+from app.services.copilot_textcalls import parse_text_tool_calls, strip_text_tool_calls
 from app.services.llm_resolver import LlmConfig, resolve_llm_config
 
 logger = logging.getLogger(__name__)
@@ -354,6 +354,9 @@ async def copilot_chat(
             "provider config is synced (rebuild AISOC or run "
             "`syncAisocProviderConfig()` from the HUD)."
         )
+
+    # A call the model wrote as text that was not run (a tool that is not allowed from text, or the loop ran out) is not the answer: it is cut out rather than shown.
+    content = strip_text_tool_calls(content) or content
 
     # Store this turn in conversation history — but only if the LLM call
     # actually succeeded. Storing fallback apologies as real assistant turns

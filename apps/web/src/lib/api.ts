@@ -747,6 +747,8 @@ export interface IdentityQuery {
   exposed?: string;
   admin?: boolean;
   disabled?: boolean;
+  /** Only accounts that are not disabled. */
+  enabled?: boolean;
   sort?: IdentitySort;
 }
 
@@ -769,6 +771,7 @@ export const identitiesApi = {
         exposed: q.exposed,
         admin: q.admin ? 'true' : undefined,
         disabled: q.disabled ? 'true' : undefined,
+        enabled: q.enabled ? 'true' : undefined,
         sort: q.sort,
       } as unknown as Record<string, string>,
     }),
@@ -789,6 +792,7 @@ export const identitiesApi = {
     if (q.hasAlerts) p.set('has_alerts', 'true');
     if (q.admin) p.set('admin', 'true');
     if (q.disabled) p.set('disabled', 'true');
+    if (q.enabled) p.set('enabled', 'true');
     const qs = p.toString();
     const response = await authFetch(`${API_BASE}/api/v1/identities/export.csv${qs ? `?${qs}` : ''}`);
     if (!response.ok) throw new Error(`Export failed (${response.status})`);

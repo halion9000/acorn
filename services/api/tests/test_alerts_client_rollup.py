@@ -353,7 +353,7 @@ def test_ticket_filter_and_the_count_of_open_alerts_without_a_halo_ticket():
     run(go)
 
 
-def test_a_client_with_no_alerts_adds_nothing_and_is_not_asked_for_a_list_but_the_counts_still_cover_the_rest():
+def test_a_client_with_no_alerts_adds_nothing_and_is_never_entered_but_the_counts_still_cover_the_rest():
     async def go(s):
         parent, a, b, _other = await seed(s)
         empty = tenant("Quiet Dental", parent.id)
@@ -363,9 +363,45 @@ def test_a_client_with_no_alerts_adds_nothing_and_is_not_asked_for_a_list_but_th
         out = await call(s, parent.id, severity="critical")
         assert (out.total, out.items) == (0, []), "the filter matches nothing"
         assert out.summary.total == 4, "but the counts still cover every client with alerts"
-        assert empty.id in scoped, "every client is still looked at once for its counts"
+        assert (
+            empty.id not in scoped
+        ), "a client with no alerts is found out in one grouped read and never entered (entering each of 224 clients took seven seconds)"
         full = await call(s, parent.id)
         assert full.total == 4 and out.summary.total == full.summary.total
+
+    run(go)
+
+
+def test_skipping_the_empty_clients_changes_no_result_and_the_old_way_is_the_fallback():
+    async def go(s):
+        parent, a, b, _other = await seed(s)
+        s.add_all([tenant(f"Quiet {i}", parent.id) for i in range(3)])
+        await s.commit()
+        fast = await call(s, parent.id)
+        with patch.object(ep, "tenants_holding_alerts", AsyncMock(return_value=None)):
+            scoped.clear()
+            slow = await call(s, parent.id)
+            assert len(set(scoped)) >= 6, "with the grouped read unavailable every client is entered, as before"
+        assert fast.model_dump() == slow.model_dump()
+        assert (fast.total, fast.summary.total) == (4, 4)
+
+    run(go)
+
+
+def test_the_tenants_holding_alerts_are_the_ones_with_a_row_and_a_failed_read_gives_none():
+    async def go(s):
+        parent, a, b, _other = await seed(s)
+        empty = tenant("Quiet", parent.id)
+        s.add(empty)
+        await s.commit()
+        held = await ep.tenants_holding_alerts(s, [parent.id, a.id, b.id, empty.id])
+        assert held == {tid for tid in (parent.id, a.id, b.id) if tid in held} and empty.id not in held and a.id in held and b.id in held
+
+        class Broken:
+            def execute(self, *_a, **_k):
+                raise RuntimeError("no")
+
+        assert await ep.tenants_holding_alerts(Broken(), [parent.id]) is None
 
     run(go)
 

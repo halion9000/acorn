@@ -70,6 +70,20 @@ describe('the Identities page', () => {
     expect(screen.getByTestId('identities-total')).toHaveTextContent('2');
   });
 
+  it('filters by account state: enabled only, disabled only, or both, and the Disabled accounts tile does the same as the disabled choice', async () => {
+    show();
+    await screen.findAllByTestId('identity-row');
+    await userEvent.selectOptions(screen.getByLabelText('Account state'), 'enabled');
+    await waitFor(() => expect([lastQuery().enabled, lastQuery().disabled]).toEqual([true, false]));
+    await userEvent.selectOptions(screen.getByLabelText('Account state'), 'disabled');
+    await waitFor(() => expect([lastQuery().enabled, lastQuery().disabled]).toEqual([false, true]));
+    await userEvent.selectOptions(screen.getByLabelText('Account state'), '');
+    await waitFor(() => expect([lastQuery().enabled, lastQuery().disabled]).toEqual([false, false]));
+    await userEvent.click(screen.getByRole('button', { name: /Disabled accounts/ }));
+    await waitFor(() => expect(lastQuery().disabled).toBe(true));
+    expect((screen.getByLabelText('Account state') as HTMLSelectElement).value).toBe('disabled');
+  });
+
   it('opens on the people of one client when the address names the client (the People button on Client Posture)', async () => {
     window.history.pushState({}, '', '/identities?client=c2');
     try {

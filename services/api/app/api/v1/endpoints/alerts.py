@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.db.rls import TenantDBSession
-from app.db.rls_scope import acting_as_tenant
+from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.models.alert import Alert
 from app.models.tenant import Tenant
 from app.services.alert_queue import (
@@ -152,6 +152,18 @@ class AlertSnoozeRequest(BaseModel):
     duration_minutes: int | None = None
     until: datetime | None = None
     reason: str | None = Field(default=None, max_length=500)
+
+
+async def tenants_holding_alerts(db: Any, scope: list[uuid.UUID]) -> set[uuid.UUID] | None:
+    """The tenants of ``scope`` that hold at least one alert, from ONE grouped read instead of entering each tenant in turn (an MSSP has over two hundred clients, most with nothing: entering each took seven
+    seconds). A tenant with no alerts adds nothing to a list or a tally, so skipping it changes no result. None when this cannot be read, so the caller goes through every tenant as before."""
+    try:
+        async with cross_tenant_reads(db):
+            rows = (await db.execute(select(Alert.tenant_id).where(Alert.tenant_id.in_(scope)).group_by(Alert.tenant_id))).all()
+    except Exception:  # noqa: BLE001 - a speed-up must never be the reason a list fails
+        logger.warning("alerts.tenants_holding_alerts_unavailable", exc_info=True)
+        return None
+    return {r[0] for r in rows}
 
 
 def _tool_of(alert: Alert) -> str | None:
@@ -863,6 +875,7 @@ async def list_alerts(
         client_hits.update(tid for tid, name in clients.items() if plain in name.lower())
 
     tally = {"total": 0, "critical": 0, "high": 0, "unresolved": 0, "no_ticket": 0}
+    holding: set[uuid.UUID] | None = None
 
     async def add_tally(tid: uuid.UUID) -> int:
         """Add one tenant's counts to the tally and return how many alerts it has (under the ``source`` filter). The caller has the session scoped to that tenant."""
@@ -905,7 +918,10 @@ async def list_alerts(
         merged: list[Alert] = []
         # Without collapsing, only the (time, id) of each client's newest ``offset + page_size`` alerts is read to find the page; the full alerts (with their raw events) are then read for the page's own rows only.
         heads: list[tuple[datetime, uuid.UUID, uuid.UUID]] = []
+        holding = await tenants_holding_alerts(db, scope)
         for tid in scope:
+            if holding is not None and tid not in holding:
+                continue  # holds no alerts: nothing to list and nothing to count
             flt = and_(*filters_for(tid))
             async with acting_as_tenant(db, tid):
                 held = await add_tally(tid)  # read in the same scope, so a tenant is entered once for the list and its counts
@@ -944,6 +960,8 @@ async def list_alerts(
     # The tally covers the whole scope, so it doesn't change as the severity / status buttons are used.
     for tid in scope:
         if tid in tallied:
+            continue
+        if len(scope) > 1 and holding is not None and tid not in holding:
             continue
         if len(scope) == 1 and scope[0] == current_user.tenant_id:
             await add_tally(tid)

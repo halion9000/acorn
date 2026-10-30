@@ -261,7 +261,9 @@ export function IdentitiesView() {
   const [kind, setKind] = useState('');
   const [hasAlerts, setHasAlerts] = useState(false);
   const [adminOnly, setAdminOnly] = useState(false);
-  const [disabledOnly, setDisabledOnly] = useState(false);
+  // Which accounts to list by their state: all of them, only the ones still enabled, or only the disabled ones.
+  const [state, setState] = useState<'' | 'enabled' | 'disabled'>('');
+  const disabledOnly = state === 'disabled';
   const [oneTool, setOneTool] = useState(false);
   const [sort, setSort] = useState<IdentitySort>('alerts');
   const [open, setOpen] = useState<string | null>(null);
@@ -272,8 +274,8 @@ export function IdentitiesView() {
   }, [search]);
 
   const query: IdentityQuery = useMemo(
-    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, alertSource: alertTool || undefined, backup: backup || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, onlyIn: oneTool && tool ? tool : undefined, sort }),
-    [page, clientId, debounced, tool, alertTool, mfa, backup, exposed, kind, hasAlerts, adminOnly, disabledOnly, oneTool, sort],
+    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, alertSource: alertTool || undefined, backup: backup || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', onlyIn: oneTool && tool ? tool : undefined, sort }),
+    [page, clientId, debounced, tool, alertTool, mfa, backup, exposed, kind, hasAlerts, adminOnly, state, oneTool, sort],
   );
   const { data, error, isLoading, mutate } = useSWR(['identities', query], () => identitiesApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
   const { data: clients } = useSWR('mssp-children', () => msspApi.listChildren().catch(() => []), { revalidateOnFocus: false });
@@ -333,7 +335,7 @@ export function IdentitiesView() {
         {tile('Exposed in a breach', summary?.exposed, exposed === 'any', () => setExposed(exposed === 'any' ? '' : 'any'), true)}
         {tile('Password or stealer log', summary?.exposed_serious, exposed === 'serious', () => setExposed(exposed === 'serious' ? '' : 'serious'), true)}
         {tile('Administrators', summary?.admins, adminOnly, () => setAdminOnly((v) => !v))}
-        {tile('Disabled accounts', summary?.disabled, disabledOnly, () => setDisabledOnly((v) => !v))}
+        {tile('Disabled accounts', summary?.disabled, disabledOnly, () => reset(() => setState(state === 'disabled' ? '' : 'disabled')))}
         {tile('In only one tool', summary?.in_one_tool, oneTool, () => setOneTool((v) => !v))}
       </div>
       {oneTool && !tool && <p className="text-xs text-amber-300">Pick a tool below to see the people only that tool knows.</p>}
@@ -390,6 +392,11 @@ export function IdentitiesView() {
           <option value="user">Members</option>
           <option value="guest">Guests</option>
           <option value="shared">Shared mailboxes</option>
+        </select>
+        <select aria-label="Account state" value={state} onChange={(e) => reset(() => setState(e.target.value as '' | 'enabled' | 'disabled'))} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white">
+          <option value="">Enabled and disabled</option>
+          <option value="enabled">Enabled only</option>
+          <option value="disabled">Disabled only</option>
         </select>
         <button type="button" onClick={() => void exportCsv()} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white hover:bg-gray-800">
           Export CSV
