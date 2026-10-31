@@ -214,7 +214,7 @@ export function TopBar({ demoOffset = false }: TopBarProps) {
             />
           </svg>
           <span className="flex-1 truncate text-fg-muted group-hover:text-fg-secondary">
-            Search alerts, cases, rules, or run a command…
+            Search anything: clients, alerts, cases, devices, stock…
           </span>
           <kbd className="pointer-events-none rounded bg-surface-hover px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-fg-secondary">
             {shortcut}

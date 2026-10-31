@@ -7,7 +7,7 @@ const api = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), update: vi.fn(),
 const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
 vi.mock('@/lib/api', () => ({ inventoryApi: api, msspApi: mssp }));
 
-import { InventoryView, holderLabel } from './InventoryView';
+import { InventoryView, holderLabel, inventoryUrlState } from './InventoryView';
 
 const item = (over: Record<string, unknown> = {}) => ({
   id: 'i1', kind: 'stock', client_id: 'c1', client_name: 'Acme Dental', customer_name: 'Acme Dental', name: 'Dell Pro Max 16', category: 'Computers', serial: 'BSH7SB4', model: 'Pro Max 16', manufacturer: null,
@@ -368,5 +368,19 @@ describe('InventoryView NUC import', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Import NUCs from NinjaOne' }));
     await screen.findByTestId('nuc-preview');
     expect(screen.getByRole('button', { name: 'Add them' })).toBeDisabled();
+  });
+});
+
+
+describe('inventoryUrlState', () => {
+  const params = (q: string) => new URLSearchParams(q);
+  it('reads what the search box links with and ignores anything else', () => {
+    expect(inventoryUrlState(null)).toEqual({ search: '', kind: 'stock', client: '' });
+    expect(inventoryUrlState(params('search=PC-1&kind=nuc'))).toEqual({ search: 'PC-1', kind: 'nuc', client: '' });
+    expect(inventoryUrlState(params('kind=laptops')).kind).toBe('stock');
+    expect(inventoryUrlState(params('client=own')).client).toBe('own');
+    expect(inventoryUrlState(params('client=11111111-2222-3333-4444-555555555555')).client).toBe('11111111-2222-3333-4444-555555555555');
+    expect(inventoryUrlState(params('client=1; drop table')).client).toBe('');
+    expect(inventoryUrlState(params('search=' + 'x'.repeat(300))).search).toHaveLength(100);
   });
 });

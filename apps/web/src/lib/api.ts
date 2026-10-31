@@ -6769,3 +6769,19 @@ export const azureSpendApi = {
   },
 };
 
+export interface SearchHit {
+  kind: 'client' | 'alert' | 'case' | 'device' | 'stock' | 'nuc';
+  id: string;
+  title: string;
+  detail: string | null;
+  client: string | null;
+  client_id: string | null;
+}
+
+export const searchApi = {
+  /** One question across alerts, cases, devices, stock and clients (the server answers nothing for fewer than two characters). */
+  search(q: string): Promise<{ query: string; hits: SearchHit[] }> {
+    return request<{ query: string; hits: SearchHit[] }>('/api/v1/search', { params: { q } });
+  },
+};
+

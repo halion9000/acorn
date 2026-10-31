@@ -19,6 +19,8 @@ import { Command } from 'cmdk';
 import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
+import { searchApi, type SearchHit } from '@/lib/api';
+
 interface PaletteAction {
   id: string;
   label: string;
@@ -32,6 +34,26 @@ interface PaletteGroup {
   id: string;
   heading: string;
   items: PaletteAction[];
+}
+
+const HIT_LABEL: Record<SearchHit['kind'], string> = { client: 'Client', alert: 'Alert', case: 'Case', device: 'Device', stock: 'Stock', nuc: 'NUC' };
+
+/** The page that shows a search result. Devices and stock open their lists already searching for that item. */
+export function hitHref(hit: SearchHit): string {
+  switch (hit.kind) {
+    case 'alert':
+      return `/alerts/${encodeURIComponent(hit.id)}`;
+    case 'case':
+      return `/cases/${encodeURIComponent(hit.id)}`;
+    case 'device':
+      return `/devices?search=${encodeURIComponent(hit.title)}`;
+    case 'stock':
+      return `/inventory?search=${encodeURIComponent(hit.title)}`;
+    case 'nuc':
+      return `/inventory?kind=nuc&search=${encodeURIComponent(hit.title)}`;
+    default:
+      return `/inventory?client=${encodeURIComponent(hit.id)}`;
+  }
 }
 
 const RECENT_STORAGE_KEY = 'aisoc.palette.recent';
@@ -83,6 +105,10 @@ const NAV_ITEMS: { label: string; href: string; keywords: string[] }[] = [
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
+  const [query, setQuery] = useState('');
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -117,6 +143,44 @@ export function CommandPalette() {
   }, [pathname]);
 
   const close = useCallback(() => setOpen(false), []);
+
+  // Search everything: wait for a pause in typing, ask the server, and ignore an answer to a question that has since changed.
+  useEffect(() => {
+    const text = query.trim();
+    if (!open || text.length < 2) {
+      setHits([]);
+      setSearching(false);
+      setSearchError(false);
+      return;
+    }
+    let current = true;
+    setSearching(true);
+    const timer = window.setTimeout(() => {
+      searchApi
+        .search(text)
+        .then((out) => {
+          if (!current) return;
+          setHits(out.hits);
+          setSearchError(false);
+        })
+        .catch(() => {
+          if (!current) return;
+          setHits([]);
+          setSearchError(true);
+        })
+        .finally(() => {
+          if (current) setSearching(false);
+        });
+    }, 250);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
+  }, [query, open]);
+
+  useEffect(() => {
+    if (!open) setQuery('');
+  }, [open]);
 
   const navigate = useCallback(
     (href: string) => {
@@ -259,7 +323,9 @@ export function CommandPalette() {
                 </svg>
                 <Command.Input
                   autoFocus
-                  placeholder="Type a command, search a page, or ask Leafy…"
+                  value={query}
+                  onValueChange={setQuery}
+                  placeholder="Search anything: clients, alerts, cases, devices, stock… or type a command"
                   className="flex-1 bg-transparent text-sm text-gray-200 placeholder-gray-500 outline-none"
                 />
                 <kbd className="rounded border border-gray-700 bg-gray-900/70 px-1.5 py-0.5 text-[10px] font-mono text-gray-500">
@@ -269,8 +335,35 @@ export function CommandPalette() {
 
               <Command.List className="max-h-[60vh] overflow-y-auto py-2">
                 <Command.Empty className="px-4 py-6 text-center text-xs text-gray-500">
-                  No matches. Try “alerts”, “hunt”, or “copilot”.
+                  {searching ? 'Searching…' : 'No matches. Try a client, a hostname, a serial number, a case number or “alerts”.'}
                 </Command.Empty>
+
+                {searchError ? (
+                  <p role="status" data-testid="palette-search-error" className="px-4 py-2 text-xs text-amber-300">
+                    Search is not answering right now. Pages and actions still work.
+                  </p>
+                ) : null}
+
+                {hits.length > 0 ? (
+                  <Command.Group heading="Results" className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                    {hits.map((hit) => (
+                      <Command.Item
+                        key={`${hit.kind}:${hit.id}`}
+                        // The search already matched on the server, so the local filter must not hide it: the typed text is part of its value.
+                        value={`hit ${hit.kind} ${hit.title} ${hit.detail ?? ''} ${hit.client ?? ''} ${query}`}
+                        onSelect={() => navigate(hitHref(hit))}
+                        className="group flex items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-300 cursor-pointer aria-selected:bg-blue-600/15 aria-selected:text-blue-200"
+                      >
+                        <span className="w-14 shrink-0 text-[10px] uppercase tracking-wide text-gray-500">{HIT_LABEL[hit.kind]}</span>
+                        <span className="flex-1 truncate">
+                          {hit.title}
+                          {hit.detail ? <span className="ml-2 text-[11px] text-gray-500">{hit.detail}</span> : null}
+                        </span>
+                        {hit.client ? <span className="max-w-[35%] truncate text-right text-[11px] text-gray-600">{hit.client}</span> : null}
+                      </Command.Item>
+                    ))}
+                  </Command.Group>
+                ) : null}
 
                 {groups.map((group) => (
                   <Command.Group

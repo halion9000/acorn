@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { InventoryView } from "@/components/inventory/InventoryView";
 
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function InventoryPage() {
-  return <InventoryView />;
+  // InventoryView reads the address (?search=, ?kind=, ?client=) through the router, which needs a Suspense boundary.
+  return (
+    <Suspense fallback={null}>
+      <InventoryView />
+    </Suspense>
+  );
 }

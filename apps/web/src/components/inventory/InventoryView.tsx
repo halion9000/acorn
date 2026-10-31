@@ -5,6 +5,7 @@
  * own tenant (or Live Oak's), so this is also the page a client portal will show a client, for that client only. Reading needs alerts:read; changing things needs mssp:manage (the API says no, and the page shows its message).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 
 import { inventoryApi, msspApi, type InventoryImportResult, type InventorySyncResult, type InventoryNucSyncResult, type InventoryItem, type InventoryKind, type InventoryQuery, type InventoryStatus } from '@/lib/api';
@@ -615,12 +616,32 @@ function SortHead({ label, field, sort, dir, onSort, className = 'px-3 py-2' }: 
 
 type Dialog = { type: 'add' } | { type: 'edit'; item: InventoryItem } | { type: 'out' | 'in'; item: InventoryItem } | { type: 'history'; item: InventoryItem } | { type: 'import' } | { type: 'bulk' } | { type: 'sync' } | { type: 'nucsync' } | null;
 
+/** A link from the search box (/inventory?search=PC-1&kind=nuc&client=<id>) opens the page already showing that. Anything else in the address is ignored. */
+export function inventoryUrlState(params: { get(name: string): string | null } | null): { search: string; kind: InventoryKind; client: string } {
+  const client = params?.get('client') ?? '';
+  return {
+    search: (params?.get('search') ?? '').slice(0, 100),
+    kind: params?.get('kind') === 'nuc' ? 'nuc' : 'stock',
+    client: client === 'own' || client === 'unmatched' || /^[0-9a-fA-F-]{36}$/.test(client) ? client : '',
+  };
+}
+
 export function InventoryView() {
-  const [kind, setKind] = useState<InventoryKind>('stock');
-  const [client, setClient] = useState('');
+  const urlState = inventoryUrlState(useSearchParams());
+  const [kind, setKind] = useState<InventoryKind>(urlState.kind);
+  const [client, setClient] = useState(urlState.client);
   const [status, setStatus] = useState<InventoryStatus | ''>('');
   const [category, setCategory] = useState('');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(urlState.search);
+  // Following another search link while already on this page (the address changes, the page stays mounted).
+  const urlKey = `${urlState.kind}|${urlState.client}|${urlState.search}`;
+  const [seenUrlKey, setSeenUrlKey] = useState(urlKey);
+  if (seenUrlKey !== urlKey) {
+    setSeenUrlKey(urlKey);
+    setKind(urlState.kind);
+    setClient(urlState.client);
+    setSearch(urlState.search);
+  }
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState('name');
   const [dir, setDir] = useState<'asc' | 'desc'>('asc');
