@@ -1,5 +1,6 @@
 /**
- * The Test button on Settings > Integrations: a CORE-fed tool is synced first (CORE is asked to run it now), any other connector is tested directly.
+ * Settings has ONE place for the tools connected to A.C.O.R.N: the Connectors page. A second "Integrations" tab used to list the same connectors with a smaller copy of the same controls
+ * (the sync-then-test behaviour of its Test button is covered in ConnectorsView.test.tsx).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -37,34 +38,17 @@ beforeEach(() => {
   api.test.mockResolvedValue({ success: true, latencyMs: 12 });
 });
 
-async function openIntegrations() {
-  render(<SettingsView />);
-  await userEvent.click(await screen.findByRole('button', { name: /^integrations/i }));
-  return screen.findAllByRole('button', { name: 'Test' });
-}
-
-describe('Settings > Integrations Test button', () => {
-  it('syncs a CORE-fed tool first, then tests it', async () => {
-    api.syncNow.mockResolvedValue({ reported: true });
-    const buttons = await openIntegrations();
-    await userEvent.click(buttons[0]);
-    await waitFor(() => expect(api.test).toHaveBeenCalledWith('c1'));
-    expect(api.syncNow).toHaveBeenCalledWith('c1');
-    expect(api.syncNow.mock.invocationCallOrder[0]).toBeLessThan(api.test.mock.invocationCallOrder[0]);
+describe('Settings: one place for connected tools', () => {
+  it('has no separate Integrations tab', async () => {
+    render(<SettingsView />);
+    await screen.findByRole('navigation', { name: 'Settings sections' });
+    expect(screen.queryByRole('button', { name: /^integrations/i })).toBeNull();
+    expect(screen.queryByText('Connected log sources, EDRs, identity providers.')).toBeNull();
   });
 
-  it('says so when CORE did not answer, and still shows the last report', async () => {
-    api.syncNow.mockResolvedValue({ reported: false });
-    const buttons = await openIntegrations();
-    await userEvent.click(buttons[0]);
-    await waitFor(() => expect(toast.success).toHaveBeenCalled());
-    expect(String(toast.success.mock.calls[0][0])).toContain("CORE didn't answer");
-  });
-
-  it('tests any other connector directly, without a sync', async () => {
-    const buttons = await openIntegrations();
-    await userEvent.click(buttons[1]);
-    await waitFor(() => expect(api.test).toHaveBeenCalledWith('c2'));
-    expect(api.syncNow).not.toHaveBeenCalled();
+  it('still lists the Connectors page, where the tools are managed', async () => {
+    render(<SettingsView />);
+    const link = await screen.findByRole('link', { name: /connectors/i });
+    expect(link).toHaveAttribute('href', '/settings/connectors');
   });
 });

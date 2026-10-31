@@ -64,7 +64,6 @@ import { authFetch } from '@/lib/auth-session';
 type TabId =
   | 'profile'
   | 'workspace'
-  | 'integrations'
   | 'autonomy'
   | 'api-keys'
   | 'tenant-access'
@@ -195,11 +194,6 @@ const TABS: { id: TabId; label: string; description: string; requires?: 'manage_
     description: 'Tenant, branding, locale.',
   },
   {
-    id: 'integrations',
-    label: 'Integrations',
-    description: 'Connected log sources, EDRs, identity providers.',
-  },
-  {
     id: 'autonomy',
     label: 'Autonomy guardrails',
     description: 'Per-action confidence thresholds for agent actions.',
@@ -308,7 +302,7 @@ export function SettingsView() {
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold text-gray-100">Settings</h1>
         <p className="max-w-2xl text-sm text-gray-500">
-          Configure your account, the workspace, and the integrations that feed
+          Configure your account, the workspace, and the data that feeds
           the SOC. Most preferences sync across devices; appearance and
           notification preferences live on this device only.
         </p>
@@ -360,7 +354,6 @@ export function SettingsView() {
             >
               {tab === 'profile' && <ProfilePanel />}
               {tab === 'workspace' && <WorkspacePanel />}
-              {tab === 'integrations' && <IntegrationsPanel />}
               {tab === 'autonomy' && <AutonomyPolicyPanel />}
               {tab === 'api-keys' && <ApiKeysPanel />}
               {tab === 'tenant-access' && <TenantAccessPanel canGrantAll={capabilities.includes('platform_admin')} />}
@@ -630,224 +623,6 @@ function InfoTile({ label, value, mono }: { label: string; value: string; mono?:
           mono && 'font-mono text-xs',
         )}
       >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-// ─── Panel: Integrations ──────────────────────────────────────────────────────
-
-function IntegrationsPanel() {
-  const { data, error, isLoading, mutate } = useSWR(
-    'settings:connectors',
-    () => connectorsApi.list(),
-    { revalidateOnFocus: false, shouldRetryOnError: false },
-  );
-
-  const connectors = data?.connectors ?? [];
-
-  const counts = useMemo(() => {
-    const c = { active: 0, error: 0, warning: 0, inactive: 0, configuring: 0 };
-    for (const x of connectors) {
-      c[x.status] = (c[x.status] ?? 0) + 1;
-    }
-    return c;
-  }, [connectors]);
-
-  const onTest = async (connector: Connector) => {
-    try {
-      // A CORE-fed tool has nothing to test from here, so ask CORE to run it now first (same as the Connectors page).
-      let note = '';
-      if (connector.type === 'core_feed') {
-        const { reported } = await connectorsApi.syncNow(connector.id);
-        if (!reported) note = " (CORE didn't answer; showing its last report)";
-        mutate();
-      }
-      const result = await connectorsApi.test(connector.id);
-      toast.success(
-        `${connector.name}: ${result.success ? 'OK' : 'Failed'} • ${result.latencyMs}ms${note}`,
-      );
-    } catch {
-      toast.error('Test request failed');
-    }
-  };
-
-  const onToggle = async (connector: Connector) => {
-    const next = !(connector.enabled ?? connector.status === 'active');
-    mutate(
-      (curr) =>
-        curr
-          ? {
-              ...curr,
-              connectors: curr.connectors.map((c) =>
-                c.id === connector.id ? { ...c, enabled: next } : c,
-              ),
-            }
-          : curr,
-      { revalidate: false },
-    );
-    try {
-      await connectorsApi.update(connector.id, { is_enabled: next });
-      toast.success(next ? 'Connector enabled' : 'Connector disabled');
-      mutate();
-    } catch {
-      toast.error('Could not update connector');
-      mutate();
-    }
-  };
-
-  return (
-    <div>
-      <PanelHeader
-        title="Integrations"
-        description="Manage the connectors that stream telemetry into A.C.O.R.N."
-        action={
-          <Link
-            href="/settings/connectors/new"
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
-          >
-            + Add connector
-          </Link>
-        }
-      />
-      <div className="px-6 py-5 space-y-5">
-        {/* Stat row */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Active" value={counts.active} tone="emerald" />
-          <StatTile label="Errors" value={counts.error} tone="red" />
-          <StatTile label="Configuring" value={counts.configuring} tone="amber" />
-          <StatTile label="Disabled" value={counts.inactive} tone="gray" />
-        </div>
-
-        {/* List */}
-        {isLoading && !data ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-20 w-full rounded-lg" />
-            ))}
-          </div>
-        ) : error ? (
-          <ErrorState
-            title="Could not load integrations"
-            error={error}
-            onRetry={() => mutate()}
-          />
-        ) : connectors.length === 0 ? (
-          <EmptyState
-            title="No connectors yet"
-            description="Add your first integration to start streaming events into A.C.O.R.N."
-            action={
-              <Link
-                href="/settings/connectors/new"
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
-              >
-                Add connector
-              </Link>
-            }
-          />
-        ) : (
-          <ul className="space-y-2">
-            {connectors.map((c) => (
-              <li
-                key={c.id}
-                className="rounded-lg border border-gray-800 bg-gray-950/40 p-4 transition-colors hover:border-gray-700"
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="truncate text-sm font-semibold text-gray-100">
-                        {c.name}
-                      </h3>
-                      <span
-                        className={clsx(
-                          'rounded-full px-2 py-0.5 text-xs ring-1 ring-inset',
-                          STATUS_PILL[c.status],
-                        )}
-                      >
-                        {STATUS_LABEL[c.status]}
-                      </span>
-                    </div>
-                    {c.description ? (
-                      <p className="mt-1 text-xs text-gray-500">{c.description}</p>
-                    ) : null}
-                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                      <span>
-                        <span className="text-gray-400">Type:</span>{' '}
-                        <span className="font-mono">{c.type}</span>
-                      </span>
-                      {c.lastSync ? (
-                        <span suppressHydrationWarning>
-                          Last sync{' '}
-                          {safeDistance(c.lastSync, {
-                            addSuffix: true,
-                          })}
-                        </span>
-                      ) : null}
-                      {typeof c.alertsIngested === 'number' ||
-                      typeof c.alertCount === 'number' ? (
-                        <span>
-                          {(c.alertsIngested ?? c.alertCount ?? 0).toLocaleString()}{' '}
-                          events
-                        </span>
-                      ) : null}
-                    </div>
-                    {c.errorMessage ? (
-                      <p className="mt-2 rounded border border-red-500/30 bg-red-500/5 px-2 py-1 text-xs text-red-300">
-                        {c.errorMessage}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onTest(c)}
-                      className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs text-gray-200 hover:bg-gray-800"
-                    >
-                      Test
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onToggle(c)}
-                      className={clsx(
-                        'rounded-lg px-3 py-1.5 text-xs font-medium',
-                        c.enabled ?? c.status === 'active'
-                          ? 'bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/30 hover:bg-amber-500/20'
-                          : 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/30 hover:bg-emerald-500/20',
-                      )}
-                    >
-                      {c.enabled ?? c.status === 'active' ? 'Disable' : 'Enable'}
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function StatTile({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: 'emerald' | 'red' | 'amber' | 'gray';
-}) {
-  const tones: Record<string, string> = {
-    emerald: 'text-emerald-300',
-    red: 'text-red-300',
-    amber: 'text-amber-300',
-    gray: 'text-gray-300',
-  };
-  return (
-    <div className="rounded-lg border border-gray-800 bg-gray-950/40 p-4">
-      <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
-      <p className={clsx('mt-1 text-2xl font-semibold tabular-nums', tones[tone])}>
         {value}
       </p>
     </div>
