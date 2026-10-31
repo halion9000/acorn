@@ -30,11 +30,6 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-  ingest-worker:
-    # CORE (on its own VM) forwards vendor alerts to this intake service, so it is published on the private address like the API and web, never on 0.0.0.0.
-    ports: !override
-      - "${ACORN_BIND_IP:-127.0.0.1}:8081:8080"
-      - "127.0.0.1:9090:9090"
   fusion:
     environment:
       DATABASE_URL: ${AZURE_DATABASE_URL:?set AZURE_DATABASE_URL}
@@ -84,6 +79,10 @@ services:
       redis:
         condition: service_healthy
   ingest-worker:
+    # CORE (on its own VM) forwards vendor alerts to this intake service, so it is published on the private address like the API and web, never on 0.0.0.0.
+    ports: !override
+      - "${ACORN_BIND_IP:-127.0.0.1}:8081:8080"
+      - "127.0.0.1:9090:9090"
     depends_on: !override
       kafka:
         condition: service_healthy

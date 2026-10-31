@@ -59,8 +59,17 @@ healthy() {
   return 1
 }
 
+# One slow answer from the AI link (it runs through the CORE VM's Claude session, which can be busy) must not undo a good update: three tries, a pause between.
 ai_test() {
   say "AI test question through the gateway..."
+  for attempt in 1 2 3; do
+    ai_try && return 0
+    [ "$attempt" -lt 3 ] && { say "AI test attempt $attempt did not answer; trying again in 20 s"; sleep 20; }
+  done
+  return 1
+}
+
+ai_try() {
   docker exec -i aisoc-api python - <<'PY'
 import json, os, time, urllib.request
 req = urllib.request.Request(
