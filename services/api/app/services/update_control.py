@@ -1,0 +1,96 @@
+"""The hand-off between A.C.O.R.N's "Update" button and the VM that runs it.
+
+The API container never gets a way to run anything. It only writes a small request file into a shared folder (ACORN_UPDATE_CTL_DIR, `/srv/acorn/update-ctl` on the Azure VM). A systemd path unit on the VM sees the file and runs `infra/azure/update-acorn.sh` (pull, rebuild, migrate, health check, roll back on failure), whose output lands in `last-run.log` in the same folder. This module reads that state back for the screen. The file names are fixed here and the request holds no command, so what a request can cause is exactly one thing: the update script.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+
+REQUEST_FILE = "request.json"
+RUNNING_FILE = "running"
+RUN_LOG = "last-run.log"
+TAIL_LINES = 40
+_SUCCESS = re.compile(r"UPDATE OK|already up to date|VERIFY OK|ROLLBACK OK")
+_FAILURE = re.compile(r"FAILED|ROLLED BACK|NOT healthy")
+
+
+@dataclass
+class UpdateState:
+    available: bool
+    state: str  # "unavailable" | "idle" | "queued" | "running"
+    requested_by: str | None = None
+    requested_at: str | None = None
+    last_run_at: str | None = None
+    last_run_ok: bool | None = None
+    summary: str | None = None
+    log: list[str] = field(default_factory=list)
+
+
+class UpdateRefused(Exception):
+    """The request cannot be made now (code is a short reason for the screen)."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
+def control_dir(env: dict[str, str] | None = None) -> Path | None:
+    raw = (env if env is not None else os.environ).get("ACORN_UPDATE_CTL_DIR", "").strip()
+    return Path(raw) if raw else None
+
+
+def _verdict(lines: list[str]) -> tuple[bool | None, str | None]:
+    """The last line that says how the run went decides, as in CORE's own reading of the same script."""
+    for line in reversed(lines):
+        if _FAILURE.search(line):
+            return False, line.strip()[:300]
+        if _SUCCESS.search(line):
+            return True, line.strip()[:300]
+    return None, (lines[-1].strip()[:300] if lines else None)
+
+
+def read_state(directory: Path | None) -> UpdateState:
+    if directory is None or not directory.is_dir():
+        return UpdateState(available=False, state="unavailable")
+    request = directory / REQUEST_FILE
+    running = directory / RUNNING_FILE
+    state = "running" if running.exists() else "queued" if request.exists() else "idle"
+    out = UpdateState(available=True, state=state)
+    if request.exists():
+        try:
+            data = json.loads(request.read_text(encoding="utf-8"))
+            out.requested_by = str(data.get("requested_by", ""))[:200] or None
+            out.requested_at = str(data.get("requested_at", "")) or None
+        except (OSError, ValueError):
+            pass
+    log = directory / RUN_LOG
+    if log.exists():
+        try:
+            lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            lines = []
+        out.log = [ln[:400] for ln in lines[-TAIL_LINES:]]
+        out.last_run_at = datetime.fromtimestamp(log.stat().st_mtime, UTC).isoformat()
+        if state == "idle":
+            out.last_run_ok, out.summary = _verdict(lines)
+        else:
+            out.summary = lines[-1].strip()[:300] if lines else None
+    return out
+
+
+def request_update(directory: Path | None, requested_by: str, now: datetime | None = None) -> None:
+    """Ask for one update. Refused when the folder is missing or one is already queued or running."""
+    if directory is None or not directory.is_dir():
+        raise UpdateRefused("unavailable", "Updating from here is not set up on this A.C.O.R.N.")
+    if (directory / RUNNING_FILE).exists() or (directory / REQUEST_FILE).exists():
+        raise UpdateRefused("busy", "An update is already waiting or running.")
+    body = {"requested_by": requested_by, "requested_at": (now or datetime.now(UTC)).isoformat()}
+    tmp = directory / (REQUEST_FILE + ".tmp")
+    tmp.write_text(json.dumps(body), encoding="utf-8")
+    os.replace(tmp, directory / REQUEST_FILE)

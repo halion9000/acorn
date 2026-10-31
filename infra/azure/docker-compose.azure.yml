@@ -21,6 +21,9 @@ services:
     environment:
       DATABASE_URL: ${AZURE_DATABASE_URL:?set AZURE_DATABASE_URL}
       MIGRATION_DATABASE_URL: ${AZURE_MIGRATION_DATABASE_URL:?set AZURE_MIGRATION_DATABASE_URL}
+      ACORN_UPDATE_CTL_DIR: /update-ctl   # the Update button's hand-off folder (see acorn-update-runner.sh)
+    volumes:
+      - /srv/acorn/update-ctl:/update-ctl
     depends_on: !override
       redis:
         condition: service_healthy

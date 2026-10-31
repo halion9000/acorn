@@ -76,6 +76,7 @@ from app.api.v1.endpoints import (
     passkeys,
     phishing,
     platform_alert_email,
+    platform_update,
     platform_tenant_access,
     playbook_dry_runs,
     playbooks,
@@ -151,6 +152,7 @@ api_router.include_router(graph.router)
 api_router.include_router(playbooks.router)
 api_router.include_router(playbook_dry_runs.router)
 api_router.include_router(platform_alert_email.router)
+api_router.include_router(platform_update.router)
 api_router.include_router(platform_tenant_access.router)
 api_router.include_router(plugins.router)
 api_router.include_router(rbac.router)

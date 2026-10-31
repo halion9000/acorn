@@ -6728,3 +6728,24 @@ export const alertEmailApi = {
   },
 };
 
+export interface PlatformUpdateStatus {
+  available: boolean;
+  state: 'unavailable' | 'idle' | 'queued' | 'running';
+  requested_by: string | null;
+  requested_at: string | null;
+  last_run_at: string | null;
+  last_run_ok: boolean | null;
+  summary: string | null;
+  log: string[];
+}
+
+export const platformUpdateApi = {
+  get(): Promise<PlatformUpdateStatus> {
+    return request<PlatformUpdateStatus>('/api/v1/platform/update');
+  },
+  /** Asks the VM to update A.C.O.R.N from GitHub (pull, rebuild, migrate, health check, roll back on failure). */
+  start(): Promise<PlatformUpdateStatus> {
+    return request<PlatformUpdateStatus>('/api/v1/platform/update', { method: 'POST' });
+  },
+};
+

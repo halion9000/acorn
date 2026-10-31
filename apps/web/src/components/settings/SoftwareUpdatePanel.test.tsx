@@ -1,0 +1,77 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { SWRConfig } from 'swr';
+
+const platformUpdateApi = vi.hoisted(() => ({ get: vi.fn(), start: vi.fn() }));
+vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), platformUpdateApi }));
+const tenantState = vi.hoisted(() => vi.fn());
+vi.mock('@/components/layout/TenantProvider', () => ({ useTenant: () => tenantState() }));
+vi.mock('react-hot-toast', () => ({ __esModule: true, default: { success: vi.fn(), error: vi.fn() } }));
+
+import { ApiError } from '@/lib/api';
+import { SoftwareUpdatePanel } from './SoftwareUpdatePanel';
+
+const status = (over: Record<string, unknown> = {}) => ({
+  available: true, state: 'idle', requested_by: null, requested_at: null, last_run_at: null, last_run_ok: null, summary: null, log: [], ...over,
+});
+
+function renderPanel() {
+  return render(
+    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+      <SoftwareUpdatePanel />
+    </SWRConfig>,
+  );
+}
+
+beforeEach(() => {
+  Object.values(platformUpdateApi).forEach((f) => f.mockReset());
+  tenantState.mockReturnValue({ viewingOther: false, home: { name: 'Live Oak IT' } });
+  platformUpdateApi.get.mockResolvedValue(status());
+});
+
+describe('SoftwareUpdatePanel', () => {
+  it('while viewing another tenant it offers nothing and asks for no data', async () => {
+    tenantState.mockReturnValue({ viewingOther: true, home: { name: 'Live Oak IT' } });
+    renderPanel();
+    expect(await screen.findByTestId('viewing-other-notice')).toHaveTextContent('Return to Live Oak IT');
+    expect(platformUpdateApi.get).not.toHaveBeenCalled();
+  });
+
+  it('where updating is not set up it says so and offers no button', async () => {
+    platformUpdateApi.get.mockResolvedValue(status({ available: false, state: 'unavailable' }));
+    renderPanel();
+    expect(await screen.findByTestId('update-unavailable')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Update A.C.O.R.N' })).toBeNull();
+  });
+
+  it('asks before updating, and only then requests it', async () => {
+    platformUpdateApi.start.mockResolvedValue(status({ state: 'queued', requested_by: 'hal@x.example' }));
+    renderPanel();
+    await userEvent.click(await screen.findByRole('button', { name: 'Update A.C.O.R.N' }));
+    expect(platformUpdateApi.start).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole('button', { name: 'Update now' }));
+    await waitFor(() => expect(platformUpdateApi.start).toHaveBeenCalledTimes(1));
+    expect(await screen.findByTestId('update-state')).toHaveTextContent('Waiting to start');
+    expect(screen.getByRole('button', { name: 'Updating…' })).toBeDisabled();
+  });
+
+  it('shows the output of the last run and whether it worked', async () => {
+    platformUpdateApi.get.mockResolvedValue(
+      status({ last_run_ok: false, summary: 'ROLLED BACK to abc', log: ['[10:04:00] UPDATE FAILED at b', '[10:06:00] ROLLED BACK to abc'], last_run_at: '2026-10-31T10:06:00Z' }),
+    );
+    renderPanel();
+    expect(await screen.findByTestId('update-state')).toHaveTextContent('Last update failed');
+    expect(screen.getByTestId('update-log')).toHaveTextContent('UPDATE FAILED at b');
+    expect(screen.getByTestId('update-summary')).toHaveTextContent('ROLLED BACK to abc');
+  });
+
+  it('a refused request shows the reason and leaves the button usable', async () => {
+    platformUpdateApi.start.mockRejectedValue(new ApiError('API 409 - /x', 409, JSON.stringify({ detail: 'An update is already waiting or running.' })));
+    renderPanel();
+    await userEvent.click(await screen.findByRole('button', { name: 'Update A.C.O.R.N' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Update now' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('already waiting or running');
+    expect(screen.getByRole('button', { name: 'Update A.C.O.R.N' })).toBeEnabled();
+  });
+});

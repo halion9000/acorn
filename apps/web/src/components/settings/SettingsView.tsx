@@ -52,6 +52,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field, PanelHeader, inputClass } from './panel-parts';
 import { AlertEmailPanel } from './AlertEmailPanel';
+import { SoftwareUpdatePanel } from './SoftwareUpdatePanel';
 import { TenantAccessPanel } from './TenantAccessPanel';
 import { AutonomyPolicyPanel } from '@/components/settings/AutonomyPolicy';
 import { useTheme, type ThemePreference } from '@/components/theme/ThemeProvider';
@@ -67,6 +68,7 @@ type TabId =
   | 'api-keys'
   | 'tenant-access'
   | 'alert-email'
+  | 'software-update'
   | 'notifications'
   | 'appearance'
   | 'deployment'
@@ -218,6 +220,12 @@ const TABS: { id: TabId; label: string; description: string; requires?: 'manage_
     requires: 'platform_admin',
   },
   {
+    id: 'software-update',
+    label: 'Update A.C.O.R.N',
+    description: 'Install the latest version.',
+    requires: 'platform_admin',
+  },
+  {
     id: 'notifications',
     label: 'Notifications',
     description: 'How and when A.C.O.R.N should ping you.',
@@ -349,6 +357,7 @@ export function SettingsView() {
               {tab === 'api-keys' && <ApiKeysPanel />}
               {tab === 'tenant-access' && <TenantAccessPanel canGrantAll={capabilities.includes('platform_admin')} />}
               {tab === 'alert-email' && <AlertEmailPanel />}
+              {tab === 'software-update' && <SoftwareUpdatePanel />}
               {tab === 'notifications' && <NotificationsPanel />}
               {tab === 'appearance' && <AppearancePanel />}
               {tab === 'deployment' && <DeploymentAIPanel />}
