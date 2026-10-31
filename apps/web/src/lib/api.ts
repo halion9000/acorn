@@ -2820,6 +2820,8 @@ export interface DashboardMetrics {
     low: number;
     info?: number;
     resolvedToday: number;
+    /** Alerts received in the last 24 hours (new is the count still in status new, not today's arrivals). */
+    newLast24h?: number;
     mttr: number;
   };
   cases: {

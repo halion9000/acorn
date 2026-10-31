@@ -15,7 +15,7 @@ vi.mock('./PipelineHealth', () => ({ PipelineHealth: () => <div>pipeline</div> }
 import { DashboardView } from './DashboardView';
 
 const metrics = (over: Record<string, unknown> = {}) => ({
-  alerts: { total: 321, new: 12, critical: 4, high: 20, medium: 100, low: 150, info: 47, resolvedToday: 9, mttr: 38 },
+  alerts: { total: 321, new: 12, critical: 4, high: 20, medium: 100, low: 150, info: 47, resolvedToday: 9, newLast24h: 5, mttr: 38 },
   cases: { open: 7, inProgress: 3, resolvedThisWeek: 11 },
   sources: [
     { name: 'CrowdStrike', status: 'healthy', count: 200 },
@@ -57,7 +57,7 @@ describe('DashboardView', () => {
     renderView();
     const card = async (label: string) => (await screen.findAllByText(label))[0].parentElement as HTMLElement;
     expect(within(await card('Active Alerts')).getByText('321')).toBeInTheDocument();
-    expect(within(await card('Active Alerts')).getByText('12 new today')).toBeInTheDocument();
+    expect(within(await card('Active Alerts')).getByText('5 in the last 24h · 12 not yet triaged')).toBeInTheDocument();
     expect(within(await card('Critical')).getByText('4')).toBeInTheDocument();
     expect(within(await card('Open Cases')).getByText('7')).toBeInTheDocument();
     expect(within(await card('Open Cases')).getByText('3 in progress')).toBeInTheDocument();

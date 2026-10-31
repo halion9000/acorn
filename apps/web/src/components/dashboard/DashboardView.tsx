@@ -135,6 +135,7 @@ const EMPTY_METRICS: DashboardMetrics = {
     medium: 0,
     low: 0,
     resolvedToday: 0,
+    newLast24h: 0,
     mttr: 0,
   },
   cases: {
@@ -453,7 +454,7 @@ export function DashboardView() {
           <MetricCard
             label="Active Alerts"
             value={metrics.alerts.total}
-            sub={`${metrics.alerts.new} new today`}
+            sub={`${metrics.alerts.newLast24h ?? 0} in the last 24h · ${metrics.alerts.new} not yet triaged`}
             color="blue"
           />
           <MetricCard

@@ -70,3 +70,29 @@ async def test_the_dashboard_answers_and_counts_each_vendor_separately(world):
     assert out.alerts.total == 3 and out.alerts.high == 3
     by_name = {s.name: s.count for s in out.sources}
     assert by_name == {"Huntress (via CORE)": 2}, "the row for CORE's Huntress feed counts Huntress alerts only"
+
+
+async def test_new_means_still_untouched_and_the_last_24_hours_is_counted_separately(world):
+    """The tile once said "N new today" for the count of alerts still in status new, which is every untouched alert however old (3932 of 8377 on the live server)."""
+    owner = create_async_engine(PG_URL, poolclass=NullPool)
+    try:
+        async with owner.begin() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            for status, age in (("new", "3 days"), ("new", "40 days"), ("triaging", "2 hours"), ("resolved", "5 days")):
+                await conn.execute(
+                    text(
+                        "insert into alerts (id, tenant_id, title, severity, status, raw_event, created_at, event_time, first_seen, last_seen) values "
+                        f"(gen_random_uuid(), :t, 'older', 'low', :s, cast('{{}}' as jsonb), now() - interval '{age}', now(), now(), now())"
+                    ),
+                    {"t": world["tenant"], "s": status},
+                )
+        async with world["factory"]() as session:
+            await tag_session(session, world["tenant"])
+            await set_rls_context(session, world["tenant"])
+            out = await get_dashboard_metrics(SimpleNamespace(tenant_id=world["tenant"]), session)
+    finally:
+        await owner.dispose()
+    # 3 alerts from now (all new) + 2 old ones still new + one 2 hours old being worked + one resolved
+    assert out.alerts.total == 7
+    assert out.alerts.new == 5, "every alert still in status new, however old"
+    assert out.alerts.newLast24h == 4, "the 3 from now and the one from 2 hours ago, not the older ones"

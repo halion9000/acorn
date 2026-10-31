@@ -47,7 +47,10 @@ router = APIRouter(prefix="/metrics", tags=["metrics"])
 
 class AlertMetrics(BaseModel):
     total: int
+    # Alerts still in status "new": nobody has started on them. NOT the alerts that arrived today (that is newLast24h).
     new: int
+    # Alerts received in the last 24 hours.
+    newLast24h: int = 0
     critical: int
     high: int
     medium: int
@@ -262,6 +265,7 @@ async def _get_dashboard_metrics_impl(
     shown = Alert.status != "suppressed"
     total_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), shown)))
     new_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), Alert.status == "new")))
+    last_24h_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), shown, Alert.created_at >= now - timedelta(hours=24))))
     critical_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), shown, Alert.severity == "critical")))
     high_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), shown, Alert.severity == "high")))
     medium_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), shown, Alert.severity == "medium")))
@@ -290,6 +294,7 @@ async def _get_dashboard_metrics_impl(
     alert_metrics = AlertMetrics(
         total=total_q or 0,
         new=new_q or 0,
+        newLast24h=last_24h_q or 0,
         critical=critical_q or 0,
         high=high_q or 0,
         medium=medium_q or 0,
