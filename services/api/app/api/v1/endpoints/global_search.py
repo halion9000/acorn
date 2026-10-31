@@ -22,11 +22,12 @@ from app.models.alert import Alert
 from app.models.case import Case
 from app.models.device import Device
 from app.models.inventory import InventoryItem
+from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
 
 router = APIRouter(prefix="/search", tags=["search"])
 
-Kind = Literal["client", "alert", "case", "device", "stock", "nuc"]
+Kind = Literal["client", "person", "alert", "case", "device", "stock", "nuc"]
 PER_KIND = 5
 
 
@@ -78,6 +79,25 @@ async def search(
     async with cross_tenant_reads(db):
         for tid in by_client[:limit]:
             hits.append(Hit(kind="client", id=str(tid), title=names[tid], client=names[tid], client_id=str(tid)))
+        # People (names and e-mail addresses) in the clients' Microsoft and other directories; one hit per person even when several tools list them.
+        people = (
+            await db.execute(
+                select(IdentityMfaUser.tenant_id, IdentityMfaUser.upn, IdentityMfaUser.display_name, IdentityMfaUser.enabled)
+                .where(
+                    IdentityMfaUser.tenant_id.in_(scope),
+                    or_(IdentityMfaUser.upn.ilike(pattern, escape="\\"), IdentityMfaUser.display_name.ilike(pattern, escape="\\")),
+                )
+                .order_by(IdentityMfaUser.display_name, IdentityMfaUser.upn)
+                .limit(limit * 6)
+            )
+        ).all()
+        seen: set[tuple[uuid.UUID, str]] = set()
+        for p in people:
+            key = (p.tenant_id, p.upn.lower())
+            if key in seen or len([h for h in hits if h.kind == "person"]) >= limit:
+                continue
+            seen.add(key)
+            add("person", p.upn, p.display_name or p.upn, p.upn if p.display_name else None, p.tenant_id)
         alerts = (
             await db.execute(
                 select(Alert.id, Alert.title, Alert.severity, Alert.status, Alert.tenant_id)

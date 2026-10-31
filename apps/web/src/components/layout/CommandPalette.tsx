@@ -36,11 +36,13 @@ interface PaletteGroup {
   items: PaletteAction[];
 }
 
-const HIT_LABEL: Record<SearchHit['kind'], string> = { client: 'Client', alert: 'Alert', case: 'Case', device: 'Device', stock: 'Stock', nuc: 'NUC' };
+const HIT_LABEL: Record<SearchHit['kind'], string> = { client: 'Client', person: 'Person', alert: 'Alert', case: 'Case', device: 'Device', stock: 'Stock', nuc: 'NUC' };
 
 /** The page that shows a search result. Devices and stock open their lists already searching for that item. */
 export function hitHref(hit: SearchHit): string {
   switch (hit.kind) {
+    case 'person':
+      return `/identities?${hit.client_id ? `client=${encodeURIComponent(hit.client_id)}&` : ''}search=${encodeURIComponent(hit.id)}`;
     case 'alert':
       return `/alerts/${encodeURIComponent(hit.id)}`;
     case 'case':
@@ -325,7 +327,7 @@ export function CommandPalette() {
                   autoFocus
                   value={query}
                   onValueChange={setQuery}
-                  placeholder="Search anything: clients, alerts, cases, devices, stock… or type a command"
+                  placeholder="Search anything: names, emails, clients, alerts, cases, devices… or type a command"
                   className="flex-1 bg-transparent text-sm text-gray-200 placeholder-gray-500 outline-none"
                 />
                 <kbd className="rounded border border-gray-700 bg-gray-900/70 px-1.5 py-0.5 text-[10px] font-mono text-gray-500">

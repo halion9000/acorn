@@ -252,6 +252,12 @@ export function IdentitiesView() {
   useEffect(() => {
     const wanted = clientFromAddress(window.location.search);
     if (wanted) setClientId(wanted);
+    // A link from the search box (?search=<name or e-mail>) opens the list already searching for that person.
+    const asked = (new URLSearchParams(window.location.search).get('search') ?? '').slice(0, 100);
+    if (asked) {
+      setSearch(asked);
+      setDebounced(asked);
+    }
   }, []);
   const [tool, setTool] = useState('');
   const [alertTool, setAlertTool] = useState('');

@@ -55,6 +55,14 @@ async def world():
                 text("insert into inventory_items (id, tenant_id, kind, name, quantity, status) values (:i, :t, 'stock', :nm, 1, 'checked_in')"),
                 {"i": uuid.uuid4(), "t": tid, "nm": f"Spare router {str(tid)[:4]}"},
             )
+            for source in ("microsoft", "google"):
+                await conn.execute(
+                    text(
+                        "insert into identity_mfa_users (tenant_id, source, user_id, upn, display_name, enabled, admin, licensed, registered, capable, ca_enforced, security_defaults, snapshot_id, refreshed_at) "
+                        "values (:t, :src, :u, :upn, :dn, true, false, true, true, true, false, false, :snap, :n)"
+                    ),
+                    {"t": tid, "src": source, "u": f"{source}-{str(tid)[:6]}", "upn": f"jane.doe@{str(tid)[:6]}.example", "dn": "Jane Doe", "snap": uuid.uuid4(), "n": now},
+                )
     return engine, SimpleNamespace(tenant_id=ids.owner, email="hal@goliveoak.com"), ids
 
 
@@ -62,7 +70,7 @@ async def cleanup(engine, ids):
     every = [ids.owner, ids.acme, ids.birch, ids.stranger, ids.theirs]
     async with engine.begin() as conn:
         await conn.execute(text("set local session_replication_role = replica"))
-        for table in ("alerts", "cases", "devices", "inventory_items"):
+        for table in ("alerts", "cases", "devices", "inventory_items", "identity_mfa_users"):
             await conn.execute(text(f"delete from {table} where tenant_id = any(:t)"), {"t": every})
         await conn.execute(text("delete from tenants where id = any(:t)"), {"t": every})
     await engine.dispose()
@@ -123,5 +131,24 @@ async def test_short_questions_find_nothing_and_a_percent_sign_is_not_a_wildcard
             assert (await run(user, db, "%%")).hits == []
             assert (await run(user, db, "ro_ter")).hits == [], "an underscore matches an underscore, not any character"
             assert len([h for h in (await run(user, db, "router", limit=1)).hits if h.kind == "alert"]) == 1
+    finally:
+        await cleanup(engine, w)
+
+
+async def test_a_name_or_an_email_finds_the_person_once_and_only_inside_the_callers_own_organisation():
+    engine, user, w = await world()
+    try:
+        async with AsyncSession(engine) as db:
+            by_name = await run(user, db, "jane doe")
+            people = [h for h in by_name.hits if h.kind == "person"]
+            assert len(people) == 3, "Live Oak's own and its two clients: listed by two tools each, shown once"
+            assert {h.title for h in people} == {"Jane Doe"}
+            assert all(h.detail and h.detail.startswith("jane.doe@") for h in people)
+            assert str(w.theirs) not in {h.client_id for h in people}
+            by_mail = await run(user, db, f"jane.doe@{str(w.acme)[:6]}")
+            assert [h.client_id for h in by_mail.hits if h.kind == "person"] == [str(w.acme)]
+            as_client = await run(SimpleNamespace(tenant_id=w.acme, email="x@acme.example"), db, "jane")
+            assert len([h for h in as_client.hits if h.kind == "person"]) == 1
+            assert [h.kind for h in (await run(user, db, "jane", limit=2)).hits].count("person") == 2
     finally:
         await cleanup(engine, w)

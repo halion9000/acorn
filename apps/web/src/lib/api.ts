@@ -6770,7 +6770,7 @@ export const azureSpendApi = {
 };
 
 export interface SearchHit {
-  kind: 'client' | 'alert' | 'case' | 'device' | 'stock' | 'nuc';
+  kind: 'client' | 'person' | 'alert' | 'case' | 'device' | 'stock' | 'nuc';
   id: string;
   title: string;
   detail: string | null;

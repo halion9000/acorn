@@ -225,6 +225,8 @@ describe('CommandPalette search', () => {
     expect(hitHref(hit({ kind: 'stock', title: 'Dell Pro 16' }) as never)).toBe('/inventory?search=Dell%20Pro%2016');
     expect(hitHref(hit({ kind: 'nuc', title: 'NUC-1' }) as never)).toBe('/inventory?kind=nuc&search=NUC-1');
     expect(hitHref(hit({ kind: 'client', id: 'c9' }) as never)).toBe('/inventory?client=c9');
+    expect(hitHref(hit({ kind: 'person', id: 'amy@acme.com', client_id: 'c1' }) as never)).toBe('/identities?client=c1&search=amy%40acme.com');
+    expect(hitHref(hit({ kind: 'person', id: 'me@liveoak.example', client_id: null }) as never)).toBe('/identities?search=me%40liveoak.example');
     expect(hitHref(hit({ kind: 'alert', id: 'a/b' }) as never)).toBe('/alerts/a%2Fb');
   });
 });

@@ -432,3 +432,17 @@ describe('the export', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Export failed (500)');
   });
 });
+
+
+describe('arriving from the search box', () => {
+  it('opens already searching for the person, in that client', async () => {
+    window.history.replaceState({}, '', '/identities?client=c1&search=amy%40acme.com');
+    try {
+      show();
+      await waitFor(() => expect(lastQuery()).toMatchObject({ search: 'amy@acme.com', clientId: 'c1' }));
+      expect((screen.getByLabelText('Search people') as HTMLInputElement).value).toBe('amy@acme.com');
+    } finally {
+      window.history.replaceState({}, '', '/');
+    }
+  });
+});
