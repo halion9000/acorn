@@ -1,13 +1,19 @@
 # Compose override for the Azure VM: the services use the managed Postgres instead of the local container.
 #   docker compose -f docker-compose.yml -f infra/azure/docker-compose.azure.yml up -d
-# Generated from docker-compose.yml by reading which services use DATABASE_URL or wait for the postgres service; regenerate it if those change.
+# The database parts were derived from docker-compose.yml by reading which services use DATABASE_URL or wait for the postgres service; redo them if those change.
 # Needs these in the environment (.env), taken from Key Vault, never committed:
+#   ACORN_BIND_IP                 the VM's private address (10.20.1.4): the API and web are published on it, never on 0.0.0.0, so CORE and a VPN can reach them and the internet cannot
 #   AZURE_DATABASE_URL            postgresql+asyncpg://aisoc_app:<aisoc-app-db-password>@<postgres host>:5432/aisoc?ssl=require   (the limited account: row-level security applies)
 #   AZURE_MIGRATION_DATABASE_URL  postgresql+asyncpg://liveoakadmin:<postgres-admin-password>@<postgres host>:5432/aisoc?ssl=require   (the owner: migrations change the schema)
 services:
+  web:
+    ports: !override
+      - "${ACORN_BIND_IP:-127.0.0.1}:3000:3000"
   postgres:
     profiles: ["local-db"]   # not started on the Azure VM
   api:
+    ports: !override
+      - "${ACORN_BIND_IP:-127.0.0.1}:8000:8000"
     environment:
       DATABASE_URL: ${AZURE_DATABASE_URL:?set AZURE_DATABASE_URL}
       MIGRATION_DATABASE_URL: ${AZURE_MIGRATION_DATABASE_URL:?set AZURE_MIGRATION_DATABASE_URL}
