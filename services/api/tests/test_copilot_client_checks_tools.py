@@ -332,3 +332,22 @@ async def test_a_tool_call_with_a_guessed_argument_runs_instead_of_returning_an_
     ):
         out = await ct.execute_copilot_tool("client_changes", {"client_name": "acme", "timeframe": "this week"}, TID, user=user)
     assert "error" not in out and out["changes"][0]["client"] == "Acme Dental"
+
+
+@pytest.mark.asyncio
+async def test_client_checks_finds_a_client_by_the_name_as_typed_not_only_as_stored():
+    """Leafy answered "no issues found" for "XtremeMD" because the client is stored as "Xstreme MD" and only an exact piece of the name matched."""
+    checks = [
+        _check("Xstreme MD", "cipp", "mfa_admins", "not_met", "2 admins have no multi-factor sign-in"),
+        _check("Acme", "cipp", "mfa_admins", "not_met", "1 admin has none"),
+    ]
+    with (
+        patch.object(ct, "_get_session", AsyncMock(return_value=_Session())),
+        patch("app.api.v1.endpoints.client_posture._fleet_checks", _fleet(checks)),
+    ):
+        typed_one_way = await ct.client_checks(tenant_id=TID, client="XtremeMD")
+        typed_another = await ct.client_checks(tenant_id=TID, client="xtreme md")
+        unknown = await ct.client_checks(tenant_id=TID, client="Globex Industries")
+    for out in (typed_one_way, typed_another):
+        assert [r["client"] for r in out["checks"]] == ["Xstreme MD"]
+    assert unknown["checks"] == []

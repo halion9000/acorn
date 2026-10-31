@@ -30,6 +30,7 @@ from app.db.rls import set_rls_context
 from app.db.rls_sessions import mark_tenant
 from app.models.alert import Alert
 from app.services.alert_status import FINISHED_ALERT_STATUSES
+from app.services.client_names import find_clients
 
 
 def _like_pattern(query: str) -> str:
@@ -215,8 +216,9 @@ async def client_checks(
         wanted = {(h["client_id"], h.get("source"), h.get("key")) for h in hits}
         checks = [c for c in checks if (c.client_id, c.source, c.key) in wanted]
     if client and client.strip():
-        needle = client.strip().lower()
-        checks = [c for c in checks if needle in c.client_name.lower()]
+        # By the name as people type it (spaces, punctuation and a slip of a letter do not matter): "XtremeMD" finds "Xstreme MD".
+        wanted = {key for key, _name in find_clients(client, {c.client_id: c.client_name for c in checks})}
+        checks = [c for c in checks if c.client_id in wanted]
     if source and source.strip():
         checks = [c for c in checks if c.source == source.strip()]
     if not include_met:
@@ -245,15 +247,11 @@ async def client_checks(
 
 
 async def _client_by_name(db: AsyncSession, owner: uuid.UUID, name: str) -> tuple[uuid.UUID, str] | list[str] | None:
-    """The one client whose name contains ``name`` (case ignored): ``(id, name)``; a list of the names when several fit; None when none does."""
+    """The one client ``name`` means (see app.services.client_names: case, spaces, punctuation and a slip of a letter are ignored): ``(id, name)``; a list of the names when several fit; None when none does."""
     from app.api.v1.endpoints.client_posture import _scope
 
     _ids, names = await _scope(db, owner, None)
-    needle = name.strip().lower()
-    exact = [(i, n) for i, n in names.items() if n and n.lower() == needle]
-    if len(exact) == 1:
-        return exact[0]
-    fits = [(i, n) for i, n in names.items() if n and needle in n.lower()]
+    fits = find_clients(name, names)
     if len(fits) == 1:
         return fits[0]
     return sorted(n for _, n in fits)[:10] if fits else None
