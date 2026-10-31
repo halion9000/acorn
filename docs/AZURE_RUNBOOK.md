@@ -100,3 +100,6 @@ Run both sides side by side for a few days and compare counts (alerts, devices, 
 - Whether the stack starts cleanly against the managed Postgres (the override renders correctly but has not been run).
 - The exact NinjaOne agent installer for the VMs.
 - Whether the first real deployment needs corrections to the template (the preview does not catch everything, for example backup item names and quota at create time).
+
+### Fixed outbound address (added 2026-10-31)
+A NAT gateway (`liveoak-nat`) with the static public IP `liveoak-nat-ip` (40.78.173.178) is attached to `snet-app` and `snet-core`, so both VMs reach vendor APIs from that one address. Allow it in vendor allowlists (CIPP API client, vCIO Toolbox firewall, others that 403 from Azure). Created with `az` after the first deploy; it is not yet in `main.bicep`, so add it there before any re-deploy. Cost about $35 a month.
