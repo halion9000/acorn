@@ -219,6 +219,20 @@ function sharedSessionCheck(): Promise<SessionState> {
   return inflight;
 }
 
+/**
+ * In a production build, a person with no saved sign-in at all (no access token and no refresh token) goes to the login page straight away. Without this the page
+ * frame stays on screen until the first data request is refused by the server, which over a slow link can take many seconds, and it looks as if no login is asked for.
+ * Returns true when it redirected. Never redirects the login pages themselves, and does nothing in development builds, where the API may not ask for a login.
+ */
+export function redirectIfSignedOut(production: boolean): boolean {
+  if (!production || typeof window === 'undefined') return false;
+  if (getItem(AUTH_TOKEN_KEY) || getItem(AUTH_REFRESH_KEY)) return false;
+  const here = window.location.pathname;
+  if (OWN_AUTH_PREFIXES.some((p) => here === p || here.startsWith(`${p}/`))) return false;
+  sessionHooks.redirectToLogin(`${here}${window.location.search}`);
+  return true;
+}
+
 function endSession(): void {
   clearSession();
   if (typeof window === 'undefined') return;

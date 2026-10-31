@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { SWRConfig } from 'swr';
 import { Sidebar } from './Sidebar';
 import { HiddenPageGuard } from './HiddenPageGuard';
@@ -13,6 +14,7 @@ import { DemoBanner } from '@/components/demo/DemoBanner';
 import { DemoAutoLogin } from '@/components/demo/DemoAutoLogin';
 import { ClientOnly } from '@/components/util/ClientOnly';
 import { isDemoMode } from '@/lib/demoMode';
+import { redirectIfSignedOut } from '@/lib/auth-session';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -23,6 +25,11 @@ export function AppShell({ children }: AppShellProps) {
   // content down to keep the TopBar from sliding underneath it.
   const demo = isDemoMode();
   const topPadClass = demo ? 'pt-[100px]' : 'pt-16';
+
+  // No saved sign-in in a production build: go to the login page now instead of waiting for the first request to be refused. Demo mode signs visitors in by itself.
+  useEffect(() => {
+    if (!demo) redirectIfSignedOut(process.env.NODE_ENV === 'production');
+  }, [demo]);
 
   return (
     // SWR v2 disables `revalidateOnMount` by default whenever `fallbackData`

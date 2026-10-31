@@ -4,6 +4,7 @@ import {
   AUTH_TOKEN_KEY,
   AUTH_USER_KEY,
   authFetch,
+  redirectIfSignedOut,
   sessionHooks,
 } from './auth-session';
 
@@ -191,5 +192,32 @@ describe('authFetch: a 401', () => {
     install(() => json(401));
     await authFetch('/api/v1/cases', { headers: { Authorization: 'Bearer mine' } });
     expect(calls).toHaveLength(1);
+  });
+});
+
+
+describe('redirectIfSignedOut: no saved sign-in goes straight to the login page', () => {
+  it('redirects, keeping where the person was going', () => {
+    expect(redirectIfSignedOut(true)).toBe(true);
+    expect(redirect).toHaveBeenCalledWith('/cases?tab=open');
+  });
+  it('does nothing when there is a saved sign-in of either kind', () => {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, 'tok1');
+    expect(redirectIfSignedOut(true)).toBe(false);
+    window.localStorage.clear();
+    window.localStorage.setItem(AUTH_REFRESH_KEY, 'r1');
+    expect(redirectIfSignedOut(true)).toBe(false);
+    expect(redirect).not.toHaveBeenCalled();
+  });
+  it('does nothing in a development build, where the API may not ask for a login', () => {
+    expect(redirectIfSignedOut(false)).toBe(false);
+    expect(redirect).not.toHaveBeenCalled();
+  });
+  it('never redirects the login pages themselves', () => {
+    window.history.replaceState({}, '', '/login?next=%2Fcases');
+    expect(redirectIfSignedOut(true)).toBe(false);
+    window.history.replaceState({}, '', '/responder/login');
+    expect(redirectIfSignedOut(true)).toBe(false);
+    expect(redirect).not.toHaveBeenCalled();
   });
 });
