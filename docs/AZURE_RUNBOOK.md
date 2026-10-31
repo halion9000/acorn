@@ -103,3 +103,8 @@ Run both sides side by side for a few days and compare counts (alerts, devices, 
 
 ### Fixed outbound address (added 2026-10-31)
 A NAT gateway (`liveoak-nat`) with the static public IP `liveoak-nat-ip` (40.78.173.178) is attached to `snet-app` and `snet-core`, so both VMs reach vendor APIs from that one address. Allow it in vendor allowlists (CIPP API client, vCIO Toolbox firewall, others that 403 from Azure). Created with `az` after the first deploy; it is not yet in `main.bicep`, so add it there before any re-deploy. Cost about $35 a month.
+
+### Timus site-to-site tunnel (connected 2026-10-31)
+Azure VPN gateway `liveoak-vpn` (VpnGw1AZ, 20.236.236.143) to the Timus gateway `170.9.228.183` (local network gateway `timus-chicago`, connection `conn-timus-chicago`). IKEv2, AES256/SHA256, DH group 14, no PFS, 3600 s, policy-based traffic selectors: Timus WireGuard `192.168.249.0/24` and the VNet `10.20.0.0/16` only (add a range on both ends or the tunnel fails). The shared key lives in a private file on the owner's machine (not in Key Vault yet). Diagnostics: connection logging goes to the Log Analytics workspace (IKEDiagnosticLog); read it with `az monitor log-analytics query`. Cost about $153 a month. The tunnel only came up after Timus's side started the connection (Azure's own attempts to 170.9.228.183:500 get no reply).
+
+People reach A.C.O.R.N through two tunnels, which leaves less room per packet (a 1300-byte ping passes, 1350 does not). `infra/azure/install-mss-clamp.sh` (run once on the A.C.O.R.N VM) installs `acorn-mss-clamp.service`, which limits TCP segments for the Timus network to 1280 so large responses do not stall.
