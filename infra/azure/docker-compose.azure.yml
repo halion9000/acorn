@@ -83,6 +83,10 @@ services:
     ports: !override
       - "${ACORN_BIND_IP:-127.0.0.1}:8081:8080"
       - "127.0.0.1:9090:9090"
+    environment:
+      # The intake looks up each sender's push token in the database ACROSS clients (it needs a role that is not limited by row-level security), so it uses the owner connection
+      # (update-acorn.sh derives this from AZURE_MIGRATION_DATABASE_URL when it is missing). Without it the intake answers "temporary lookup failure" and no vendor alert gets in.
+      DATABASE_DSN: ${AZURE_INGEST_DSN:?set AZURE_INGEST_DSN}
     depends_on: !override
       kafka:
         condition: service_healthy

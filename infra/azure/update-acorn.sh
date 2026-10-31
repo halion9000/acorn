@@ -87,7 +87,22 @@ except Exception as e:
 PY
 }
 
+# The intake service needs its own database connection (the owner account, in the postgres:// form with sslmode). Made from the migration URL the first time, kept in .env after that.
+ensure_ingest_dsn() {
+  local envfile=$REPO/.env url
+  grep -q '^AZURE_INGEST_DSN=' "$envfile" && return 0
+  url=$(grep '^AZURE_MIGRATION_DATABASE_URL=' "$envfile" | head -1 | cut -d= -f2-)
+  url=${url#\"}; url=${url%\"}
+  [ -n "$url" ] || { say "FAILED: AZURE_MIGRATION_DATABASE_URL is not in $envfile, so the intake service has no database to use"; return 1; }
+  url=${url/postgresql+asyncpg:/postgres:}; url=${url/postgres+asyncpg:/postgres:}
+  url=${url/ssl=require/sslmode=require}
+  [ -n "$(tail -c1 "$envfile")" ] && echo >> "$envfile"   # a last line with no newline would swallow the new one
+  echo "AZURE_INGEST_DSN=$url" >> "$envfile"
+  say "added AZURE_INGEST_DSN to .env (derived from the migration URL)"
+}
+
 deploy() {  # build and start whatever is checked out now
+  ensure_ingest_dsn || return 1
   # Every build leaves layers behind in containerd's store on the VM's main disk (about 3 GB a build). Keep 10 GB of cache for speed, drop the rest, and stop with a clear
   # message rather than a half-written image if the disk is still nearly full (on 2026-10-31 it filled up and an update failed mid-build).
   docker builder prune -f --keep-storage 10GB >/dev/null 2>&1 || true
