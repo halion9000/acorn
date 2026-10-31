@@ -1,0 +1,15 @@
+{
+  "Name": "LiveOak A.C.O.R.N Deployer",
+  "IsCustom": true,
+  "Description": "Run one-off scripts on the A.C.O.R.N VM through Azure Run Command (v2 resources) and read the result. Nothing else: no VM changes, no other resources. Assigned to the CORE VM's identity, on the A.C.O.R.N VM only, so CORE's rebuild button can deploy.",
+  "Actions": [
+    "Microsoft.Compute/virtualMachines/read",
+    "Microsoft.Compute/virtualMachines/runCommands/read",
+    "Microsoft.Compute/virtualMachines/runCommands/write",
+    "Microsoft.Compute/virtualMachines/runCommands/delete"
+  ],
+  "NotActions": [],
+  "AssignableScopes": [
+    "/subscriptions/34497679-4e8a-41d5-a9ae-a3e03c24981f/resourceGroups/rg-liveoak-ops"
+  ]
+}

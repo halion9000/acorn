@@ -6,6 +6,10 @@
 #   AZURE_DATABASE_URL            postgresql+asyncpg://aisoc_app:<aisoc-app-db-password>@<postgres host>:5432/aisoc?ssl=require   (the limited account: row-level security applies)
 #   AZURE_MIGRATION_DATABASE_URL  postgresql+asyncpg://liveoakadmin:<postgres-admin-password>@<postgres host>:5432/aisoc?ssl=require   (the owner: migrations change the schema)
 services:
+  litellm:
+    # The Azure gateway config lives outside the repository (it points at the CORE VM's Claude link), so an update from git never overwrites it.
+    volumes: !override
+      - /srv/acorn/config/litellm.yaml:/etc/litellm/config.yaml:ro
   web:
     ports: !override
       - "${ACORN_BIND_IP:-127.0.0.1}:3000:3000"

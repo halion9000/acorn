@@ -49,6 +49,24 @@ CORE runs from `C:\CORE` as `liveoakadmin`, started with `corepack pnpm run hud`
 - **Result.** About ten minutes after CORE started with both tokens, 8,498 device rows in the Azure database had been refreshed (newest 03:01 UTC); alerts had not arrived yet.
 - **Start at sign-in.** Scheduled task `CORE autostart` runs `C:\CORE\start-core-azure.ps1` when `liveoakadmin` signs in; the script starts CORE again 30 seconds after it exits (log: `C:\CORE\start-core.log`). It only helps once something signs the account in after a reboot (automatic sign-in); that needs the owner's decision because it keeps the password on the VM.
 
+### Updating A.C.O.R.N from CORE's button (built 2026-10-31, finished with two steps by the owner)
+
+**How it works.** In CORE on the Windows VM, `AISOC_REMOTE_DEPLOY_VM` (set in `C:\CORE\start-core-azure.ps1`) names the A.C.O.R.N VM. The A.C.O.R.N panel's build button then, instead of building with Docker on the CORE VM, asks Azure (signing in with the CORE VM's own identity, no stored secret) to run `infra/azure/update-acorn.sh` on the A.C.O.R.N VM through a Run Command resource, and streams its output into the panel (CORE: `hud/src/aisoc-remote-deploy.ts`). The script pulls `main` with a read-only deploy key, rebuilds, restarts, runs the migrations, waits for every container to be healthy, asks the AI gateway a test question, and **rolls back to the previous commit if any step fails** (`--rollback` goes back to the last commit that passed; `--verify-only` changes nothing and just checks). Log: `/srv/acorn/update.log` on the VM. Migrations are not rolled back.
+
+**Settings that survive an update** (git does not hold them): `/srv/acorn/AiSOC/.env`, `/srv/acorn/config/litellm.yaml` (the AI gateway, pointing at the CORE VM's Claude link on `10.20.2.4:4871`), `/root/.ssh/acorn_deploy` (the deploy key).
+
+**Done and checked (2026-10-31):** the update script is on the VM and `--verify-only` passes (migrations current, 20 containers healthy, the AI test answered "pong" through the CORE VM's Claude link); the deploy key pair exists on the VM; the CORE code with the remote mode is on the CORE VM (tests: 8 for the remote run, 6 for the Claude link listener).
+
+**Two steps that need the owner (tomorrow):**
+
+1. **Add the deploy key to GitHub** (read-only): repository `halion9000/acorn`, Settings, Deploy keys, Add deploy key. Title `acorn-azure-vm`, leave **Allow write access unchecked**, paste this public key:
+
+   `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKhOM415tV08FnMTTmR3D0ANHYC/WEvpbvv/MGGBD+3p acorn-azure-vm deploy (read-only)`
+
+2. **Give the CORE VM's identity the narrow deployer role.** In a PowerShell where `az login` was done as an Owner: `.\infra\azure\grant-deployer.ps1` (creates the custom role from `role-acorn-deployer.json` and assigns it on the A.C.O.R.N VM only: read the VM; read, write and delete its Run Command resources). The assistant's attempt to do this was refused by its permission check, so it is left for you (or allow it).
+
+**Then, together:** (a) from the A.C.O.R.N VM, `ssh -T -i /root/.ssh/acorn_deploy git@github.com` should greet the repository; (b) run `update-acorn.sh` once (the first run turns the unpacked archive into a git checkout; it keeps `.env`); (c) press the button in CORE: the panel should show the run and end with `UPDATE OK`; (d) push a harmless commit and press it again to see a real update, and, if you like, a deliberately broken one to see the rollback.
+
 ## 2. Reach the machines
 
 Install the NinjaOne agent on both VMs through each VM's Run Command (Azure portal > the VM > Run command), using the organisation's installer. From then on use the NinjaOne remote session. Add NordLayer or Tailscale later; neither is needed for the steps below.
