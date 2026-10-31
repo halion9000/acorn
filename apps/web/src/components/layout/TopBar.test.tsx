@@ -152,11 +152,29 @@ describe('TopBar: who is signed in, and signing out', () => {
     pathnameMock.mockReturnValue('/cases');
   });
 
-  it('has a Setup Guide button that opens the ACORN Setup Guide, and titles the guide page', () => {
+  it('has no Setup Guide button in the bar (the guide stays under Settings), and still titles the guide page', () => {
     pathnameMock.mockReturnValue('/settings/guide');
     renderTopBar();
-    expect(screen.getByRole('link', { name: 'Open the ACORN Setup Guide' })).toHaveAttribute('href', '/settings/guide');
+    expect(screen.queryByRole('link', { name: 'Open the ACORN Setup Guide' })).toBeNull();
+    expect(screen.queryByText('Setup Guide')).toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('ACORN Setup Guide');
+  });
+
+  it('the search box just says what it does, and keeps the shortcut', () => {
+    renderTopBar();
+    const box = screen.getByRole('button', { name: 'Open command palette' });
+    expect(box).toHaveTextContent('Search anything');
+    expect(box.textContent).not.toMatch(/people|clients|alerts|cases/);
+  });
+
+  it('keeps every control in a right-hand group that cannot shrink, so nothing is pushed off the edge', () => {
+    renderTopBar();
+    const signOut = screen.getByRole('button', { name: /sign out/i });
+    let group: HTMLElement | null = signOut.parentElement;
+    while (group && !group.className.toString().includes('shrink-0')) group = group.parentElement;
+    expect(group).not.toBeNull();
+    expect(group!.className).toContain('items-center');
+    expect(group!.querySelector('[aria-label="Open the ACORN Setup Guide"]')).toBeNull();
   });
 
   it('offers a Sign out button', () => {

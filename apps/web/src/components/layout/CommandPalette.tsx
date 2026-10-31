@@ -327,7 +327,7 @@ export function CommandPalette() {
                   autoFocus
                   value={query}
                   onValueChange={setQuery}
-                  placeholder="Search anything: names, emails, clients, alerts, cases, devices… or type a command"
+                  placeholder="Search anything, or type a command"
                   className="flex-1 bg-transparent text-sm text-gray-200 placeholder-gray-500 outline-none"
                 />
                 <kbd className="rounded border border-gray-700 bg-gray-900/70 px-1.5 py-0.5 text-[10px] font-mono text-gray-500">

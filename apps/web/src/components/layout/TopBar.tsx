@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { authApi, type AuthUser } from '@/lib/api';
 import { unsubscribeFromPush } from '@/lib/pwa';
@@ -181,19 +180,19 @@ export function TopBar({ demoOffset = false }: TopBarProps) {
 
   return (
     <header
-      className={`fixed left-60 right-0 h-16 flex items-center justify-between px-6 bg-surface-raised/90 backdrop-blur-sm border-b border-surface-border z-20 ${
+      className={`fixed left-60 right-0 h-16 flex items-center justify-between gap-3 px-4 xl:px-6 bg-surface-raised/90 backdrop-blur-sm border-b border-surface-border z-20 ${
         demoOffset ? 'top-9' : 'top-0'
       }`}
     >
       {/* Page title */}
       {/* The description is dropped on narrower windows (a laptop, or the console inside CORE): wrapped into a narrow column it ran out of the bar. */}
-      <div className="min-w-0 shrink-0 max-w-[16rem]">
+      <div className="min-w-0 shrink max-w-[12rem] xl:max-w-[16rem]">
         <h1 className="truncate text-base font-semibold text-fg-primary leading-tight">{routeInfo.title}</h1>
         <p className="hidden truncate text-xs text-fg-subtle xl:block">{routeInfo.description}</p>
       </div>
 
       {/* Center: command palette launcher */}
-      <div className="flex-1 max-w-lg mx-8">
+      <div className="min-w-0 flex-1 max-w-lg xl:mx-4">
         <button
           type="button"
           onClick={openPalette}
@@ -214,7 +213,7 @@ export function TopBar({ demoOffset = false }: TopBarProps) {
             />
           </svg>
           <span className="flex-1 truncate text-fg-muted group-hover:text-fg-secondary">
-            Search anything: people, clients, alerts, cases, devices…
+            Search anything
           </span>
           <kbd className="pointer-events-none rounded bg-surface-hover px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-fg-secondary">
             {shortcut}
@@ -223,7 +222,8 @@ export function TopBar({ demoOffset = false }: TopBarProps) {
       </div>
 
       {/* Right: time window, tenant, role badge, clock, theme toggle, notifications, user */}
-      <div className="flex items-center gap-3">
+      {/* The right-hand group never shrinks and never wraps: everything in it is sized to fit, and the clock's date waits for a wide window. */}
+      <div className="flex shrink-0 items-center gap-2 xl:gap-3">
         {/*
           v1.5 W4: Global time-window selector. Lives next to the tenant
           switcher in the TopBar so every page reads from the same context.
@@ -260,21 +260,8 @@ export function TopBar({ demoOffset = false }: TopBarProps) {
         {/* Clock */}
         <div className="text-right hidden xl:block">
           <p className="text-sm font-mono text-fg-secondary" suppressHydrationWarning>{timeStr}</p>
-          <p className="text-xs text-fg-subtle" suppressHydrationWarning>{dateStr}</p>
+          <p className="hidden text-xs text-fg-subtle 2xl:block" suppressHydrationWarning>{dateStr}</p>
         </div>
-
-        {/* ACORN Setup Guide (under Settings): one click from anywhere. The word waits for xl: so a narrow window (the CORE desktop panel) keeps its room. */}
-        <Link
-          href="/settings/guide"
-          aria-label="Open the ACORN Setup Guide"
-          title="ACORN Setup Guide"
-          className="flex items-center gap-1.5 rounded-lg border border-surface-border px-2 py-1.5 text-sm text-fg-secondary transition-colors hover:border-brand-500/40 hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-          </svg>
-          <span className="hidden xl:inline">Setup Guide</span>
-        </Link>
 
         {/* Theme toggle (WS-F1) */}
         <ThemeToggle />
