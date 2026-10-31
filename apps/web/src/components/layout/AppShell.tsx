@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { SWRConfig } from 'swr';
 import { Sidebar } from './Sidebar';
 import { HiddenPageGuard } from './HiddenPageGuard';
@@ -26,10 +26,17 @@ export function AppShell({ children }: AppShellProps) {
   const demo = isDemoMode();
   const topPadClass = demo ? 'pt-[100px]' : 'pt-16';
 
-  // No saved sign-in in a production build: go to the login page now instead of waiting for the first request to be refused. Demo mode signs visitors in by itself.
+  // In a production build nothing of the console is drawn until this browser is known to hold a saved sign-in. With none, the person goes to the login page straight away
+  // and never sees the page frame (the server refuses every data request without a login anyway, but the frame should not flash up first). Demo mode signs visitors in by
+  // itself, and development builds, where the API may not ask for a login, draw at once.
+  const gated = !demo && process.env.NODE_ENV === 'production';
+  const [signedIn, setSignedIn] = useState(!gated);
   useEffect(() => {
-    if (!demo) redirectIfSignedOut(process.env.NODE_ENV === 'production');
-  }, [demo]);
+    if (!gated) return;
+    if (redirectIfSignedOut(true)) return; // on its way to the login page: stay blank
+    setSignedIn(true);
+  }, [gated]);
+  if (!signedIn) return <div aria-busy="true" className="min-h-screen bg-surface-base" />;
 
   return (
     // SWR v2 disables `revalidateOnMount` by default whenever `fallbackData`
