@@ -101,8 +101,18 @@ ensure_ingest_dsn() {
   say "added AZURE_INGEST_DSN to .env (derived from the migration URL)"
 }
 
+# A "?ssl=require" on AZURE_DATABASE_URL works for the API (SQLAlchemy) but makes every service that opens a raw asyncpg connection (fusion, which saves every alert; the agents' memory and
+# guardrails; cost tracking) fail with "parameter ssl cannot be changed now". Encryption is required through PGSSLMODE in the compose file instead, so the address carries no ssl setting.
+ensure_plain_database_url() {
+  local envfile=$REPO/.env
+  grep -qE '^AZURE_DATABASE_URL=.*[?&]ssl=' "$envfile" || return 0
+  sed -i -E '/^AZURE_DATABASE_URL=/ { s/\?ssl=[a-z-]+&/?/; s/[?&]ssl=[a-z-]+$//; }' "$envfile"
+  say "removed ?ssl= from AZURE_DATABASE_URL in .env (PGSSLMODE=require carries it now)"
+}
+
 deploy() {  # build and start whatever is checked out now
   ensure_ingest_dsn || return 1
+  ensure_plain_database_url
   # Every build leaves layers behind in containerd's store on the VM's main disk (about 3 GB a build). Keep 10 GB of cache for speed, drop the rest, and stop with a clear
   # message rather than a half-written image if the disk is still nearly full (on 2026-10-31 it filled up and an update failed mid-build).
   docker builder prune -f --keep-storage 10GB >/dev/null 2>&1 || true
