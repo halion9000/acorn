@@ -39,6 +39,16 @@ The local database was dumped (read-only) and restored into the managed server t
 
 Not copied, on purpose: ClickHouse, OpenSearch, Neo4j and Qdrant start empty (rebuilt from Postgres and the feeds). The AI features need the Claude shim on the CORE VM and are not working in Azure yet. The VM's code is the archive of commit e960d5af; update it by archiving a newer commit and rebuilding. The API and web are published on the VM's private address only (`ACORN_BIND_IP=10.20.1.4` in `.env`; `http://10.20.1.4:8000` and `:3000`), never on the internet: from the CORE VM, `http://10.20.1.4:8000/health` answers 200, and the CORE VM's identity reads Key Vault (HTTP 200). **This Azure copy runs alongside the local one:** both poll the same vendors, so expect the same alerts to arrive in each.
 
+### CORE on the Windows VM (2026-10-31)
+
+CORE runs from `C:\CORE` as `liveoakadmin`, started with `corepack pnpm run hud` (the bat launcher failed its own Node check on this machine; the start script avoids it). Lessons from getting it to stay up:
+
+- **Memory.** On 8 GB (`Standard_B2ms`) Windows logged low virtual memory at 02:10 and 02:34 with several `claude.exe` processes the biggest users; CORE, ScreenConnect and `claude.exe` died. The VM is now `Standard_B4ms` (4 vCPU, 16 GB).
+- **Two tokens.** CORE needs `AISOC_CORE_API_KEY` and `AISOC_CORE_FEED_TOKEN` in `C:\Users\liveoakadmin\AppData\Local\CORE-AISOC\.env`. The API key comes from `bootstrap_production --rotate-core-key` run in the Azure api container (rotating it there does not touch the local database); the feed token from `python -m app.scripts.ensure_core_feed_token` in the same container. Neither was ever printed. Without the feed token CORE logs "waiting for A.C.O.R.N to issue its forwarding token" and sends nothing.
+- **Profile.** Vendor keys (53 settings, without the Microsoft mailbox tokens), `knowledge`, `workspace`, `roster.json`, `operations.md` and the NinjaOne allowed-scripts list were copied; scheduled jobs and feed cursors were not (so the two CORE copies do not both post, and the Azure one re-sweeps).
+- **Result.** About ten minutes after CORE started with both tokens, 8,498 device rows in the Azure database had been refreshed (newest 03:01 UTC); alerts had not arrived yet.
+- **Start at sign-in.** Scheduled task `CORE autostart` runs `C:\CORE\start-core-azure.ps1` when `liveoakadmin` signs in; the script starts CORE again 30 seconds after it exits (log: `C:\CORE\start-core.log`). It only helps once something signs the account in after a reboot (automatic sign-in); that needs the owner's decision because it keeps the password on the VM.
+
 ## 2. Reach the machines
 
 Install the NinjaOne agent on both VMs through each VM's Run Command (Azure portal > the VM > Run command), using the organisation's installer. From then on use the NinjaOne remote session. Add NordLayer or Tailscale later; neither is needed for the steps below.
