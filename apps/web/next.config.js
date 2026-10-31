@@ -28,6 +28,11 @@ const FUSION_HOST = process.env.FUSION_URL || '';
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@aisoc/ui', '@aisoc/types', '@aisoc/report-card'],
+  // The rewrites below proxy to the API. Next.js gives up on a proxied request after 30 seconds by default, but Leafy's answers can take a minute or more (the AI call goes through the gateway),
+  // and the user then sees a 500 while the API finishes the answer. Three minutes covers the longest chat the API itself allows.
+  experimental: {
+    proxyTimeout: 180_000,
+  },
   // pnpm monorepo: anchor Turbopack at the repository root so it can resolve
   // the hoisted `next` package via apps/web/node_modules/next (symlink into
   // the root .pnpm store). Setting this to __dirname caused Turbopack to

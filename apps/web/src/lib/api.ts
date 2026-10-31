@@ -6749,3 +6749,23 @@ export const platformUpdateApi = {
   },
 };
 
+export interface AzureSpend {
+  configured: boolean;
+  currency: string;
+  month: string;
+  total: number;
+  by_service: Array<{ service: string; cost: number }>;
+  daily: Array<{ date: string; cost: number }>;
+  forecast: number | null;
+  budget: number | null;
+  fetched_at: string | null;
+  stale: boolean;
+  error: string | null;
+}
+
+export const azureSpendApi = {
+  get(refresh = false): Promise<AzureSpend> {
+    return request<AzureSpend>('/api/v1/platform/azure-spend', refresh ? { params: { refresh: true } } : undefined);
+  },
+};
+

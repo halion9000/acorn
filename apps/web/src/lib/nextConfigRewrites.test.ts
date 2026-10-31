@@ -64,3 +64,11 @@ describe('which service answers /api/v1/hunt*', () => {
     expect(await serviceFor('/api/v1/contextual/action')).toBe('agents');
   });
 });
+
+describe('proxy timeout', () => {
+  it('lets a slow Leafy answer finish instead of cutting it off at the Next.js default of 30 seconds', () => {
+    const require = createRequire(import.meta.url);
+    const config = require('../../next.config.js');
+    expect(config.experimental?.proxyTimeout).toBeGreaterThanOrEqual(120_000);
+  });
+});
