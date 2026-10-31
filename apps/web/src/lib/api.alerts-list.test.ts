@@ -48,6 +48,37 @@ describe('alertsApi.list', () => {
     expect(url).not.toMatch(/[?&]user=/);
   });
 
+  it('turns the date range into since and until when it asks, and never sends the range itself', async () => {
+    let url = '';
+    vi.stubGlobal('fetch', async (u: RequestInfo | URL) => {
+      url = String(u);
+      return json({ items: [], total: 0 });
+    });
+    await alertsApi.list({ dateRange: { preset: 'custom', from: '2026-10-01', to: '2026-10-03' } });
+    const q = new URL(url, 'http://x').searchParams;
+    expect(q.get('since')).toBe(new Date(2026, 9, 1).toISOString());
+    expect(q.get('until')).toBe(new Date(2026, 9, 4).toISOString());
+    expect(url).not.toContain('dateRange');
+    expect(url).not.toContain('preset');
+    await alertsApi.list({ dateRange: { preset: 'today' } });
+    const today = new URL(url, 'http://x').searchParams;
+    expect(today.get('since')).toBeTruthy();
+    expect(today.get('until')).toBeTruthy();
+    expect(new Date(today.get('until')!).getTime() - new Date(today.get('since')!).getTime()).toBeGreaterThanOrEqual(23 * 3600_000);
+  });
+
+  it('sends no dates for all time, for no choice, or for a range that cannot be used', async () => {
+    let url = '';
+    vi.stubGlobal('fetch', async (u: RequestInfo | URL) => {
+      url = String(u);
+      return json({ items: [], total: 0 });
+    });
+    for (const dateRange of [undefined, { preset: 'all' as const }, { preset: 'custom' as const, from: '2026-10-05', to: '2026-10-01' }]) {
+      await alertsApi.list({ dateRange });
+      expect(url).not.toMatch(/[?&](since|until)=/);
+    }
+  });
+
   it("still reads rows sent under 'alerts' (older responses)", async () => {
     vi.stubGlobal('fetch', async () => json({ alerts: [{ id: 'old1', title: 'x', severity: 'low', status: 'new', created_at: '2026-10-12T00:00:00Z' }], total: 1 }));
     const out = await alertsApi.list();

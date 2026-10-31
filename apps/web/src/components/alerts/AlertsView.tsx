@@ -18,6 +18,7 @@ import BulkScriptBar from './BulkScriptBar';
 import BulkCloseBar from './BulkCloseBar';
 import { loadFilters, saveFilters } from '@/lib/remembered-filters';
 import { rememberable, restoreFilters } from '@/lib/alert-filter-memory';
+import { DATE_PRESETS, dateRangeError, isDateLimited, type DatePreset } from '@/lib/alert-date-range';
 import { sourceLink } from './AlertContext';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
 
@@ -251,6 +252,48 @@ export function FiltersBar({
         <option value="linked">Has a Halo ticket</option>
         <option value="none">No Halo ticket</option>
       </select>
+      <div className="w-px h-4 bg-gray-700" />
+      <select
+        aria-label="Date range"
+        value={filters.dateRange?.preset ?? 'all'}
+        onChange={(e) => {
+          const preset = e.target.value as DatePreset;
+          onChange({ ...filters, dateRange: preset === 'all' ? undefined : { preset, ...(preset === 'custom' ? { from: filters.dateRange?.from, to: filters.dateRange?.to } : {}) }, page: 1 });
+        }}
+        className="text-xs bg-gray-900 border border-gray-700 text-gray-300 rounded-lg px-2 py-1"
+      >
+        {DATE_PRESETS.map((p) => (
+          <option key={p.value} value={p.value}>
+            {p.label}
+          </option>
+        ))}
+      </select>
+      {filters.dateRange?.preset === 'custom' && (
+        <span className="flex items-center gap-1.5 text-xs text-gray-400">
+          <input
+            type="date"
+            aria-label="From date"
+            value={filters.dateRange.from ?? ''}
+            max={filters.dateRange.to || undefined}
+            onChange={(e) => onChange({ ...filters, dateRange: { preset: 'custom', from: e.target.value || undefined, to: filters.dateRange?.to }, page: 1 })}
+            className="text-xs bg-gray-900 border border-gray-700 text-gray-300 rounded-lg px-2 py-1"
+          />
+          <span aria-hidden>to</span>
+          <input
+            type="date"
+            aria-label="To date"
+            value={filters.dateRange.to ?? ''}
+            min={filters.dateRange.from || undefined}
+            onChange={(e) => onChange({ ...filters, dateRange: { preset: 'custom', from: filters.dateRange?.from, to: e.target.value || undefined }, page: 1 })}
+            className="text-xs bg-gray-900 border border-gray-700 text-gray-300 rounded-lg px-2 py-1"
+          />
+        </span>
+      )}
+      {dateRangeError(filters.dateRange) && (
+        <span role="alert" className="text-xs text-amber-300">
+          {dateRangeError(filters.dateRange)}
+        </span>
+      )}
       <label className="flex items-center gap-1.5 text-xs text-gray-300 cursor-pointer" title="Show one row for each group of repeat alerts (same rule, machine and user): the newest, with how many there are.">
         <input
           type="checkbox"
@@ -797,11 +840,11 @@ export function AlertsTableGrid({
             filter-aware copy is the difference between an analyst thinking
             "the system is broken" and "I should clear my filters".
           */}
-          {filters.severity || filters.status || filters.source || filters.clientId || filters.device || filters.user || filters.search ? (
+          {filters.severity || filters.status || filters.source || filters.clientId || filters.device || filters.user || filters.search || isDateLimited(filters.dateRange) ? (
             <EmptyState
               icon={EmptyStateIcons.search}
               title="No alerts match these filters"
-              description="Try clearing the search text or the severity, status or source filter to widen the search."
+              description="Try clearing the search text, the date range or the severity, status or source filter to widen the search."
               action={
                 <button
                   onClick={() => onFilterChange({ page: 1, pageSize: filters.pageSize ?? 25 })}

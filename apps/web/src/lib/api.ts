@@ -255,6 +255,7 @@ async function request<T>(path: string, options: FetchOptions = {}): Promise<T> 
 
 export { AUTH_TOKEN_KEY, AUTH_REFRESH_KEY, AUTH_USER_KEY } from './auth-session';
 import { AUTH_TOKEN_KEY, AUTH_REFRESH_KEY, AUTH_USER_KEY, authFetch, clearSession } from './auth-session';
+import { rangeToInstants, type AlertDateRange } from './alert-date-range';
 import { getViewedTenantId, homeTenantId, setViewedTenantId, VIEW_AS_ERROR_HEADER } from './tenant-view';
 
 export interface AuthUser {
@@ -1550,6 +1551,8 @@ export interface AlertsResponse {
 }
 
 export interface AlertFilters {
+  /** When the alert was received: all time (the default), today, yesterday, the last 7 or 30 days, or a custom pair of dates. Turned into exact moments when the list is asked for (see alert-date-range.ts). */
+  dateRange?: AlertDateRange;
   severity?: string;
   status?: string;
   source?: string;
@@ -1680,9 +1683,9 @@ export const alertsApi = {
     }>('/api/v1/alerts', {
       // The API query names are snake_case; pageSize and clientId would otherwise be ignored. (No apostrophes or backticks in comments inside a call: the B11 parser reads them as quotes.)
       params: (() => {
-        const { pageSize, clientId, user, ...rest } = filters;
-        // The API calls the person filter person: a query parameter named user reads like the signed-in user.
-        return { ...rest, page_size: pageSize, client_id: clientId, person: user } as unknown as Record<string, string>;
+        const { pageSize, clientId, user, dateRange, ...rest } = filters;
+        // The API calls the person filter person: a query parameter named user reads like the signed-in user. The date range is turned into the two moments the API takes (since, until) now, so a list left open past midnight asks for the right day.
+        return { ...rest, ...rangeToInstants(dateRange), page_size: pageSize, client_id: clientId, person: user } as unknown as Record<string, string>;
       })(),
     });
     return {

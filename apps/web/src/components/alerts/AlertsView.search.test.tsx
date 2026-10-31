@@ -133,3 +133,38 @@ describe('Halo ticket filter', () => {
     expect((screen.getByLabelText('Halo ticket') as HTMLSelectElement).value).toBe('linked');
   });
 });
+
+
+describe('date range', () => {
+  it('defaults to all time and offers today, yesterday, 7 days, 30 days and a custom range', () => {
+    show();
+    const select = screen.getByLabelText('Date range') as HTMLSelectElement;
+    expect(select.value).toBe('all');
+    expect([...select.options].map((o) => o.textContent)).toEqual(['All time', 'Today', 'Yesterday', 'Last 7 days', 'Last 30 days', 'Custom range…']);
+    expect(screen.queryByLabelText('From date')).toBeNull();
+  });
+
+  it('picking a preset filters by it and goes back to page 1; picking All time removes it', () => {
+    const onChange = show();
+    fireEvent.change(screen.getByLabelText('Date range'), { target: { value: '7d' } });
+    expect(onChange).toHaveBeenCalledWith({ page: 1, pageSize: 25, dateRange: { preset: '7d' } });
+    const again = show(vi.fn(), { page: 2, pageSize: 25, dateRange: { preset: '7d' } });
+    fireEvent.change(screen.getAllByLabelText('Date range')[1], { target: { value: 'all' } });
+    expect(again).toHaveBeenCalledWith({ page: 1, pageSize: 25, dateRange: undefined });
+  });
+
+  it('a custom range shows two date boxes, and each one sets its end of the range', () => {
+    const onChange = show(vi.fn(), { page: 1, pageSize: 25, dateRange: { preset: 'custom' } });
+    fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-10-01' } });
+    expect(onChange).toHaveBeenLastCalledWith({ page: 1, pageSize: 25, dateRange: { preset: 'custom', from: '2026-10-01', to: undefined } });
+    fireEvent.change(screen.getByLabelText('To date'), { target: { value: '2026-10-03' } });
+    expect(onChange).toHaveBeenLastCalledWith({ page: 1, pageSize: 25, dateRange: { preset: 'custom', from: undefined, to: '2026-10-03' } });
+  });
+
+  it('shows the chosen dates, and says so when the start is after the end', () => {
+    show(vi.fn(), { page: 1, pageSize: 25, dateRange: { preset: 'custom', from: '2026-10-05', to: '2026-10-01' } });
+    expect((screen.getByLabelText('From date') as HTMLInputElement).value).toBe('2026-10-05');
+    expect((screen.getByLabelText('To date') as HTMLInputElement).value).toBe('2026-10-01');
+    expect(screen.getByRole('alert')).toHaveTextContent('The start date is after the end date.');
+  });
+});

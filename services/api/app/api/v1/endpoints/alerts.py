@@ -768,6 +768,14 @@ async def list_alerts(
     source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
     client_id: uuid.UUID | None = Query(default=None),
     device: str | None = Query(default=None, max_length=255),
+    since: Annotated[
+        datetime | None,
+        Query(description="Only alerts received at or after this time (ISO 8601; a time with no zone counts as UTC)."),
+    ] = None,
+    until: Annotated[
+        datetime | None,
+        Query(description="Only alerts received before this time (ISO 8601; a time with no zone counts as UTC)."),
+    ] = None,
     # Named ``person`` (not ``user``): a query parameter called ``user`` reads like the signed-in user object, and a guard test refuses that name.
     person: Annotated[
         str | None,
@@ -797,6 +805,19 @@ async def list_alerts(
     match either filter — that's intentional; analysts who care about
     confidence should only see alerts that actually carry the signal.
     """
+    # A date range on when the alert was received. The page works out "today", "yesterday" and the like in the person's own time zone and sends the two instants.
+    if since is not None and since.tzinfo is None:
+        since = since.replace(tzinfo=UTC)
+    if until is not None and until.tzinfo is None:
+        until = until.replace(tzinfo=UTC)
+    if since is not None and until is not None and until <= since:
+        raise HTTPException(status_code=422, detail="until must be after since")
+    date_filters: list = []
+    if since is not None:
+        date_filters.append(Alert.created_at >= since)
+    if until is not None:
+        date_filters.append(Alert.created_at < until)
+
     collapse = (
         collapse is True
     )  # called directly (without FastAPI), an omitted parameter is its Query() default, which must not read as "on"
@@ -824,7 +845,7 @@ async def list_alerts(
     )
 
     def filters_for(tenant_id: uuid.UUID) -> list:
-        filters = [Alert.tenant_id == tenant_id]
+        filters = [Alert.tenant_id == tenant_id, *date_filters]
         if severity:
             filters.append(Alert.severity == severity)
         if status == OPEN_STATUS:
@@ -879,7 +900,7 @@ async def list_alerts(
 
     async def add_tally(tid: uuid.UUID) -> int:
         """Add one tenant's counts to the tally and return how many alerts it has (under the ``source`` filter). The caller has the session scoped to that tenant."""
-        base = and_(Alert.tenant_id == tid, Alert.raw_event["source"].astext == source) if source else Alert.tenant_id == tid
+        base = and_(Alert.tenant_id == tid, *date_filters, Alert.raw_event["source"].astext == source) if source else and_(Alert.tenant_id == tid, *date_filters)
         grouped = (
             await db.execute(select(Alert.severity, Alert.status, func.count()).where(base).group_by(Alert.severity, Alert.status))
         ).all()
@@ -957,7 +978,7 @@ async def list_alerts(
                         loaded[alert.id] = alert
             rows = [loaded[alert_id] for _created, alert_id, _tid in page_heads if alert_id in loaded]
 
-    # The tally covers the whole scope, so it doesn't change as the severity / status buttons are used.
+    # The tally covers the whole scope (within the chosen dates), so it doesn't change as the severity / status buttons are used.
     for tid in scope:
         if tid in tallied:
             continue
