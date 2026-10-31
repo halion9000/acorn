@@ -79,6 +79,11 @@ PY
 }
 
 deploy() {  # build and start whatever is checked out now
+  # Every build leaves layers behind in containerd's store on the VM's main disk (about 3 GB a build). Keep 10 GB of cache for speed, drop the rest, and stop with a clear
+  # message rather than a half-written image if the disk is still nearly full (on 2026-10-31 it filled up and an update failed mid-build).
+  docker builder prune -f --keep-storage 10GB >/dev/null 2>&1 || true
+  free_gb=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+  if [ "${free_gb:-0}" -lt 6 ]; then say "NOT ENOUGH DISK: only ${free_gb:-0} GB free on the main disk (need 6): free some space, then update again"; return 1; fi
   say "building..."
   $COMPOSE build 2>&1 | grep -E "^#[0-9]+ (ERROR|DONE)|error|Error" | tail -5
   [ "${PIPESTATUS[0]}" -eq 0 ] || return 1
