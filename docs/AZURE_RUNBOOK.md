@@ -33,6 +33,12 @@ Resource group `rg-liveoak-ops` (Central US): `liveoak-acorn-vm` (Linux, D4s_v6,
 - **The Postgres address.** The server's address is `liveoak-pg-dnzpna3fw56s4.postgres.database.azure.com` (it resolves to 10.20.3.4 from inside the network and port 5432 answers there). The `...liveoak.private...` name the template first printed does not resolve; the template output now gives the right one.
 - **Key Vault from the VMs.** The vault firewall blocked the VMs too, because they reach it over the public path. Both VM subnets now carry a Key Vault service endpoint and the vault allows exactly those two subnets (done with the CLI and written into `main.bicep`). Checked from the Linux VM: its identity reads `postgres-admin-password` and `aisoc-app-db-password` (HTTP 200). The Windows VM has not been checked yet. **Do not re-run `deploy.ps1 -Deploy` on this resource group as it is:** it would generate new admin passwords and overwrite the stored ones.
 
+### Database restored and the stack running (2026-10-30)
+
+The local database was dumped (read-only) and restored into the managed server through a temporary private storage account (deleted afterwards): 155 tables, row counts equal to the local ones at that moment, `aisoc_app` is not a superuser. `AISOC_CREDENTIAL_KEY` was copied unchanged from the running local API into Key Vault (`aisoc-credential-key`). `/srv/acorn/AiSOC/.env` on the VM (mode 600) holds freshly generated service tokens and the two database URLs, built from Key Vault; none of it is committed. The images were built on the VM and `docker compose -f docker-compose.yml -f infra/azure/docker-compose.azure.yml up -d --build` brought up all 20 containers healthy. The API logs `db.rls_enforced role=aisoc_app` (the superuser warning is gone), `/health` answers 200 and the web container answers.
+
+Not copied, on purpose: ClickHouse, OpenSearch, Neo4j and Qdrant start empty (rebuilt from Postgres and the feeds). The AI features need the Claude shim on the CORE VM and are not working in Azure yet. The VM's code is the archive of commit e960d5af; update it by archiving a newer commit and rebuilding. **This Azure copy runs alongside the local one:** both poll the same vendors, so expect the same alerts to arrive in each.
+
 ## 2. Reach the machines
 
 Install the NinjaOne agent on both VMs through each VM's Run Command (Azure portal > the VM > Run command), using the organisation's installer. From then on use the NinjaOne remote session. Add NordLayer or Tailscale later; neither is needed for the steps below.

@@ -80,8 +80,9 @@ def _asyncpg_dsn(url: str) -> tuple[str, dict]:
     kwargs: dict = {}
     remaining: list[tuple[str, str]] = []
     for key, value in pairs:
-        if key == "sslmode":
-            mode = value.lower().strip()
+        if key in ("sslmode", "ssl"):
+            # ``ssl=require`` is how the SQLAlchemy URL the services use asks for TLS (a managed Postgres insists on it); asyncpg's own DSN parser only knows ``sslmode`` and would send ``ssl`` to the server as a setting.
+            mode = {"true": "require", "false": "disable"}.get(value.lower().strip(), value.lower().strip())
             if mode in _SSLMODE_PASSTHROUGH:
                 kwargs["ssl"] = False if mode == "disable" else mode
             continue

@@ -167,3 +167,26 @@ class TestTheSetting:
             and src.count("await run_sql_migrations()") == 2
         )
         assert "run_migrations import _connect" not in src
+
+
+class TestSslInTheServicesUrl:
+    """A managed Postgres insists on TLS and the services say so as ``?ssl=require`` (SQLAlchemy's spelling). asyncpg's own parser only knows ``sslmode``, and sent ``ssl`` to the server as a setting: "parameter ssl cannot be changed now"."""
+
+    @pytest.mark.parametrize(
+        ("query", "expected"),
+        [
+            ("ssl=require", "require"),
+            ("ssl=verify-full", "verify-full"),
+            ("ssl=true", "require"),
+            ("sslmode=require", "require"),
+            ("ssl=disable", False),
+            ("ssl=false", False),
+        ],
+    )
+    def test_ssl_becomes_the_connection_setting_and_leaves_the_url(self, query, expected):
+        dsn, kwargs = rm._asyncpg_dsn(f"postgresql+asyncpg://u:p@db:5432/aisoc?{query}&application_name=x")
+        assert kwargs == {"ssl": expected}
+        assert dsn == "postgresql://u:p@db:5432/aisoc?application_name=x"
+
+    def test_a_url_with_no_ssl_is_unchanged(self):
+        assert rm._asyncpg_dsn("postgresql+asyncpg://u:p@db:5432/aisoc") == ("postgresql://u:p@db:5432/aisoc", {})
