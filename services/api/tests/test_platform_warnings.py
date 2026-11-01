@@ -202,3 +202,17 @@ def test_the_database_query_finds_the_active_feed_token_and_keys_of_the_callers_
     sync.dispose()
     assert found is not None, "the query must work, not be swallowed"
     assert [c["kind"] for c in found] == ["API key ci", "CORE feed token"]
+
+
+def test_alerts_kept_forever_is_a_notice_unless_it_was_said_to_be_intended():
+    out = _w(alerts_kept_forever=True)
+    assert [(w["key"], w["level"]) for w in out] == [("retention", "warn")]
+    assert "RETENTION_ALERTS_DAYS" in out[0]["text"] and "RETENTION_ALERTS_KEEP_FOREVER_OK" in out[0]["text"]
+    assert _w(alerts_kept_forever=False) == []
+
+
+def test_the_notice_follows_the_settings():
+    from app.core.config import Settings
+
+    assert Settings.model_fields["RETENTION_ALERTS_KEEP_FOREVER_OK"].default is False
+    assert Settings.model_fields["RETENTION_ALERTS_DAYS"].default == 0, "nothing starts deleting alerts by itself"

@@ -972,6 +972,7 @@ def platform_warnings(
     failing_connectors: list[str] | None = None,
     secret: dict[str, Any] | None = None,
     old_creds: list[dict[str, Any]] | None = None,
+    alerts_kept_forever: bool = False,
 ) -> list[dict[str, str]]:
     """Plain-language problems worth a person's attention, worst first, built only from what the page already knows (pure; unit-tested)."""
     out: list[dict[str, str]] = []
@@ -1012,6 +1013,14 @@ def platform_warnings(
                 "key": "old_credentials",
                 "level": "warn",
                 "text": f"Credentials not replaced for a long time: {shown}. Rotate them (a new feed token must also be put into CORE).",
+            }
+        )
+    if alerts_kept_forever:
+        out.append(
+            {
+                "key": "retention",
+                "level": "warn",
+                "text": "Alerts are kept forever (no retention period is set), so the database only grows. Set RETENTION_ALERTS_DAYS to a number of days, or RETENTION_ALERTS_KEEP_FOREVER_OK=true if keeping them is intended.",
             }
         )
     if loop and loop.get("slow"):
@@ -1111,6 +1120,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
             failing_connectors=failing,
             secret=secret,
             old_creds=old_creds,
+            alerts_kept_forever=settings.RETENTION_ALERTS_DAYS <= 0 and not settings.RETENTION_ALERTS_KEEP_FOREVER_OK,
         ),
         "old_credentials": old_creds or [],
         "microsoft_secret": secret,
