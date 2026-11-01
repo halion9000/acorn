@@ -26,7 +26,12 @@ async def record_scope(_db, tenant_id):
     yield
 
 
-ep.acting_as_tenant = record_scope  # the real one sets a Postgres setting; these tests run on SQLite
+
+
+@pytest.fixture(autouse=True)
+def _record_scope(monkeypatch):
+    """The real one sets a Postgres setting; these tests run on SQLite. Patched per test (not at import): other alert test files replace the same name, and whichever imported last used to win."""
+    monkeypatch.setattr(ep, "acting_as_tenant", record_scope)
 
 
 def run(fn):
