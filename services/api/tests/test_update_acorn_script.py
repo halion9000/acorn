@@ -88,3 +88,49 @@ def test_every_service_that_gets_the_database_address_also_gets_ssl_required_thr
     with_url = compose.count("DATABASE_URL: ${AZURE_DATABASE_URL:?set AZURE_DATABASE_URL}")
     assert with_url >= 9
     assert compose.count("PGSSLMODE: require") == with_url, "one PGSSLMODE for each service that gets the address"
+
+
+# The statuses the script's last line can carry. CORE (hud/src/aisoc-remote-deploy.test.ts) keeps the same list and reads exactly these: change both together.
+RESULT_STATUSES = ["ok", "up_to_date", "verify_ok", "rollback_ok", "rolled_back", "failed", "verify_failed", "rollback_failed", "busy"]
+
+
+def run_copy_of_script(tmp_path: Path, *args: str):
+    """The real script, with its two fixed folders pointed at temporary ones and the checkout folder missing."""
+    text = SCRIPT.read_text().replace("REPO=/srv/acorn/AiSOC", f"REPO={(tmp_path / 'no-checkout').as_posix()}").replace("STATE=/srv/acorn", f"STATE={tmp_path.as_posix()}")
+    copy = tmp_path / "update-acorn.sh"
+    copy.write_text(text)
+    return subprocess.run([BASH, str(copy), *args], capture_output=True, text=True, timeout=60)
+
+
+def test_every_status_comes_out_as_one_json_line_with_the_status_and_a_commit(tmp_path):
+    import json
+
+    for status in RESULT_STATUSES:
+        program = (
+            f"REPO={tmp_path.as_posix()}\nSTATUS={status}\n"
+            f"eval \"$(sed -n '/^emit_result() {{/p' {SCRIPT.as_posix()})\"\n"
+            "emit_result\n"
+        )
+        out = subprocess.run([BASH, "-c", program], capture_output=True, text=True, timeout=60).stdout.strip()
+        assert out.startswith("RESULT "), out
+        body = json.loads(out[len("RESULT "):])
+        assert body == {"status": status, "commit": "none"}
+
+
+@pytest.mark.skipif(shutil.which("flock") is None, reason="needs flock")
+def test_a_real_run_that_fails_early_still_ends_with_a_failed_result_line(tmp_path):
+    out = run_copy_of_script(tmp_path).stdout.strip().splitlines()
+    assert any("FAILED:" in line and "does not exist" in line for line in out)
+    assert out[-1] == 'RESULT {"status":"failed","commit":"none"}'
+
+
+@pytest.mark.skipif(shutil.which("flock") is None, reason="needs flock")
+def test_a_second_run_while_one_holds_the_lock_ends_with_busy(tmp_path):
+    holder = subprocess.Popen([BASH, "-c", f"exec 9>{(tmp_path / 'update.lock').as_posix()}; flock -n 9; echo held; sleep 20"], stdout=subprocess.PIPE, text=True)
+    try:
+        assert holder.stdout.readline().strip() == "held"
+        result = run_copy_of_script(tmp_path)
+        assert result.stdout.strip().splitlines()[-1] == 'RESULT {"status":"busy","commit":"none"}'
+        assert result.returncode == 3
+    finally:
+        holder.kill()

@@ -31,8 +31,15 @@ for arg in "$@"; do
 done
 
 exec > >(tee -a "$LOG") 2>&1
+
+# The last line of every run is machine-readable: CORE reads the verdict from it instead of from the wording above it.
+# status is one of: ok, up_to_date, verify_ok, rollback_ok, rolled_back, failed, verify_failed, rollback_failed, busy.
+STATUS=failed
+emit_result() { echo "RESULT {\"status\":\"$STATUS\",\"commit\":\"$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo none)\"}"; }
+trap emit_result EXIT
+
 exec 9>"$STATE/update.lock"
-flock -n 9 || { echo "Another update is already running."; exit 3; }
+flock -n 9 || { echo "Another update is already running."; STATUS=busy; exit 3; }
 
 say() { echo "[$(date -u +%H:%M:%S)] $*"; }
 cd "$REPO" || { say "FAILED: $REPO does not exist"; exit 1; }
@@ -129,16 +136,16 @@ deploy() {  # build and start whatever is checked out now
 
 if [ "$MODE" = verify ]; then
   say "verify only (nothing changes). Running commit: $(head_commit)"
-  migrate && healthy && ai_test && say "VERIFY OK" && exit 0
-  say "VERIFY FAILED"; exit 1
+  migrate && healthy && ai_test && say "VERIFY OK" && { STATUS=verify_ok; exit 0; }
+  say "VERIFY FAILED"; STATUS=verify_failed; exit 1
 fi
 
 if [ "$MODE" = rollback ]; then
   [ -s "$STATE/last-good-commit" ] || { say "FAILED: no last-good commit is recorded"; exit 1; }
   target=$(cat "$STATE/last-good-commit")
   say "rolling back from $(head_commit) to $target"
-  git reset --hard "$target" >/dev/null && deploy && ai_test && say "ROLLBACK OK ($target)" && exit 0
-  say "ROLLBACK FAILED"; exit 1
+  git reset --hard "$target" >/dev/null && deploy && ai_test && say "ROLLBACK OK ($target)" && { STATUS=rollback_ok; exit 0; }
+  say "ROLLBACK FAILED"; STATUS=rollback_failed; exit 1
 fi
 
 [ -f "$KEY" ] || { say "FAILED: the deploy key $KEY is missing"; exit 1; }
@@ -151,7 +158,7 @@ before=$(head_commit)
 say "fetching $BRANCH..."
 git fetch -q origin "$BRANCH" || { say "FAILED: could not fetch from GitHub (is the deploy key added to the repository?)"; exit 1; }
 target=$(git rev-parse --short FETCH_HEAD)
-if [ "$before" = "$target" ] && [ "$MODE" != force ]; then say "already up to date at $target"; exit 0; fi
+if [ "$before" = "$target" ] && [ "$MODE" != force ]; then say "already up to date at $target"; STATUS=up_to_date; exit 0; fi
 [ "$before" != none ] && git rev-parse --verify -q "$before" >/dev/null && echo "$before" > "$STATE/previous-commit"
 say "updating $before -> $target"
 git log --oneline "$before..FETCH_HEAD" 2>/dev/null | head -20
@@ -160,6 +167,7 @@ git reset --hard FETCH_HEAD >/dev/null
 if deploy && ai_test; then
   echo "$target" > "$STATE/last-good-commit"
   say "UPDATE OK ($target)"
+  STATUS=ok
   exit 0
 fi
 
@@ -168,6 +176,6 @@ prev=$(cat "$STATE/previous-commit" 2>/dev/null || true)
 if [ -n "$prev" ] && git rev-parse --verify -q "$prev" >/dev/null; then
   say "rolling back to $prev"
   git reset --hard "$prev" >/dev/null
-  if deploy; then say "ROLLED BACK to $prev: A.C.O.R.N is running the old version again"; else say "ROLLBACK ALSO FAILED: look at $LOG"; fi
+  if deploy; then say "ROLLED BACK to $prev: A.C.O.R.N is running the old version again"; STATUS=rolled_back; else say "ROLLBACK ALSO FAILED: look at $LOG"; STATUS=rollback_failed; fi
 fi
 exit 1
