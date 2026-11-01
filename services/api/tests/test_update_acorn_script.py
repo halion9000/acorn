@@ -134,3 +134,17 @@ def test_a_second_run_while_one_holds_the_lock_ends_with_busy(tmp_path):
         assert result.returncode == 3
     finally:
         holder.kill()
+
+
+def test_the_azure_honeytoken_service_gets_a_public_canary_address_not_localhost():
+    import yaml
+
+    class Loader(yaml.SafeLoader):
+        pass
+
+    # docker compose's merge tags (!override, !reset) mean nothing to a plain reader: take the value as it is.
+    Loader.add_multi_constructor("!", lambda loader, suffix, node: loader.construct_sequence(node) if isinstance(node, yaml.SequenceNode) else loader.construct_mapping(node) if isinstance(node, yaml.MappingNode) else loader.construct_scalar(node))
+    compose = yaml.load((SCRIPT.parent / "docker-compose.azure.yml").read_text(), Loader=Loader)  # noqa: S506 - SafeLoader subclass
+    value = compose["services"]["honeytokens"]["environment"]["HONEYTOKEN_CANARY_BASE_URL"]
+    assert value == "${ACORN_PUBLIC_URL:-https://acorn.goliveoak.com}"
+    assert "localhost" not in value
