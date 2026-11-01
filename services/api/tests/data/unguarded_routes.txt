@@ -1,7 +1,7 @@
 # Routes with no authorization guard of any kind. Only ever remove lines. See test_route_authorization_ratchet.py
 #
 # What remains after the guarding passes (all deliberate; see LEFT_LOGIN_ONLY in tests/test_remaining_routes_matrix.py):
-#   PUBLIC by design (also listed, with reasons, in test_anonymous_access_sweep.py): login/refresh, SSO, passkey sign-in,
+#   PUBLIC by design (also listed, with reasons, in test_anonymous_access_sweep.py): login/refresh, SSO (including Sign in with Microsoft: status, start, one-time code exchange), passkey sign-in,
 #     health, OAuth callback, VAPID public key, waitlist signup, public replay links.
 #   PERSONAL to the caller: passkeys, saved views, push subscriptions, on-call settings, /auth/me, own tenant identity.
 #   (The realtime ticket was listed here. It is not personal: it opens the tenant's alert, case, agent and graph streams, so it now needs alerts:read and cases:read.)
@@ -9,6 +9,8 @@
 DELETE /passkeys/credentials/{credential_id} [passkeys.py::revoke_credential]
 DELETE /saved-views/{view_id} [saved_views.py::delete_saved_view]
 GET /auth/me [auth.py::get_me]
+GET /auth/sso/microsoft/login [sso_microsoft.py::microsoft_login]
+GET /auth/sso/status [sso_microsoft.py::sso_status]
 GET /canary/{token_id} [canary.py::canary_visit]
 GET /health [health.py::api_reachability]
 GET /health/pipeline [health.py::get_pipeline_health]
@@ -20,6 +22,7 @@ GET /saved-views [saved_views.py::list_saved_views]
 GET /tenants/me/identity [tenants.py::get_my_tenant_identity]
 PATCH /auth/me/preferences [auth.py::patch_me_preferences]
 POST /auth/logout [auth.py::logout]
+POST /auth/sso/exchange [sso_microsoft.py::exchange]
 PATCH /saved-views/{view_id} [saved_views.py::update_saved_view]
 POST /passkeys/authenticate/begin [passkeys.py::passkey_authenticate_begin]
 POST /passkeys/register/begin [passkeys.py::passkey_register_begin]

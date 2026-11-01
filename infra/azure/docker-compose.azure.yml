@@ -23,6 +23,15 @@ services:
       PGSSLMODE: require   # encryption is required through this setting, not through ?ssl= in the address: services that open raw asyncpg connections cannot read that
       MIGRATION_DATABASE_URL: ${AZURE_MIGRATION_DATABASE_URL:?set AZURE_MIGRATION_DATABASE_URL}
       ACORN_UPDATE_CTL_DIR: /update-ctl   # the Update button's hand-off folder (see acorn-update-runner.sh)
+      MS_SSO_TENANT_ID: ${MS_SSO_TENANT_ID:-}   # Sign in with Microsoft: all four of the first four stay empty = the button is not shown (see docs/SSO_MICROSOFT.md)
+      MS_SSO_CLIENT_ID: ${MS_SSO_CLIENT_ID:-}
+      MS_SSO_CLIENT_SECRET: ${MS_SSO_CLIENT_SECRET:-}
+      MS_SSO_REDIRECT_URI: ${MS_SSO_REDIRECT_URI:-}
+      MS_SSO_GROUP_ID: ${MS_SSO_GROUP_ID:-}
+      MS_SSO_ACORN_TENANT_ID: ${MS_SSO_ACORN_TENANT_ID:-}
+      MS_SSO_NEW_USER_ROLE: ${MS_SSO_NEW_USER_ROLE:-viewer}
+      MS_SSO_PASSWORD_LOGIN: ${MS_SSO_PASSWORD_LOGIN:-admins}
+      MS_SSO_WEB_URL: ${MS_SSO_WEB_URL:-}
       ACORN_AZURE_SPEND_SCOPE: /subscriptions/34497679-4e8a-41d5-a9ae-a3e03c24981f/resourceGroups/rg-liveoak-ops   # Settings > Azure spend reads costs here (read-only, VM identity)
     volumes:
       - /srv/acorn/update-ctl:/update-ctl

@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { authApi } from '@/lib/api';
+import { ssoErrorMessage } from '@/lib/sso-messages';
 
 /**
  * The server refuses further sign-ins (429) after too many failed attempts, and says how long to wait in its own sentence ("Too many failed sign-in attempts. Try again in about
@@ -67,11 +68,48 @@ function LoginInner() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
 
+  const [sso, setSso] = useState<{ microsoft: boolean; password_login: string }>({ microsoft: false, password_login: 'all' });
+  const ssoCode = search?.get('sso') ?? null;
+  const [ssoError, setSsoError] = useState<string | null>(ssoErrorMessage(search?.get('sso_error')));
+  const [finishing, setFinishing] = useState(Boolean(ssoCode));
+
   useEffect(() => {
-    if (authApi.isAuthenticated()) {
+    if (authApi.isAuthenticated() && !ssoCode) {
       router.replace(next);
     }
-  }, [next, router]);
+  }, [next, router, ssoCode]);
+
+  useEffect(() => {
+    let live = true;
+    void authApi.ssoStatus().then((s) => {
+      if (live) setSso(s);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // Back from Microsoft with a one-time code: trade it for a session, then go where the person was headed.
+  useEffect(() => {
+    if (!ssoCode) return;
+    let live = true;
+    authApi
+      .completeSso(ssoCode)
+      .then(() => {
+        if (live) router.replace(next);
+      })
+      .catch((err) => {
+        if (!live) return;
+        console.error('[login] sso failed', err);
+        setFinishing(false);
+        setSsoError('That sign-in link has expired or was already used. Start again.');
+      });
+    return () => {
+      live = false;
+    };
+  }, [ssoCode, next, router]);
+
+  const microsoftHref = `/api/v1/auth/sso/microsoft/login?next=${encodeURIComponent(next)}`;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -129,8 +167,40 @@ function LoginInner() {
             </p>
           </div>
 
+          {finishing ? (
+            <p role="status" className="text-center text-sm text-zinc-400">
+              Finishing sign-in…
+            </p>
+          ) : null}
+
+          {sso.microsoft && !finishing ? (
+            <div className="mb-6 space-y-3">
+              <a
+                href={microsoftHref}
+                className="w-full border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-100 font-medium rounded-xl py-3 px-4 transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 21 21" aria-hidden="true">
+                  <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+                  <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+                  <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+                  <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+                </svg>
+                <span>Sign in with Microsoft</span>
+              </a>
+              <p className="text-center text-xs text-zinc-500">
+                {sso.password_login === 'admins' ? 'Administrators can also sign in with an account name and password.' : 'Or sign in with an account name and password.'}
+              </p>
+            </div>
+          ) : null}
+
+          {ssoError ? (
+            <div role="alert" className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-xs text-red-300">
+              {ssoError}
+            </div>
+          ) : null}
+
           {/* Form */}
-          <form onSubmit={submit} className="space-y-4" noValidate>
+          <form onSubmit={submit} className={finishing ? 'hidden' : 'space-y-4'} noValidate>
             <label className="block">
               <span className="block text-xs uppercase tracking-wider text-zinc-500 mb-2">
                 Account name

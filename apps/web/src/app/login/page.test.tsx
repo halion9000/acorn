@@ -14,7 +14,12 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/lib/api', () => ({
-  authApi: { login: (...args: unknown[]) => login(...args), isAuthenticated: () => isAuthenticated() },
+  authApi: {
+    login: (...args: unknown[]) => login(...args),
+    isAuthenticated: () => isAuthenticated(),
+    ssoStatus: () => Promise.resolve({ microsoft: false, password_login: 'all' }),
+    completeSso: () => Promise.reject(new Error('not used here')),
+  },
 }));
 
 import LoginPage from './page';

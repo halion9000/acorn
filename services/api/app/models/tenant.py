@@ -63,6 +63,8 @@ class User(Base):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     preferences: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # The permanent id of this person at an outside identity provider, "entra:<tenant id>:<object id>" for Microsoft (migration 134). Unique when set; an email address is never used to recognise someone again.
+    external_identity: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

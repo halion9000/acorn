@@ -503,6 +503,7 @@ class TestEveryCreationPathSetsAName:
         """A name made by the model's fallback could collide: code that creates accounts for real must choose one, and make it unique."""
         expected = {
             "api/v1/endpoints/tenants.py": "account_name=name,",
+            "api/v1/endpoints/sso_microsoft.py": "account_name = await unique_account_name(db, upn.split(",
             "services/tenant_provision/provisioner.py": "account_name=await unique_account_name(db, entry.email)",
             "scripts/bootstrap_production.py": "account_name=chosen_name,",
             "scripts/seed_demo.py": 'account_name="demo",',
@@ -514,13 +515,14 @@ class TestEveryCreationPathSetsAName:
         assert an.is_valid_account_name("demo")
 
     def test_no_new_place_constructs_a_user_without_being_listed_here(self):
-        """Every `User(` construction in app/ must be one of the four above (a fifth must be added to the list, with its name set explicitly)."""
+        """Every `User(` construction in app/ must be one of those above (a sixth must be added to the list, with its name set explicitly)."""
         found = []
         for p in APP.rglob("*.py"):
             for _n, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
                 if re.search(r"(?<![\w.])User\(\s*$", line) or re.search(r"(?<![\w.])User\(id=|(?<![\w.])User\(tenant_id=", line):
                     found.append(p.relative_to(APP).as_posix())
         assert sorted(set(found)) == [
+            "api/v1/endpoints/sso_microsoft.py",
             "api/v1/endpoints/tenants.py",
             "scripts/bootstrap_production.py",
             "scripts/seed_demo.py",

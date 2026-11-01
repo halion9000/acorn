@@ -328,6 +328,33 @@ export const authApi = {
     return { ...tokens, user };
   },
 
+  /** Which ways of signing in to offer: the Microsoft button, and whether passwords still work for everyone ("all") or only administrators ("admins"). Never throws: no answer means password only. */
+  async ssoStatus(): Promise<{ microsoft: boolean; password_login: string }> {
+    try {
+      return await request<{ microsoft: boolean; password_login: string }>('/api/v1/auth/sso/status');
+    } catch {
+      return { microsoft: false, password_login: 'all' };
+    }
+  },
+
+  /** Finish a Sign in with Microsoft: the one-time code from the address becomes the same tokens a password sign-in gives. */
+  async completeSso(code: string): Promise<LoginResult> {
+    const tokens = await request<TokenResponse>('/api/v1/auth/sso/exchange', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(AUTH_TOKEN_KEY, tokens.access_token);
+      } catch {
+        /* ignore */
+      }
+    }
+    const user = await request<AuthUser>('/api/v1/auth/me');
+    persistAuth(tokens, user);
+    return { ...tokens, user };
+  },
+
   logout(): void {
     if (typeof window === 'undefined') return;
     clearSession();

@@ -13,6 +13,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select, update
 
 from app.api.v1.deps import AuthUser, DBSession, SessionUser, bearer_scheme, get_current_user
+from app.api.v1.endpoints.sso_microsoft import password_login_allowed
 
 __all__ = ["router", "get_current_user"]
 from app.core.config import settings
@@ -156,6 +157,10 @@ async def login(
         )
 
     await login_throttle.clear_failures(db, request.identifier)  # this name starts again (the client address's count stays)
+
+    # With Microsoft sign-in on, only administrators may still use a password (a way back in if Microsoft or its setup breaks). Said only AFTER the password is right, so it reveals nothing about who has an account.
+    if not password_login_allowed(user.role):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in with Microsoft.")
 
     # Update last login
     await db.execute(update(User).where(User.id == user.id).values(last_login=datetime.now(UTC)))
