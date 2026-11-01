@@ -76,7 +76,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -895,6 +895,19 @@ async def _failing_connectors_or_none(db: Any, user: Any) -> list[str] | None:
         return None
 
 
+SECRET_WARN_DAYS = 30
+SECRET_ERROR_DAYS = 7
+
+
+def secret_expiry_row(expires: str, today: date) -> dict[str, Any] | None:
+    """Days left on the Microsoft client secret from the configured date (YYYY-MM-DD), or None when none is set or the value is not a date (pure)."""
+    try:
+        day = date.fromisoformat((expires or "").strip())
+    except ValueError:
+        return None
+    return {"expires_on": day.isoformat(), "days_left": (day - today).days}
+
+
 def platform_warnings(
     *,
     down: list[str],
@@ -905,6 +918,7 @@ def platform_warnings(
     signins: dict[str, Any] | None,
     loop: dict[str, Any] | None = None,
     failing_connectors: list[str] | None = None,
+    secret: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     """Plain-language problems worth a person's attention, worst first, built only from what the page already knows (pure; unit-tested)."""
     out: list[dict[str, str]] = []
@@ -924,6 +938,16 @@ def platform_warnings(
                 "key": "core",
                 "level": "error",
                 "text": "CORE has not reported for over 15 minutes: no alerts, devices or links arrive while it is silent",
+            }
+        )
+    if secret and secret["days_left"] <= SECRET_WARN_DAYS:
+        left = secret["days_left"]
+        when = "has expired" if left < 0 else "expires today" if left == 0 else f"expires in {left} day{'s' if left != 1 else ''}"
+        out.append(
+            {
+                "key": "microsoft_secret",
+                "level": "error" if left <= SECRET_ERROR_DAYS else "warn",
+                "text": f"The Microsoft sign-in client secret {when} ({secret['expires_on']}): create a new one in Entra (Certificates & secrets) and update it, or nobody can sign in with Microsoft",
             }
         )
     if loop and loop.get("slow"):
@@ -998,6 +1022,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
     pending = await pending_migrations(db)
     loop = loop_lag(time.time())
     failing = await _failing_connectors_or_none(db, user)
+    secret = secret_expiry_row(settings.MICROSOFT_CLIENT_SECRET_EXPIRES, datetime.now(UTC).date())
     return {
         "overall": "degraded" if down else "ok",
         "down": down,
@@ -1019,6 +1044,8 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
             signins=signins,
             loop=loop,
             failing_connectors=failing,
+            secret=secret,
         ),
+        "microsoft_secret": secret,
         "generated_at": datetime.now(UTC),
     }
