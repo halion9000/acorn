@@ -17,7 +17,7 @@
  * the panel says so instead of showing invented content (it used to show a made-up person, workspace and member list).
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { docs } from '@/lib/docs';
 import Link from 'next/link';
@@ -58,6 +58,8 @@ import { TenantAccessPanel } from './TenantAccessPanel';
 import { AutonomyPolicyPanel } from '@/components/settings/AutonomyPolicy';
 import { useTheme, type ThemePreference } from '@/components/theme/ThemeProvider';
 import { authFetch } from '@/lib/auth-session';
+import { AvatarError, avatarFromFile, avatarOf } from '@/lib/avatar';
+import { AddMemberForm } from './AddMemberForm';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -353,7 +355,7 @@ export function SettingsView() {
               className="rounded-xl border border-gray-800 bg-gray-900/40"
             >
               {tab === 'profile' && <ProfilePanel />}
-              {tab === 'workspace' && <WorkspacePanel />}
+              {tab === 'workspace' && <WorkspacePanel canAdd={capabilities.includes('manage_users')} />}
               {tab === 'autonomy' && <AutonomyPolicyPanel />}
               {tab === 'api-keys' && <ApiKeysPanel />}
               {tab === 'tenant-access' && <TenantAccessPanel canGrantAll={capabilities.includes('platform_admin')} />}
@@ -419,6 +421,9 @@ function Toggle({
 
 function ProfilePanel() {
   const [account, setAccount] = useState<AuthUser | null>(null);
+  const [pictureBusy, setPictureBusy] = useState(false);
+  const [pictureProblem, setPictureProblem] = useState<string | null>(null);
+  const pictureInput = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [ready, setReady] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -440,6 +445,23 @@ function ProfilePanel() {
   const update = <K extends 'displayName' | 'title' | 'timezone'>(key: K, value: ProfileData[K]) => {
     setProfile((p) => (p ? { ...p, [key]: value } : p));
     setDirty(true);
+  };
+
+  /** Save a new picture (a File chosen by the person), or remove it (null). Saved at once, on its own: it does not wait for Save changes. */
+  const changePicture = async (file: File | null) => {
+    setPictureProblem(null);
+    setPictureBusy(true);
+    try {
+      const avatar = file ? await avatarFromFile(file) : null;
+      const updated = await authApi.updateUserPreferences({ avatar });
+      setAccount(updated);
+      toast.success(file ? 'Photo updated' : 'Photo removed');
+    } catch (error) {
+      setPictureProblem(error instanceof AvatarError ? error.message : 'Could not save your photo. Try again.');
+    } finally {
+      setPictureBusy(false);
+      if (pictureInput.current) pictureInput.current.value = '';
+    }
   };
 
   const onSave = async () => {
@@ -470,6 +492,7 @@ function ProfilePanel() {
   }
 
   const label = profile.displayName || profile.accountName || profile.email;
+  const picture = avatarOf(account);
   const initials = label
     .split(/[\s@.]+/)
     .filter(Boolean)
@@ -500,22 +523,55 @@ function ProfilePanel() {
         <div className="flex items-center gap-4">
           <div
             aria-hidden
-            className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 text-xl font-semibold text-white ring-2 ring-gray-700"
+            className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-600 text-xl font-semibold text-white ring-2 ring-gray-700"
           >
-            {initials || '?'}
+            {picture ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={picture} alt="" data-testid="profile-avatar" className="h-full w-full object-cover" />
+            ) : (
+              initials || '?'
+            )}
           </div>
           <div className="min-w-0">
             <p className="truncate text-base font-semibold text-gray-100">{profile.displayName || 'Unnamed user'}</p>
             <p className="truncate text-sm text-gray-400">{profile.accountName || profile.email}</p>
-            <p className="mt-1 text-xs text-gray-500">
-              Avatar generated from initials.{' '}
-              <span className="inline-flex items-center gap-1">
-                Custom avatars
-                <span className="text-[10px] font-medium rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5">
-                  Planned for v1.1
-                </span>
-              </span>
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                ref={pictureInput}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                aria-label="Choose a photo"
+                className="sr-only"
+                onChange={(e) => {
+                  const chosen = e.target.files?.[0];
+                  if (chosen) void changePicture(chosen);
+                }}
+              />
+              <button
+                type="button"
+                disabled={pictureBusy}
+                onClick={() => pictureInput.current?.click()}
+                className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-gray-800 disabled:opacity-50"
+              >
+                {pictureBusy ? 'Saving…' : picture ? 'Change photo' : 'Upload photo'}
+              </button>
+              {picture ? (
+                <button
+                  type="button"
+                  disabled={pictureBusy}
+                  onClick={() => void changePicture(null)}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-400 hover:bg-gray-800 hover:text-gray-200 disabled:opacity-50"
+                >
+                  Remove photo
+                </button>
+              ) : null}
+            </div>
+            <p className="mt-1.5 text-xs text-gray-500">A square picture works best. It is cut to a square, shrunk and saved with your account.</p>
+            {pictureProblem ? (
+              <p role="alert" className="mt-1 text-xs text-red-300">
+                {pictureProblem}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -559,9 +615,10 @@ export function workspaceProblem(error: unknown, what: string): string {
   return `Could not load ${what}${detail}.`;
 }
 
-function WorkspacePanel() {
+function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
+  const [adding, setAdding] = useState(false);
   const { data: tenant, error: tenantError, isLoading: tenantLoading } = useSWR<TenantDetails>('settings:workspace', () => tenantsApi.details());
-  const { data: members, error: membersError, isLoading: membersLoading } = useSWR<TenantUser[]>('settings:workspace-members', () => tenantsApi.users());
+  const { data: members, error: membersError, isLoading: membersLoading, mutate: reloadMembers } = useSWR<TenantUser[]>('settings:workspace-members', () => tenantsApi.users());
 
   return (
     <div>
@@ -580,7 +637,15 @@ function WorkspacePanel() {
         </div>
       ) : null}
       <div className="border-t border-gray-800 px-6 py-5">
-        <h3 className="text-sm font-semibold text-gray-200">Members</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-gray-200">Members</h3>
+          {canAdd && !adding ? (
+            <button type="button" onClick={() => setAdding(true)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">
+              Add a member
+            </button>
+          ) : null}
+        </div>
+        {canAdd && adding ? <AddMemberForm onCreated={() => void reloadMembers()} onCancel={() => setAdding(false)} /> : null}
         {membersLoading && !members ? (
           <p role="status" className="mt-1 text-xs text-gray-500">Loading members…</p>
         ) : membersError && !members ? (

@@ -360,3 +360,46 @@ describe('TopBar: who is signed in, and signing out', () => {
   });
 });
 
+describe('TopBar: the picture of the person signed in', () => {
+  const PICTURE = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==';
+  const signedIn = (preferences: Record<string, unknown>) =>
+    window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify({ id: 'u1', username: 'hal', account_name: 'hal.owner', role: 'admin', tenant_id: 't1', preferences }));
+
+  it('shows the initials when there is no picture, and the picture when there is one', async () => {
+    window.localStorage.clear();
+    pathnameMock.mockReturnValue('/dashboard');
+    signedIn({});
+    const first = renderTopBar();
+    expect(await screen.findByText('HA')).toBeInTheDocument();
+    expect(screen.queryByTestId('topbar-avatar')).toBeNull();
+    first.unmount();
+    signedIn({ avatar: PICTURE });
+    renderTopBar();
+    expect(await screen.findByTestId('topbar-avatar')).toHaveAttribute('src', PICTURE);
+  });
+
+  it('never shows a "picture" that is a link to another site', async () => {
+    window.localStorage.clear();
+    pathnameMock.mockReturnValue('/dashboard');
+    signedIn({ avatar: 'https://evil.example/pixel.png' });
+    renderTopBar();
+    expect(await screen.findByText('HA')).toBeInTheDocument();
+    expect(screen.queryByTestId('topbar-avatar')).toBeNull();
+  });
+
+  it('changes at once when the Profile page saves a new picture or removes it, without a reload', async () => {
+    window.localStorage.clear();
+    pathnameMock.mockReturnValue('/dashboard');
+    signedIn({});
+    renderTopBar();
+    await screen.findByText('HA');
+    signedIn({ avatar: PICTURE });
+    window.dispatchEvent(new Event('aisoc:user-updated'));
+    expect(await screen.findByTestId('topbar-avatar')).toHaveAttribute('src', PICTURE);
+    signedIn({});
+    window.dispatchEvent(new Event('aisoc:user-updated'));
+    await waitFor(() => expect(screen.queryByTestId('topbar-avatar')).toBeNull());
+    expect(screen.getByText('HA')).toBeInTheDocument();
+  });
+});
+

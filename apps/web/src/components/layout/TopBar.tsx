@@ -12,6 +12,7 @@ import { TenantSwitcher } from './TenantSwitcher';
 import { RoleBadge } from './RoleBadge';
 import { useTenant } from './TenantProvider';
 import { NotificationsBell } from './NotificationsBell';
+import { avatarOf } from '@/lib/avatar';
 
 // Order matters: longer/more specific paths first so startsWith() picks
 // the right label for nested routes (e.g. /detection/vendor-detections before /detection).
@@ -87,6 +88,10 @@ export function TopBar({ demoOffset = false }: TopBarProps) {
   // Who is signed in. Read in an effect (not during render) so the server render and the first browser render agree.
   useEffect(() => {
     setUser(authApi.currentUser());
+    // The Profile page changes the picture or the name: show it without a reload.
+    const refresh = () => setUser(authApi.currentUser());
+    window.addEventListener('aisoc:user-updated', refresh);
+    return () => window.removeEventListener('aisoc:user-updated', refresh);
   }, []);
 
   const [signingOut, setSigningOut] = useState(false);
@@ -111,6 +116,7 @@ export function TopBar({ demoOffset = false }: TopBarProps) {
   };
   const identity = user?.username || user?.account_name || user?.email || null;
   const initials = identity ? identity.slice(0, 2).toUpperCase() : '?';
+  const picture = avatarOf(user);
 
   // Update the clock every second on the client only (avoids hydration drift).
   useEffect(() => {
@@ -293,9 +299,14 @@ export function TopBar({ demoOffset = false }: TopBarProps) {
         <div className="flex items-center gap-2">
           <div
             aria-hidden
-            className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-xs font-bold text-white"
+            className="w-8 h-8 shrink-0 overflow-hidden rounded-full bg-brand-600 flex items-center justify-center text-xs font-bold text-white"
           >
-            {initials}
+            {picture ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={picture} alt="" data-testid="topbar-avatar" className="h-full w-full object-cover" />
+            ) : (
+              initials
+            )}
           </div>
           {identity ? (
             <div className="hidden xl:block min-w-0">

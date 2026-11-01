@@ -370,6 +370,10 @@ export const authApi = {
     try {
       window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
     } catch { /* ignore */ }
+    // The top bar shows the person's picture and name: tell it the account changed.
+    try {
+      window.dispatchEvent(new Event('aisoc:user-updated'));
+    } catch { /* ignore */ }
     return user;
   },
 };
@@ -467,6 +471,10 @@ export const tenantsApi = {
   /** Everyone in this tenant. Needs `users:read`; a role without it gets a 403. */
   async users(): Promise<TenantUser[]> {
     return request<TenantUser[]>('/api/v1/tenants/me/users');
+  },
+  /** Add a person to this tenant. Needs `users:write`; the server refuses a role that grants more than the caller's own, a taken account name or email, and says why. */
+  async createUser(body: { account_name: string; username?: string; email?: string; password: string; role: string }): Promise<TenantUser> {
+    return request<TenantUser>('/api/v1/tenants/me/users', { method: 'POST', body: JSON.stringify(body) });
   },
 };
 

@@ -2,13 +2,14 @@
 
 import json
 import logging
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select, update
 
 from app.api.v1.deps import AuthUser, DBSession, SessionUser, bearer_scheme, get_current_user
@@ -88,10 +89,38 @@ def _me(user: User) -> UserMeResponse:
     return response
 
 
+AVATAR_MAX_CHARS = 100_000  # a 128 x 128 picture is about 10 000; this leaves room for a sharper one and refuses anything big
+PREFERENCES_MAX_CHARS = 250_000
+_AVATAR = re.compile(r"^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$")
+
+
+def merge_preferences(existing: dict[str, Any] | None, patch: dict[str, Any]) -> dict[str, Any]:
+    """The stored preferences with ``patch`` laid over them (a key in the patch replaces that key). An ``avatar`` set to nothing removes the picture instead of storing an empty one."""
+    merged = {**(existing or {}), **patch}
+    if "avatar" in patch and not patch["avatar"]:
+        merged.pop("avatar", None)
+    return merged
+
+
 class PreferencesPatch(BaseModel):
-    """Partial update payload for user preferences (merged server-side)."""
+    """Partial update payload for user preferences (merged server-side).
+
+    ``avatar`` is the person's picture: a small PNG, JPEG or WebP as a data address (never a link to elsewhere, never an SVG, which can carry script), or empty to remove it.
+    """
 
     preferences: dict[str, Any]
+
+    @model_validator(mode="after")
+    def _check_limits(self) -> "PreferencesPatch":
+        if len(json.dumps(self.preferences, default=str)) > PREFERENCES_MAX_CHARS:
+            raise ValueError("preferences are too large")
+        avatar = self.preferences.get("avatar")
+        if avatar:
+            if not isinstance(avatar, str) or len(avatar) > AVATAR_MAX_CHARS or not _AVATAR.match(avatar):
+                raise ValueError("avatar must be a small PNG, JPEG or WebP picture (a data: address of at most 100 000 characters)")
+        elif "avatar" in self.preferences and avatar not in (None, ""):
+            raise ValueError("avatar must be a picture or empty")
+        return self
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -327,7 +356,7 @@ async def patch_me_preferences(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    merged = {**(user.preferences or {}), **body.preferences}
+    merged = merge_preferences(user.preferences, body.preferences)
     await db.execute(update(User).where(User.id == current_user.user_id).values(preferences=merged))
     await db.commit()
 
