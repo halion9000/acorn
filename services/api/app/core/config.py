@@ -304,6 +304,10 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     RETENTION_SWEEPER_ENABLED: bool = True
     RETENTION_DRY_RUN: bool = False
+    # The platform watching itself (app/workers/platform_watch_worker.py): every five minutes it checks that CORE is still reporting, that connectors that had events have not gone quiet, and that the server has disk and memory left, and emails the alert-email recipients about changes. On by default;
+    # it sends mail only when recipients and the Graph credentials above are set, and always logs changes. A connector counts as quiet after PLATFORM_WATCH_CONNECTOR_SILENT_HOURS without an event (a quiet client can legitimately have none for hours).
+    PLATFORM_WATCH_ENABLED: bool = True
+    PLATFORM_WATCH_CONNECTOR_SILENT_HOURS: int = Field(default=6, ge=1, le=720)
     RETENTION_SWEEP_INTERVAL_SECONDS: int = 21600
     RETENTION_INITIAL_DELAY_SECONDS: int = 300
     RETENTION_BATCH_SIZE: int = 1000

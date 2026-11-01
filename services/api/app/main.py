@@ -41,6 +41,7 @@ from app.workers.hunt_scheduler import run_forever as run_hunt_scheduler
 from app.workers.oauth_refresh import run_forever as run_oauth_refresh
 from app.workers.playbook_dry_run_worker import run_playbook_dry_runs
 from app.workers.retention_sweeper import run_retention_sweeper
+from app.workers.platform_watch_worker import run_platform_watch
 from app.workers.suppression_sweeper import run_suppression_sweeper
 from app.workers.weekly_digest_task import run_forever as run_weekly_digest
 
@@ -443,6 +444,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             logger.warning("retention_sweeper worker failed to start", error=str(exc))
 
+    # The platform watching itself: CORE gone quiet, connectors gone quiet, low disk or memory. Emails the alert-email recipients about changes (app/workers/platform_watch_worker.py).
+    platform_watch_task: asyncio.Task | None = None
+    if settings.PLATFORM_WATCH_ENABLED:
+        try:
+            platform_watch_task = asyncio.create_task(
+                _run_guarded_scheduler_worker(job_name="platform_watch", ttl_seconds=_ALERT_EMAIL_LOCK_TTL_SECONDS, worker=run_platform_watch),
+                name="platform_watch_worker",
+            )
+            logger.info("platform_watch worker started")
+        except Exception as exc:
+            logger.warning("platform_watch worker failed to start", error=str(exc))
+
     # Hide-this-alert-type rules: hide new alerts an active rule covers and lift rules that have run out, every minute.
     suppression_task: asyncio.Task | None = None
     try:
@@ -525,6 +538,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.debug("alert_email worker cancelled during shutdown")
         except Exception as exc:
             logger.warning("alert_email worker shutdown error", error=type(exc).__name__)
+
+    if platform_watch_task is not None and not platform_watch_task.done():
+        platform_watch_task.cancel()
+        try:
+            await platform_watch_task
+        except asyncio.CancelledError:
+            logger.debug("platform_watch worker cancelled during shutdown")
+        except Exception as exc:
+            logger.warning("platform_watch worker shutdown error", error=type(exc).__name__)
 
     if hunt_scheduler_task is not None and not hunt_scheduler_task.done():
         hunt_scheduler_task.cancel()
