@@ -897,6 +897,58 @@ async def _failing_connectors_or_none(db: Any, user: Any) -> list[str] | None:
 
 SECRET_WARN_DAYS = 30
 SECRET_ERROR_DAYS = 7
+# A credential that has never been replaced for this long is worth rotating. The feed token travels in a URL (so it lands in access logs); API keys are long-lived by design.
+FEED_TOKEN_MAX_AGE_DAYS = 180
+API_KEY_MAX_AGE_DAYS = 365
+
+
+def old_credentials(
+    feed_token_created: datetime | None, api_keys: list[tuple[str, datetime | None]], now: datetime
+) -> list[dict[str, Any]]:
+    """Credentials past their age limit, oldest first: the CORE feed token and any active API key (pure). Only names and ages, never a value."""
+
+    def aware(moment: datetime | None) -> datetime | None:
+        return moment if moment is None or moment.tzinfo else moment.replace(tzinfo=UTC)
+
+    out: list[dict[str, Any]] = []
+    feed = aware(feed_token_created)
+    if feed is not None and (now - feed).days >= FEED_TOKEN_MAX_AGE_DAYS:
+        out.append({"kind": "CORE feed token", "age_days": (now - feed).days, "limit_days": FEED_TOKEN_MAX_AGE_DAYS})
+    for name, made in api_keys:
+        created = aware(made)
+        if created is not None and (now - created).days >= API_KEY_MAX_AGE_DAYS:
+            out.append({"kind": f"API key {name}", "age_days": (now - created).days, "limit_days": API_KEY_MAX_AGE_DAYS})
+    return sorted(out, key=lambda c: -c["age_days"])
+
+
+async def _old_credentials_or_none(db: Any, user: Any) -> list[dict[str, Any]] | None:
+    """Old credentials of the caller's own tenant, or None when they cannot be read."""
+    try:
+        from app.models.inbox import TenantInboxToken
+        from app.models.tenant import ApiKey
+
+        feed_dates = (
+            (
+                await db.execute(
+                    select(TenantInboxToken.created_at).where(
+                        TenantInboxToken.tenant_id == user.tenant_id,
+                        TenantInboxToken.label == "core-feed",
+                        TenantInboxToken.revoked_at.is_(None),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        feed = max(
+            feed_dates, key=lambda d: d.replace(tzinfo=d.tzinfo or UTC), default=None
+        )  # the newest active one: the token CORE uses now
+        keys = (
+            await db.execute(select(ApiKey.name, ApiKey.created_at).where(ApiKey.tenant_id == user.tenant_id, ApiKey.is_active.is_(True)))
+        ).all()
+        return old_credentials(feed, [(k.name, k.created_at) for k in keys], datetime.now(UTC))
+    except Exception:  # noqa: BLE001 - extra detail on a health page must not take it down
+        return None
 
 
 def secret_expiry_row(expires: str, today: date) -> dict[str, Any] | None:
@@ -919,6 +971,7 @@ def platform_warnings(
     loop: dict[str, Any] | None = None,
     failing_connectors: list[str] | None = None,
     secret: dict[str, Any] | None = None,
+    old_creds: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, str]]:
     """Plain-language problems worth a person's attention, worst first, built only from what the page already knows (pure; unit-tested)."""
     out: list[dict[str, str]] = []
@@ -948,6 +1001,17 @@ def platform_warnings(
                 "key": "microsoft_secret",
                 "level": "error" if left <= SECRET_ERROR_DAYS else "warn",
                 "text": f"The Microsoft sign-in client secret {when} ({secret['expires_on']}): create a new one in Entra (Certificates & secrets) and update it, or nobody can sign in with Microsoft",
+            }
+        )
+    if old_creds:
+        shown = ", ".join(f"{c['kind']} ({c['age_days']} days)" for c in old_creds[:4]) + (
+            f" and {len(old_creds) - 4} more" if len(old_creds) > 4 else ""
+        )
+        out.append(
+            {
+                "key": "old_credentials",
+                "level": "warn",
+                "text": f"Credentials not replaced for a long time: {shown}. Rotate them (a new feed token must also be put into CORE).",
             }
         )
     if loop and loop.get("slow"):
@@ -1023,6 +1087,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
     loop = loop_lag(time.time())
     failing = await _failing_connectors_or_none(db, user)
     secret = secret_expiry_row(settings.MICROSOFT_CLIENT_SECRET_EXPIRES, datetime.now(UTC).date())
+    old_creds = await _old_credentials_or_none(db, user)
     return {
         "overall": "degraded" if down else "ok",
         "down": down,
@@ -1045,7 +1110,9 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
             loop=loop,
             failing_connectors=failing,
             secret=secret,
+            old_creds=old_creds,
         ),
+        "old_credentials": old_creds or [],
         "microsoft_secret": secret,
         "generated_at": datetime.now(UTC),
     }

@@ -92,3 +92,113 @@ def test_the_secret_warns_from_thirty_days_and_is_an_error_from_seven():
     assert "expires today" in _w(secret={"expires_on": "x", "days_left": 0})[0]["text"]
     assert "has expired" in _w(secret={"expires_on": "x", "days_left": -3})[0]["text"]
     assert _w(secret=None) == []
+
+
+def test_old_credentials_lists_the_feed_token_and_api_keys_past_their_limits_oldest_first():
+    from datetime import UTC, datetime, timedelta
+
+    from app.api.v1.endpoints.health import old_credentials
+
+    now = datetime(2026, 11, 1, tzinfo=UTC)
+    ago = lambda days: now - timedelta(days=days)  # noqa: E731
+    out = old_credentials(ago(200), [("ci", ago(400)), ("new", ago(30)), ("edge", ago(365)), ("none", None)], now)
+    assert [(c["kind"], c["age_days"]) for c in out] == [("API key ci", 400), ("API key edge", 365), ("CORE feed token", 200)]
+    assert old_credentials(ago(179), [("k", ago(364))], now) == []
+    assert old_credentials(None, [], now) == []
+
+
+def test_an_old_credential_is_a_warning_that_names_it_and_never_a_value():
+    out = _w(old_creds=[{"kind": "CORE feed token", "age_days": 200, "limit_days": 180}])
+    assert [(w["key"], w["level"]) for w in out] == [("old_credentials", "warn")]
+    assert "CORE feed token (200 days)" in out[0]["text"] and "put into CORE" in out[0]["text"]
+    assert _w(old_creds=[]) == [] and _w(old_creds=None) == []
+    many = _w(old_creds=[{"kind": f"API key {i}", "age_days": 400 - i, "limit_days": 365} for i in range(6)])
+    assert "and 2 more" in many[0]["text"]
+
+
+def test_the_database_query_finds_the_active_feed_token_and_keys_of_the_callers_tenant(tmp_path):
+    import asyncio
+    import uuid
+    from datetime import UTC, datetime, timedelta
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints.health import _old_credentials_or_none
+    from app.db.database import Base
+    from app.models.inbox import TenantInboxToken
+    from app.models.tenant import ApiKey, Tenant
+    from sqlalchemy import create_engine
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.orm import Session
+    from sqlalchemy.pool import NullPool
+
+    path = tmp_path / "creds.db"
+    sync = create_engine(f"sqlite:///{path}")
+    Base.metadata.create_all(sync, tables=[Tenant.__table__, ApiKey.__table__, TenantInboxToken.__table__])
+    mine, other = (
+        Tenant(id=uuid.uuid4(), name="A", slug="a-" + uuid.uuid4().hex[:6]),
+        Tenant(id=uuid.uuid4(), name="B", slug="b-" + uuid.uuid4().hex[:6]),
+    )
+    now = datetime.now(UTC)
+    old = now - timedelta(days=400)
+    with Session(sync, expire_on_commit=False) as s:
+        s.add_all([mine, other])
+        s.flush()
+        s.add_all(
+            [
+                TenantInboxToken(
+                    token="t-old-feed",
+                    tenant_id=mine.id,
+                    template_id="generic-json",
+                    label="core-feed",
+                    created_at=now - timedelta(days=200),
+                ),
+                TenantInboxToken(
+                    token="t-revoked", tenant_id=mine.id, template_id="generic-json", label="core-feed", created_at=old, revoked_at=now
+                ),
+                TenantInboxToken(token="t-other", tenant_id=other.id, template_id="generic-json", label="core-feed", created_at=old),
+                ApiKey(
+                    id=uuid.uuid4(),
+                    tenant_id=mine.id,
+                    user_id=uuid.uuid4(),
+                    name="ci",
+                    key_prefix="aisoc_aaaaaa",
+                    hashed_key="h1",
+                    scopes=["*"],
+                    is_active=True,
+                    created_at=old,
+                ),
+                ApiKey(
+                    id=uuid.uuid4(),
+                    tenant_id=mine.id,
+                    user_id=uuid.uuid4(),
+                    name="dead",
+                    key_prefix="aisoc_bbbbbb",
+                    hashed_key="h2",
+                    scopes=["*"],
+                    is_active=False,
+                    created_at=old,
+                ),
+                ApiKey(
+                    id=uuid.uuid4(),
+                    tenant_id=other.id,
+                    user_id=uuid.uuid4(),
+                    name="theirs",
+                    key_prefix="aisoc_cccccc",
+                    hashed_key="h3",
+                    scopes=["*"],
+                    is_active=True,
+                    created_at=old,
+                ),
+            ]
+        )
+        s.commit()
+    factory = async_sessionmaker(create_async_engine(f"sqlite+aiosqlite:///{path}", poolclass=NullPool), expire_on_commit=False)
+
+    async def run():
+        async with factory() as db:
+            return await _old_credentials_or_none(db, SimpleNamespace(tenant_id=mine.id))
+
+    found = asyncio.run(run())
+    sync.dispose()
+    assert found is not None, "the query must work, not be swallowed"
+    assert [c["kind"] for c in found] == ["API key ci", "CORE feed token"]
