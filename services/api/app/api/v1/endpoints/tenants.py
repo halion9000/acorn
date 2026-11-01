@@ -604,3 +604,79 @@ async def update_user(
         await db.refresh(user)
 
     return UserResponse.model_validate(user)
+
+
+class ResetPasswordRequest(BaseModel):
+    new_password: str
+
+
+class AdminActionResponse(BaseModel):
+    done: bool
+    detail: str
+
+
+async def _user_the_caller_may_manage(db: Any, current_user: Any, user_id: uuid.UUID) -> User:
+    """The same guards as update_user: same tenant, and never someone who holds more power than the caller."""
+    user = (await db.execute(select(User).where(User.id == user_id, User.tenant_id == current_user.tenant_id))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not current_user.can_grant_role(user.role):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot manage a user whose role grants more than your own.")
+    return user
+
+
+@router.post("/me/users/{user_id}/sign-out", response_model=AdminActionResponse)
+async def sign_user_out_everywhere(
+    user_id: uuid.UUID,
+    current_user: Annotated[AuthUser, Depends(require_permission("users:write"))],
+    db: DBSession,
+) -> AdminActionResponse:
+    """End every session this person holds (a lost laptop, someone who left). They can sign in again unless the account is also deactivated."""
+    from app.core.token_revocation import RevocationUnavailable, sign_out_everywhere  # noqa: PLC0415
+
+    user = await _user_the_caller_may_manage(db, current_user, user_id)
+    try:
+        await sign_out_everywhere(user.id)
+    except RevocationUnavailable:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not end their sessions: the revocation store is unavailable. Try again.",
+        ) from None
+    logger.warning("user signed out everywhere", extra={"acting_user": str(current_user.user_id), "target_user": str(user.id)})
+    return AdminActionResponse(done=True, detail="Every session of this person was ended.")
+
+
+@router.post("/me/users/{user_id}/password", response_model=AdminActionResponse)
+async def reset_user_password(
+    user_id: uuid.UUID,
+    request: ResetPasswordRequest,
+    current_user: Annotated[AuthUser, Depends(require_permission("users:write"))],
+    db: DBSession,
+) -> AdminActionResponse:
+    """Set a new password for a person (they forgot it) and end all their sessions. Someone resetting their OWN password here is refused: use the change-password route, which asks for the current one."""
+    from app.core.password_policy import password_problem  # noqa: PLC0415
+    from app.core.token_revocation import RevocationUnavailable, sign_out_everywhere  # noqa: PLC0415
+
+    user = await _user_the_caller_may_manage(db, current_user, user_id)
+    if user.id == current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Use Change password for your own account; it asks for the current password."
+        )
+    problem = password_problem(request.new_password)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=problem)
+    await db.execute(
+        update(User)
+        .where(User.id == user.id, User.tenant_id == current_user.tenant_id)
+        .values(hashed_password=get_password_hash(request.new_password), updated_at=datetime.now(UTC))
+    )
+    await db.commit()
+    logger.warning("user password reset by an administrator", extra={"acting_user": str(current_user.user_id), "target_user": str(user.id)})
+    try:
+        await sign_out_everywhere(user.id)
+    except RevocationUnavailable:
+        return AdminActionResponse(
+            done=True,
+            detail="Password reset, but their existing sessions could not be ended right now (the revocation store is unavailable). Use Sign out everywhere again shortly.",
+        )
+    return AdminActionResponse(done=True, detail="Password reset. Their sessions were ended: they sign in with the new password.")

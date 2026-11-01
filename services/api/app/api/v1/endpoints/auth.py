@@ -17,15 +17,26 @@ from app.api.v1.endpoints.sso_microsoft import password_login_allowed
 
 __all__ = ["router", "get_current_user"]
 from app.core.config import settings
+from app.core.password_policy import password_problem
 from app.core.security import (
     capabilities_for_role,
     create_access_token,
     create_refresh_token,
     decode_token,
+    get_password_hash,
     known_permissions,
     verify_password_or_equalise,
 )
-from app.core.token_revocation import RevocationUnavailable, claim_refresh, is_revoked, remember_refresh_pair, revoke, spent_pair
+from app.core.token_revocation import (
+    RevocationUnavailable,
+    claim_refresh,
+    is_revoked,
+    remember_refresh_pair,
+    revoke,
+    sign_out_everywhere,
+    signed_out_everywhere,
+    spent_pair,
+)
 from app.core.trusted_proxy import resolve_client_ip
 from app.models.tenant import User
 from app.services import login_throttle
@@ -64,6 +75,16 @@ class LogoutRequest(BaseModel):
 
 class LogoutResponse(BaseModel):
     revoked: bool
+    detail: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class ChangePasswordResponse(BaseModel):
+    changed: bool
     detail: str
 
 
@@ -231,6 +252,36 @@ async def logout(
     return LogoutResponse(revoked=True, detail="Session ended.")
 
 
+@router.post("/password", response_model=ChangePasswordResponse)
+async def change_own_password(body: ChangePasswordRequest, current_user: SessionUser, db: DBSession) -> ChangePasswordResponse:
+    """Change the signed-in person's own password. The current password must be right (a stolen session alone is not enough), the new one must pass the password rule, and every session this person holds is ended,
+    this one included: sign in again with the new password. Wrong current passwords are counted like failed sign-ins."""
+    user = (await db.execute(select(User).where(User.id == current_user.user_id, User.is_active.is_(True)))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    await login_throttle.ensure_not_locked(db, user.account_name, None)
+    if not verify_password_or_equalise(body.current_password, user.hashed_password):
+        await login_throttle.record_failure(db, user.account_name, None)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="The current password is not right.")
+    problem = password_problem(body.new_password, body.current_password)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=problem)
+    await db.execute(
+        update(User).where(User.id == user.id).values(hashed_password=get_password_hash(body.new_password), updated_at=datetime.now(UTC))
+    )
+    await db.commit()
+    try:
+        await sign_out_everywhere(user.id)
+    except RevocationUnavailable:
+        # The password is changed; only the ending of old sessions could not be recorded. Said plainly rather than claiming it happened.
+        return ChangePasswordResponse(
+            changed=True,
+            detail="Password changed, but other sessions could not be ended right now (the revocation store is unavailable). Sign out of them yourself or change it again later.",
+        )
+    logger.info("auth.password_changed user=%s", user.id)
+    return ChangePasswordResponse(changed=True, detail="Password changed. Every session was ended: sign in again with the new password.")
+
+
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(request: RefreshRequest, db: DBSession) -> TokenResponse:
     """Refresh access token using a valid refresh token."""
@@ -242,7 +293,7 @@ async def refresh_token(request: RefreshRequest, db: DBSession) -> TokenResponse
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token") from e
 
-    if await is_revoked(payload.get("jti")):
+    if await is_revoked(payload.get("jti")) or await signed_out_everywhere(payload):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has been revoked")
 
     try:

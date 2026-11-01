@@ -122,3 +122,39 @@ async def spent_pair(jti: str | None) -> str | None:
             return pair
         await asyncio.sleep(_PAIR_WAIT_SECONDS)
     return None
+
+
+# ── Signing a person out everywhere ──────────────────────────────────────────────────────────────────────────────────────
+# Revoking a jti ends one session. To end ALL of a person's sessions (a password was reset, a laptop was lost) a cutoff is recorded instead: every token issued at or before that second is
+# refused, whatever its jti. It lives as long as the longest token (the refresh token), after which nothing older can still be valid. Same failure policy as above: setting it fails loudly,
+# checking it fails open.
+
+_CUTOFF_PREFIX = "aisoc:signed-out-after:"
+
+
+async def sign_out_everywhere(user_id: Any, now: float | None = None) -> None:
+    """Refuse every token this user holds now. Raises RevocationUnavailable if the store cannot be reached."""
+    cutoff = int(now if now is not None else time.time())
+    try:
+        await _get_client().set(_CUTOFF_PREFIX + str(user_id), str(cutoff), ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400 + 3600)
+    except (RedisError, OSError) as exc:
+        logger.warning("token_revocation.sign_out_everywhere_failed", extra={"err": str(exc)})
+        raise RevocationUnavailable("the revocation store is unavailable") from exc
+
+
+async def signed_out_everywhere(payload: dict[str, Any]) -> bool:
+    """True if this token was issued at or before the moment its user was signed out everywhere. A token with no subject or issue time is not judged. Fails OPEN if the store is unreachable."""
+    sub, iat = payload.get("sub"), payload.get("iat")
+    if not sub or iat is None:
+        return False
+    try:
+        raw = await _get_client().get(_CUTOFF_PREFIX + str(sub))
+    except (RedisError, OSError) as exc:
+        logger.warning("token_revocation.cutoff_check_failed_allowing_request", extra={"err": str(exc)})
+        return False
+    if raw is None:
+        return False
+    try:
+        return int(float(iat)) <= int(raw)
+    except (TypeError, ValueError):
+        return False

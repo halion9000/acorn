@@ -40,7 +40,7 @@ from app.api.v1.dev_auth import (
     is_dev_mode,
 )
 from app.core.security import decode_token, has_permission, hash_api_key, permission_in
-from app.core.token_revocation import is_revoked
+from app.core.token_revocation import is_revoked, signed_out_everywhere
 from app.db.database import get_db
 from app.db.rls_hook import tag_session
 from app.db.rls_scope import cross_tenant_reads
@@ -372,7 +372,7 @@ async def _authenticate(
         if user_id is None or token_type != "access":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
         # A token that was signed out (revoked) is refused even though its signature and expiry are still good.
-        if await is_revoked(payload.get("jti")):
+        if await is_revoked(payload.get("jti")) or await signed_out_everywhere(payload):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token has been revoked",
