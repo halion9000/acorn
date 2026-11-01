@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
@@ -99,6 +99,20 @@ class UpdateUserRequest(BaseModel):
 
 class UpdateTenantSettingsRequest(BaseModel):
     settings: dict = {}
+
+
+class RenameWorkspaceRequest(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def _tidy(cls, value: str) -> str:
+        cleaned = " ".join(value.split())
+        if not 2 <= len(cleaned) <= 80:
+            raise ValueError("Use 2 to 80 characters.")
+        if any(ch in cleaned for ch in "<>\x00"):
+            raise ValueError("Leave out < and >.")
+        return cleaned
 
 
 class SelectableTenant(BaseModel):
@@ -435,6 +449,34 @@ async def update_tenant_settings(
 
     result = await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))
     return TenantResponse.model_validate(result.scalar_one())
+
+
+@router.patch("/me/name", response_model=TenantResponse)
+async def rename_my_workspace(
+    request: RenameWorkspaceRequest,
+    current_user: Annotated[AuthUser, Depends(require_permission("settings:write"))],
+    db: DBSession,
+) -> TenantResponse:
+    """Give this workspace its name (shown in Settings and the top bar). The slug and id stay as they are."""
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    before = tenant.name
+    if before != request.name:
+        tenant.name = request.name
+        tenant.updated_at = datetime.now(UTC)
+        await emit_audit(
+            db=db,
+            tenant_id=tenant.id,
+            actor_id=current_user.user_id,
+            actor_email=current_user.email,
+            action="tenant:renamed",
+            resource="tenant",
+            resource_id=str(tenant.id),
+            changes={"before": before, "after": request.name},
+        )
+        await db.commit()
+    return TenantResponse.model_validate(tenant)
 
 
 @router.get("/me/users", response_model=list[UserResponse])

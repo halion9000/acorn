@@ -495,6 +495,10 @@ export const tenantsApi = {
   async details(): Promise<TenantDetails> {
     return request<TenantDetails>('/api/v1/tenants/me');
   },
+  /** Give this workspace its name. Needs `settings:write`; the server tidies the name and says why if it cannot be used. */
+  async rename(name: string): Promise<TenantDetails> {
+    return request<TenantDetails>('/api/v1/tenants/me/name', { method: 'PATCH', body: JSON.stringify({ name }) });
+  },
   /** Everyone in this tenant. Needs `users:read`; a role without it gets a 403. */
   async users(): Promise<TenantUser[]> {
     return request<TenantUser[]>('/api/v1/tenants/me/users');

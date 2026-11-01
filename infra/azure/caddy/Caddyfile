@@ -1,0 +1,13 @@
+# https for A.C.O.R.N on its private address. The token (CF_API_TOKEN) comes from /srv/acorn/caddy/cloudflare.env, never from git.
+acorn.goliveoak.com {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+	encode gzip
+	# Leafy's answers can take minutes; match the web container's own limit.
+	reverse_proxy web:3000 {
+		transport http {
+			response_header_timeout 200s
+		}
+	}
+}

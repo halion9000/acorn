@@ -13,6 +13,21 @@ services:
   web:
     ports: !override
       - "${ACORN_BIND_IP:-127.0.0.1}:3000:3000"
+  caddy:
+    # https in front of the web container (Microsoft sign-in needs an https address). Published only on the private address.
+    build: ./infra/azure/caddy
+    restart: unless-stopped
+    ports:
+      - "${ACORN_BIND_IP:-127.0.0.1}:443:443"
+    env_file:
+      - /srv/acorn/caddy/cloudflare.env
+    volumes:
+      - ./infra/azure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/acorn/caddy/data:/data
+    networks:
+      - aisoc
+    depends_on:
+      - web
   postgres:
     profiles: ["local-db"]   # not started on the Azure VM
   api:

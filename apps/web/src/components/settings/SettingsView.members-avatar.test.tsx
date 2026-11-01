@@ -12,6 +12,8 @@ const updateUserPreferences = vi.hoisted(() => vi.fn());
 const details = vi.hoisted(() => vi.fn());
 const users = vi.hoisted(() => vi.fn());
 const createUser = vi.hoisted(() => vi.fn());
+const rename = vi.hoisted(() => vi.fn());
+const apiErrorDetail = vi.hoisted(() => vi.fn());
 const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 const avatarFromFile = vi.hoisted(() => vi.fn());
@@ -19,8 +21,8 @@ const avatarFromFile = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/api', () => ({
   __esModule: true,
   authApi: { currentUser: () => currentUser(), updateUserPreferences: (p: unknown) => updateUserPreferences(p) },
-  tenantsApi: { details: () => details(), users: () => users(), createUser: (b: unknown) => createUser(b) },
-  apiErrorDetail: () => null,
+  tenantsApi: { details: () => details(), users: () => users(), createUser: (b: unknown) => createUser(b), rename: (n: string) => rename(n) },
+  apiErrorDetail: (e: unknown) => apiErrorDetail(e),
   ApiError: class ApiError extends Error {
     status: number;
     constructor(message: string, status = 500) {
@@ -49,10 +51,11 @@ function renderSettings() {
 }
 
 beforeEach(() => {
-  [currentUser, updateUserPreferences, details, users, createUser, toastSuccess, toastError, avatarFromFile].forEach((m) => m.mockReset());
+  [currentUser, updateUserPreferences, details, users, createUser, rename, apiErrorDetail, toastSuccess, toastError, avatarFromFile].forEach((m) => m.mockReset());
   window.localStorage.clear();
   details.mockResolvedValue(tenant);
   users.mockResolvedValue([member('hal.owner')]);
+  apiErrorDetail.mockReturnValue(null);
 });
 
 const picture = () => new File([new Uint8Array([1, 2, 3])], 'me.png', { type: 'image/png' });
@@ -164,5 +167,51 @@ describe('Settings > Workspace > Add a member', () => {
     expect(await screen.findByTestId('member-added')).toBeInTheDocument();
     await waitFor(() => expect(users.mock.calls.length).toBeGreaterThanOrEqual(2));
     expect(screen.queryByRole('button', { name: 'Add a member' })).toBeNull(); // hidden while the form (or its result) is open
+  });
+});
+
+describe('Settings > Workspace > name and id', () => {
+  const openWorkspace = async () => {
+    renderSettings();
+    await userEvent.click(await screen.findByRole('button', { name: /^workspace/i }));
+  };
+
+  it('no longer shows a Plan tile, and shows the tenant id with a Copy button', async () => {
+    currentUser.mockReturnValue(account);
+    await openWorkspace();
+    expect(await screen.findByTestId('tenant-id')).toHaveTextContent(tenant.id);
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+    expect(screen.queryByText(/^plan$/i)).toBeNull();
+  });
+
+  it('lets a manager rename the workspace and reloads it', async () => {
+    currentUser.mockReturnValue(account);
+    rename.mockResolvedValue({ ...tenant, name: 'Live Oak IT Partners' });
+    await openWorkspace();
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename' }));
+    const box = screen.getByLabelText('Workspace name');
+    await userEvent.clear(box);
+    await userEvent.type(box, 'Live Oak IT Partners');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(rename).toHaveBeenCalledWith('Live Oak IT Partners'));
+    expect(toastSuccess).toHaveBeenCalledWith('Workspace renamed');
+    await waitFor(() => expect(details.mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("shows the server's reason when the name is refused", async () => {
+    currentUser.mockReturnValue(account);
+    rename.mockRejectedValue(new Error('x'));
+    apiErrorDetail.mockReturnValue('Use 2 to 80 characters.');
+    await openWorkspace();
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Use 2 to 80 characters.');
+  });
+
+  it('offers no Rename to someone who cannot manage the workspace', async () => {
+    currentUser.mockReturnValue({ ...account, role: 'viewer', capabilities: [] });
+    await openWorkspace();
+    await screen.findByTestId('tenant-id');
+    expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
   });
 });

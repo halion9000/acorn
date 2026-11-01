@@ -197,7 +197,7 @@ describe('Settings > Workspace', () => {
 
     expect(await screen.findByText('Live Oak IT')).toBeInTheDocument();
     expect(screen.getByText(tenant.id)).toBeInTheDocument();
-    expect(screen.getByText('open-source')).toBeInTheDocument();
+    expect(screen.queryByText('open-source')).toBeNull(); // the plan is a leftover label, not shown
     expect(screen.getByText('October 7th, 2026')).toBeInTheDocument();
     expect(await screen.findByText('2 members in this workspace.')).toBeInTheDocument();
     expect(screen.getByText('hal')).toBeInTheDocument();

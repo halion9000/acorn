@@ -29,6 +29,7 @@ import { safeDistance, safeFormat } from '@/lib/safe-date';
 import toast from 'react-hot-toast';
 import {
   ApiError,
+  apiErrorDetail,
   apiKeysApi,
   authApi,
   connectorsApi,
@@ -617,7 +618,7 @@ export function workspaceProblem(error: unknown, what: string): string {
 
 function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
   const [adding, setAdding] = useState(false);
-  const { data: tenant, error: tenantError, isLoading: tenantLoading } = useSWR<TenantDetails>('settings:workspace', () => tenantsApi.details());
+  const { data: tenant, error: tenantError, isLoading: tenantLoading, mutate: reloadTenant } = useSWR<TenantDetails>('settings:workspace', () => tenantsApi.details());
   const { data: members, error: membersError, isLoading: membersLoading, mutate: reloadMembers } = useSWR<TenantUser[]>('settings:workspace-members', () => tenantsApi.users());
 
   return (
@@ -629,9 +630,8 @@ function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
         <div role="alert" className="px-6 py-5 text-sm text-gray-400">{workspaceProblem(tenantError, 'this workspace')}</div>
       ) : tenant ? (
         <div className="grid gap-5 px-6 py-5 sm:grid-cols-2">
-          <InfoTile label="Workspace name" value={tenant.name} />
-          <InfoTile label="Tenant ID" value={tenant.id} mono />
-          <InfoTile label="Plan" value={tenant.plan} />
+          <WorkspaceNameTile name={tenant.name} canEdit={canAdd} onSaved={() => void reloadTenant()} />
+          <TenantIdTile id={tenant.id} />
           <InfoTile label="Created" value={Number.isNaN(new Date(tenant.created_at).getTime()) ? '—' : safeFormat(tenant.created_at, 'PPP')} />
           <InfoTile label="Default locale" value={`${Intl.DateTimeFormat().resolvedOptions().locale} • 24h`} />
         </div>
@@ -674,6 +674,81 @@ function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
           </>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/** The workspace's name, with a Rename control for people who manage the workspace (the server checks the permission and says why if it refuses). */
+function WorkspaceNameTile({ name, canEdit, onSaved }: { name: string; canEdit: boolean; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(name);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await tenantsApi.rename(value);
+      toast.success('Workspace renamed');
+      setEditing(false);
+      onSaved();
+    } catch (err) {
+      setError(apiErrorDetail(err) ?? 'Could not rename the workspace.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="rounded-lg border border-gray-800 bg-gray-950/40 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs uppercase tracking-wide text-gray-500">Workspace name</p>
+        {canEdit && !editing ? (
+          <button type="button" onClick={() => { setValue(name); setEditing(true); }} className="text-xs text-blue-400 hover:text-blue-300">
+            Rename
+          </button>
+        ) : null}
+      </div>
+      {editing ? (
+        <form className="mt-1.5 space-y-2" onSubmit={(e) => { e.preventDefault(); void save(); }}>
+          <input aria-label="Workspace name" className={inputClass()} value={value} onChange={(e) => setValue(e.target.value)} maxLength={80} autoFocus />
+          {error ? <p role="alert" className="text-xs text-red-300">{error}</p> : null}
+          <div className="flex gap-2">
+            <button type="submit" disabled={busy || value.trim().length < 2} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50">
+              {busy ? 'Saving…' : 'Save'}
+            </button>
+            <button type="button" onClick={() => setEditing(false)} className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-200 hover:bg-gray-800">
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <p className="mt-1.5 text-sm text-gray-100">{name}</p>
+      )}
+    </div>
+  );
+}
+
+/** The tenant id, which setup steps ask for (for example the Microsoft sign-in's MS_SSO_ACORN_TENANT_ID), with a button that copies it. */
+function TenantIdTile({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Could not copy. Select the id and copy it by hand.');
+    }
+  };
+  return (
+    <div className="rounded-lg border border-gray-800 bg-gray-950/40 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs uppercase tracking-wide text-gray-500">Tenant ID</p>
+        <button type="button" onClick={() => void copy()} className="text-xs text-blue-400 hover:text-blue-300">
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <p className="mt-1.5 select-all break-all font-mono text-xs text-gray-100" data-testid="tenant-id">{id}</p>
     </div>
   );
 }
