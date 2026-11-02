@@ -302,6 +302,11 @@ const navSections: NavSection[] = [
         icon: <ShieldIcon />,
       },
       {
+        label: 'Vulnerability Scans',
+        href: '/settings/nessus',
+        icon: <ShieldIcon />,
+      },
+      {
         label: 'Client Docs',
         href: '/settings/client-docs',
         icon: <FolderIcon />,

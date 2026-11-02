@@ -25,6 +25,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/settings/client-posture': { title: 'Client Posture', description: 'Devices, Multi-Factor, alerts and cases for one client' },
   '/settings/billing': { title: 'Licences & Counts', description: 'What each tool counts for each client, and every change, to check an invoice against' },
   '/settings/fleet-posture': { title: 'Fleet Posture', description: 'Every client\'s tool checks side by side, with what is about to lapse and what changed' },
+  '/settings/nessus': { title: 'Vulnerability scans', description: 'Nessus scans uploaded for each client, worst findings first' },
   '/settings/dmarc': { title: 'DMARC reports', description: 'What mail receivers saw sent as each client\'s domains, and whether it passed' },
   '/settings/cipp-actions': { title: 'CIPP actions', description: 'What CORE can do through CIPP, whether it is on, and what it was asked to do' },
   '/inventory': { title: 'Inventory', description: 'Stock we hold for clients and the NUCs: who has each item, and what has happened to it' },
