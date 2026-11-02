@@ -110,7 +110,7 @@ function RoleCard({ role, onEdit, onDelete }: { role: Role; onEdit: (r: Role) =>
       )}
       <div className="mt-3 flex flex-wrap gap-1.5">
         {role.permissions.length === 0 ? (
-          <span className="text-xs text-gray-600 italic">No permissions assigned</span>
+          <span className="text-xs text-gray-500 italic">No permissions assigned</span>
         ) : (
           role.permissions.map((p) => <PermissionBadge key={p.id} perm={p} />)
         )}
@@ -145,9 +145,9 @@ function CategoryToggle({ label, ids, selected, onChange }: { label: string; ids
           if (el) el.indeterminate = have > 0 && !all;
         }}
         onChange={() => onChange(ids, !all)}
-        className="rounded border-gray-400 text-indigo-600"
+        className="rounded border-gray-600 bg-gray-950 accent-indigo-500 text-indigo-500"
       />
-      <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">{label}</span>
     </label>
   );
 }
@@ -229,21 +229,21 @@ function RoleForm({ allPermissions, initial, prefill, onClose }: RoleFormProps) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div role="dialog" aria-modal="true" aria-label={initial ? 'Edit role' : 'Create role'} className="w-full max-w-2xl rounded-2xl bg-white text-gray-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">{initial ? 'Edit Role' : 'Create Role'}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800" aria-label="Close">✕</button>
+      <div role="dialog" aria-modal="true" aria-label={initial ? 'Edit role' : 'Create role'} className="w-full max-w-2xl rounded-2xl border border-gray-700 bg-gray-900 text-gray-100 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
+          <h2 className="text-lg font-semibold text-gray-100">{initial ? 'Edit Role' : 'Create Role'}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-200" aria-label="Close">✕</button>
         </div>
         <div className="max-h-[70vh] space-y-4 overflow-y-auto px-6 py-4">
           {prefill && (
-            <p className="rounded bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+            <p className="rounded bg-indigo-500/10 px-3 py-2 text-sm text-indigo-200">
               Started from the built-in role <strong>{prefill.name.replace(/ \(copy\)$/, '')}</strong>. Change anything, then press Create; the built-in role itself stays as it is.
               {leftOut.length > 0 ? ` ${leftOut.length} permission(s) it grants are not offered here and were left out: ${leftOut.join(', ')}.` : ''}
             </p>
           )}
           {!initial && !prefill && (
             <div>
-              <p className="mb-1 text-sm font-medium text-gray-800">Start from</p>
+              <p className="mb-1 text-sm font-medium text-gray-200">Start from</p>
               <div className="flex flex-wrap gap-2">
                 {ROLE_PRESETS.map((p) => (
                   <button
@@ -251,39 +251,39 @@ function RoleForm({ allPermissions, initial, prefill, onClose }: RoleFormProps) 
                     type="button"
                     title={p.description}
                     onClick={() => applyPreset(p.key)}
-                    className="rounded-full border border-gray-300 px-3 py-1 text-xs text-gray-800 hover:border-indigo-500 hover:bg-indigo-50"
+                    className="rounded-full border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:border-indigo-500 hover:bg-indigo-500/10"
                   >
                     {p.label}
                   </button>
                 ))}
               </div>
-              <p className="mt-1 text-xs text-gray-600">Fills in the permissions and what is hidden. Nothing is saved until you press Create.</p>
+              <p className="mt-1 text-xs text-gray-400">Fills in the permissions and what is hidden. Nothing is saved until you press Create.</p>
             </div>
           )}
-          {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          {error && <p className="rounded bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">Name</label>
+            <label className="mb-1 block text-sm font-medium text-gray-200">Name</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="e.g. threat-hunter"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">Description</label>
+            <label className="mb-1 block text-sm font-medium text-gray-200">Description</label>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="Optional description"
             />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-800">
+            <label className="mb-2 block text-sm font-medium text-gray-200">
               Permissions ({selectedIds.size} selected)
             </label>
-            <div className="max-h-64 overflow-y-auto space-y-3 rounded-lg border p-3">
+            <div className="max-h-64 overflow-y-auto space-y-3 rounded-lg border border-gray-700 p-3">
               {categories.map((cat) => (
                 <div key={cat}>
                   <CategoryToggle label={cat} ids={allPermissions.filter((p) => (p.category ?? 'other') === cat).map((p) => p.id)} selected={selectedIds} onChange={setMany} />
@@ -295,9 +295,9 @@ function RoleForm({ allPermissions, initial, prefill, onClose }: RoleFormProps) 
                             type="checkbox"
                             checked={selectedIds.has(perm.id)}
                             onChange={() => toggle(perm.id)}
-                            className="rounded border-gray-400 text-indigo-600"
+                            className="rounded border-gray-600 bg-gray-950 accent-indigo-500 text-indigo-500"
                           />
-                          <span className="text-xs text-gray-800">{perm.name}</span>
+                          <span className="text-xs text-gray-200">{perm.name}</span>
                         </label>
                       ))}
                   </div>
@@ -306,13 +306,13 @@ function RoleForm({ allPermissions, initial, prefill, onClose }: RoleFormProps) 
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">What people in this role see</label>
-            <p className="mb-2 text-xs text-gray-600">Untick a section or a page to hide it from the sidebar and stop its address opening. This is about what is shown; the permissions above are what is enforced.</p>
+            <label className="mb-1 block text-sm font-medium text-gray-200">What people in this role see</label>
+            <p className="mb-2 text-xs text-gray-400">Untick a section or a page to hide it from the sidebar and stop its address opening. This is about what is shown; the permissions above are what is enforced.</p>
             <RoleVisibilityPicker catalog={NAV_CATALOG} hidden={hidden} onChange={setHidden} />
           </div>
         </div>
-        <div className="flex justify-end gap-3 border-t px-6 py-4">
-          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+        <div className="flex justify-end gap-3 border-t border-gray-800 px-6 py-4">
+          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-gray-300 hover:bg-gray-800">
             Cancel
           </button>
           <button

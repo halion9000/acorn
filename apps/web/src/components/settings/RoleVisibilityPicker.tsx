@@ -22,7 +22,7 @@ export function RoleVisibilityPicker({ catalog, hidden, onChange }: Props) {
   };
 
   return (
-    <div className="max-h-64 space-y-3 overflow-y-auto rounded-lg border border-gray-300 p-3">
+    <div className="max-h-64 space-y-3 overflow-y-auto rounded-lg border border-gray-700 p-3">
       {catalog.map((section, si) => {
         const title = section.title;
         const sectionHidden = !!title && hidden.has(sectionKey(title));
@@ -35,12 +35,12 @@ export function RoleVisibilityPicker({ catalog, hidden, onChange }: Props) {
                   aria-label={`Show the ${title} section`}
                   checked={!sectionHidden}
                   onChange={(e) => flip(sectionKey(title), e.target.checked)}
-                  className="rounded border-gray-400 text-indigo-600"
+                  className="rounded border-gray-600 bg-gray-950 accent-indigo-500 text-indigo-500"
                 />
-                <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">{title}</span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">{title}</span>
               </label>
             ) : (
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-600">Main</p>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Main</p>
             )}
             <div className="flex flex-wrap gap-x-4 gap-y-1 pl-6">
               {section.items.map((item) => {
@@ -54,9 +54,9 @@ export function RoleVisibilityPicker({ catalog, hidden, onChange }: Props) {
                       checked={shown}
                       disabled={sectionHidden || locked}
                       onChange={(e) => flip(item.href, e.target.checked)}
-                      className="rounded border-gray-400 text-indigo-600"
+                      className="rounded border-gray-600 bg-gray-950 accent-indigo-500 text-indigo-500"
                     />
-                    <span className="text-xs text-gray-800">{item.label}</span>
+                    <span className="text-xs text-gray-200">{item.label}</span>
                   </label>
                 );
               })}

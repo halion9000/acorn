@@ -173,11 +173,20 @@ describe('the permission picker', () => {
     expect(screen.getByRole('checkbox', { name: 'connectors:read' })).not.toBeChecked();
   });
 
-  it('shows what you type in dark text, not the page text colour', async () => {
+  it('uses the same dark colours as the rest of Settings: light text on a dark panel, typed text with its own colour and background', async () => {
     await openForm();
-    const dialog = screen.getByText('Create Role').closest('div')!.parentElement!;
-    expect(within(dialog).getByPlaceholderText('Optional description').className).toMatch(/text-gray-900/);
-    expect(within(dialog).getByPlaceholderText('e.g. threat-hunter').className).toMatch(/text-gray-900/);
+    const panel = screen.getByRole('dialog', { name: 'Create role' });
+    expect(panel.className).toMatch(/bg-gray-900/);
+    expect(panel.className).toMatch(/text-gray-100/);
+    expect(panel.className).not.toMatch(/bg-white|text-gray-900/);
+    for (const placeholder of ['Optional description', 'e.g. threat-hunter']) {
+      const input = within(panel).getByPlaceholderText(placeholder);
+      expect(input.className).toMatch(/text-gray-100/); // typed text is light on...
+      expect(input.className).toMatch(/bg-gray-950/); // ...an explicitly dark field, never inherited from the page
+      expect(input.className).not.toMatch(/bg-white|text-gray-900/);
+    }
+    // No dark-on-dark leftovers anywhere inside the dialog.
+    expect(panel.innerHTML).not.toMatch(/text-gray-(600|700|800|900)|bg-white|border-gray-300/);
   });
 });
 
