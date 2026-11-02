@@ -216,3 +216,35 @@ describe('Settings > Workspace > name and id', () => {
     expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
   });
 });
+
+describe('Settings > Workspace > the role chips on each member', () => {
+  const openWorkspace = async () => {
+    currentUser.mockReturnValue(account);
+    renderSettings();
+    await userEvent.click(await screen.findByRole('button', { name: /^workspace/i }));
+  };
+  const row = (name: string) => screen.getAllByText(name)[0].closest('li') as HTMLElement;
+
+  it('a person who is Viewer plus one custom role shows only the custom role, as the editor dropdown does', async () => {
+    users.mockResolvedValue([{ ...member('chris'), role: 'viewer', custom_roles: [{ id: 'r1', name: 'Default' }] }]);
+    await openWorkspace();
+    await screen.findAllByText('chris');
+    expect(within(row('chris')).getByText('Default')).toBeInTheDocument();
+    expect(within(row('chris')).queryByText('viewer')).not.toBeInTheDocument();
+  });
+
+  it('any other mix shows every part, and a plain built-in role shows just that role', async () => {
+    users.mockResolvedValue([
+      { ...member('mixed'), role: 'soc_analyst', custom_roles: [{ id: 'r1', name: 'Default' }] },
+      { ...member('many'), role: 'viewer', custom_roles: [{ id: 'r1', name: 'Default' }, { id: 'r2', name: 'vCIO' }] },
+      { ...member('plain'), role: 'viewer', custom_roles: [] },
+    ]);
+    await openWorkspace();
+    await screen.findAllByText('mixed');
+    expect(within(row('mixed')).getByText('soc_analyst')).toBeInTheDocument();
+    expect(within(row('mixed')).getByText('Default')).toBeInTheDocument();
+    expect(within(row('many')).getByText('viewer')).toBeInTheDocument();
+    expect(within(row('many')).getByText('vCIO')).toBeInTheDocument();
+    expect(within(row('plain')).getByText('viewer')).toBeInTheDocument();
+  });
+});

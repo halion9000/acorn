@@ -13,7 +13,8 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/login',
 }));
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (original) => ({
+  ...(await original<typeof import('@/lib/api')>()),
   authApi: {
     login: (...args: unknown[]) => login(...args),
     isAuthenticated: () => isAuthenticated(),
@@ -22,6 +23,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
+import { ApiError } from '@/lib/api';
 import LoginPage from './page';
 
 // There is no demo mode. The sign-in page used to offer a "Public demo" card whose credentials were empty strings (so it showed a bare "/" and
@@ -172,5 +174,31 @@ describe('the sign-in page', () => {
       await attempt();
       expect(await screen.findByText('API 429 Too Many Requests')).toBeInTheDocument();
     });
+  });
+});
+
+describe('a refused sign-in says why in the server\'s own words', () => {
+  beforeEach(() => {
+    login.mockReset();
+    isAuthenticated.mockReturnValue(false);
+  });
+
+  it('an account that may not use a password is told to sign in with Microsoft, not shown a bare status line', async () => {
+    login.mockRejectedValue(new ApiError('API 403 — /api/v1/auth/login', 403, JSON.stringify({ detail: 'Sign in with Microsoft.' })));
+    render(<LoginPage />);
+    await userEvent.type(screen.getByLabelText(/account name/i), 'test');
+    await userEvent.type(screen.getByLabelText(/password/i), 'a-long-enough-password');
+    await userEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
+    expect(await screen.findByText('Sign in with Microsoft.')).toBeInTheDocument();
+    expect(screen.queryByText(/API 403/)).not.toBeInTheDocument();
+  });
+
+  it('a refusal with no message from the server still shows what happened', async () => {
+    login.mockRejectedValue(new ApiError('API 403 — /api/v1/auth/login', 403, ''));
+    render(<LoginPage />);
+    await userEvent.type(screen.getByLabelText(/account name/i), 'test');
+    await userEvent.type(screen.getByLabelText(/password/i), 'a-long-enough-password');
+    await userEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
+    expect(await screen.findByText(/API 403/)).toBeInTheDocument();
   });
 });

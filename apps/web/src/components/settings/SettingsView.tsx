@@ -685,7 +685,10 @@ function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       {m.is_active ? null : <span className="rounded-full bg-red-500/10 px-2.5 py-1 text-xs text-red-300 ring-1 ring-red-500/30">Disabled</span>}
-                      <span className="rounded-full bg-gray-800 px-2.5 py-1 text-xs text-gray-300 ring-1 ring-gray-700">{m.role}</span>
+                      {/* A person who is exactly Viewer plus one custom role is shown as that custom role (the way the editor's dropdown shows them); any other mix shows every part. */}
+                      {(m.custom_roles ?? []).length === 1 && m.role === 'viewer' ? null : (
+                        <span className="rounded-full bg-gray-800 px-2.5 py-1 text-xs text-gray-300 ring-1 ring-gray-700">{m.role}</span>
+                      )}
                       {(m.custom_roles ?? []).map((r) => (
                         <span key={r.id} className="rounded-full bg-indigo-500/10 px-2.5 py-1 text-xs text-indigo-200 ring-1 ring-indigo-500/30">{r.name}</span>
                       ))}

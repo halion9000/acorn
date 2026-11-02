@@ -9,7 +9,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { authApi, passkeyApi } from '@/lib/api';
+import { apiErrorDetail, authApi, passkeyApi } from '@/lib/api';
 import { getPasskey, isWebAuthnSupported } from '@/lib/webauthn';
 import { ssoErrorMessage } from '@/lib/sso-messages';
 
@@ -152,7 +152,8 @@ function LoginInner() {
       } else if (/401|incorrect/i.test(message)) {
         setError('Account name or password incorrect.');
       } else {
-        setError(message);
+        // The server's own words when it gave any (for example "Sign in with Microsoft." for an account that may not use a password), not the bare status line.
+        setError(apiErrorDetail(err) ?? message);
       }
     }
   };
