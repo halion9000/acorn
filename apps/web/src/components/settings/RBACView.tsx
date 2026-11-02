@@ -28,6 +28,21 @@ interface Role {
   permissions: Permission[];
 }
 
+/** A role that ships with the product: fixed in code, listed here with exactly what it grants. */
+interface BuiltinRole {
+  key: string;
+  label: string;
+  description: string;
+  permissions: string[];
+}
+
+/** What a copy of a built-in role starts with: nothing is saved until the person presses Create. */
+interface Prefill {
+  name: string;
+  description: string;
+  permissionNames: string[];
+}
+
 const fetcher = (url: string) =>
   authFetch(url).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -139,15 +154,18 @@ function CategoryToggle({ label, ids, selected, onChange }: { label: string; ids
 interface RoleFormProps {
   allPermissions: Permission[];
   initial?: Role;
+  prefill?: Prefill;
   onClose: () => void;
 }
 
-function RoleForm({ allPermissions, initial, onClose }: RoleFormProps) {
-  const [name, setName] = useState(initial?.name ?? '');
-  const [description, setDescription] = useState(initial?.description ?? '');
+function RoleForm({ allPermissions, initial, prefill, onClose }: RoleFormProps) {
+  const [name, setName] = useState(initial?.name ?? prefill?.name ?? '');
+  const [description, setDescription] = useState(initial?.description ?? prefill?.description ?? '');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    new Set(initial?.permissions.map((p) => p.id) ?? [])
+    new Set(initial ? initial.permissions.map((p) => p.id) : prefill ? allPermissions.filter((p) => prefill.permissionNames.includes(p.name)).map((p) => p.id) : [])
   );
+  // Permissions the built-in role grants that this list does not offer (so the copy cannot include them): said, not hidden.
+  const leftOut = prefill ? prefill.permissionNames.filter((n) => !allPermissions.some((p) => p.name === n)) : [];
   const [hidden, setHidden] = useState<Set<string>>(new Set(initial?.hidden_nav ?? []));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -216,7 +234,13 @@ function RoleForm({ allPermissions, initial, onClose }: RoleFormProps) {
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800" aria-label="Close">✕</button>
         </div>
         <div className="max-h-[70vh] space-y-4 overflow-y-auto px-6 py-4">
-          {!initial && (
+          {prefill && (
+            <p className="rounded bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+              Started from the built-in role <strong>{prefill.name.replace(/ \(copy\)$/, '')}</strong>. Change anything, then press Create; the built-in role itself stays as it is.
+              {leftOut.length > 0 ? ` ${leftOut.length} permission(s) it grants are not offered here and were left out: ${leftOut.join(', ')}.` : ''}
+            </p>
+          )}
+          {!initial && !prefill && (
             <div>
               <p className="mb-1 text-sm font-medium text-gray-800">Start from</p>
               <div className="flex flex-wrap gap-2">
@@ -307,7 +331,10 @@ export function RBACView() {
   const { data: roles, error: rolesError, isLoading: rolesLoading } = useSWR<Role[]>('/api/v1/rbac/roles', fetcher);
   const { data: permissions, isLoading: permsLoading } = useSWR<Permission[]>('/api/v1/rbac/permissions', fetcher);
 
+  const { data: builtins } = useSWR<BuiltinRole[]>('/api/v1/rbac/builtin-roles', fetcher);
   const [showCreate, setShowCreate] = useState(false);
+  const [prefill, setPrefill] = useState<Prefill | null>(null);
+  const [openBuiltin, setOpenBuiltin] = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -384,6 +411,56 @@ export function RBACView() {
         />
       )}
 
+      {builtins && builtins.length > 0 && (
+        <section aria-labelledby="builtin-roles-heading" className="space-y-3">
+          <div>
+            <h3 id="builtin-roles-heading" className="text-sm font-semibold text-gray-200">Built-in roles</h3>
+            <p className="text-xs text-gray-500">These come with the product and are the same for every workspace, so they cannot be edited. To change one, make a copy: it becomes a custom role you can edit freely, and you can give it to people instead.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {builtins.map((b) => (
+              <div key={b.key} className="rounded-xl border border-gray-800/60 bg-gray-900/60 p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-semibold text-gray-100">{b.label}</span>
+                      <span className="rounded bg-gray-700 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-200">built-in</span>
+                    </div>
+                    <p className="mt-0.5 text-sm text-gray-400">{b.description}</p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={`Copy ${b.label} to edit`}
+                    onClick={() => setPrefill({ name: `${b.label} (copy)`, description: b.description, permissionNames: b.permissions })}
+                    className="shrink-0 rounded px-2 py-1 text-xs text-gray-300 hover:bg-gray-800"
+                  >
+                    Copy to edit
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  aria-expanded={openBuiltin === b.key}
+                  onClick={() => setOpenBuiltin(openBuiltin === b.key ? null : b.key)}
+                  className="mt-3 text-xs text-indigo-300 hover:underline"
+                >
+                  {openBuiltin === b.key ? 'Hide' : 'Show'} the {b.permissions.length} permissions
+                </button>
+                {openBuiltin === b.key ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {b.permissions.map((n) => (
+                      <span key={n} className="inline-block rounded bg-gray-500/20 px-2 py-0.5 text-xs font-medium text-gray-300">{n}</span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {roles && roles.length > 0 && (
+        <h3 className="text-sm font-semibold text-gray-200">Your roles</h3>
+      )}
       {roles && roles.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {roles.map((role) => (
@@ -397,13 +474,15 @@ export function RBACView() {
         </div>
       )}
 
-      {(showCreate || editingRole) && permissions && (
+      {(showCreate || editingRole || prefill) && permissions && (
         <RoleForm
           allPermissions={permissions}
           initial={editingRole ?? undefined}
+          prefill={prefill ?? undefined}
           onClose={() => {
             setShowCreate(false);
             setEditingRole(null);
+            setPrefill(null);
           }}
         />
       )}

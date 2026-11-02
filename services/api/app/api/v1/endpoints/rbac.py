@@ -99,6 +99,34 @@ async def list_permissions(
     return [PermissionOut.model_validate(p) for p in result.scalars().all()]
 
 
+# The built-in roles an administrator can hand out from Settings. Their permissions are fixed in code (app.core.security.ROLE_PERMISSIONS), the same list the access checks use,
+# so what is shown here is exactly what the role grants. platform_admin and the legacy admin role are never listed: they are not something a workspace hands out.
+BUILTIN_ASSIGNABLE: tuple[tuple[str, str, str], ...] = (
+    ("viewer", "Viewer", "Can look, cannot change anything."),
+    ("soc_analyst", "SOC analyst", "Works alerts and cases."),
+    ("threat_hunter", "Threat hunter", "Analyst who also runs hunts and queries."),
+    ("soc_lead", "SOC lead", "Analyst who also manages the team and rules."),
+    ("tenant_admin", "Administrator", "Manages the workspace, its members and settings."),
+)
+
+
+class BuiltinRoleOut(BaseModel):
+    key: str
+    label: str
+    description: str
+    permissions: list[str]
+
+
+@router.get("/builtin-roles", response_model=list[BuiltinRoleOut])
+async def list_builtin_roles(
+    current_user: Annotated[AuthUser, Depends(require_permission("roles:read"))],
+) -> list[BuiltinRoleOut]:
+    """The built-in roles and exactly what each grants. They cannot be edited (they are part of the product); make a custom role from one to change it."""
+    from app.core.security import ROLE_PERMISSIONS  # noqa: PLC0415
+
+    return [BuiltinRoleOut(key=key, label=label, description=hint, permissions=sorted(ROLE_PERMISSIONS[key])) for key, label, hint in BUILTIN_ASSIGNABLE]
+
+
 # ──────────────────────────────────────────────
 # Roles (tenant-scoped)
 # ──────────────────────────────────────────────
