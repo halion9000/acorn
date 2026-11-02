@@ -201,3 +201,27 @@ def test_a_mailbox_failure_keeps_the_cursor_and_says_why():
     out, state = asyncio.run(go())
     assert "403" in out.error and (out.stored, out.messages) == (0, 0)
     assert "403" in state.last_error and state.cursor.replace(tzinfo=UTC) == datetime(2026, 11, 2, 10, tzinfo=UTC)
+
+
+def test_the_reader_uses_its_own_app_when_all_three_are_set_and_the_alert_mail_app_otherwise(monkeypatch):
+    from app.workers import dmarc_ingest_worker as w
+
+    s = w.settings
+    for name, value in {
+        "DMARC_MAILBOX": "lodmarc@goliveoak.com",
+        "ALERT_EMAIL_GRAPH_TENANT_ID": "alert-t",
+        "ALERT_EMAIL_GRAPH_CLIENT_ID": "alert-c",
+        "ALERT_EMAIL_GRAPH_CLIENT_SECRET": "alert-s",
+        "DMARC_GRAPH_TENANT_ID": "",
+        "DMARC_GRAPH_CLIENT_ID": "",
+        "DMARC_GRAPH_CLIENT_SECRET": "",
+    }.items():
+        monkeypatch.setattr(s, name, value, raising=False)
+    fallback = w.make_reader()
+    assert (fallback.client_id, fallback.sender) == ("alert-c", "lodmarc@goliveoak.com") and fallback.configured
+    monkeypatch.setattr(s, "DMARC_GRAPH_TENANT_ID", "own-t", raising=False)
+    assert w.make_reader().client_id == "alert-c"  # two of three is not enough: never a half-and-half mix
+    monkeypatch.setattr(s, "DMARC_GRAPH_CLIENT_ID", "own-c", raising=False)
+    monkeypatch.setattr(s, "DMARC_GRAPH_CLIENT_SECRET", "own-s", raising=False)
+    own = w.make_reader()
+    assert (own.tenant_id, own.client_id, own.client_secret) == ("own-t", "own-c", "own-s")

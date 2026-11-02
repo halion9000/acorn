@@ -302,6 +302,9 @@ services:
       RETENTION_ALERTS_KEEP_FOREVER_OK: ${RETENTION_ALERTS_KEEP_FOREVER_OK:-false}   # true = keeping alerts forever is intended: silences the notice on the platform health page
       RETENTION_DRY_RUN: ${RETENTION_DRY_RUN:-false}
       # DMARC reports: the shared mailbox that receives every client's reports, the managing tenant they belong to, and the Microsoft mail app that reads it (the alert-e-mail app, with Mail.Read limited to that mailbox).
+      DMARC_GRAPH_TENANT_ID: ${DMARC_GRAPH_TENANT_ID:-}
+      DMARC_GRAPH_CLIENT_ID: ${DMARC_GRAPH_CLIENT_ID:-}
+      DMARC_GRAPH_CLIENT_SECRET: ${DMARC_GRAPH_CLIENT_SECRET:-}
       DMARC_MAILBOX: ${DMARC_MAILBOX:-}
       DMARC_OWNER_TENANT_ID: ${DMARC_OWNER_TENANT_ID:-}
       ALERT_EMAIL_GRAPH_TENANT_ID: ${ALERT_EMAIL_GRAPH_TENANT_ID:-}

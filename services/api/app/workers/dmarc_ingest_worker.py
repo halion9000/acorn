@@ -1,7 +1,7 @@
 """Reads the shared DMARC mailbox on a timer and stores the reports it finds (see app/services/dmarc_mailbox.py).
 
-Off until the mailbox is set up: it needs DMARC_MAILBOX (the shared mailbox that receives every client's reports), DMARC_OWNER_TENANT_ID (the managing tenant the reports belong to) and the same Microsoft
-mail app the alert e-mails use (ALERT_EMAIL_GRAPH_*), given the Mail.Read application permission limited to that one mailbox. A failed pass never ends the loop; the reason is kept for the page.
+Off until the mailbox is set up: it needs DMARC_MAILBOX (the shared mailbox that receives every client's reports), DMARC_OWNER_TENANT_ID (the managing tenant the reports belong to) and a Microsoft
+app with the Mail.Read application permission limited to that one mailbox (DMARC_GRAPH_*, or the alert-e-mail app ALERT_EMAIL_GRAPH_* as a fallback). A failed pass never ends the loop; the reason is kept for the page.
 """
 
 from __future__ import annotations
@@ -22,10 +22,13 @@ logger = structlog.get_logger()
 
 
 def make_reader() -> GraphMailboxReader:
+    """The reader's own app (DMARC_GRAPH_*) when all three are set, otherwise the alert-e-mail app (ALERT_EMAIL_GRAPH_*)."""
+    own = (settings.DMARC_GRAPH_TENANT_ID, settings.DMARC_GRAPH_CLIENT_ID, settings.DMARC_GRAPH_CLIENT_SECRET)
+    tenant_id, client_id, client_secret = own if all(own) else (settings.ALERT_EMAIL_GRAPH_TENANT_ID, settings.ALERT_EMAIL_GRAPH_CLIENT_ID, settings.ALERT_EMAIL_GRAPH_CLIENT_SECRET)
     return GraphMailboxReader(
-        tenant_id=settings.ALERT_EMAIL_GRAPH_TENANT_ID,
-        client_id=settings.ALERT_EMAIL_GRAPH_CLIENT_ID,
-        client_secret=settings.ALERT_EMAIL_GRAPH_CLIENT_SECRET,
+        tenant_id=tenant_id,
+        client_id=client_id,
+        client_secret=client_secret,
         sender=settings.DMARC_MAILBOX,
         base_url=settings.ALERT_EMAIL_GRAPH_BASE_URL,
         authority=settings.ALERT_EMAIL_AUTHORITY,

@@ -310,6 +310,10 @@ class Settings(BaseSettings):
     MICROSOFT_CLIENT_SECRET_EXPIRES: str = ""
     # DMARC reports: the one shared mailbox every client's DMARC reports are sent to (read with the same Microsoft mail app as ALERT_EMAIL_GRAPH_*, which needs the Mail.Read application permission limited to this
     # mailbox), and the managing tenant the reports belong to. Reading is off until both are set.
+    # The reader has its own Microsoft app by default (Mail.Read only, limited to the one mailbox): DMARC_GRAPH_*. Left empty, it falls back to the alert-e-mail app (ALERT_EMAIL_GRAPH_*), which then needs Mail.Read too.
+    DMARC_GRAPH_TENANT_ID: str = ""
+    DMARC_GRAPH_CLIENT_ID: str = ""
+    DMARC_GRAPH_CLIENT_SECRET: str = ""
     DMARC_MAILBOX: str = ""
     DMARC_OWNER_TENANT_ID: str = ""
     DMARC_INGEST_ENABLED: bool = True
