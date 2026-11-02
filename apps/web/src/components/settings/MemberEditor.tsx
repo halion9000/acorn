@@ -10,10 +10,13 @@ import toast from 'react-hot-toast';
 
 import { apiErrorDetail, tenantsApi, type CustomRole, type TenantUser } from '@/lib/api';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { MEMBER_ROLES, MIN_PASSWORD_LENGTH, generatePassword } from './AddMemberForm';
+import { CUSTOM_PREFIX, MEMBER_ROLES, MIN_PASSWORD_LENGTH, generatePassword } from './AddMemberForm';
 import { Field, inputClass } from './panel-parts';
 
 type Pending = null | 'mfa' | 'signout' | 'disable' | 'delete';
+
+/** The dropdown's "leave as it is" choice, for a person whose current mix of built-in and custom roles is not one single choice. */
+const KEEP = '__keep';
 
 const BUTTON = 'rounded-lg border border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50';
 
@@ -31,10 +34,12 @@ export function MemberEditor({
   onChanged: (gone?: boolean) => void;
   onClose: () => void;
 }) {
-  const heldIds = (member.custom_roles ?? []).map((r) => r.id);
+  const current = member.custom_roles ?? [];
+  // One dropdown holds every role. A custom role is held on top of Viewer (what Add member does), so a person with exactly that is shown as the custom role; any other mix (several custom roles, or a custom role on top of a higher built-in role) is shown as "keep as it is" until a different choice is made.
+  const initialChoice = current.length === 0 ? member.role : current.length === 1 && member.role === 'viewer' ? CUSTOM_PREFIX + current[0].id : KEEP;
+  const mixLabel = `${MEMBER_ROLES.find((r) => r.value === member.role)?.label ?? member.role} + ${current.map((r) => r.name).join(', ')}`;
   const [displayName, setDisplayName] = useState(member.username ?? '');
-  const [role, setRole] = useState(member.role);
-  const [held, setHeld] = useState<string[]>(heldIds);
+  const [choice, setChoice] = useState(initialChoice);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending>(null);
@@ -42,8 +47,7 @@ export function MemberEditor({
   const [passwordShown, setPasswordShown] = useState<string | null>(null);
 
   const knownRole = MEMBER_ROLES.some((r) => r.value === member.role);
-  const sameSet = held.length === heldIds.length && held.every((id) => heldIds.includes(id));
-  const dirty = displayName.trim() !== (member.username ?? '') || role !== member.role || !sameSet;
+  const dirty = displayName.trim() !== (member.username ?? '') || choice !== initialChoice;
 
   // One place for "call the server, show its answer": a failure keeps the dialog's message on screen, a success reloads the list.
   const act = async (what: () => Promise<{ detail?: string } | unknown>, success: string, gone = false) => {
@@ -64,16 +68,14 @@ export function MemberEditor({
     }
   };
 
-  const save = () =>
-    act(
-      () =>
-        tenantsApi.updateUser(member.id, {
-          username: displayName.trim() || undefined,
-          ...(role !== member.role ? { role } : {}),
-          ...(!sameSet ? { custom_role_ids: held } : {}),
-        }),
-      'Saved',
-    );
+  // What the choice means for the server: a built-in role clears any custom roles; a custom role is held on top of Viewer; "keep" changes neither.
+  const roleChange = (): { role?: string; custom_role_ids?: string[] } => {
+    if (choice === initialChoice || choice === KEEP) return {};
+    if (choice.startsWith(CUSTOM_PREFIX)) return { ...(member.role !== 'viewer' ? { role: 'viewer' } : {}), custom_role_ids: [choice.slice(CUSTOM_PREFIX.length)] };
+    return { ...(choice !== member.role ? { role: choice } : {}), ...(current.length > 0 ? { custom_role_ids: [] } : {}) };
+  };
+
+  const save = () => act(() => tenantsApi.updateUser(member.id, { username: displayName.trim() || undefined, ...roleChange() }), 'Saved');
 
   const resetPassword = async () => {
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
@@ -87,7 +89,6 @@ export function MemberEditor({
     }
   };
 
-  const toggleHeld = (id: string) => setHeld((h) => (h.includes(id) ? h.filter((x) => x !== id) : [...h, id]));
   const name = member.username || member.account_name;
 
   return (
@@ -96,33 +97,40 @@ export function MemberEditor({
         <Field label="Display name" hint="Shown in cases and audit. The account name they sign in with cannot be changed here.">
           <input className={inputClass()} value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="off" />
         </Field>
-        <Field label="Role" hint={isSelf ? 'You cannot change your own role.' : MEMBER_ROLES.find((r) => r.value === role)?.hint}>
-          <select className={inputClass()} value={role} disabled={isSelf} onChange={(e) => setRole(e.target.value)}>
-            {knownRole ? null : <option value={member.role}>{member.role}</option>}
-            {MEMBER_ROLES.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
+        <Field
+          label="Role"
+          hint={
+            isSelf
+              ? 'You cannot change your own role.'
+              : choice.startsWith(CUSTOM_PREFIX)
+                ? customRoles.find((r) => CUSTOM_PREFIX + r.id === choice)?.description || 'A role your workspace made. They also hold the Viewer role.'
+                : choice === KEEP
+                  ? 'Pick a role to replace this mix.'
+                  : MEMBER_ROLES.find((r) => r.value === choice)?.hint
+          }
+        >
+          <select className={inputClass()} value={choice} disabled={isSelf} onChange={(e) => setChoice(e.target.value)}>
+            {choice === KEEP || initialChoice === KEEP ? <option value={KEEP}>{`Keep as it is (${mixLabel})`}</option> : null}
+            {knownRole || initialChoice === KEEP ? null : <option value={member.role}>{member.role}</option>}
+            <optgroup label="Built-in roles">
+              {MEMBER_ROLES.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </optgroup>
+            {customRoles.length > 0 ? (
+              <optgroup label="Your custom roles">
+                {customRoles.map((r) => (
+                  <option key={r.id} value={CUSTOM_PREFIX + r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
           </select>
         </Field>
       </div>
-
-      <fieldset>
-        <legend className="text-xs font-medium text-gray-300">Custom roles</legend>
-        {customRoles.length === 0 ? (
-          <p className="mt-1 text-xs text-gray-500">This workspace has no custom roles yet. Make one under Settings, Roles; its permissions are added to the role above.</p>
-        ) : (
-          <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
-            {customRoles.map((r) => (
-              <label key={r.id} className="flex items-center gap-2 text-sm text-gray-200">
-                <input type="checkbox" checked={held.includes(r.id)} onChange={() => toggleHeld(r.id)} />
-                {r.name}
-              </label>
-            ))}
-          </div>
-        )}
-      </fieldset>
 
       {error ? (
         <p role="alert" data-testid="member-edit-error" className="text-sm text-red-300">

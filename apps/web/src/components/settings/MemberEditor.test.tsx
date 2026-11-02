@@ -39,27 +39,69 @@ beforeEach(() => {
   [updateUser, deleteUser, resetUserPassword, signUserOut, resetUserMfa].forEach((m) => m.mockReset().mockResolvedValue({ done: true, detail: 'ok' }));
 });
 
-describe('editing a member', () => {
-  it('saves only what changed: a new role set, not the built-in role', async () => {
-    open();
+const plain: TenantUser = { ...ann, custom_roles: [] };
+const reviewer: TenantUser = { ...ann, role: 'viewer', custom_roles: [{ id: 'r1', name: 'Client reviewer' }] };
+
+describe('editing a member: one Role dropdown holds the built-in and the custom roles', () => {
+  it('lists built-in roles and custom roles in the same dropdown, and no separate custom roles area', () => {
+    open(plain);
+    expect(screen.getByRole('group', { name: 'Built-in roles' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Your custom roles' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Billing' })).toBeInTheDocument();
+    expect(screen.queryByText('Custom roles')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('a person who is exactly Viewer plus one custom role is shown as that custom role', () => {
+    open(reviewer);
+    expect(screen.getByLabelText(/^Role/)).toHaveValue('custom:r1');
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
-    await userEvent.click(screen.getByLabelText('Billing'));
-    await userEvent.click(screen.getByLabelText('Client reviewer'));
+  });
+
+  it('choosing a custom role for someone with a built-in role makes them Viewer plus that role', async () => {
+    open(plain);
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    await userEvent.selectOptions(screen.getByLabelText(/^Role/), 'Billing');
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(updateUser).toHaveBeenCalledWith('u1', { username: 'Ann', custom_role_ids: ['r2'] }));
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith('u1', { username: 'Ann', role: 'viewer', custom_role_ids: ['r2'] }));
     expect(changed).toEqual([false]);
   });
 
-  it('changing the built-in role sends the role', async () => {
-    open();
+  it('moving from one custom role to another changes only the custom role', async () => {
+    open(reviewer);
+    await userEvent.selectOptions(screen.getByLabelText(/^Role/), 'Billing');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith('u1', { username: 'Ann', custom_role_ids: ['r2'] }));
+  });
+
+  it('choosing a built-in role sets it and clears any custom roles', async () => {
+    open(reviewer);
+    await userEvent.selectOptions(screen.getByLabelText(/^Role/), 'SOC lead');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith('u1', { username: 'Ann', role: 'soc_lead', custom_role_ids: [] }));
+  });
+
+  it('a built-in role for someone with no custom roles sends just the role', async () => {
+    open(plain);
     await userEvent.selectOptions(screen.getByLabelText(/^Role/), 'SOC lead');
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(updateUser).toHaveBeenCalledWith('u1', { username: 'Ann', role: 'soc_lead' }));
   });
 
+  it('a mix that is not one single choice is kept as it is until a role is picked', async () => {
+    open(ann); // SOC analyst plus a custom role
+    const select = screen.getByLabelText(/^Role/);
+    expect(select).toHaveValue('__keep');
+    expect(screen.getByRole('option', { name: /Keep as it is \(SOC analyst \+ Client reviewer\)/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText(/^Display name/), '!');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith('u1', { username: 'Ann!' })); // the name changed; the roles did not
+  });
+
   it('shows the refusal of the server as it is and does not reload the list', async () => {
     updateUser.mockRejectedValue(refusal('This is the only active administrator. Changing this role would lock everyone out.'));
-    open({ ...ann, role: 'tenant_admin' });
+    open({ ...plain, role: 'tenant_admin' });
     await userEvent.selectOptions(screen.getByLabelText(/^Role/), 'Viewer');
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(await screen.findByTestId('member-edit-error')).toHaveTextContent(/only active administrator/);
