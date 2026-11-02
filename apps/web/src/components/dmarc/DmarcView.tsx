@@ -55,6 +55,8 @@ export interface SetupLine {
   client_dmarc_rua: string;
   authorization_record_name: string;
   authorization_record_value: string;
+  /** False when the domain has no mail records, so it cannot receive or send mail. Absent from an older server: treated as having mail. */
+  has_mx?: boolean;
 }
 export interface DmarcSetup {
   mailbox: string | null;
@@ -85,6 +87,16 @@ function ago(iso: string | null): string {
   if (!iso) return 'never';
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
   return mins < 2 ? 'just now' : mins < 120 ? `${mins} min ago` : mins < 2880 ? `${Math.round(mins / 60)} hours ago` : `${Math.round(mins / 1440)} days ago`;
+}
+
+/** The Exchange Online command(s) that give the shared mailbox every alias in the list, 40 to a command so none is too long to paste. Already-present aliases are skipped by Exchange without an error. */
+export function aliasScript(mailbox: string, aliases: string[]): string {
+  const unique = [...new Set(aliases)].sort();
+  const lines: string[] = [];
+  for (let i = 0; i < unique.length; i += 40) {
+    lines.push(`Set-Mailbox -Identity ${mailbox} -EmailAddresses @{add=${unique.slice(i, i + 40).map((a) => `"${a}"`).join(',')}}`);
+  }
+  return lines.join('\n');
 }
 
 function Copy({ text, label }: { text: string; label: string }) {
@@ -265,8 +277,72 @@ function Results() {
   );
 }
 
+const CHOICES_KEY = 'dmarc-setup-choices';
+const lineKey = (l: SetupLine) => `${l.client_id}:${l.domain}`;
+
+const ALIASES_KEY = 'dmarc-setup-aliases';
+
+/** The part of an address before the @, made safe to use: lower case, letters, digits, dot, dash and underscore only, starting with a letter or digit, at most 64 characters. */
+export function cleanAliasName(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[^a-z0-9]+/, '').slice(0, 64);
+}
+
+/** The alias names you chose on this browser, by client (a convenience: it changes nothing on the server; the mailbox only needs the alias to exist). */
+function useAliasNames(): [Record<string, string>, (next: Record<string, string>) => void] {
+  const [names, setNames] = useState<Record<string, string>>(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(ALIASES_KEY) ?? '{}');
+      return saved && typeof saved === 'object' && !Array.isArray(saved) ? (Object.fromEntries(Object.entries(saved).filter(([, v]) => typeof v === 'string')) as Record<string, string>) : {};
+    } catch {
+      return {};
+    }
+  });
+  const update = (next: Record<string, string>) => {
+    setNames(next);
+    try {
+      window.localStorage.setItem(ALIASES_KEY, JSON.stringify(next));
+    } catch {
+      /* private mode: the choice lasts until the page is closed */
+    }
+  };
+  return [names, update];
+}
+
+/** What a domain is by default: covered, unless it has no mail records (then it is left out, because it has nothing to report). */
+const onByDefault = (l: SetupLine) => l.has_mx !== false;
+
+/** The choices made on this browser (domain key to covered or not). Only choices the person made are kept, so a domain that has since gained or lost its mail records follows the default again. A
+ *  convenience: it changes nothing on the server. */
+function useChoices(): [Record<string, boolean>, (next: Record<string, boolean>) => void] {
+  const [choices, setChoices] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(CHOICES_KEY) ?? '{}');
+      return saved && typeof saved === 'object' && !Array.isArray(saved) ? (Object.fromEntries(Object.entries(saved).filter(([, v]) => typeof v === 'boolean')) as Record<string, boolean>) : {};
+    } catch {
+      return {};
+    }
+  });
+  const update = (next: Record<string, boolean>) => {
+    setChoices(next);
+    try {
+      window.localStorage.setItem(CHOICES_KEY, JSON.stringify(next));
+    } catch {
+      /* private mode: the choice lasts until the page is closed */
+    }
+  };
+  return [choices, update];
+}
+
+/** The lines that are still ticked, as the DNS records for your zone (one per line, tab separated: name, type, value). */
+export function dnsRecordsText(lines: SetupLine[]): string {
+  return lines.map((l) => `${l.authorization_record_name}\tTXT\t${l.authorization_record_value}`).join('\n');
+}
+
 function Setup() {
   const { data, error, isLoading } = useSWR<DmarcSetup>('/api/v1/dmarc/setup', fetcher, { shouldRetryOnError: false });
+  const [choices, setChoices] = useChoices();
+  const [aliasNames, setAliasNames] = useAliasNames();
+  const [showNoMail, setShowNoMail] = useState(false);
   if (error) {
     return (
       <p role="alert" className="text-sm text-red-300">
@@ -278,6 +354,17 @@ function Setup() {
   if (!data.mailbox) {
     return <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">Set up the shared mailbox on the server first; the lines below are built from its address.</p>;
   }
+  const isOn = (l: SetupLine) => choices[lineKey(l)] ?? onByDefault(l);
+  const domainOfMailbox = data.mailbox_domain ?? (data.mailbox as string).split('@')[1];
+  const aliasOf = (l: SetupLine) => `${cleanAliasName(aliasNames[l.client_id] ?? l.alias.split('@')[0]) || l.alias.split('@')[0]}@${domainOfMailbox}`;
+  const ruaOf = (l: SetupLine) => `rua=mailto:${aliasOf(l)}`;
+  const noMail = data.lines.filter((l) => l.has_mx === false);
+  const shown = showNoMail ? data.lines : data.lines.filter((l) => l.has_mx !== false);
+  const included = data.lines.filter(isOn);
+  const aliasCount = new Set(included.map(aliasOf)).size;
+  const allOn = shown.length > 0 && shown.every(isOn);
+  const someOn = shown.some(isOn);
+  const toggle = (l: SetupLine) => setChoices({ ...choices, [lineKey(l)]: !isOn(l) });
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-gray-800 bg-gray-950/40 px-4 py-3 text-sm text-gray-300">
@@ -291,38 +378,94 @@ function Setup() {
           </li>
         </ol>
         <p className="mt-2 text-gray-400">Every alias delivers into the one mailbox, so the alias only tells reports apart and lets you retire one client without touching the others.</p>
+        <p className="mt-2 text-amber-200">
+          Create the aliases <strong>first</strong>: mail sent to an address that does not exist bounces, and the receivers stop reporting. Untick the domains you do not want to collect reports for; the commands below cover only the ticked ones.
+        </p>
       </div>
       {data.lines.length === 0 ? (
         <p className="text-sm text-gray-400">No client domains are known yet: they come from the e-mail addresses of each client&rsquo;s people.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-900/60 text-xs text-gray-400">
-              <tr>
-                <th className="px-3 py-2">Client</th>
-                <th className="px-3 py-2">Domain</th>
-                <th className="px-3 py-2">Add to the client&rsquo;s DMARC record</th>
-                <th className="px-3 py-2">Add to your DNS (TXT)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.lines.map((l) => (
-                <tr key={`${l.client_id}-${l.domain}`} data-testid="setup-row" className="border-t border-gray-800 align-top">
-                  <td className="px-3 py-2 text-gray-100">{l.client_name}</td>
-                  <td className="px-3 py-2 font-mono text-gray-200">{l.domain}</td>
-                  <td className="px-3 py-2">
-                    <span className="font-mono text-gray-200">{l.client_dmarc_rua}</span> <Copy text={l.client_dmarc_rua} label={`Copy the DMARC record value for ${l.domain}`} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="font-mono text-gray-200">{l.authorization_record_name}</div>
-                    <div className="font-mono text-gray-400">{l.authorization_record_value}</div>{' '}
-                    <Copy text={`${l.authorization_record_name}\tTXT\t${l.authorization_record_value}`} label={`Copy the DNS record for ${l.domain}`} />
-                  </td>
+        <>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-300">
+            <span data-testid="setup-count">
+              {included.length} of {data.lines.length} domains selected ({aliasCount} alias{aliasCount === 1 ? '' : 'es'})
+            </span>
+            {noMail.length > 0 ? (
+              <span data-testid="setup-nomail" className="text-gray-400">
+                {showNoMail ? '' : `${noMail.length} domain${noMail.length === 1 ? ' is' : 's are'} hidden: no mail records (MX), so nothing to report. `}
+                <button type="button" onClick={() => setShowNoMail(!showNoMail)} className="text-sky-300 hover:underline">
+                  {showNoMail ? 'Hide the domains without mail' : 'Show them'}
+                </button>
+              </span>
+            ) : null}
+            <button type="button" disabled={included.length === 0} aria-label="Copy the PowerShell that creates the selected aliases" onClick={() => void navigator.clipboard?.writeText(aliasScript(data.mailbox as string, included.map(aliasOf)))} className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40">
+              Copy PowerShell for the aliases
+            </button>
+            <button type="button" disabled={included.length === 0} aria-label="Copy the DNS records for the selected domains" onClick={() => void navigator.clipboard?.writeText(dnsRecordsText(included))} className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40">
+              Copy DNS records
+            </button>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-gray-800">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-900/60 text-xs text-gray-400">
+                <tr>
+                  <th className="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      aria-label="Include every domain"
+                      checked={allOn}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someOn && !allOn;
+                      }}
+                      onChange={() => setChoices({ ...choices, ...Object.fromEntries(shown.map((l) => [lineKey(l), !allOn])) })}
+                    />
+                  </th>
+                  <th className="px-3 py-2">Client</th>
+                  <th className="px-3 py-2">Domain</th>
+                  <th className="px-3 py-2">Alias</th>
+                  <th className="px-3 py-2">Add to the client&rsquo;s DMARC record</th>
+                  <th className="px-3 py-2">Add to your DNS (TXT)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {shown.map((l) => {
+                  const on = isOn(l);
+                  return (
+                    <tr key={lineKey(l)} data-testid="setup-row" className={`border-t border-gray-800 align-top ${on ? '' : 'opacity-50'}`}>
+                      <td className="px-3 py-2">
+                        <input type="checkbox" aria-label={`Include ${l.domain}`} checked={on} onChange={() => toggle(l)} />
+                      </td>
+                      <td className="px-3 py-2 text-gray-100">{l.client_name}</td>
+                      <td className="px-3 py-2 font-mono text-gray-200">
+                        {l.domain}
+                        {l.has_mx === false ? <span className="ml-2 rounded bg-gray-700 px-1.5 py-0.5 font-sans text-[10px] uppercase text-gray-200">no mail</span> : null}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center gap-0.5 font-mono text-gray-200">
+                          <input
+                            aria-label={`Alias for ${l.client_name}`}
+                            value={aliasNames[l.client_id] ?? l.alias.split('@')[0]}
+                            onChange={(e) => setAliasNames({ ...aliasNames, [l.client_id]: cleanAliasName(e.target.value) })}
+                            className="w-44 rounded border border-gray-700 bg-gray-950 px-1.5 py-0.5 text-xs text-gray-100"
+                          />
+                          <span className="text-gray-500">@{domainOfMailbox}</span>
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="font-mono text-gray-200">{ruaOf(l)}</span> <Copy text={ruaOf(l)} label={`Copy the DMARC record value for ${l.domain}`} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="font-mono text-gray-200">{l.authorization_record_name}</div>
+                        <div className="font-mono text-gray-400">{l.authorization_record_value}</div>{' '}
+                        <Copy text={`${l.authorization_record_name}\tTXT\t${l.authorization_record_value}`} label={`Copy the DNS record for ${l.domain}`} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

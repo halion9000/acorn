@@ -6,7 +6,7 @@ import { SWRConfig } from 'swr';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { DmarcView, policyLabel, rateTone } from './DmarcView';
+import { DmarcView, aliasScript, cleanAliasName, dnsRecordsText, policyLabel, rateTone } from './DmarcView';
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const status = { configured: true, mailbox: 'lodmarc@goliveoak.com', last_run_at: new Date().toISOString(), last_error: null, stored: 14, rejected: 0, unmatched_reports: 0 };
@@ -22,6 +22,7 @@ const view = () => (
 );
 
 beforeEach(() => {
+  window.localStorage.clear();
   overview = { days: 30, status, domains: [row()] };
   setup = { mailbox: 'lodmarc@goliveoak.com', mailbox_domain: 'goliveoak.com', lines: [{ client_id: 'c1', client_name: 'Acme Dental', domain: 'acmedental.com', alias: 'acme-dental@goliveoak.com', client_dmarc_rua: 'rua=mailto:acme-dental@goliveoak.com', authorization_record_name: 'acmedental.com._report._dmarc.goliveoak.com', authorization_record_value: 'v=DMARC1' }] };
   detail = { domain: 'acme.com', days: 30, reports: 4, total: 200, passed: 190, failed: 10, policy: 'none', series: [{ day: '2026-11-01', total: 100, passed: 95, failed: 5 }, { day: '2026-11-02', total: 100, passed: 95, failed: 5 }], failing_sources: [{ ip: '9.9.9.9', count: 10, header_from: 'acme.com', envelope_from: 'evil.example', disposition: 'quarantine' }] };
@@ -128,5 +129,203 @@ describe('DMARC setup', () => {
     render(view());
     await userEvent.click(await screen.findByRole('tab', { name: 'Setup' }));
     expect(await screen.findByText(/No client domains are known yet/)).toBeInTheDocument();
+  });
+});
+
+const line = (domain: string, client: string, alias: string) => ({
+  client_id: `id-${client}`,
+  client_name: client,
+  domain,
+  alias,
+  client_dmarc_rua: `rua=mailto:${alias}`,
+  authorization_record_name: `${domain}._report._dmarc.goliveoak.com`,
+  authorization_record_value: 'v=DMARC1',
+});
+
+describe('the helpers that build the commands', () => {
+  it('aliasScript lists each alias once, sorted, 40 to a command', () => {
+    const many = Array.from({ length: 85 }, (_, i) => `client-${String(i).padStart(2, '0')}@goliveoak.com`);
+    const lines = aliasScript('lodmarc@goliveoak.com', [...many, many[0], many[1]]).split('\n');
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toMatch(/^Set-Mailbox -Identity lodmarc@goliveoak\.com -EmailAddresses @\{add="client-00@goliveoak\.com","client-01@goliveoak\.com"/);
+    expect(lines.join('').match(/@goliveoak\.com"/g)).toHaveLength(85);
+    expect(aliasScript('m@x.com', [])).toBe('');
+  });
+
+  it('dnsRecordsText gives one tab-separated line per domain', () => {
+    expect(dnsRecordsText([line('a.com', 'A', 'a@goliveoak.com'), line('b.com', 'B', 'b@goliveoak.com')])).toBe(
+      'a.com._report._dmarc.goliveoak.com\tTXT\tv=DMARC1\nb.com._report._dmarc.goliveoak.com\tTXT\tv=DMARC1',
+    );
+  });
+});
+
+describe('choosing which domains the setup covers', () => {
+  let write: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    write = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: write }, configurable: true });
+    setup = {
+      mailbox: 'lodmarc@goliveoak.com',
+      mailbox_domain: 'goliveoak.com',
+      lines: [line('acme.com', 'Acme', 'acme@goliveoak.com'), line('acme.net', 'Acme', 'acme@goliveoak.com'), line('birch.com', 'Birch', 'birch@goliveoak.com')],
+    };
+  });
+  const open = async () => {
+    const r = render(view());
+    await userEvent.click(await screen.findByRole('tab', { name: 'Setup' }));
+    await screen.findAllByTestId('setup-row');
+    return r;
+  };
+
+  it('every domain starts ticked and the count says how many domains and aliases are covered', async () => {
+    await open();
+    expect(screen.getAllByRole('checkbox', { name: /^Include (acme|birch)/ }).every((c) => (c as HTMLInputElement).checked)).toBe(true);
+    expect(screen.getByTestId('setup-count')).toHaveTextContent('3 of 3 domains selected (2 aliases)'); // two Acme domains share one alias
+  });
+
+  it('unticking a domain leaves it out of the commands and dims its row', async () => {
+    await open();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include acme.net' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include birch.com' }));
+    expect(screen.getByTestId('setup-count')).toHaveTextContent('1 of 3 domains selected (1 alias)');
+    expect(screen.getAllByTestId('setup-row')[1]).toHaveClass('opacity-50');
+    await userEvent.click(screen.getByRole('button', { name: 'Copy the PowerShell that creates the selected aliases' }));
+    expect(write).toHaveBeenLastCalledWith('Set-Mailbox -Identity lodmarc@goliveoak.com -EmailAddresses @{add="acme@goliveoak.com"}');
+    await userEvent.click(screen.getByRole('button', { name: 'Copy the DNS records for the selected domains' }));
+    expect(write).toHaveBeenLastCalledWith('acme.com._report._dmarc.goliveoak.com\tTXT\tv=DMARC1');
+  });
+
+  it('the header box ticks or unticks everything, and with nothing ticked the copy buttons are off', async () => {
+    await open();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include every domain' }));
+    expect(screen.getByTestId('setup-count')).toHaveTextContent('0 of 3 domains selected (0 aliases)');
+    expect(screen.getByRole('button', { name: 'Copy the PowerShell that creates the selected aliases' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Copy the DNS records for the selected domains' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include every domain' }));
+    expect(screen.getByTestId('setup-count')).toHaveTextContent('3 of 3 domains selected');
+  });
+
+  it('the header box shows a dash when only some are ticked', async () => {
+    await open();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include birch.com' }));
+    expect((screen.getByRole('checkbox', { name: 'Include every domain' }) as HTMLInputElement).indeterminate).toBe(true);
+  });
+
+  it('what was left out is remembered when the page is opened again', async () => {
+    const first = await open();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include birch.com' }));
+    first.unmount();
+    await open();
+    expect((screen.getByRole('checkbox', { name: 'Include birch.com' }) as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByTestId('setup-count')).toHaveTextContent('2 of 3 domains selected');
+  });
+});
+
+describe('choosing the alias name', () => {
+  beforeEach(() => {
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
+    setup = {
+      mailbox: 'lodmarc@goliveoak.com',
+      mailbox_domain: 'goliveoak.com',
+      lines: [line('lonestar.com', 'Lonestar Landscape', 'lonestar-landscape-dfw-llc.dmarc@goliveoak.com'), line('lonestar.net', 'Lonestar Landscape', 'lonestar-landscape-dfw-llc.dmarc@goliveoak.com')],
+    };
+  });
+  const open = async () => {
+    const r = render(view());
+    await userEvent.click(await screen.findByRole('tab', { name: 'Setup' }));
+    await screen.findAllByTestId('setup-row');
+    return r;
+  };
+
+  it('cleanAliasName keeps a safe name: lower case, allowed characters, starting with a letter or digit, at most 64', () => {
+    expect(cleanAliasName('LoneStar.DMARC')).toBe('lonestar.dmarc');
+    expect(cleanAliasName(' lone star@x!')).toBe('lonestarx');
+    expect(cleanAliasName('..-a_b')).toBe('a_b');
+    expect(cleanAliasName('x'.repeat(80))).toHaveLength(64);
+    expect(cleanAliasName('@@@')).toBe('');
+  });
+
+  it('the alias name can be changed for a client: the record value, the PowerShell and the count follow, for all of its domains', async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: write }, configurable: true });
+    await open();
+    const [first, second] = screen.getAllByLabelText('Alias for Lonestar Landscape');
+    expect(first).toHaveValue('lonestar-landscape-dfw-llc.dmarc');
+    await userEvent.clear(first);
+    await userEvent.type(first, 'Lonestar.DMARC');
+    expect(first).toHaveValue('lonestar.dmarc');
+    expect(second).toHaveValue('lonestar.dmarc'); // one alias per client
+    expect(screen.getAllByText('rua=mailto:lonestar.dmarc@goliveoak.com')).toHaveLength(2);
+    expect(screen.getByTestId('setup-count')).toHaveTextContent('2 of 2 domains selected (1 alias)');
+    await userEvent.click(screen.getByRole('button', { name: 'Copy the PowerShell that creates the selected aliases' }));
+    expect(write).toHaveBeenLastCalledWith('Set-Mailbox -Identity lodmarc@goliveoak.com -EmailAddresses @{add="lonestar.dmarc@goliveoak.com"}');
+  });
+
+  it('the chosen name is remembered, and an empty box means the suggested name', async () => {
+    const first = await open();
+    await userEvent.clear(screen.getAllByLabelText('Alias for Lonestar Landscape')[0]);
+    await userEvent.type(screen.getAllByLabelText('Alias for Lonestar Landscape')[0], 'lonestar.dmarc');
+    first.unmount();
+    await open();
+    expect(screen.getAllByLabelText('Alias for Lonestar Landscape')[0]).toHaveValue('lonestar.dmarc');
+    await userEvent.clear(screen.getAllByLabelText('Alias for Lonestar Landscape')[0]);
+    expect(screen.getAllByLabelText('Alias for Lonestar Landscape')[0]).toHaveValue(''); // empty while you type a new one...
+    expect(screen.getAllByText('rua=mailto:lonestar-landscape-dfw-llc.dmarc@goliveoak.com')).toHaveLength(2); // ...and the suggested name is used if it stays empty
+  });
+});
+
+describe('domains with no mail records', () => {
+  beforeEach(() => {
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
+    setup = {
+      mailbox: 'lodmarc@goliveoak.com',
+      mailbox_domain: 'goliveoak.com',
+      lines: [{ ...line('acme.com', 'Acme', 'acme.dmarc@goliveoak.com'), has_mx: true }, { ...line('parked.example', 'Acme', 'acme.dmarc@goliveoak.com'), has_mx: false }, { ...line('old.example', 'Birch', 'birch.dmarc@goliveoak.com'), has_mx: false }],
+    };
+  });
+  const open = async () => {
+    const r = render(view());
+    await userEvent.click(await screen.findByRole('tab', { name: 'Setup' }));
+    await screen.findAllByTestId('setup-row');
+    return r;
+  };
+
+  it('are hidden by default, left out of the count, and the page says how many and why', async () => {
+    await open();
+    expect(screen.getAllByTestId('setup-row')).toHaveLength(1);
+    expect(screen.queryByText('parked.example')).not.toBeInTheDocument();
+    expect(screen.getByTestId('setup-count')).toHaveTextContent('1 of 3 domains selected (1 alias)');
+    expect(screen.getByTestId('setup-nomail')).toHaveTextContent('2 domains are hidden: no mail records (MX), so nothing to report.');
+  });
+
+  it('can be shown, marked "no mail" and unticked; ticking one covers it', async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: write }, configurable: true });
+    await open();
+    await userEvent.click(screen.getByRole('button', { name: 'Show them' }));
+    expect(screen.getAllByTestId('setup-row')).toHaveLength(3);
+    expect(screen.getAllByText('no mail')).toHaveLength(2);
+    expect((screen.getByRole('checkbox', { name: 'Include parked.example' }) as HTMLInputElement).checked).toBe(false);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include parked.example' }));
+    expect(screen.getByTestId('setup-count')).toHaveTextContent('2 of 3 domains selected');
+    await userEvent.click(screen.getByRole('button', { name: 'Copy the DNS records for the selected domains' }));
+    expect(write).toHaveBeenLastCalledWith('acme.com._report._dmarc.goliveoak.com\tTXT\tv=DMARC1\nparked.example._report._dmarc.goliveoak.com\tTXT\tv=DMARC1');
+    await userEvent.click(screen.getByRole('button', { name: 'Hide the domains without mail' }));
+    expect(screen.getAllByTestId('setup-row')).toHaveLength(1);
+  });
+
+  it('the header box only touches the rows on screen', async () => {
+    await open();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include every domain' })); // the one visible row off
+    expect(screen.getByTestId('setup-count')).toHaveTextContent('0 of 3 domains selected');
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include every domain' })); // back on; the hidden ones stay as they were (off)
+    expect(screen.getByTestId('setup-count')).toHaveTextContent('1 of 3 domains selected');
+  });
+
+  it('a server that does not say (an older one) is treated as having mail: nothing is hidden', async () => {
+    setup = { mailbox: 'lodmarc@goliveoak.com', mailbox_domain: 'goliveoak.com', lines: [line('acme.com', 'Acme', 'acme.dmarc@goliveoak.com')] };
+    await open();
+    expect(screen.getAllByTestId('setup-row')).toHaveLength(1);
+    expect(screen.queryByTestId('setup-nomail')).not.toBeInTheDocument();
   });
 });

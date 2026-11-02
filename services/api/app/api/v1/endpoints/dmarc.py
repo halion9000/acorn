@@ -5,7 +5,9 @@ Reads only. The reports arrive through the shared mailbox (app/workers/dmarc_ing
 
 from __future__ import annotations
 
+import asyncio
 import re
+import time
 from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
@@ -21,7 +23,7 @@ from app.models.dmarc import DmarcIngestState, DmarcReport
 from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
-from app.services.domain_posture import candidate_domains
+from app.services.domain_posture import DohResolver, Resolver, candidate_domains
 
 router = APIRouter(prefix="/dmarc", tags=["dmarc"])
 
@@ -93,12 +95,61 @@ class SetupLine(BaseModel):
     client_dmarc_rua: str
     authorization_record_name: str
     authorization_record_value: str
+    # False when the domain has no mail records (MX), so it cannot receive or send mail and has nothing to report. True when it has some, or when that could not be told (a domain is never
+    # hidden on a failed lookup).
+    has_mx: bool = True
 
 
 class Setup(BaseModel):
     mailbox: str | None
     mailbox_domain: str | None
     lines: list[SetupLine]
+
+
+def alias_names(clients: dict[Any, Tenant]) -> dict[Any, str]:
+    """A readable mailbox alias (the part before the @) for each client. It comes from the client's slug, with the random six-character tail the slug carries for uniqueness taken off, so
+    ``acme-dental-1a2b3c`` becomes ``acme-dental``. Two clients that would end up with the same name keep their full slug, so no two clients ever share an alias."""
+
+    def full(t: Tenant) -> str:
+        return re.sub(r"[^a-z0-9-]", "-", t.slug.lower())[:48].strip("-") or "client"
+
+    def short(t: Tenant) -> str:
+        return re.sub(r"-[0-9a-f]{6}$", "", full(t)).strip("-") or full(t)
+
+    counts = Counter(short(t) for t in clients.values())
+    return {tid: (short(t) if counts[short(t)] == 1 else full(t)) for tid, t in clients.items()}
+
+
+_MX_TTL_SECONDS = 3600
+_MX_CACHE: dict[str, tuple[float, bool]] = {}
+
+
+def get_resolver() -> Resolver:
+    """The DNS resolver the mail-record check uses (replaced in tests)."""
+    return DohResolver()
+
+
+async def mail_domains(domains: list[str], resolver: Resolver, now: float | None = None) -> dict[str, bool]:
+    """For each domain: does it have mail records (an MX that is not the "null MX" of RFC 7505, which says "no mail here")? A lookup that comes back empty is tried once more before the domain is called
+    mail-less, and a lookup that fails outright counts as "has mail": a domain is hidden only when it is clearly mail-less. Answers are kept for an hour so the page stays quick."""
+    stamp = time.monotonic() if now is None else now
+    gate = asyncio.Semaphore(10)
+
+    async def one(domain: str) -> tuple[str, bool]:
+        cached = _MX_CACHE.get(domain)
+        if cached and stamp - cached[0] < _MX_TTL_SECONDS:
+            return domain, cached[1]
+        async with gate:
+            try:
+                hosts = [h for h in await resolver.mx(domain) if h]
+                if not hosts:
+                    hosts = [h for h in await resolver.mx(domain) if h]
+            except Exception:  # noqa: BLE001  # a failed lookup must never hide a domain
+                return domain, True
+        _MX_CACHE[domain] = (stamp, bool(hosts))
+        return domain, bool(hosts)
+
+    return dict(await asyncio.gather(*(one(d) for d in sorted(set(domains)))))
 
 
 def _configured() -> bool:
@@ -212,7 +263,9 @@ async def domain_detail(
 
 
 @router.get("/setup", response_model=Setup, summary="For each client domain: the address to put in its DMARC record and the DNS line that authorises it")
-async def setup(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> Setup:
+async def setup(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, resolver: Annotated[Resolver, Depends(get_resolver)]
+) -> Setup:
     """Nothing is changed. Each client domain gets its own alias on the shared mailbox (so its reports are recognisable and can be retired alone) and the one DNS record, in YOUR zone, that lets receivers send a
     client domain's reports to you (receivers require it before reporting to a different domain)."""
     mailbox = settings.DMARC_MAILBOX.strip() or None
@@ -227,8 +280,9 @@ async def setup(current_user: Annotated[AuthUser, Depends(require_permission("al
         emails: dict[Any, list[str]] = defaultdict(list)
         for tenant_id, address in [*upns, *mails]:
             emails[tenant_id].append(address)
+        locals_by_client = alias_names(clients)
         for tenant_id, tenant in sorted(clients.items(), key=lambda kv: kv[1].name.lower()):
-            alias = f"{re.sub(r'[^a-z0-9-]', '-', tenant.slug.lower())[:48].strip('-') or 'client'}@{mailbox_domain}"
+            alias = f"{locals_by_client[tenant_id]}.dmarc@{mailbox_domain}"  # e.g. lonestar.dmarc@: the name says what the address is for
             for domain in candidate_domains(emails.get(tenant_id, [])):
                 lines.append(
                     SetupLine(
@@ -241,4 +295,8 @@ async def setup(current_user: Annotated[AuthUser, Depends(require_permission("al
                         authorization_record_value="v=DMARC1",
                     )
                 )
+    if lines:
+        has_mail = await mail_domains([ln.domain for ln in lines], resolver)
+        for ln in lines:
+            ln.has_mx = has_mail.get(ln.domain, True)
     return Setup(mailbox=mailbox, mailbox_domain=mailbox_domain, lines=lines)
