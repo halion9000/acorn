@@ -20,7 +20,9 @@ from sqlalchemy.orm import selectinload
 from app.api.v1.deps import AuthUser, require_permission
 from app.db.rls import TenantDBSession
 from app.models.rbac import Permission, Role, RolePermission, UserRole
-from app.models.tenant import User
+from app.models.tenant import Tenant, User
+from app.services.audit import emit_audit
+from app.services.sso_default_role import ALLOWED_BUILTIN, KEY as SSO_DEFAULT_KEY, effective as effective_default_role, stored as stored_default_role
 from app.services.role_nav import clean_hidden_nav
 
 router = APIRouter(prefix="/rbac", tags=["rbac"])
@@ -125,6 +127,91 @@ async def list_builtin_roles(
     from app.core.security import ROLE_PERMISSIONS  # noqa: PLC0415
 
     return [BuiltinRoleOut(key=key, label=label, description=hint, permissions=sorted(ROLE_PERMISSIONS[key])) for key, label, hint in BUILTIN_ASSIGNABLE]
+
+
+class SsoDefaultOut(BaseModel):
+    sso_configured: bool  # Microsoft sign-in is set up on this server
+    applies_here: bool  # and it creates new people in THIS workspace
+    role: str
+    custom_role_id: uuid.UUID | None
+    source: str  # "setting" (chosen here) or "server" (the MS_SSO_NEW_USER_ROLE setting)
+    allowed_builtin: list[str]
+
+
+class SsoDefaultIn(BaseModel):
+    role: str
+    custom_role_id: uuid.UUID | None = None
+
+
+def _sso_state() -> tuple[bool, Any]:
+    from app.api.v1.endpoints.sso_microsoft import load_config  # noqa: PLC0415
+
+    cfg = load_config()
+    return cfg is not None, cfg
+
+
+@router.get("/sso-default", response_model=SsoDefaultOut)
+async def get_sso_default(
+    current_user: Annotated[AuthUser, Depends(require_permission("roles:read"))],
+    db: TenantDBSession,
+) -> SsoDefaultOut:
+    """The role a person gets the first time they sign in with Microsoft without an account."""
+    configured, cfg = _sso_state()
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    role, custom, source = effective_default_role(tenant.settings if tenant is not None else None, cfg.new_user_role if cfg else "viewer")
+    return SsoDefaultOut(
+        sso_configured=configured,
+        applies_here=bool(cfg and cfg.home_tenant == current_user.tenant_id),
+        role=role,
+        custom_role_id=custom,
+        source=source,
+        allowed_builtin=list(ALLOWED_BUILTIN),
+    )
+
+
+@router.put("/sso-default", response_model=SsoDefaultOut)
+async def set_sso_default(
+    body: SsoDefaultIn,
+    current_user: Annotated[AuthUser, Depends(require_permission("roles:write"))],
+    db: TenantDBSession,
+) -> SsoDefaultOut:
+    """Choose the role new Microsoft sign-ins get: a built-in role (never an administrator) or one of this workspace's custom roles, held on top of Viewer."""
+    configured, cfg = _sso_state()
+    if not configured:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Microsoft sign-in is not set up on this server, so there is nothing to choose a role for.")
+    if cfg.home_tenant != current_user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Microsoft sign-in creates new people in a different workspace. Choose the role there.")
+    if body.role not in ALLOWED_BUILTIN:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Choose Viewer, SOC analyst, Threat hunter or SOC lead (or a custom role). Administrators are never made automatically.",
+        )
+    if not current_user.can_grant_role(body.role):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot choose a role that grants more than your own.")
+    role = body.role
+    if body.custom_role_id is not None:
+        custom = await _get_role_or_404(db, body.custom_role_id, current_user.tenant_id)
+        _require_permissions_held(current_user, [p.name for p in await _load_role_permissions(db, custom.id)])
+        role = "viewer"  # a custom role is held on top of Viewer, as when adding a member
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    before = effective_default_role(tenant.settings, cfg.new_user_role)
+    tenant.settings = {**(tenant.settings or {}), SSO_DEFAULT_KEY: stored_default_role(role, body.custom_role_id)}
+    await emit_audit(
+        db=db,
+        tenant_id=tenant.id,
+        actor_id=current_user.user_id,
+        actor_email=current_user.email,
+        action="sso:default_role_changed",
+        resource="sso_default_role",
+        resource_id=str(tenant.id),
+        changes={"before": {"role": before[0], "custom_role_id": str(before[1]) if before[1] else None}, "after": stored_default_role(role, body.custom_role_id)},
+    )
+    await db.commit()
+    return SsoDefaultOut(
+        sso_configured=True, applies_here=True, role=role, custom_role_id=body.custom_role_id, source="setting", allowed_builtin=list(ALLOWED_BUILTIN)
+    )
 
 
 # ──────────────────────────────────────────────

@@ -44,7 +44,9 @@ from app.api.v1.deps import DBSession
 from app.core.config import settings
 from app.core.emails import normalize_email
 from app.core.security import ROLE_PERMISSIONS, create_access_token, create_refresh_token, get_password_hash
-from app.models.tenant import User
+from app.models.rbac import Role, UserRole
+from app.models.tenant import Tenant, User
+from app.services.sso_default_role import effective as effective_default_role
 from app.services.account_names import unique_account_name
 from app.services.audit import emit_audit
 from app.services.user_lookup import find_user_by_email
@@ -284,6 +286,11 @@ async def resolve_user(db: Any, cfg: SsoConfig, claims: dict[str, Any]) -> tuple
         raise SsoFailure("no_account", "no account, and automatic creation is not set up (MS_SSO_ACORN_TENANT_ID)")
     name = str(claims.get("name") or "").strip()[:100] or upn.split("@")[0]
     account_name = await unique_account_name(db, upn.split("@")[0])
+    # The role chosen under Settings > Roles & Permissions, else the server setting. Never an administrator role, whatever is stored.
+    home = await db.get(Tenant, cfg.home_tenant)
+    role, custom_role_id, _ = effective_default_role(home.settings if home is not None else None, cfg.new_user_role)
+    if role not in ROLE_PERMISSIONS or role in NEVER_AT_FIRST:
+        role, custom_role_id = "viewer", None
     created = User(
         tenant_id=cfg.home_tenant,
         email=upn,
@@ -291,13 +298,17 @@ async def resolve_user(db: Any, cfg: SsoConfig, claims: dict[str, Any]) -> tuple
         username=name,
         # Nobody knows this password: sign-in is through Microsoft until an administrator sets one.
         hashed_password=get_password_hash(secrets.token_urlsafe(48)),
-        role=cfg.new_user_role,
+        role=role,
         is_active=True,
         is_verified=True,
         external_identity=key,
     )
     db.add(created)
     await db.flush()
+    if custom_role_id is not None:
+        # Only a role of this workspace; one that was deleted since is simply not given.
+        if (await db.execute(select(Role.id).where(Role.id == custom_role_id, Role.tenant_id == cfg.home_tenant))).first() is not None:
+            db.add(UserRole(user_id=created.id, role_id=custom_role_id))
     return created, "created"
 
 

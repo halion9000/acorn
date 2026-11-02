@@ -9,6 +9,7 @@ import { failureDetail } from '@/lib/failure-detail';
 import { NAV_CATALOG } from '@/components/layout/Sidebar';
 import { RoleVisibilityPicker } from './RoleVisibilityPicker';
 import { ROLE_PRESETS, presetPermissionIds } from './rolePresets';
+import { SsoDefaultRoleCard } from './SsoDefaultRoleCard';
 
 interface Permission {
   id: string;
@@ -410,6 +411,8 @@ export function RBACView() {
           }
         />
       )}
+
+      <SsoDefaultRoleCard customRoles={(roles ?? []).filter((r) => !r.is_system).map((r) => ({ id: r.id, name: r.name }))} />
 
       {builtins && builtins.length > 0 && (
         <section aria-labelledby="builtin-roles-heading" className="space-y-3">
