@@ -57,7 +57,9 @@ class GraphMailboxReader(GraphMailer):
 
     async def new_messages(self, since: datetime | None) -> list[Message]:
         mailbox = quote(self.sender, safe="@")
-        flt = "hasAttachments eq true" + (f" and receivedDateTime gt {since.astimezone(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}" if since else "")
+        # Microsoft refuses a sorted list ("InefficientFilter", HTTP 400) unless the sort property is the FIRST thing in the filter, so the date always leads, even for the very first read.
+        floor = (since or datetime(2000, 1, 1, tzinfo=UTC)).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        flt = f"receivedDateTime gt {floor} and hasAttachments eq true"
         url: str | None = f"{self.base_url}/users/{mailbox}/mailFolders/inbox/messages"
         params: dict[str, str] | None = {"$filter": flt, "$orderby": "receivedDateTime asc", "$top": str(PAGE), "$select": "id,receivedDateTime"}
         out: list[Message] = []

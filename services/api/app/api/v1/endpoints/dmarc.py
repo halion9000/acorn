@@ -132,6 +132,8 @@ async def overview(
 ) -> Overview:
     owner = current_user.tenant_id
     clients = await _children(db, owner)
+    async with cross_tenant_reads(db):
+        owner_name = (await db.execute(select(Tenant.name).where(Tenant.id == owner))).scalar_one_or_none() or "This company"
     since = datetime.now(UTC) - timedelta(days=days)
     async with cross_tenant_reads(db):
         reports = (
@@ -148,8 +150,9 @@ async def overview(
         rows.append(
             DomainRow(
                 client_id=str(tenant_id),
-                client_name=clients[tenant_id].name if tenant_id in clients else "Not matched to a client",
-                matched=tenant_id in clients,
+                # the managing company's own domain is matched too (to itself); only a domain nobody could be matched to is "not matched"
+                client_name=clients[tenant_id].name if tenant_id in clients else (f"{owner_name} (own)" if all(i.matched for i in items) else "Not matched to a client"),
+                matched=all(i.matched for i in items),
                 domain=domain,
                 reports=len(items),
                 total=total,

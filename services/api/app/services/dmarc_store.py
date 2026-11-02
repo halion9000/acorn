@@ -31,22 +31,27 @@ class Stored:
     matched: bool
 
 
+async def _people_by_tenant(db, tenant_ids: set[uuid.UUID], domain: str) -> Counter[uuid.UUID]:
+    counts: Counter[uuid.UUID] = Counter()
+    suffix = f"%@{domain}"
+    for column, tenant_column in ((IdentityMfaUser.upn, IdentityMfaUser.tenant_id), (IdentitySource.email, IdentitySource.tenant_id)):
+        for tenant_id in (await db.execute(select(tenant_column).where(tenant_column.in_(tenant_ids), column.ilike(suffix)))).scalars().all():
+            counts[tenant_id] += 1
+    return counts
+
+
 async def client_for_domain(db, owner_id: uuid.UUID, domain: str) -> uuid.UUID | None:
-    """The client of ``owner_id`` whose people use ``domain`` most, or None when none does (or two are tied for it)."""
+    """The client of ``owner_id`` whose people use ``domain`` most; the owner itself when it is the owner's OWN people who use it (the managing company's own domain); None when nobody does, or two
+    clients are tied for it."""
     domain = domain.strip().lower().rstrip(".")
     if not domain:
         return None
     async with cross_tenant_reads(db):
         children = set((await db.execute(select(Tenant.id).where(Tenant.parent_tenant_id == owner_id))).scalars().all())
-        if not children:
-            return None
-        counts: Counter[uuid.UUID] = Counter()
-        suffix = f"%@{domain}"
-        for column, tenant_column in ((IdentityMfaUser.upn, IdentityMfaUser.tenant_id), (IdentitySource.email, IdentitySource.tenant_id)):
-            for tenant_id in (await db.execute(select(tenant_column).where(tenant_column.in_(children), column.ilike(suffix)))).scalars().all():
-                counts[tenant_id] += 1
-    if not counts:
-        return None
+        counts = await _people_by_tenant(db, children, domain) if children else Counter()
+        if not counts:
+            own = await _people_by_tenant(db, {owner_id}, domain)
+            return owner_id if own else None
     ranked = counts.most_common(2)
     if len(ranked) > 1 and ranked[0][1] == ranked[1][1]:
         return None

@@ -134,3 +134,18 @@ def test_only_the_biggest_sources_are_kept_when_a_report_is_huge(monkeypatch):
     recs = [Record(f"10.0.0.{i}", i, "none", True, True, "client.com", "client.com") for i in range(1, 8)]
     rows = store.compact_rows(report(records=recs))
     assert [r["count"] for r in rows] == [7, 6, 5]
+
+
+def test_the_managing_companys_own_domain_is_matched_to_itself_not_left_unmatched():
+    async def body(s):
+        owner = await tenant(s, "Live Oak")
+        acme = await tenant(s, "Acme", owner.id)
+        s.add_all([person(owner.id, "hal@goliveoak.com"), person(acme.id, "a@acme.example")])
+        await s.commit()
+        own = await store.store_report(s, owner.id, report("goliveoak.com", "own1"))
+        theirs = await store.store_report(s, owner.id, report("acme.example", "c1"))
+        return own, theirs, owner.id, acme.id
+
+    own, theirs, owner_id, acme_id = run(body)
+    assert (own.tenant_id, own.matched) == (owner_id, True)
+    assert (theirs.tenant_id, theirs.matched) == (acme_id, True)  # a client's domain still goes to the client, not the owner

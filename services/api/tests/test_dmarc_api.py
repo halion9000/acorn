@@ -187,3 +187,15 @@ def test_without_a_mailbox_the_setup_is_empty_and_the_status_says_not_configured
 
     out, st = run(body)
     assert out.lines == [] and out.mailbox is None and st.configured is False
+
+
+def test_the_managing_companys_own_domain_is_labelled_as_its_own_and_counts_as_matched():
+    async def body(s):
+        owner = await tenant(s, "Live Oak")
+        s.add(rep(owner.id, "goliveoak.com", 20, 20, matched=True))
+        await s.commit()
+        return await ep.overview(caller(owner), s, days=30)
+
+    out = run(body)
+    assert (out.domains[0].client_name, out.domains[0].matched) == ("Live Oak (own)", True)
+    assert out.status.unmatched_reports == 0

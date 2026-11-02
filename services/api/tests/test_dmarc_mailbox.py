@@ -70,7 +70,7 @@ def test_it_reads_report_attachments_only_and_skips_everything_else():
     out = asyncio.run(reader(graph([msg("m1")], atts, calls)).new_messages(None))
     assert [m.id for m in out] == ["m1"] and [n for n, _ in out[0].attachments] == ["google.com!client.com!1!2.xml.gz"]
     assert out[0].received == datetime(2026, 11, 2, 10, tzinfo=UTC)
-    assert any("$filter=hasAttachments" in u.replace("%20", " ").replace("+", " ") or "hasAttachments" in u for _, u in calls)
+    assert any("hasAttachments" in u for _, u in calls)
 
 
 def test_it_asks_only_for_what_arrived_after_the_cursor_and_follows_pages():
@@ -225,3 +225,17 @@ def test_the_reader_uses_its_own_app_when_all_three_are_set_and_the_alert_mail_a
     monkeypatch.setattr(s, "DMARC_GRAPH_CLIENT_SECRET", "own-s", raising=False)
     own = w.make_reader()
     assert (own.tenant_id, own.client_id, own.client_secret) == ("own-t", "own-c", "own-s")
+
+
+def test_the_listing_filter_starts_with_the_date_the_list_is_sorted_by_or_microsoft_refuses_it():
+    """Found live: HTTP 400 InefficientFilter. A list sorted by receivedDateTime is only accepted when the filter's first condition is on receivedDateTime, also on the very first read (no cursor yet)."""
+    from urllib.parse import parse_qs, urlsplit
+
+    for since in (None, datetime(2026, 11, 1, 9, 30, tzinfo=UTC)):
+        calls = []
+        asyncio.run(reader(graph([msg("m1")], {"m1": []}, calls)).new_messages(since))
+        listing = next(u for _, u in calls if "mailFolders/inbox/messages" in u)
+        query = parse_qs(urlsplit(listing).query)
+        assert query["$orderby"] == ["receivedDateTime asc"]
+        assert query["$filter"][0].startswith("receivedDateTime gt "), query["$filter"]
+        assert query["$filter"][0].endswith("and hasAttachments eq true")
