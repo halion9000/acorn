@@ -10,7 +10,7 @@ vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => fetchMock
 vi.mock('@/lib/api', () => ({ alertsApi: { list: (...a: unknown[]) => listMock(...a) } }));
 vi.mock('next/link', () => ({ default: ({ children, href, onClick, ...rest }: { children: React.ReactNode; href: string; onClick?: () => void; 'data-testid'?: string }) => <a href={href} onClick={onClick} data-testid={rest['data-testid']}>{children}</a> }));
 
-import { NotificationsBell, billingLinesOff, needsAttention } from './NotificationsBell';
+import { NotificationsBell, approvalsLine, billingLinesOff, needsAttention } from './NotificationsBell';
 
 const alert = (id: string, severity: string, createdAt: string, clientName?: string) => ({ id, title: `Alert ${id}`, severity, createdAt, clientName }) as unknown as Alert;
 const wrap = () => render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}><NotificationsBell /></SWRConfig>);
@@ -94,5 +94,55 @@ describe('billing lines in the bell', () => {
     await user.click(screen.getByRole('button', { name: 'Open notifications' }));
     expect(await screen.findByText('No new critical or high alerts.')).toBeTruthy();
     expect(screen.queryByTestId('bell-billing')).toBeNull();
+  });
+});
+
+describe('CORE approvals in the bell', () => {
+  const okJson = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
+
+  it('says nothing when none are waiting, and describes the one closest to expiring when some are', () => {
+    expect(approvalsLine([])).toBeNull();
+    expect(approvalsLine([{ role: 'cipher', summary: 'Close case 7', days_left: 1 }, { role: 'jax', summary: 'Escalate 12', days_left: 5 }])).toEqual({
+      title: '2 approvals waiting in CORE',
+      detail: 'cipher: Close case 7 (expires in 1 day). Answer in the CORE app.',
+    });
+    expect(approvalsLine([{ role: 'jax', summary: 'x', days_left: 0 }])?.detail).toContain('expires today');
+    expect(approvalsLine([{ role: 'jax', summary: 'x', days_left: 4 }])?.title).toBe('1 approval waiting in CORE');
+  });
+
+  it('shows an amber dot and a row in the panel, below the alerts, when CORE reported waiting approvals', async () => {
+    listMock.mockResolvedValue({ alerts: [], total: 0 });
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).includes('core-approvals') ? okJson({ reported: true, items: [{ role: 'cipher', summary: 'Close case 7', days_left: 2 }] }) : { ok: false, status: 403, json: async () => ({}) },
+    );
+    const user = userEvent.setup();
+    wrap();
+    expect(await screen.findByTestId('bell-dot-approvals')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Open notifications' }));
+    const row = await screen.findByTestId('bell-approvals');
+    expect(row.textContent).toContain('1 approval waiting in CORE');
+    expect(row.textContent).toContain('cipher: Close case 7 (expires in 2 days)');
+  });
+
+  it('shows neither when CORE has not reported, the list is empty, or the person may not read it', async () => {
+    listMock.mockResolvedValue({ alerts: [], total: 0 });
+    const user = userEvent.setup();
+    for (const answer of [okJson({ reported: false, items: [] }), okJson({ reported: true, items: [] }), { ok: false, status: 403, json: async () => ({}) }]) {
+      fetchMock.mockImplementation(async (url: string) => (String(url).includes('core-approvals') ? answer : { ok: false, status: 403, json: async () => ({}) }));
+      const view = wrap();
+      await user.click(screen.getByRole('button', { name: 'Open notifications' }));
+      await screen.findByText('No new critical or high alerts.');
+      expect(screen.queryByTestId('bell-dot-approvals')).toBeNull();
+      expect(screen.queryByTestId('bell-approvals')).toBeNull();
+      view.unmount();
+    }
+  });
+
+  it('a critical alert still wins the dot', async () => {
+    listMock.mockImplementation(async (f: { severity: string }) => (f.severity === 'critical' ? { alerts: [alert('c1', 'critical', '2026-10-15T01:00:00Z')], total: 1 } : { alerts: [], total: 0 }));
+    fetchMock.mockImplementation(async (url: string) => (String(url).includes('core-approvals') ? okJson({ items: [{ role: 'jax', summary: 's', days_left: 3 }] }) : { ok: false, status: 403, json: async () => ({}) }));
+    wrap();
+    expect(await screen.findByTestId('bell-dot')).toBeTruthy();
+    expect(screen.queryByTestId('bell-dot-approvals')).toBeNull();
   });
 });

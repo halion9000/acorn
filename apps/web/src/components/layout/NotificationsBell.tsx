@@ -28,6 +28,24 @@ export function billingLinesOff(rows: BillingRow[]): { lines: number; clients: n
   return { lines: off.length, clients: new Set(off.map((r) => r.client_id)).size };
 }
 
+/** One approval CORE says is waiting for the owner (agent, one-line summary, whole days before CORE takes it off the list). */
+export interface CoreApproval {
+  role: string;
+  summary: string;
+  days_left: number;
+}
+
+/** What the bell says about CORE's waiting approvals: how many, and the one closest to expiring (the list arrives fewest-days-left first). Nothing to say when none wait. */
+export function approvalsLine(items: CoreApproval[]): { title: string; detail: string } | null {
+  if (items.length === 0) return null;
+  const first = items[0];
+  const days = first.days_left <= 0 ? 'expires today' : first.days_left === 1 ? 'expires in 1 day' : `expires in ${first.days_left} days`;
+  return {
+    title: `${items.length} approval${items.length === 1 ? '' : 's'} waiting in CORE`,
+    detail: `${first.role}: ${first.summary} (${days}). Answer in the CORE app.`,
+  };
+}
+
 export function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -55,6 +73,18 @@ export function NotificationsBell() {
     { refreshInterval: 300_000, shouldRetryOnError: false },
   );
 
+  // Approvals CORE says are waiting for the owner, as of its last report. A person without alert access, a failed read, or a CORE that has not reported lately simply gets no approvals line.
+  const { data: coreApprovals } = useSWR(
+    'topbar-core-approvals',
+    async () => {
+      const res = await authFetch('/api/v1/health/core-approvals');
+      if (!res.ok) return null;
+      const body = (await res.json()) as { items?: CoreApproval[] };
+      return Array.isArray(body.items) ? body.items : [];
+    },
+    { refreshInterval: 120_000, shouldRetryOnError: false },
+  );
+
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -74,6 +104,7 @@ export function NotificationsBell() {
   const criticalCount = data?.criticalCount ?? 0;
   const total = criticalCount + (data?.highCount ?? 0);
   const billingLines = billing?.lines ?? 0;
+  const approvals = approvalsLine(coreApprovals ?? []);
 
   return (
     <div ref={box} className="relative">
@@ -89,6 +120,8 @@ export function NotificationsBell() {
         </svg>
         {criticalCount > 0 ? (
           <span aria-hidden data-testid="bell-dot" className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-surface-raised" />
+        ) : approvals ? (
+          <span aria-hidden data-testid="bell-dot-approvals" className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full ring-2 ring-surface-raised" />
         ) : billingLines > 0 ? (
           <span aria-hidden data-testid="bell-dot-billing" className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full ring-2 ring-surface-raised" />
         ) : null}
@@ -116,6 +149,12 @@ export function NotificationsBell() {
                 </li>
               ))}
             </ul>
+          ) : null}
+          {approvals ? (
+            <div data-testid="bell-approvals" className="px-4 py-2.5 border-t border-gray-800">
+              <p className="text-sm text-amber-300">{approvals.title}</p>
+              <p className="text-xs text-gray-500">{approvals.detail}</p>
+            </div>
           ) : null}
           {billing && billing.lines > 0 ? (
             <Link href="/settings/billing" onClick={() => setOpen(false)} data-testid="bell-billing" className="block px-4 py-2.5 border-t border-gray-800 hover:bg-gray-800/50">
