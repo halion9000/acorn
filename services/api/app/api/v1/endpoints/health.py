@@ -1071,6 +1071,19 @@ def platform_warnings(
 
 
 @router.get(
+    "/core-approvals",
+    summary="Approvals waiting for the owner in CORE, as CORE last reported them",
+    dependencies=[Depends(require_permission("alerts:read"))],
+)
+async def core_approvals_waiting(user: AuthUser) -> dict[str, Any]:
+    """For the notification bell: what CORE said was waiting for the owner at its last report (within 20 minutes), the agent, a one-line summary and the days left. Empty when CORE has not reported lately."""
+    from app.services import core_approvals  # noqa: PLC0415
+
+    found = await core_approvals.recall(user.tenant_id)
+    return {"reported": found is not None, "reported_at": found["reported_at"] if found else None, "items": found["items"] if found else []}
+
+
+@router.get(
     "/feed-routes",
     summary="When each CORE feed route last received a report",
     dependencies=[Depends(require_permission("alerts:read"))],

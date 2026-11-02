@@ -42,7 +42,8 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/passkeys/authenticate/finish"): ENTRY + " (passkey sign-in)",
     ("GET", "/api/v1/auth/sso/status"): "says which sign-in buttons the login page shows; carries no data",
     ("GET", "/api/v1/auth/sso/microsoft/login"): SSO + " (keeps a state, nonce and PKCE verifier for ten minutes)",
-    ("GET", "/api/v1/auth/sso/microsoft/callback"): SSO + " (the state is used up; the ID token is verified: signature, issuer, audience, expiry, nonce, Microsoft tenant, group)",
+    ("GET", "/api/v1/auth/sso/microsoft/callback"): SSO
+    + " (the state is used up; the ID token is verified: signature, issuer, audience, expiry, nonce, Microsoft tenant, group)",
     ("POST", "/api/v1/auth/sso/exchange"): ENTRY + " (a one-time code from the callback, valid a minute, usable once)",
     ("GET", "/auth/oidc/login"): SSO,
     ("GET", "/auth/oidc/callback"): SSO,
@@ -194,6 +195,8 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
 
 LOGIN_ONLY_NO_CHECK: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/auth/logout"): OWN,
+    ("POST", "/api/v1/auth/password"): OWN
+    + " (changes only the caller's own password, and only with the current password; sign-in throttling applies to wrong guesses; needs a real session, not an API key)",
     ("GET", "/api/v1/auth/me"): OWN,
     ("PATCH", "/api/v1/auth/me/preferences"): OWN,
     ("GET", "/api/v1/tenants/me/identity"): "the caller's own tenant's name and identity",

@@ -31,6 +31,7 @@ from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.tenant import Tenant
 from app.models.vendor_action import VendorAction
+from app.services import core_approvals
 from app.services.client_mapping import IncomingClient, upsert_clients
 from app.services.connector_run_log import record_if_changed
 from app.services.core_feed_cases import close_finished_cases, open_cases_for_new_alerts
@@ -68,8 +69,18 @@ class SourceReport(BaseModel):
     )
 
 
+class ApprovalNote(BaseModel):
+    """One approval waiting for the owner in CORE. Only what the bell shows."""
+
+    role: str = Field(max_length=40)
+    summary: str = Field(max_length=200)
+    days_left: int = Field(ge=0, le=30, description="Whole days before CORE takes the card off the list.")
+
+
 class StatusReport(BaseModel):
     sources: list[SourceReport] = Field(max_length=50)
+    # CORE's approvals waiting right now; absent from an older CORE (then nothing is stored or changed), an empty list when none are waiting.
+    approvals: list[ApprovalNote] | None = Field(default=None, max_length=50)
 
 
 class StatusResponse(BaseModel):
@@ -219,6 +230,8 @@ async def report_core_feed_status(tenant_token: str, body: StatusReport, db: DBS
     await adopt_tenant(db, tenant_id)
     applied = await apply_report(db, tenant_id, body)
     await db.commit()
+    if body.approvals is not None:
+        await core_approvals.remember(tenant_id, [a.model_dump() for a in body.approvals])
     # Refresh the per-client numbers the MSSP overview shows. Best effort: it must never fail the status report itself.
     try:
         if await snapshot_children_throttled(db, tenant_id):
