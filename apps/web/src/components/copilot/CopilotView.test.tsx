@@ -62,6 +62,16 @@ describe('when it answers', () => {
     expect(screen.getByText('Connected')).toBeInTheDocument();
     expect(screen.queryByText(/could not answer/)).not.toBeInTheDocument();
   });
+
+  it('labels the answer with the assistant\'s name, Leafy, not "AI"', async () => {
+    copilotApi.chat.mockResolvedValue({ conversationId: 'c1', reply });
+    render(<CopilotView />);
+    await ask('Why is this phishing?');
+    await screen.findByText('The sender domain was registered yesterday.');
+    // The header, the "Leafy" avatar beside the answer; the old two-letter badge is gone.
+    expect(screen.getAllByText('Leafy').length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText(/^ai$/i)).not.toBeInTheDocument();
+  });
 });
 
 describe('when the copilot asks to delete something', () => {

@@ -534,8 +534,8 @@ ${c.title}`)) return;
                     )}
                   >
                     {m.role === 'assistant' && (
-                      <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
-                        ai
+                      <div className="flex h-8 flex-none items-center justify-center rounded-full bg-emerald-500/15 px-2.5 text-[11px] font-semibold text-emerald-300">
+                        Leafy
                       </div>
                     )}
                     <div
@@ -598,8 +598,8 @@ ${c.title}`)) return;
               </AnimatePresence>
               {sending && (
                 <li className="flex justify-start gap-3">
-                  <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
-                    ai
+                  <div className="flex h-8 flex-none items-center justify-center rounded-full bg-emerald-500/15 px-2.5 text-[11px] font-semibold text-emerald-300">
+                    Leafy
                   </div>
                   <div className="rounded-2xl bg-slate-800/70 px-4 py-3 ring-1 ring-slate-700/60">
                     <TypingDots />
