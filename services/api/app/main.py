@@ -42,6 +42,7 @@ from app.workers.oauth_refresh import run_forever as run_oauth_refresh
 from app.workers.playbook_dry_run_worker import run_playbook_dry_runs
 from app.workers.retention_sweeper import run_retention_sweeper
 from app.workers.platform_watch_worker import run_platform_watch
+from app.workers.dmarc_ingest_worker import run_dmarc_ingest
 from app.workers.suppression_sweeper import run_suppression_sweeper
 from app.workers.weekly_digest_task import run_forever as run_weekly_digest
 
@@ -455,6 +456,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info("platform_watch worker started")
         except Exception as exc:
             logger.warning("platform_watch worker failed to start", error=str(exc))
+
+    # DMARC reports: read the shared mailbox and store each client's reports. Does nothing until the mailbox is set up (app/workers/dmarc_ingest_worker.py).
+    dmarc_task: asyncio.Task | None = None
+    if settings.DMARC_INGEST_ENABLED:
+        try:
+            dmarc_task = asyncio.create_task(
+                _run_guarded_scheduler_worker(job_name="dmarc_ingest", ttl_seconds=_ALERT_EMAIL_LOCK_TTL_SECONDS, worker=run_dmarc_ingest),
+                name="dmarc_ingest_worker",
+            )
+            logger.info("dmarc_ingest worker started")
+        except Exception as exc:
+            logger.warning("dmarc_ingest worker failed to start", error=str(exc))
 
     # Hide-this-alert-type rules: hide new alerts an active rule covers and lift rules that have run out, every minute.
     suppression_task: asyncio.Task | None = None

@@ -308,6 +308,12 @@ class Settings(BaseSettings):
     # it sends mail only when recipients and the Graph credentials above are set, and always logs changes. A connector counts as quiet after PLATFORM_WATCH_CONNECTOR_SILENT_HOURS without an event (a quiet client can legitimately have none for hours).
     # The day (YYYY-MM-DD) the Microsoft sign-in app's client secret expires, from the app registration's Certificates & secrets page. The platform health page shows the days left and warns at 30 and 7. Empty: nothing is shown.
     MICROSOFT_CLIENT_SECRET_EXPIRES: str = ""
+    # DMARC reports: the one shared mailbox every client's DMARC reports are sent to (read with the same Microsoft mail app as ALERT_EMAIL_GRAPH_*, which needs the Mail.Read application permission limited to this
+    # mailbox), and the managing tenant the reports belong to. Reading is off until both are set.
+    DMARC_MAILBOX: str = ""
+    DMARC_OWNER_TENANT_ID: str = ""
+    DMARC_INGEST_ENABLED: bool = True
+    DMARC_INTERVAL_SECONDS: int = Field(default=1800, ge=300, le=86400)
     PLATFORM_WATCH_ENABLED: bool = True
     PLATFORM_WATCH_CONNECTOR_SILENT_HOURS: int = Field(default=6, ge=1, le=720)
     RETENTION_SWEEP_INTERVAL_SECONDS: int = 21600

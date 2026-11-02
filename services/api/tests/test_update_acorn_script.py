@@ -191,3 +191,6 @@ def test_the_settings_the_health_page_reads_actually_reach_the_api_container():
     env = base["services"]["api"]["environment"]
     assert env["MICROSOFT_CLIENT_SECRET_EXPIRES"] == "${MICROSOFT_CLIENT_SECRET_EXPIRES:-}"
     assert env["RETENTION_ALERTS_KEEP_FOREVER_OK"] == "${RETENTION_ALERTS_KEEP_FOREVER_OK:-false}"
+    # the container only receives what is listed here: the DMARC mailbox reader needs these, or it silently does nothing
+    for name in ("DMARC_MAILBOX", "DMARC_OWNER_TENANT_ID", "ALERT_EMAIL_GRAPH_TENANT_ID", "ALERT_EMAIL_GRAPH_CLIENT_ID", "ALERT_EMAIL_GRAPH_CLIENT_SECRET"):
+        assert env[name] == "${" + name + ":-}", name

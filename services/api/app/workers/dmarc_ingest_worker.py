@@ -1,0 +1,56 @@
+"""Reads the shared DMARC mailbox on a timer and stores the reports it finds (see app/services/dmarc_mailbox.py).
+
+Off until the mailbox is set up: it needs DMARC_MAILBOX (the shared mailbox that receives every client's reports), DMARC_OWNER_TENANT_ID (the managing tenant the reports belong to) and the same Microsoft
+mail app the alert e-mails use (ALERT_EMAIL_GRAPH_*), given the Mail.Read application permission limited to that one mailbox. A failed pass never ends the loop; the reason is kept for the page.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import uuid
+from collections.abc import Callable
+from typing import Any
+
+import structlog
+
+from app.core.config import settings
+from app.db.database import AsyncSessionLocal
+from app.services.dmarc_mailbox import GraphMailboxReader, ingest_once
+from app.services.dmarc_store import store_report
+
+logger = structlog.get_logger()
+
+
+def make_reader() -> GraphMailboxReader:
+    return GraphMailboxReader(
+        tenant_id=settings.ALERT_EMAIL_GRAPH_TENANT_ID,
+        client_id=settings.ALERT_EMAIL_GRAPH_CLIENT_ID,
+        client_secret=settings.ALERT_EMAIL_GRAPH_CLIENT_SECRET,
+        sender=settings.DMARC_MAILBOX,
+        base_url=settings.ALERT_EMAIL_GRAPH_BASE_URL,
+        authority=settings.ALERT_EMAIL_AUTHORITY,
+    )
+
+
+def owner_id() -> uuid.UUID | None:
+    try:
+        return uuid.UUID(settings.DMARC_OWNER_TENANT_ID.strip())
+    except ValueError:
+        return None
+
+
+async def run_dmarc_ingest(*, sleep: Callable[[float], Any] = asyncio.sleep) -> None:
+    await sleep(120)
+    while True:
+        try:
+            owner, reader = owner_id(), make_reader()
+            if owner is None or not reader.configured:
+                logger.info("dmarc_ingest.not_set_up")
+            else:
+                result = await ingest_once(AsyncSessionLocal, reader, owner, store=store_report)
+                logger.info("dmarc_ingest.pass", stored=result.stored, duplicates=result.duplicates, rejected=result.rejected, messages=result.messages, error=result.error)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001  # the reader must outlive a bad pass
+            logger.exception("dmarc_ingest.pass_failed")
+        await sleep(max(300, settings.DMARC_INTERVAL_SECONDS))
