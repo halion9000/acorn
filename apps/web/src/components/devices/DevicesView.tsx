@@ -10,6 +10,7 @@ import DuplicateDevices from './DuplicateDevices';
 import UnmappedDevices from './UnmappedDevices';
 import { ClientRollupTable } from './ClientRollupTable';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
+import { SavedViewsBar } from '@/components/saved-views/SavedViewsBar';
 import { loadFilters, pickString, saveFilters } from '@/lib/remembered-filters';
 
 /**
@@ -142,25 +143,27 @@ export default function DevicesView() {
   const [hiddenOnly, setHiddenOnly] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
 
+  /** Put a set of filters on the page (what was remembered, a link's filters, or a saved view's). */
+  const applyFilters = (saved: Partial<SavedDeviceFilters>) => {
+    setClientId(pickString(saved.clientId));
+    setVendor(pickString(saved.vendor));
+    setOs(pickString(saved.os, OS_CHOICES.map((o) => o.value)));
+    setKind(pickString(saved.kind, KIND_VALUES));
+    setMissing((pickString(saved.missing, MISSING_TOOLS) || null) as Missing | null);
+    setGapsOnly(saved.gapsOnly === true);
+    setAttentionOnly(saved.attentionOnly === true);
+    setStaleOnly(saved.staleOnly === true);
+    setNotEncryptedOnly(saved.notEncryptedOnly === true);
+    setOfflineOnly(saved.offlineOnly === true);
+    setAlertsOnly(saved.alertsOnly === true);
+  };
   // The filters a person picked last time come back when they return (not the search or the hidden list, which are for the moment).
   const [filtersRestored, setFiltersRestored] = useState(false);
   useEffect(() => {
     // A link from another page (a posture tile, say) names the filters it wants, and those win over what was saved.
     const fromLink = filtersFromParams(urlParams);
     const saved = fromLink ?? loadFilters<SavedDeviceFilters>('devices');
-    if (saved) {
-      setClientId(pickString(saved.clientId));
-      setVendor(pickString(saved.vendor));
-      setOs(pickString(saved.os, OS_CHOICES.map((o) => o.value)));
-      setKind(pickString(saved.kind, KIND_VALUES));
-      setMissing((pickString(saved.missing, MISSING_TOOLS) || null) as Missing | null);
-      setGapsOnly(saved.gapsOnly === true);
-      setAttentionOnly(saved.attentionOnly === true);
-      setStaleOnly(saved.staleOnly === true);
-      setNotEncryptedOnly(saved.notEncryptedOnly === true);
-      setOfflineOnly(saved.offlineOnly === true);
-      setAlertsOnly(saved.alertsOnly === true);
-    }
+    if (saved) applyFilters(saved);
     setFiltersRestored(true);
     // Only on first show.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -407,6 +410,15 @@ export default function DevicesView() {
           );
         })}
       </div>
+
+      <SavedViewsBar<SavedDeviceFilters>
+        viewType="devices"
+        filters={{ clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, offlineOnly, alertsOnly }}
+        onApply={(applied) => {
+          applyFilters(applied);
+          setPage(1);
+        }}
+      />
 
       <div className="flex flex-wrap gap-2">
         <input

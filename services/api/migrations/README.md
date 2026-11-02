@@ -22,6 +22,7 @@ Audit of every value-limiting constraint added since 080 (2026-10-23): each colu
 | `connector_run_log.status` | ok, warning, error (086) | the status CORE reports (limited to the same three in the request model) |
 | `client_vcio_proposals.status` | suggested, approved, rejected, sent, failed, cleared (096) | the suggestion, decision and CORE result routes |
 | `client_vcio_proposals.kind` | recommendation, risk (096) | the suggestion builder |
+| `saved_views.view_type` | alerts, cases, investigations, playbooks (037), devices (135) | the saved-views routes |
 
 ## What 094 to 098 are for
 
@@ -32,3 +33,4 @@ Audit of every value-limiting constraint added since 080 (2026-10-23): each colu
 | `096_client_vcio_proposals.sql` | What A.C.O.R.N suggests adding to a client's vCIO Toolbox, and what a person decided |
 | `097_client_m365_checks.sql` | Each client's Microsoft 365 baseline checks, read through CIPP (see `docs/M365_CHECKS.md`) |
 | `098_vendor_actions_run_script.sql` | Lets the vendor-actions queue carry `run_script` (the Run script button, single and bulk) |
+| `135_saved_views_devices.sql` | Lets a person save named filter views on the Devices page (`saved_views.view_type` gains `devices`) |

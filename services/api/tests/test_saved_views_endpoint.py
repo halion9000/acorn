@@ -126,7 +126,7 @@ def _saved_view_row(
 
 @pytest.mark.parametrize(
     "view_type",
-    ["alerts", "cases", "investigations", "playbooks"],
+    ["alerts", "cases", "investigations", "playbooks", "devices"],
 )
 def test_validate_view_type_accepts_known_pages(view_type: str) -> None:
     """Every page wired into the saved-views menu must round-trip."""

@@ -6447,7 +6447,8 @@ export type SavedViewType =
   | 'alerts'
   | 'cases'
   | 'investigations'
-  | 'playbooks';
+  | 'playbooks'
+  | 'devices';
 
 /** A saved-view row as returned by the API. */
 export interface SavedView {
