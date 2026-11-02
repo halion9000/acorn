@@ -37,6 +37,8 @@ class Record:
     envelope_from: str
     dkim_domains: list[str] = field(default_factory=list)
     spf_domains: list[str] = field(default_factory=list)
+    # Why the receiver overrode the published policy, when it did (forwarded, mailing_list, local_policy, sampled_out, trusted_forwarder, other), comma separated; empty when it did not.
+    reason: str = ""
 
     @property
     def dmarc_pass(self) -> bool:
@@ -159,6 +161,7 @@ def parse_report(attachment: bytes) -> DmarcReport:
                 envelope_from=_clip(ident.findtext("envelope_from") if ident is not None else None, 255).lower(),
                 dkim_domains=[d for d in (_clip(x.findtext("domain"), 255).lower() for x in (auth.findall("dkim") if auth is not None else [])) if d][:10],
                 spf_domains=[d for d in (_clip(x.findtext("domain"), 255).lower() for x in (auth.findall("spf") if auth is not None else [])) if d][:10],
+                reason=",".join(t for t in (_clip(x.findtext("type"), 30).lower() for x in (evaluated.findall("reason") if evaluated is not None else [])) if t)[:120],
             )
         )
     return DmarcReport(

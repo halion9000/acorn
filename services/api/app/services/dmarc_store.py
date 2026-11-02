@@ -73,6 +73,7 @@ def compact_rows(report: ParsedReport) -> list[dict]:
             "envelope_from": r.envelope_from,
             "dkim_domains": r.dkim_domains,
             "spf_domains": r.spf_domains,
+            "reason": r.reason,
         }
         for r in rows
     ]

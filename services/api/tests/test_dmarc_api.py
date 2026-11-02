@@ -278,3 +278,132 @@ def test_the_setup_marks_each_line_with_whether_its_domain_has_mail():
 
     out = run(body)
     assert {ln.domain: ln.has_mx for ln in out.lines} == {"acme.com": True, "parked.example": False}
+
+
+def line_row(ip, count, ok=True, dkim=None, spf=None, disposition="none", reason="", spf_domains=(), dkim_domains=(), header_from="acme.com"):
+    return {
+        "ip": ip,
+        "count": count,
+        "disposition": disposition,
+        "dkim": ok if dkim is None else dkim,
+        "spf": ok if spf is None else spf,
+        "pass": ok,
+        "header_from": header_from,
+        "envelope_from": header_from,
+        "dkim_domains": list(dkim_domains),
+        "spf_domains": list(spf_domains),
+        "reason": reason,
+    }
+
+
+def test_every_message_lands_in_exactly_one_delivery_outcome():
+    rows = [
+        line_row("1.1.1.1", 50),  # passed and delivered
+        line_row("2.2.2.2", 7, ok=False),  # failed but delivered (monitor-only)
+        line_row("3.3.3.3", 5, ok=False, reason="forwarded"),  # delivered because the receiver overrode the policy
+        line_row("4.4.4.4", 4, ok=False, disposition="quarantine"),
+        line_row("5.5.5.5", 3, ok=False, disposition="reject"),
+        line_row("6.6.6.6", 2, ok=False, disposition="quarantine", reason="forwarded"),  # what the receiver did decides: quarantined, not overridden
+    ]
+    assert [ep.delivery_class(r) for r in rows] == ["passed", "failed_delivered", "overridden", "quarantined", "rejected", "quarantined"]
+
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        acme = await tenant(s, "Acme", owner.id)
+        s.add(rep(acme.id, "acme.com", 71, 50, rows=rows))
+        await s.commit()
+        return await ep.insights(caller(owner), s, days=30, domain=None, client_id=None)
+
+    out = run(body)
+    d = out.delivery
+    assert (d.passed, d.failed_delivered, d.overridden, d.quarantined, d.rejected) == (50, 7, 5, 6, 3)
+    assert out.emails == 71 == d.passed + d.failed_delivered + d.overridden + d.quarantined + d.rejected
+
+
+def test_failure_rates_overall_and_per_day_count_dkim_and_spf_separately():
+    day1 = [line_row("1.1.1.1", 90), line_row("2.2.2.2", 10, ok=False, dkim=False, spf=True)]  # fails DKIM only; DMARC passes? no: pass=False here, so DMARC fails
+    day3 = [line_row("1.1.1.1", 100)]
+
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        acme = await tenant(s, "Acme", owner.id)
+        s.add_all([rep(acme.id, "acme.com", 100, 90, days_ago=1, rows=day1), rep(acme.id, "acme.com", 100, 100, days_ago=3, rows=day3)])
+        await s.commit()
+        return await ep.insights(caller(owner), s, days=30, domain="acme.com", client_id=None)
+
+    out = run(body)
+    assert out.emails == 200 and out.domain == "acme.com"
+    assert (out.rates.dmarc, out.rates.dkim, out.rates.spf) == (5.0, 5.0, 0.0)
+    assert [(p.total, p.dmarc_fail, p.dkim_fail, p.spf_fail) for p in out.series] == [(100, 0, 0, 0), (100, 10, 10, 0)]  # oldest day first
+    assert out.series[0].day < out.series[1].day
+
+
+def test_top_senders_are_named_when_known_and_grouped_by_address_when_not_with_a_status():
+    rows = [
+        line_row("40.1.1.1", 60, spf_domains=["spf.protection.outlook.com"]),
+        line_row("40.1.1.2", 40, spf_domains=["spf.protection.outlook.com"]),  # a second address of the same service is one sender
+        line_row("9.9.9.9", 5, ok=False),
+        line_row("9.9.9.9", 5),
+        line_row("8.8.8.8", 3, ok=False),
+        line_row("50.1.1.1", 7, dkim_domains=["s1._domainkey.sendgrid.net"], ok=False, dkim=True, spf=False),
+    ]
+
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        acme = await tenant(s, "Acme", owner.id)
+        s.add(rep(acme.id, "acme.com", 120, 110, rows=rows))
+        await s.commit()
+        return await ep.insights(caller(owner), s, days=30, domain=None, client_id=None)
+
+    names = {x.name: x for x in run(body).senders}
+    assert names["Microsoft 365"].emails == 100 and names["Microsoft 365"].status == "passing" and names["Microsoft 365"].identified
+    assert names["Unknown (9.9.9.9)"].status == "partly" and names["Unknown (9.9.9.9)"].identified is False
+    assert names["Unknown (8.8.8.8)"].status == "failing"
+    assert names["SendGrid"].failed == 7
+    assert [x.emails for x in run(body).senders] == sorted([x.emails for x in run(body).senders], reverse=True)
+
+
+def test_top_sending_domains_come_from_the_from_address_in_the_report():
+    rows = [line_row("1.1.1.1", 5000, header_from="goliveoak.com"), line_row("2.2.2.2", 12, ok=False, header_from="lookalike.example")]
+
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        s.add(rep(owner.id, "goliveoak.com", 5012, 5000, rows=rows))
+        await s.commit()
+        return await ep.insights(caller(owner), s, days=30, domain=None, client_id=None)
+
+    domains = {x.domain: x for x in run(body).sending_domains}
+    assert domains["goliveoak.com"].emails == 5000 and domains["goliveoak.com"].status == "passing"
+    assert domains["lookalike.example"].status == "failing"  # mail claiming to be from a domain that is not the reported one stands out
+
+
+def test_insights_can_be_narrowed_to_one_client_and_never_include_another_owners_reports():
+    async def body(s):
+        owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
+        acme, birch = await tenant(s, "Acme", owner.id), await tenant(s, "Birch", owner.id)
+        theirs = await tenant(s, "Theirs", other.id)
+        s.add_all([rep(acme.id, "acme.com", 10, 10, rows=[line_row("1.1.1.1", 10)]), rep(birch.id, "birch.com", 20, 20, rows=[line_row("2.2.2.2", 20)]), rep(theirs.id, "theirs.com", 99, 99, rows=[line_row("3.3.3.3", 99)])])
+        await s.commit()
+        everyone = await ep.insights(caller(owner), s, days=30, domain=None, client_id=None)
+        just_acme = await ep.insights(caller(owner), s, days=30, domain=None, client_id=str(acme.id))
+        with pytest.raises(HTTPException) as foreign:
+            await ep.insights(caller(owner), s, days=30, domain=None, client_id=str(theirs.id))
+        with pytest.raises(HTTPException) as bad_domain:
+            await ep.insights(caller(owner), s, days=30, domain="not a domain!", client_id=None)
+        with pytest.raises(HTTPException) as bad_id:
+            await ep.insights(caller(owner), s, days=30, domain=None, client_id="nope")
+        return everyone, just_acme, foreign.value.status_code, bad_domain.value.status_code, bad_id.value.status_code
+
+    everyone, just_acme, foreign, bad_domain, bad_id = run(body)
+    assert everyone.emails == 30 and just_acme.emails == 10  # 99 of the other owner's is in neither
+    assert (foreign, bad_domain, bad_id) == (404, 422, 422)
+
+
+def test_insights_with_no_reports_is_empty_not_an_error():
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        await s.commit()
+        return await ep.insights(caller(owner), s, days=30, domain=None, client_id=None)
+
+    out = run(body)
+    assert (out.emails, out.rates.dmarc, out.series, out.senders, out.sending_domains) == (0, None, [], [], [])

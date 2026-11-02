@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+import uuid
 from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
@@ -23,6 +24,7 @@ from app.models.dmarc import DmarcIngestState, DmarcReport
 from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
+from app.services.dmarc_senders import identify_sender
 from app.services.domain_posture import DohResolver, Resolver, candidate_domains
 
 router = APIRouter(prefix="/dmarc", tags=["dmarc"])
@@ -259,6 +261,160 @@ async def domain_detail(
         policy=reports[0].policy,
         series=[DayPoint(day=d, total=v[0], passed=v[1], failed=v[2]) for d, v in sorted(daily.items())],
         failing_sources=[FailingSource(ip=k[0], count=n, header_from=k[1], envelope_from=k[2], disposition=k[3]) for k, n in failing.most_common(25)],
+    )
+
+
+class Delivery(BaseModel):
+    """What became of the mail, in the order a person cares about it. Every message counts in exactly one of these."""
+
+    passed: int  # passed DMARC and was delivered
+    failed_delivered: int  # failed DMARC but was delivered anyway (the policy is monitor-only)
+    overridden: int  # delivered although the policy said otherwise: the receiver overrode it (forwarded, mailing list...)
+    quarantined: int
+    rejected: int
+
+
+class FailureRates(BaseModel):
+    dmarc: float | None
+    dkim: float | None
+    spf: float | None
+
+
+class RatePoint(BaseModel):
+    day: str
+    total: int
+    dmarc_fail: int
+    dkim_fail: int
+    spf_fail: int
+
+
+class SenderRow(BaseModel):
+    name: str
+    identified: bool  # False: not a service we recognise, shown by its address
+    emails: int
+    passed: int
+    failed: int
+    status: str  # passing (nothing failed), failing (nothing passed) or partly
+
+
+class SendingDomainRow(BaseModel):
+    domain: str
+    emails: int
+    passed: int
+    failed: int
+    status: str
+
+
+class Insights(BaseModel):
+    days: int
+    domain: str | None
+    emails: int
+    delivery: Delivery
+    rates: FailureRates
+    series: list[RatePoint]
+    senders: list[SenderRow]
+    sending_domains: list[SendingDomainRow]
+
+
+def _health(passed: int, failed: int) -> str:
+    return "passing" if failed == 0 else "failing" if passed == 0 else "partly"
+
+
+def _pct(part: int, whole: int) -> float | None:
+    return round(part * 100.0 / whole, 1) if whole else None
+
+
+def delivery_class(row: dict[str, Any]) -> str:
+    """Which of the five outcomes one source line belongs to. What the receiver DID decides it first (quarantine, reject); for delivered mail an override reason says the policy was set aside, and
+    otherwise it is delivered because it passed or because the policy only monitors."""
+    disposition = str(row.get("disposition", "none")).lower()
+    if disposition == "quarantine":
+        return "quarantined"
+    if disposition == "reject":
+        return "rejected"
+    if row.get("reason"):
+        return "overridden"
+    return "passed" if row.get("pass") else "failed_delivered"
+
+
+@router.get("/insights", response_model=Insights, summary="Delivery, failure rates over time, top senders and top sending domains")
+async def insights(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    days: int = Query(30, ge=1, le=365),
+    domain: str | None = Query(default=None, max_length=255),
+    client_id: str | None = Query(default=None, max_length=64),
+) -> Insights:
+    """Everything the Valimail-style overview shows, computed from the stored reports: for all clients, one client, or one domain. Counts are messages, not reports."""
+    owner = current_user.tenant_id
+    clients = await _children(db, owner)
+    wanted = [owner, *clients]
+    if client_id:
+        try:
+            only = uuid.UUID(client_id)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="That is not a client id.") from None
+        if only not in wanted:
+            raise HTTPException(status_code=404, detail="Client not found")
+        wanted = [only]
+    where = [DmarcReport.tenant_id.in_(wanted), DmarcReport.end_at >= datetime.now(UTC) - timedelta(days=days)]
+    clean = None
+    if domain:
+        clean = domain.strip().lower().rstrip(".")
+        if not _DOMAIN.match(clean):
+            raise HTTPException(status_code=422, detail="That is not a domain name.")
+        where.append(DmarcReport.domain == clean)
+    async with cross_tenant_reads(db):
+        reports = (await db.execute(select(DmarcReport).where(*where))).scalars().all()
+
+    delivery: Counter[str] = Counter()
+    daily: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0, 0])
+    senders: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0])
+    from_domains: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+    total = dmarc_fail = dkim_fail = spf_fail = 0
+    for r in reports:
+        day = r.end_at.astimezone(UTC).date().isoformat() if r.end_at.tzinfo else r.end_at.date().isoformat()
+        for row in r.rows or []:
+            count = int(row.get("count", 0))
+            ok = bool(row.get("pass"))
+            total += count
+            delivery[delivery_class(row)] += count
+            d = daily[day]
+            d[0] += count
+            if not ok:
+                dmarc_fail += count
+                d[1] += count
+            if not row.get("dkim"):
+                dkim_fail += count
+                d[2] += count
+            if not row.get("spf"):
+                spf_fail += count
+                d[3] += count
+            name = identify_sender(list(row.get("spf_domains") or []), list(row.get("dkim_domains") or []))
+            key = (name, "named") if name else (str(row.get("ip") or "unknown"), "address")
+            senders[key][0 if ok else 1] += count
+            from_domains[str(row.get("header_from") or r.domain)][0 if ok else 1] += count
+
+    def top_senders() -> list[SenderRow]:
+        rows = [
+            SenderRow(name=name if kind == "named" else f"Unknown ({name})", identified=kind == "named", emails=p + f, passed=p, failed=f, status=_health(p, f))
+            for (name, kind), (p, f) in senders.items()
+        ]
+        return sorted(rows, key=lambda s: -s.emails)[:10]
+
+    return Insights(
+        days=days,
+        domain=clean,
+        emails=total,
+        delivery=Delivery(
+            passed=delivery["passed"], failed_delivered=delivery["failed_delivered"], overridden=delivery["overridden"], quarantined=delivery["quarantined"], rejected=delivery["rejected"]
+        ),
+        rates=FailureRates(dmarc=_pct(dmarc_fail, total), dkim=_pct(dkim_fail, total), spf=_pct(spf_fail, total)),
+        series=[RatePoint(day=k, total=v[0], dmarc_fail=v[1], dkim_fail=v[2], spf_fail=v[3]) for k, v in sorted(daily.items())],
+        senders=top_senders(),
+        sending_domains=sorted(
+            (SendingDomainRow(domain=k, emails=p + f, passed=p, failed=f, status=_health(p, f)) for k, (p, f) in from_domains.items()), key=lambda s: -s.emails
+        )[:10],
     )
 
 

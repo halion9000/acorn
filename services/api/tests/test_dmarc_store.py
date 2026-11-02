@@ -149,3 +149,8 @@ def test_the_managing_companys_own_domain_is_matched_to_itself_not_left_unmatche
     own, theirs, owner_id, acme_id = run(body)
     assert (own.tenant_id, own.matched) == (owner_id, True)
     assert (theirs.tenant_id, theirs.matched) == (acme_id, True)  # a client's domain still goes to the client, not the owner
+
+
+def test_the_override_reason_is_stored_with_each_source_line():
+    rows = store.compact_rows(report(records=[Record("1.1.1.1", 4, "none", False, False, "client.com", "client.com", reason="forwarded"), Record("2.2.2.2", 1, "none", True, True, "client.com", "client.com")]))
+    assert [r["reason"] for r in rows] == ["forwarded", ""]

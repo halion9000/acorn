@@ -92,3 +92,17 @@ def test_the_row_limit_is_enforced_and_long_text_is_cut(monkeypatch):
         parse_report(report(record("1.1.1.1", 1), record("2.2.2.2", 1)))
     monkeypatch.setattr(dr, "MAX_RECORDS", 100)
     assert len(parse_report(report(record("x" * 500, 1))).records[0].source_ip) == 64
+
+
+def test_the_receivers_override_reason_is_kept_per_source_line():
+    xml = (
+        '<?xml version="1.0"?><feedback><report_metadata><org_name>g</org_name><email>n@g.com</email><report_id>1</report_id>'
+        f"<date_range><begin>{BEGIN}</begin><end>{END}</end></date_range></report_metadata><policy_published><domain>client.com</domain><p>reject</p></policy_published>"
+        "<record><row><source_ip>1.2.3.4</source_ip><count>3</count><policy_evaluated><disposition>none</disposition><dkim>fail</dkim><spf>fail</spf>"
+        "<reason><type>forwarded</type><comment>sent by a forwarder</comment></reason><reason><type>mailing_list</type></reason></policy_evaluated></row><identifiers><header_from>client.com</header_from></identifiers></record>"
+        "<record><row><source_ip>5.6.7.8</source_ip><count>9</count><policy_evaluated><disposition>none</disposition><dkim>pass</dkim><spf>pass</spf></policy_evaluated></row><identifiers><header_from>client.com</header_from></identifiers></record>"
+        "</feedback>"
+    ).encode()
+    r = parse_report(xml)
+    assert r.records[0].reason == "forwarded,mailing_list"
+    assert r.records[1].reason == ""  # no override: no reason
