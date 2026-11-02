@@ -88,6 +88,7 @@ from app.core.config import settings
 from app.models.alert import Alert
 from app.models.connector import Connector
 from app.services.connector_freshness import compute_freshness
+from app.services.llm_health import llm_status
 from app.services.runtime_stats import feed_receipts, loop_lag, slow_routes
 
 logger = logging.getLogger(__name__)
@@ -973,6 +974,7 @@ def platform_warnings(
     secret: dict[str, Any] | None = None,
     old_creds: list[dict[str, Any]] | None = None,
     alerts_kept_forever: bool = False,
+    llm: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     """Plain-language problems worth a person's attention, worst first, built only from what the page already knows (pure; unit-tested)."""
     out: list[dict[str, str]] = []
@@ -992,6 +994,15 @@ def platform_warnings(
                 "key": "core",
                 "level": "error",
                 "text": "CORE has not reported for over 15 minutes: no alerts, devices or links arrive while it is silent",
+            }
+        )
+    if llm:
+        out.append(
+            {
+                "key": "llm",
+                "level": "error",
+                "text": f"Leafy cannot reach its AI: the last {llm['failures']} questions all failed (the latest {llm['minutes_since']} minutes ago). "
+                "Check that CORE is running on the CORE VM and that Claude Code there is still signed in.",
             }
         )
     if secret and secret["days_left"] <= SECRET_WARN_DAYS:
@@ -1121,6 +1132,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
             secret=secret,
             old_creds=old_creds,
             alerts_kept_forever=settings.RETENTION_ALERTS_DAYS <= 0 and not settings.RETENTION_ALERTS_KEEP_FOREVER_OK,
+            llm=llm_status(),
         ),
         "old_credentials": old_creds or [],
         "microsoft_secret": secret,

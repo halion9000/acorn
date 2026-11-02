@@ -24,6 +24,7 @@ from app.models.connector import Connector
 from app.models.tenant import Tenant
 from app.services.alert_email.graph import GraphMailer, MailError
 from app.services.alert_email.settings_store import get_settings
+from app.services.llm_health import llm_status
 from app.services.platform_watch import ConnectorSeen, Finding, changes, compose, evaluate
 
 logger = structlog.get_logger()
@@ -56,7 +57,9 @@ def memory_available_percent(meminfo: str = "/proc/meminfo") -> float | None:
 async def measure(session_factory: Callable[[], Any], now: datetime) -> dict[str, Any]:
     async with session_factory() as db:
         mark_platform(db)  # one look across every client
-        feed = (await db.execute(select(func.max(Connector.last_health_check), func.count()).where(Connector.connector_type == "core_feed"))).first()
+        feed = (
+            await db.execute(select(func.max(Connector.last_health_check), func.count()).where(Connector.connector_type == "core_feed"))
+        ).first()
         rows = (
             await db.execute(
                 select(Connector.name, Connector.last_event_at, Tenant.name)
@@ -72,6 +75,7 @@ async def measure(session_factory: Callable[[], Any], now: datetime) -> dict[str
         "connector_silent_after": timedelta(hours=settings.PLATFORM_WATCH_CONNECTOR_SILENT_HOURS),
         "disk_free_percent": disk_free_percent(),
         "memory_available_percent": memory_available_percent(),
+        "llm_failing": llm_status(now),
     }
 
 
@@ -95,7 +99,9 @@ class Watch:
         current = evaluate(**await measure_fn(session_factory, now))
         new, cleared = changes(self.known, current)
         self.known = {f.key: f for f in current}
-        self.untold_new = [f for f in self.untold_new if f.key in self.known] + [f for f in new if f.key not in {u.key for u in self.untold_new}]
+        self.untold_new = [f for f in self.untold_new if f.key in self.known] + [
+            f for f in new if f.key not in {u.key for u in self.untold_new}
+        ]
         self.untold_cleared = [f for f in self.untold_cleared if f.key not in self.known] + cleared
         for f in new:
             logger.warning("platform_watch.change", state="problem", key=f.key, severity=f.severity, message=f.message)
@@ -112,7 +118,9 @@ class Watch:
         if not recipients or not mailer.configured:
             # Nobody to mail: the log line above is the record. Count it as told so it is not retried forever.
             return True
-        subject, body = compose(self.untold_new, self.untold_cleared, server_name=os.environ.get("AISOC_SERVER_NAME") or socket.gethostname())
+        subject, body = compose(
+            self.untold_new, self.untold_cleared, server_name=os.environ.get("AISOC_SERVER_NAME") or socket.gethostname()
+        )
         try:
             await mailer.send(recipients, subject, body)
         except MailError as exc:

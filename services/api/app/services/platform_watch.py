@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 CORE_FEED_SILENT_AFTER = timedelta(minutes=15)
 DISK_WARN_FREE_PERCENT = 15.0
@@ -52,6 +53,7 @@ def evaluate(
     connector_silent_after: timedelta,
     disk_free_percent: float | None,
     memory_available_percent: float | None,
+    llm_failing: dict[str, Any] | None = None,
 ) -> list[Finding]:
     """Every problem visible in these measurements. A measurement that could not be taken (None) produces no finding: a blind spot is not an alarm."""
     found: list[Finding] = []
@@ -60,7 +62,13 @@ def evaluate(
     if core_feed_sources > 0:
         last = _aware(core_feed_last_report)
         if last is None:
-            found.append(Finding("core_feed", "critical", "CORE is set up but has never reported. Nothing from Huntress, Petra, NinjaOne and the other tools is arriving."))
+            found.append(
+                Finding(
+                    "core_feed",
+                    "critical",
+                    "CORE is set up but has never reported. Nothing from Huntress, Petra, NinjaOne and the other tools is arriving.",
+                )
+            )
         elif now - last > CORE_FEED_SILENT_AFTER:
             found.append(
                 Finding(
@@ -81,6 +89,15 @@ def evaluate(
                     f"{c.name} for {c.tenant_name} has sent nothing for {_ago(now - last)}.",
                 )
             )
+
+    if llm_failing:
+        found.append(
+            Finding(
+                "llm",
+                "critical",
+                f"Leafy cannot reach its AI: the last {llm_failing['failures']} questions all failed. Check that CORE is running on the CORE VM and that Claude Code there is still signed in.",
+            )
+        )
 
     if disk_free_percent is not None and disk_free_percent < DISK_WARN_FREE_PERCENT:
         severity = "critical" if disk_free_percent < DISK_CRIT_FREE_PERCENT else "warning"
@@ -103,9 +120,13 @@ def compose(new: list[Finding], cleared: list[Finding], *, server_name: str) -> 
     """Subject and plain-text body for one message about what changed."""
     critical = any(f.severity == "critical" for f in new)
     if new:
-        subject = f"[A.C.O.R.N] {'ACTION NEEDED' if critical else 'Warning'}: {new[0].message.split('.')[0]}" + (f" (+{len(new) - 1} more)" if len(new) > 1 else "")
+        subject = f"[A.C.O.R.N] {'ACTION NEEDED' if critical else 'Warning'}: {new[0].message.split('.')[0]}" + (
+            f" (+{len(new) - 1} more)" if len(new) > 1 else ""
+        )
     else:
-        subject = f"[A.C.O.R.N] Back to normal: {cleared[0].message.split('.')[0]}" + (f" (+{len(cleared) - 1} more)" if len(cleared) > 1 else "")
+        subject = f"[A.C.O.R.N] Back to normal: {cleared[0].message.split('.')[0]}" + (
+            f" (+{len(cleared) - 1} more)" if len(cleared) > 1 else ""
+        )
     lines = [f"A.C.O.R.N on {server_name} noticed a change.", ""]
     if new:
         lines.append("New problems:")

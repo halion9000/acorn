@@ -372,6 +372,22 @@ class TestWhatIsStored:
         chat(c, "next question", cid)
         assert history_seen_by_model() == ["good question", "answer-1", "next question"]  # the apology did not poison the context
 
+    def test_failed_questions_are_noted_for_the_health_page_and_a_good_one_clears_it(self):
+        from app.services.llm_health import llm_status, reset_llm_outcomes
+
+        reset_llm_outcomes()
+        c = client_as()
+        cid = chat(c, "good question").json()["conversationId"]
+        LLM.raise_on_call = True
+        for i in range(3):
+            chat(c, f"failing {i}", cid)
+        status = llm_status()
+        assert status is not None and status["failures"] == 3
+        LLM.raise_on_call = False
+        chat(c, "works again", cid)
+        assert llm_status() is None
+        reset_llm_outcomes()
+
     def test_the_owner_and_tenant_are_recorded(self):
         c = client_as()
         cid = chat(c, "hello").json()["conversationId"]

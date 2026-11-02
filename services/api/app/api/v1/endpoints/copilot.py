@@ -42,6 +42,7 @@ from app.llm.contract import safe_ainvoke
 from app.llm.factory import llm_override, make_chat_model
 from app.services import copilot_history
 from app.services.copilot_textcalls import parse_text_tool_calls, strip_text_tool_calls
+from app.services.llm_health import note_llm_outcome
 from app.services.llm_resolver import LlmConfig, resolve_llm_config
 
 logger = logging.getLogger(__name__)
@@ -348,12 +349,16 @@ async def copilot_chat(
     except Exception as exc:  # noqa: BLE001
         logger.warning("Copilot LLM call failed: %s", exc, exc_info=True)
         degraded = True
+        note_llm_outcome(False)
         content = (
             "I couldn't reach the LLM backend right now. "
             "I answer through CORE's Claude link, so check that CORE is running "
             "(after a CORE restart it needs a few minutes) and that the LiteLLM gateway is up, then ask again. "
             "On a local install, also rebuild A.C.O.R.N or run `syncAisocProviderConfig()` from the HUD."
         )
+
+    if not degraded:
+        note_llm_outcome(True)
 
     # A call the model wrote as text that was not run (a tool that is not allowed from text, or the loop ran out) is not the answer: it is cut out rather than shown.
     content = strip_text_tool_calls(content) or content
