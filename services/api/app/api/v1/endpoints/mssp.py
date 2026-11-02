@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
@@ -16,6 +16,7 @@ from app.core.security import ROLE_PERMISSIONS
 from app.db.database import get_db
 from app.models.mssp import MSSPDelegation, MSSPTenantMetrics, MSSPTenantNote
 from app.models.tenant import Tenant, User
+from app.services.measure_trend import daily_series, summarise
 
 router = APIRouter(prefix="/mssp", tags=["mssp"])
 
@@ -403,6 +404,60 @@ async def _require_owned_child(db: AsyncSession, current_user: User, child_id: u
     child = await db.get(Tenant, child_id)
     if not child or child.parent_tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Child tenant not found")
+
+
+# What the progress report shows for a client: the figures A.C.O.R.N records itself (hourly snapshots, see services/mssp_snapshots.py), label and whether a lower line is better.
+_PROGRESS_MEASURES = (
+    ("open_alerts", "Open alerts", True),
+    ("critical_alerts", "Open critical alerts", True),
+    ("open_cases", "Open cases", True),
+    ("sla_breaches", "SLA breaches", True),
+    ("health_score", "Health score", False),
+)
+
+
+@router.get("/children/{child_id}/progress", dependencies=[Depends(require_permission("mssp:read"))])
+async def child_progress(
+    child_id: uuid.UUID,
+    days: int = Query(90, ge=7, le=365),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """A client's trend over the last ``days`` days: for each measure the start, now, change, lowest, highest and the daily line. A measure with no recording in the period, or one that stopped being recorded, is reported as not recorded instead of being filled in."""
+    await _require_owned_child(db, current_user, child_id)
+    end_day = datetime.now(UTC).date()
+    start_day = end_day - timedelta(days=days - 1)
+    rows = (
+        await db.execute(
+            select(MSSPTenantMetrics)
+            .where(MSSPTenantMetrics.tenant_id == child_id, MSSPTenantMetrics.snapshot_at >= datetime.combine(start_day, datetime.min.time(), tzinfo=UTC))
+            .order_by(MSSPTenantMetrics.snapshot_at)
+        )
+    ).scalars().all()
+    measures = []
+    for key, label, lower_is_better in _PROGRESS_MEASURES:
+        series = daily_series([(r.snapshot_at, getattr(r, key)) for r in rows], start_day, end_day)
+        summary = summarise(series)
+        measures.append(
+            {
+                "key": key,
+                "label": label,
+                "lower_is_better": lower_is_better,
+                "recorded": summary is not None,
+                "summary": None
+                if summary is None
+                else {
+                    "start": summary.start,
+                    "now": summary.now,
+                    "change": summary.change,
+                    "lowest": summary.lowest,
+                    "highest": summary.highest,
+                    "last_recorded": summary.last_recorded.isoformat(),
+                },
+                "series": [{"day": d.isoformat(), "value": v} for d, v in series],
+            }
+        )
+    return {"tenant_id": str(child_id), "days": days, "start": start_day.isoformat(), "end": end_day.isoformat(), "measures": measures}
 
 
 _DELEGABLE_ROLES = frozenset(r for r, perms in ROLE_PERMISSIONS.items() if "*" not in perms)
