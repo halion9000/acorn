@@ -23,6 +23,7 @@ vi.mock('@/lib/api', () => ({
   authApi: { currentUser: () => currentUser(), updateUserPreferences: (p: unknown) => updateUserPreferences(p) },
   tenantsApi: { details: () => details(), users: () => users(), createUser: (b: unknown) => createUser(b), rename: (n: string) => rename(n) },
   apiErrorDetail: (e: unknown) => apiErrorDetail(e),
+  passkeyApi: { list: async () => ({ items: [] }) },
   ApiError: class ApiError extends Error {
     status: number;
     constructor(message: string, status = 500) {

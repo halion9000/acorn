@@ -53,6 +53,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field, PanelHeader, inputClass } from './panel-parts';
 import { AlertEmailPanel } from './AlertEmailPanel';
+import { PasskeysCard } from './PasskeysCard';
 import { SoftwareUpdatePanel } from './SoftwareUpdatePanel';
 import { AzureSpendPanel } from './AzureSpendPanel';
 import { TenantAccessPanel } from './TenantAccessPanel';
@@ -598,6 +599,8 @@ function ProfilePanel() {
             </Field>
           ) : null}
         </div>
+
+        <PasskeysCard />
 
         <div className="rounded-lg border border-gray-800 bg-gray-950/40 p-4 text-xs text-gray-500">
           Your display name, job title and timezone are saved to your user account and follow you across devices when you sign in.
