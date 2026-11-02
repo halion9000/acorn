@@ -175,7 +175,7 @@ async def set_sso_default(
     current_user: Annotated[AuthUser, Depends(require_permission("roles:write"))],
     db: TenantDBSession,
 ) -> SsoDefaultOut:
-    """Choose the role new Microsoft sign-ins get: a built-in role (never an administrator) or one of this workspace's custom roles, held on top of Viewer."""
+    """Choose the role new Microsoft sign-ins get: a built-in role (never an administrator) or one of this workspace's custom roles, which then stands alone."""
     configured, cfg = _sso_state()
     if not configured:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Microsoft sign-in is not set up on this server, so there is nothing to choose a role for.")
@@ -192,7 +192,7 @@ async def set_sso_default(
     if body.custom_role_id is not None:
         custom = await _get_role_or_404(db, body.custom_role_id, current_user.tenant_id)
         _require_permissions_held(current_user, [p.name for p in await _load_role_permissions(db, custom.id)])
-        role = "viewer"  # a custom role is held on top of Viewer, as when adding a member
+        role = "custom"  # a custom role stands alone: a person has one role
     tenant = await db.get(Tenant, current_user.tenant_id)
     if tenant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
@@ -411,8 +411,19 @@ async def assign_role(
 
     # Ensure the target user belongs to this tenant
     user_res = await db.execute(select(User).where(User.id == user_id, User.tenant_id == current_user.tenant_id))
-    if user_res.scalar_one_or_none() is None:
+    target = user_res.scalar_one_or_none()
+    if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found in tenant")
+    # A person has ONE role. Only someone whose role is already "custom" can be given another custom role here (it replaces the first); a person with a built-in role changes
+    # role under Settings > Workspace > Edit, which keeps the built-in role and the custom role in step.
+    if target.role != "custom":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A person has one role. Change their role to this custom role under Settings > Workspace > Edit.")
+    await db.execute(
+        delete(UserRole).where(
+            UserRole.user_id == user_id,
+            UserRole.role_id.in_(select(Role.id).where(Role.tenant_id == current_user.tenant_id, Role.is_system.is_(False))),
+        )
+    )
 
     # Upsert
     existing = await db.execute(select(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role.id))

@@ -225,15 +225,15 @@ describe('Settings > Workspace > the role chips on each member', () => {
   };
   const row = (name: string) => screen.getAllByText(name)[0].closest('li') as HTMLElement;
 
-  it('a person who is Viewer plus one custom role shows only the custom role, as the editor dropdown does', async () => {
-    users.mockResolvedValue([{ ...member('chris'), role: 'viewer', custom_roles: [{ id: 'r1', name: 'Default' }] }]);
+  it('a person whose one role is a custom role shows only that role, as the editor dropdown does', async () => {
+    users.mockResolvedValue([{ ...member('chris'), role: 'custom', custom_roles: [{ id: 'r1', name: 'Default' }] }]);
     await openWorkspace();
     await screen.findAllByText('chris');
     expect(within(row('chris')).getByText('Default')).toBeInTheDocument();
-    expect(within(row('chris')).queryByText('viewer')).not.toBeInTheDocument();
+    expect(within(row('chris')).queryByText('custom')).not.toBeInTheDocument();
   });
 
-  it('any other mix shows every part, and a plain built-in role shows just that role', async () => {
+  it('an older mix of a built-in role and custom roles shows every part, and a plain built-in role shows just that role', async () => {
     users.mockResolvedValue([
       { ...member('mixed'), role: 'soc_analyst', custom_roles: [{ id: 'r1', name: 'Default' }] },
       { ...member('many'), role: 'viewer', custom_roles: [{ id: 'r1', name: 'Default' }, { id: 'r2', name: 'vCIO' }] },

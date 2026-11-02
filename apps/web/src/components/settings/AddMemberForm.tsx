@@ -14,7 +14,7 @@ export const MEMBER_ROLES: { value: string; label: string; hint: string }[] = [
   { value: 'tenant_admin', label: 'Administrator', hint: 'Manages the workspace, its members and settings.' },
 ];
 
-/** A role this workspace made itself is chosen as `custom:<id>`; the person is then added as a Viewer (the lowest built-in role) holding that custom role, so what they can do is what the custom role grants. */
+/** A role this workspace made itself is chosen as `custom:<id>`. A person has ONE role: a custom role stands alone (the person's role is "custom" plus that one custom role), so what they can do is exactly what it grants. */
 export const CUSTOM_PREFIX = 'custom:';
 
 export const MIN_PASSWORD_LENGTH = 12;
@@ -93,7 +93,7 @@ export function AddMemberForm({ onCreated, onCancel }: { onCreated: (user: Tenan
         username: fields.displayName.trim() || undefined,
         email: fields.email.trim() || undefined,
         password: fields.password,
-        ...(fields.role.startsWith(CUSTOM_PREFIX) ? { role: 'viewer', custom_role_ids: [fields.role.slice(CUSTOM_PREFIX.length)] } : { role: fields.role }),
+        ...(fields.role.startsWith(CUSTOM_PREFIX) ? { role: 'custom', custom_role_ids: [fields.role.slice(CUSTOM_PREFIX.length)] } : { role: fields.role }),
       });
       setAdded({ user, password: fields.password });
       onCreated(user);
@@ -142,7 +142,7 @@ export function AddMemberForm({ onCreated, onCancel }: { onCreated: (user: Tenan
           <input type="email" className={inputClass()} value={fields.email} onChange={(e) => set('email', e.target.value)} autoComplete="off" placeholder="jane@example.com" aria-invalid={!!shown('email')} />
           {shown('email') ? <span role="alert" className="text-xs text-red-300">{shown('email')}</span> : null}
         </Field>
-        <Field label="Role" hint={fields.role.startsWith(CUSTOM_PREFIX) ? customRoles.find((r) => CUSTOM_PREFIX + r.id === fields.role)?.description || 'A role your workspace made. They also hold the Viewer role.' : MEMBER_ROLES.find((r) => r.value === fields.role)?.hint}>
+        <Field label="Role" hint={fields.role.startsWith(CUSTOM_PREFIX) ? customRoles.find((r) => CUSTOM_PREFIX + r.id === fields.role)?.description || 'A role your workspace made. It is their only role: they can do exactly what it grants.' : MEMBER_ROLES.find((r) => r.value === fields.role)?.hint}>
           <select className={inputClass()} value={fields.role} onChange={(e) => set('role', e.target.value)}>
             <optgroup label="Built-in roles">
               {MEMBER_ROLES.map((r) => (

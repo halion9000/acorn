@@ -35,6 +35,7 @@ def test_no_statement_in_the_handler_changes_a_user_without_the_tenant():
 
 def test_the_privilege_checks_still_come_before_any_write():
     source = _source()
-    assert source.index("can_grant_role") < source.index("update(User)") and source.index(
+    # _may_manage applies can_grant_role (and the equivalent for a person whose role is a custom role).
+    assert source.index("_may_manage") < source.index("update(User)") and source.index(
         "You cannot change your own role."
     ) < source.index("update(User)")

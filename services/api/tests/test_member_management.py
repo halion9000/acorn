@@ -87,29 +87,55 @@ def new_member(world, h, **over):
 
 
 class TestCustomRoles:
-    def test_adding_a_member_with_a_custom_role_gives_them_it_and_the_list_shows_it(self, world):
+    def test_a_custom_role_is_the_persons_one_role(self, world):
         h = login(world, "boss")
-        r = new_member(world, h, custom_role_ids=[str(world.mine.id)])
+        r = new_member(world, h, role="custom", custom_role_ids=[str(world.mine.id)])
         assert r.status_code == 201, r.text
-        assert [c["name"] for c in r.json()["custom_roles"]] == ["Client reviewer"]
+        assert r.json()["role"] == "custom" and [c["name"] for c in r.json()["custom_roles"]] == ["Client reviewer"]
         listed = {u["account_name"]: u for u in world.client.get("/tenants/me/users", headers=h).json()}
-        assert [c["name"] for c in listed["newbie"]["custom_roles"]] == ["Client reviewer"]
+        assert listed["newbie"]["role"] == "custom" and [c["name"] for c in listed["newbie"]["custom_roles"]] == ["Client reviewer"]
         assert listed["ann"]["custom_roles"] == []
+
+    def test_a_person_has_exactly_one_role(self, world):
+        h = login(world, "boss")
+        both = new_member(world, h, role="viewer", custom_role_ids=[str(world.mine.id)])  # a built-in role AND a custom role
+        assert both.status_code == 422 and "one role" in both.json()["detail"]
+        none = new_member(world, h, role="custom", custom_role_ids=[])  # custom, but which one?
+        assert none.status_code == 422 and "exactly one" in none.json()["detail"]
+        assert all(u["account_name"] != "newbie" for u in world.client.get("/tenants/me/users", headers=h).json())
 
     def test_a_role_of_another_workspace_is_refused_and_nobody_is_created(self, world):
         h = login(world, "boss")
-        r = new_member(world, h, custom_role_ids=[str(world.theirs.id)])
+        r = new_member(world, h, role="custom", custom_role_ids=[str(world.theirs.id)])
         assert r.status_code == 404
         assert all(u["account_name"] != "newbie" for u in world.client.get("/tenants/me/users", headers=h).json())
 
-    def test_editing_replaces_the_set_of_custom_roles_and_leaves_them_alone_when_not_mentioned(self, world):
+    def test_switching_between_a_built_in_role_and_a_custom_role_keeps_one_role(self, world):
         h = login(world, "boss")
-        r = world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"custom_role_ids": [str(world.mine.id)]}, headers=h)
-        assert r.status_code == 200 and [c["name"] for c in r.json()["custom_roles"]] == ["Client reviewer"]
+        to_custom = world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "custom", "custom_role_ids": [str(world.mine.id)]}, headers=h)
+        assert to_custom.status_code == 200 and to_custom.json()["role"] == "custom" and len(to_custom.json()["custom_roles"]) == 1
+        # naming a custom role for a built-in one is refused
+        mixed = world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "soc_lead", "custom_role_ids": [str(world.mine.id)]}, headers=h)
+        assert mixed.status_code == 422
+        # back to a built-in role clears the custom role
+        back = world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "soc_lead"}, headers=h)
+        assert back.status_code == 200 and back.json()["role"] == "soc_lead" and back.json()["custom_roles"] == []
+
+    def test_becoming_a_custom_role_person_needs_the_role_named(self, world):
+        h = login(world, "boss")
+        r = world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "custom"}, headers=h)
+        assert r.status_code == 422 and "Choose which custom role" in r.json()["detail"]
+
+    def test_renaming_a_custom_role_person_leaves_their_role_alone(self, world):
+        h = login(world, "boss")
+        world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "custom", "custom_role_ids": [str(world.mine.id)]}, headers=h)
         r = world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"username": "Ann A."}, headers=h)
-        assert r.json()["username"] == "Ann A." and len(r.json()["custom_roles"]) == 1
-        r = world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"custom_role_ids": []}, headers=h)
-        assert r.json()["custom_roles"] == []
+        assert r.json()["username"] == "Ann A." and r.json()["role"] == "custom" and len(r.json()["custom_roles"]) == 1
+
+    def test_the_old_way_of_stacking_a_second_role_is_refused(self, world):
+        h = login(world, "boss")
+        r = world.client.post(f"/rbac/users/{world.ann.id}/roles", json={"user_id": str(world.ann.id), "role_id": str(world.mine.id)}, headers=h)
+        assert r.status_code in (404, 409)  # the route is not mounted in this test app, or it refuses: either way nothing is stacked
 
 
 class TestDisablingAndRoles:

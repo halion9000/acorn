@@ -26,7 +26,7 @@ describe('adding a member with a custom role', () => {
     expect(screen.getByRole('group', { name: 'Your custom roles' })).toBeInTheDocument();
   });
 
-  it('choosing a custom role adds the person as a Viewer holding that role', async () => {
+  it('choosing a custom role makes it the persons one role', async () => {
     render(<AddMemberForm onCreated={() => undefined} onCancel={() => undefined} />);
     await screen.findByRole('option', { name: 'Client reviewer' });
     await userEvent.type(screen.getByLabelText(/^Account name/), 'jane');
@@ -34,7 +34,7 @@ describe('adding a member with a custom role', () => {
     await userEvent.selectOptions(screen.getByLabelText(/^Role/), 'Client reviewer');
     await userEvent.click(screen.getByRole('button', { name: 'Add member' }));
     await waitFor(() => expect(createUser).toHaveBeenCalled());
-    expect(createUser.mock.calls[0][0]).toMatchObject({ role: 'viewer', custom_role_ids: ['r1'] });
+    expect(createUser.mock.calls[0][0]).toMatchObject({ role: 'custom', custom_role_ids: ['r1'] });
   });
 
   it('a built-in role is sent as before, with no custom roles', async () => {

@@ -12,19 +12,25 @@ from typing import Any
 KEY = "sso_new_user_role"
 # Built-in roles that may be the automatic role. Administrator is deliberately not here, and neither are the platform and legacy admin roles.
 ALLOWED_BUILTIN: tuple[str, ...] = ("viewer", "soc_analyst", "threat_hunter", "soc_lead")
+CUSTOM = "custom"  # the stored role of a person whose one role is a custom role
 
 
 def effective(workspace_settings: dict[str, Any] | None, server_role: str) -> tuple[str, uuid.UUID | None, str]:
     """(built-in role, custom role id or None, where it came from: "setting" or "server"). A stored value that is not usable falls back to the server setting."""
     raw = (workspace_settings or {}).get(KEY)
-    if isinstance(raw, dict) and raw.get("role") in ALLOWED_BUILTIN:
+    if isinstance(raw, dict) and (raw.get("role") in ALLOWED_BUILTIN or raw.get("role") == CUSTOM):
         custom: uuid.UUID | None = None
         if raw.get("custom_role_id"):
             try:
                 custom = uuid.UUID(str(raw["custom_role_id"]))
             except ValueError:
                 return server_role, None, "server"
-        return str(raw["role"]), custom, "setting"
+        if custom is not None:
+            # A custom role stands alone (a person has one role). An older saved value of Viewer plus a custom role means the same thing.
+            return CUSTOM, custom, "setting"
+        if raw.get("role") == CUSTOM:
+            return server_role, None, "server"  # "custom" with no role named is not usable
+        return str(raw["role"]), None, "setting"
     return server_role, None, "server"
 
 

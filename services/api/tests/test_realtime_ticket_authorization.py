@@ -57,7 +57,7 @@ class TestWhatTheRouteDeclares:
 
 class TestWhoGetsATicket:
     def test_every_standard_role_still_gets_one_so_the_console_is_unaffected(self):
-        for role in ROLE_PERMISSIONS:
+        for role in (r for r in ROLE_PERMISSIONS if r != "custom"):  # "custom": a person whose one role is a custom role holds what that role lists
             assert has_permission(role, "alerts:read") and has_permission(
                 role, "cases:read"
             ), f"{role} would lose live updates: check before shipping"

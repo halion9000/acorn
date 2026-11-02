@@ -35,8 +35,8 @@ export function MemberEditor({
   onClose: () => void;
 }) {
   const current = member.custom_roles ?? [];
-  // One dropdown holds every role. A custom role is held on top of Viewer (what Add member does), so a person with exactly that is shown as the custom role; any other mix (several custom roles, or a custom role on top of a higher built-in role) is shown as "keep as it is" until a different choice is made.
-  const initialChoice = current.length === 0 ? member.role : current.length === 1 && member.role === 'viewer' ? CUSTOM_PREFIX + current[0].id : KEEP;
+  // One dropdown holds every role, because a person has ONE role. A person whose role is a custom role shows as that role; an older mix of a built-in role and custom roles shows as "keep as it is" until a role is picked.
+  const initialChoice = current.length === 0 ? member.role : current.length === 1 && member.role === 'custom' ? CUSTOM_PREFIX + current[0].id : KEEP;
   const mixLabel = `${MEMBER_ROLES.find((r) => r.value === member.role)?.label ?? member.role} + ${current.map((r) => r.name).join(', ')}`;
   const [displayName, setDisplayName] = useState(member.username ?? '');
   const [choice, setChoice] = useState(initialChoice);
@@ -68,10 +68,10 @@ export function MemberEditor({
     }
   };
 
-  // What the choice means for the server: a built-in role clears any custom roles; a custom role is held on top of Viewer; "keep" changes neither.
+  // What the choice means for the server: a built-in role clears any custom roles; a custom role is the person's one role ("custom" plus that role); "keep" changes neither.
   const roleChange = (): { role?: string; custom_role_ids?: string[] } => {
     if (choice === initialChoice || choice === KEEP) return {};
-    if (choice.startsWith(CUSTOM_PREFIX)) return { ...(member.role !== 'viewer' ? { role: 'viewer' } : {}), custom_role_ids: [choice.slice(CUSTOM_PREFIX.length)] };
+    if (choice.startsWith(CUSTOM_PREFIX)) return { role: 'custom', custom_role_ids: [choice.slice(CUSTOM_PREFIX.length)] };
     return { ...(choice !== member.role ? { role: choice } : {}), ...(current.length > 0 ? { custom_role_ids: [] } : {}) };
   };
 
@@ -103,7 +103,7 @@ export function MemberEditor({
             isSelf
               ? 'You cannot change your own role.'
               : choice.startsWith(CUSTOM_PREFIX)
-                ? customRoles.find((r) => CUSTOM_PREFIX + r.id === choice)?.description || 'A role your workspace made. They also hold the Viewer role.'
+                ? customRoles.find((r) => CUSTOM_PREFIX + r.id === choice)?.description || 'A role your workspace made. It is their only role: they can do exactly what it grants.'
                 : choice === KEEP
                   ? 'Pick a role to replace this mix.'
                   : MEMBER_ROLES.find((r) => r.value === choice)?.hint

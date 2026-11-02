@@ -12,13 +12,14 @@ from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select, update
 
-from app.api.v1.deps import AuthUser, DBSession, SessionUser, bearer_scheme, get_current_user
+from app.api.v1.deps import AuthUser, DBSession, SessionUser, bearer_scheme, custom_role_grants, get_current_user
 from app.api.v1.endpoints.sso_microsoft import password_login_allowed
 
 __all__ = ["router", "get_current_user"]
 from app.core.config import settings
 from app.core.password_policy import password_problem
 from app.core.security import (
+    capabilities_for_permissions,
     capabilities_for_role,
     create_access_token,
     create_refresh_token,
@@ -105,9 +106,9 @@ class UserMeResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-def _me(user: User) -> UserMeResponse:
+def _me(user: User, custom_permissions: list[str] | None = None) -> UserMeResponse:
     response = UserMeResponse.model_validate(user)
-    response.capabilities = capabilities_for_role(user.role)
+    response.capabilities = capabilities_for_permissions(custom_permissions) if custom_permissions is not None else capabilities_for_role(user.role)
     return response
 
 
@@ -390,7 +391,7 @@ async def get_me(current_user: AuthUser, db: DBSession) -> UserMeResponse:
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    me = _me(user)
+    me = _me(user, await custom_role_grants(db, user))
     me.hidden_nav = await _hidden_nav(db, user)
     return me
 
@@ -419,4 +420,4 @@ async def patch_me_preferences(
     # Re-fetch to return fresh state
     result = await db.execute(select(User).where(User.id == current_user.user_id))
     user = result.scalar_one_or_none()
-    return _me(user)
+    return _me(user, await custom_role_grants(db, user))

@@ -99,7 +99,8 @@ def test_role_permissions_map_covers_every_role_under_test() -> None:
     classify it as write or read-only here, this test fails loudly
     instead of silently leaving the new role unaudited.
     """
-    real_roles = set(ROLE_PERMISSIONS) - {"admin", "platform_admin"}
+    # "custom" is the role of a person whose one role is a custom role: it has no built-in permissions, and what they hold is tested with the custom-role tests.
+    real_roles = set(ROLE_PERMISSIONS) - {"admin", "platform_admin", "custom"}
     audited_roles = set(WRITE_ROLES + READ_ONLY_ROLES) - {"admin", "platform_admin"}
     missing = real_roles - audited_roles
     assert (

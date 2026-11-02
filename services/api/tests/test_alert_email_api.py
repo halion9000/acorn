@@ -18,6 +18,7 @@ from app.core.security import ROLE_PERMISSIONS, create_access_token
 from app.db.database import Base
 from app.models.alert_email import AlertEmailLog, PlatformAlertEmailSettings
 from app.models.login_failure import LoginFailure
+from app.models.rbac import Permission, Role, RolePermission, UserRole
 from app.models.tenant import ApiKey, Tenant, User
 from app.scripts import alert_email as cli
 from app.services.alert_email.graph import MailError
@@ -53,17 +54,27 @@ class Recorder:
 def world(tmp_path, monkeypatch):
     path = tmp_path / "ae_api.db"
     sync = create_engine(f"sqlite:///{path}")
-    Base.metadata.create_all(
-        sync,
-        tables=[
-            Tenant.__table__,
-            User.__table__,
-            ApiKey.__table__,
-            LoginFailure.__table__,
-            PlatformAlertEmailSettings.__table__,
-            AlertEmailLog.__table__,
-        ],
-    )
+    # A person whose role is "custom" gets their permissions from the role tables, so those exist here too. roles.hidden_nav's default is Postgres-only SQL: drop it for this test database.
+    hidden_nav = Role.__table__.c.hidden_nav
+    saved_default, hidden_nav.server_default = hidden_nav.server_default, None
+    try:
+        Base.metadata.create_all(
+            sync,
+            tables=[
+                Tenant.__table__,
+                User.__table__,
+                ApiKey.__table__,
+                LoginFailure.__table__,
+                PlatformAlertEmailSettings.__table__,
+                AlertEmailLog.__table__,
+                Role.__table__,
+                Permission.__table__,
+                RolePermission.__table__,
+                UserRole.__table__,
+            ],
+        )
+    finally:
+        hidden_nav.server_default = saved_default
     t = Tenant(id=uuid.uuid4(), name="Live Oak IT", slug="live-oak-" + uuid.uuid4().hex[:6])
     other = Tenant(id=uuid.uuid4(), name="Acme Corp", slug="acme-" + uuid.uuid4().hex[:6])
     users = {

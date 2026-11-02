@@ -27,6 +27,9 @@ _BCRYPT_MAX_BYTES = 72
 PLATFORM_PERMISSIONS: frozenset[str] = frozenset({"plugins:admin", "mssp:onboard", "platform:cross_tenant_query"})
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
+    # "custom" is the role of a person whose ONE role is a custom role their workspace made (Settings > Roles & Permissions). It carries no built-in permissions of its own:
+    # what they can do is exactly what that custom role grants (see CurrentUser.role_permissions). Nothing is added from Viewer or any other built-in role.
+    "custom": [],
     "platform_admin": ["*", *sorted(PLATFORM_PERMISSIONS)],
     # ``admin`` is the role string handed out by the dev-mode demo user
     # (see ``app.api.v1.dev_auth``) and by some legacy seed scripts. It
@@ -409,3 +412,8 @@ UI_CAPABILITIES: dict[str, str] = {"platform_admin": "platform:cross_tenant_quer
 def capabilities_for_role(role: str) -> list[str]:
     """The UI capability names this role holds, sorted."""
     return sorted(name for name, permission in UI_CAPABILITIES.items() if has_permission(role, permission))
+
+
+def capabilities_for_permissions(permissions: list[str]) -> list[str]:
+    """The same, for a person whose permissions come from a custom role."""
+    return sorted(name for name, permission in UI_CAPABILITIES.items() if permission_in(permissions, permission))

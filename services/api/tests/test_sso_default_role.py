@@ -55,7 +55,9 @@ class TestEffective:
     def test_a_stored_choice_wins_and_may_carry_a_custom_role(self):
         cid = uuid.uuid4()
         assert sdr.effective({sdr.KEY: sdr.stored("soc_analyst", None)}, "viewer") == ("soc_analyst", None, "setting")
-        assert sdr.effective({sdr.KEY: sdr.stored("viewer", cid)}, "viewer") == ("viewer", cid, "setting")
+        assert sdr.effective({sdr.KEY: sdr.stored("custom", cid)}, "viewer") == ("custom", cid, "setting")
+        # an older saved value of Viewer plus a custom role means the same thing: the custom role alone
+        assert sdr.effective({sdr.KEY: sdr.stored("viewer", cid)}, "viewer") == ("custom", cid, "setting")
 
     @pytest.mark.parametrize("bad", [{"role": "tenant_admin"}, {"role": "platform_admin"}, {"role": "nonsense"}, {"role": "viewer", "custom_role_id": "not-a-uuid"}, "text", 5])
     def test_an_unusable_stored_value_falls_back_to_the_server_setting(self, bad):
@@ -78,10 +80,10 @@ class TestTheNewPersonIsCreatedWithIt:
     def claims(self, n="new"):
         return {"tid": "tid", "oid": f"oid-{n}", "preferred_username": f"{n}@client.example", "name": n.title()}
 
-    def test_a_custom_role_choice_makes_the_person_a_viewer_holding_that_role(self):
+    def test_a_custom_role_choice_makes_it_the_persons_one_role(self):
         async def body(s):
             home, role = await self.make(s)
-            home.settings = {sdr.KEY: sdr.stored("viewer", role.id)}
+            home.settings = {sdr.KEY: sdr.stored("custom", role.id)}
             await s.commit()
             cfg = sso_microsoft.load_config(sso_env(home.id))
             user, outcome = await sso_microsoft.resolve_user(s, cfg, self.claims())
@@ -90,7 +92,7 @@ class TestTheNewPersonIsCreatedWithIt:
             return outcome, user.role, held, role.id
 
         outcome, base, held, rid = run(body)
-        assert (outcome, base, held) == ("created", "viewer", [rid])
+        assert (outcome, base, held) == ("created", "custom", [rid])
 
     def test_a_built_in_choice_is_used_and_no_custom_role_is_given(self):
         async def body(s):
@@ -120,12 +122,12 @@ class TestTheNewPersonIsCreatedWithIt:
     def test_a_custom_role_that_was_deleted_is_simply_not_given(self):
         async def body(s):
             home, _ = await self.make(s, custom=False)
-            home.settings = {sdr.KEY: sdr.stored("viewer", uuid.uuid4())}
+            home.settings = {sdr.KEY: sdr.stored("custom", uuid.uuid4())}
             await s.commit()
             user, _o = await sso_microsoft.resolve_user(s, sso_microsoft.load_config(sso_env(home.id)), self.claims())
             return user.role, (await s.execute(select(UserRole))).all()
 
-        assert run(body) == ("viewer", [])
+        assert run(body) == ("custom", [])
 
 
 class TestChoosingIt:
@@ -162,7 +164,7 @@ class TestChoosingIt:
         assert audit.await_args.kwargs["action"] == "sso:default_role_changed"
         assert audit.await_args.kwargs["changes"]["after"]["role"] == "soc_analyst" and audit.await_args.kwargs["changes"]["before"]["role"] == "viewer"
 
-    def test_a_custom_role_is_saved_on_top_of_viewer(self, monkeypatch):
+    def test_a_custom_role_is_saved_as_the_one_role(self, monkeypatch):
         monkeypatch.setattr(rbac, "emit_audit", AsyncMock())
 
         async def body(s):
@@ -171,7 +173,7 @@ class TestChoosingIt:
             return out, role.id
 
         out, rid = run(body)
-        assert (out.role, out.custom_role_id) == ("viewer", rid)
+        assert (out.role, out.custom_role_id) == ("custom", rid)
 
     @pytest.mark.parametrize("role", ["tenant_admin", "platform_admin", "admin", "nonsense"])
     def test_an_administrator_or_unknown_role_is_refused(self, role, monkeypatch):

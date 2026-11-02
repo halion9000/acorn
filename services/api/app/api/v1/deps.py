@@ -87,6 +87,7 @@ class CurrentUser:
         scopes: list[str] | None = None,
         home_tenant_id: uuid.UUID | None = None,
         acting_access: str | None = None,
+        role_permissions: list[str] | None = None,
     ) -> None:
         self.user_id = user_id
         self.tenant_id = tenant_id
@@ -97,6 +98,14 @@ class CurrentUser:
         self.role = role
         self.email = email
         self.scopes = scopes  # None → role-based; list → API-key scoped
+        # For a person whose one role is a custom role: the permissions that role grants. None for everyone else (their built-in role decides).
+        self.role_permissions = role_permissions
+
+    def _role_grants(self, permission: str) -> bool:
+        """Does this person's ONE role grant `permission`? A custom role grants exactly its own permissions; a built-in role grants what the table says."""
+        if self.role_permissions is not None:
+            return permission_in(self.role_permissions, permission)
+        return has_permission(self.role, permission)
 
     @property
     def viewing_other_tenant(self) -> bool:
@@ -135,7 +144,7 @@ class CurrentUser:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN, detail=f"Not available while working in another tenant: {permission}"
                 )
-            if not has_permission(self.role, permission):
+            if not self._role_grants(permission):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Permission denied: {permission}",
@@ -168,6 +177,8 @@ class CurrentUser:
 
         if self.scopes is not None:
             return "*" in self.scopes
+        if self.role_permissions is not None:
+            return "*" in self.role_permissions
         return "*" in ROLE_PERMISSIONS.get(self.role, [])
 
     async def has_permission_db(self, permission: str, db: AsyncSession) -> bool:
@@ -195,8 +206,8 @@ class CurrentUser:
         if db_perms:
             return permission_in(db_perms, permission)
 
-        # Fallback to static map
-        return has_permission(self.role, permission)
+        # Fallback to the person's one role (built-in table, or the custom role's own permissions)
+        return self._role_grants(permission)
 
     async def require_permission_db(self, permission: str, db: AsyncSession) -> None:
         """Async permission check (RBAC tables then static fallback)."""
@@ -330,7 +341,25 @@ async def get_current_user(
         email=user.email,
         home_tenant_id=user.tenant_id,
         acting_access=target.access,
+        role_permissions=user.role_permissions,
     )
+
+
+async def custom_role_grants(db: AsyncSession, user: User) -> list[str] | None:
+    """The permissions of the custom role a person holds, or None when their role is a built-in one. A person whose role is \"custom\" but who has no custom role assigned (it was deleted) holds nothing."""
+    if user.role != "custom":
+        return None
+    from app.models.rbac import Permission as PermModel  # noqa: PLC0415
+    from app.models.rbac import Role, RolePermission, UserRole  # noqa: PLC0415
+
+    rows = await db.execute(
+        select(PermModel.name)
+        .join(RolePermission, RolePermission.permission_id == PermModel.id)
+        .join(Role, Role.id == RolePermission.role_id)
+        .join(UserRole, UserRole.role_id == Role.id)
+        .where(UserRole.user_id == user.id, Role.tenant_id == user.tenant_id, Role.is_system.is_(False))
+    )
+    return [r[0] for r in rows.all()]
 
 
 async def _authenticate(
@@ -407,6 +436,7 @@ async def _authenticate(
         tenant_id=user.tenant_id,
         role=user.role,
         email=user.email or user.account_name,  # the label for 'who' (audit etc.): the email if there is one, else the account name
+        role_permissions=await custom_role_grants(db, user),
     )
 
 

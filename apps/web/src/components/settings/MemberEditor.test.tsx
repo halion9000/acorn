@@ -40,7 +40,7 @@ beforeEach(() => {
 });
 
 const plain: TenantUser = { ...ann, custom_roles: [] };
-const reviewer: TenantUser = { ...ann, role: 'viewer', custom_roles: [{ id: 'r1', name: 'Client reviewer' }] };
+const reviewer: TenantUser = { ...ann, role: 'custom', custom_roles: [{ id: 'r1', name: 'Client reviewer' }] };
 
 describe('editing a member: one Role dropdown holds the built-in and the custom roles', () => {
   it('lists built-in roles and custom roles in the same dropdown, and no separate custom roles area', () => {
@@ -52,26 +52,26 @@ describe('editing a member: one Role dropdown holds the built-in and the custom 
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
 
-  it('a person who is exactly Viewer plus one custom role is shown as that custom role', () => {
+  it('a person whose one role is a custom role is shown as that custom role', () => {
     open(reviewer);
     expect(screen.getByLabelText(/^Role/)).toHaveValue('custom:r1');
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
   });
 
-  it('choosing a custom role for someone with a built-in role makes them Viewer plus that role', async () => {
+  it('choosing a custom role for someone with a built-in role makes it their one role', async () => {
     open(plain);
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
     await userEvent.selectOptions(screen.getByLabelText(/^Role/), 'Billing');
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(updateUser).toHaveBeenCalledWith('u1', { username: 'Ann', role: 'viewer', custom_role_ids: ['r2'] }));
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith('u1', { username: 'Ann', role: 'custom', custom_role_ids: ['r2'] }));
     expect(changed).toEqual([false]);
   });
 
-  it('moving from one custom role to another changes only the custom role', async () => {
+  it('moving from one custom role to another sends the new one as their only role', async () => {
     open(reviewer);
     await userEvent.selectOptions(screen.getByLabelText(/^Role/), 'Billing');
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(updateUser).toHaveBeenCalledWith('u1', { username: 'Ann', custom_role_ids: ['r2'] }));
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith('u1', { username: 'Ann', role: 'custom', custom_role_ids: ['r2'] }));
   });
 
   it('choosing a built-in role sets it and clears any custom roles', async () => {

@@ -1241,6 +1241,7 @@ class TestCapabilities:
 
         got = {role: capabilities_for_role(role) for role in ROLE_PERMISSIONS}
         assert got == {
+            "custom": [],  # a custom-role person's capabilities come from that role (capabilities_for_permissions)
             "platform_admin": ["manage_users", "platform_admin"],
             "admin": ["manage_users"],
             "tenant_admin": ["manage_users"],

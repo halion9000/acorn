@@ -530,6 +530,29 @@ async def _checked_custom_roles(db: Any, current_user: Any, role_ids: list[uuid.
 _ADMIN_ROLES = ("tenant_admin", "platform_admin")
 
 
+async def _one_role(db: Any, current_user: Any, role: str, role_ids: list[uuid.UUID]) -> list[Any]:
+    """A person has ONE role: a built-in role, or a custom role their workspace made (stored as the role "custom" plus that one custom role). Returns the custom roles to give (one or none)."""
+    if role == "custom":
+        if len(set(role_ids)) != 1:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Choose exactly one custom role.")
+        return await _checked_custom_roles(db, current_user, role_ids)
+    if role_ids:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="A person has one role: a built-in role or a custom role, not both.")
+    return []
+
+
+async def _may_manage(db: Any, current_user: Any, user: User) -> bool:
+    """May the caller change this person? Only someone whose own permissions cover everything the person's role grants (nobody manages more power than they hold)."""
+    if user.role != "custom":
+        return current_user.can_grant_role(user.role)
+    from app.api.v1.deps import custom_role_grants  # noqa: PLC0415
+
+    perms = await custom_role_grants(db, user) or []
+    if "*" in perms and not current_user.holds_wildcard():
+        return False
+    return all(current_user.holds(p) for p in perms if p != "*")
+
+
 async def _refuse_if_last_admin(db: Any, tenant_id: uuid.UUID, user: User, what: str) -> None:
     """409 when ``what`` (disabling, deleting or demoting) would leave the workspace with no active administrator."""
     if user.role not in _ADMIN_ROLES or not user.is_active:
@@ -583,7 +606,7 @@ async def create_user(
 ) -> UserResponse:
     """Create a new user in the current tenant."""
     _require_grantable_role(current_user, request.role)
-    custom_roles = await _checked_custom_roles(db, current_user, request.custom_role_ids)
+    custom_roles = await _one_role(db, current_user, request.role, request.custom_role_ids)
 
     # The account name. Chosen explicitly: it must be valid and free (a name is not sensitive, so "taken" is said plainly). Not chosen (an older client): made from the username or email and made unique.
     if request.account_name is not None:
@@ -664,7 +687,7 @@ async def update_user(
 
     # Nobody edits a user who holds more power than they do (a tenant_admin could otherwise deactivate or demote a platform_admin of the same tenant), and
     # nobody changes their OWN role (a tenant_admin could otherwise promote itself with one request).
-    if not current_user.can_grant_role(user.role):
+    if not await _may_manage(db, current_user, user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot modify a user whose role grants more than your own.")
     if request.role is not None:
         if user.id == current_user.user_id and request.role != user.role:
@@ -676,7 +699,19 @@ async def update_user(
         if user.id == current_user.user_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot disable your own account.")
         await _refuse_if_last_admin(db, current_user.tenant_id, user, "Disabling this account")
-    new_custom = await _checked_custom_roles(db, current_user, request.custom_role_ids) if request.custom_role_ids is not None else None
+    # One role per person. Becoming a custom-role person needs exactly one custom role; any built-in role clears custom roles; staying custom without naming one leaves it as it is.
+    final_role = request.role if request.role is not None else user.role
+    new_custom: list[Any] | None = None
+    if final_role == "custom":
+        if request.custom_role_ids is not None:
+            new_custom = await _one_role(db, current_user, "custom", request.custom_role_ids)
+        elif user.role != "custom":
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Choose which custom role this person gets.")
+    else:
+        await _one_role(db, current_user, final_role, request.custom_role_ids or [])  # refuses a custom role next to a built-in one
+        # Custom roles are cleared when the person stops being a custom-role person, or when the request says so (the console always does, for a mix it is replacing).
+        if (request.role is not None and user.role == "custom") or request.custom_role_ids is not None:
+            new_custom = []
 
     updates: dict = {}
     for field in ["username", "role", "is_active"]:
@@ -717,7 +752,7 @@ async def _user_the_caller_may_manage(db: Any, current_user: Any, user_id: uuid.
     user = (await db.execute(select(User).where(User.id == user_id, User.tenant_id == current_user.tenant_id))).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    if not current_user.can_grant_role(user.role):
+    if not await _may_manage(db, current_user, user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot manage a user whose role grants more than your own.")
     return user
 

@@ -63,7 +63,7 @@ from jwt import PyJWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import CurrentUser, _resolve_api_key
+from app.api.v1.deps import CurrentUser, _resolve_api_key, custom_role_grants
 from app.api.v1.dev_auth import (
     DEMO_TENANT_ID,
     DEMO_USER_EMAIL,
@@ -168,6 +168,7 @@ async def _authenticate_ws(
         tenant_id=user.tenant_id,
         role=user.role,
         email=user.email,
+        role_permissions=await custom_role_grants(db, user),
     )
 
 
