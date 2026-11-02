@@ -297,6 +297,11 @@ const navSections: NavSection[] = [
         icon: <ShieldIcon />,
       },
       {
+        label: 'DMARC',
+        href: '/settings/dmarc',
+        icon: <ShieldIcon />,
+      },
+      {
         label: 'Client Docs',
         href: '/settings/client-docs',
         icon: <FolderIcon />,
