@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { apiErrorDetail, tenantsApi, type TenantUser } from '@/lib/api';
+import { apiErrorDetail, tenantsApi, type CustomRole, type TenantUser } from '@/lib/api';
 import { Field, inputClass } from './panel-parts';
 
 /** The roles an administrator can hand out from here. The server decides who may grant which (nobody can give more than their own role) and says so if the answer is no. */
@@ -13,6 +13,9 @@ export const MEMBER_ROLES: { value: string; label: string; hint: string }[] = [
   { value: 'soc_lead', label: 'SOC lead', hint: 'Analyst who also manages the team and rules.' },
   { value: 'tenant_admin', label: 'Administrator', hint: 'Manages the workspace, its members and settings.' },
 ];
+
+/** A role this workspace made itself is chosen as `custom:<id>`; the person is then added as a Viewer (the lowest built-in role) holding that custom role, so what they can do is what the custom role grants. */
+export const CUSTOM_PREFIX = 'custom:';
 
 export const MIN_PASSWORD_LENGTH = 12;
 const ACCOUNT_NAME = /^[a-z0-9][a-z0-9._-]{1,30}[a-z0-9]$/;
@@ -33,7 +36,7 @@ export function memberFormProblems(f: MemberFields): Partial<Record<keyof Member
   if (!name) out.accountName = 'Choose the name this person signs in with.';
   else if (!ACCOUNT_NAME.test(name)) out.accountName = "3 to 32 characters: lower-case letters, digits, '.', '_' or '-', starting and ending with a letter or digit.";
   if (f.email.trim() && !EMAIL.test(f.email.trim())) out.email = 'That does not look like an email address.';
-  if (!MEMBER_ROLES.some((r) => r.value === f.role)) out.role = 'Choose a role.';
+  if (!MEMBER_ROLES.some((r) => r.value === f.role) && !f.role.startsWith(CUSTOM_PREFIX)) out.role = 'Choose a role.';
   if (f.password.length < MIN_PASSWORD_LENGTH) out.password = `Use at least ${MIN_PASSWORD_LENGTH} characters.`;
   return out;
 }
@@ -60,6 +63,22 @@ export function AddMemberForm({ onCreated, onCancel }: { onCreated: (user: Tenan
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState<{ user: TenantUser; password: string } | null>(null);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
+  useEffect(() => {
+    // Custom roles are an extra: if the list cannot be read (no permission, an older server) the built-in roles still work.
+    let live = true;
+    void (async () => {
+      try {
+        const roles = await tenantsApi.customRoles();
+        if (live) setCustomRoles(roles);
+      } catch {
+        /* built-in roles only */
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
   const problems = memberFormProblems(fields);
   const set = <K extends keyof MemberFields>(key: K, value: MemberFields[K]) => setFields((f) => ({ ...f, [key]: value }));
 
@@ -74,7 +93,7 @@ export function AddMemberForm({ onCreated, onCancel }: { onCreated: (user: Tenan
         username: fields.displayName.trim() || undefined,
         email: fields.email.trim() || undefined,
         password: fields.password,
-        role: fields.role,
+        ...(fields.role.startsWith(CUSTOM_PREFIX) ? { role: 'viewer', custom_role_ids: [fields.role.slice(CUSTOM_PREFIX.length)] } : { role: fields.role }),
       });
       setAdded({ user, password: fields.password });
       onCreated(user);
@@ -123,13 +142,24 @@ export function AddMemberForm({ onCreated, onCancel }: { onCreated: (user: Tenan
           <input type="email" className={inputClass()} value={fields.email} onChange={(e) => set('email', e.target.value)} autoComplete="off" placeholder="jane@example.com" aria-invalid={!!shown('email')} />
           {shown('email') ? <span role="alert" className="text-xs text-red-300">{shown('email')}</span> : null}
         </Field>
-        <Field label="Role" hint={MEMBER_ROLES.find((r) => r.value === fields.role)?.hint}>
+        <Field label="Role" hint={fields.role.startsWith(CUSTOM_PREFIX) ? customRoles.find((r) => CUSTOM_PREFIX + r.id === fields.role)?.description || 'A role your workspace made. They also hold the Viewer role.' : MEMBER_ROLES.find((r) => r.value === fields.role)?.hint}>
           <select className={inputClass()} value={fields.role} onChange={(e) => set('role', e.target.value)}>
-            {MEMBER_ROLES.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
+            <optgroup label="Built-in roles">
+              {MEMBER_ROLES.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </optgroup>
+            {customRoles.length > 0 ? (
+              <optgroup label="Your custom roles">
+                {customRoles.map((r) => (
+                  <option key={r.id} value={CUSTOM_PREFIX + r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
           </select>
         </Field>
       </div>

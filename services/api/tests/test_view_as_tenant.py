@@ -21,6 +21,7 @@ from app.api.v1.endpoints import tenants as tn
 from app.core.security import create_access_token, hash_api_key
 from app.db.database import Base
 from app.models.login_failure import LoginFailure
+from app.models.rbac import Role, UserRole
 from app.models.tenant import ApiKey, Tenant, User
 from app.models.tenant_access import AllTenantAccessGrant, TenantAccessGrant
 from app.services import view_as
@@ -55,17 +56,25 @@ def world(tmp_path, monkeypatch):
     """P is an MSSP parent with two children (C1, C2); X is unrelated; PL holds a platform admin. GRANTS: p_admin may view C1 and C2, p_analyst only C1, nobody else anything (being in P confers nothing by itself). Users are minted tokens directly (no password hashing)."""
     path = tmp_path / "viewas.db"
     sync = create_engine(f"sqlite:///{path}")
-    Base.metadata.create_all(
-        sync,
-        tables=[
-            Tenant.__table__,
-            User.__table__,
-            ApiKey.__table__,
-            LoginFailure.__table__,
-            TenantAccessGrant.__table__,
-            AllTenantAccessGrant.__table__,
-        ],
-    )
+    # The member list also reads each person's custom roles, so those two tables exist. roles.hidden_nav's default is Postgres-only SQL: drop it for this test database.
+    hidden_nav = Role.__table__.c.hidden_nav
+    saved_default, hidden_nav.server_default = hidden_nav.server_default, None
+    try:
+        Base.metadata.create_all(
+            sync,
+            tables=[
+                Tenant.__table__,
+                User.__table__,
+                ApiKey.__table__,
+                LoginFailure.__table__,
+                TenantAccessGrant.__table__,
+                AllTenantAccessGrant.__table__,
+                Role.__table__,
+                UserRole.__table__,
+            ],
+        )
+    finally:
+        hidden_nav.server_default = saved_default
     P, X, PL = tenant("P"), tenant("X"), tenant("PL")
     C1, C2 = tenant("C1", P), tenant("C2", P)
     users = {

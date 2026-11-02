@@ -38,6 +38,7 @@ import {
   type AuthUser,
   type TenantDetails,
   type TenantUser,
+  type CustomRole,
   type AirgapStatus,
   type Connector,
   type ConnectorStatus,
@@ -54,6 +55,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field, PanelHeader, inputClass } from './panel-parts';
 import { AlertEmailPanel } from './AlertEmailPanel';
 import { PasskeysCard } from './PasskeysCard';
+import { MemberEditor } from './MemberEditor';
 import { SoftwareUpdatePanel } from './SoftwareUpdatePanel';
 import { AzureSpendPanel } from './AzureSpendPanel';
 import { TenantAccessPanel } from './TenantAccessPanel';
@@ -621,6 +623,19 @@ export function workspaceProblem(error: unknown, what: string): string {
 
 function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [selfId, setSelfId] = useState<string | null>(null);
+  useEffect(() => {
+    setSelfId(authApi.currentUser()?.id ?? null);
+  }, []);
+  // The workspace's own roles, for the editor. Only administrators edit members, and a failure just means no custom roles are offered.
+  const { data: customRoles = [] } = useSWR<CustomRole[]>(canAdd ? 'settings:workspace-custom-roles' : null, async () => {
+    try {
+      return await tenantsApi.customRoles();
+    } catch {
+      return [];
+    }
+  });
   const { data: tenant, error: tenantError, isLoading: tenantLoading, mutate: reloadTenant } = useSWR<TenantDetails>('settings:workspace', () => tenantsApi.details());
   const { data: members, error: membersError, isLoading: membersLoading, mutate: reloadMembers } = useSWR<TenantUser[]>('settings:workspace-members', () => tenantsApi.users());
 
@@ -662,15 +677,44 @@ function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
             </p>
             <ul className="mt-3 divide-y divide-gray-800 rounded-lg border border-gray-800 bg-gray-950/40">
               {members.map((m) => (
-                <li key={m.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                  <div className="min-w-0">
-                    <p className="truncate text-gray-100">{m.username || m.account_name}</p>
-                    <p className="truncate text-xs text-gray-500">{m.account_name}{m.email ? ` · ${m.email}` : ''}</p>
+                <li key={m.id} className="text-sm">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-gray-100">{m.username || m.account_name}</p>
+                      <p className="truncate text-xs text-gray-500">{m.account_name}{m.email ? ` · ${m.email}` : ''}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {m.is_active ? null : <span className="rounded-full bg-red-500/10 px-2.5 py-1 text-xs text-red-300 ring-1 ring-red-500/30">Disabled</span>}
+                      <span className="rounded-full bg-gray-800 px-2.5 py-1 text-xs text-gray-300 ring-1 ring-gray-700">{m.role}</span>
+                      {(m.custom_roles ?? []).map((r) => (
+                        <span key={r.id} className="rounded-full bg-indigo-500/10 px-2.5 py-1 text-xs text-indigo-200 ring-1 ring-indigo-500/30">{r.name}</span>
+                      ))}
+                      {canAdd ? (
+                        <button
+                          type="button"
+                          aria-label={`Edit ${m.username || m.account_name}`}
+                          aria-expanded={editing === m.id}
+                          onClick={() => setEditing(editing === m.id ? null : m.id)}
+                          className="rounded-lg border border-gray-700 px-3 py-1 text-xs font-medium text-gray-200 hover:bg-gray-800"
+                        >
+                          {editing === m.id ? 'Close' : 'Edit'}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {m.is_active ? null : <span className="rounded-full bg-red-500/10 px-2.5 py-1 text-xs text-red-300 ring-1 ring-red-500/30">Disabled</span>}
-                    <span className="rounded-full bg-gray-800 px-2.5 py-1 text-xs text-gray-300 ring-1 ring-gray-700">{m.role}</span>
-                  </div>
+                  {canAdd && editing === m.id ? (
+                    <MemberEditor
+                      key={m.id}
+                      member={m}
+                      isSelf={m.id === selfId}
+                      customRoles={customRoles}
+                      onChanged={(gone) => {
+                        if (gone) setEditing(null);
+                        void reloadMembers();
+                      }}
+                      onClose={() => setEditing(null)}
+                    />
+                  ) : null}
                 </li>
               ))}
             </ul>

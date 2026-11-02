@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -60,6 +60,11 @@ class TenantResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CustomRoleRef(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
@@ -70,6 +75,8 @@ class UserResponse(BaseModel):
     is_active: bool
     last_login: datetime | None
     created_at: datetime
+    # Roles the workspace made itself, held in addition to the built-in role above (their permissions add up). Filled by the member routes.
+    custom_roles: list[CustomRoleRef] = []
 
     model_config = {"from_attributes": True}
 
@@ -83,6 +90,7 @@ class CreateUserRequest(BaseModel):
     username: str | None = None
     password: str
     role: str = "soc_analyst"
+    custom_role_ids: list[uuid.UUID] = []
 
     @model_validator(mode="after")
     def _needs_a_name(self) -> "CreateUserRequest":
@@ -95,6 +103,8 @@ class UpdateUserRequest(BaseModel):
     username: str | None = None
     role: str | None = None
     is_active: bool | None = None
+    # The whole set of custom roles the person should hold (replaces what they have). Left out: unchanged.
+    custom_role_ids: list[uuid.UUID] | None = None
 
 
 class UpdateTenantSettingsRequest(BaseModel):
@@ -479,6 +489,63 @@ async def rename_my_workspace(
     return TenantResponse.model_validate(tenant)
 
 
+async def _custom_roles_of(db: Any, tenant_id: uuid.UUID, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[CustomRoleRef]]:
+    """The custom (non built-in) roles each of these people holds, by person."""
+    from app.models.rbac import Role, UserRole  # noqa: PLC0415
+
+    out: dict[uuid.UUID, list[CustomRoleRef]] = {u: [] for u in user_ids}
+    if not user_ids:
+        return out
+    rows = (
+        await db.execute(
+            select(UserRole.user_id, Role.id, Role.name)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(UserRole.user_id.in_(user_ids), Role.tenant_id == tenant_id, Role.is_system.is_(False))
+            .order_by(Role.name)
+        )
+    ).all()
+    for user_id, role_id, name in rows:
+        out[user_id].append(CustomRoleRef(id=role_id, name=name))
+    return out
+
+
+async def _user_out(db: Any, tenant_id: uuid.UUID, user: User) -> UserResponse:
+    out = UserResponse.model_validate(user)
+    out.custom_roles = (await _custom_roles_of(db, tenant_id, [user.id])).get(user.id, [])
+    return out
+
+
+async def _checked_custom_roles(db: Any, current_user: Any, role_ids: list[uuid.UUID]) -> list[Any]:
+    """The roles these ids name, each of them this workspace's own role and held in full by the caller (handing a role out hands out everything in it)."""
+    from app.api.v1.endpoints.rbac import _get_role_or_404, _load_role_permissions, _require_permissions_held  # noqa: PLC0415
+
+    roles = []
+    for role_id in dict.fromkeys(role_ids):
+        role = await _get_role_or_404(db, role_id, current_user.tenant_id)
+        _require_permissions_held(current_user, [p.name for p in await _load_role_permissions(db, role.id)])
+        roles.append(role)
+    return roles
+
+
+_ADMIN_ROLES = ("tenant_admin", "platform_admin")
+
+
+async def _refuse_if_last_admin(db: Any, tenant_id: uuid.UUID, user: User, what: str) -> None:
+    """409 when ``what`` (disabling, deleting or demoting) would leave the workspace with no active administrator."""
+    if user.role not in _ADMIN_ROLES or not user.is_active:
+        return
+    others = await db.scalar(
+        select(func.count())
+        .select_from(User)
+        .where(User.tenant_id == tenant_id, User.id != user.id, User.is_active.is_(True), User.role.in_(_ADMIN_ROLES))
+    )
+    if not others:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"This is the only active administrator. {what} would lock everyone out of settings; make someone else an administrator first.",
+        )
+
+
 @router.get("/me/users", response_model=list[UserResponse])
 async def list_users(
     current_user: Annotated[AuthUser, Depends(require_permission("users:read"))],
@@ -487,7 +554,13 @@ async def list_users(
     """List all users in the current tenant."""
     result = await db.execute(select(User).where(User.tenant_id == current_user.tenant_id).order_by(User.created_at))
     users = result.scalars().all()
-    return [UserResponse.model_validate(u) for u in users]
+    roles = await _custom_roles_of(db, current_user.tenant_id, [u.id for u in users])
+    out = []
+    for u in users:
+        item = UserResponse.model_validate(u)
+        item.custom_roles = roles.get(u.id, [])
+        out.append(item)
+    return out
 
 
 def _require_grantable_role(current_user: Any, role: str) -> None:
@@ -510,6 +583,7 @@ async def create_user(
 ) -> UserResponse:
     """Create a new user in the current tenant."""
     _require_grantable_role(current_user, request.role)
+    custom_roles = await _checked_custom_roles(db, current_user, request.custom_role_ids)
 
     # The account name. Chosen explicitly: it must be valid and free (a name is not sensitive, so "taken" is said plainly). Not chosen (an older client): made from the username or email and made unique.
     if request.account_name is not None:
@@ -555,6 +629,12 @@ async def create_user(
         role=request.role,
     )
     db.add(user)
+    if custom_roles:
+        from app.models.rbac import UserRole  # noqa: PLC0415
+
+        await db.flush()
+        for role in custom_roles:
+            db.add(UserRole(user_id=user.id, role_id=role.id, assigned_by=current_user.user_id))
     try:
         await db.commit()
     except IntegrityError:
@@ -564,7 +644,9 @@ async def create_user(
             status_code=status.HTTP_409_CONFLICT, detail="That account name (or email) was just taken. Choose another."
         ) from None
     await db.refresh(user)
-    return UserResponse.model_validate(user)
+    out = UserResponse.model_validate(user)
+    out.custom_roles = [CustomRoleRef(id=r.id, name=r.name) for r in custom_roles]  # a new person holds exactly the roles just given
+    return out
 
 
 @router.patch("/me/users/{user_id}", response_model=UserResponse)
@@ -588,6 +670,13 @@ async def update_user(
         if user.id == current_user.user_id and request.role != user.role:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot change your own role.")
         _require_grantable_role(current_user, request.role)
+        if request.role != user.role and request.role not in _ADMIN_ROLES:
+            await _refuse_if_last_admin(db, current_user.tenant_id, user, "Changing this role")
+    if request.is_active is False:
+        if user.id == current_user.user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot disable your own account.")
+        await _refuse_if_last_admin(db, current_user.tenant_id, user, "Disabling this account")
+    new_custom = await _checked_custom_roles(db, current_user, request.custom_role_ids) if request.custom_role_ids is not None else None
 
     updates: dict = {}
     for field in ["username", "role", "is_active"]:
@@ -600,10 +689,18 @@ async def update_user(
         # The user was loaded above with this tenant's id, but the UPDATE carries it too: `users` has no row-level security, so the tenant
         # must not depend on the order of the statements.
         await db.execute(update(User).where(User.id == user_id, User.tenant_id == current_user.tenant_id).values(**updates))
+    if new_custom is not None:
+        from app.models.rbac import Role, UserRole  # noqa: PLC0415
+
+        mine = select(Role.id).where(Role.tenant_id == current_user.tenant_id, Role.is_system.is_(False))
+        await db.execute(delete(UserRole).where(UserRole.user_id == user_id, UserRole.role_id.in_(mine)))
+        for role in new_custom:
+            db.add(UserRole(user_id=user_id, role_id=role.id, assigned_by=current_user.user_id))
+    if updates or new_custom is not None:
         await db.commit()
         await db.refresh(user)
 
-    return UserResponse.model_validate(user)
+    return await _user_out(db, current_user.tenant_id, user)
 
 
 class ResetPasswordRequest(BaseModel):
@@ -680,3 +777,66 @@ async def reset_user_password(
             detail="Password reset, but their existing sessions could not be ended right now (the revocation store is unavailable). Use Sign out everywhere again shortly.",
         )
     return AdminActionResponse(done=True, detail="Password reset. Their sessions were ended: they sign in with the new password.")
+
+
+@router.delete("/me/users/{user_id}", response_model=AdminActionResponse)
+async def delete_user(
+    user_id: uuid.UUID,
+    current_user: Annotated[AuthUser, Depends(require_permission("users:write"))],
+    db: DBSession,
+) -> AdminActionResponse:
+    """Remove a person from the workspace for good: their sessions end, their passkeys and role assignments go. Refused for yourself and for the only active administrator. If cases, notes or audit entries still name them the database refuses; disable them instead (they keep their history and cannot sign in)."""
+    from app.core.token_revocation import RevocationUnavailable, sign_out_everywhere  # noqa: PLC0415
+    from app.models.rbac import UserRole  # noqa: PLC0415
+    from app.models.responder import PasskeyCredential  # noqa: PLC0415
+
+    user = await _user_the_caller_may_manage(db, current_user, user_id)
+    if user.id == current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot delete your own account.")
+    await _refuse_if_last_admin(db, current_user.tenant_id, user, "Deleting this account")
+    try:
+        await sign_out_everywhere(user.id)
+    except RevocationUnavailable:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Could not end their sessions first: the revocation store is unavailable. Nothing was deleted. Try again."
+        ) from None
+    name = user.account_name
+    try:
+        await db.execute(delete(PasskeyCredential).where(PasskeyCredential.user_id == user.id))
+        await db.execute(delete(UserRole).where(UserRole.user_id == user.id))
+        await db.execute(delete(User).where(User.id == user.id, User.tenant_id == current_user.tenant_id))
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This person cannot be deleted because cases, notes or audit entries still refer to them. Disable the account instead: they keep their history and cannot sign in.",
+        ) from None
+    logger.warning("user deleted by an administrator", extra={"acting_user": str(current_user.user_id), "deleted_user": str(user_id), "account_name": name})
+    return AdminActionResponse(done=True, detail=f"{name} was deleted.")
+
+
+@router.post("/me/users/{user_id}/reset-mfa", response_model=AdminActionResponse)
+async def reset_user_mfa(
+    user_id: uuid.UUID,
+    current_user: Annotated[AuthUser, Depends(require_permission("users:write"))],
+    db: DBSession,
+) -> AdminActionResponse:
+    """Remove every passkey this person has enrolled (a lost phone or security key) and end their sessions. They sign in with their password and can enrol a new passkey from Settings > Profile."""
+    from app.core.token_revocation import RevocationUnavailable, sign_out_everywhere  # noqa: PLC0415
+    from app.models.responder import PasskeyCredential  # noqa: PLC0415
+
+    user = await _user_the_caller_may_manage(db, current_user, user_id)
+    result = await db.execute(
+        update(PasskeyCredential)
+        .where(PasskeyCredential.user_id == user.id, PasskeyCredential.tenant_id == current_user.tenant_id, PasskeyCredential.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(UTC))
+    )
+    await db.commit()
+    count = result.rowcount or 0
+    logger.warning("user passkeys removed by an administrator", extra={"acting_user": str(current_user.user_id), "target_user": str(user.id), "passkeys": count})
+    try:
+        await sign_out_everywhere(user.id)
+    except RevocationUnavailable:
+        return AdminActionResponse(done=True, detail=f"{count} passkey(s) removed, but their sessions could not be ended right now (the revocation store is unavailable). Use Sign out everywhere again shortly.")
+    return AdminActionResponse(done=True, detail=f"{count} passkey(s) removed and their sessions ended. They sign in with their password and can enrol a new passkey.")

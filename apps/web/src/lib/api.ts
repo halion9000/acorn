@@ -459,6 +459,20 @@ export interface TenantUser {
   is_active: boolean;
   last_login: string | null;
   created_at: string;
+  /** Roles this workspace made itself, held in addition to `role`. */
+  custom_roles?: { id: string; name: string }[];
+}
+
+/** A role the workspace made itself (the built-in roles are not listed here). */
+export interface CustomRole {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export interface AdminActionResult {
+  done: boolean;
+  detail: string;
 }
 
 export interface ViewableTenant {
@@ -509,8 +523,33 @@ export const tenantsApi = {
     return request<TenantUser[]>('/api/v1/tenants/me/users');
   },
   /** Add a person to this tenant. Needs `users:write`; the server refuses a role that grants more than the caller's own, a taken account name or email, and says why. */
-  async createUser(body: { account_name: string; username?: string; email?: string; password: string; role: string }): Promise<TenantUser> {
+  async createUser(body: { account_name: string; username?: string; email?: string; password: string; role: string; custom_role_ids?: string[] }): Promise<TenantUser> {
     return request<TenantUser>('/api/v1/tenants/me/users', { method: 'POST', body: JSON.stringify(body) });
+  },
+  /** The roles this workspace made itself (Settings > Roles). Needs `users:read`. */
+  async customRoles(): Promise<CustomRole[]> {
+    const all = await request<(CustomRole & { is_system?: boolean })[]>('/api/v1/rbac/roles');
+    return all.filter((r) => !r.is_system).map((r) => ({ id: r.id, name: r.name, description: r.description ?? null }));
+  },
+  /** Change a person: display name, built-in role, disabled or not, and the whole set of custom roles they hold. Needs `users:write`. */
+  async updateUser(id: string, body: { username?: string; role?: string; is_active?: boolean; custom_role_ids?: string[] }): Promise<TenantUser> {
+    return request<TenantUser>(`/api/v1/tenants/me/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  },
+  /** Remove a person for good. The server refuses yourself, the only administrator, and anyone cases or audit entries still name (disable them instead). */
+  async deleteUser(id: string): Promise<AdminActionResult> {
+    return request<AdminActionResult>(`/api/v1/tenants/me/users/${id}`, { method: 'DELETE' });
+  },
+  /** Set a new password for a person and end their sessions. */
+  async resetUserPassword(id: string, newPassword: string): Promise<AdminActionResult> {
+    return request<AdminActionResult>(`/api/v1/tenants/me/users/${id}/password`, { method: 'POST', body: JSON.stringify({ new_password: newPassword }) });
+  },
+  /** End every session a person holds. */
+  async signUserOut(id: string): Promise<AdminActionResult> {
+    return request<AdminActionResult>(`/api/v1/tenants/me/users/${id}/sign-out`, { method: 'POST' });
+  },
+  /** Remove every passkey a person enrolled (a lost phone or key) and end their sessions. */
+  async resetUserMfa(id: string): Promise<AdminActionResult> {
+    return request<AdminActionResult>(`/api/v1/tenants/me/users/${id}/reset-mfa`, { method: 'POST' });
   },
 };
 
