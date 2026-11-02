@@ -350,9 +350,9 @@ async def copilot_chat(
         degraded = True
         content = (
             "I couldn't reach the LLM backend right now. "
-            "Check that the LiteLLM gateway is running and that CORE's "
-            "provider config is synced (rebuild AISOC or run "
-            "`syncAisocProviderConfig()` from the HUD)."
+            "I answer through CORE's Claude link, so check that CORE is running "
+            "(after a CORE restart it needs a few minutes) and that the LiteLLM gateway is up, then ask again. "
+            "On a local install, also rebuild A.C.O.R.N or run `syncAisocProviderConfig()` from the HUD."
         )
 
     # A call the model wrote as text that was not run (a tool that is not allowed from text, or the loop ran out) is not the answer: it is cut out rather than shown.
