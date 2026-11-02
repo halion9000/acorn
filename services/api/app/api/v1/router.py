@@ -25,6 +25,7 @@ from app.api.v1.endpoints import (
     cipp_actions,
     client_documents,
     client_posture,
+    dmarc,
     client_review,
     compliance,
     connectors,
@@ -230,6 +231,7 @@ api_router.include_router(inventory.router)
 api_router.include_router(client_documents.ingest_router)
 api_router.include_router(client_documents.router)
 api_router.include_router(client_posture.router)
+api_router.include_router(dmarc.router)
 api_router.include_router(billing.router)
 api_router.include_router(billing.ingest_router)
 api_router.include_router(client_review.ingest_router)
