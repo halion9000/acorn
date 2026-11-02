@@ -4,15 +4,13 @@
  * Desktop console login.
  *
  * Account name + password against ``POST /api/v1/auth/login`` (an email works only if the server has LOGIN_ALLOW_EMAIL on; it is off by default) for the open-source
- * console. The mobile responder PWA at ``/responder/login`` uses passkeys; this
- * page is the desktop counterpart and the link target from the responder login
- * footer ("Sign in on desktop").
+ * console, or a passkey added under Settings > Profile.
  */
 
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { authApi } from '@/lib/api';
+import { authApi, passkeyApi } from '@/lib/api';
+import { getPasskey, isWebAuthnSupported } from '@/lib/webauthn';
 import { ssoErrorMessage } from '@/lib/sso-messages';
 
 /**
@@ -108,6 +106,28 @@ function LoginInner() {
       live = false;
     };
   }, [ssoCode, next, router]);
+
+  // Sign in with a passkey. The account name is only a hint (an email, when it looks like one); with none, the browser offers the passkeys it holds.
+  const passkeySupported = typeof window !== 'undefined' && isWebAuthnSupported();
+  const passkeySignIn = async () => {
+    if (phase === 'pending') return;
+    setPhase('pending');
+    setError(null);
+    try {
+      const hint = identifier.includes('@') ? identifier.trim() : undefined;
+      const begin = await passkeyApi.authenticateBegin(hint);
+      const credential = await getPasskey(begin.publicKey as unknown as Parameters<typeof getPasskey>[0]);
+      const tokens = await passkeyApi.authenticateFinish(begin.challenge, credential as unknown as Record<string, unknown>);
+      await authApi.completeWithTokens(tokens);
+      setPhase('success');
+      router.replace(next);
+    } catch (err) {
+      console.error('[login] passkey failed', err);
+      setPhase('error');
+      if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')) setError('Cancelled. Try the passkey again, or use your password.');
+      else setError(err instanceof Error && err.message ? err.message : 'Passkey sign-in failed.');
+    }
+  };
 
   const microsoftHref = `/api/v1/auth/sso/microsoft/login?next=${encodeURIComponent(next)}`;
 
@@ -281,16 +301,16 @@ function LoginInner() {
 
           {/* Footer hints */}
           <div className="mt-8 space-y-3 text-center">
-            <p className="text-xs text-zinc-500">
-              On a phone?{' '}
-              <Link
-                href="/responder/login"
-                className="text-indigo-400 hover:text-indigo-300 underline-offset-2 hover:underline"
+            {passkeySupported ? (
+              <button
+                type="button"
+                onClick={() => void passkeySignIn()}
+                disabled={phase === 'pending'}
+                className="w-full border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 text-zinc-100 text-sm font-medium rounded-xl py-2.5 px-4 transition"
               >
-                Use the responder PWA
-              </Link>{' '}
-              with passkeys.
-            </p>
+                Sign in with a passkey
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

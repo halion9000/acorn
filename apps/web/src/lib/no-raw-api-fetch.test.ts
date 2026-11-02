@@ -10,8 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 // vitest runs from apps/web (see vitest.config.ts), so resolve from the cwd.
 const SRC = path.resolve(process.cwd(), 'src');
-// The mobile responder app has its own sign-in and token store.
-const EXEMPT = [`lib${path.sep}auth-session.ts`, `lib${path.sep}responder${path.sep}`, `components${path.sep}responder${path.sep}`, `app${path.sep}(responder)${path.sep}`];
+const EXEMPT = [`lib${path.sep}auth-session.ts`];
 const RAW_API_FETCH = /(?<![A-Za-z_.\w])fetch\(\s*(?:[`'"]\/api\/|`\$\{[A-Za-z_]*BASE[A-Za-z_]*\}|\$\{[A-Za-z_]*BASE[A-Za-z_]*\})/;
 
 function walk(dir: string, out: string[] = []): string[] {

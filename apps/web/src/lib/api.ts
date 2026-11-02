@@ -343,6 +343,11 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ code }),
     });
+    return authApi.completeWithTokens(tokens);
+  },
+
+  /** Finish a passkey sign-in: the tokens the passkey check returns become the same login a password sign-in gives. */
+  async completeWithTokens(tokens: TokenResponse): Promise<LoginResult> {
     if (typeof window !== 'undefined') {
       try {
         window.localStorage.setItem(AUTH_TOKEN_KEY, tokens.access_token);

@@ -179,8 +179,8 @@ describe('authFetch: a 401', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('no redirect loop: already on /login, or on the mobile responder', async () => {
-    for (const where of ['/login', '/responder/cases']) {
+  it('no redirect loop: already on /login', async () => {
+    for (const where of ['/login']) {
       window.history.replaceState({}, '', where);
       install(() => json(401));
       await authFetch('/api/v1/cases');
@@ -215,8 +215,6 @@ describe('redirectIfSignedOut: no saved sign-in goes straight to the login page'
   });
   it('never redirects the login pages themselves', () => {
     window.history.replaceState({}, '', '/login?next=%2Fcases');
-    expect(redirectIfSignedOut(true)).toBe(false);
-    window.history.replaceState({}, '', '/responder/login');
     expect(redirectIfSignedOut(true)).toBe(false);
     expect(redirect).not.toHaveBeenCalled();
   });

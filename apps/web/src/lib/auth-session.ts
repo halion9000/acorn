@@ -41,7 +41,7 @@ const REFRESH_PATH = '/api/v1/auth/refresh';
 const ME_PATH = '/api/v1/auth/me';
 const NO_RETRY_PATHS = ['/api/v1/auth/login', REFRESH_PATH];
 // Pages that manage their own sign-in; never bounce these to /login.
-const OWN_AUTH_PREFIXES = ['/login', '/responder'];
+const OWN_AUTH_PREFIXES = ['/login'];
 
 function store(): Storage | null {
   try {

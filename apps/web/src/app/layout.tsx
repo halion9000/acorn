@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import { Toaster } from 'react-hot-toast';
 import './globals.css';
-import { PwaBootstrap } from '@/components/pwa/PwaBootstrap';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { themeBootstrapScript } from '@/components/theme/themeScript';
 import { docs } from '@/lib/docs';
@@ -74,7 +73,6 @@ export const metadata: Metadata = {
     icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
     apple: [{ url: '/icons/icon-192.svg', type: 'image/svg+xml' }],
   },
-  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     title: 'A.C.O.R.N',
@@ -190,7 +188,6 @@ export default function RootLayout({
           // eslint-disable-next-line react/no-danger -- JSON-LD for SEO crawlers
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <PwaBootstrap />
         <ThemeProvider>
           {children}
           <Toaster

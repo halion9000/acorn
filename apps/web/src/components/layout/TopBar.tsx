@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { authApi, type AuthUser } from '@/lib/api';
-import { unsubscribeFromPush } from '@/lib/pwa';
 import { revokeServerSession } from '@/lib/auth-session';
 import toast from 'react-hot-toast';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
@@ -65,18 +64,6 @@ interface TopBarProps {
   demoOffset?: boolean;
 }
 
-/** Resolve when `p` settles (either way) or after `ms`, whichever is first; never rejects and leaves no timer behind. */
-function settleWithin(p: Promise<unknown>, ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    const done = () => {
-      clearTimeout(timer);
-      resolve();
-    };
-    p.then(done, done);
-  });
-}
-
 export function TopBar({ demoOffset = false }: TopBarProps) {
   const pathname = usePathname();
   const [now, setNow] = useState<Date | null>(null);
@@ -99,14 +86,12 @@ export function TopBar({ demoOffset = false }: TopBarProps) {
     if (signingOut) return;
     setSigningOut(true);
     try {
-      // 1. Drop this browser's push subscription while there is still a token to authorise it (best effort, and bounded so it cannot hold the user here).
-      await settleWithin(unsubscribeFromPush(), 3000);
-      // 2. Ask the server to END the session while we still hold the tokens, so a copied or stolen token stops working. Never throws, never waits long.
+      // 1. Ask the server to END the session while we still hold the tokens, so a copied or stolen token stops working. Never throws, never waits long.
       const server = await revokeServerSession();
-      // 3. Forget the session in this browser and go to the sign-in page, whatever the server said.
+      // 2. Forget the session in this browser and go to the sign-in page, whatever the server said.
       authApi.logout();
       router.replace('/login');
-      // 4. If the server did not confirm, say so honestly instead of implying the session is dead everywhere.
+      // 3. If the server did not confirm, say so honestly instead of implying the session is dead everywhere.
       if (!server.ended) {
         toast.error(`Signed out on this device, but the server could not end the session (${server.message}). If this device is shared or lost, change your password.`, { duration: 12000 });
       }

@@ -115,6 +115,9 @@ const nextConfig = {
       { source: '/connectors', destination: '/settings/connectors', permanent: false },
       { source: '/connectors/:path*', destination: '/settings/connectors/:path*', permanent: false },
       { source: '/audit', destination: '/settings/audit', permanent: false },
+      // The phone Responder app was removed (2026-11-02); old bookmarks and installed copies land on the sign-in page.
+      { source: '/responder', destination: '/login', permanent: false },
+      { source: '/responder/:path*', destination: '/login', permanent: false },
     ];
   },
 

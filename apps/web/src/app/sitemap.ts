@@ -9,7 +9,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const highPriority = ["/", "/settings/connectors"];
   const mediumPriority = [
     "/purple-team",
-    "/responder",
     "/compliance",
     "/hunt",
     "/explore",

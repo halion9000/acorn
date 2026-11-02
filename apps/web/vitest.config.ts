@@ -33,8 +33,8 @@ export default defineConfig({
       // tests actually import, not against every `src/**/*.ts(x)`.
       // That's the metric we want for a regression gate: removing a
       // test that covers a function will drop coverage, but
-      // intentionally untested files (e.g. `src/lib/responder/auth.ts`
-      // which is exercised only via the API route layer / e2e) don't
+      // intentionally untested files (those
+      // exercised only via the API route layer / e2e) don't
       // pollute the denominator. Whole-tree exhaustive coverage is a
       // separate exercise tracked under Phase 4.8 (Playwright e2e).
       provider: 'v8',

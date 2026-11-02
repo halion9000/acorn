@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { passkeyApi, type PasskeyCredential } from '@/lib/api';
-import { createPasskey, isWebAuthnSupported } from '@/lib/responder/webauthn';
+import { createPasskey, isWebAuthnSupported } from '@/lib/webauthn';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { safeFormat } from '@/lib/safe-date';
 

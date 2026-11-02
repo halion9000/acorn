@@ -20,7 +20,7 @@ vi.mock('@/lib/api', () => ({
     registerFinish: (c: string, cred: unknown) => registerFinish(c, cred),
   },
 }));
-vi.mock('@/lib/responder/webauthn', () => ({ __esModule: true, createPasskey: (o: unknown) => createPasskey(o), isWebAuthnSupported: () => supported() }));
+vi.mock('@/lib/webauthn', () => ({ __esModule: true, createPasskey: (o: unknown) => createPasskey(o), isWebAuthnSupported: () => supported() }));
 vi.mock('react-hot-toast', () => ({ __esModule: true, default: Object.assign(vi.fn(), { success: toastSuccess, error: toastError }) }));
 
 import { PasskeysCard } from './PasskeysCard';
