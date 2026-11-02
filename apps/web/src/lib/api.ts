@@ -1004,6 +1004,8 @@ export const inventoryApi = {
   list: (q: InventoryQuery = {}) => request<InventoryList>('/api/v1/inventory', { params: { ...inventoryParams(q), page: q.page ?? 1, page_size: q.pageSize ?? 50, sort: q.sort, direction: q.direction } }),
   create: (body: InventoryInput) => request<InventoryItem>('/api/v1/inventory', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: Partial<InventoryInput> & { move_to_own?: boolean }) => request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  /** Delete an item for good (its history goes with it). Refused for an item that is checked out, or kept in step with a tool. */
+  remove: (id: string) => request<{ deleted: boolean; name: string }>(`/api/v1/inventory/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   checkOut: (id: string, body: { person?: string; site?: string; ticket_url?: string; note?: string }) =>
     request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}/check-out`, { method: 'POST', body: JSON.stringify(body) }),
   checkIn: (id: string, body: { note?: string; ticket_url?: string } = {}) => request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}/check-in`, { method: 'POST', body: JSON.stringify(body) }),

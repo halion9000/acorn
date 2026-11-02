@@ -25,6 +25,7 @@ from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.models.device import Device, DeviceSource
 from app.models.inventory import InventoryEvent, InventoryItem
 from app.models.tenant import Tenant
+from app.services.audit import emit_audit
 from app.services import inventory as inv
 from app.services.client_matching import Candidate
 
@@ -471,6 +472,50 @@ async def update_item(
         await db.commit()
         await db.refresh(row)
     return _out(row, owner, names)
+
+
+class DeletedOut(BaseModel):
+    deleted: bool
+    name: str
+
+
+@router.delete("/{item_id}", response_model=DeletedOut, summary="Delete an item from the stock for good (its history goes with it)")
+async def delete_item(item_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> DeletedOut:
+    """Remove an item and its history. Refused for an item that is checked out (check it in first, so nothing is lost track of) and for one a tool keeps in step (a NinjaOne device
+    would come back at the next sync: mark it Retired instead). The deletion is written to the audit log with what the item was, since its own history goes with it."""
+    owner = user.tenant_id
+    item, names = await _find(db, user, item_id)
+    if item.status == "checked_out":
+        raise HTTPException(status_code=409, detail="This item is checked out. Check it in first, then delete it.")
+    if item.source == "device":
+        raise HTTPException(
+            status_code=409, detail="This item is kept in step with a tool (it comes from a synced device), so it would come back at the next sync. Mark it Retired instead."
+        )
+    summary = {
+        "kind": item.kind,
+        "name": item.name,
+        "serial": item.serial,
+        "category": item.category,
+        "status": item.status,
+        "client_id": str(item.tenant_id) if item.tenant_id != owner else None,
+        "client_name": names.get(item.tenant_id),
+        "source": item.source,
+    }
+    name = item.name
+    async with _acting(db, owner, item.tenant_id):
+        await db.execute(InventoryItem.__table__.delete().where(InventoryItem.id == item.id))  # its events go with it (ON DELETE CASCADE)
+        await emit_audit(
+            db=db,
+            tenant_id=owner,
+            actor_id=user.user_id,
+            actor_email=user.email,
+            action="inventory:item_deleted",
+            resource="inventory_item",
+            resource_id=str(item_id),
+            changes=summary,
+        )
+        await db.commit()
+    return DeletedOut(deleted=True, name=name)
 
 
 class BulkIn(BaseModel):

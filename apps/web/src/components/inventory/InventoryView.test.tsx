@@ -3,10 +3,11 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), update: vi.fn(), checkOut: vi.fn(), checkIn: vi.fn(), events: vi.fn(), import: vi.fn(), exportCsv: vi.fn(), bulk: vi.fn(), syncDevices: vi.fn(), syncNucs: vi.fn() }));
+const api = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), checkOut: vi.fn(), checkIn: vi.fn(), events: vi.fn(), import: vi.fn(), exportCsv: vi.fn(), bulk: vi.fn(), syncDevices: vi.fn(), syncNucs: vi.fn() }));
 const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
-vi.mock('@/lib/api', () => ({ inventoryApi: api, msspApi: mssp }));
+vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), inventoryApi: api, msspApi: mssp }));
 
+import { ApiError } from '@/lib/api';
 import { InventoryView, holderLabel, inventoryUrlState } from './InventoryView';
 
 const item = (over: Record<string, unknown> = {}) => ({
@@ -382,5 +383,38 @@ describe('inventoryUrlState', () => {
     expect(inventoryUrlState(params('client=11111111-2222-3333-4444-555555555555')).client).toBe('11111111-2222-3333-4444-555555555555');
     expect(inventoryUrlState(params('client=1; drop table')).client).toBe('');
     expect(inventoryUrlState(params('search=' + 'x'.repeat(300))).search).toHaveLength(100);
+  });
+});
+
+describe('deleting an item', () => {
+  const refusal = (detail: string) => new ApiError('409', 409, JSON.stringify({ detail }));
+
+  it('asks first, names the item and says its history goes with it, and deletes only after the person confirms', async () => {
+    api.remove.mockResolvedValue({ deleted: true, name: 'Dell Pro Max 16' });
+    view();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Dell Pro Max 16' }));
+    expect(api.remove).not.toHaveBeenCalled();
+    expect(screen.getByText(/Dell Pro Max 16 \(serial BSH7SB4\) is removed from the stock, and so is its history/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(api.remove).toHaveBeenCalledWith('i1'));
+    await waitFor(() => expect(api.list.mock.calls.length).toBeGreaterThan(1)); // the list is reloaded
+  });
+
+  it('cancelling deletes nothing', async () => {
+    view();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Dell Pro Max 16' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(api.remove).not.toHaveBeenCalled();
+    expect(screen.queryByText(/is removed from the stock/)).not.toBeInTheDocument();
+  });
+
+  it('shows the server\'s refusal as it is and keeps the item', async () => {
+    api.remove.mockRejectedValue(refusal('This item is checked out. Check it in first, then delete it.'));
+    view();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Dell Pro Max 16' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByText('This item is checked out. Check it in first, then delete it.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+    expect(api.list.mock.calls).toHaveLength(1); // not reloaded: nothing changed
   });
 });

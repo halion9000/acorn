@@ -8,8 +8,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 
-import { inventoryApi, msspApi, type InventoryImportResult, type InventorySyncResult, type InventoryNucSyncResult, type InventoryItem, type InventoryKind, type InventoryQuery, type InventoryStatus } from '@/lib/api';
+import { apiErrorDetail, inventoryApi, msspApi, type InventoryImportResult, type InventorySyncResult, type InventoryNucSyncResult, type InventoryItem, type InventoryKind, type InventoryQuery, type InventoryStatus } from '@/lib/api';
 import { safeDistance } from '@/lib/safe-date';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export const STATUS_LABEL: Record<InventoryStatus, string> = { checked_in: 'Checked in', checked_out: 'Checked out', offline: 'Offline', retired: 'Retired' };
 const STATUS_STYLE: Record<InventoryStatus, string> = {
@@ -614,7 +615,41 @@ function SortHead({ label, field, sort, dir, onSort, className = 'px-3 py-2' }: 
   );
 }
 
-type Dialog = { type: 'add' } | { type: 'edit'; item: InventoryItem } | { type: 'out' | 'in'; item: InventoryItem } | { type: 'history'; item: InventoryItem } | { type: 'import' } | { type: 'bulk' } | { type: 'sync' } | { type: 'nucsync' } | null;
+/** Delete one item for good. Asks first, names the item and says its history goes with it; the server's refusal (checked out, kept in step with a tool) is shown as it is. */
+function DeleteItem({ item, onDone, onClose }: { item: InventoryItem; onDone: () => void; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const confirm = async () => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      await inventoryApi.remove(item.id);
+      onDone();
+    } catch (err) {
+      setProblem(apiErrorDetail(err) ?? 'The item could not be deleted. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <ConfirmDialog
+      open
+      title="Delete this item?"
+      message={
+        problem
+          ? problem
+          : `${item.name}${item.serial ? ` (serial ${item.serial})` : ''} is removed from the stock, and so is its history. This cannot be undone. It is written to the audit log.`
+      }
+      confirmLabel={problem ? 'Close' : 'Delete'}
+      destructive={!problem}
+      busy={busy}
+      onConfirm={() => (problem ? onClose() : void confirm())}
+      onCancel={onClose}
+    />
+  );
+}
+
+type Dialog = { type: 'add' } | { type: 'edit'; item: InventoryItem } | { type: 'out' | 'in'; item: InventoryItem } | { type: 'history'; item: InventoryItem } | { type: 'delete'; item: InventoryItem } | { type: 'import' } | { type: 'bulk' } | { type: 'sync' } | { type: 'nucsync' } | null;
 
 /** A link from the search box (/inventory?search=PC-1&kind=nuc&client=<id>) opens the page already showing that. Anything else in the address is ignored. */
 export function inventoryUrlState(params: { get(name: string): string | null } | null): { search: string; kind: InventoryKind; client: string } {
@@ -882,8 +917,11 @@ export function InventoryView() {
                   <button type="button" onClick={() => setDialog({ type: 'edit', item: i })} className="mr-2 text-gray-300 hover:underline">
                     Edit
                   </button>
-                  <button type="button" onClick={() => setDialog({ type: 'history', item: i })} className="text-gray-400 hover:underline">
+                  <button type="button" onClick={() => setDialog({ type: 'history', item: i })} className="mr-2 text-gray-400 hover:underline">
                     History
+                  </button>
+                  <button type="button" aria-label={`Delete ${i.name}`} onClick={() => setDialog({ type: 'delete', item: i })} className="text-red-300 hover:underline">
+                    Delete
                   </button>
                 </td>
               </tr>
@@ -920,6 +958,7 @@ export function InventoryView() {
       {dialog?.type === 'sync' && <SyncForm onDone={() => void mutate()} onClose={() => setDialog(null)} />}
       {dialog?.type === 'nucsync' && <NucSyncForm onDone={() => void mutate()} onClose={() => setDialog(null)} />}
       {dialog?.type === 'history' && <History item={dialog.item} onClose={() => setDialog(null)} />}
+      {dialog?.type === 'delete' && <DeleteItem item={dialog.item} onDone={changed} onClose={() => setDialog(null)} />}
       {dialog?.type === 'import' && <ImportForm kind={kind} clients={clients} onDone={() => void mutate()} onClose={() => setDialog(null)} />}
     </div>
   );
