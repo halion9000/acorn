@@ -10,6 +10,7 @@ import structlog
 
 from app.db.database import AsyncSessionLocal
 from app.db.rls_sessions import mark_platform
+from app.services import worker_heartbeat
 from app.services.alert_suppression import sweep
 
 logger = structlog.get_logger()
@@ -21,6 +22,7 @@ async def run_suppression_sweeper(
     *, sleep: Callable[[float], Any] = asyncio.sleep, session_factory: Callable[[], Any] = AsyncSessionLocal
 ) -> None:
     """The long-running loop (started under the scheduler lock from the API lifespan). A failed pass never ends it; cancellation does."""
+    worker_heartbeat.expect("alert_suppression", INTERVAL_SECONDS, first_turn_after_seconds=20)
     await sleep(20)
     while True:
         try:
@@ -29,8 +31,10 @@ async def run_suppression_sweeper(
                 done = await sweep(session)
                 if done["hidden"] or done["expired"]:
                     logger.info("alert_suppression.sweep", **done)
+            worker_heartbeat.beat("alert_suppression")
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
             logger.warning("alert_suppression.sweeper_error", error=str(exc))
+            worker_heartbeat.beat("alert_suppression", error=type(exc).__name__)
         await sleep(INTERVAL_SECONDS)

@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PlatformHealth, agoLabel } from './PlatformHealth';
+import { PlatformHealth, agoLabel, workerLabel } from './PlatformHealth';
 
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
@@ -272,3 +272,39 @@ describe('sign-in collection', () => {
     expect(screen.queryByTestId('signins-line')).not.toBeInTheDocument();
   });
 });
+
+describe('background workers', () => {
+  const withWorkers = (workers: unknown) => ({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ overall: 'ok', down: [], services: [{ service: 'fusion', status: 'up', latency_ms: 20, detail: '' }], runtime: { workers }, generated_at: '2026-11-03T02:00:00Z' }),
+  });
+  const w = (over: Record<string, unknown>) => ({ name: 'dmarc_ingest', interval_seconds: 1800, seconds_since_pass: 60, passes: 3, last_error: null, status: 'ok', ...over });
+
+  it('lists each worker with when it last ran, and a quiet one in red with what that means', async () => {
+    authFetch.mockResolvedValue(withWorkers([w({ name: 'retention', status: 'late', seconds_since_pass: 5400 }), w({ name: 'platform_watch', status: 'failing', last_error: 'TimeoutError' }), w({ name: 'alert_suppression', interval_seconds: 60 })]));
+    render(<PlatformHealth />);
+    const table = await screen.findByTestId('workers');
+    expect(table).toHaveTextContent('alert_suppression');
+    expect(screen.getByTestId('worker-retention')).toHaveTextContent('quiet for 90 min: something is wrong');
+    expect(screen.getByTestId('worker-retention')).toHaveClass('text-red-300');
+    expect(screen.getByTestId('worker-platform_watch')).toHaveTextContent('last pass failed (TimeoutError)');
+    expect(screen.getByTestId('worker-platform_watch')).toHaveClass('text-amber-300');
+    expect(screen.getByTestId('worker-alert_suppression')).toHaveTextContent('running');
+  });
+
+  it('says nothing when the server sends no workers, and an older server is not an error', async () => {
+    authFetch.mockResolvedValue(withWorkers(undefined));
+    render(<PlatformHealth />);
+    await waitFor(() => expect(screen.getByTestId('overall')).toBeInTheDocument());
+    expect(screen.queryByTestId('workers')).not.toBeInTheDocument();
+  });
+
+  it('words each state plainly, including a worker that never ran', () => {
+    expect(workerLabel({ status: 'late', seconds_since_pass: null, last_error: null })).toBe('never ran: something is wrong');
+    expect(workerLabel({ status: 'waiting', seconds_since_pass: null, last_error: null })).toBe('waiting for its first turn');
+    expect(workerLabel({ status: 'failing', seconds_since_pass: 5, last_error: null })).toBe('last pass failed');
+    expect(workerLabel({ status: 'ok', seconds_since_pass: 5, last_error: null })).toBe('running');
+  });
+});
+

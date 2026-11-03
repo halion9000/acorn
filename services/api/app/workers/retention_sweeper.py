@@ -38,6 +38,7 @@ from app.models.copilot_conversation import CopilotConversation
 from app.models.data_lifecycle import RetentionPolicyRow
 from app.models.detection_suggestion import DetectionSuggestion
 from app.models.signin import ClientCheckHistory, ClientLicenseHistory, ClientScoreHistory
+from app.services import worker_heartbeat
 from app.services.retention import TERMINAL_ACTION_STATUSES, clamp_days
 
 logger = structlog.get_logger()
@@ -241,12 +242,15 @@ async def run_retention_sweeper(
     session_factory: Callable[[], AsyncSession] = AsyncSessionLocal,
 ) -> None:
     """The long-running loop (started under the scheduler lock from the API lifespan). The first sweep waits RETENTION_INITIAL_DELAY_SECONDS; a failure never ends the loop; cancellation does."""
+    worker_heartbeat.expect("retention", max(60, settings.RETENTION_SWEEP_INTERVAL_SECONDS), first_turn_after_seconds=max(0, settings.RETENTION_INITIAL_DELAY_SECONDS))
     await sleep(max(0, settings.RETENTION_INITIAL_DELAY_SECONDS))
     while True:
         try:
             await sweep_once(session_factory, settings=settings)
+            worker_heartbeat.beat("retention")
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
             logger.warning("retention.sweeper_error", error=str(exc))
+            worker_heartbeat.beat("retention", error=type(exc).__name__)
         await sleep(max(60, settings.RETENTION_SWEEP_INTERVAL_SECONDS))

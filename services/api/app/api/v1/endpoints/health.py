@@ -89,6 +89,7 @@ from app.models.alert import Alert
 from app.models.connector import Connector
 from app.services.connector_freshness import compute_freshness
 from app.services.llm_health import llm_status
+from app.services import worker_heartbeat
 from app.services.runtime_stats import feed_receipts, loop_lag, slow_routes
 
 logger = logging.getLogger(__name__)
@@ -975,6 +976,7 @@ def platform_warnings(
     old_creds: list[dict[str, Any]] | None = None,
     alerts_kept_forever: bool = False,
     llm: dict[str, Any] | None = None,
+    workers: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, str]]:
     """Plain-language problems worth a person's attention, worst first, built only from what the page already knows (pure; unit-tested)."""
     out: list[dict[str, str]] = []
@@ -988,6 +990,14 @@ def platform_warnings(
                 "text": f"{len(pending)} database migration(s) not applied ({pending[0]}...): rebuild or restart the API",
             }
         )
+    quiet = [w for w in workers or [] if w["status"] == "late"]
+    failing_workers = [w for w in workers or [] if w["status"] == "failing"]
+    if quiet:
+        names = ", ".join(f"{w['name']} ({'never ran' if w['seconds_since_pass'] is None else str(w['seconds_since_pass'] // 60) + ' minutes since its last pass'})" for w in quiet)
+        out.append({"key": "workers_quiet", "level": "error", "text": f"Background work has gone quiet: {names}. What it does (reading the DMARC mailbox, sweeping hidden alerts, retention) is not happening; restart the API if it stays so"})
+    if failing_workers:
+        names = ", ".join(f"{w['name']} ({w['last_error'] or 'error'})" for w in failing_workers)
+        out.append({"key": "workers_failing", "level": "warn", "text": f"Background work is running but its last pass failed: {names}"})
     if core_feed and core_feed.get("silent"):
         out.append(
             {
@@ -1118,6 +1128,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
     disk = disk_row()
     pending = await pending_migrations(db)
     loop = loop_lag(time.time())
+    workers = worker_heartbeat.snapshot()
     failing = await _failing_connectors_or_none(db, user)
     secret = secret_expiry_row(settings.MICROSOFT_CLIENT_SECRET_EXPIRES, datetime.now(UTC).date())
     old_creds = await _old_credentials_or_none(db, user)
@@ -1131,7 +1142,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
         "signins": signins,
         "disk": disk,
         "pending_migrations": pending or [],
-        "runtime": {"loop": loop, "slow_routes": slow_routes()},
+        "runtime": {"loop": loop, "slow_routes": slow_routes(), "workers": workers},
         "feed_routes": feed_receipts(),
         "warnings": platform_warnings(
             down=down,
@@ -1146,6 +1157,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
             old_creds=old_creds,
             alerts_kept_forever=settings.RETENTION_ALERTS_DAYS <= 0 and not settings.RETENTION_ALERTS_KEEP_FOREVER_OK,
             llm=llm_status(),
+            workers=workers,
         ),
         "old_credentials": old_creds or [],
         "microsoft_secret": secret,

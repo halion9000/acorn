@@ -15,6 +15,7 @@ import structlog
 
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
+from app.services import worker_heartbeat
 from app.services.dmarc_mailbox import GraphMailboxReader, ingest_once
 from app.services.dmarc_store import store_report, store_tls_policy
 
@@ -43,17 +44,21 @@ def owner_id() -> uuid.UUID | None:
 
 
 async def run_dmarc_ingest(*, sleep: Callable[[float], Any] = asyncio.sleep) -> None:
+    worker_heartbeat.expect("dmarc_ingest", max(300, settings.DMARC_INTERVAL_SECONDS), first_turn_after_seconds=120)
     await sleep(120)
     while True:
         try:
             owner, reader = owner_id(), make_reader()
             if owner is None or not reader.configured:
                 logger.info("dmarc_ingest.not_set_up")
+                worker_heartbeat.beat("dmarc_ingest")  # not being set up is not a fault: the worker is alive and has nothing to read
             else:
                 result = await ingest_once(AsyncSessionLocal, reader, owner, store=store_report, store_tls=store_tls_policy)
                 logger.info("dmarc_ingest.pass", stored=result.stored, tls_stored=result.tls_stored, duplicates=result.duplicates, rejected=result.rejected, messages=result.messages, error=result.error)
+                worker_heartbeat.beat("dmarc_ingest", error="mailbox_read_failed" if result.error else None)
         except asyncio.CancelledError:
             raise
-        except Exception:  # noqa: BLE001  # the reader must outlive a bad pass
+        except Exception as exc:  # noqa: BLE001  # the reader must outlive a bad pass
             logger.exception("dmarc_ingest.pass_failed")
+            worker_heartbeat.beat("dmarc_ingest", error=type(exc).__name__)
         await sleep(max(300, settings.DMARC_INTERVAL_SECONDS))

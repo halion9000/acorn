@@ -61,6 +61,23 @@ interface SlowRoute {
   worst_seconds: number;
 }
 
+interface WorkerRow {
+  name: string;
+  interval_seconds: number;
+  seconds_since_pass: number | null;
+  passes: number;
+  last_error: string | null;
+  status: "ok" | "failing" | "waiting" | "late";
+}
+
+/** What a worker's status reads as on the page, in plain words. */
+export function workerLabel(w: Pick<WorkerRow, "status" | "seconds_since_pass" | "last_error">): string {
+  if (w.status === "late") return w.seconds_since_pass === null ? "never ran: something is wrong" : `quiet for ${Math.floor(w.seconds_since_pass / 60)} min: something is wrong`;
+  if (w.status === "failing") return `last pass failed${w.last_error ? ` (${w.last_error})` : ""}`;
+  if (w.status === "waiting") return "waiting for its first turn";
+  return "running";
+}
+
 interface FeedRoute {
   route: string;
   last_ok_minutes_ago: number | null;
@@ -80,7 +97,7 @@ interface Snapshot {
   warnings?: { key: string; level: "error" | "warn"; text: string }[];
   database?: DatabaseSecurity;
   feed_routes?: { since_minutes_ago: number; routes: FeedRoute[] };
-  runtime?: { loop?: { samples: number; max_seconds?: number; typical_seconds?: number; window_seconds: number }; slow_routes?: SlowRoute[] };
+  runtime?: { loop?: { samples: number; max_seconds?: number; typical_seconds?: number; window_seconds: number }; slow_routes?: SlowRoute[]; workers?: WorkerRow[] };
   generated_at: string;
 }
 
@@ -164,6 +181,33 @@ export function PlatformHealth() {
                     <td>{r.typical_seconds}</td>
                     <td>{r.p95_seconds}</td>
                     <td>{r.worst_seconds}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {(snapshot.runtime?.workers ?? []).length > 0 && (
+            <table data-testid="workers" className="w-full text-left text-xs text-slate-300">
+              <caption className="pb-1 text-left text-sm text-slate-400">Background work since the API started (the worst is first)</caption>
+              <thead>
+                <tr className="text-slate-500">
+                  <th scope="col">Worker</th>
+                  <th scope="col">Runs every</th>
+                  <th scope="col">Last pass</th>
+                  <th scope="col">Passes</th>
+                  <th scope="col">State</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(snapshot.runtime?.workers ?? []).map((w) => (
+                  <tr key={w.name}>
+                    <td className="font-mono">{w.name}</td>
+                    <td>{Math.round(w.interval_seconds / 60) || 1} min</td>
+                    <td>{w.seconds_since_pass === null ? "none yet" : `${Math.floor(w.seconds_since_pass / 60)} min ago`}</td>
+                    <td>{w.passes}</td>
+                    <td data-testid={`worker-${w.name}`} className={w.status === "ok" || w.status === "waiting" ? "text-slate-300" : w.status === "failing" ? "text-amber-300" : "text-red-300"}>
+                      {workerLabel(w)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

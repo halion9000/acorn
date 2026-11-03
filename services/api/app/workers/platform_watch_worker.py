@@ -22,6 +22,7 @@ from app.db.database import AsyncSessionLocal
 from app.db.rls_sessions import mark_platform
 from app.models.connector import Connector
 from app.models.tenant import Tenant
+from app.services import worker_heartbeat
 from app.services.alert_email.graph import GraphMailer, MailError
 from app.services.alert_email.settings_store import get_settings
 from app.services.llm_health import llm_status
@@ -131,13 +132,16 @@ class Watch:
 
 async def run_platform_watch(*, sleep: Callable[[float], Any] = asyncio.sleep) -> None:
     """The long-running loop (started under the scheduler lock from the API lifespan). A failed cycle never ends it; cancellation does."""
+    worker_heartbeat.expect("platform_watch", INTERVAL_SECONDS, first_turn_after_seconds=60)
     await sleep(60)
     watch = Watch()
     while True:
         try:
             await watch.step()
+            worker_heartbeat.beat("platform_watch")
         except asyncio.CancelledError:
             raise
-        except Exception:  # noqa: BLE001  # the watcher must outlive a bad cycle
+        except Exception as exc:  # noqa: BLE001  # the watcher must outlive a bad cycle
             logger.exception("platform_watch.cycle_failed")
+            worker_heartbeat.beat("platform_watch", error=type(exc).__name__)
         await sleep(INTERVAL_SECONDS)
