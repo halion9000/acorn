@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.models.alert import Alert
@@ -21,6 +22,10 @@ from app.models.tenant import Tenant
 from app.services.alert_scope import alert_scope
 from app.services.alert_suppression import (
     MAX_DAYS,
+    SUGGEST_AFTER,
+    SUGGEST_WINDOW_DAYS,
+    _type_filter,
+    should_suggest_hiding,
     MAX_WINDOW_HOURS,
     WINDOW_SIGNATURE,
     SUPPRESSED,
@@ -180,6 +185,56 @@ async def start_maintenance(body: MaintenanceIn, user: AuthUser, db: DBSession) 
     hidden = await apply_rule(db, rule, user.tenant_id) if starts <= now else 0
     await db.commit()
     return _out(rule, now, kids, hidden)
+
+
+class HideSuggestion(BaseModel):
+    suggest: bool
+    false_positives: int  # how many alerts of this type were closed as false positive for this client in the last SUGGEST_WINDOW_DAYS days
+    threshold: int = SUGGEST_AFTER
+    days: int = SUGGEST_WINDOW_DAYS
+
+
+@router.get(
+    "/suggestion",
+    response_model=HideSuggestion,
+    dependencies=[Depends(require_permission("alerts:read"))],
+    summary="Whether hiding this alert's type is worth suggesting (it was closed as a false positive several times)",
+)
+async def hide_suggestion(alert_id: uuid.UUID, user: AuthUser, db: DBSession) -> HideSuggestion:
+    """Counts the alerts of the same type, for the same client, closed as a false positive in the last 90 days. Three or more, and no rule hiding the type already, is worth suggesting. It suggests; it hides nothing."""
+    now = datetime.now(UTC)
+    async with alert_scope(db, user.tenant_id, alert_id) as tid:
+        alert = (await db.execute(select(Alert).where(Alert.id == alert_id, Alert.tenant_id == tid))).scalar_one_or_none()
+        if alert is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+        signature = signature_of(alert.rule_id, alert.title)
+        count = (
+            await db.execute(
+                select(func.count())
+                .select_from(Alert)
+                .where(
+                    Alert.tenant_id == tid,
+                    or_(Alert.status == "false_positive", Alert.disposition == "false_positive"),  # a single close sets the status, a bulk close also the verdict
+                    Alert.resolved_at >= now - timedelta(days=SUGGEST_WINDOW_DAYS),
+                    _type_filter(SimpleNamespace(signature=signature)),
+                )
+            )
+        ).scalar_one()
+    hiding = (
+        await db.execute(
+            select(func.count())
+            .select_from(AlertSuppression)
+            .where(
+                AlertSuppression.signature == signature,
+                AlertSuppression.revoked_at.is_(None),
+                or_(AlertSuppression.expires_at.is_(None), AlertSuppression.expires_at > now),
+                or_(AlertSuppression.starts_at.is_(None), AlertSuppression.starts_at <= now),
+                or_(AlertSuppression.scope == "all", AlertSuppression.client_tenant_id == tid),
+                AlertSuppression.tenant_id == user.tenant_id,
+            )
+        )
+    ).scalar_one()
+    return HideSuggestion(suggest=should_suggest_hiding(int(count), int(hiding) > 0), false_positives=int(count))
 
 
 @router.get("", response_model=list[SuppressionOut], dependencies=[Depends(require_permission("alerts:read"))])

@@ -63,6 +63,15 @@ def expiry_from_days(days: int | None, now: datetime) -> datetime | None:
     return now + timedelta(days=days)
 
 
+SUGGEST_AFTER = 3  # false-positive closes of one alert type, for one client, that make hiding it worth suggesting
+SUGGEST_WINDOW_DAYS = 90
+
+
+def should_suggest_hiding(false_positives: int, already_hidden: bool) -> bool:
+    """Suggest hiding an alert type once people have closed it as a false positive SUGGEST_AFTER times lately, unless a rule already hides it."""
+    return false_positives >= SUGGEST_AFTER and not already_hidden
+
+
 def is_window(rule: Any) -> bool:
     return rule.signature == WINDOW_SIGNATURE
 

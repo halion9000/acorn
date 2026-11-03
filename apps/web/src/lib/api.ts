@@ -1747,6 +1747,14 @@ export interface AlertSuppression {
   hidden_alerts: number | null;
 }
 
+/** Whether hiding an alert's type is worth suggesting: it was closed as a false positive several times lately and nothing hides it yet. */
+export interface HideSuggestion {
+  suggest: boolean;
+  false_positives: number;
+  threshold: number;
+  days: number;
+}
+
 export const alertsApi = {
   /** Hide this alert's type for a device, its client or all clients, for ``days`` days or (null) without end. */
   hideType: (body: { alertId: string; scope: 'device' | 'client' | 'all'; days: number | null; device?: string }) =>
@@ -1762,6 +1770,8 @@ export const alertsApi = {
       method: 'POST',
       body: JSON.stringify({ client_id: body.clientId, hours: body.hours, starts_at: body.startsAt, reason: body.reason }),
     }),
+  /** Whether to suggest hiding this alert's type (only counts; hides nothing). */
+  hideSuggestion: (alertId: string) => request<HideSuggestion>('/api/v1/alert-suppressions/suggestion', { params: { alert_id: alertId } }),
   /** Stop hiding an alert type: its alerts come back as they were. */
   liftSuppression: (id: string) => request<AlertSuppression>(`/api/v1/alert-suppressions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   /** Enter one alert by hand (the same endpoint `aisoc submit` uses). */

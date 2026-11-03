@@ -27,6 +27,7 @@ import { ContextualActions } from '@/components/copilot/ContextualActions';
 import { ExplainDrawer } from '@/components/alerts/ExplainDrawer';
 import { CreateCaseModal } from '@/components/alerts/CreateCaseModal';
 import { HideAlertTypeModal } from '@/components/alerts/HideAlertTypeModal';
+import { HideSuggestionBanner } from '@/components/alerts/HideSuggestionBanner';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -891,6 +892,8 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
           </button>
         </div>
       </div>
+
+      <HideSuggestionBanner alertId={alertId} status={alert.status} onHide={() => setHideOpen(true)} />
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-gray-800">
