@@ -274,3 +274,35 @@ def test_the_extras_step_comes_after_the_services_start_and_never_fails_the_upda
     assert script.index("$COMPOSE up -d") < script.index("\n  start_extras\n") < script.index("migrate && healthy")
     body = script[script.index("start_extras() {") : script.index("deploy() {")]
     assert body.rstrip().endswith("}") and "return 0" in body.rsplit("}", 1)[0].splitlines()[-1] + "\n  return 0"
+
+
+def test_the_running_version_is_the_commit_the_update_set_and_how_long_the_process_has_been_up(monkeypatch):
+    from app.api.v1.endpoints import health
+
+    monkeypatch.setenv("ACORN_COMMIT", " 97659064 ")
+    v = health.running_version(now=health._STARTED_AT + 3725)
+    assert v == {"commit": "97659064", "up_seconds": 3725}
+
+
+def test_a_commit_that_was_never_set_is_none_not_a_made_up_value(monkeypatch):
+    from app.api.v1.endpoints import health
+
+    for value in (None, "", "   ", "unknown", "UNKNOWN"):
+        if value is None:
+            monkeypatch.delenv("ACORN_COMMIT", raising=False)
+        else:
+            monkeypatch.setenv("ACORN_COMMIT", value)
+        assert health.running_version()["commit"] is None, value
+
+
+def test_the_update_script_hands_the_commit_to_compose_and_compose_hands_it_to_the_api_container():
+    script = SCRIPT.read_text(encoding="utf-8")
+    deploy = script[script.index("deploy() {") :]
+    assert deploy.index("ACORN_COMMIT=$(git") < deploy.index("export ACORN_COMMIT") < deploy.index("$COMPOSE build")
+    import re
+
+    compose = (SCRIPT.parents[2] / "docker-compose.yml").read_text(encoding="utf-8")
+    at = compose.index("ACORN_COMMIT: ${ACORN_COMMIT:-}")
+    owner = re.findall(r"^  ([a-z][a-z0-9-]*):\s*$", compose[:at], flags=re.M)[-1]
+    assert owner == "api", f"the commit is handed to {owner}, not the API"
+    assert compose.count("ACORN_COMMIT: ${ACORN_COMMIT:-}") == 1

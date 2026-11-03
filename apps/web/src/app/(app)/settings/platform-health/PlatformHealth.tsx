@@ -70,6 +70,13 @@ interface WorkerRow {
   status: "ok" | "failing" | "waiting" | "late";
 }
 
+/** "Running version abc1234, up 2 h": which commit the API is, and for how long. Says plainly when it does not know the commit. */
+export function runningLabel(v: { commit: string | null; up_seconds: number }): string {
+  const s = v.up_seconds;
+  const up = s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 172_800 ? `${(s / 3600).toFixed(1).replace(/\.0$/, "")} h` : `${Math.round(s / 86_400)} days`;
+  return v.commit ? `Running version ${v.commit}, up ${up}.` : `Running version unknown (started by hand, not by the update), up ${up}.`;
+}
+
 /** What a worker's status reads as on the page, in plain words. */
 export function workerLabel(w: Pick<WorkerRow, "status" | "seconds_since_pass" | "last_error">): string {
   if (w.status === "late") return w.seconds_since_pass === null ? "never ran: something is wrong" : `quiet for ${Math.floor(w.seconds_since_pass / 60)} min: something is wrong`;
@@ -97,7 +104,7 @@ interface Snapshot {
   warnings?: { key: string; level: "error" | "warn"; text: string }[];
   database?: DatabaseSecurity;
   feed_routes?: { since_minutes_ago: number; routes: FeedRoute[] };
-  runtime?: { loop?: { samples: number; max_seconds?: number; typical_seconds?: number; window_seconds: number }; slow_routes?: SlowRoute[]; workers?: WorkerRow[] };
+  runtime?: { version?: { commit: string | null; up_seconds: number }; loop?: { samples: number; max_seconds?: number; typical_seconds?: number; window_seconds: number }; slow_routes?: SlowRoute[]; workers?: WorkerRow[] };
   generated_at: string;
 }
 
@@ -152,6 +159,11 @@ export function PlatformHealth() {
             <p role="note" data-testid="pool-warning" className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
               The database connection pool is {snapshot.database.pool.percent}% full ({snapshot.database.pool.in_use} of {snapshot.database.pool.limit} in use). When it is full, pages start failing with 500
               errors until requests finish.
+            </p>
+          )}
+          {snapshot.runtime?.version && (
+            <p data-testid="running-version" className="text-sm text-slate-400">
+              {runningLabel(snapshot.runtime.version)}
             </p>
           )}
           {snapshot.runtime?.loop && snapshot.runtime.loop.samples > 0 && (

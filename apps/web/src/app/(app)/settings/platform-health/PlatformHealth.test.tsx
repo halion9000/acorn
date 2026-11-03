@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PlatformHealth, agoLabel, workerLabel } from './PlatformHealth';
+import { PlatformHealth, agoLabel, runningLabel, workerLabel } from './PlatformHealth';
 
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
@@ -308,3 +308,17 @@ describe('background workers', () => {
   });
 });
 
+
+
+describe('the running version line', () => {
+  it('says which commit is running and for how long, in plain units', () => {
+    expect(runningLabel({ commit: '97659064', up_seconds: 40 })).toBe('Running version 97659064, up 40 s.');
+    expect(runningLabel({ commit: '97659064', up_seconds: 20 * 60 })).toBe('Running version 97659064, up 20 min.');
+    expect(runningLabel({ commit: '97659064', up_seconds: 3 * 3600 })).toBe('Running version 97659064, up 3 h.');
+    expect(runningLabel({ commit: '97659064', up_seconds: 3 * 86_400 })).toBe('Running version 97659064, up 3 days.');
+  });
+
+  it('says plainly that it does not know the commit when the API was not started by the update', () => {
+    expect(runningLabel({ commit: null, up_seconds: 120 })).toBe('Running version unknown (started by hand, not by the update), up 2 min.');
+  });
+});

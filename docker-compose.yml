@@ -286,6 +286,8 @@ services:
       AISOC_INGEST_SERVICE_TOKEN: ${AISOC_INGEST_SERVICE_TOKEN:-}
       # Authenticated gateways to the honeytokens and purple-team services (both in the `extras` profile). Ports are the
       # services' real listening ports (their Dockerfiles).
+      # The commit this container was started from (the update script sets it); the health page shows it. Unset when started by hand.
+      ACORN_COMMIT: ${ACORN_COMMIT:-}
       HONEYTOKENS_SERVICE_URL: http://honeytokens:8005
       AISOC_HONEYTOKENS_SERVICE_TOKEN: ${AISOC_HONEYTOKENS_SERVICE_TOKEN:-}
       PURPLE_TEAM_SERVICE_URL: http://purple-team:8006

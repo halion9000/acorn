@@ -136,6 +136,9 @@ start_extras() {
 }
 
 deploy() {  # build and start whatever is checked out now
+  # The version being started, handed to the API container (compose reads it as ACORN_COMMIT) so the health page can say what is running.
+  ACORN_COMMIT=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo unknown)
+  export ACORN_COMMIT
   ensure_ingest_dsn || return 1
   ensure_plain_database_url
   # Every build leaves layers behind in containerd's store on the VM's main disk (about 3 GB a build). Keep 10 GB of cache for speed, drop the rest, and stop with a clear

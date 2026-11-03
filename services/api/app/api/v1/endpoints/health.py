@@ -593,6 +593,19 @@ _SERVICE_PROBES: dict[str, str] = {
 }
 
 
+_STARTED_AT = time.time()
+
+
+def running_version(now: float | None = None) -> dict[str, Any]:
+    """What this API process is: the commit it was started from (``ACORN_COMMIT``, set by the update script; None when started by hand) and how long it has been up."""
+    import os
+
+    commit = (os.environ.get("ACORN_COMMIT") or "").strip()
+    if commit.lower() in ("", "unknown"):
+        commit = ""
+    return {"commit": commit or None, "up_seconds": int((now if now is not None else time.time()) - _STARTED_AT)}
+
+
 def optional_services() -> set[str]:
     """Services that are allowed to be absent: one that is not running at all is reported as "off" (not switched on here), not as down. ``AISOC_OPTIONAL_SERVICES`` (comma separated) sets the list; the default is
     purple-team, which only does anything alongside a test lab and is not started on this deployment. An empty value makes none optional. A service that is running but unwell is down whatever this says."""
@@ -1159,7 +1172,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
         "signins": signins,
         "disk": disk,
         "pending_migrations": pending or [],
-        "runtime": {"loop": loop, "slow_routes": slow_routes(), "workers": workers},
+        "runtime": {"loop": loop, "slow_routes": slow_routes(), "workers": workers, "version": running_version()},
         "feed_routes": feed_receipts(),
         "warnings": platform_warnings(
             down=down,
