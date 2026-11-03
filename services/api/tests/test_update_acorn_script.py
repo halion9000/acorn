@@ -169,7 +169,8 @@ def test_the_azure_honeytoken_service_gets_a_public_canary_address_not_localhost
     )
     compose = yaml.load((SCRIPT.parent / "docker-compose.azure.yml").read_text(), Loader=Loader)  # noqa: S506 - SafeLoader subclass
     value = compose["services"]["honeytokens"]["environment"]["HONEYTOKEN_CANARY_BASE_URL"]
-    assert value == "${ACORN_PUBLIC_URL:-https://acorn.goliveoak.com}"
+    # The public tripwire address (ACORN_CANARY_URL) wins when it is set; otherwise the console address, never localhost.
+    assert value == "${ACORN_CANARY_URL:-${ACORN_PUBLIC_URL:-https://acorn.goliveoak.com}}"
     assert "localhost" not in value
 
 
@@ -204,6 +205,7 @@ def _handles(text: str) -> dict[str, str]:
     import re
 
     out: dict[str, str] = {}
+    text = text.split("\n:8088 {")[0]  # the console's site only; the tripwire listener has its own test
     for m in re.finditer(r"^\thandle\s*(@\w+)?\s*\{(.*?)^\t\}", text, flags=re.S | re.M):
         target = re.search(r"reverse_proxy\s+(\S+)", m.group(2))
         out[m.group(1) or ""] = target.group(1) if target else ""
@@ -306,3 +308,33 @@ def test_the_update_script_hands_the_commit_to_compose_and_compose_hands_it_to_t
     owner = re.findall(r"^  ([a-z][a-z0-9-]*):\s*$", compose[:at], flags=re.M)[-1]
     assert owner == "api", f"the commit is handed to {owner}, not the API"
     assert compose.count("ACORN_COMMIT: ${ACORN_COMMIT:-}") == 1
+
+
+def test_the_public_tripwire_listener_serves_only_the_canary_path_and_the_tunnel_token_is_never_in_git():
+    import re
+
+    import yaml
+
+    text = CADDYFILE.read_text(encoding="utf-8")
+    block = text[text.index("\n:8088 {") :]
+    assert re.search(r"path_regexp\s+canary\s+\^/api/v1/canary/\[0-9a-fA-F-\]\{36\}\$", block), "the tripwire matcher is no longer an exact id path"
+    assert 'respond "Not found" 404' in block, "everything but the tripwire path must be a 404"
+    assert "web:3000" not in block and "realtime:4000" not in block, "the public name must not reach the console or the realtime service"
+    assert "header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}" in block, "the visitor address must come from Cloudflare, not from the visitor"
+
+    class Loader(yaml.SafeLoader):
+        pass
+
+    Loader.add_multi_constructor(
+        "!",
+        lambda loader, suffix, node: loader.construct_sequence(node)
+        if isinstance(node, yaml.SequenceNode)
+        else loader.construct_mapping(node)
+        if isinstance(node, yaml.MappingNode)
+        else loader.construct_scalar(node),
+    )
+    compose = yaml.load((SCRIPT.parent / "docker-compose.azure.yml").read_text(), Loader=Loader)  # noqa: S506 - SafeLoader subclass
+    svc = compose["services"]["cloudflared"]
+    assert svc["profiles"] == ["extras"], "the tunnel must not start unless the owner lists it"
+    assert svc["environment"]["TUNNEL_TOKEN"] == "${CLOUDFLARED_TUNNEL_TOKEN:-}", "the token must come from .env, never be written in the file"
+    assert "ports" not in svc, "the tunnel connects out; nothing is published"
