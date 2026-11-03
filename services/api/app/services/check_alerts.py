@@ -99,6 +99,11 @@ def build_alert(tenant_id: uuid.UUID, source: str, spec: dict[str, Any], now: da
 
 async def raise_alerts(db: Any, tenant_id: uuid.UUID, source: str, changes: list[dict[str, Any]], now: datetime) -> int:
     """Add the alerts a report's changes call for to ``db`` (the caller commits), skipping one that already exists for the same check, day and status. Returns how many were added."""
+    from app.models.tenant import Tenant  # noqa: PLC0415
+    from app.services.tool_exclusions import check_is_excluded, of_settings  # noqa: PLC0415
+
+    if check_is_excluded(source, of_settings((await db.execute(select(Tenant.settings).where(Tenant.id == tenant_id))).scalar_one_or_none())):
+        return 0  # the client does not use this tool: its checks raise nothing
     specs = alerts_for_changes(changes, source, now)
     added = 0
     for spec in specs:

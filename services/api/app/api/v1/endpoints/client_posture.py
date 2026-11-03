@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, bindparam, delete, func, not_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -38,7 +38,7 @@ from app.models.signin import (
     IdentityMfaUser,
 )
 from app.models.tenant import Tenant
-from app.services import fleet_cache
+from app.services import fleet_cache, tool_exclusions
 from app.services.check_alerts import raises_alert
 from app.services.audit import emit_audit
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
@@ -206,7 +206,8 @@ async def _comment_counts(db: Any, client_id: uuid.UUID) -> dict[str, int]:
 async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, aliases: list[Any]) -> dict[str, ToolChecksOut]:
     """The checks each tool sent for this client. Only tools the client is mapped to are read (none at all, no query, for a client mapped to none of them); a tool that sent nothing is left out."""
     mapped = {v for v, _, _ in aliases}
-    sources = [source for source, vendor in TOOL_CHECK_SOURCES.items() if vendor in mapped]
+    excluded = await _excluded_for(db, client_id)
+    sources = [source for source, vendor in TOOL_CHECK_SOURCES.items() if vendor in mapped and vendor not in excluded]
     if not sources:
         return {}
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
@@ -393,6 +394,74 @@ class CheckHistoryRow(BaseModel):
 class CheckHistoryOut(BaseModel):
     client_id: uuid.UUID
     rows: list[CheckHistoryRow]
+
+
+async def _excluded_for(db: Any, client_id: uuid.UUID) -> frozenset[str]:
+    """The tools a client does not use (see ``tool_exclusions``)."""
+    tenant = await db.get(Tenant, client_id)
+    return tool_exclusions.of_settings(getattr(tenant, "settings", None))
+
+
+class ToolExclusionsIn(BaseModel):
+    tools: list[str] = Field(default_factory=list, max_length=20)
+
+
+class ToolExclusionsOut(BaseModel):
+    tools: list[str]
+    choices: list[str]
+
+
+@router.get("/{client_id}/tool-exclusions", response_model=ToolExclusionsOut, summary="The tools this client does not use, which are never reported as missing for it")
+async def get_tool_exclusions(
+    client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
+) -> ToolExclusionsOut:
+    await _client_of_owner(db, current_user.tenant_id, client_id)
+    return ToolExclusionsOut(tools=sorted(await _excluded_for(db, client_id)), choices=list(tool_exclusions.EXCLUDABLE))
+
+
+@router.put(
+    "/{client_id}/tool-exclusions",
+    response_model=ToolExclusionsOut,
+    summary="Choose the tools this client does not use: they are no longer reported as missing on Devices, the posture pages or the score, and raise no alerts",
+)
+async def put_tool_exclusions(
+    client_id: uuid.UUID,
+    body: ToolExclusionsIn,
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))],
+    db: DBSession,
+    request: Request = None,  # type: ignore[assignment]
+) -> ToolExclusionsOut:
+    owner = current_user.tenant_id
+    if client_id == owner:
+        raise HTTPException(status_code=422, detail="Tool exclusions are set per client, not for the managing company")
+    await _client_of_owner(db, owner, client_id)
+    try:
+        chosen = tool_exclusions.normalize(body.tools)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"{exc} is not a tool that can be excluded") from None
+    tenant = await db.get(Tenant, client_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    before = sorted(tool_exclusions.of_settings(tenant.settings))
+    tenant.settings = tool_exclusions.with_exclusions(tenant.settings, chosen)
+    await db.commit()
+    if before != chosen:
+        await emit_audit(
+            db=db,
+            tenant_id=owner,
+            actor_id=current_user.user_id,
+            action="posture:tool_exclusions_changed",
+            resource="client",
+            resource_id=str(client_id),
+            changes={"client": str(client_id), "before": before, "after": chosen},
+            request=request,
+        )
+        await db.commit()
+    from app.api.v1.endpoints.devices import forget_loaded  # noqa: PLC0415
+
+    forget_loaded()
+    fleet_cache.clear()
+    return ToolExclusionsOut(tools=chosen, choices=list(tool_exclusions.EXCLUDABLE))
 
 
 async def _client_of_owner(db: Any, owner: uuid.UUID, client_id: uuid.UUID) -> None:
@@ -987,6 +1056,7 @@ async def _read_fleet_checks(
 ) -> tuple[list[FleetCheck], dict[uuid.UUID, str], dict[uuid.UUID, dict[str, datetime]]]:
     _ids, clients = await _scope(db, owner, None)
     shown, names = _ids[1:], clients
+    settings_of = {r.id: r.settings for r in (await db.execute(select(Tenant.id, Tenant.settings).where(Tenant.parent_tenant_id == owner))).all()}
     sources = list(TOOL_CHECK_SOURCES)
     now = datetime.now(UTC)
     out: list[FleetCheck] = []
@@ -998,6 +1068,8 @@ async def _read_fleet_checks(
                 .scalars()
                 .all()
             )
+            excluded = tool_exclusions.of_settings(settings_of.get(cid))
+            rows = [r for r in rows if not tool_exclusions.check_is_excluded(r.source, excluded)]
             if not rows:
                 continue
             since = dict(

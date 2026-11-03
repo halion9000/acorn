@@ -155,3 +155,36 @@ describe('toolCheckEntries', () => {
     expect(toolCheckEntries(undefined)).toEqual([]);
   });
 });
+
+describe('tools the client does not use', () => {
+  const choices = ['addigy', 'fieldeffect', 'huntress', 'screenconnect'];
+  function serveWith(excluded: string[]) {
+    authFetch.mockImplementation((url?: string, init?: { method?: string }) => {
+      const u = url ?? '';
+      if (u.includes('/mssp/children')) return Promise.resolve(reply([{ id: 'c1', name: 'Acme Dental' }]));
+      if (u.endsWith('/tool-exclusions')) return Promise.resolve(reply({ tools: excluded, choices }));
+      return Promise.resolve(reply(posture()));
+    });
+  }
+
+  it('replaces the not-in-Huntress count with Not used, and no link, once Huntress is excluded for the client', async () => {
+    serveWith(['huntress']);
+    render(<ClientPosture />);
+    await screen.findByRole('option', { name: 'Acme Dental' });
+    await userEvent.selectOptions(screen.getByLabelText('Client'), 'c1');
+    const page = await screen.findByTestId('posture');
+    expect(await within(page).findByText('Not used')).toBeInTheDocument();
+    expect(within(page).queryByRole('link', { name: /Not in Huntress/ })).toBeNull();
+  });
+
+  it('still shows and links the count for a client that uses Huntress', async () => {
+    serveWith(['screenconnect']);
+    render(<ClientPosture />);
+    await screen.findByRole('option', { name: 'Acme Dental' });
+    await userEvent.selectOptions(screen.getByLabelText('Client'), 'c1');
+    const page = await screen.findByTestId('posture');
+    await within(page).findByLabelText('Huntress');
+    expect(within(page).getByRole('link', { name: /Not in Huntress: 2/ })).toHaveAttribute('href', '/devices?client=c1&missing=huntress');
+    expect(within(page).queryByText('Not used')).toBeNull();
+  });
+});

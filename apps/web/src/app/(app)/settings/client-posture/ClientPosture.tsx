@@ -15,6 +15,7 @@ import { DomainChecks } from "./DomainChecks";
 import { ToolChecks, checkTitle, type PostureCheck } from "./ToolChecks";
 import { ClientSummary } from "./ClientSummary";
 import { SourceHealth } from "./SourceHealth";
+import { ToolExclusions } from "./ToolExclusions";
 
 export interface Posture {
   client_id: string;
@@ -148,6 +149,8 @@ export function ClientPosture() {
   const [error, setError] = useState<string | null>(null);
   const [onlyProblems, setOnlyProblems] = useState(false);
   const [reload, setReload] = useState(0);
+  // The tools this client does not use (chosen below): a count of machines missing one is replaced by "Not used".
+  const [excludedTools, setExcludedTools] = useState<string[]>([]);
 
   useEffect(() => {
     let live = true;
@@ -239,13 +242,25 @@ export function ClientPosture() {
             </Link>
           </div>
           <LinkedTools tools={shown.tools ?? []} />
+          <ToolExclusions
+            clientId={shown.client_id}
+            onLoaded={(tools) => setExcludedTools(tools)}
+            onChanged={(tools) => {
+              setExcludedTools(tools);
+              setReload((n) => n + 1); // the counts on this page change with it
+            }}
+          />
           <section>
             <h3 className="mb-2 text-sm uppercase text-slate-500">Devices</h3>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               <Stat label="Devices" value={shown.devices.devices} href={links.devices} />
               <Stat label="Need attention" value={shown.devices.needs_attention} bad={shown.devices.needs_attention > 0} href={links.needsAttention} />
               <Stat label="Stale agents" value={shown.devices.stale_agents} bad={shown.devices.stale_agents > 0} href={links.stale} />
-              <Stat label="Not in Huntress" value={shown.devices.not_in_huntress} bad={shown.devices.not_in_huntress > 0} href={links.notInHuntress} />
+              {excludedTools.includes("huntress") ? (
+                <Stat label="Not in Huntress" value="Not used" />
+              ) : (
+                <Stat label="Not in Huntress" value={shown.devices.not_in_huntress} bad={shown.devices.not_in_huntress > 0} href={links.notInHuntress} />
+              )}
               <Stat label="Offline" value={shown.devices.offline} href={links.offline} />
             </div>
           </section>

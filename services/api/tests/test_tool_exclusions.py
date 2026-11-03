@@ -1,0 +1,189 @@
+"""A client can be marked as not using a tool: its machines are never counted as missing from it, its checks for the tool vanish from the posture pages, and a worsened check raises no alert."""
+
+import asyncio
+import uuid
+from datetime import UTC, datetime
+from types import SimpleNamespace as NS
+from unittest.mock import AsyncMock
+
+import pytest
+from app.api.v1.endpoints import client_posture as cp
+from app.api.v1.endpoints.devices import DeviceOut, DeviceSourceOut, is_missing_from, rollup_of
+from app.services import check_alerts
+from app.services import tool_exclusions as tx
+from app.services.client_review import device_facts
+from fastapi import HTTPException
+
+NOW = datetime(2026, 11, 3, tzinfo=UTC)
+OWNER, CLIENT = uuid.uuid4(), uuid.uuid4()
+
+
+def device(excluded=(), vendors=("ninjaone",), tenant=CLIENT, os="Windows 11"):
+    return DeviceOut(
+        id=uuid.uuid4(), tenant_id=tenant, client_name="Acme", hostname=f"PC-{uuid.uuid4().hex[:4]}", os=os, last_seen=NOW, first_seen=NOW,
+        sources=[DeviceSourceOut(vendor=v, name="x", last_seen=NOW, details={}, last_checkin=NOW, stale=False) for v in vendors],
+        excluded_tools=list(excluded),
+    )
+
+
+# ---- the settings -------------------------------------------------------------------------------------------------------------------------------------------
+
+
+def test_the_four_tools_asked_for_can_be_excluded():
+    assert {"huntress", "screenconnect", "addigy", "fieldeffect"} <= set(tx.EXCLUDABLE)
+
+
+def test_a_list_is_stored_unique_and_sorted_and_an_unknown_tool_is_refused_by_name():
+    assert tx.normalize(["Huntress", "addigy", "huntress"]) == ["addigy", "huntress"]
+    with pytest.raises(ValueError, match="windows"):
+        tx.normalize(["huntress", "windows"])
+    with pytest.raises(ValueError):
+        tx.normalize([""])
+
+
+def test_reading_ignores_anything_that_is_not_a_known_tool_so_a_hand_edit_cannot_widen_it():
+    assert tx.of_settings({"tool_exclusions": ["huntress", "bogus", 5, None]}) == frozenset({"huntress"})
+    assert tx.of_settings({"tool_exclusions": "huntress"}) == frozenset()
+    assert tx.of_settings(None) == frozenset() and tx.of_settings({}) == frozenset()
+
+
+def test_setting_keeps_the_other_settings_and_an_empty_list_removes_the_key():
+    s = {"hidden": True, "devices": {"master_vendor": "ninjaone"}}
+    out = tx.with_exclusions(s, ["huntress"])
+    assert out == {"hidden": True, "devices": {"master_vendor": "ninjaone"}, "tool_exclusions": ["huntress"]} and "tool_exclusions" not in s
+    assert tx.with_exclusions(out, []) == s
+
+
+def test_a_tool_checks_source_maps_to_its_tool_so_threatmate_google_belongs_to_threatmate():
+    assert tx.check_is_excluded("threatmate-google", frozenset({"threatmate"}))
+    assert tx.check_is_excluded("huntress", frozenset({"huntress"}))
+    assert not tx.check_is_excluded("huntress", frozenset({"screenconnect"})) and not tx.check_is_excluded("huntress", frozenset())
+
+
+# ---- the devices --------------------------------------------------------------------------------------------------------------------------------------------
+
+
+def test_an_excluded_tool_is_never_missing_for_that_client_but_others_still_are():
+    d = device(excluded=["huntress"])
+    assert not is_missing_from(d, "huntress")
+    assert is_missing_from(d, "screenconnect")
+    assert is_missing_from(device(), "huntress")  # another client with no exclusion is unchanged
+
+
+def test_each_of_the_four_is_honoured_including_addigy_on_a_mac_and_field_effect():
+    mac = device(excluded=["addigy", "fieldeffect", "screenconnect", "huntress"], os="macOS")
+    assert [is_missing_from(mac, t) for t in ("addigy", "fieldeffect", "screenconnect", "huntress")] == [False] * 4
+    assert is_missing_from(device(os="macOS"), "addigy") and is_missing_from(device(), "fieldeffect")
+
+
+def test_the_roll_up_counts_nothing_missing_from_huntress_for_a_client_that_does_not_use_it():
+    rows = rollup_of([device(excluded=["huntress"]), device(excluded=["huntress"]), device(tenant=OWNER)])
+    by = {r.client_id: r.not_in_huntress for r in rows}
+    assert by[CLIENT] == 0 and by[OWNER] == 1
+
+
+def test_the_client_review_marks_an_excluded_tool_instead_of_counting_a_gap():
+    facts = device_facts([device(excluded=["huntress"]), device(excluded=["huntress"])], stale_agents=0, offline=0)
+    huntress = next(c for c in facts.coverage if c.tool == "huntress")
+    assert (huntress.excluded, huntress.of, huntress.percent) == (True, 0, None)
+    assert all(not c.excluded for c in facts.coverage if c.tool != "huntress")
+
+
+# ---- the posture checks and alerts -------------------------------------------------------------------------------------------------------------------------
+
+
+class FakeDb:
+    def __init__(self, settings=None, known_client=True):
+        self.settings, self.known_client, self.added, self.committed = settings, known_client, [], 0
+        self.tenant = NS(settings=settings)
+        self.queries = []
+
+    async def execute(self, stmt, *a, **k):
+        text = str(stmt)
+        self.queries.append(text)
+        if "tenants.parent_tenant_id" in text:
+            return NS(scalar_one_or_none=lambda: CLIENT if self.known_client else None)
+        if "FROM alerts" in text:
+            return NS(scalar_one_or_none=lambda: None)  # no alert for this check and day yet
+        return NS(scalar_one_or_none=lambda: self.settings, scalars=lambda: NS(all=lambda: []), all=lambda: [])
+
+    async def get(self, model, key):
+        return self.tenant
+
+    def add(self, row):
+        self.added.append(row)
+
+    async def commit(self):
+        self.committed += 1
+
+
+def test_a_worsened_check_of_an_excluded_tool_raises_no_alert_and_another_tool_still_does():
+    changes = [{"key": "huntress_protection", "status": "not_met", "previous_status": "met", "evidence": "x"}]
+    assert asyncio.run(check_alerts.raise_alerts(FakeDb({"tool_exclusions": ["huntress"]}), CLIENT, "huntress", changes, NOW)) == 0
+    other = FakeDb({"tool_exclusions": ["screenconnect"]})
+    assert asyncio.run(check_alerts.raise_alerts(other, CLIENT, "huntress", changes, NOW)) == 1 and len(other.added) == 1
+
+
+def test_the_clients_posture_page_reads_no_checks_for_an_excluded_tool():
+    db = FakeDb({"tool_exclusions": ["huntress"]})
+    assert asyncio.run(cp._all_tool_checks(db, OWNER, CLIENT, [("huntress", "1", "Acme")])) == {}
+    assert not any("client_m365_checks" in q for q in db.queries)  # not even asked for
+    other = FakeDb({"tool_exclusions": ["screenconnect"]})
+    asyncio.run(cp._all_tool_checks(other, OWNER, CLIENT, [("huntress", "1", "Acme")]))
+    assert any("client_m365_checks" in q for q in other.queries)  # a client that excludes another tool still has its Huntress checks read
+
+
+# ---- the endpoints ------------------------------------------------------------------------------------------------------------------------------------------
+
+
+def user():
+    return NS(tenant_id=OWNER, user_id=uuid.uuid4(), email="o@example.com")
+
+
+def put(db, tools, client=CLIENT):
+    return asyncio.run(cp.put_tool_exclusions(client, cp.ToolExclusionsIn(tools=tools), user(), db))
+
+
+@pytest.fixture
+def audited(monkeypatch):
+    audit = AsyncMock()
+    monkeypatch.setattr(cp, "emit_audit", audit)
+    return audit
+
+
+def test_choosing_tools_stores_them_on_the_client_audits_the_change_and_drops_the_caches(audited, monkeypatch):
+    from app.api.v1.endpoints import devices
+
+    forgot = []
+    monkeypatch.setattr(devices, "forget_loaded", lambda: forgot.append(1))
+    db = FakeDb({"hidden": True})
+    out = put(db, ["Huntress", "screenconnect", "addigy", "fieldeffect"])
+    assert out.tools == ["addigy", "fieldeffect", "huntress", "screenconnect"]
+    assert db.tenant.settings == {"hidden": True, "tool_exclusions": out.tools}
+    (call,) = audited.await_args_list
+    assert call.kwargs["action"] == "posture:tool_exclusions_changed" and call.kwargs["changes"]["before"] == [] and call.kwargs["changes"]["after"] == out.tools
+    assert forgot == [1]
+
+
+def test_repeating_the_same_choice_is_not_audited_again(audited):
+    put(FakeDb({"tool_exclusions": ["huntress"]}), ["huntress"])
+    audited.assert_not_awaited()
+
+
+def test_an_empty_list_clears_them_and_is_audited(audited):
+    db = FakeDb({"tool_exclusions": ["huntress"]})
+    assert put(db, []).tools == [] and "tool_exclusions" not in db.tenant.settings
+    assert audited.await_args.kwargs["changes"]["before"] == ["huntress"]
+
+
+def test_an_unknown_tool_the_managing_company_and_a_stranger_client_are_refused(audited):
+    with pytest.raises(HTTPException) as e:
+        put(FakeDb({}), ["huntress", "notatool"])
+    assert e.value.status_code == 422 and "notatool" in e.value.detail
+    with pytest.raises(HTTPException) as e:
+        put(FakeDb({}), ["huntress"], client=OWNER)
+    assert e.value.status_code == 422
+    with pytest.raises(HTTPException) as e:
+        put(FakeDb({}, known_client=False), ["huntress"])
+    assert e.value.status_code == 404
+    audited.assert_not_awaited()

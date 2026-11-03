@@ -38,6 +38,8 @@ class ToolCoverage(BaseModel):
     # Whether this client exists in the tool at all: True when the tool reports some of its machines or the client is mapped to one of its organizations, False when the tool maps clients and this one is not
     # among them ("not currently enrolled"), None when AiSOC cannot tell (the tool has no client mapping).
     enrolled: bool | None = None
+    # The client does not use this tool (chosen on its posture page), so it is not a gap.
+    excluded: bool = False
 
 
 class DeviceFacts(BaseModel):
@@ -69,6 +71,14 @@ def device_facts(
             if have > 0 or (enrolled_in is not None and tool in enrolled_in)
             else (False if mapped_tools is not None and tool in mapped_tools else None)
         )
+        if any(tool in (getattr(d, "excluded_tools", None) or []) for d in devices):
+            # The client does not use this tool (set on its posture page): it is not a gap, so no share is reckoned.
+            coverage.append(ToolCoverage(tool=tool, have=0, of=0, percent=None, enrolled=None, excluded=True))
+            continue
+        if any(tool in (getattr(d, "excluded_tools", None) or []) for d in devices):
+            # The client does not use this tool (set on its posture page): it is not a gap, so no share is reckoned.
+            coverage.append(ToolCoverage(tool=tool, have=0, of=0, percent=None, enrolled=None, excluded=True))
+            continue
         coverage.append(
             ToolCoverage(
                 tool=tool,

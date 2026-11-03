@@ -32,6 +32,7 @@ from app.models.alert import Alert
 from app.models.client_alias import ClientAlias, ClientDeviceHint
 from app.models.device import Device, DeviceMergeDismissal, DeviceMergeLog, DeviceSnooze, DeviceSource
 from app.models.tenant import Tenant
+from app.services import tool_exclusions
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.client_mapping import IncomingClient, auto_link_by_devices, record_device_hints, tenant_hidden, upsert_clients
 from app.services.device_identity import confidence_label, pair_confidence
@@ -181,6 +182,8 @@ class DeviceOut(BaseModel):
     hidden_since: datetime | None = None
     # True when the device is hidden by itself: every tool that gives a check-in time has gone SOURCE_STALE_DAYS without one. It comes back when one of them checks in.
     auto_hidden: bool = False
+    # Tools this device's client does not use (set on the client's page): the device is never counted as missing from them.
+    excluded_tools: list[str] = Field(default_factory=list)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -416,6 +419,8 @@ def is_missing_from(d: DeviceOut, tool: str) -> bool:
     ThreatMate covers every machine."""
     if any(s.vendor == tool for s in d.sources):
         return False
+    if tool in d.excluded_tools:
+        return False  # the client does not use this tool
     # An agent-based tool is expected on computers only, not on a switch, access point, camera, printer or anything a tool cannot name.
     if d.kind != "computer":
         return False
@@ -585,6 +590,10 @@ def hidden_since_of(snoozed_at: datetime | None, last_online: datetime | None) -
 
 async def _load(db: Any, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[uuid.UUID, str], master: str | None) -> list[DeviceOut]:
     out: list[DeviceOut] = []
+    excluded_by_tenant = {
+        row.id: sorted(tool_exclusions.of_settings(row.settings))
+        for row in (await db.execute(select(Tenant.id, Tenant.settings).where(Tenant.id.in_(tids)))).all()
+    }
     for tid in tids:
         async with _as(db, owner, tid):
             devices = (await db.execute(select(Device).where(Device.tenant_id == tid))).scalars().all()
@@ -634,6 +643,7 @@ async def _load(db: Any, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[
                     alerts=alerts.get(host_key(d.hostname), [])[:_ALERTS_PER_DEVICE],
                     hidden_since=hidden_since_of(snoozes.get(d.id), online) or (online if auto else None),
                     auto_hidden=auto and hidden_since_of(snoozes.get(d.id), online) is None,
+                    excluded_tools=excluded_by_tenant.get(d.tenant_id, []),
                 )
             )
     return out
