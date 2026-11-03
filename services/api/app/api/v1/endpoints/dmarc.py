@@ -314,6 +314,7 @@ class Insights(BaseModel):
     rates: FailureRates
     series: list[RatePoint]
     senders: list[SenderRow]
+    at_risk: list[SenderRow]  # senders whose mail fails DMARC: what an enforcing policy (quarantine or reject) would start to block
     sending_domains: list[SendingDomainRow]
 
 
@@ -520,12 +521,12 @@ async def insights(
             senders[key][0 if ok else 1] += count
             from_domains[str(row.get("header_from") or r.domain)][0 if ok else 1] += count
 
-    def top_senders() -> list[SenderRow]:
-        rows = [
-            SenderRow(name=name if kind == "named" else f"Unknown ({name})", identified=kind == "named", emails=p + f, passed=p, failed=f, status=_health(p, f))
-            for (name, kind), (p, f) in senders.items()
-        ]
-        return sorted(rows, key=lambda s: -s.emails)[:10]
+    sender_rows = [
+        SenderRow(name=name if kind == "named" else f"Unknown ({name})", identified=kind == "named", emails=p + f, passed=p, failed=f, status=_health(p, f))
+        for (name, kind), (p, f) in senders.items()
+    ]
+    # At risk: any sender (not only the busiest) with failures, most failing messages first. A sender with a handful of failures among thousands is still listed: the count says how small it is.
+    at_risk = sorted((x for x in sender_rows if x.failed > 0), key=lambda x: -x.failed)[:10]
 
     return Insights(
         days=days,
@@ -536,7 +537,8 @@ async def insights(
         ),
         rates=FailureRates(dmarc=_pct(dmarc_fail, total), dkim=_pct(dkim_fail, total), spf=_pct(spf_fail, total)),
         series=[RatePoint(day=k, total=v[0], dmarc_fail=v[1], dkim_fail=v[2], spf_fail=v[3]) for k, v in sorted(daily.items())],
-        senders=top_senders(),
+        senders=sorted(sender_rows, key=lambda x: -x.emails)[:10],
+        at_risk=at_risk,
         sending_domains=sorted(
             (SendingDomainRow(domain=k, emails=p + f, passed=p, failed=f, status=_health(p, f)) for k, (p, f) in from_domains.items()), key=lambda s: -s.emails
         )[:10],

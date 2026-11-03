@@ -36,6 +36,7 @@ beforeEach(() => {
     series: [{ day: '2026-11-01', total: 50, dmarc_fail: 5, dkim_fail: 8, spf_fail: 3 }, { day: '2026-11-02', total: 50, dmarc_fail: 7, dkim_fail: 7, spf_fail: 4 }],
     senders: [{ name: 'Microsoft 365', identified: true, emails: 90, passed: 90, failed: 0, status: 'passing' }, { name: 'Unknown (9.9.9.9)', identified: false, emails: 10, passed: 0, failed: 10, status: 'failing' }],
     sending_domains: [{ domain: 'acme.com', emails: 100, passed: 88, failed: 12, status: 'partly' }],
+    at_risk: [{ name: 'Unknown (9.9.9.9)', identified: false, emails: 10, passed: 0, failed: 10, status: 'failing' }],
   };
   countries = null;
   card = null;
@@ -431,5 +432,21 @@ describe('DMARC domain report card', () => {
     const mail = await screen.findByTestId('card-mail-records');
     expect(mail).toHaveTextContent('cannot receive mail');
     expect(mail).toHaveClass('text-amber-300');
+  });
+});
+
+describe('DMARC senders at risk', () => {
+  it('lists the senders failing DMARC with how much of their mail fails', async () => {
+    render(view());
+    const row = await screen.findByTestId('at-risk-row');
+    expect(row).toHaveTextContent('Unknown (9.9.9.9)');
+    expect(row).toHaveTextContent('10 of 10 failing');
+  });
+
+  it('is left out when no sender is failing, or the server does not send it', async () => {
+    (insights as { at_risk?: unknown[] }).at_risk = [];
+    render(view());
+    await screen.findByTestId('delivery-passed');
+    expect(screen.queryByTestId('at-risk')).toBeNull();
   });
 });

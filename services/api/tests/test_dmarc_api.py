@@ -568,3 +568,19 @@ def test_the_card_checks_dns_only_for_a_domain_that_has_reports_and_combines_it_
     assert card.posture.mx == ["mx.acme.com"] and card.posture.dmarc.record.startswith("v=DMARC1")
     assert any("start enforcing" in a for a in card.advice)
     assert (unknown, nothing, bad) == (404, 404, 422) and after == before  # no DNS lookup was made for any of the refused ones
+
+
+def test_at_risk_lists_every_sender_with_failures_by_failing_volume_even_when_it_is_not_a_top_sender():
+    rows = [line_row(f"20.0.0.{i}", 100 + i) for i in range(1, 12)]  # eleven busy, passing senders push the quiet one out of the top ten
+    rows += [line_row("30.0.0.1", 3, ok=False), line_row("30.0.0.2", 9, ok=False, spf_domains=["spf.protection.outlook.com"]), line_row("30.0.0.2", 500)]
+
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        s.add(rep(owner.id, "goliveoak.com", 3000, 2900, rows=rows))
+        await s.commit()
+        return await ep.insights(caller(owner), s, days=30, domain=None, client_id=None)
+
+    out = run(body)
+    assert "Unknown (30.0.0.1)" not in [x.name for x in out.senders]  # not among the top ten by volume
+    assert [(x.name, x.failed) for x in out.at_risk] == [("Microsoft 365", 9), ("Unknown (30.0.0.1)", 3)]
+    assert all(x.failed > 0 for x in out.at_risk)

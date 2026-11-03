@@ -55,6 +55,8 @@ export interface DmarcInsights {
   rates: { dmarc: number | null; dkim: number | null; spf: number | null };
   series: { day: string; total: number; dmarc_fail: number; dkim_fail: number; spf_fail: number }[];
   senders: { name: string; identified: boolean; emails: number; passed: number; failed: number; status: string }[];
+  /** Absent from an older server. */
+  at_risk?: { name: string; identified: boolean; emails: number; passed: number; failed: number; status: string }[];
   sending_domains: { domain: string; emails: number; passed: number; failed: number; status: string }[];
 }
 export interface DmarcCountries {
@@ -403,6 +405,22 @@ function Insights({ days }: { days: number }) {
           </tbody>
         </table>
       </div>
+      {data.at_risk && data.at_risk.length > 0 ? (
+        <div data-testid="at-risk" className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-3">
+          <h3 className="text-sm font-medium text-amber-200">Senders at risk when the policy is enforced</h3>
+          <p className="mt-1 text-xs text-gray-400">Mail from these fails DMARC today. A quarantine or reject policy would start blocking it, so fix real senders first (add them to SPF or sign with DKIM).</p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {data.at_risk.map((s) => (
+              <li key={s.name} data-testid="at-risk-row" className="flex justify-between gap-3">
+                <span className={s.identified ? 'text-gray-100' : 'font-mono text-gray-400'}>{s.name}</span>
+                <span className="text-amber-300">
+                  {s.failed.toLocaleString()} of {s.emails.toLocaleString()} failing
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <Countries days={days} />
     </section>
   );
