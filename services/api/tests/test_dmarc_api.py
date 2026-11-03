@@ -407,3 +407,80 @@ def test_insights_with_no_reports_is_empty_not_an_error():
 
     out = run(body)
     assert (out.emails, out.rates.dmarc, out.series, out.senders, out.sending_domains) == (0, None, [], [], [])
+
+
+class CountryResolver:
+    def __init__(self, by_ip):
+        from app.services.ip_country import cymru_name
+
+        self.by_name = {cymru_name(ip): [f"1 | x | {code} | y"] for ip, code in by_ip.items()}
+        self.calls = []
+
+    async def txt(self, name):
+        self.calls.append(name)
+        return self.by_name.get(name, [])
+
+
+def test_mail_is_grouped_by_the_country_of_the_sending_address_and_what_cannot_be_placed_is_said_so():
+    from app.services import ip_country
+
+    ip_country._CACHE.clear()
+    rows = [
+        line_row("8.8.8.8", 30),
+        line_row("8.8.4.4", 10, ok=False),
+        line_row("1.1.1.1", 5),
+        line_row("10.0.0.5", 4),  # private: never asked about
+        line_row("9.9.9.9", 2),  # the lookup does not know it
+    ]
+    r = CountryResolver({"8.8.8.8": "US", "8.8.4.4": "US", "1.1.1.1": "AU"})
+
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        s.add(rep(owner.id, "goliveoak.com", 51, 41, rows=rows))
+        await s.commit()
+        return await ep.countries(caller(owner), s, r, days=30, domain=None, client_id=None)
+
+    out = run(body)
+    assert [(c.code, c.emails, c.passed, c.failed) for c in out.countries] == [("US", 40, 30, 10), ("AU", 5, 5, 0)]
+    assert (out.emails, out.unknown, out.not_looked_up) == (51, 6, 0)
+    assert len(r.calls) == 4  # the private address was not sent to anyone
+
+
+def test_only_the_busiest_addresses_are_looked_up_and_the_rest_are_counted_as_not_looked_up(monkeypatch):
+    from app.services import ip_country
+
+    ip_country._CACHE.clear()
+    monkeypatch.setattr(ep, "MAX_LOOKUPS", 2)
+    rows = [line_row("8.8.8.8", 50), line_row("8.8.4.4", 30), line_row("1.1.1.1", 5), line_row("9.9.9.9", 3)]
+    r = CountryResolver({"8.8.8.8": "US", "8.8.4.4": "US", "1.1.1.1": "AU"})
+
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        s.add(rep(owner.id, "goliveoak.com", 88, 88, rows=rows))
+        await s.commit()
+        return await ep.countries(caller(owner), s, r, days=30, domain=None, client_id=None)
+
+    out = run(body)
+    assert [(c.code, c.emails) for c in out.countries] == [("US", 80)]
+    assert (out.not_looked_up, out.unknown, out.emails) == (8, 0, 88)
+    assert len(r.calls) == 2
+
+
+def test_countries_never_include_another_owners_mail_and_a_foreign_client_is_refused():
+    from app.services import ip_country
+
+    ip_country._CACHE.clear()
+    r = CountryResolver({"8.8.8.8": "US", "1.1.1.1": "AU"})
+
+    async def body(s):
+        owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
+        theirs = await tenant(s, "Theirs", other.id)
+        s.add_all([rep(owner.id, "goliveoak.com", 5, 5, rows=[line_row("8.8.8.8", 5)]), rep(theirs.id, "theirs.com", 99, 99, rows=[line_row("1.1.1.1", 99)])])
+        await s.commit()
+        mine = await ep.countries(caller(owner), s, r, days=30, domain=None, client_id=None)
+        with pytest.raises(HTTPException) as foreign:
+            await ep.countries(caller(owner), s, r, days=30, domain=None, client_id=str(theirs.id))
+        return mine, foreign.value.status_code
+
+    mine, foreign = run(body)
+    assert [(c.code, c.emails) for c in mine.countries] == [("US", 5)] and foreign == 404

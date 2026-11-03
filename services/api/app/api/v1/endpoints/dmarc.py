@@ -26,6 +26,7 @@ from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.dmarc_senders import identify_sender
 from app.services.domain_posture import DohResolver, Resolver, candidate_domains
+from app.services.ip_country import country_of
 
 router = APIRouter(prefix="/dmarc", tags=["dmarc"])
 
@@ -337,15 +338,8 @@ def delivery_class(row: dict[str, Any]) -> str:
     return "passed" if row.get("pass") else "failed_delivered"
 
 
-@router.get("/insights", response_model=Insights, summary="Delivery, failure rates over time, top senders and top sending domains")
-async def insights(
-    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
-    db: DBSession,
-    days: int = Query(30, ge=1, le=365),
-    domain: str | None = Query(default=None, max_length=255),
-    client_id: str | None = Query(default=None, max_length=64),
-) -> Insights:
-    """Everything the Valimail-style overview shows, computed from the stored reports: for all clients, one client, or one domain. Counts are messages, not reports."""
+async def _scoped_reports(current_user: AuthUser, db: Any, days: int, domain: str | None, client_id: str | None) -> tuple[list[DmarcReport], str | None]:
+    """The stored reports the caller may see (their own and their clients'), narrowed to one client or domain; the domain as cleaned. 422 for a malformed filter, 404 for a client that is not theirs."""
     owner = current_user.tenant_id
     clients = await _children(db, owner)
     wanted = [owner, *clients]
@@ -366,6 +360,75 @@ async def insights(
         where.append(DmarcReport.domain == clean)
     async with cross_tenant_reads(db):
         reports = (await db.execute(select(DmarcReport).where(*where))).scalars().all()
+    return list(reports), clean
+
+
+class CountryRow(BaseModel):
+    code: str  # two-letter country code
+    emails: int
+    passed: int
+    failed: int
+
+
+class Countries(BaseModel):
+    days: int
+    emails: int
+    countries: list[CountryRow]
+    unknown: int  # messages from addresses whose country could not be found (private, or the lookup did not answer)
+    not_looked_up: int  # messages from the quieter addresses beyond the busiest MAX_LOOKUPS, not asked about
+
+
+MAX_LOOKUPS = 60
+
+
+@router.get("/countries", response_model=Countries, summary="Where the mail was sent from, by country")
+async def countries(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    resolver: Annotated[Resolver, Depends(get_resolver)],
+    days: int = Query(30, ge=1, le=365),
+    domain: str | None = Query(default=None, max_length=255),
+    client_id: str | None = Query(default=None, max_length=64),
+) -> Countries:
+    """Country of each sending address, looked up for the busiest addresses only (a quiet tail is reported as not looked up rather than guessed or fetched one by one)."""
+    reports, _ = await _scoped_reports(current_user, db, days, domain, client_id)
+    by_ip: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+    total = 0
+    for r in reports:
+        for row in r.rows or []:
+            count = int(row.get("count", 0))
+            total += count
+            by_ip[str(row.get("ip") or "")][0 if row.get("pass") else 1] += count
+    busiest = sorted(by_ip.items(), key=lambda kv: -(kv[1][0] + kv[1][1]))[:MAX_LOOKUPS]
+    found = await asyncio.gather(*(country_of(ip, resolver) for ip, _ in busiest))
+    per: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+    unknown = 0
+    for (_, (p, f)), code in zip(busiest, found, strict=True):
+        if code is None:
+            unknown += p + f
+        else:
+            per[code][0] += p
+            per[code][1] += f
+    looked = sum(p + f for _, (p, f) in busiest)
+    return Countries(
+        days=days,
+        emails=total,
+        countries=sorted((CountryRow(code=c, emails=p + f, passed=p, failed=f) for c, (p, f) in per.items()), key=lambda c: -c.emails),
+        unknown=unknown,
+        not_looked_up=total - looked,
+    )
+
+
+@router.get("/insights", response_model=Insights, summary="Delivery, failure rates over time, top senders and top sending domains")
+async def insights(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    days: int = Query(30, ge=1, le=365),
+    domain: str | None = Query(default=None, max_length=255),
+    client_id: str | None = Query(default=None, max_length=64),
+) -> Insights:
+    """Everything the Valimail-style overview shows, computed from the stored reports: for all clients, one client, or one domain. Counts are messages, not reports."""
+    reports, clean = await _scoped_reports(current_user, db, days, domain, client_id)
 
     delivery: Counter[str] = Counter()
     daily: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0, 0])
