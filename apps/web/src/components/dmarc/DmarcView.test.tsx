@@ -15,6 +15,7 @@ let overview: Record<string, unknown>;
 let setup: Record<string, unknown>;
 let detail: Record<string, unknown>;
 let insights: Record<string, unknown> | null;
+let countries: Record<string, unknown> | null;
 
 const view = () => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
@@ -35,9 +36,11 @@ beforeEach(() => {
     senders: [{ name: 'Microsoft 365', identified: true, emails: 90, passed: 90, failed: 0, status: 'passing' }, { name: 'Unknown (9.9.9.9)', identified: false, emails: 10, passed: 0, failed: 10, status: 'failing' }],
     sending_domains: [{ domain: 'acme.com', emails: 100, passed: 88, failed: 12, status: 'partly' }],
   };
+  countries = null;
   authFetch.mockReset();
   authFetch.mockImplementation(async (url: string) => {
     if (url.startsWith('/api/v1/dmarc/overview')) return json(200, overview);
+    if (url.startsWith('/api/v1/dmarc/countries')) return countries ? json(200, countries) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/insights')) return insights ? json(200, insights) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/setup')) return json(200, setup);
     if (url.startsWith('/api/v1/dmarc/domains/')) return json(200, detail);
@@ -362,5 +365,25 @@ describe('DMARC mail overview', () => {
     render(view());
     expect(await screen.findAllByTestId('dmarc-row')).toHaveLength(1);
     expect(screen.queryByTestId('delivery-passed')).toBeNull();
+  });
+});
+
+describe('DMARC countries', () => {
+  it('lists the countries busiest first with their failures, and says how much could not be placed', async () => {
+    countries = { days: 30, emails: 100, countries: [{ code: 'US', emails: 70, passed: 60, failed: 10 }, { code: 'AU', emails: 20, passed: 20, failed: 0 }], unknown: 4, not_looked_up: 6 };
+    render(view());
+    const rows = await screen.findAllByTestId('country-row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('United States');
+    expect(rows[0]).toHaveTextContent('10 failed');
+    expect(rows[1]).toHaveTextContent('all pass');
+    expect(screen.getByTestId('country-unplaced')).toHaveTextContent('10 messages could not be placed');
+  });
+
+  it('is left out when nothing could be placed or the server has no such route', async () => {
+    countries = null;
+    render(view());
+    await screen.findByTestId('delivery-passed');
+    expect(screen.queryByTestId('country-row')).toBeNull();
   });
 });

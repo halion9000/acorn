@@ -57,6 +57,13 @@ export interface DmarcInsights {
   senders: { name: string; identified: boolean; emails: number; passed: number; failed: number; status: string }[];
   sending_domains: { domain: string; emails: number; passed: number; failed: number; status: string }[];
 }
+export interface DmarcCountries {
+  days: number;
+  emails: number;
+  countries: { code: string; emails: number; passed: number; failed: number }[];
+  unknown: number;
+  not_looked_up: number;
+}
 export interface SetupLine {
   client_id: string;
   client_name: string;
@@ -245,6 +252,45 @@ function RateChart({ series }: { series: DmarcInsights['series'] }) {
   );
 }
 
+/** A country's name in the viewer's language; the code itself when the browser does not know it. */
+export function countryName(code: string): string {
+  try {
+    return new Intl.DisplayNames(undefined, { type: 'region' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** Where the mail was sent from, busiest first, as bars. Says plainly how much could not be placed. Hidden when there is nothing to show or the lookup is unavailable. */
+function Countries({ days }: { days: number }) {
+  const { data } = useSWR<DmarcCountries>(`/api/v1/dmarc/countries?days=${days}`, fetcher, { shouldRetryOnError: false });
+  if (!data || data.countries.length === 0) return null;
+  const top = data.countries[0].emails;
+  const unplaced = data.unknown + data.not_looked_up;
+  return (
+    <section aria-label="Where mail was sent from" className="space-y-2">
+      <h3 className="text-sm font-medium text-gray-200">Where it was sent from</h3>
+      <ul className="space-y-1">
+        {data.countries.slice(0, 15).map((c) => (
+          <li key={c.code} data-testid="country-row" className="flex items-center gap-3 text-sm">
+            <span className="w-40 shrink-0 truncate text-gray-200">{countryName(c.code)}</span>
+            <span className="h-2 flex-1 rounded bg-gray-800">
+              <span className="block h-2 rounded bg-blue-400" style={{ width: `${Math.max(2, Math.round((c.emails / top) * 100))}%` }} />
+            </span>
+            <span className="w-20 text-right text-gray-300">{c.emails.toLocaleString()}</span>
+            <span className={`w-16 text-right ${c.failed > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>{c.failed > 0 ? `${c.failed.toLocaleString()} failed` : 'all pass'}</span>
+          </li>
+        ))}
+      </ul>
+      {unplaced > 0 ? (
+        <p data-testid="country-unplaced" className="text-xs text-gray-500">
+          {unplaced.toLocaleString()} messages could not be placed in a country (private or unanswered addresses, or quieter addresses not looked up).
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 /** What happened to the mail, how often it failed, who sends it. Shown only when the server has insights and there is mail to show: a failure here never hides the table below. */
 function Insights({ days }: { days: number }) {
   const { data } = useSWR<DmarcInsights>(`/api/v1/dmarc/insights?days=${days}`, fetcher, { shouldRetryOnError: false });
@@ -304,6 +350,7 @@ function Insights({ days }: { days: number }) {
           </tbody>
         </table>
       </div>
+      <Countries days={days} />
     </section>
   );
 }
