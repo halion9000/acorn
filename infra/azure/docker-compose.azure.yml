@@ -22,7 +22,8 @@ services:
     env_file:
       - /srv/acorn/caddy/cloudflare.env
     volumes:
-      - ./infra/azure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # The whole folder, not the one file: a file mounted by itself keeps showing the version it had when the container started, because git replaces a changed file with a new one.
+      - ./infra/azure/caddy:/etc/caddy:ro
       - /srv/acorn/caddy/data:/data
     networks:
       - aisoc

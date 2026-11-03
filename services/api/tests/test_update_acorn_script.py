@@ -229,3 +229,9 @@ def test_a_changed_proxy_file_is_loaded_when_an_update_runs_not_only_when_the_co
 def test_a_failing_reload_never_fails_the_update():
     line = next(l for l in SCRIPT.read_text(encoding="utf-8").splitlines() if "caddy reload" in l)
     assert line.rstrip().endswith("|| true"), line
+
+
+def test_the_proxy_gets_its_whole_folder_so_a_changed_file_is_seen_by_the_running_container():
+    compose = (SCRIPT.parent / "docker-compose.azure.yml").read_text(encoding="utf-8")
+    assert "- ./infra/azure/caddy:/etc/caddy:ro" in compose
+    assert "caddy/Caddyfile:/etc/caddy/Caddyfile" not in compose, "a single-file mount goes stale when git replaces the file"
