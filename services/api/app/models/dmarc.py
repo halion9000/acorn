@@ -52,6 +52,19 @@ class TlsReport(Base):
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
 
 
+class DomainRegistration(Base):
+    """The last registration lookup for one client domain (migration 140): when it ends, or why that could not be read."""
+
+    __tablename__ = "domain_registrations"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    domain: Mapped[str] = mapped_column(String(255), primary_key=True)
+    registered: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    error: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
 class DmarcIngestState(Base):
     __tablename__ = "dmarc_ingest_state"
 
