@@ -187,3 +187,121 @@ def test_an_unknown_tool_the_managing_company_and_a_stranger_client_are_refused(
         put(FakeDb({}, known_client=False), ["huntress"])
     assert e.value.status_code == 404
     audited.assert_not_awaited()
+
+
+# ---- the reverse: marked as not used, but it is there ----------------------------------------------------------------------------------------------------
+
+
+def test_a_tool_marked_as_not_used_that_reports_devices_is_a_finding_naming_how_many():
+    found = tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress", "addigy"}), {"huntress": 12}, set(), NOW)
+    assert [f.title for f in found] == ["huntress is marked as not used for Acme, but it is there"]
+    f = found[0]
+    assert (f.severity, f.rule_id, f.key) == ("medium", tx.RULE_ID, "huntress:2026-11")
+    assert "reports 12 devices" in f.summary and "untick it" in f.summary
+    assert ("Devices reporting", "12") in f.fields and ("Linked to an organization", "no") in f.fields
+
+
+def test_being_linked_to_an_organization_of_the_tool_counts_even_with_no_devices_and_both_are_said():
+    only_linked = tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {}, {"huntress"}, NOW)
+    assert len(only_linked) == 1 and "is linked to one of its organizations" in only_linked[0].summary and "reports" not in only_linked[0].summary
+    both = tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {"huntress": 1}, {"huntress"}, NOW)[0]
+    assert "reports 1 device and is linked to one of its organizations" in both.summary
+
+
+def test_nothing_is_raised_for_an_excluded_tool_that_is_really_absent_or_for_a_tool_that_is_not_excluded():
+    assert tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {}, set(), NOW) == []
+    assert tx.detect_excluded_but_present(CLIENT, "Acme", frozenset(), {"huntress": 5}, {"huntress"}, NOW) == []
+    assert tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {"screenconnect": 5}, {"screenconnect"}, NOW) == []  # another tool's devices are not this tool's
+
+
+def test_it_comes_back_each_month_and_not_each_day():
+    june = tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {"huntress": 1}, set(), datetime(2026, 6, 3, tzinfo=UTC))[0].key
+    later_june = tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {"huntress": 1}, set(), datetime(2026, 6, 28, tzinfo=UTC))[0].key
+    july = tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {"huntress": 1}, set(), datetime(2026, 7, 1, tzinfo=UTC))[0].key
+    assert june == later_june == "huntress:2026-06" and july == "huntress:2026-07"
+
+
+class RunDb:
+    """Answers the runner's reads by statement text: the client, its links to tools, and how many devices each excluded tool reports."""
+
+    def __init__(self, settings, counts=(), links=()):
+        self.settings, self.counts, self.links, self.writes = settings, list(counts), list(links), []
+
+    async def execute(self, stmt, *a, **k):
+        text = str(stmt)
+        if text.lstrip().upper().startswith("INSERT"):
+            self.writes.append(stmt)
+            return NS(rowcount=1)
+        if "FROM tenants" in text:
+            return NS(all=lambda: [NS(id=CLIENT, name="Acme", settings=self.settings)])
+        if "FROM client_aliases" in text:
+            return NS(scalars=lambda: NS(all=lambda: self.links))
+        if "FROM device_sources" in text:
+            return NS(all=lambda: self.counts)
+        return NS(all=lambda: [])
+
+    def begin_nested(self):
+        class C:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *e):
+                return False
+
+        return C()
+
+
+@pytest.fixture
+def no_rls(monkeypatch):
+    import contextlib
+
+    from app.db import rls_scope
+
+    @contextlib.asynccontextmanager
+    async def noop(*a, **k):
+        yield
+
+    monkeypatch.setattr(rls_scope, "acting_as_tenant", noop)
+
+
+def test_the_runner_raises_one_alert_in_the_clients_tenant_for_a_tool_that_is_excluded_and_reporting(no_rls):
+    from sqlalchemy.dialects import postgresql
+
+    db = RunDb({"tool_exclusions": ["huntress", "addigy"]}, counts=[("huntress", 3)])
+    assert asyncio.run(tx.run_excluded_present(db, OWNER, [CLIENT], NOW)) == 1
+    c = db.writes[0].compile(dialect=postgresql.dialect())
+    assert "ON CONFLICT (id) DO NOTHING" in str(c)
+    assert c.params["tenant_id"] == CLIENT and c.params["title"] == "huntress is marked as not used for Acme, but it is there" and c.params["category"] == "posture"
+
+
+def test_the_runner_raises_nothing_for_a_client_with_no_exclusions_or_no_such_devices(no_rls):
+    assert asyncio.run(tx.run_excluded_present(RunDb({}, counts=[("huntress", 3)]), OWNER, [CLIENT], NOW)) == 0
+    quiet = RunDb({"tool_exclusions": ["huntress"]})
+    assert asyncio.run(tx.run_excluded_present(quiet, OWNER, [CLIENT], NOW)) == 0 and quiet.writes == []
+
+
+def test_a_failure_in_the_check_never_fails_the_sync_that_called_it(no_rls):
+    class Broken(RunDb):
+        async def execute(self, *a, **k):
+            raise RuntimeError("down")
+
+    assert asyncio.run(tx.run_excluded_present(Broken({}), OWNER, [CLIENT], NOW)) == 0
+
+
+def test_marking_a_tool_as_not_used_while_it_reports_devices_checks_straight_away(audited, monkeypatch):
+    from app.api.v1.endpoints import devices
+
+    monkeypatch.setattr(devices, "forget_loaded", lambda: None)
+    called = []
+
+    async def fake_run(db, owner, tenants, now=None):
+        called.append((owner, tenants))
+        return 1
+
+    monkeypatch.setattr(tx, "run_excluded_present", fake_run)
+    put(FakeDb({}), ["huntress"])
+    assert called == [(OWNER, [CLIENT])]
+    called.clear()
+    put(FakeDb({"tool_exclusions": ["huntress"]}), ["huntress"])  # no change: not checked again here
+    put(FakeDb({"tool_exclusions": ["huntress"]}), [])  # nothing excluded now: nothing to check
+    assert called == []

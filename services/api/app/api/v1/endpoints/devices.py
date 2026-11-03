@@ -1353,6 +1353,7 @@ async def apply_devices(db: Any, owner: uuid.UUID, report: DevicesReport) -> Dev
                     known,
                 )
                 accepted += 1
+    await tool_exclusions.run_excluded_present(db, owner, list(by_tenant))  # a tool marked as not used for a client that is reporting devices for it
     merged = await _auto_merge_touched(db, list(by_tenant))
     return DevicesResponse(
         accepted=accepted, unmapped=unmapped, ignored=ignored, unmapped_clients=unmapped_clients, auto_linked=auto_linked, merged=merged

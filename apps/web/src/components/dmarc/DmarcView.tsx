@@ -489,6 +489,7 @@ function Detail({ domain, days, onClose }: { domain: string; days: number; onClo
           {data.failing_sources.length === 0 ? (
             <p className="mt-1 text-sm text-emerald-300">Nothing failed in this period.</p>
           ) : (
+            <div className="overflow-x-auto">
             <table className="mt-2 w-full text-left text-sm">
               <thead className="text-xs text-gray-500">
                 <tr>
@@ -511,6 +512,7 @@ function Detail({ domain, days, onClose }: { domain: string; days: number; onClo
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </>
       )}
@@ -604,7 +606,7 @@ function Insights({ days }: { days: number }) {
         </p>
         {data.series.length > 0 ? <RateChart series={data.series} /> : null}
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 [&>*]:min-w-0 [&>*]:overflow-x-auto">
         <table className="w-full text-left text-sm" aria-label="Top senders">
           <thead className="text-xs text-gray-400">
             <tr>
@@ -931,7 +933,7 @@ function Setup() {
                         <input type="checkbox" aria-label={`Include ${l.domain}`} checked={on} onChange={() => toggle(l)} />
                       </td>
                       <td className="px-3 py-2 text-gray-100">{l.client_name}</td>
-                      <td className="px-3 py-2 font-mono text-gray-200">
+                      <td className="break-all px-3 py-2 font-mono text-gray-200">
                         {l.domain}
                         {l.has_mx === false ? <span className="ml-2 rounded bg-gray-700 px-1.5 py-0.5 font-sans text-[10px] uppercase text-gray-200">no mail</span> : null}
                       </td>
@@ -947,11 +949,11 @@ function Setup() {
                         </span>
                       </td>
                       <td className="px-3 py-2">
-                        <span className="font-mono text-gray-200">{ruaOf(l)}</span> <Copy text={ruaOf(l)} label={`Copy the DMARC record value for ${l.domain}`} />
+                        <span className="break-all font-mono text-gray-200">{ruaOf(l)}</span> <Copy text={ruaOf(l)} label={`Copy the DMARC record value for ${l.domain}`} />
                       </td>
                       <td className="px-3 py-2">
-                        <div className="font-mono text-gray-200">{l.authorization_record_name}</div>
-                        <div className="font-mono text-gray-400">{l.authorization_record_value}</div>{' '}
+                        <div className="break-all font-mono text-gray-200">{l.authorization_record_name}</div>
+                        <div className="break-all font-mono text-gray-400">{l.authorization_record_value}</div>{' '}
                         <Copy text={`${l.authorization_record_name}\tTXT\t${l.authorization_record_value}`} label={`Copy the DNS record for ${l.domain}`} />
                       </td>
                     </tr>
@@ -969,7 +971,7 @@ function Setup() {
 export function DmarcView() {
   const [tab, setTab] = useState<'results' | 'setup'>('results');
   return (
-    <div className="space-y-5 p-6">
+    <div className="min-w-0 max-w-full space-y-5 p-6">
       <div>
         <h1 className="text-2xl font-semibold text-white">DMARC reports</h1>
         <p className="mt-1 text-sm text-gray-400">What mail receivers saw being sent as each client&rsquo;s domains, and whether it passed. A low pass rate means real mail is failing or someone is pretending to be the client.</p>

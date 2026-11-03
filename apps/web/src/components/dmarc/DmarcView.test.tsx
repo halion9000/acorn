@@ -137,6 +137,16 @@ describe('DMARC results', () => {
 });
 
 describe('DMARC setup', () => {
+  it('keeps the page no wider than the window: long record lines wrap and the page can shrink so a table scrolls inside its own box', async () => {
+    render(view());
+    await userEvent.click(await screen.findByRole('tab', { name: 'Setup' }));
+    const r = await screen.findByTestId('setup-row');
+    for (const text of ['rua=mailto:acme-dental@goliveoak.com', 'acmedental.com._report._dmarc.goliveoak.com', 'v=DMARC1']) expect(within(r).getByText(text)).toHaveClass('break-all');
+    expect(within(r).getByText('acmedental.com').closest('td')).toHaveClass('break-all');
+    expect(screen.getByRole('heading', { name: 'DMARC reports' }).closest('div.p-6')).toHaveClass('min-w-0', 'max-w-full');
+    expect(r.closest('div.overflow-x-auto')).not.toBeNull();
+  });
+
   it('gives each client domain its DMARC record value and the DNS line for your zone, ready to copy', async () => {
     const write = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: write }, configurable: true });

@@ -461,6 +461,9 @@ async def put_tool_exclusions(
 
     forget_loaded()
     fleet_cache.clear()
+    if chosen and before != chosen:
+        await tool_exclusions.run_excluded_present(db, owner, [client_id])  # marking a tool as not used while it reports devices is itself worth an alert
+        await db.commit()
     return ToolExclusionsOut(tools=chosen, choices=list(tool_exclusions.EXCLUDABLE))
 
 
