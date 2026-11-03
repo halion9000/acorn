@@ -107,7 +107,13 @@ const VENDOR_NAMES: Record<string, string> = { halopsa: 'HaloPSA', ninjaone: 'Ni
 
 /** "halopsa" -> "HaloPSA", "petra" -> "Petra"; a tool it doesn't know is capitalized. */
 export function vendorLabel(vendor: string): string {
-  return VENDOR_NAMES[vendor] ?? vendor.charAt(0).toUpperCase() + vendor.slice(1);
+  if (VENDOR_NAMES[vendor]) return VENDOR_NAMES[vendor];
+  // A.C.O.R.N's own detections name themselves aisoc-<what> ("aisoc-identity-detections", "aisoc-checks"): show them as A.C.O.R.N, not "Aisoc-...".
+  if (vendor.startsWith('aisoc-') || vendor === 'aisoc') {
+    const what = vendor.slice(6).replace(/[-_]+/g, ' ').trim();
+    return what ? `A.C.O.R.N ${what}` : 'A.C.O.R.N';
+  }
+  return vendor.charAt(0).toUpperCase() + vendor.slice(1);
 }
 
 /**

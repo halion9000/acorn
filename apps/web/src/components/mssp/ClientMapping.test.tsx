@@ -68,6 +68,9 @@ describe('grouping', () => {
     expect([g.unmapped, g.mapped, g.ignored].map((x) => x.map((c) => c.vendor_client_name))).toEqual([['A'], ['B'], ['C']]);
     expect(vendorLabel('petra')).toBe('Petra');
     expect(vendorLabel('halopsa')).toBe('HaloPSA');
+    expect(vendorLabel('aisoc-identity-detections')).toBe('A.C.O.R.N identity detections');
+    expect(vendorLabel('aisoc-checks')).toBe('A.C.O.R.N checks');
+    expect(vendorLabel('aisoc')).toBe('A.C.O.R.N');
     expect(vendorLabel('ninjaone')).toBe('NinjaOne');
     expect(vendorLabel('acme')).toBe('Acme');
   });
