@@ -110,7 +110,19 @@ export function useRealtimeChannel<T = unknown>(
       if (cancelled) return;
 
       setStep({ name: 'socket', attempt });
-      const ws = new WebSocket(target);
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(target);
+      } catch (e) {
+        // The browser refuses some addresses before trying anything (an insecure ws:// address from an https page, a malformed address). That used to be an unhandled error and the panel sat on "connecting"
+        // for good; say what happened and try again.
+        if (cancelled) return;
+        setStatus('error');
+        const why = String((e as { message?: unknown } | null)?.message ?? '').slice(0, 140);
+        setProblem(`The browser refused to open the live connection${why ? ` (${why})` : ''}.`);
+        retryWithBackoff();
+        return;
+      }
       wsRef.current = ws;
 
       // A socket that never opens (a proxy holding the upgrade, a blocked port) stays "connecting" for a long time and says nothing; give it a limit and say what happened.

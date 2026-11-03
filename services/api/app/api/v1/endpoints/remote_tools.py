@@ -66,6 +66,10 @@ class ToolRow(BaseModel):
     blocked_devices: int
     allowed_devices: int
     unreviewed_devices: int
+    # For a tool that is installed once per server (ScreenConnect): whether it has one, your own identifiers, and how many installs belong to another server.
+    has_instances: bool = False
+    trusted_instances: list[str] = []
+    foreign_installs: int = 0
 
 
 class Inventory(BaseModel):
@@ -78,9 +82,10 @@ class Inventory(BaseModel):
 
 
 def build_inventory(
-    sightings: list[Any], rules: dict[tuple[str, uuid.UUID | None], str], scans: list[Any]
+    sightings: list[Any], rules: dict[tuple[str, uuid.UUID | None], str], scans: list[Any], trusted: dict[str, list[str]] | None = None
 ) -> Inventory:
     """The numbers behind the page, from stored sightings (pure: tested without a database)."""
+    trusted = trusted or {}
     by_tool: dict[str, list[Any]] = {}
     for s in sightings:
         if rt.tool_by_key(s.tool_key) is not None:
@@ -90,24 +95,33 @@ def build_inventory(
     for key, rows in by_tool.items():
         tool = rt.tool_by_key(key)
         counts = {"allowed": 0, "blocked": 0, "unreviewed": 0}
+        seen_device: set[tuple[uuid.UUID, str]] = set()
         for s in rows:
             v = rt.effective_verdict(key, s.tenant_id, rules)
-            counts[v] += 1
+            device = (s.tenant_id, rt.host_key(s.hostname))
+            if device not in seen_device:  # a second install of the tool on the same device is still one device
+                seen_device.add(device)
+                counts[v] += 1
             if v == "blocked":
-                blocked_devices.add((s.tenant_id, rt.host_key(s.hostname)))
+                blocked_devices.add(device)
+        mine = trusted.get(key, [])
+        foreign = sum(1 for s in rows if mine and getattr(s, "instance_id", "") and s.instance_id not in mine)
         tools.append(
             ToolRow(
                 key=key,
                 name=tool.name,  # type: ignore[union-attr]
                 category=tool.category,  # type: ignore[union-attr]
                 clients=len({s.tenant_id for s in rows}),
-                devices=len(rows),
+                devices=len(seen_device),
                 last_seen=max((s.last_seen for s in rows), default=None),
                 verdict=rules.get((key, None), "unreviewed"),
                 client_rules=sum(1 for (k, c) in rules if k == key and c is not None),
                 blocked_devices=counts["blocked"],
                 allowed_devices=counts["allowed"],
                 unreviewed_devices=counts["unreviewed"],
+                has_instances=tool.instance_pattern is not None,  # type: ignore[union-attr]
+                trusted_instances=mine,
+                foreign_installs=foreign,
             )
         )
     tools.sort(key=lambda t: (-t.blocked_devices, -t.devices, t.name.lower()))
@@ -130,7 +144,8 @@ async def inventory(current_user: Annotated[AuthUser, Depends(require_permission
     sightings = await _sightings(db, scope)
     async with cross_tenant_reads(db):
         scans = list((await db.execute(select(RemoteToolScan).where(RemoteToolScan.tenant_id.in_(scope)))).scalars().all())
-    return build_inventory(sightings, rules, scans)
+    owner_tenant = await db.get(Tenant, owner)
+    return build_inventory(sightings, rules, scans, rt.trusted_instances(getattr(owner_tenant, "settings", None)))
 
 
 class CatalogEntry(BaseModel):
@@ -152,6 +167,11 @@ class DeviceRow(BaseModel):
     first_seen: datetime
     last_seen: datetime
     verdict: str
+    install_path: str | None = None
+    program: str | None = None
+    instance_id: str = ""
+    # For an install that belongs to another server than yours (see the tool's own identifiers): True.
+    foreign: bool = False
 
 
 
@@ -174,8 +194,9 @@ async def tool_devices(
             raise HTTPException(status_code=404, detail="Client not found")
         scope = [client_id]
     rules = await _rules(db, owner)
+    mine = rt.trusted_instances(getattr(await db.get(Tenant, owner), "settings", None)).get(tool_key, [])
     rows = [s for s in await _sightings(db, scope) if s.tool_key == tool_key]
-    rows.sort(key=lambda s: ((clients.get(s.tenant_id) or "").lower(), s.hostname.lower()))
+    rows.sort(key=lambda s: ((clients.get(s.tenant_id) or "").lower(), s.hostname.lower(), getattr(s, "instance_id", "") or ""))
     return [
         DeviceRow(
             client_id=s.tenant_id,
@@ -185,6 +206,10 @@ async def tool_devices(
             first_seen=s.first_seen,
             last_seen=s.last_seen,
             verdict=rt.effective_verdict(tool_key, s.tenant_id, rules),
+            install_path=getattr(s, "install_path", None),
+            program=getattr(s, "program", None),
+            instance_id=getattr(s, "instance_id", "") or "",
+            foreign=bool(mine and getattr(s, "instance_id", "") and s.instance_id not in mine),
         )
         for s in rows[:limit]
     ]
@@ -234,19 +259,24 @@ async def _save(db: Any, tenant_id: uuid.UUID, findings: list[Any], now: datetim
             values.update(
                 category="remote_access",
                 connector_type="remote-tools",
-                tags=["remote-tool", "blocked", rt.RULE_ID],
-                raw_event={"source": "aisoc-remote-tools", "finding": {"uid": f"{rt.RULE_ID}:{f.key}", "title": f.title}},
+                tags=["remote-tool", "foreign-server" if f.rule_id == rt.FOREIGN_RULE_ID else "blocked", f.rule_id],
+                raw_event={"source": "aisoc-remote-tools", "finding": {"uid": f"{f.rule_id}:{f.key}", "title": f.title}},
             )
             res = await db.execute(pg_insert(_alert_model()).values(**values).on_conflict_do_nothing(index_elements=["id"]))
             made += res.rowcount or 0
     return made
 
 
-async def _raise_alerts(db: Any, owner: uuid.UUID, rows: list[Any], rules: dict[tuple[str, uuid.UUID | None], str], now: datetime) -> int:
-    """Alerts for the blocked tools among ``rows`` (stored sightings of any clients), each raised in its own client's tenant. One alert per device and tool (a fixed id), so a repeat raises nothing."""
+async def _raise_alerts(
+    db: Any, owner: uuid.UUID, rows: list[Any], rules: dict[tuple[str, uuid.UUID | None], str], now: datetime, trusted: dict[str, list[str]] | None = None
+) -> int:
+    """Alerts for the blocked tools, and the installs that belong to another server than yours, among ``rows`` (stored sightings of any clients), each raised in its own client's tenant. One alert per device and
+    tool (blocked) or per device, tool and server (another server's); a fixed id, so a repeat raises nothing."""
     made = 0
+    if trusted is None:
+        trusted = rt.trusted_instances(getattr(await db.get(Tenant, owner), "settings", None))
     by_tenant: dict[uuid.UUID, list[Any]] = {}
-    for tenant_id, finding in rt.blocked_findings(rows, rules, now):
+    for tenant_id, finding in [*rt.blocked_findings(rows, rules, now), *rt.foreign_findings(rows, trusted, now)]:
         by_tenant.setdefault(tenant_id, []).append(finding)
     for tenant_id, findings in by_tenant.items():
         try:
@@ -310,6 +340,64 @@ async def set_verdict(
     return VerdictOut(tool_key=tool_key, verdict=body.verdict, client_id=body.client_id, alerts_raised=raised)
 
 
+class InstancesIn(BaseModel):
+    ids: list[str] = Field(default_factory=list, max_length=20, description="The server identifiers that are yours, as they appear in the install (ScreenConnect: the 16 characters in 'ScreenConnect Client (...)').")
+
+
+class InstancesOut(BaseModel):
+    tool_key: str
+    ids: list[str]
+    alerts_raised: int
+
+
+@router.put(
+    "/tools/{tool_key}/instances",
+    response_model=InstancesOut,
+    summary="Say which server identifiers of a tool are yours; an install that belongs to any other raises a critical alert",
+)
+async def set_instances(
+    tool_key: str,
+    body: InstancesIn,
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))],
+    db: DBSession,
+    request: Request = None,  # type: ignore[assignment]
+) -> InstancesOut:
+    tool = rt.tool_by_key(tool_key)
+    if tool is None:
+        raise HTTPException(status_code=404, detail="That is not a tool this page knows")
+    if tool.instance_pattern is None:
+        raise HTTPException(status_code=422, detail=f"{tool.name} installs do not name a server, so there are no identifiers to set")
+    try:
+        chosen = rt.normalize_instance_ids(body.ids)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"{exc} is not a server identifier (it is 8 to 40 letters a to f and digits)") from None
+    owner = current_user.tenant_id
+    tenant = await db.get(Tenant, owner)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    before = rt.trusted_instances(tenant.settings).get(tool_key, [])
+    tenant.settings = rt.with_trusted_instances(tenant.settings, tool_key, chosen)
+    await db.flush()
+    raised = 0
+    if chosen:
+        clients = await _clients(db, owner)
+        rows = [s for s in await _sightings(db, [owner, *clients]) if s.tool_key == tool_key]
+        raised = await _raise_alerts(db, owner, rows, await _rules(db, owner), datetime.now(UTC), trusted={tool_key: chosen})
+    if before != chosen:
+        await emit_audit(
+            db=db,
+            tenant_id=owner,
+            actor_id=current_user.user_id,
+            action="remote_tool:instances_changed",
+            resource="remote_tool",
+            resource_id=tool_key,
+            changes={"tool": tool.name, "before": before, "after": chosen},
+            request=request,
+        )
+    await db.commit()
+    return InstancesOut(tool_key=tool_key, ids=chosen, alerts_raised=raised)
+
+
 # ---- CORE reports ---------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -317,6 +405,8 @@ class FoundIn(BaseModel):
     hostname: str = Field(min_length=1, max_length=255)
     tool_key: str = Field(pattern=_TOOL_KEY)
     version: str | None = Field(default=None, max_length=60)
+    program: str | None = Field(default=None, max_length=255, description="The program's name as the device lists it.")
+    path: str | None = Field(default=None, max_length=500, description="Where it is installed, when the tool that lists the software says.")
 
 
 class RemoteToolsReport(BaseModel):
@@ -347,25 +437,36 @@ async def apply_report(db: Any, owner: uuid.UUID, report: RemoteToolsReport, now
             return ReportOut(stored=0, removed=0, unknown_tools=0, unmapped=True, alerts_raised=0)  # not mapped to a client yet: it arrives again after the mapping
         target = alias.child_tenant_id
     unknown = sum(1 for i in report.items if rt.tool_by_key(i.tool_key) is None)
-    wanted: dict[tuple[str, str], FoundIn] = {}
+    wanted: dict[tuple[str, str, str], FoundIn] = {}
     for i in report.items:
         if rt.tool_by_key(i.tool_key) is not None:
-            wanted[(rt.host_key(i.hostname), i.tool_key)] = i
+            # Two installs of one tool on one device are two rows when they belong to different servers; the same install listed twice is one.
+            wanted[(rt.host_key(i.hostname), i.tool_key, rt.instance_of(i.tool_key, i.program, i.path))] = i
     stored = removed = 0
     async with _in_tenant(db, owner, target):
         held = (await db.execute(select(DeviceRemoteTool).where(DeviceRemoteTool.tenant_id == target, DeviceRemoteTool.vendor == report.vendor))).scalars().all()
-        for (hk, tk), item in wanted.items():
-            stmt = pg_insert(DeviceRemoteTool).values(tenant_id=target, hostname_key=hk, tool_key=tk, hostname=item.hostname, vendor=report.vendor, version=item.version, first_seen=now, last_seen=now)
+        for (hk, tk, inst), item in wanted.items():
+            stmt = pg_insert(DeviceRemoteTool).values(
+                tenant_id=target, hostname_key=hk, tool_key=tk, instance_id=inst, hostname=item.hostname, vendor=report.vendor, version=item.version, program=item.program, install_path=item.path, first_seen=now, last_seen=now
+            )
             await db.execute(
                 stmt.on_conflict_do_update(
-                    index_elements=["tenant_id", "hostname_key", "tool_key"], set_={"hostname": item.hostname, "vendor": report.vendor, "version": item.version, "last_seen": now}
+                    index_elements=["tenant_id", "hostname_key", "tool_key", "instance_id"],
+                    set_={"hostname": item.hostname, "vendor": report.vendor, "version": item.version, "program": item.program, "install_path": item.path, "last_seen": now},
                 )
             )
             stored += 1
         if report.devices_scanned > 0:
             for row in held:
-                if (row.hostname_key, row.tool_key) not in wanted:
-                    await db.execute(delete(DeviceRemoteTool).where(DeviceRemoteTool.tenant_id == target, DeviceRemoteTool.hostname_key == row.hostname_key, DeviceRemoteTool.tool_key == row.tool_key))
+                if (row.hostname_key, row.tool_key, getattr(row, "instance_id", "") or "") not in wanted:
+                    await db.execute(
+                        delete(DeviceRemoteTool).where(
+                            DeviceRemoteTool.tenant_id == target,
+                            DeviceRemoteTool.hostname_key == row.hostname_key,
+                            DeviceRemoteTool.tool_key == row.tool_key,
+                            DeviceRemoteTool.instance_id == (getattr(row, "instance_id", "") or ""),
+                        )
+                    )
                     removed += 1
         scan = pg_insert(RemoteToolScan).values(tenant_id=target, vendor=report.vendor, scanned_at=now, devices_scanned=report.devices_scanned)
         await db.execute(scan.on_conflict_do_update(index_elements=["tenant_id", "vendor"], set_={"scanned_at": now, "devices_scanned": report.devices_scanned}))

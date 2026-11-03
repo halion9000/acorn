@@ -24,6 +24,10 @@ export interface ToolRow {
   blocked_devices: number;
   allowed_devices: number;
   unreviewed_devices: number;
+  /** A tool installed once per server (ScreenConnect): whether it is one, which server identifiers are yours, and how many installs belong to another. Absent from an older API. */
+  has_instances?: boolean;
+  trusted_instances?: string[];
+  foreign_installs?: number;
 }
 
 export interface Inventory {
@@ -42,6 +46,15 @@ interface DeviceRow {
   version: string | null;
   last_seen: string;
   verdict: Verdict;
+  install_path?: string | null;
+  program?: string | null;
+  instance_id?: string;
+  foreign?: boolean;
+}
+
+/** "798cebdb8316a8ff, 1111222233334444" as a list of identifiers: split on commas, spaces and semicolons, empty parts dropped. */
+export function parseIds(text: string): string[] {
+  return text.split(/[\s,;]+/).map((t) => t.trim().toLowerCase()).filter(Boolean);
 }
 
 export type Filter = 'all' | Verdict;
@@ -100,6 +113,74 @@ function when(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
+}
+
+function InstanceEditor({ tool, onSaved, disabled }: { tool: ToolRow; onSaved: (message: string) => void; disabled: boolean }) {
+  const mine = tool.trusted_instances ?? [];
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(mine.join(', '));
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    setProblem(null);
+    try {
+      const res = await authFetch(`/api/v1/remote-tools/tools/${encodeURIComponent(tool.key)}/instances`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ids: parseIds(text) }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { detail?: string } | null;
+        throw new Error(res.status === 403 ? 'You need permission to manage clients to change this.' : (body?.detail ?? `The API answered ${res.status}`));
+      }
+      const out = (await res.json()) as { ids: string[]; alerts_raised: number };
+      setEditing(false);
+      onSaved(`${tool.name} server identifiers saved (${out.ids.length === 0 ? 'none' : out.ids.join(', ')}).${out.alerts_raised > 0 ? ` ${out.alerts_raised} critical alert${out.alerts_raised === 1 ? '' : 's'} raised for installs that belong to another server.` : ''}`);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : 'Could not save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <div className="mt-1 text-xs" data-testid={`instances-${tool.key}`}>
+        {mine.length === 0 ? (
+          <span className="text-amber-300">Not set: installs for another server are not being checked.</span>
+        ) : (
+          <span className="text-gray-400">
+            Your server {mine.length === 1 ? 'identifier' : 'identifiers'}: <span className="font-mono text-gray-200">{mine.join(', ')}</span>
+          </span>
+        )}{' '}
+        <button type="button" disabled={disabled} onClick={() => { setText(mine.join(', ')); setEditing(true); }} className="text-sky-300 hover:underline disabled:opacity-40">
+          {mine.length === 0 ? 'Set yours' : 'Change'}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-1 space-y-1 text-xs" data-testid={`instances-${tool.key}`}>
+      <label className="block text-gray-400">
+        Your {tool.name} server identifiers (the 16 characters in the install, for example 798cebdb8316a8ff), separated by commas
+        <input value={text} onChange={(e) => setText(e.target.value)} aria-label={`Your ${tool.name} server identifiers`} className="mt-1 block w-full max-w-md rounded border border-gray-700 bg-gray-950 px-2 py-1 font-mono text-gray-100" />
+      </label>
+      <button type="button" disabled={saving} onClick={() => void save()} className="rounded border border-sky-500/50 px-2 py-0.5 text-sky-300 disabled:opacity-40">
+        Save
+      </button>{' '}
+      <button type="button" disabled={saving} onClick={() => setEditing(false)} className="text-gray-400 hover:underline">
+        Cancel
+      </button>
+      <p className="text-gray-500">Any install of {tool.name} for a server not listed here raises a critical alert.</p>
+      {problem && (
+        <p role="alert" className="text-red-300">
+          {problem}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export default function RemoteToolsView() {
@@ -266,11 +347,28 @@ export default function RemoteToolsView() {
                         {t.name}
                       </button>
                       <div className="text-xs text-gray-500">{categoryLabel(t.category)}</div>
+                      {t.has_instances ? (
+                        <InstanceEditor
+                          key={`${t.key}:${(t.trusted_instances ?? []).join(',')}`}
+                          tool={t}
+                          disabled={busy}
+                          onSaved={(message) => {
+                            setNotice(message);
+                            void load();
+                            if (open === t.key) void loadDevices(t.key);
+                          }}
+                        />
+                      ) : null}
                     </td>
                     <td className="pr-3">{t.clients}</td>
                     <td className="pr-3">
                       {t.devices}
                       {t.blocked_devices > 0 && <span className="ml-1 text-xs text-red-300">({t.blocked_devices} blocked)</span>}
+                      {(t.foreign_installs ?? 0) > 0 && (
+                        <span className="ml-1 text-xs font-medium text-red-300" data-testid={`foreign-${t.key}`}>
+                          ({t.foreign_installs} for another server)
+                        </span>
+                      )}
                     </td>
                     <td className="pr-3">
                       <Badge verdict={t.verdict} />
@@ -301,13 +399,14 @@ export default function RemoteToolsView() {
                                 <th scope="col" className="py-1 pr-3 text-left">Client</th>
                                 <th scope="col" className="pr-3 text-left">Device</th>
                                 <th scope="col" className="pr-3 text-left">Version</th>
+                                <th scope="col" className="pr-3 text-left">Installed at</th>
                                 <th scope="col" className="pr-3 text-left">Decision for this client</th>
                                 <th scope="col"><span className="sr-only">Decide for this client</span></th>
                               </tr>
                             </thead>
                             <tbody>
                               {devices.map((d) => (
-                                <tr key={`${d.client_id}:${d.hostname}`} className="border-t border-gray-800 text-gray-300">
+                                <tr key={`${d.client_id}:${d.hostname}:${d.instance_id ?? ''}`} className={`border-t border-gray-800 ${d.foreign ? 'bg-red-500/5 text-red-200' : 'text-gray-300'}`}>
                                   <td className="py-1 pr-3">{d.client_name ?? '—'}</td>
                                   <td className="pr-3">
                                     <Link href={`/devices?search=${encodeURIComponent(d.hostname)}`} className="text-sky-300 hover:underline">
@@ -315,6 +414,14 @@ export default function RemoteToolsView() {
                                     </Link>
                                   </td>
                                   <td className="pr-3">{d.version ?? '—'}</td>
+                                  <td className="pr-3 break-all font-mono text-gray-300" data-testid="install-path">
+                                    {d.install_path ?? '—'}
+                                    {d.instance_id ? (
+                                      <div className={d.foreign ? 'font-sans font-medium text-red-300' : 'font-sans text-gray-500'}>
+                                        {d.foreign ? `Another server: ${d.instance_id}` : `Server ${d.instance_id}`}
+                                      </div>
+                                    ) : null}
+                                  </td>
                                   <td className="pr-3"><Badge verdict={d.verdict} /></td>
                                   <td className="space-x-1 whitespace-nowrap text-right">
                                     <button type="button" disabled={busy} onClick={() => void decide(t, 'allowed', { id: d.client_id, name: d.client_name })} className="rounded border border-emerald-500/40 px-1.5 text-emerald-300 disabled:opacity-40" aria-label={`Approve ${t.name} for ${d.client_name ?? 'this client'}`}>

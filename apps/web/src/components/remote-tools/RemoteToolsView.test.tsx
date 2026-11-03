@@ -6,7 +6,7 @@ const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a> }));
 
-import RemoteToolsView, { categoryLabel, counts, filterTools, reach, type Inventory, type ToolRow } from './RemoteToolsView';
+import RemoteToolsView, { categoryLabel, counts, filterTools, parseIds, reach, type Inventory, type ToolRow } from './RemoteToolsView';
 
 const tool = (over: Partial<ToolRow> & { key: string; name: string }): ToolRow => ({
   category: 'remote_access', clients: 1, devices: 1, last_seen: '2026-11-03T14:28:00Z', verdict: 'unreviewed', client_rules: 0, blocked_devices: 0, allowed_devices: 0, unreviewed_devices: 1, ...over,
@@ -147,5 +147,77 @@ describe('RemoteToolsView', () => {
     authFetch.mockImplementation(() => json({}, 500));
     render(<RemoteToolsView />);
     expect(await screen.findByRole('alert')).toHaveTextContent('The API answered 500');
+  });
+});
+
+describe('where it is installed, and whose server it connects to', () => {
+  const PATH = 'C:\Program Files (x86)\ScreenConnect Client (1111222233334444)';
+  const withSc = (trusted: string[], foreign: number) =>
+    inventory({
+      tools: [tool({ key: 'screenconnect', name: 'ScreenConnect', category: 'remote_support', verdict: 'allowed', devices: 3, has_instances: true, trusted_instances: trusted, foreign_installs: foreign })],
+    });
+
+  it('splits identifiers on commas, spaces and semicolons and lower-cases them', () => {
+    expect(parseIds(' 798CEBDB8316A8FF, 1111222233334444;aaaa bbbb ')).toEqual(['798cebdb8316a8ff', '1111222233334444', 'aaaa', 'bbbb']);
+    expect(parseIds('  ')).toEqual([]);
+  });
+
+  it('shows the install folder of each device and marks an install for another server', async () => {
+    serve(withSc(['798cebdb8316a8ff'], 1), [
+      { client_id: 'c1', client_name: 'Acme', hostname: 'PC-1', version: '24.1', last_seen: '2026-11-03T14:28:00Z', verdict: 'allowed', install_path: PATH, instance_id: '1111222233334444', foreign: true },
+      { client_id: 'c1', client_name: 'Acme', hostname: 'PC-2', version: '24.1', last_seen: '2026-11-03T14:28:00Z', verdict: 'allowed', install_path: 'C:\Program Files (x86)\ScreenConnect Client (798cebdb8316a8ff)', instance_id: '798cebdb8316a8ff', foreign: false },
+    ]);
+    render(<RemoteToolsView />);
+    expect(await screen.findByTestId('foreign-screenconnect')).toHaveTextContent('(1 for another server)');
+    await userEvent.click(screen.getByRole('button', { name: 'ScreenConnect' }));
+    const panel = await screen.findByTestId('devices-screenconnect');
+    const paths = within(panel).getAllByTestId('install-path');
+    expect(paths[0]).toHaveTextContent(PATH);
+    expect(paths[0]).toHaveTextContent('Another server: 1111222233334444');
+    expect(paths[1]).toHaveTextContent('Server 798cebdb8316a8ff');
+    expect(paths[1]).not.toHaveTextContent('Another server');
+  });
+
+  it('says plainly when none of your identifiers is set, and shows them once they are', async () => {
+    serve(withSc([], 0));
+    const first = render(<RemoteToolsView />);
+    expect(await screen.findByTestId('instances-screenconnect')).toHaveTextContent('Not set: installs for another server are not being checked.');
+    first.unmount();
+    serve(withSc(['798cebdb8316a8ff'], 0));
+    render(<RemoteToolsView />);
+    expect(await screen.findByTestId('instances-screenconnect')).toHaveTextContent('Your server identifier: 798cebdb8316a8ff');
+  });
+
+  it('saves your identifiers as a clean list, says how many critical alerts that raised, and reloads', async () => {
+    authFetch.mockImplementation((url: string, init?: { method?: string; body?: string }) => {
+      if (init?.method === 'PUT') return json({ tool_key: 'screenconnect', ids: JSON.parse(String(init.body)).ids, alerts_raised: 2 });
+      return json(withSc([], 0));
+    });
+    render(<RemoteToolsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Set yours' }));
+    await userEvent.type(screen.getByLabelText('Your ScreenConnect server identifiers'), '798CEBDB8316A8FF');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('ScreenConnect server identifiers saved (798cebdb8316a8ff). 2 critical alerts raised'));
+    const put = authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')!;
+    expect(put[0]).toBe('/api/v1/remote-tools/tools/screenconnect/instances');
+    expect(JSON.parse(put[1].body)).toEqual({ ids: ['798cebdb8316a8ff'] });
+    expect(authFetch.mock.calls.filter((c) => String(c[0]).endsWith('/inventory')).length).toBe(2);
+  });
+
+  it('shows what the API says when an identifier is refused, and keeps the editor open', async () => {
+    authFetch.mockImplementation((url: string, init?: { method?: string }) => (init?.method === 'PUT' ? json({ detail: 'zzz is not a server identifier (it is 8 to 40 letters a to f and digits)' }, 422) : json(withSc([], 0))));
+    render(<RemoteToolsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Set yours' }));
+    await userEvent.type(screen.getByLabelText('Your ScreenConnect server identifiers'), 'zzz');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('zzz is not a server identifier');
+    expect(screen.getByLabelText('Your ScreenConnect server identifiers')).toBeInTheDocument();
+  });
+
+  it('offers no identifier editor for a tool that has no server identifier', async () => {
+    serve();
+    render(<RemoteToolsView />);
+    await screen.findByTestId('tools-table');
+    expect(screen.queryByTestId('instances-teamviewer')).toBeNull();
   });
 });

@@ -64,12 +64,15 @@ const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || ''; // WS handled separately b
  * SSR fallback: returns `''` so the resulting URL is path-only; nothing on
  * the server actually opens WebSockets.
  */
-export function resolveWsBase(wsBase: string, pageHostname: string): string {
+export function resolveWsBase(wsBase: string, pageHostname: string, page?: { protocol: string; host: string }): string {
   // The bundle bakes ws://localhost:<port>. Opened from another computer that would point at the viewer's own machine, so keep the port and use the host the page was loaded from.
   try {
     const u = new URL(wsBase);
     const loopback = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
     if (loopback && pageHostname && pageHostname !== 'localhost' && pageHostname !== '127.0.0.1') {
+      // A page served over https cannot open a plain ws:// socket: the browser refuses it outright (and throws before anything is tried). Such a site has a proxy in front that carries /ws on the same
+      // address, so use that: wss on the page's own host and port, with no extra port.
+      if (page?.protocol === 'https:') return `wss://${page.host}`;
       u.hostname = pageHostname;
       return u.toString().replace(/\/$/, '');
     }
@@ -81,7 +84,7 @@ export function resolveWsBase(wsBase: string, pageHostname: string): string {
 
 function wsOrigin(): string {
   if (WS_BASE) {
-    return typeof window !== 'undefined' ? resolveWsBase(WS_BASE, window.location.hostname) : WS_BASE;
+    return typeof window !== 'undefined' ? resolveWsBase(WS_BASE, window.location.hostname, { protocol: window.location.protocol, host: window.location.host }) : WS_BASE;
   }
   if (typeof window !== 'undefined') {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

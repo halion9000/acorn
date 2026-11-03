@@ -10708,6 +10708,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/remote-tools/tools/{tool_key}/instances:
+    put:
+      tags:
+      - remote-tools
+      summary: Say which server identifiers of a tool are yours; an install that belongs
+        to any other raises a critical alert
+      operationId: set_instances_api_v1_remote_tools_tools__tool_key__instances_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: tool_key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tool Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstancesIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstancesOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/remote-tools:
     post:
       tags:
@@ -29472,6 +29507,24 @@ components:
         verdict:
           type: string
           title: Verdict
+        install_path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Install Path
+        program:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Program
+        instance_id:
+          type: string
+          title: Instance Id
+          default: ''
+        foreign:
+          type: boolean
+          title: Foreign
+          default: false
       type: object
       required:
       - client_id
@@ -31857,6 +31910,21 @@ components:
             maxLength: 60
           - type: 'null'
           title: Version
+        program:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Program
+          description: The program's name as the device lists it.
+        path:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Path
+          description: Where it is installed, when the tool that lists the software
+            says.
       type: object
       required:
       - hostname
@@ -33542,6 +33610,37 @@ components:
       - at_risk
       - sending_domains
       title: Insights
+    InstancesIn:
+      properties:
+        ids:
+          items:
+            type: string
+          type: array
+          maxItems: 20
+          title: Ids
+          description: 'The server identifiers that are yours, as they appear in the
+            install (ScreenConnect: the 16 characters in ''ScreenConnect Client (...)'').'
+      type: object
+      title: InstancesIn
+    InstancesOut:
+      properties:
+        tool_key:
+          type: string
+          title: Tool Key
+        ids:
+          items:
+            type: string
+          type: array
+          title: Ids
+        alerts_raised:
+          type: integer
+          title: Alerts Raised
+      type: object
+      required:
+      - tool_key
+      - ids
+      - alerts_raised
+      title: InstancesOut
     Inventory:
       properties:
         tools_found:
@@ -45215,6 +45314,20 @@ components:
         unreviewed_devices:
           type: integer
           title: Unreviewed Devices
+        has_instances:
+          type: boolean
+          title: Has Instances
+          default: false
+        trusted_instances:
+          items:
+            type: string
+          type: array
+          title: Trusted Instances
+          default: []
+        foreign_installs:
+          type: integer
+          title: Foreign Installs
+          default: 0
       type: object
       required:
       - key

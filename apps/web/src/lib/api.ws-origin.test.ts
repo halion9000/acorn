@@ -22,4 +22,14 @@ describe('resolveWsBase', () => {
   it('leaves a non-URL value alone', () => {
     expect(resolveWsBase('/ws', 'aisoc.local')).toBe('/ws');
   });
+
+  it('on an https page never answers a plain ws:// address (the browser refuses it): it uses wss on the host and port of the page', () => {
+    expect(resolveWsBase('ws://localhost:8086', 'acorn.goliveoak.com', { protocol: 'https:', host: 'acorn.goliveoak.com' })).toBe('wss://acorn.goliveoak.com');
+    expect(resolveWsBase('ws://localhost:8086', 'acorn.example', { protocol: 'https:', host: 'acorn.example:8443' })).toBe('wss://acorn.example:8443');
+  });
+
+  it('on an http page it still keeps the port, and on localhost it changes nothing even over https', () => {
+    expect(resolveWsBase('ws://localhost:8086', '192.168.1.50', { protocol: 'http:', host: '192.168.1.50:3000' })).toBe('ws://192.168.1.50:8086');
+    expect(resolveWsBase('ws://localhost:8086', 'localhost', { protocol: 'https:', host: 'localhost:3000' })).toBe('ws://localhost:8086');
+  });
 });

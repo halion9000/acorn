@@ -27,6 +27,9 @@ class Tool:
     category: str  # rmm | remote_access | remote_support | file_transfer | remote_desktop_manager
     # Regular expressions tried against "<program name>" (and "<program name> <publisher>" where the pattern says so with \b boundaries).
     patterns: tuple[str, ...]
+    # Some tools are installed once per server they connect to, and the install says which server in its name or folder (ScreenConnect: "ScreenConnect Client (798cebdb8316a8ff)"). A regular
+    # expression with one group that picks that identifier out of the program name or install path; None for a tool that has no such thing.
+    instance_pattern: str | None = None
 
 
 CATALOG: tuple[Tool, ...] = (
@@ -56,7 +59,7 @@ CATALOG: tuple[Tool, ...] = (
     Tool("putty", "PuTTY", "remote_access", (r"^putty\b",)),
     Tool("radmin", "RAdmin", "remote_access", (r"\bradmin (server|viewer)\b", r"^radmin\b", r"\bremote administrator\b.*\bfamatech\b")),
     Tool("remotepc", "RemotePC", "remote_access", (r"^remotepc\b", r"\bremotepc (host|viewer)\b")),
-    Tool("screenconnect", "ScreenConnect", "remote_support", (r"\bscreenconnect\b", r"\bconnectwise control\b")),
+    Tool("screenconnect", "ScreenConnect", "remote_support", (r"\bscreenconnect\b", r"\bconnectwise control\b"), r"(?<![0-9a-f])([0-9a-f]{16})(?![0-9a-f])"),
     Tool("simplehelp", "SimpleHelp", "remote_support", (r"\bsimplehelp\b", r"\bsimple-help\b")),
     Tool("splashtop", "Splashtop", "remote_access", (r"\bsplashtop\b",)),
     Tool("superops", "SuperOps", "rmm", (r"\bsuperops\b",)),
@@ -141,10 +144,15 @@ def blocked_findings(rows: Iterable[object], rules: dict[tuple[str, uuid.UUID | 
     from app.services.identity_detections import Finding  # noqa: PLC0415
 
     out: list[tuple[uuid.UUID, object]] = []
-    for r in sorted(rows, key=lambda r: (str(r.tenant_id), host_key(r.hostname), r.tool_key)):  # type: ignore[attr-defined]
+    done: set[tuple[uuid.UUID, str]] = set()
+    for r in sorted(rows, key=lambda r: (str(r.tenant_id), host_key(r.hostname), r.tool_key, getattr(r, "instance_id", "") or "")):  # type: ignore[attr-defined]
         tool = _BY_KEY.get(r.tool_key)  # type: ignore[attr-defined]
         if tool is None or effective_verdict(r.tool_key, r.tenant_id, rules) != "blocked":  # type: ignore[attr-defined]
             continue
+        once = (r.tenant_id, f"{r.tool_key}:{host_key(r.hostname)}")  # type: ignore[attr-defined]
+        if once in done:
+            continue  # a second install of the same tool on the same device is the same alert
+        done.add(once)
         version = f" {r.version}" if getattr(r, "version", None) else ""  # type: ignore[attr-defined]
         out.append(
             (
@@ -162,7 +170,108 @@ def blocked_findings(rows: Iterable[object], rules: dict[tuple[str, uuid.UUID | 
                         f"{tool.name}{version} is installed on {r.hostname}, and it is marked as blocked: nobody should be running it. Remote access software is a common way for an attacker to keep a way back in, "
                         "and a forgotten technician tool is a way in too. Find out who installed it; if it is not meant to be there, remove it and check what connected through it."
                     ),
-                    fields=[("Tool", tool.name), ("Device", r.hostname), ("Version", version.strip() or "unknown"), ("Kind", tool.category.replace("_", " "))],  # type: ignore[attr-defined]
+                    fields=[("Tool", tool.name), ("Device", r.hostname), ("Version", version.strip() or "unknown"), ("Kind", tool.category.replace("_", " ")), ("Installed at", getattr(r, "install_path", None) or "unknown")],  # type: ignore[attr-defined]
+                    source_ids=[],
+                ),
+            )
+        )
+    return out
+
+
+# ---- which server an install belongs to (ScreenConnect) -----------------------------------------------------------------------------------------------------
+
+INSTANCE_ID = re.compile(r"^[0-9a-f]{8,40}$")
+SETTINGS_KEY = "remote_tool_instances"
+
+
+def instance_of(tool_key: str, *texts: str | None) -> str:
+    """The identifier of the server an install belongs to, from its program name or install path (the first text that has one), lower case; '' when the tool has no such thing or none is found."""
+    tool = _BY_KEY.get(tool_key)
+    if tool is None or tool.instance_pattern is None:
+        return ""
+    pattern = re.compile(tool.instance_pattern, re.IGNORECASE)
+    for text in texts:
+        m = pattern.search(text or "")
+        if m:
+            return m.group(1).lower()
+    return ""
+
+
+def normalize_instance_ids(ids: Iterable[str]) -> list[str]:
+    """A list as it is stored: trimmed, lower case, unique, sorted. Raises ValueError naming the first that is not a hexadecimal identifier of 8 to 40 characters."""
+    seen: set[str] = set()
+    for raw in ids:
+        v = (raw or "").strip().lower()
+        if not INSTANCE_ID.match(v):
+            raise ValueError(v or "(empty)")
+        seen.add(v)
+    return sorted(seen)
+
+
+def trusted_instances(settings: object) -> dict[str, list[str]]:
+    """The server identifiers the owner says are theirs, per tool, from the managing company's settings. Anything malformed is ignored."""
+    raw = (settings or {}).get(SETTINGS_KEY) if isinstance(settings, dict) else None
+    out: dict[str, list[str]] = {}
+    if isinstance(raw, dict):
+        for key, ids in raw.items():
+            if key in _BY_KEY and isinstance(ids, list):
+                good = [i for i in ids if isinstance(i, str) and INSTANCE_ID.match(i)]
+                if good:
+                    out[key] = sorted(set(good))
+    return out
+
+
+def with_trusted_instances(settings: object, tool_key: str, ids: list[str]) -> dict[str, object]:
+    """A copy of the settings with one tool's identifiers set (the entry is removed when the list is empty)."""
+    out = dict(settings or {}) if isinstance(settings, dict) else {}
+    current = dict(trusted_instances(settings))
+    chosen = normalize_instance_ids(ids)
+    if chosen:
+        current[tool_key] = chosen
+    else:
+        current.pop(tool_key, None)
+    if current:
+        out[SETTINGS_KEY] = current
+    else:
+        out.pop(SETTINGS_KEY, None)
+    return out
+
+
+FOREIGN_RULE_ID = "aisoc-remote-tool-foreign-instance"
+FOREIGN_RULE_NAME = "Remote tool connected to someone else's server"
+
+
+def foreign_findings(rows: Iterable[object], trusted: dict[str, list[str]], now) -> list[tuple[uuid.UUID, object]]:
+    """A critical finding for each install of a tool that belongs to a server other than the owner's (``rows``: sightings with ``tenant_id``, ``hostname``, ``tool_key``, ``instance_id``, ``install_path``).
+    Only judged for a tool whose owner identifiers are known: with none set there is nothing to compare against, and nothing is raised. An install whose identifier could not be read is not judged either."""
+    from app.services.identity_detections import Finding  # noqa: PLC0415
+
+    out: list[tuple[uuid.UUID, object]] = []
+    for r in sorted(rows, key=lambda r: (str(r.tenant_id), host_key(r.hostname), r.tool_key, getattr(r, "instance_id", "") or "")):  # type: ignore[attr-defined]
+        mine = trusted.get(r.tool_key)  # type: ignore[attr-defined]
+        tool = _BY_KEY.get(r.tool_key)  # type: ignore[attr-defined]
+        instance = getattr(r, "instance_id", "") or ""
+        if not mine or tool is None or not instance or instance in mine:
+            continue
+        path = getattr(r, "install_path", None) or "unknown"
+        out.append(
+            (
+                r.tenant_id,  # type: ignore[attr-defined]
+                Finding(
+                    rule_id=FOREIGN_RULE_ID,
+                    rule_name=FOREIGN_RULE_NAME,
+                    title=f"{tool.name} for another server ({instance}) found on {r.hostname}",  # type: ignore[attr-defined]
+                    severity="critical",
+                    tactic="Command and Control",
+                    technique="T1219",
+                    key=f"{r.tool_key}:{host_key(r.hostname)}:{instance}",  # type: ignore[attr-defined]
+                    occurred_at=now,
+                    summary=(
+                        f"{tool.name} is installed on {r.hostname} and it connects to a server whose identifier is {instance}, which is not one of yours ({', '.join(mine)}). Someone with access to that other "
+                        "server can control this computer. This is how attackers use a legitimate remote support tool to stay in a network (and how a technician's old or personal install is left behind). "
+                        "Find out who installed it; if it is not meant to be there, remove it and treat the computer as possibly accessed."
+                    ),
+                    fields=[("Tool", tool.name), ("Device", r.hostname), ("Server identifier", instance), ("Your identifiers", ", ".join(mine)), ("Installed at", path)],  # type: ignore[attr-defined]
                     source_ids=[],
                 ),
             )

@@ -9,12 +9,23 @@
       {
         "hostname": "PC-01",
         "tool_key": "anydesk",
-        "version": "8.0.1"
+        "version": "8.0.1",
+        "program": "AnyDesk",
+        "path": "C:\\Program Files (x86)\\AnyDesk"
+      },
+      {
+        "hostname": "PC-02",
+        "tool_key": "screenconnect",
+        "version": "24.1.5",
+        "program": "ScreenConnect Client (798cebdb8316a8ff)",
+        "path": "C:\\Program Files (x86)\\ScreenConnect Client (798cebdb8316a8ff)"
       },
       {
         "hostname": "PC-02",
         "tool_key": "teamviewer",
-        "version": "15.2"
+        "version": "15.2",
+        "program": "TeamViewer Host",
+        "path": null
       }
     ]
   }

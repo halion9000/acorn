@@ -268,4 +268,26 @@ describe('useRealtimeChannel', () => {
     expect(result.current.step).toBeNull();
     expect(result.current.status).toBe('open');
   });
+
+  it('an address the browser refuses before trying anything is shown as a reason and tried again, not left on connecting', async () => {
+    class Refusing {
+      static CONNECTING = 0;
+      static OPEN = 1;
+      static CLOSING = 2;
+      static CLOSED = 3;
+      constructor() {
+        throw new DOMException('An insecure WebSocket connection may not be initiated from a page loaded over HTTPS.', 'SecurityError');
+      }
+    }
+    vi.stubGlobal('WebSocket', Refusing);
+    const { result } = renderHook(() => useRealtimeChannel('alerts'));
+    await flush();
+    expect(result.current.status).toBe('error');
+    expect(result.current.problem).toContain('The browser refused to open the live connection');
+    expect(result.current.problem).toContain('insecure WebSocket');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000 + 1);
+    });
+    expect(result.current.step?.attempt).toBe(2);
+  });
 });

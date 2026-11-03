@@ -38,7 +38,11 @@ class DeviceRemoteTool(Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
     hostname_key: Mapped[str] = mapped_column(String(255), primary_key=True)
     tool_key: Mapped[str] = mapped_column(String(60), primary_key=True)
+    # Which server this install belongs to, for tools that are installed once per server (ScreenConnect); '' otherwise. Part of the key: one device can hold more than one install of a tool.
+    instance_id: Mapped[str] = mapped_column(String(40), primary_key=True, default="")
     hostname: Mapped[str] = mapped_column(String(255), nullable=False)
+    program: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    install_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     vendor: Mapped[str] = mapped_column(String(40), nullable=False)
     version: Mapped[str | None] = mapped_column(String(60), nullable=True)
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
