@@ -685,6 +685,58 @@ def detect_ca_policy_change(audits: list[Any]) -> list[Finding]:
 # ---- turning findings into alerts ---------------------------------------------------------------------------------------------------------------------------
 
 
+MAX_ADMIN_MFA_FINDINGS = 50
+
+
+def detect_admins_without_mfa(users: list[Any], now: datetime) -> list[Finding]:
+    """An enabled administrator with no multi-factor, judged by the same rules as the Identities and Multi-Factor pages (see ``identity_people.mfa_state``). One finding per person per month: a person
+    who is still without it next month is raised again, one who fixed it raises nothing. Guests and disabled accounts are left out."""
+    from app.services.identity_people import mfa_state
+    from app.services.mfa_registration import GOOGLE_SOURCES, microsoft_rows, registration_known
+
+    known_microsoft = registration_known(microsoft_rows(users))
+    out: list[Finding] = []
+    for u in users:
+        if not (u.admin and u.enabled) or str(u.user_type or "").lower() == "guest":
+            continue
+        known = True if (getattr(u, "source", None) or "") in GOOGLE_SOURCES else known_microsoft
+        if mfa_state(u, known) != "none":
+            continue
+        who = str(u.upn).lower()
+        out.append(
+            Finding(
+                rule_id="aisoc-id-admin-no-mfa",
+                rule_name="Administrator without multi-factor",
+                title=f"Administrator {who} has no multi-factor sign-in",
+                severity="high",
+                tactic="Initial Access",
+                technique="T1078.004",
+                key=f"{who}:{now:%Y-%m}",
+                occurred_at=now,
+                summary="This account holds an administrator role and has no second factor, and nothing requires one of it, so a guessed or stolen password is enough to take it over.",
+                fields=[("Account", who), ("Second factor registered or required", "no")],
+                users=[who],
+            )
+        )
+    return out[:MAX_ADMIN_MFA_FINDINGS]
+
+
+async def run_mfa_detections(db: Any, tenant_id: uuid.UUID, now: datetime | None = None) -> int:
+    """After a client's multi-factor snapshot is complete: raise an alert for each administrator without multi-factor. Never raises. Returns how many alerts were new."""
+    from sqlalchemy import select
+
+    from app.models.signin import IdentityMfaUser
+
+    now = now or datetime.now(UTC)
+    try:
+        async with db.begin_nested():  # a failure rolls back to here, never the snapshot that triggered it
+            users = (await db.execute(select(IdentityMfaUser).where(IdentityMfaUser.tenant_id == tenant_id))).scalars().all()
+            return await save_findings(db, tenant_id, detect_admins_without_mfa(list(users), now), now)
+    except Exception:  # noqa: BLE001
+        logger.warning("identity detections: the multi-factor rule failed for tenant=%s", tenant_id, exc_info=True)
+        return 0
+
+
 def alert_id(tenant_id: uuid.UUID, finding: Finding) -> uuid.UUID:
     """The same client and the same finding always give the same id, so a repeat is a no-op."""
     return uuid.uuid5(_NAMESPACE, f"{tenant_id}:{finding.rule_id}:{finding.key}")

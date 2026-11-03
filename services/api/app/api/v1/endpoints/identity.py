@@ -28,7 +28,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.signin import DirectoryAuditEvent, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
 from app.services.directory_scoring import directory_features, sensitivity_of
-from app.services.identity_detections import run_audit_detections
+from app.services.identity_detections import run_audit_detections, run_mfa_detections
 from app.services.mfa_registration import (
     REGISTRATION_REPORTED,
     THREATMATE_MICROSOFT,
@@ -353,6 +353,7 @@ async def apply_mfa_users(db: Any, owner: uuid.UUID, report: MfaUsersReport, now
                     )
                 )
                 removed += res.rowcount or 0
+                await run_mfa_detections(db, tid, now)
     return MfaUsersResponse(accepted=accepted, unmapped=unmapped, ignored=ignored, removed=removed, unmapped_clients=waiting)
 
 
