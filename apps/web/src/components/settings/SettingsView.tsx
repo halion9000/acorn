@@ -55,6 +55,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field, PanelHeader, inputClass } from './panel-parts';
 import { AlertEmailPanel } from './AlertEmailPanel';
 import { PasskeysCard } from './PasskeysCard';
+import { keyHealth } from './apiKeyHealth';
 import { MemberEditor } from './MemberEditor';
 import { SoftwareUpdatePanel } from './SoftwareUpdatePanel';
 import { AzureSpendPanel } from './AzureSpendPanel';
@@ -88,6 +89,7 @@ interface ApiKey {
   scopes: string[];
   createdAt: string;
   lastUsedAt?: string;
+  expiresAt?: string | null;
 }
 
 interface Preferences {
@@ -971,6 +973,7 @@ function ApiKeysPanel() {
                   <th className="px-4 py-2 text-left">Scopes</th>
                   <th className="px-4 py-2 text-left">Created</th>
                   <th className="px-4 py-2 text-left">Last used</th>
+                  <th className="px-4 py-2 text-left">Expires</th>
                   <th className="px-4 py-2 text-right">Actions</th>
                 </tr>
               </thead>
@@ -1002,6 +1005,17 @@ function ApiKeysPanel() {
                             addSuffix: true,
                           })
                         : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-400" suppressHydrationWarning>
+                      {k.expiresAt ? safeFormat(k.expiresAt, 'PP') : 'Never'}
+                      {(() => {
+                        const h = keyHealth(k);
+                        return h ? (
+                          <span data-testid="key-health" className={h.tone === 'bad' ? 'ml-2 font-medium text-red-300' : 'ml-2 font-medium text-amber-300'}>
+                            {h.text}
+                          </span>
+                        ) : null;
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button

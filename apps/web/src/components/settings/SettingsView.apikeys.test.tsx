@@ -131,3 +131,23 @@ describe('revoking an API key', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 });
+
+describe('what the key list says about each key', () => {
+  it('shows when a key expires and flags an expired one, one expiring soon and one nobody has used', async () => {
+    const day = 86_400_000;
+    const iso = (d: number) => new Date(Date.now() + d * day).toISOString();
+    swrData.set('settings:api-keys', [
+      { ...key('k1', 'Expired forwarder'), expiresAt: iso(-3), lastUsedAt: iso(-4) },
+      { ...key('k2', 'Soon script'), expiresAt: iso(10.5), lastUsedAt: iso(-1) },
+      { ...key('k3', 'Forgotten key'), createdAt: iso(-200), lastUsedAt: null, expiresAt: null },
+      { ...key('k4', 'Healthy key'), createdAt: iso(-5), lastUsedAt: iso(-1), expiresAt: null },
+    ]);
+    await openApiKeys();
+    const row = (name: string) => screen.getByText(name).closest('tr') as HTMLElement;
+    expect(within(row('Expired forwarder')).getByTestId('key-health')).toHaveTextContent('Expired');
+    expect(within(row('Soon script')).getByTestId('key-health')).toHaveTextContent('Expires in 10 days');
+    expect(within(row('Forgotten key')).getByTestId('key-health')).toHaveTextContent('Never used');
+    expect(within(row('Forgotten key')).getByText('Never')).toBeInTheDocument();
+    expect(within(row('Healthy key')).queryByTestId('key-health')).toBeNull();
+  });
+});
