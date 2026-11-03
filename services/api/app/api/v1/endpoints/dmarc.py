@@ -25,7 +25,7 @@ from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.dmarc_senders import identify_sender
-from app.services.domain_posture import DohResolver, Resolver, candidate_domains
+from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domain
 from app.services.ip_country import country_of
 
 router = APIRouter(prefix="/dmarc", tags=["dmarc"])
@@ -417,6 +417,68 @@ async def countries(
         unknown=unknown,
         not_looked_up=total - looked,
     )
+
+
+class ReportCard(BaseModel):
+    domain: str
+    days: int
+    total: int
+    pass_rate: float | None
+    policy: str
+    posture: DomainPosture  # the live DNS check: mail records, SPF, DMARC, DKIM
+    advice: list[str]  # plain-language next steps, most useful first
+
+
+MIN_MAIL_TO_JUDGE = 100
+
+
+def report_card_advice(policy: str, pass_rate: float | None, total: int, posture: DomainPosture) -> list[str]:
+    """What to do next for one domain, from its published policy, how much of its mail passes, and what DNS says. Rules only: no guessing about senders."""
+    out: list[str] = []
+    has_mail = bool(posture.mx)
+    if not has_mail:
+        out.append("This domain has no mail records, so it should not send mail. Publishing a reject policy and an SPF record that allows nobody stops others pretending to be it.")
+    if total < MIN_MAIL_TO_JUDGE or pass_rate is None:
+        out.append(f"Only {total:,} messages so far, which is too few to judge. Wait for more reports before changing the policy.")
+    elif policy == "none":
+        if pass_rate >= 98:
+            out.append(f"{pass_rate}% of mail passes and the policy only monitors. It is reasonable to start enforcing: move to quarantine for a small share first (p=quarantine; pct=25), then raise it.")
+        else:
+            out.append(f"Only {pass_rate}% of mail passes. Find the failing senders (the list below) and fix or remove them before enforcing, or real mail will be quarantined.")
+    elif policy == "quarantine":
+        if pass_rate >= 99.5:
+            out.append(f"{pass_rate}% passes under quarantine. The next step is reject, which stops pretenders completely.")
+        elif pass_rate < 95:
+            out.append(f"{pass_rate}% passes while failing mail is being quarantined. Check that the failures are not real mail going to spam.")
+    elif policy == "reject" and pass_rate is not None and pass_rate < 95:
+        out.append(f"{pass_rate}% passes under a reject policy. Real mail may be bouncing: check the failing senders now.")
+    elif policy == "reject":
+        out.append("Fully enforced: this is the strongest setting. Keep watching the failing list for new senders.")
+    # The policy is already covered above (and known better from the reports), so a DMARC finding is only added when the record itself is missing or unreadable.
+    for f, covered in ((posture.spf, False), (posture.dmarc, posture.dmarc.record is not None)):
+        if f.status != "good" and not covered:
+            out.extend(f.issues or [f.summary])
+    return out
+
+
+@router.get("/domains/{domain}/card", response_model=ReportCard, summary="One domain's report card: results, live DNS check and next steps")
+async def domain_report_card(
+    domain: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    resolver: Annotated[Resolver, Depends(get_resolver)],
+    days: int = Query(30, ge=1, le=365),
+) -> ReportCard:
+    """Only a domain that has reports in the caller's data is checked (so this cannot be used to probe arbitrary domains)."""
+    reports, clean = await _scoped_reports(current_user, db, days, domain, None)
+    if not reports or clean is None:
+        raise HTTPException(status_code=404, detail="No reports for that domain in this period.")
+    total = sum(r.total for r in reports)
+    passed = sum(r.passed for r in reports)
+    newest = max(reports, key=lambda r: r.end_at)
+    posture = await check_domain(clean, resolver)
+    rate = _pct(passed, total)
+    return ReportCard(domain=clean, days=days, total=total, pass_rate=rate, policy=newest.policy, posture=posture, advice=report_card_advice(newest.policy, rate, total, posture))
 
 
 @router.get("/insights", response_model=Insights, summary="Delivery, failure rates over time, top senders and top sending domains")

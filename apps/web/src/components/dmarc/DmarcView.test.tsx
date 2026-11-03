@@ -16,6 +16,7 @@ let setup: Record<string, unknown>;
 let detail: Record<string, unknown>;
 let insights: Record<string, unknown> | null;
 let countries: Record<string, unknown> | null;
+let card: Record<string, unknown> | null;
 
 const view = () => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
@@ -37,12 +38,14 @@ beforeEach(() => {
     sending_domains: [{ domain: 'acme.com', emails: 100, passed: 88, failed: 12, status: 'partly' }],
   };
   countries = null;
+  card = null;
   authFetch.mockReset();
   authFetch.mockImplementation(async (url: string) => {
     if (url.startsWith('/api/v1/dmarc/overview')) return json(200, overview);
     if (url.startsWith('/api/v1/dmarc/countries')) return countries ? json(200, countries) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/insights')) return insights ? json(200, insights) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/setup')) return json(200, setup);
+    if (url.includes('/card')) return card ? json(200, card) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/domains/')) return json(200, detail);
     return json(404, {});
   });
@@ -385,5 +388,48 @@ describe('DMARC countries', () => {
     render(view());
     await screen.findByTestId('delivery-passed');
     expect(screen.queryByTestId('country-row')).toBeNull();
+  });
+});
+
+describe('DMARC domain report card', () => {
+  it('shows what DNS says for the domain and the next steps when a domain is opened', async () => {
+    card = {
+      domain: 'acme.com', days: 30, total: 200, pass_rate: 95, policy: 'none',
+      posture: {
+        domain: 'acme.com', status: 'needs_work', mx: ['acme-com.mail.protection.outlook.com'], mail_provider: 'Microsoft 365',
+        spf: { status: 'good', summary: 'SPF is set and ends in -all', record: 'v=spf1 -all', issues: [] },
+        dmarc: { status: 'needs_work', summary: "policy is 'none'", record: 'v=DMARC1; p=none', issues: [] },
+        dkim: { status: 'good', summary: 'DKIM found', record: null, issues: [] },
+      },
+      advice: ['Only 95% of mail passes. Find the failing senders first.'],
+    };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    const shown = await screen.findByTestId('report-card');
+    expect(within(shown).getByTestId('card-mail-records')).toHaveTextContent('Microsoft 365');
+    expect(within(shown).getByTestId('card-spf')).toHaveClass('text-emerald-300');
+    expect(within(shown).getByTestId('card-dmarc')).toHaveClass('text-amber-300');
+    expect(within(shown).getByText(/Find the failing senders/)).toBeInTheDocument();
+  });
+
+  it('is left out, and the rest of the detail still shows, when the card is unavailable', async () => {
+    card = null;
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    await screen.findByText(/Sources failing DMARC/);
+    expect(screen.queryByTestId('report-card')).toBeNull();
+  });
+
+  it('says plainly when the domain has no mail records', async () => {
+    card = {
+      domain: 'acme.com', days: 30, total: 200, pass_rate: 100, policy: 'none',
+      posture: { domain: 'acme.com', status: 'needs_work', mx: [], mail_provider: null, spf: { status: 'good', summary: 'ok', record: null, issues: [] }, dmarc: { status: 'good', summary: 'ok', record: null, issues: [] }, dkim: { status: 'good', summary: 'ok', record: null, issues: [] } },
+      advice: [],
+    };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    const mail = await screen.findByTestId('card-mail-records');
+    expect(mail).toHaveTextContent('cannot receive mail');
+    expect(mail).toHaveClass('text-amber-300');
   });
 });

@@ -64,6 +64,21 @@ export interface DmarcCountries {
   unknown: number;
   not_looked_up: number;
 }
+export interface PostureFinding {
+  status: string;
+  summary: string;
+  record: string | null;
+  issues: string[];
+}
+export interface DmarcCard {
+  domain: string;
+  days: number;
+  total: number;
+  pass_rate: number | null;
+  policy: string;
+  posture: { domain: string; status: string; mx: string[]; mail_provider: string | null; spf: PostureFinding; dmarc: PostureFinding; dkim: PostureFinding };
+  advice: string[];
+}
 export interface SetupLine {
   client_id: string;
   client_name: string;
@@ -163,6 +178,43 @@ function StatusStrip({ status }: { status: DmarcStatus }) {
   );
 }
 
+const findingTone = (status: string) => (status === 'good' ? 'text-emerald-300' : status === 'needs_work' ? 'text-amber-300' : 'text-red-300');
+
+/** One domain's report card: what DNS says right now about its mail, SPF, DMARC and DKIM, and plain-language next steps. Left out when the server cannot produce it. */
+function ReportCardView({ domain, days }: { domain: string; days: number }) {
+  const { data } = useSWR<DmarcCard>(`/api/v1/dmarc/domains/${encodeURIComponent(domain)}/card?days=${days}`, fetcher, { shouldRetryOnError: false });
+  if (!data) return null;
+  const p = data.posture;
+  const rows: [string, string, string][] = [
+    ['Mail records', p.mx.length > 0 ? 'good' : 'needs_work', p.mx.length > 0 ? `${p.mail_provider ?? 'Mail server'}: ${p.mx[0]}` : 'None: this domain cannot receive mail'],
+    ['SPF', p.spf.status, p.spf.summary],
+    ['DMARC', p.dmarc.status, p.dmarc.summary],
+    ['DKIM', p.dkim.status, p.dkim.summary],
+  ];
+  return (
+    <div data-testid="report-card" className="mt-4 rounded-lg border border-gray-800 p-3">
+      <h4 className="text-sm font-medium text-gray-200">Report card</h4>
+      <dl className="mt-2 grid gap-x-4 gap-y-1 text-sm md:grid-cols-[8rem_1fr]">
+        {rows.map(([label, status, text]) => (
+          <div key={label} className="contents">
+            <dt className="text-gray-400">{label}</dt>
+            <dd data-testid={`card-${label.toLowerCase().replace(' ', '-')}`} className={findingTone(status)}>
+              {text}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {data.advice.length > 0 ? (
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-gray-200">
+          {data.advice.map((a) => (
+            <li key={a}>{a}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function Detail({ domain, days, onClose }: { domain: string; days: number; onClose: () => void }) {
   const { data, error } = useSWR<DmarcDetail>(`/api/v1/dmarc/domains/${encodeURIComponent(domain)}?days=${days}`, fetcher, { shouldRetryOnError: false });
   const max = Math.max(1, ...(data?.series.map((p) => p.total) ?? [1]));
@@ -193,6 +245,7 @@ function Detail({ domain, days, onClose }: { domain: string; days: number; onClo
               </div>
             ))}
           </div>
+          <ReportCardView domain={domain} days={days} />
           <h4 className="mt-5 text-sm font-medium text-gray-200">Sources failing DMARC</h4>
           {data.failing_sources.length === 0 ? (
             <p className="mt-1 text-sm text-emerald-300">Nothing failed in this period.</p>

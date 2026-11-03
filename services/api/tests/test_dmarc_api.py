@@ -484,3 +484,87 @@ def test_countries_never_include_another_owners_mail_and_a_foreign_client_is_ref
 
     mine, foreign = run(body)
     assert [(c.code, c.emails) for c in mine.countries] == [("US", 5)] and foreign == 404
+
+
+class DnsResolver:
+    """Every record type the posture check asks for, by name; anything not listed does not exist."""
+
+    def __init__(self, txt=None, mx=None):
+        self.txt_by, self.mx_by, self.calls = txt or {}, mx or {}, []
+
+    async def txt(self, name):
+        self.calls.append(name)
+        return self.txt_by.get(name, [])
+
+    async def cname(self, name):
+        return []
+
+    async def mx(self, name):
+        return self.mx_by.get(name, [])
+
+    async def a(self, name):
+        return []
+
+
+def posture(domain="acme.com", mx=("mx.acme.com",), spf="v=spf1 include:spf.protection.outlook.com -all", dmarc="v=DMARC1; p=none; rua=mailto:a@goliveoak.com"):
+    from app.services.domain_posture import check_domain
+
+    r = DnsResolver({domain: [spf] if spf else [], f"_dmarc.{domain}": [dmarc] if dmarc else []}, {domain: list(mx)})
+    return run_coro(check_domain(domain, r))
+
+
+def run_coro(c):
+    import asyncio
+
+    return asyncio.run(c)
+
+
+def test_the_advice_follows_the_policy_and_how_much_mail_passes():
+    good = posture()
+    adv = ep.report_card_advice
+    assert any("start enforcing" in a for a in adv("none", 99.0, 5000, good))
+    assert any("Find the failing senders" in a for a in adv("none", 80.0, 5000, good))
+    assert any("next step is reject" in a for a in adv("quarantine", 99.8, 5000, good))
+    assert any("Real mail may be bouncing" in a for a in adv("reject", 90.0, 5000, good))
+    assert any("Fully enforced" in a for a in adv("reject", 99.9, 5000, good))
+    assert adv("quarantine", 97.0, 5000, good) == []  # nothing to say is nothing said
+
+
+def test_too_little_mail_is_never_judged_either_way():
+    good = posture()
+    for policy in ("none", "quarantine", "reject"):
+        out = ep.report_card_advice(policy, 100.0, 40, good)
+        assert len(out) == 1 and "too few to judge" in out[0]
+    assert "too few to judge" in ep.report_card_advice("none", None, 0, good)[0]
+
+
+def test_a_domain_with_no_mail_records_is_told_it_should_not_send_and_dns_problems_are_listed():
+    nomail = posture(mx=(), dmarc=None, spf=None)
+    out = ep.report_card_advice("none", 100.0, 5000, nomail)
+    assert "no mail records" in out[0]
+    assert len(out) > 1  # and what is missing from its SPF and DMARC records follows
+
+
+def test_the_card_checks_dns_only_for_a_domain_that_has_reports_and_combines_it_with_the_results():
+    resolver = DnsResolver({"acme.com": ["v=spf1 include:spf.protection.outlook.com -all"], "_dmarc.acme.com": ["v=DMARC1; p=none; rua=mailto:a@goliveoak.com"]}, {"acme.com": ["mx.acme.com"]})
+
+    async def body(s):
+        owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
+        acme, theirs = await tenant(s, "Acme", owner.id), await tenant(s, "Theirs", other.id)
+        s.add_all([rep(acme.id, "acme.com", 1000, 990, rows=[line_row("1.1.1.1", 1000)]), rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)])])
+        await s.commit()
+        card = await ep.domain_report_card("Acme.com.", caller(owner), s, resolver, days=30)
+        before = len(resolver.calls)
+        with pytest.raises(HTTPException) as unknown:
+            await ep.domain_report_card("theirs.com", caller(owner), s, resolver, days=30)  # another owner's domain
+        with pytest.raises(HTTPException) as nothing:
+            await ep.domain_report_card("never-reported.example", caller(owner), s, resolver, days=30)
+        with pytest.raises(HTTPException) as bad:
+            await ep.domain_report_card("not a domain!", caller(owner), s, resolver, days=30)
+        return card, before, len(resolver.calls), unknown.value.status_code, nothing.value.status_code, bad.value.status_code
+
+    card, before, after, unknown, nothing, bad = run(body)
+    assert (card.domain, card.total, card.pass_rate, card.policy) == ("acme.com", 1000, 99.0, "none")
+    assert card.posture.mx == ["mx.acme.com"] and card.posture.dmarc.record.startswith("v=DMARC1")
+    assert any("start enforcing" in a for a in card.advice)
+    assert (unknown, nothing, bad) == (404, 404, 422) and after == before  # no DNS lookup was made for any of the refused ones
