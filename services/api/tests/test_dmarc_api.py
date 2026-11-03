@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+from app.services import bimi as bimi_check_module
 from app.api.v1.endpoints import dmarc as ep
 from app.db.database import Base
 from app.models.dmarc import DmarcIngestState, DmarcReport
@@ -612,3 +613,27 @@ def test_lookalikes_are_scanned_only_for_a_domain_in_the_callers_reports_and_mai
     out, foreign, before, after = run(body)
     assert [(x.domain, x.has_mail) for x in out.found] == [("acme.co", True), ("acme.net", False)]
     assert out.checked > 20 and foreign == 404 and after == before  # the refused domain cost no lookups
+
+
+def test_the_bimi_check_runs_only_for_a_domain_in_the_callers_reports_and_never_fetches_for_a_refused_one():
+    fetched = []
+
+    async def fetch(url):
+        fetched.append(url)
+        raise bimi_check_module.FetchRefused("The certificate address did not answer.")
+
+    resolver = DnsResolver({"default._bimi.acme.com": ["v=BIMI1; l=https://acme.com/l.svg; a=https://acme.com/vmc.pem"], "_dmarc.acme.com": ["v=DMARC1; p=reject"]})
+
+    async def body(s):
+        owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
+        acme, theirs = await tenant(s, "Acme", owner.id), await tenant(s, "Theirs", other.id)
+        s.add_all([rep(acme.id, "acme.com", 10, 10, rows=[line_row("1.1.1.1", 10)]), rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)])])
+        await s.commit()
+        out = await ep.domain_bimi("acme.com", caller(owner), s, resolver, fetch)
+        with pytest.raises(HTTPException) as foreign:
+            await ep.domain_bimi("theirs.com", caller(owner), s, resolver, fetch)
+        return out, foreign.value.status_code
+
+    out, foreign = run(body)
+    assert out.published and out.dmarc_ready and out.problems == ["The certificate address did not answer."]
+    assert fetched == ["https://acme.com/vmc.pem"] and foreign == 404  # nothing was fetched for the other owner's domain

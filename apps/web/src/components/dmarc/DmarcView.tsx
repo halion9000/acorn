@@ -86,6 +86,15 @@ export interface DmarcLookalikes {
   checked: number;
   found: { domain: string; kind: string; has_mail: boolean }[];
 }
+export interface DmarcBimi {
+  domain: string;
+  published: boolean;
+  logo_url: string | null;
+  certificate_url: string | null;
+  dmarc_ready: boolean;
+  certificate: { organization: string | null; not_after: string; days_left: number; valid: boolean; is_vmc: boolean } | null;
+  problems: string[];
+}
 export interface SetupLine {
   client_id: string;
   client_name: string;
@@ -270,6 +279,52 @@ function LookalikesView({ domain }: { domain: string }) {
   );
 }
 
+/** The brand-logo (BIMI) check: is a logo published, is its certificate valid and for how long, and is DMARC strong enough for the logo to show. Run on request: it fetches the certificate named in the domain's record. */
+function BimiView({ domain }: { domain: string }) {
+  const [run, setRun] = useState(false);
+  const { data, error, isLoading } = useSWR<DmarcBimi>(run ? `/api/v1/dmarc/domains/${encodeURIComponent(domain)}/bimi` : null, fetcher, { shouldRetryOnError: false });
+  return (
+    <div data-testid="bimi" className="mt-4 rounded-lg border border-gray-800 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="text-sm font-medium text-gray-200">Brand logo (BIMI)</h4>
+        {!run ? (
+          <button type="button" onClick={() => setRun(true)} className="rounded-lg bg-gray-800 px-3 py-1 text-xs text-gray-100 hover:bg-gray-700">
+            Check logo setup
+          </button>
+        ) : null}
+      </div>
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-red-300">
+          {(error as Error).message}
+        </p>
+      ) : isLoading ? (
+        <p className="mt-2 text-sm text-gray-500">Checking…</p>
+      ) : data ? (
+        <div className="mt-2 space-y-1 text-sm">
+          <p data-testid="bimi-published" className={data.published ? 'text-emerald-300' : 'text-gray-400'}>
+            {data.published ? 'A BIMI record is published.' : 'No BIMI record published (the logo does not show in mail clients).'}
+          </p>
+          <p data-testid="bimi-dmarc" className={data.dmarc_ready ? 'text-emerald-300' : 'text-amber-300'}>
+            {data.dmarc_ready ? 'DMARC is strong enough for BIMI.' : 'DMARC is not yet strong enough for BIMI.'}
+          </p>
+          {data.certificate ? (
+            <p data-testid="bimi-cert" className={data.certificate.valid && data.certificate.days_left > 30 ? 'text-emerald-300' : 'text-red-300'}>
+              Certificate{data.certificate.organization ? ` for ${data.certificate.organization}` : ''}: {data.certificate.valid ? `valid, ${data.certificate.days_left} days left` : 'not valid now'} (ends {new Date(data.certificate.not_after).toLocaleDateString()}).
+            </p>
+          ) : null}
+          {data.problems.length > 0 ? (
+            <ul className="list-disc space-y-1 pl-5 text-gray-200">
+              {data.problems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function Detail({ domain, days, onClose }: { domain: string; days: number; onClose: () => void }) {
   const { data, error } = useSWR<DmarcDetail>(`/api/v1/dmarc/domains/${encodeURIComponent(domain)}?days=${days}`, fetcher, { shouldRetryOnError: false });
   const max = Math.max(1, ...(data?.series.map((p) => p.total) ?? [1]));
@@ -302,6 +357,7 @@ function Detail({ domain, days, onClose }: { domain: string; days: number; onClo
           </div>
           <ReportCardView domain={domain} days={days} />
           <LookalikesView domain={domain} />
+          <BimiView domain={domain} />
           <h4 className="mt-5 text-sm font-medium text-gray-200">Sources failing DMARC</h4>
           {data.failing_sources.length === 0 ? (
             <p className="mt-1 text-sm text-emerald-300">Nothing failed in this period.</p>

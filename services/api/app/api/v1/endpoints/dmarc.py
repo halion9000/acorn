@@ -24,6 +24,7 @@ from app.models.dmarc import DmarcIngestState, DmarcReport
 from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
+from app.services import bimi as bimi_check
 from app.services.dmarc_senders import identify_sender
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domain
 from app.services.ip_country import country_of
@@ -509,6 +510,26 @@ async def domain_lookalikes(
         raise HTTPException(status_code=404, detail="No reports for that domain.")
     found = await scan_lookalikes(clean, resolver)
     return Lookalikes(domain=clean, checked=len(generate_lookalikes(clean)), found=[LookalikeRow(domain=x.domain, kind=x.kind, has_mail=x.has_mail) for x in found])
+
+
+def get_cert_fetcher() -> bimi_check.Fetcher:
+    """How the BIMI certificate is fetched (replaced in tests)."""
+    return bimi_check.public_https_fetch
+
+
+@router.get("/domains/{domain}/bimi", response_model=bimi_check.Bimi, summary="BIMI brand-logo check for one of the caller's domains")
+async def domain_bimi(
+    domain: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    resolver: Annotated[Resolver, Depends(get_resolver)],
+    fetch: Annotated[bimi_check.Fetcher, Depends(get_cert_fetcher)],
+) -> bimi_check.Bimi:
+    """Only a domain with reports in the caller's data is checked. The certificate address in its public record is fetched with care (https, public address, no redirects, size limit)."""
+    reports, clean = await _scoped_reports(current_user, db, 365, domain, None)
+    if not reports or clean is None:
+        raise HTTPException(status_code=404, detail="No reports for that domain.")
+    return await bimi_check.check(clean, resolver, fetch)
 
 
 @router.get("/insights", response_model=Insights, summary="Delivery, failure rates over time, top senders and top sending domains")

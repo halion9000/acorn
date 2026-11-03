@@ -18,6 +18,7 @@ let insights: Record<string, unknown> | null;
 let countries: Record<string, unknown> | null;
 let card: Record<string, unknown> | null;
 let lookalikes: Record<string, unknown> | null;
+let bimi: Record<string, unknown> | null;
 
 const view = () => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
@@ -42,12 +43,14 @@ beforeEach(() => {
   countries = null;
   card = null;
   lookalikes = null;
+  bimi = null;
   authFetch.mockReset();
   authFetch.mockImplementation(async (url: string) => {
     if (url.startsWith('/api/v1/dmarc/overview')) return json(200, overview);
     if (url.startsWith('/api/v1/dmarc/countries')) return countries ? json(200, countries) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/insights')) return insights ? json(200, insights) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/setup')) return json(200, setup);
+    if (url.includes('/bimi')) return bimi ? json(200, bimi) : json(404, {});
     if (url.includes('/lookalikes')) return lookalikes ? json(200, lookalikes) : json(404, {});
     if (url.includes('/card')) return card ? json(200, card) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/domains/')) return json(200, detail);
@@ -483,5 +486,35 @@ describe('DMARC look-alike domains', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Check for look-alikes' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('The server answered 404');
+  });
+});
+
+describe('DMARC brand logo (BIMI) check', () => {
+  it('asks only on request, then shows the record, DMARC readiness, certificate life and problems', async () => {
+    bimi = {
+      domain: 'acme.com', published: true, logo_url: 'https://acme.com/l.svg', certificate_url: 'https://acme.com/v.pem', dmarc_ready: true,
+      certificate: { organization: 'Acme Dental LLC', not_after: '2026-11-15T00:00:00Z', days_left: 12, valid: true, is_vmc: true },
+      problems: ['The certificate expires in 12 days (2026-11-15). When it lapses the logo disappears without warning.'],
+    };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    await screen.findByTestId('bimi');
+    expect(authFetch.mock.calls.some(([u]) => String(u).includes('/bimi'))).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Check logo setup' }));
+    expect(await screen.findByTestId('bimi-published')).toHaveTextContent('A BIMI record is published');
+    expect(screen.getByTestId('bimi-dmarc')).toHaveClass('text-emerald-300');
+    expect(screen.getByTestId('bimi-cert')).toHaveTextContent('12 days left');
+    expect(screen.getByTestId('bimi-cert')).toHaveClass('text-red-300');
+    expect(screen.getByText(/disappears without warning/)).toBeInTheDocument();
+  });
+
+  it('says plainly when nothing is published and DMARC is not ready', async () => {
+    bimi = { domain: 'acme.com', published: false, logo_url: null, certificate_url: null, dmarc_ready: false, certificate: null, problems: ["DMARC policy is 'none'; BIMI needs quarantine or reject."] };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Check logo setup' }));
+    expect(await screen.findByTestId('bimi-published')).toHaveTextContent('No BIMI record published');
+    expect(screen.getByTestId('bimi-dmarc')).toHaveClass('text-amber-300');
+    expect(screen.queryByTestId('bimi-cert')).toBeNull();
   });
 });
