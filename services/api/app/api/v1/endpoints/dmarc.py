@@ -11,6 +11,7 @@ import time
 import uuid
 from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
+from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -25,7 +26,8 @@ from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services import bimi as bimi_check
-from app.services import blocklist
+from app.services import blocklist, safe_fetch
+from app.services import reputation as reputation_service
 from app.services.dmarc_senders import identify_sender
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domain
 from app.services.ip_country import country_of
@@ -592,6 +594,52 @@ async def domain_blocklists(
         listed=sum(1 for r in everything if r.status == "listed"),
         not_checked=sum(1 for r in everything if r.status in ("refused", "no_answer")),
     )
+
+
+class ReputationFact(BaseModel):
+    label: str
+    text: str
+    tone: str  # good, warn, bad or unknown
+
+
+class Reputation(BaseModel):
+    domain: str
+    facts: list[ReputationFact]
+
+
+def get_rdap_fetcher() -> Callable[[str], Awaitable[bytes]]:
+    """How the public registration record is fetched (replaced in tests): https to a public address, a few redirects (the lookup service hands over to the registry)."""
+
+    async def fetch(url: str) -> bytes:
+        return await safe_fetch.fetch(url, max_bytes=500_000, max_redirects=3, accept="application/rdap+json, application/json")
+
+    return fetch
+
+
+@router.get("/domains/{domain}/reputation", response_model=Reputation, summary="Facts that bear on one of the caller's domains' reputation (registration age, expiry, its own mail)")
+async def domain_reputation(
+    domain: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    fetch: Annotated[Callable[[str], Awaitable[bytes]], Depends(get_rdap_fetcher)],
+    days: int = Query(30, ge=1, le=365),
+) -> Reputation:
+    """Only a domain with reports in the caller's data is looked up. No single score: a few facts, each marked good, warning, bad or unknown. A registration record that cannot be fetched or read is unknown."""
+    reports, clean = await _scoped_reports(current_user, db, days, domain, None)
+    if not reports or clean is None:
+        raise HTTPException(status_code=404, detail="No reports for that domain in this period.")
+    total = sum(r.total for r in reports)
+    passed = sum(r.passed for r in reports)
+    registration, problem = None, None
+    try:
+        registration = reputation_service.parse_rdap(await fetch(reputation_service.RDAP_URL.format(domain=clean)))
+    except safe_fetch.FetchRefused as e:
+        problem = f"The registration record could not be fetched: {e}"
+    except ValueError as e:
+        problem = str(e)
+    newest = max(reports, key=lambda r: r.end_at)
+    items = reputation_service.facts(registration, problem, newest.policy, _pct(passed, total), total, total - passed)
+    return Reputation(domain=clean, facts=[ReputationFact(label=f.label, text=f.text, tone=f.tone) for f in items])
 
 
 @router.get("/insights", response_model=Insights, summary="Delivery, failure rates over time, top senders and top sending domains")

@@ -673,3 +673,38 @@ def test_blocklists_count_listed_apart_from_not_checked_and_never_treat_a_refusa
     assert out.listed == 1
     assert out.not_checked == 3  # two UCEPROTECT lookups that failed and one Spamhaus refusal: none of them is "clear"
     assert foreign == 404 and after == before
+
+
+def test_reputation_combines_registration_with_the_domains_own_mail_and_says_unknown_when_the_record_cannot_be_read():
+    import json
+
+    from app.services import safe_fetch as sf
+
+    asked = []
+
+    async def good(url):
+        asked.append(url)
+        return json.dumps({"events": [{"eventAction": "registration", "eventDate": "2010-01-01T00:00:00Z"}, {"eventAction": "expiration", "eventDate": "2040-01-01T00:00:00Z"}]}).encode()
+
+    async def refused(url):
+        raise sf.FetchRefused("The address did not answer.")
+
+    async def body(s):
+        owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
+        acme, theirs = await tenant(s, "Acme", owner.id), await tenant(s, "Theirs", other.id)
+        s.add_all([rep(acme.id, "acme.com", 1000, 800, policy="quarantine", rows=[line_row("1.1.1.1", 1000)]), rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)])])
+        await s.commit()
+        ok = await ep.domain_reputation("acme.com", caller(owner), s, good, days=30)
+        before = len(asked)
+        down = await ep.domain_reputation("acme.com", caller(owner), s, refused, days=30)
+        with pytest.raises(HTTPException) as foreign:
+            await ep.domain_reputation("theirs.com", caller(owner), s, good, days=30)
+        return ok, down, foreign.value.status_code, before, len(asked)
+
+    ok, down, foreign, before, after = run(body)
+    facts = {f.label: f for f in ok.facts}
+    assert facts["Registered"].tone == "good" and facts["Registration ends"].tone == "good"
+    assert facts["Its own mail"].tone == "bad" and "80.0%" in facts["Its own mail"].text  # 800 of 1000 pass
+    assert facts["DMARC policy"].tone == "good" and asked == ["https://rdap.org/domain/acme.com"]
+    assert {f.label: f for f in down.facts}["Registered"].tone == "unknown" and "did not answer" in {f.label: f for f in down.facts}["Registered"].text
+    assert foreign == 404 and after == before  # no lookup for another owner's domain

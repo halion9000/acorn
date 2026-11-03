@@ -7,29 +7,24 @@ The certificate address comes from a public DNS record anyone can write, so it i
 from __future__ import annotations
 
 import asyncio
-import ipaddress
-import socket
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Awaitable, Callable
 from urllib.parse import urlparse
 
-import httpx
 from cryptography import x509
 from cryptography.x509.oid import ObjectIdentifier
 from pydantic import BaseModel
 
+from app.services import safe_fetch
 from app.services.domain_posture import Resolver, _tags
+from app.services.safe_fetch import FetchRefused
 
 MAX_CERT_BYTES = 200_000
 EXPIRY_WARNING_DAYS = 30
 _LOGOTYPE_OID = ObjectIdentifier("1.3.6.1.5.5.7.1.12")  # the logotype extension a Verified Mark Certificate carries
 
 Fetcher = Callable[[str], Awaitable[bytes]]
-
-
-class FetchRefused(Exception):
-    """The address is not one we may fetch (not https, not public, redirected, too large, or it did not answer)."""
 
 
 class CertInfo(BaseModel):
@@ -99,29 +94,8 @@ def read_certificate(pem: bytes, now: datetime | None = None) -> CertInfo:
 
 
 async def public_https_fetch(url: str) -> bytes:
-    """GET an https address that resolves only to public addresses. No redirects, at most MAX_CERT_BYTES, short timeout. The address is checked first and the request follows at once; a name that
-    changes its answer in between is the small remaining gap, which a size limit and no redirects keep harmless (the answer is only ever parsed as a certificate)."""
-    parts = urlparse(url)
-    if parts.scheme != "https" or not parts.hostname or parts.username or parts.password:
-        raise FetchRefused("The certificate address is not a plain https address.")
-    try:
-        infos = await asyncio.get_running_loop().getaddrinfo(parts.hostname, parts.port or 443, type=socket.SOCK_STREAM)
-    except OSError:
-        raise FetchRefused("The certificate address does not resolve.") from None
-    if not infos or any(not ipaddress.ip_address(i[4][0]).is_global for i in infos):
-        raise FetchRefused("The certificate address is not on the public internet.")
-    try:
-        async with httpx.AsyncClient(follow_redirects=False, timeout=8.0) as client, client.stream("GET", url) as res:
-            if res.status_code != 200:
-                raise FetchRefused(f"The certificate address answered {res.status_code}.")
-            body = b""
-            async for chunk in res.aiter_bytes():
-                body += chunk
-                if len(body) > MAX_CERT_BYTES:
-                    raise FetchRefused("The certificate file is larger than expected.")
-            return body
-    except httpx.HTTPError:
-        raise FetchRefused("The certificate address did not answer.") from None
+    """The certificate file: https, public address, no redirects, at most MAX_CERT_BYTES (see safe_fetch)."""
+    return await safe_fetch.fetch(url, max_bytes=MAX_CERT_BYTES, max_redirects=0)
 
 
 async def check(domain: str, resolver: Resolver, fetch: Fetcher = public_https_fetch, now: datetime | None = None) -> Bimi:

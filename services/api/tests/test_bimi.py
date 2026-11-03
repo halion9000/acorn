@@ -4,7 +4,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from app.services import bimi
+from app.services import bimi, safe_fetch
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -99,7 +99,7 @@ def test_only_a_plain_public_https_address_is_ever_fetched(url, monkeypatch):
         def __init__(self, *a, **k):
             sent.append("client")
 
-    monkeypatch.setattr(bimi.httpx, "AsyncClient", Boom)
+    monkeypatch.setattr(safe_fetch.httpx, "AsyncClient", Boom)
     with pytest.raises(bimi.FetchRefused):
         asyncio.run(bimi.public_https_fetch(url))
     assert sent == []

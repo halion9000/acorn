@@ -107,6 +107,10 @@ export interface DmarcBlocklists {
   listed: number;
   not_checked: number;
 }
+export interface DmarcReputation {
+  domain: string;
+  facts: { label: string; text: string; tone: 'good' | 'warn' | 'bad' | 'unknown' }[];
+}
 export interface SetupLine {
   client_id: string;
   client_name: string;
@@ -391,6 +395,44 @@ function BlocklistsView({ domain, days }: { domain: string; days: number }) {
   );
 }
 
+const FACT_TONE: Record<DmarcReputation['facts'][number]['tone'], string> = { good: 'text-emerald-300', warn: 'text-amber-300', bad: 'text-red-300', unknown: 'text-gray-400' };
+
+/** The facts that bear on a domain's reputation: how long it has been registered, when that ends, how its own mail behaves. No single score. Blocklists are the separate check above. On request. */
+function ReputationView({ domain, days }: { domain: string; days: number }) {
+  const [run, setRun] = useState(false);
+  const { data, error, isLoading } = useSWR<DmarcReputation>(run ? `/api/v1/dmarc/domains/${encodeURIComponent(domain)}/reputation?days=${days}` : null, fetcher, { shouldRetryOnError: false });
+  return (
+    <div data-testid="reputation" className="mt-4 rounded-lg border border-gray-800 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="text-sm font-medium text-gray-200">Domain reputation</h4>
+        {!run ? (
+          <button type="button" onClick={() => setRun(true)} className="rounded-lg bg-gray-800 px-3 py-1 text-xs text-gray-100 hover:bg-gray-700">
+            Check reputation
+          </button>
+        ) : null}
+      </div>
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-red-300">
+          {(error as Error).message}
+        </p>
+      ) : isLoading ? (
+        <p className="mt-2 text-sm text-gray-500">Checking…</p>
+      ) : data ? (
+        <dl className="mt-2 grid gap-x-4 gap-y-1 text-sm md:grid-cols-[9rem_1fr]">
+          {data.facts.map((f) => (
+            <div key={f.label} className="contents">
+              <dt className="text-gray-400">{f.label}</dt>
+              <dd data-testid={`reputation-${f.label.toLowerCase().replace(/\s+/g, '-')}`} className={FACT_TONE[f.tone]}>
+                {f.text}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </div>
+  );
+}
+
 function Detail({ domain, days, onClose }: { domain: string; days: number; onClose: () => void }) {
   const { data, error } = useSWR<DmarcDetail>(`/api/v1/dmarc/domains/${encodeURIComponent(domain)}?days=${days}`, fetcher, { shouldRetryOnError: false });
   const max = Math.max(1, ...(data?.series.map((p) => p.total) ?? [1]));
@@ -425,6 +467,7 @@ function Detail({ domain, days, onClose }: { domain: string; days: number; onClo
           <LookalikesView domain={domain} />
           <BimiView domain={domain} />
           <BlocklistsView domain={domain} days={days} />
+          <ReputationView domain={domain} days={days} />
           <h4 className="mt-5 text-sm font-medium text-gray-200">Sources failing DMARC</h4>
           {data.failing_sources.length === 0 ? (
             <p className="mt-1 text-sm text-emerald-300">Nothing failed in this period.</p>

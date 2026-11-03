@@ -20,6 +20,7 @@ let card: Record<string, unknown> | null;
 let lookalikes: Record<string, unknown> | null;
 let bimi: Record<string, unknown> | null;
 let blocklists: Record<string, unknown> | null;
+let reputation: Record<string, unknown> | null;
 
 const view = () => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
@@ -46,12 +47,14 @@ beforeEach(() => {
   lookalikes = null;
   bimi = null;
   blocklists = null;
+  reputation = null;
   authFetch.mockReset();
   authFetch.mockImplementation(async (url: string) => {
     if (url.startsWith('/api/v1/dmarc/overview')) return json(200, overview);
     if (url.startsWith('/api/v1/dmarc/countries')) return countries ? json(200, countries) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/insights')) return insights ? json(200, insights) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/setup')) return json(200, setup);
+    if (url.includes('/reputation')) return reputation ? json(200, reputation) : json(404, {});
     if (url.includes('/blocklists')) return blocklists ? json(200, blocklists) : json(404, {});
     if (url.includes('/bimi')) return bimi ? json(200, bimi) : json(404, {});
     if (url.includes('/lookalikes')) return lookalikes ? json(200, lookalikes) : json(404, {});
@@ -554,5 +557,36 @@ describe('DMARC blocklists', () => {
     expect(summary).toHaveTextContent('No listings found.');
     expect(summary).toHaveClass('text-emerald-300');
     expect(screen.queryByTestId('blocklist-row')).toBeNull();
+  });
+});
+
+describe('DMARC domain reputation', () => {
+  it('asks only on request and shows each fact in its own colour, unknown included', async () => {
+    reputation = {
+      domain: 'acme.com',
+      facts: [
+        { label: 'Registered', text: '2010-01-01 (16 years ago).', tone: 'good' },
+        { label: 'Registration ends', text: 'Expires in 12 days (2026-11-15).', tone: 'warn' },
+        { label: 'Its own mail', text: '80.0% of 1,000 messages pass DMARC; 200 failed.', tone: 'bad' },
+        { label: 'DMARC policy', text: 'The registration record could not be fetched: x', tone: 'unknown' },
+      ],
+    };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    await screen.findByTestId('reputation');
+    expect(authFetch.mock.calls.some(([u]) => String(u).includes('/reputation'))).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Check reputation' }));
+    expect(await screen.findByTestId('reputation-registered')).toHaveClass('text-emerald-300');
+    expect(screen.getByTestId('reputation-registration-ends')).toHaveClass('text-amber-300');
+    expect(screen.getByTestId('reputation-its-own-mail')).toHaveClass('text-red-300');
+    expect(screen.getByTestId('reputation-dmarc-policy')).toHaveClass('text-gray-400');
+  });
+
+  it('shows the reason when the check fails', async () => {
+    reputation = null;
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Check reputation' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The server answered 404');
   });
 });
