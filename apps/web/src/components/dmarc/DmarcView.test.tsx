@@ -19,6 +19,7 @@ let countries: Record<string, unknown> | null;
 let card: Record<string, unknown> | null;
 let lookalikes: Record<string, unknown> | null;
 let bimi: Record<string, unknown> | null;
+let blocklists: Record<string, unknown> | null;
 
 const view = () => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
@@ -44,12 +45,14 @@ beforeEach(() => {
   card = null;
   lookalikes = null;
   bimi = null;
+  blocklists = null;
   authFetch.mockReset();
   authFetch.mockImplementation(async (url: string) => {
     if (url.startsWith('/api/v1/dmarc/overview')) return json(200, overview);
     if (url.startsWith('/api/v1/dmarc/countries')) return countries ? json(200, countries) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/insights')) return insights ? json(200, insights) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/setup')) return json(200, setup);
+    if (url.includes('/blocklists')) return blocklists ? json(200, blocklists) : json(404, {});
     if (url.includes('/bimi')) return bimi ? json(200, bimi) : json(404, {});
     if (url.includes('/lookalikes')) return lookalikes ? json(200, lookalikes) : json(404, {});
     if (url.includes('/card')) return card ? json(200, card) : json(404, {});
@@ -516,5 +519,40 @@ describe('DMARC brand logo (BIMI) check', () => {
     expect(await screen.findByTestId('bimi-published')).toHaveTextContent('No BIMI record published');
     expect(screen.getByTestId('bimi-dmarc')).toHaveClass('text-amber-300');
     expect(screen.queryByTestId('bimi-cert')).toBeNull();
+  });
+});
+
+describe('DMARC blocklists', () => {
+  it('asks only on request, lists what is listed or not checked, and never calls a refusal clean', async () => {
+    blocklists = {
+      domain: 'acme.com', listed: 1, not_checked: 2,
+      domain_results: [{ list_name: 'Spamhaus DBL', status: 'clear', detail: '' }],
+      addresses: [{ ip: '8.8.8.8', emails: 40, results: [{ list_name: 'Spamhaus ZEN', status: 'listed', detail: '127.0.0.2' }, { list_name: 'SpamCop', status: 'clear', detail: '' }, { list_name: 'UCEPROTECT level 1', status: 'no_answer', detail: 'x' }] }, { ip: '1.1.1.1', emails: 20, results: [{ list_name: 'Spamhaus ZEN', status: 'refused', detail: 'x' }] }],
+    };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    await screen.findByTestId('blocklists');
+    expect(authFetch.mock.calls.some(([u]) => String(u).includes('/blocklists'))).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Check blocklists' }));
+    const summary = await screen.findByTestId('blocklist-summary');
+    expect(summary).toHaveTextContent('1 listing found.');
+    expect(summary).toHaveTextContent('2 checks could not be completed');
+    expect(summary).toHaveTextContent('not a clean result');
+    const rows = screen.getAllByTestId('blocklist-row');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent('LISTED');
+    expect(rows.map((r) => r.textContent).join('|')).toContain('list refused to answer');
+    expect(rows.map((r) => r.textContent).join('|')).not.toContain('SpamCop');
+  });
+
+  it('says no listings when everything answered clear', async () => {
+    blocklists = { domain: 'acme.com', listed: 0, not_checked: 0, domain_results: [{ list_name: 'Spamhaus DBL', status: 'clear', detail: '' }], addresses: [] };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Check blocklists' }));
+    const summary = await screen.findByTestId('blocklist-summary');
+    expect(summary).toHaveTextContent('No listings found.');
+    expect(summary).toHaveClass('text-emerald-300');
+    expect(screen.queryByTestId('blocklist-row')).toBeNull();
   });
 });

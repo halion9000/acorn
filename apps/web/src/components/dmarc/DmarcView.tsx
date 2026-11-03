@@ -95,6 +95,18 @@ export interface DmarcBimi {
   certificate: { organization: string | null; not_after: string; days_left: number; valid: boolean; is_vmc: boolean } | null;
   problems: string[];
 }
+export interface BlocklistRow {
+  list_name: string;
+  status: 'listed' | 'clear' | 'refused' | 'no_answer';
+  detail: string;
+}
+export interface DmarcBlocklists {
+  domain: string;
+  domain_results: BlocklistRow[];
+  addresses: { ip: string; emails: number; results: BlocklistRow[] }[];
+  listed: number;
+  not_checked: number;
+}
 export interface SetupLine {
   client_id: string;
   client_name: string;
@@ -325,6 +337,60 @@ function BimiView({ domain }: { domain: string }) {
   );
 }
 
+const LIST_STATUS: Record<BlocklistRow['status'], { text: string; tone: string }> = {
+  listed: { text: 'LISTED', tone: 'text-red-300' },
+  clear: { text: 'not listed', tone: 'text-emerald-300' },
+  refused: { text: 'list refused to answer', tone: 'text-amber-300' },
+  no_answer: { text: 'no answer', tone: 'text-amber-300' },
+};
+
+/** Whether the domain and its busiest sending addresses are on public blocklists. A list that refused or did not answer is shown as that, and counted apart: it never reads as "not listed". On request. */
+function BlocklistsView({ domain, days }: { domain: string; days: number }) {
+  const [run, setRun] = useState(false);
+  const { data, error, isLoading } = useSWR<DmarcBlocklists>(run ? `/api/v1/dmarc/domains/${encodeURIComponent(domain)}/blocklists?days=${days}` : null, fetcher, { shouldRetryOnError: false });
+  const flagged = data ? [...data.domain_results.map((r) => ({ who: domain, ...r })), ...data.addresses.flatMap((a) => a.results.map((r) => ({ who: a.ip, ...r })))].filter((r) => r.status !== 'clear') : [];
+  return (
+    <div data-testid="blocklists" className="mt-4 rounded-lg border border-gray-800 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="text-sm font-medium text-gray-200">Blocklists</h4>
+        {!run ? (
+          <button type="button" onClick={() => setRun(true)} className="rounded-lg bg-gray-800 px-3 py-1 text-xs text-gray-100 hover:bg-gray-700">
+            Check blocklists
+          </button>
+        ) : null}
+      </div>
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-red-300">
+          {(error as Error).message}
+        </p>
+      ) : isLoading ? (
+        <p className="mt-2 text-sm text-gray-500">Checking…</p>
+      ) : data ? (
+        <div className="mt-2 space-y-2 text-sm">
+          <p data-testid="blocklist-summary" className={data.listed > 0 ? 'text-red-300' : data.not_checked > 0 ? 'text-amber-300' : 'text-emerald-300'}>
+            {data.listed > 0 ? `${data.listed} listing${data.listed === 1 ? '' : 's'} found.` : 'No listings found.'}
+            {data.not_checked > 0 ? ` ${data.not_checked} check${data.not_checked === 1 ? '' : 's'} could not be completed (a list refused or did not answer), so this is not a clean result for those.` : ''}
+          </p>
+          <p className="text-xs text-gray-500">
+            Checked the domain and {data.addresses.length} sending address{data.addresses.length === 1 ? '' : 'es'}.
+          </p>
+          {flagged.length > 0 ? (
+            <ul className="space-y-1">
+              {flagged.map((r) => (
+                <li key={`${r.who}-${r.list_name}`} data-testid="blocklist-row" className="flex justify-between gap-3">
+                  <span className="font-mono text-gray-100">{r.who}</span>
+                  <span className="text-gray-400">{r.list_name}</span>
+                  <span className={LIST_STATUS[r.status].tone}>{LIST_STATUS[r.status].text}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function Detail({ domain, days, onClose }: { domain: string; days: number; onClose: () => void }) {
   const { data, error } = useSWR<DmarcDetail>(`/api/v1/dmarc/domains/${encodeURIComponent(domain)}?days=${days}`, fetcher, { shouldRetryOnError: false });
   const max = Math.max(1, ...(data?.series.map((p) => p.total) ?? [1]));
@@ -358,6 +424,7 @@ function Detail({ domain, days, onClose }: { domain: string; days: number; onClo
           <ReportCardView domain={domain} days={days} />
           <LookalikesView domain={domain} />
           <BimiView domain={domain} />
+          <BlocklistsView domain={domain} days={days} />
           <h4 className="mt-5 text-sm font-medium text-gray-200">Sources failing DMARC</h4>
           {data.failing_sources.length === 0 ? (
             <p className="mt-1 text-sm text-emerald-300">Nothing failed in this period.</p>

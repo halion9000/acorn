@@ -25,6 +25,7 @@ from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services import bimi as bimi_check
+from app.services import blocklist
 from app.services.dmarc_senders import identify_sender
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domain
 from app.services.ip_country import country_of
@@ -530,6 +531,67 @@ async def domain_bimi(
     if not reports or clean is None:
         raise HTTPException(status_code=404, detail="No reports for that domain.")
     return await bimi_check.check(clean, resolver, fetch)
+
+
+class ListRow(BaseModel):
+    list_name: str
+    status: str  # listed, clear, refused (the list will not answer us) or no_answer (the lookup failed)
+    detail: str
+
+
+class AddressBlocklists(BaseModel):
+    ip: str
+    emails: int
+    results: list[ListRow]
+
+
+class Blocklists(BaseModel):
+    domain: str
+    domain_results: list[ListRow]
+    addresses: list[AddressBlocklists]
+    listed: int
+    not_checked: int  # answers that were refused or did not arrive: these are not "clear"
+
+
+MAX_BLOCKLIST_ADDRESSES = 20
+
+
+def get_blocklist_lookup() -> blocklist.Lookup:
+    """How blocklists are asked: the server's own resolver (replaced in tests)."""
+    return blocklist.system_lookup
+
+
+def _rows(results: list[blocklist.ListResult]) -> list[ListRow]:
+    return [ListRow(list_name=r.list_name, status=r.status, detail=r.detail) for r in results]
+
+
+@router.get("/domains/{domain}/blocklists", response_model=Blocklists, summary="Blocklist status of one of the caller's domains and its busiest sending addresses")
+async def domain_blocklists(
+    domain: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    lookup: Annotated[blocklist.Lookup, Depends(get_blocklist_lookup)],
+    days: int = Query(30, ge=1, le=365),
+) -> Blocklists:
+    """The domain on the domain lists, and the busiest public sending addresses (from its reports) on the address lists. A list that refuses or does not answer is reported as that, never as clear."""
+    reports, clean = await _scoped_reports(current_user, db, days, domain, None)
+    if not reports or clean is None:
+        raise HTTPException(status_code=404, detail="No reports for that domain in this period.")
+    volume: Counter[str] = Counter()
+    for r in reports:
+        for row in r.rows or []:
+            volume[str(row.get("ip") or "")] += int(row.get("count", 0))
+    busiest = [(ip, n) for ip, n in volume.most_common() if blocklist.reverse_ipv4(ip)][:MAX_BLOCKLIST_ADDRESSES]
+    domain_results, *per_ip = await asyncio.gather(blocklist.check_domain(clean, lookup), *(blocklist.check_ip(ip, lookup) for ip, _ in busiest))
+    addresses = [AddressBlocklists(ip=ip, emails=n, results=_rows(res)) for (ip, n), res in zip(busiest, per_ip, strict=True)]
+    everything = [*domain_results, *(r for res in per_ip for r in res)]
+    return Blocklists(
+        domain=clean,
+        domain_results=_rows(domain_results),
+        addresses=addresses,
+        listed=sum(1 for r in everything if r.status == "listed"),
+        not_checked=sum(1 for r in everything if r.status in ("refused", "no_answer")),
+    )
 
 
 @router.get("/insights", response_model=Insights, summary="Delivery, failure rates over time, top senders and top sending domains")

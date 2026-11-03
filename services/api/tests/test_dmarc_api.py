@@ -637,3 +637,39 @@ def test_the_bimi_check_runs_only_for_a_domain_in_the_callers_reports_and_never_
     out, foreign = run(body)
     assert out.published and out.dmarc_ready and out.problems == ["The certificate address did not answer."]
     assert fetched == ["https://acme.com/vmc.pem"] and foreign == 404  # nothing was fetched for the other owner's domain
+
+
+def test_blocklists_count_listed_apart_from_not_checked_and_never_treat_a_refusal_as_clear():
+    from app.services import blocklist as bl_module
+
+    asked = []
+
+    async def lookup(name):
+        asked.append(name)
+        if name == "8.8.8.8.zen.spamhaus.org" or name == "1.1.1.1.zen.spamhaus.org":
+            return ["127.0.0.2"] if name.startswith("8.") else ["127.255.255.254"]
+        if name.endswith("uceprotect.net"):
+            raise bl_module.LookupFailed("timeout")
+        return []
+
+    rows = [line_row("8.8.8.8", 40), line_row("1.1.1.1", 20), line_row("10.0.0.9", 99), line_row("2001:db8::1", 50)]
+
+    async def body(s):
+        owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
+        theirs = await tenant(s, "Theirs", other.id)
+        s.add_all([rep(owner.id, "acme.com", 209, 209, rows=rows), rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("3.3.3.3", 5)])])
+        await s.commit()
+        out = await ep.domain_blocklists("acme.com", caller(owner), s, lookup, days=30)
+        before = len(asked)
+        with pytest.raises(HTTPException) as foreign:
+            await ep.domain_blocklists("theirs.com", caller(owner), s, lookup, days=30)
+        return out, foreign.value.status_code, before, len(asked)
+
+    out, foreign, before, after = run(body)
+    assert [a.ip for a in out.addresses] == ["8.8.8.8", "1.1.1.1"]  # private and IPv6 addresses are never asked about; busiest first
+    by_ip = {a.ip: {r.list_name: r.status for r in a.results} for a in out.addresses}
+    assert by_ip["8.8.8.8"]["Spamhaus ZEN"] == "listed" and by_ip["1.1.1.1"]["Spamhaus ZEN"] == "refused"
+    assert by_ip["8.8.8.8"]["UCEPROTECT level 1"] == "no_answer" and by_ip["8.8.8.8"]["SpamCop"] == "clear"
+    assert out.listed == 1
+    assert out.not_checked == 3  # two UCEPROTECT lookups that failed and one Spamhaus refusal: none of them is "clear"
+    assert foreign == 404 and after == before
