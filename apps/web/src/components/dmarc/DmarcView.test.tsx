@@ -6,7 +6,7 @@ import { SWRConfig } from 'swr';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { DmarcView, aliasScript, cleanAliasName, dnsRecordsText, policyLabel, rateTone, tlsRecordsText } from './DmarcView';
+import { DmarcView, aliasScript, cleanAliasName, dnsRecordsText, policyLabel, rateTone, spfLookupRow, tlsRecordsText } from './DmarcView';
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const status = { configured: true, mailbox: 'lodmarc@goliveoak.com', last_run_at: new Date().toISOString(), last_error: null, stored: 14, rejected: 0, unmatched_reports: 0 };
@@ -624,5 +624,39 @@ describe('DMARC TLS reports', () => {
     await userEvent.click(await screen.findByRole('tab', { name: 'Setup' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Copy the TLS report records for the selected domains' }));
     expect(write).toHaveBeenCalledWith('_smtp._tls.acmedental.com\tTXT\tv=TLSRPTv1; rua=mailto:acme-dental@goliveoak.com');
+  });
+});
+
+describe('the SPF lookup row', () => {
+  it('shows nothing without a count, a green count under 8, amber from 8, and red above 10 with the consequence', () => {
+    expect(spfLookupRow(null, true)).toEqual([]);
+    expect(spfLookupRow(undefined, undefined)).toEqual([]);
+    expect(spfLookupRow(5, true)).toEqual([['SPF lookups', 'good', '5 of 10']]);
+    expect(spfLookupRow(8, true)[0][1]).toBe('needs_work');
+    expect(spfLookupRow(10, true)[0][1]).toBe('needs_work');
+    const over = spfLookupRow(12, true)[0];
+    expect(over[1]).toBe('missing');
+    expect(over[2]).toContain('receivers treat SPF as failed');
+  });
+
+  it('labels a count that could not be completed as a minimum and never calls it fine', () => {
+    const r = spfLookupRow(4, false)[0];
+    expect(r[1]).toBe('unknown');
+    expect(r[2]).toContain('at least 4 of 10');
+    expect(r[2]).toContain('could not be read');
+    expect(spfLookupRow(11, false)[0][1]).toBe('missing');
+  });
+
+  it('appears on the report card with the count the server gave', async () => {
+    card = {
+      domain: 'acme.com', days: 30, total: 200, pass_rate: 95, policy: 'none', spf_lookups: 9, spf_lookups_complete: true,
+      posture: { domain: 'acme.com', status: 'good', mx: ['mx.acme.com'], mail_provider: null, spf: { status: 'good', summary: 'ok', record: null, issues: [] }, dmarc: { status: 'good', summary: 'ok', record: null, issues: [] }, dkim: { status: 'good', summary: 'ok', record: null, issues: [] } },
+      advice: [],
+    };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    const shown = await screen.findByTestId('report-card');
+    expect(within(shown).getByTestId('card-spf-lookups')).toHaveTextContent('9 of 10');
+    expect(within(shown).getByTestId('card-spf-lookups')).toHaveClass('text-amber-300');
   });
 });

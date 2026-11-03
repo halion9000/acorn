@@ -31,6 +31,10 @@ from app.services import reputation as reputation_service
 from app.services.dmarc_senders import identify_sender
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domain
 from app.services.ip_country import country_of
+from app.services.spf_lookups import LIMIT as SPF_LIMIT
+from app.services.spf_lookups import WARN_AT as SPF_WARN_AT
+from app.services.spf_lookups import SpfLookups
+from app.services.spf_lookups import count_lookups as count_spf_lookups
 from app.services.lookalike import generate as generate_lookalikes
 from app.services.lookalike import scan as scan_lookalikes
 
@@ -436,13 +440,15 @@ class ReportCard(BaseModel):
     pass_rate: float | None
     policy: str
     posture: DomainPosture  # the live DNS check: mail records, SPF, DMARC, DKIM
+    spf_lookups: int | None = None  # DNS lookups the SPF record costs through every include (the limit is 10); None when there is no SPF record
+    spf_lookups_complete: bool = True  # False when part of the chain could not be read: spf_lookups is then a minimum
     advice: list[str]  # plain-language next steps, most useful first
 
 
 MIN_MAIL_TO_JUDGE = 100
 
 
-def report_card_advice(policy: str, pass_rate: float | None, total: int, posture: DomainPosture) -> list[str]:
+def report_card_advice(policy: str, pass_rate: float | None, total: int, posture: DomainPosture, lookups: SpfLookups | None = None) -> list[str]:
     """What to do next for one domain, from its published policy, how much of its mail passes, and what DNS says. Rules only: no guessing about senders."""
     out: list[str] = []
     has_mail = bool(posture.mx)
@@ -468,6 +474,14 @@ def report_card_advice(policy: str, pass_rate: float | None, total: int, posture
     for f, covered in ((posture.spf, False), (posture.dmarc, posture.dmarc.record is not None)):
         if f.status != "good" and not covered:
             out.extend(f.issues or [f.summary])
+    if lookups is not None:
+        if lookups.over_limit:
+            out.append(
+                f"SPF needs {'at least ' if not lookups.complete else ''}{lookups.count} DNS lookups once every include is counted; receivers stop at {SPF_LIMIT} and treat SPF as failed. "
+                "Remove an include you no longer use, or replace includes with the sender's IP ranges."
+            )
+        elif lookups.complete and lookups.count >= SPF_WARN_AT:
+            out.append(f"SPF uses {lookups.count} of the {SPF_LIMIT} DNS lookups receivers allow. Adding one more sender could push it over and break SPF for everyone.")
     return out
 
 
@@ -487,8 +501,20 @@ async def domain_report_card(
     passed = sum(r.passed for r in reports)
     newest = max(reports, key=lambda r: r.end_at)
     posture = await check_domain(clean, resolver)
+    has_spf = posture.spf.status != "missing"
+    lookups = await count_spf_lookups(clean, resolver) if has_spf else None
     rate = _pct(passed, total)
-    return ReportCard(domain=clean, days=days, total=total, pass_rate=rate, policy=newest.policy, posture=posture, advice=report_card_advice(newest.policy, rate, total, posture))
+    return ReportCard(
+        domain=clean,
+        days=days,
+        total=total,
+        pass_rate=rate,
+        policy=newest.policy,
+        posture=posture,
+        spf_lookups=lookups.count if lookups is not None else None,
+        spf_lookups_complete=lookups.complete if lookups is not None else True,
+        advice=report_card_advice(newest.policy, rate, total, posture, lookups),
+    )
 
 
 class LookalikeRow(BaseModel):

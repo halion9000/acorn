@@ -79,6 +79,10 @@ export interface DmarcCard {
   pass_rate: number | null;
   policy: string;
   posture: { domain: string; status: string; mx: string[]; mail_provider: string | null; spf: PostureFinding; dmarc: PostureFinding; dkim: PostureFinding };
+  /** DNS lookups the SPF record costs through every include (the limit is 10); null with no SPF record; absent from an older server. */
+  spf_lookups?: number | null;
+  /** False when part of the chain could not be read, so spf_lookups is a minimum. */
+  spf_lookups_complete?: boolean;
   advice: string[];
 }
 export interface DmarcLookalikes {
@@ -214,7 +218,15 @@ function StatusStrip({ status }: { status: DmarcStatus }) {
   );
 }
 
-const findingTone = (status: string) => (status === 'good' ? 'text-emerald-300' : status === 'needs_work' ? 'text-amber-300' : 'text-red-300');
+/** The SPF lookup row: how many of the 10 DNS lookups receivers allow the record uses, once every include is counted. A minimum is labelled as one and never judged "fine". Nothing when there is no count. */
+export function spfLookupRow(count: number | null | undefined, complete: boolean | undefined): [string, string, string][] {
+  if (count === null || count === undefined) return [];
+  const partial = complete === false;
+  const tone = count > 10 ? 'missing' : partial ? 'unknown' : count >= 8 ? 'needs_work' : 'good';
+  return [['SPF lookups', tone, `${partial ? 'at least ' : ''}${count} of 10${partial ? ' (part of the chain could not be read)' : count > 10 ? ': receivers treat SPF as failed' : ''}`]];
+}
+
+const findingTone = (status: string) => (status === 'good' ? 'text-emerald-300' : status === 'needs_work' ? 'text-amber-300' : status === 'unknown' ? 'text-gray-400' : 'text-red-300');
 
 /** One domain's report card: what DNS says right now about its mail, SPF, DMARC and DKIM, and plain-language next steps. Left out when the server cannot produce it. */
 function ReportCardView({ domain, days }: { domain: string; days: number }) {
@@ -226,6 +238,7 @@ function ReportCardView({ domain, days }: { domain: string; days: number }) {
     ['SPF', p.spf.status, p.spf.summary],
     ['DMARC', p.dmarc.status, p.dmarc.summary],
     ['DKIM', p.dkim.status, p.dkim.summary],
+    ...spfLookupRow(data.spf_lookups, data.spf_lookups_complete),
   ];
   return (
     <div data-testid="report-card" className="mt-4 rounded-lg border border-gray-800 p-3">

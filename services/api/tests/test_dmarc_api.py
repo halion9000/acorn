@@ -755,3 +755,42 @@ def test_the_setup_lists_the_tls_reporting_record_for_each_domain_pointing_at_th
     line = run(body).lines[0]
     assert line.tls_rpt_name == "_smtp._tls.acmedental.com"
     assert line.tls_rpt_value == f"v=TLSRPTv1; rua=mailto:{line.alias}"
+
+
+def test_the_advice_warns_near_the_spf_lookup_limit_and_says_when_it_is_only_a_minimum():
+    from app.services.spf_lookups import SpfLookups
+
+    good = posture()
+    adv = ep.report_card_advice
+    over = adv("none", 99.0, 5000, good, SpfLookups(12, True, True))
+    assert any("12 DNS lookups" in a and "receivers stop at 10" in a and "at least" not in a for a in over)
+    partial = adv("none", 99.0, 5000, good, SpfLookups(11, False, True))
+    assert any("at least 11 DNS lookups" in a for a in partial)
+    near = adv("none", 99.0, 5000, good, SpfLookups(9, True, False))
+    assert any("9 of the 10 DNS lookups" in a for a in near)
+    assert not any("DNS lookups" in a for a in adv("none", 99.0, 5000, good, SpfLookups(5, True, False)))
+    assert not any("of the 10 DNS lookups" in a for a in adv("none", 99.0, 5000, good, SpfLookups(9, False, False))), "a partial count under the limit makes no claim"
+    assert not any("DNS lookups" in a for a in adv("none", 99.0, 5000, good, None))
+
+
+def test_the_card_reports_the_spf_lookup_count_through_the_includes_and_none_without_an_spf_record():
+    records = {
+        "acme.com": ["v=spf1 include:a.example include:b.example -all"],
+        "a.example": ["v=spf1 a mx include:c.example -all"],
+        "b.example": ["v=spf1 mx -all"],
+        "c.example": ["v=spf1 a -all"],
+        "_dmarc.acme.com": ["v=DMARC1; p=none; rua=mailto:a@goliveoak.com"],
+    }
+
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        acme, bare = await tenant(s, "Acme", owner.id), await tenant(s, "Bare", owner.id)
+        s.add_all([rep(acme.id, "acme.com", 1000, 990, rows=[line_row("1.1.1.1", 1000)]), rep(bare.id, "bare.example", 1000, 990, rows=[line_row("2.2.2.2", 1000)])])
+        await s.commit()
+        full = await ep.domain_report_card("acme.com", caller(owner), s, DnsResolver(records, {"acme.com": ["mx.acme.com"]}), days=30)
+        none = await ep.domain_report_card("bare.example", caller(owner), s, DnsResolver({}, {}), days=30)
+        return full, none
+
+    full, none = run(body)
+    assert (full.spf_lookups, full.spf_lookups_complete) == (2 + 3 + 1 + 1, True)  # two includes, then a+mx+include, mx, and c's a
+    assert (none.spf_lookups, none.spf_lookups_complete) == (None, True)
