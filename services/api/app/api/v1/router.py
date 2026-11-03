@@ -40,6 +40,7 @@ from app.api.v1.endpoints import (
     detection_rules,
     detection_vendor,
     devices,
+    remote_tools,
     easm,
     effective_permissions,
     enrichment,
@@ -218,6 +219,8 @@ api_router.include_router(saved_views.router)
 api_router.include_router(assets.router)
 api_router.include_router(devices.router)
 api_router.include_router(devices.ingest_router)
+api_router.include_router(remote_tools.router)
+api_router.include_router(remote_tools.ingest_router)
 api_router.include_router(signins.ingest_router)
 api_router.include_router(signins.router)
 api_router.include_router(identity.ingest_router)

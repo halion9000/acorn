@@ -68,7 +68,9 @@ MODELS = {
 PUSH = "generic-json"
 
 # core-feed routes the API has that CORE does not call (and why)
-NOT_CALLED_BY_CORE: dict[str, str] = {}
+NOT_CALLED_BY_CORE: dict[str, str] = {
+    "/core-feed/{tenant_token}/remote-tools": "CORE's scan of installed software for remote tools is not built yet (A.C.O.R.N side first); when it is, record its request here and remove this line",
+}
 
 
 def api_routes() -> set[str]:

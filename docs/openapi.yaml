@@ -79,6 +79,39 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/auth/password:
+    post:
+      tags:
+      - auth
+      summary: Change Own Password
+      description: 'Change the signed-in person''s own password. The current password
+        must be right (a stolen session alone is not enough), the new one must pass
+        the password rule, and every session this person holds is ended,
+
+        this one included: sign in again with the new password. Wrong current passwords
+        are counted like failed sign-ins.'
+      operationId: change_own_password_api_v1_auth_password_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangePasswordResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/auth/refresh:
     post:
       tags:
@@ -554,6 +587,32 @@ paths:
             maxLength: 255
           - type: 'null'
           title: Device
+      - name: since
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Only alerts received at or after this time (ISO 8601; a time
+            with no zone counts as UTC).
+          title: Since
+        description: Only alerts received at or after this time (ISO 8601; a time
+          with no zone counts as UTC).
+      - name: until
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Only alerts received before this time (ISO 8601; a time with
+            no zone counts as UTC).
+          title: Until
+        description: Only alerts received before this time (ISO 8601; a time with
+          no zone counts as UTC).
       - name: person
         in: query
         required: false
@@ -1354,6 +1413,69 @@ paths:
                 items:
                   $ref: '#/components/schemas/SuppressionOut'
                 title: Response List Suppressions Api V1 Alert Suppressions Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-suppressions/maintenance:
+    post:
+      tags:
+      - alerts
+      summary: Hide a client's alerts during planned maintenance
+      description: 'A maintenance window: every open and new alert of the client,
+        except critical ones, is hidden from the start to the end (at most 72 hours)
+        and comes back when it ends. Lift it early with DELETE.'
+      operationId: start_maintenance_api_v1_alert_suppressions_maintenance_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuppressionOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/alert-suppressions/suggestion:
+    get:
+      tags:
+      - alerts
+      summary: Whether hiding this alert's type is worth suggesting (it was closed
+        as a false positive several times)
+      description: Counts the alerts of the same type, for the same client, closed
+        as a false positive in the last 90 days. Three or more, and no rule hiding
+        the type already, is worth suggesting. It suggests; it hides nothing.
+      operationId: hide_suggestion_api_v1_alert_suppressions_suggestion_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HideSuggestion'
         '422':
           description: Validation Error
           content:
@@ -3442,6 +3564,35 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/tenants/me/name:
+    patch:
+      tags:
+      - tenants
+      summary: Rename My Workspace
+      description: Give this workspace its name (shown in Settings and the top bar).
+        The slug and id stay as they are.
+      operationId: rename_my_workspace_api_v1_tenants_me_name_patch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameWorkspaceRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/tenants/me/users:
     get:
       tags:
@@ -3518,6 +3669,140 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - tenants
+      summary: Delete User
+      description: 'Remove a person from the workspace for good: their sessions end,
+        their passkeys and role assignments go. Refused for yourself and for the only
+        active administrator. If cases, notes or audit entries still name them the
+        database refuses; disable them instead (they keep their history and cannot
+        sign in).'
+      operationId: delete_user_api_v1_tenants_me_users__user_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminActionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/tenants/me/users/{user_id}/sign-out:
+    post:
+      tags:
+      - tenants
+      summary: Sign User Out Everywhere
+      description: End every session this person holds (a lost laptop, someone who
+        left). They can sign in again unless the account is also deactivated.
+      operationId: sign_user_out_everywhere_api_v1_tenants_me_users__user_id__sign_out_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminActionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/tenants/me/users/{user_id}/password:
+    post:
+      tags:
+      - tenants
+      summary: Reset User Password
+      description: 'Set a new password for a person (they forgot it) and end all their
+        sessions. Someone resetting their OWN password here is refused: use the change-password
+        route, which asks for the current one.'
+      operationId: reset_user_password_api_v1_tenants_me_users__user_id__password_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminActionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/tenants/me/users/{user_id}/reset-mfa:
+    post:
+      tags:
+      - tenants
+      summary: Reset User Mfa
+      description: Remove every passkey this person has enrolled (a lost phone or
+        security key) and end their sessions. They sign in with their password and
+        can enrol a new passkey from Settings > Profile.
+      operationId: reset_user_mfa_api_v1_tenants_me_users__user_id__reset_mfa_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminActionResponse'
         '422':
           description: Validation Error
           content:
@@ -5866,6 +6151,219 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/platform/update:
+    get:
+      tags:
+      - platform
+      summary: Get Update Status
+      operationId: get_update_status_api_v1_platform_update_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateStatus'
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - platform
+      summary: Request Update
+      operationId: request_update_api_v1_platform_update_post
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateStatus'
+      security:
+      - HTTPBearer: []
+  /api/v1/platform/azure-spend:
+    get:
+      tags:
+      - platform
+      summary: Get Azure Spend
+      operationId: get_azure_spend_api_v1_platform_azure_spend_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: refresh
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Refresh
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AzureSpend'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/search:
+    get:
+      tags:
+      - search
+      summary: Search alerts, cases, devices, stock and clients at once
+      operationId: search_api_v1_search_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 100
+          title: Q
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 10
+          minimum: 1
+          default: 5
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/sso/status:
+    get:
+      tags:
+      - auth-sso
+      summary: Sso Status
+      description: 'Which ways of signing in the login page offers. Public: it only
+        says whether the Microsoft button is shown and whether passwords still work
+        for everyone.'
+      operationId: sso_status_api_v1_auth_sso_status_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SsoStatus'
+  /api/v1/auth/sso/microsoft/login:
+    get:
+      tags:
+      - auth-sso
+      summary: Microsoft Login
+      operationId: microsoft_login_api_v1_auth_sso_microsoft_login_get
+      parameters:
+      - name: next
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Next
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/sso/microsoft/callback:
+    get:
+      tags:
+      - auth-sso
+      summary: Microsoft Callback
+      operationId: microsoft_callback_api_v1_auth_sso_microsoft_callback_get
+      parameters:
+      - name: code
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Code
+      - name: state
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: State
+      - name: error
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Error
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/sso/exchange:
+    post:
+      tags:
+      - auth-sso
+      summary: Exchange
+      description: Trade the one-time code from the redirect for the session tokens.
+        A code works once and for a minute.
+      operationId: exchange_api_v1_auth_sso_exchange_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/platform/all-tenant-access:
     get:
       tags:
@@ -6208,6 +6706,73 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/rbac/builtin-roles:
+    get:
+      tags:
+      - rbac
+      summary: List Builtin Roles
+      description: The built-in roles and exactly what each grants. They cannot be
+        edited (they are part of the product); make a custom role from one to change
+        it.
+      operationId: list_builtin_roles_api_v1_rbac_builtin_roles_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/BuiltinRoleOut'
+                type: array
+                title: Response List Builtin Roles Api V1 Rbac Builtin Roles Get
+      security:
+      - HTTPBearer: []
+  /api/v1/rbac/sso-default:
+    get:
+      tags:
+      - rbac
+      summary: Get Sso Default
+      description: The role a person gets the first time they sign in with Microsoft
+        without an account.
+      operationId: get_sso_default_api_v1_rbac_sso_default_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SsoDefaultOut'
+      security:
+      - HTTPBearer: []
+    put:
+      tags:
+      - rbac
+      summary: Set Sso Default
+      description: 'Choose the role new Microsoft sign-ins get: a built-in role (never
+        an administrator) or one of this workspace''s custom roles, which then stands
+        alone.'
+      operationId: set_sso_default_api_v1_rbac_sso_default_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SsoDefaultIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SsoDefaultOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/rbac/roles:
     get:
       tags:
@@ -7308,6 +7873,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PipelineHealth'
+      security:
+      - HTTPBearer: []
+  /api/v1/health/core-approvals:
+    get:
+      tags:
+      - health
+      summary: Approvals waiting for the owner in CORE, as CORE last reported them
+      description: 'For the notification bell: what CORE said was waiting for the
+        owner at its last report (within 20 minutes), the agent, a one-line summary
+        and the days left. Empty when CORE has not reported lately.'
+      operationId: core_approvals_waiting_api_v1_health_core_approvals_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Core Approvals Waiting Api V1 Health Core Approvals
+                  Get
       security:
       - HTTPBearer: []
   /api/v1/health/feed-routes:
@@ -8942,10 +9528,10 @@ paths:
         schema:
           type: string
           description: 'Which list page to return presets for. One of: alerts, cases,
-            investigations, playbooks.'
+            devices, investigations, playbooks.'
           title: View Type
         description: 'Which list page to return presets for. One of: alerts, cases,
-          investigations, playbooks.'
+          devices, investigations, playbooks.'
       responses:
         '200':
           description: Successful Response
@@ -9998,6 +10584,190 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/app__api__v1__endpoints__devices__DevicesResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/remote-tools/inventory:
+    get:
+      tags:
+      - remote-tools
+      summary: Every remote management and remote access tool found on client devices,
+        with what has been decided about each
+      operationId: inventory_api_v1_remote_tools_inventory_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+      security:
+      - HTTPBearer: []
+  /api/v1/remote-tools/catalog:
+    get:
+      tags:
+      - remote-tools
+      summary: The tools that are looked for
+      operationId: catalog_api_v1_remote_tools_catalog_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/CatalogEntry'
+                type: array
+                title: Response Catalog Api V1 Remote Tools Catalog Get
+      security:
+      - HTTPBearer: []
+  /api/v1/remote-tools/tools/{tool_key}/devices:
+    get:
+      tags:
+      - remote-tools
+      summary: The devices one tool was found on
+      operationId: tool_devices_api_v1_remote_tools_tools__tool_key__devices_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: tool_key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tool Key
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 5000
+          minimum: 1
+          default: 2000
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceRow'
+                title: Response Tool Devices Api V1 Remote Tools Tools  Tool Key  Devices
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/remote-tools/tools/{tool_key}/verdict:
+    put:
+      tags:
+      - remote-tools
+      summary: Allow, block or leave unreviewed a tool, for every client or for one
+      operationId: set_verdict_api_v1_remote_tools_tools__tool_key__verdict_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: tool_key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tool Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerdictIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerdictOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/remote-tools:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Remote Tools
+      description: Record the remote tools a scan of one client's devices found (CORE
+        sends the matches only).
+      operationId: report_core_feed_remote_tools_api_v1_inbox_core_feed__tenant_token__remote_tools_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoteToolsReport'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/remote-tools/catalog:
+    get:
+      tags:
+      - inbox-core-feed
+      summary: Core Feed Remote Tools Catalog
+      description: The tools and the patterns that recognise them in a program name,
+        so CORE matches on its side and sends only the matches (one list, kept here).
+      operationId: core_feed_remote_tools_catalog_api_v1_inbox_core_feed__tenant_token__remote_tools_catalog_get
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogForCore'
+                title: Response Core Feed Remote Tools Catalog Api V1 Inbox Core Feed  Tenant
+                  Token  Remote Tools Catalog Get
         '422':
           description: Validation Error
           content:
@@ -11114,6 +11884,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - inventory
+      summary: Delete an item from the stock for good (its history goes with it)
+      description: 'Remove an item and its history. Refused for an item that is checked
+        out (check it in first, so nothing is lost track of) and for one a tool keeps
+        in step (a NinjaOne device
+
+        would come back at the next sync: mark it Retired instead). The deletion is
+        written to the audit log with what the item was, since its own history goes
+        with it.'
+      operationId: delete_item_api_v1_inventory__item_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inventory/bulk:
     post:
       tags:
@@ -11568,6 +12373,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClientDomains'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-posture/{client_id}/tool-exclusions:
+    get:
+      tags:
+      - posture
+      summary: The tools this client does not use, which are never reported as missing
+        for it
+      operationId: get_tool_exclusions_api_v1_client_posture__client_id__tool_exclusions_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolExclusionsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - posture
+      summary: 'Choose the tools this client does not use: they are no longer reported
+        as missing on Devices, the posture pages or the score, and raise no alerts'
+      operationId: put_tool_exclusions_api_v1_client_posture__client_id__tool_exclusions_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolExclusionsIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolExclusionsOut'
         '422':
           description: Validation Error
           content:
@@ -12419,6 +13289,601 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DigestOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/overview:
+    get:
+      tags:
+      - dmarc
+      summary: Each client domain's DMARC results over the last N days
+      operationId: overview_api_v1_dmarc_overview_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 30
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Overview'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/domains/{domain}:
+    get:
+      tags:
+      - dmarc
+      summary: 'One domain: its daily results and the sources failing DMARC'
+      operationId: domain_detail_api_v1_dmarc_domains__domain__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Domain
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 30
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/countries:
+    get:
+      tags:
+      - dmarc
+      summary: Where the mail was sent from, by country
+      description: Country of each sending address, looked up for the busiest addresses
+        only (a quiet tail is reported as not looked up rather than guessed or fetched
+        one by one).
+      operationId: countries_api_v1_dmarc_countries_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 30
+          title: Days
+      - name: domain
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Domain
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Countries'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/domains/{domain}/card:
+    get:
+      tags:
+      - dmarc
+      summary: 'One domain''s report card: results, live DNS check and next steps'
+      description: Only a domain that has reports in the caller's data is checked
+        (so this cannot be used to probe arbitrary domains).
+      operationId: domain_report_card_api_v1_dmarc_domains__domain__card_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Domain
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 30
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportCard'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/domains/{domain}/lookalikes:
+    get:
+      tags:
+      - dmarc
+      summary: Look-alike domains of one of the caller's domains that exist in DNS
+      description: Only a domain with reports in the caller's data is scanned. Read-only
+        DNS questions about the lookalike names; no connection is made to them.
+      operationId: domain_lookalikes_api_v1_dmarc_domains__domain__lookalikes_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Domain
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lookalikes'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/domains/{domain}/bimi:
+    get:
+      tags:
+      - dmarc
+      summary: BIMI brand-logo check for one of the caller's domains
+      description: Only a domain with reports in the caller's data is checked. The
+        certificate address in its public record is fetched with care (https, public
+        address, no redirects, size limit).
+      operationId: domain_bimi_api_v1_dmarc_domains__domain__bimi_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Domain
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bimi'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/domains/{domain}/blocklists:
+    get:
+      tags:
+      - dmarc
+      summary: Blocklist status of one of the caller's domains and its busiest sending
+        addresses
+      description: The domain on the domain lists, and the busiest public sending
+        addresses (from its reports) on the address lists. A list that refuses or
+        does not answer is reported as that, never as clear.
+      operationId: domain_blocklists_api_v1_dmarc_domains__domain__blocklists_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Domain
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 30
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Blocklists'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/domains/{domain}/reputation:
+    get:
+      tags:
+      - dmarc
+      summary: Facts that bear on one of the caller's domains' reputation (registration
+        age, expiry, its own mail)
+      description: 'Only a domain with reports in the caller''s data is looked up.
+        No single score: a few facts, each marked good, warning, bad or unknown. A
+        registration record that cannot be fetched or read is unknown.'
+      operationId: domain_reputation_api_v1_dmarc_domains__domain__reputation_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Domain
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 30
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reputation'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/tls:
+    get:
+      tags:
+      - dmarc
+      summary: 'TLS reports per domain: how many TLS-protected connections to the
+        domain''s mail servers worked, and why the rest failed'
+      operationId: tls_overview_api_v1_dmarc_tls_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 30
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TlsOverview'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/insights:
+    get:
+      tags:
+      - dmarc
+      summary: Delivery, failure rates over time, top senders and top sending domains
+      description: 'Everything the Valimail-style overview shows, computed from the
+        stored reports: for all clients, one client, or one domain. Counts are messages,
+        not reports.'
+      operationId: insights_api_v1_dmarc_insights_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 30
+          title: Days
+      - name: domain
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Domain
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Insights'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/setup:
+    get:
+      tags:
+      - dmarc
+      summary: 'For each client domain: the address to put in its DMARC record and
+        the DNS line that authorises it'
+      description: 'Nothing is changed. Each client domain gets its own alias on the
+        shared mailbox (so its reports are recognisable and can be retired alone)
+        and the one DNS record, in YOUR zone, that lets receivers send a
+
+        client domain''s reports to you (receivers require it before reporting to
+        a different domain).'
+      operationId: setup_api_v1_dmarc_setup_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Setup'
+      security:
+      - HTTPBearer: []
+  /api/v1/nessus/scans:
+    post:
+      tags:
+      - nessus
+      summary: Upload a .nessus export for a client
+      operationId: upload_scan_api_v1_nessus_scans_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Name
+      - name: description
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Description
+      - name: notes
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Notes
+      - name: scan_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(lan|wan|other)$
+          - type: 'null'
+          title: Scan Type
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - nessus
+      summary: Uploaded scans, newest first
+      operationId: list_scans_api_v1_nessus_scans_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScanOut'
+                title: Response List Scans Api V1 Nessus Scans Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/nessus/scans/{scan_id}:
+    get:
+      tags:
+      - nessus
+      summary: One scan with its findings, worst first
+      operationId: scan_detail_api_v1_nessus_scans__scan_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: scan_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Scan Id
+      - name: severity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(critical|high|medium|low)$
+          - type: 'null'
+          title: Severity
+      - name: host
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Host
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+          title: Page
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Page Size
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - nessus
+      summary: Delete an uploaded scan and its findings
+      operationId: delete_scan_api_v1_nessus_scans__scan_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: scan_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Scan Id
+      responses:
+        '204':
+          description: Successful Response
         '422':
           description: Validation Error
           content:
@@ -13554,6 +15019,51 @@ paths:
                 title: Response List Metrics Api V1 Mssp Metrics Get
       security:
       - HTTPBearer: []
+  /api/v1/mssp/children/{child_id}/progress:
+    get:
+      tags:
+      - mssp
+      summary: Child Progress
+      description: 'A client''s trend over the last ``days`` days: for each measure
+        the start, now, change, lowest, highest and the daily line. A measure with
+        no recording in the period, or one that stopped being recorded, is reported
+        as not recorded instead of being filled in.'
+      operationId: child_progress_api_v1_mssp_children__child_id__progress_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: child_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Child Id
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 7
+          default: 90
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Child Progress Api V1 Mssp Children  Child Id  Progress
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/mssp/rule-packs:
     get:
       tags:
@@ -17021,7 +18531,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/FindingOut'
+                  $ref: '#/components/schemas/app__api__v1__endpoints__posture__FindingOut'
                 title: Response List Findings Api V1 Posture Findings Get
         '422':
           description: Validation Error
@@ -17048,7 +18558,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FindingOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__posture__FindingOut'
         '422':
           description: Validation Error
           content:
@@ -17077,7 +18587,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FindingOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__posture__FindingOut'
         '422':
           description: Validation Error
           content:
@@ -17112,7 +18622,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FindingOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__posture__FindingOut'
         '422':
           description: Validation Error
           content:
@@ -17141,7 +18651,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FindingOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__posture__FindingOut'
         '422':
           description: Validation Error
           content:
@@ -20932,6 +22442,38 @@ components:
       required:
       - findings
       title: AddFindingsRequest
+    AddressBlocklists:
+      properties:
+        ip:
+          type: string
+          title: Ip
+        emails:
+          type: integer
+          title: Emails
+        results:
+          items:
+            $ref: '#/components/schemas/ListRow'
+          type: array
+          title: Results
+      type: object
+      required:
+      - ip
+      - emails
+      - results
+      title: AddressBlocklists
+    AdminActionResponse:
+      properties:
+        done:
+          type: boolean
+          title: Done
+        detail:
+          type: string
+          title: Detail
+      type: object
+      required:
+      - done
+      - detail
+      title: AdminActionResponse
     AdminInviteWire:
       properties:
         token:
@@ -21559,6 +23101,10 @@ components:
         new:
           type: integer
           title: New
+        newLast24h:
+          type: integer
+          title: Newlast24H
+          default: 0
         critical:
           type: integer
           title: Critical
@@ -22340,6 +23886,30 @@ components:
       - page_size
       - pages
       title: ApprovalListResponse
+    ApprovalNote:
+      properties:
+        role:
+          type: string
+          maxLength: 40
+          title: Role
+        summary:
+          type: string
+          maxLength: 200
+          title: Summary
+        days_left:
+          type: integer
+          maximum: 30.0
+          minimum: 0.0
+          title: Days Left
+          description: Whole days before CORE takes the card off the list.
+      type: object
+      required:
+      - role
+      - summary
+      - days_left
+      title: ApprovalNote
+      description: One approval waiting for the owner in CORE. Only what the bell
+        shows.
     ApprovalResponse:
       properties:
         id:
@@ -23327,6 +24897,65 @@ components:
       - tenant_id
       - actions
       title: AutonomyPolicyResponse
+    AzureSpend:
+      properties:
+        configured:
+          type: boolean
+          title: Configured
+        currency:
+          type: string
+          title: Currency
+          default: USD
+        month:
+          type: string
+          title: Month
+          default: ''
+        total:
+          type: number
+          title: Total
+          default: 0.0
+        by_service:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: By Service
+          default: []
+        daily:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Daily
+          default: []
+        forecast:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Forecast
+        budget:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Budget
+        fetched_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Fetched At
+        stale:
+          type: boolean
+          title: Stale
+          default: false
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+      type: object
+      required:
+      - configured
+      title: AzureSpend
     BacktestProposalRequest:
       properties:
         window_days:
@@ -23481,6 +25110,46 @@ components:
       - recorded_by_id
       - created_at
       title: BaselineResponse
+    Bimi:
+      properties:
+        domain:
+          type: string
+          title: Domain
+        published:
+          type: boolean
+          title: Published
+        logo_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Logo Url
+        certificate_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Certificate Url
+        dmarc_ready:
+          type: boolean
+          title: Dmarc Ready
+        certificate:
+          anyOf:
+          - $ref: '#/components/schemas/CertInfo'
+          - type: 'null'
+        problems:
+          items:
+            type: string
+          type: array
+          title: Problems
+      type: object
+      required:
+      - domain
+      - published
+      - logo_url
+      - certificate_url
+      - dmarc_ready
+      - certificate
+      - problems
+      title: Bimi
     BlastRadiusResponse:
       properties:
         entity_id:
@@ -23518,6 +25187,35 @@ components:
       - type_breakdown
       - blast_radius_score
       title: BlastRadiusResponse
+    Blocklists:
+      properties:
+        domain:
+          type: string
+          title: Domain
+        domain_results:
+          items:
+            $ref: '#/components/schemas/ListRow'
+          type: array
+          title: Domain Results
+        addresses:
+          items:
+            $ref: '#/components/schemas/AddressBlocklists'
+          type: array
+          title: Addresses
+        listed:
+          type: integer
+          title: Listed
+        not_checked:
+          type: integer
+          title: Not Checked
+      type: object
+      required:
+      - domain
+      - domain_results
+      - addresses
+      - listed
+      - not_checked
+      title: Blocklists
     BuildTimelineRequest:
       properties:
         identity_kind:
@@ -23559,6 +25257,29 @@ components:
       - identity_kind
       - identity_value
       title: BuildTimelineRequest
+    BuiltinRoleOut:
+      properties:
+        key:
+          type: string
+          title: Key
+        label:
+          type: string
+          title: Label
+        description:
+          type: string
+          title: Description
+        permissions:
+          items:
+            type: string
+          type: array
+          title: Permissions
+      type: object
+      required:
+      - key
+      - label
+      - description
+      - permissions
+      title: BuiltinRoleOut
     BulkAcceptIn:
       properties:
         reason:
@@ -24263,6 +25984,96 @@ components:
       - tags
       - sla_due_at
       title: CaseResponse
+    CatalogEntry:
+      properties:
+        key:
+          type: string
+          title: Key
+        name:
+          type: string
+          title: Name
+        category:
+          type: string
+          title: Category
+      type: object
+      required:
+      - key
+      - name
+      - category
+      title: CatalogEntry
+    CatalogForCore:
+      properties:
+        key:
+          type: string
+          title: Key
+        name:
+          type: string
+          title: Name
+        patterns:
+          items:
+            type: string
+          type: array
+          title: Patterns
+      type: object
+      required:
+      - key
+      - name
+      - patterns
+      title: CatalogForCore
+    CertInfo:
+      properties:
+        organization:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Organization
+        not_after:
+          type: string
+          format: date-time
+          title: Not After
+        days_left:
+          type: integer
+          title: Days Left
+        valid:
+          type: boolean
+          title: Valid
+        is_vmc:
+          type: boolean
+          title: Is Vmc
+      type: object
+      required:
+      - organization
+      - not_after
+      - days_left
+      - valid
+      - is_vmc
+      title: CertInfo
+    ChangePasswordRequest:
+      properties:
+        current_password:
+          type: string
+          title: Current Password
+        new_password:
+          type: string
+          title: New Password
+      type: object
+      required:
+      - current_password
+      - new_password
+      title: ChangePasswordRequest
+    ChangePasswordResponse:
+      properties:
+        changed:
+          type: boolean
+          title: Changed
+        detail:
+          type: string
+          title: Detail
+      type: object
+      required:
+      - changed
+      - detail
+      title: ChangePasswordResponse
     CheckAcceptanceOut:
       properties:
         reason:
@@ -26071,6 +27882,54 @@ components:
       - source
       - item
       title: CountedRef
+    Countries:
+      properties:
+        days:
+          type: integer
+          title: Days
+        emails:
+          type: integer
+          title: Emails
+        countries:
+          items:
+            $ref: '#/components/schemas/CountryRow'
+          type: array
+          title: Countries
+        unknown:
+          type: integer
+          title: Unknown
+        not_looked_up:
+          type: integer
+          title: Not Looked Up
+      type: object
+      required:
+      - days
+      - emails
+      - countries
+      - unknown
+      - not_looked_up
+      title: Countries
+    CountryRow:
+      properties:
+        code:
+          type: string
+          title: Code
+        emails:
+          type: integer
+          title: Emails
+        passed:
+          type: integer
+          title: Passed
+        failed:
+          type: integer
+          title: Failed
+      type: object
+      required:
+      - code
+      - emails
+      - passed
+      - failed
+      title: CountryRow
     CoverageCell:
       properties:
         techniqueId:
@@ -26669,6 +28528,13 @@ components:
           type: string
           title: Role
           default: soc_analyst
+        custom_role_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Custom Role Ids
+          default: []
       type: object
       required:
       - password
@@ -26762,6 +28628,20 @@ components:
       - summary
       - evidence
       title: CspmScanResponse
+    CustomRoleRef:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+      type: object
+      required:
+      - id
+      - name
+      title: CustomRoleRef
     CustomerPlacement:
       properties:
         name:
@@ -26889,6 +28769,27 @@ components:
       - baseline_tool
       - rows
       title: DataQualityOut
+    DayPoint:
+      properties:
+        day:
+          type: string
+          title: Day
+        total:
+          type: integer
+          title: Total
+        passed:
+          type: integer
+          title: Passed
+        failed:
+          type: integer
+          title: Failed
+      type: object
+      required:
+      - day
+      - total
+      - passed
+      - failed
+      title: DayPoint
     DecisionRequest:
       properties:
         decision:
@@ -26976,6 +28877,46 @@ components:
       - revoked_at
       - created_at
       title: DelegationOut
+    DeletedOut:
+      properties:
+        deleted:
+          type: boolean
+          title: Deleted
+        name:
+          type: string
+          title: Name
+      type: object
+      required:
+      - deleted
+      - name
+      title: DeletedOut
+    Delivery:
+      properties:
+        passed:
+          type: integer
+          title: Passed
+        failed_delivered:
+          type: integer
+          title: Failed Delivered
+        overridden:
+          type: integer
+          title: Overridden
+        quarantined:
+          type: integer
+          title: Quarantined
+        rejected:
+          type: integer
+          title: Rejected
+      type: object
+      required:
+      - passed
+      - failed_delivered
+      - overridden
+      - quarantined
+      - rejected
+      title: Delivery
+      description: What became of the mail, in the order a person cares about it.
+        Every message counts in exactly one of these.
     DeploymentConfig:
       properties:
         mode:
@@ -27472,6 +29413,11 @@ components:
           type: boolean
           title: Auto Hidden
           default: false
+        excluded_tools:
+          items:
+            type: string
+          type: array
+          title: Excluded Tools
         kind:
           type: string
           title: Kind
@@ -27496,6 +29442,46 @@ components:
       - kind
       - encrypted
       title: DeviceOut
+    DeviceRow:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        hostname:
+          type: string
+          title: Hostname
+        version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Version
+        first_seen:
+          type: string
+          format: date-time
+          title: First Seen
+        last_seen:
+          type: string
+          format: date-time
+          title: Last Seen
+        verdict:
+          type: string
+          title: Verdict
+      type: object
+      required:
+      - client_id
+      - client_name
+      - hostname
+      - version
+      - first_seen
+      - last_seen
+      - verdict
+      title: DeviceRow
     DeviceSettings:
       properties:
         master_vendor:
@@ -27985,6 +29971,141 @@ components:
       - kinds
       - refreshed_at
       title: DocSummary
+    DomainDetail:
+      properties:
+        domain:
+          type: string
+          title: Domain
+        days:
+          type: integer
+          title: Days
+        reports:
+          type: integer
+          title: Reports
+        total:
+          type: integer
+          title: Total
+        passed:
+          type: integer
+          title: Passed
+        failed:
+          type: integer
+          title: Failed
+        policy:
+          type: string
+          title: Policy
+        series:
+          items:
+            $ref: '#/components/schemas/DayPoint'
+          type: array
+          title: Series
+        failing_sources:
+          items:
+            $ref: '#/components/schemas/FailingSource'
+          type: array
+          title: Failing Sources
+      type: object
+      required:
+      - domain
+      - days
+      - reports
+      - total
+      - passed
+      - failed
+      - policy
+      - series
+      - failing_sources
+      title: DomainDetail
+    DomainPosture:
+      properties:
+        domain:
+          type: string
+          title: Domain
+        status:
+          type: string
+          enum:
+          - good
+          - needs_work
+          - missing
+          title: Status
+        mx:
+          items:
+            type: string
+          type: array
+          title: Mx
+        mail_provider:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mail Provider
+        spf:
+          $ref: '#/components/schemas/Finding'
+        dmarc:
+          $ref: '#/components/schemas/Finding'
+        dkim:
+          $ref: '#/components/schemas/Finding'
+      type: object
+      required:
+      - domain
+      - status
+      - mx
+      - mail_provider
+      - spf
+      - dmarc
+      - dkim
+      title: DomainPosture
+    DomainRow:
+      properties:
+        client_id:
+          type: string
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        matched:
+          type: boolean
+          title: Matched
+        domain:
+          type: string
+          title: Domain
+        reports:
+          type: integer
+          title: Reports
+        total:
+          type: integer
+          title: Total
+        passed:
+          type: integer
+          title: Passed
+        failed:
+          type: integer
+          title: Failed
+        pass_rate:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Pass Rate
+        policy:
+          type: string
+          title: Policy
+        last_report:
+          type: string
+          format: date-time
+          title: Last Report
+      type: object
+      required:
+      - client_id
+      - client_name
+      - matched
+      - domain
+      - reports
+      - total
+      - passed
+      - failed
+      - pass_rate
+      - policy
+      - last_report
+      title: DomainRow
     DomainWithWeb:
       properties:
         domain:
@@ -28753,6 +30874,32 @@ components:
       - status
       - created_at
       title: EvidenceResponse
+    ExchangeRequest:
+      properties:
+        code:
+          type: string
+          title: Code
+      type: object
+      required:
+      - code
+      title: ExchangeRequest
+    ExchangeResponse:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        refresh_token:
+          type: string
+          title: Refresh Token
+        token_type:
+          type: string
+          title: Token Type
+          default: bearer
+      type: object
+      required:
+      - access_token
+      - refresh_token
+      title: ExchangeResponse
     ExecuteRuleRequest:
       properties:
         events:
@@ -28898,6 +31045,31 @@ components:
       - api_endpoint
       title: ExternalAssetType
       description: Types of externally-discovered assets.
+    FailingSource:
+      properties:
+        ip:
+          type: string
+          title: Ip
+        count:
+          type: integer
+          title: Count
+        header_from:
+          type: string
+          title: Header From
+        envelope_from:
+          type: string
+          title: Envelope From
+        disposition:
+          type: string
+          title: Disposition
+      type: object
+      required:
+      - ip
+      - count
+      - header_from
+      - envelope_from
+      - disposition
+      title: FailingSource
     FailingTest:
       properties:
         key:
@@ -28946,6 +31118,29 @@ components:
       required:
       - title
       title: FailingTest
+    FailureRates:
+      properties:
+        dmarc:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Dmarc
+        dkim:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Dkim
+        spf:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Spf
+      type: object
+      required:
+      - dmarc
+      - dkim
+      - spf
+      title: FailureRates
     FanoutResult:
       properties:
         connector_id:
@@ -29359,112 +31554,6 @@ components:
       - rule_id
       - rule_title
       title: FindingCreate
-    FindingOut:
-      properties:
-        cloud_provider:
-          type: string
-          title: Cloud Provider
-        cloud_account:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Cloud Account
-        cloud_region:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Cloud Region
-        resource_type:
-          type: string
-          title: Resource Type
-        resource_id:
-          type: string
-          title: Resource Id
-        resource_name:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Resource Name
-        rule_id:
-          type: string
-          title: Rule Id
-        rule_title:
-          type: string
-          title: Rule Title
-        description:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Description
-        severity:
-          type: string
-          title: Severity
-          default: medium
-        frameworks:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Frameworks
-        control_ids:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Control Ids
-        evidence:
-          additionalProperties: true
-          type: object
-          title: Evidence
-        remediation_guide:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Remediation Guide
-        id:
-          type: string
-          format: uuid
-          title: Id
-        tenant_id:
-          type: string
-          format: uuid
-          title: Tenant Id
-        status:
-          type: string
-          title: Status
-        auto_remediated:
-          type: boolean
-          title: Auto Remediated
-        first_detected_at:
-          type: string
-          format: date-time
-          title: First Detected At
-        last_evaluated_at:
-          type: string
-          format: date-time
-          title: Last Evaluated At
-        resolved_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Resolved At
-      type: object
-      required:
-      - cloud_provider
-      - resource_type
-      - resource_id
-      - rule_id
-      - rule_title
-      - id
-      - tenant_id
-      - status
-      - auto_remediated
-      - first_detected_at
-      - last_evaluated_at
-      title: FindingOut
     FinishRequest:
       properties:
         credential:
@@ -29595,6 +31684,10 @@ components:
         overdue:
           type: boolean
           title: Overdue
+          default: false
+        raises_alerts:
+          type: boolean
+          title: Raises Alerts
           default: false
       type: object
       required:
@@ -29747,6 +31840,28 @@ components:
       required:
       - formats
       title: FormatsResponse
+    FoundIn:
+      properties:
+        hostname:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Hostname
+        tool_key:
+          type: string
+          pattern: ^[a-z0-9_]{1,60}$
+          title: Tool Key
+        version:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Version
+      type: object
+      required:
+      - hostname
+      - tool_key
+      title: FoundIn
     FrameworkCounts:
       properties:
         key:
@@ -30267,6 +32382,27 @@ components:
       - device_id
       - hidden_since
       title: HideOut
+    HideSuggestion:
+      properties:
+        suggest:
+          type: boolean
+          title: Suggest
+        false_positives:
+          type: integer
+          title: False Positives
+        threshold:
+          type: integer
+          title: Threshold
+          default: 3
+        days:
+          type: integer
+          title: Days
+          default: 90
+      type: object
+      required:
+      - suggest
+      - false_positives
+      title: HideSuggestion
     HistoryEntry:
       properties:
         at:
@@ -30301,6 +32437,46 @@ components:
       - at
       - source
       title: HistoryEntry
+    Hit:
+      properties:
+        kind:
+          type: string
+          enum:
+          - client
+          - person
+          - alert
+          - case
+          - device
+          - stock
+          - nuc
+          title: Kind
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+        client:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client
+        client_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Id
+      type: object
+      required:
+      - kind
+      - id
+      - title
+      title: Hit
     HuntHit:
       properties:
         id:
@@ -31317,6 +33493,89 @@ components:
       - previous_value
       title: InsightTile
       description: One tile on the SOC Insights dashboard.
+    Insights:
+      properties:
+        days:
+          type: integer
+          title: Days
+        domain:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Domain
+        emails:
+          type: integer
+          title: Emails
+        delivery:
+          $ref: '#/components/schemas/Delivery'
+        rates:
+          $ref: '#/components/schemas/FailureRates'
+        series:
+          items:
+            $ref: '#/components/schemas/RatePoint'
+          type: array
+          title: Series
+        senders:
+          items:
+            $ref: '#/components/schemas/SenderRow'
+          type: array
+          title: Senders
+        at_risk:
+          items:
+            $ref: '#/components/schemas/SenderRow'
+          type: array
+          title: At Risk
+        sending_domains:
+          items:
+            $ref: '#/components/schemas/SendingDomainRow'
+          type: array
+          title: Sending Domains
+      type: object
+      required:
+      - days
+      - domain
+      - emails
+      - delivery
+      - rates
+      - series
+      - senders
+      - at_risk
+      - sending_domains
+      title: Insights
+    Inventory:
+      properties:
+        tools_found:
+          type: integer
+          title: Tools Found
+        devices_with_tools:
+          type: integer
+          title: Devices With Tools
+        devices_scanned:
+          type: integer
+          title: Devices Scanned
+        blocked_devices:
+          type: integer
+          title: Blocked Devices
+        last_scanned:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Scanned
+        tools:
+          items:
+            $ref: '#/components/schemas/ToolRow'
+          type: array
+          title: Tools
+      type: object
+      required:
+      - tools_found
+      - devices_with_tools
+      - devices_scanned
+      - blocked_devices
+      - last_scanned
+      - tools
+      title: Inventory
     InvestigateRequest:
       properties:
         alert_summary:
@@ -32453,6 +34712,23 @@ components:
       - rules
       - total
       title: ListResponse
+    ListRow:
+      properties:
+        list_name:
+          type: string
+          title: List Name
+        status:
+          type: string
+          title: Status
+        detail:
+          type: string
+          title: Detail
+      type: object
+      required:
+      - list_name
+      - status
+      - detail
+      title: ListRow
     LlmCredentialUpsert:
       properties:
         provider:
@@ -32620,6 +34896,42 @@ components:
       - revoked
       - detail
       title: LogoutResponse
+    LookalikeRow:
+      properties:
+        domain:
+          type: string
+          title: Domain
+        kind:
+          type: string
+          title: Kind
+        has_mail:
+          type: boolean
+          title: Has Mail
+      type: object
+      required:
+      - domain
+      - kind
+      - has_mail
+      title: LookalikeRow
+    Lookalikes:
+      properties:
+        domain:
+          type: string
+          title: Domain
+        checked:
+          type: integer
+          title: Checked
+        found:
+          items:
+            $ref: '#/components/schemas/LookalikeRow'
+          type: array
+          title: Found
+      type: object
+      required:
+      - domain
+      - checked
+      - found
+      title: Lookalikes
     M365Answer:
       properties:
         group:
@@ -32772,6 +35084,34 @@ components:
 
         made-up number: this used to return hard-coded values (a fixed 23.4-minute
         MTTR, "3 connectors online") for tenants that did not exist.'
+    MaintenanceIn:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        hours:
+          type: integer
+          maximum: 72.0
+          minimum: 1.0
+          title: Hours
+          description: 1 to 72 hours
+        starts_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Starts At
+        reason:
+          type: string
+          maxLength: 200
+          title: Reason
+          default: ''
+      type: object
+      required:
+      - client_id
+      - hours
+      title: MaintenanceIn
     ManageableTenant:
       properties:
         id:
@@ -32880,6 +35220,16 @@ components:
           - type: integer
           - type: 'null'
           title: Connector Count
+        connectors_enabled:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Connectors Enabled
+        connectors_unhealthy:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Connectors Unhealthy
       type: object
       required:
       - tenant_id
@@ -34684,6 +37034,24 @@ components:
       - benign_corrections
       - escalate_corrections
       title: OverrideSummaryResponse
+    Overview:
+      properties:
+        days:
+          type: integer
+          title: Days
+        status:
+          $ref: '#/components/schemas/Status'
+        domains:
+          items:
+            $ref: '#/components/schemas/DomainRow'
+          type: array
+          title: Domains
+      type: object
+      required:
+      - days
+      - status
+      - domains
+      title: Overview
     OwnerIn:
       properties:
         owner:
@@ -35663,7 +38031,12 @@ components:
       required:
       - preferences
       title: PreferencesPatch
-      description: Partial update payload for user preferences (merged server-side).
+      description: 'Partial update payload for user preferences (merged server-side).
+
+
+        ``avatar`` is the person''s picture: a small PNG, JPEG or WebP as a data address
+        (never a link to elsewhere, never an SVG, which can carry script), or empty
+        to remove it.'
     PreviewRequest:
       properties:
         yaml:
@@ -36403,6 +38776,31 @@ components:
         SLA remaining — the frontend can drift its own clock from this
 
         so multiple analysts on different boxes see the same countdowns.'
+    RatePoint:
+      properties:
+        day:
+          type: string
+          title: Day
+        total:
+          type: integer
+          title: Total
+        dmarc_fail:
+          type: integer
+          title: Dmarc Fail
+        dkim_fail:
+          type: integer
+          title: Dkim Fail
+        spf_fail:
+          type: integer
+          title: Spf Fail
+      type: object
+      required:
+      - day
+      - total
+      - dmarc_fail
+      - dkim_fail
+      - spf_fail
+      title: RatePoint
     Readiness:
       properties:
         met:
@@ -36804,6 +39202,37 @@ components:
         under (``principal``, ``network``, ``workflow``, ``tenant``). One
 
         entity belongs to exactly one group; we don''t duplicate rows.'
+    RemoteToolsReport:
+      properties:
+        vendor:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          title: Vendor
+          description: The tool the software list came from (ninjaone).
+        vendor_client_id:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Vendor Client Id
+        devices_scanned:
+          type: integer
+          maximum: 200000.0
+          minimum: 0.0
+          title: Devices Scanned
+          description: How many of the client's devices were looked at in this scan,
+            with or without a tool on them.
+        items:
+          items:
+            $ref: '#/components/schemas/FoundIn'
+          type: array
+          maxItems: 5000
+          title: Items
+      type: object
+      required:
+      - vendor
+      - devices_scanned
+      title: RemoteToolsReport
     RemoveOut:
       properties:
         removed:
@@ -36822,6 +39251,15 @@ components:
       - removed
       - name
       title: RemoveOut
+    RenameWorkspaceRequest:
+      properties:
+        name:
+          type: string
+          title: Name
+      type: object
+      required:
+      - name
+      title: RenameWorkspaceRequest
     ReplaceRulesRequest:
       properties:
         yaml:
@@ -36832,6 +39270,51 @@ components:
       required:
       - yaml
       title: ReplaceRulesRequest
+    ReportCard:
+      properties:
+        domain:
+          type: string
+          title: Domain
+        days:
+          type: integer
+          title: Days
+        total:
+          type: integer
+          title: Total
+        pass_rate:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Pass Rate
+        policy:
+          type: string
+          title: Policy
+        posture:
+          $ref: '#/components/schemas/DomainPosture'
+        spf_lookups:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Spf Lookups
+        spf_lookups_complete:
+          type: boolean
+          title: Spf Lookups Complete
+          default: true
+        advice:
+          items:
+            type: string
+          type: array
+          title: Advice
+      type: object
+      required:
+      - domain
+      - days
+      - total
+      - pass_rate
+      - policy
+      - posture
+      - advice
+      title: ReportCard
     ReportDefinitionBody:
       properties:
         name:
@@ -36862,6 +39345,31 @@ components:
       required:
       - report
       title: ReportIn
+    ReportOut:
+      properties:
+        stored:
+          type: integer
+          title: Stored
+        removed:
+          type: integer
+          title: Removed
+        unknown_tools:
+          type: integer
+          title: Unknown Tools
+        unmapped:
+          type: boolean
+          title: Unmapped
+        alerts_raised:
+          type: integer
+          title: Alerts Raised
+      type: object
+      required:
+      - stored
+      - removed
+      - unknown_tools
+      - unmapped
+      - alerts_raised
+      title: ReportOut
     ReportResponse:
       properties:
         stored:
@@ -36870,6 +39378,38 @@ components:
           default: true
       type: object
       title: ReportResponse
+    Reputation:
+      properties:
+        domain:
+          type: string
+          title: Domain
+        facts:
+          items:
+            $ref: '#/components/schemas/ReputationFact'
+          type: array
+          title: Facts
+      type: object
+      required:
+      - domain
+      - facts
+      title: Reputation
+    ReputationFact:
+      properties:
+        label:
+          type: string
+          title: Label
+        text:
+          type: string
+          title: Text
+        tone:
+          type: string
+          title: Tone
+      type: object
+      required:
+      - label
+      - text
+      - tone
+      title: ReputationFact
     RequirementControl:
       properties:
         key:
@@ -36941,6 +39481,15 @@ components:
       - cases_moved
       - by_client
       title: RerouteOut
+    ResetPasswordRequest:
+      properties:
+        new_password:
+          type: string
+          title: New Password
+      type: object
+      required:
+      - new_password
+      title: ResetPasswordRequest
     RetentionOut:
       properties:
         raw_events_days:
@@ -38553,6 +41102,172 @@ components:
       - updated_at
       title: SavedViewModel
       description: Wire format for a saved view row.
+    ScanDetail:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+        scan_type:
+          type: string
+          title: Scan Type
+        uploaded_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Uploaded By
+        uploaded_at:
+          type: string
+          format: date-time
+          title: Uploaded At
+        hosts:
+          type: integer
+          title: Hosts
+        matched_hosts:
+          type: integer
+          title: Matched Hosts
+        critical:
+          type: integer
+          title: Critical
+        high:
+          type: integer
+          title: High
+        medium:
+          type: integer
+          title: Medium
+        low:
+          type: integer
+          title: Low
+        findings:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__nessus__FindingOut'
+          type: array
+          title: Findings
+        total_findings:
+          type: integer
+          title: Total Findings
+        page:
+          type: integer
+          title: Page
+        pages:
+          type: integer
+          title: Pages
+      type: object
+      required:
+      - id
+      - client_id
+      - client_name
+      - name
+      - description
+      - notes
+      - scan_type
+      - uploaded_by
+      - uploaded_at
+      - hosts
+      - matched_hosts
+      - critical
+      - high
+      - medium
+      - low
+      - findings
+      - total_findings
+      - page
+      - pages
+      title: ScanDetail
+    ScanOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+        scan_type:
+          type: string
+          title: Scan Type
+        uploaded_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Uploaded By
+        uploaded_at:
+          type: string
+          format: date-time
+          title: Uploaded At
+        hosts:
+          type: integer
+          title: Hosts
+        matched_hosts:
+          type: integer
+          title: Matched Hosts
+        critical:
+          type: integer
+          title: Critical
+        high:
+          type: integer
+          title: High
+        medium:
+          type: integer
+          title: Medium
+        low:
+          type: integer
+          title: Low
+      type: object
+      required:
+      - id
+      - client_id
+      - client_name
+      - name
+      - description
+      - notes
+      - scan_type
+      - uploaded_by
+      - uploaded_at
+      - hosts
+      - matched_hosts
+      - critical
+      - high
+      - medium
+      - low
+      title: ScanOut
     ScanRequest:
       properties:
         tenant_id:
@@ -39092,6 +41807,21 @@ components:
       - status
       - evidence
       title: SearchHit
+    SearchOut:
+      properties:
+        query:
+          type: string
+          title: Query
+        hits:
+          items:
+            $ref: '#/components/schemas/Hit'
+          type: array
+          title: Hits
+      type: object
+      required:
+      - query
+      - hits
+      title: SearchOut
     SecureScoreBrief:
       properties:
         client_id:
@@ -39587,6 +42317,60 @@ components:
       - can_select_other_tenants
       - tenants
       title: SelectableTenantsResponse
+    SenderRow:
+      properties:
+        name:
+          type: string
+          title: Name
+        identified:
+          type: boolean
+          title: Identified
+        emails:
+          type: integer
+          title: Emails
+        passed:
+          type: integer
+          title: Passed
+        failed:
+          type: integer
+          title: Failed
+        status:
+          type: string
+          title: Status
+      type: object
+      required:
+      - name
+      - identified
+      - emails
+      - passed
+      - failed
+      - status
+      title: SenderRow
+    SendingDomainRow:
+      properties:
+        domain:
+          type: string
+          title: Domain
+        emails:
+          type: integer
+          title: Emails
+        passed:
+          type: integer
+          title: Passed
+        failed:
+          type: integer
+          title: Failed
+        status:
+          type: string
+          title: Status
+      type: object
+      required:
+      - domain
+      - emails
+      - passed
+      - failed
+      - status
+      title: SendingDomainRow
     SentAlert:
       properties:
         alert_id:
@@ -39667,6 +42451,74 @@ components:
       required:
       - close_status
       title: SetTicketSettings
+    Setup:
+      properties:
+        mailbox:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mailbox
+        mailbox_domain:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mailbox Domain
+        lines:
+          items:
+            $ref: '#/components/schemas/SetupLine'
+          type: array
+          title: Lines
+      type: object
+      required:
+      - mailbox
+      - mailbox_domain
+      - lines
+      title: Setup
+    SetupLine:
+      properties:
+        client_id:
+          type: string
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        domain:
+          type: string
+          title: Domain
+        alias:
+          type: string
+          title: Alias
+        client_dmarc_rua:
+          type: string
+          title: Client Dmarc Rua
+        authorization_record_name:
+          type: string
+          title: Authorization Record Name
+        authorization_record_value:
+          type: string
+          title: Authorization Record Value
+        has_mx:
+          type: boolean
+          title: Has Mx
+          default: true
+        tls_rpt_name:
+          type: string
+          title: Tls Rpt Name
+          default: ''
+        tls_rpt_value:
+          type: string
+          title: Tls Rpt Value
+          default: ''
+      type: object
+      required:
+      - client_id
+      - client_name
+      - domain
+      - alias
+      - client_dmarc_rua
+      - authorization_record_name
+      - authorization_record_value
+      title: SetupLine
     ShiftAnalyst:
       properties:
         id:
@@ -40258,6 +43110,68 @@ components:
       required:
       - vendors
       title: SourcesRequest
+    SsoDefaultIn:
+      properties:
+        role:
+          type: string
+          title: Role
+        custom_role_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Custom Role Id
+      type: object
+      required:
+      - role
+      title: SsoDefaultIn
+    SsoDefaultOut:
+      properties:
+        sso_configured:
+          type: boolean
+          title: Sso Configured
+        applies_here:
+          type: boolean
+          title: Applies Here
+        role:
+          type: string
+          title: Role
+        custom_role_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Custom Role Id
+        source:
+          type: string
+          title: Source
+        allowed_builtin:
+          items:
+            type: string
+          type: array
+          title: Allowed Builtin
+      type: object
+      required:
+      - sso_configured
+      - applies_here
+      - role
+      - custom_role_id
+      - source
+      - allowed_builtin
+      title: SsoDefaultOut
+    SsoStatus:
+      properties:
+        microsoft:
+          type: boolean
+          title: Microsoft
+        password_login:
+          type: string
+          title: Password Login
+      type: object
+      required:
+      - microsoft
+      - password_login
+      title: SsoStatus
     StateItem:
       properties:
         uid:
@@ -40313,6 +43227,46 @@ components:
       required:
       - updated
       title: StateResponse
+    Status:
+      properties:
+        configured:
+          type: boolean
+          title: Configured
+        mailbox:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mailbox
+        last_run_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Run At
+        last_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Error
+        stored:
+          type: integer
+          title: Stored
+        rejected:
+          type: integer
+          title: Rejected
+        unmatched_reports:
+          type: integer
+          title: Unmatched Reports
+      type: object
+      required:
+      - configured
+      - mailbox
+      - last_run_at
+      - last_error
+      - stored
+      - rejected
+      - unmatched_reports
+      title: Status
     StatusReport:
       properties:
         sources:
@@ -40321,6 +43275,14 @@ components:
           type: array
           maxItems: 50
           title: Sources
+        approvals:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ApprovalNote'
+            type: array
+            maxItems: 50
+          - type: 'null'
+          title: Approvals
       type: object
       required:
       - sources
@@ -40672,6 +43634,16 @@ components:
             format: date-time
           - type: 'null'
           title: Expires At
+        starts_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Starts At
+        maintenance:
+          type: boolean
+          title: Maintenance
+          default: false
         indefinite:
           type: boolean
           title: Indefinite
@@ -42034,6 +45006,80 @@ components:
       - diff_vs_prev_attempt
       title: TimelineNode
       description: One node in the scrubbable investigation timeline.
+    TlsDomainRow:
+      properties:
+        domain:
+          type: string
+          title: Domain
+        client_id:
+          type: string
+          title: Client Id
+        matched:
+          type: boolean
+          title: Matched
+        reports:
+          type: integer
+          title: Reports
+        success:
+          type: integer
+          title: Success
+        failure:
+          type: integer
+          title: Failure
+        success_rate:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Success Rate
+        failures:
+          items:
+            $ref: '#/components/schemas/TlsFailureKind'
+          type: array
+          title: Failures
+        last_report:
+          type: string
+          format: date-time
+          title: Last Report
+      type: object
+      required:
+      - domain
+      - client_id
+      - matched
+      - reports
+      - success
+      - failure
+      - success_rate
+      - failures
+      - last_report
+      title: TlsDomainRow
+    TlsFailureKind:
+      properties:
+        type:
+          type: string
+          title: Type
+        count:
+          type: integer
+          title: Count
+      type: object
+      required:
+      - type
+      - count
+      title: TlsFailureKind
+    TlsOverview:
+      properties:
+        days:
+          type: integer
+          title: Days
+        domains:
+          items:
+            $ref: '#/components/schemas/TlsDomainRow'
+          type: array
+          title: Domains
+      type: object
+      required:
+      - days
+      - domains
+      title: TlsOverview
     TokenResponse:
       properties:
         access_token:
@@ -42093,6 +45139,10 @@ components:
           - type: boolean
           - type: 'null'
           title: Enrolled
+        excluded:
+          type: boolean
+          title: Excluded
+          default: false
       type: object
       required:
       - tool
@@ -42100,6 +45150,85 @@ components:
       - of
       - percent
       title: ToolCoverage
+    ToolExclusionsIn:
+      properties:
+        tools:
+          items:
+            type: string
+          type: array
+          maxItems: 20
+          title: Tools
+      type: object
+      title: ToolExclusionsIn
+    ToolExclusionsOut:
+      properties:
+        tools:
+          items:
+            type: string
+          type: array
+          title: Tools
+        choices:
+          items:
+            type: string
+          type: array
+          title: Choices
+      type: object
+      required:
+      - tools
+      - choices
+      title: ToolExclusionsOut
+    ToolRow:
+      properties:
+        key:
+          type: string
+          title: Key
+        name:
+          type: string
+          title: Name
+        category:
+          type: string
+          title: Category
+        clients:
+          type: integer
+          title: Clients
+        devices:
+          type: integer
+          title: Devices
+        last_seen:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Seen
+        verdict:
+          type: string
+          title: Verdict
+        client_rules:
+          type: integer
+          title: Client Rules
+        blocked_devices:
+          type: integer
+          title: Blocked Devices
+        allowed_devices:
+          type: integer
+          title: Allowed Devices
+        unreviewed_devices:
+          type: integer
+          title: Unreviewed Devices
+      type: object
+      required:
+      - key
+      - name
+      - category
+      - clients
+      - devices
+      - last_seen
+      - verdict
+      - client_rules
+      - blocked_devices
+      - allowed_devices
+      - unreviewed_devices
+      title: ToolRow
     ToolScorecard:
       properties:
         source:
@@ -43010,6 +46139,50 @@ components:
         the caller passes ``columns: null`` explicitly — the optional /
 
         null distinction is preserved in the JSON.'
+    UpdateStatus:
+      properties:
+        available:
+          type: boolean
+          title: Available
+        state:
+          type: string
+          title: State
+        requested_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requested By
+        requested_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requested At
+        last_run_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Run At
+        last_run_ok:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Last Run Ok
+        summary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Summary
+        log:
+          items:
+            type: string
+          type: array
+          title: Log
+          default: []
+      type: object
+      required:
+      - available
+      - state
+      title: UpdateStatus
     UpdateTaskRequest:
       properties:
         title:
@@ -43065,6 +46238,14 @@ components:
           - type: boolean
           - type: 'null'
           title: Is Active
+        custom_role_ids:
+          anyOf:
+          - items:
+              type: string
+              format: uuid
+            type: array
+          - type: 'null'
+          title: Custom Role Ids
       type: object
       title: UpdateUserRequest
     UpsertAlertGraphRequest:
@@ -43266,6 +46447,12 @@ components:
           type: string
           format: date-time
           title: Created At
+        custom_roles:
+          items:
+            $ref: '#/components/schemas/CustomRoleRef'
+          type: array
+          title: Custom Roles
+          default: []
       type: object
       required:
       - id
@@ -43670,6 +46857,53 @@ components:
       - window_days
       - detections
       title: VendorDetectionsResponse
+    VerdictIn:
+      properties:
+        verdict:
+          type: string
+          pattern: ^(allowed|blocked|unreviewed)$
+          title: Verdict
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+          description: Only this client; leave out for every client.
+        note:
+          anyOf:
+          - type: string
+            maxLength: 400
+          - type: 'null'
+          title: Note
+      type: object
+      required:
+      - verdict
+      title: VerdictIn
+    VerdictOut:
+      properties:
+        tool_key:
+          type: string
+          title: Tool Key
+        verdict:
+          type: string
+          title: Verdict
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        alerts_raised:
+          type: integer
+          title: Alerts Raised
+      type: object
+      required:
+      - tool_key
+      - verdict
+      - client_id
+      - alerts_raised
+      title: VerdictOut
     ViewableTenant:
       properties:
         id:
@@ -44734,6 +47968,18 @@ components:
           type: integer
           title: Exposed Serious
           default: 0
+        guests:
+          type: integer
+          title: Guests
+          default: 0
+        failed_signins_24h:
+          type: integer
+          title: Failed Signins 24H
+          default: 0
+        brute_force:
+          type: integer
+          title: Brute Force
+          default: 0
       type: object
       required:
       - total
@@ -45122,6 +48368,188 @@ components:
       - target
       - remapped
       title: MergeOut
+    app__api__v1__endpoints__nessus__FindingOut:
+      properties:
+        host_name:
+          type: string
+          title: Host Name
+        host_ip:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Host Ip
+        host_os:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Host Os
+        device_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Device Id
+        plugin_id:
+          type: string
+          title: Plugin Id
+        name:
+          type: string
+          title: Name
+        severity:
+          type: string
+          title: Severity
+        port:
+          type: integer
+          title: Port
+        protocol:
+          type: string
+          title: Protocol
+        service:
+          type: string
+          title: Service
+        cvss:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Cvss
+        cves:
+          items:
+            type: string
+          type: array
+          title: Cves
+        exploit:
+          type: boolean
+          title: Exploit
+        synopsis:
+          type: string
+          title: Synopsis
+        solution:
+          type: string
+          title: Solution
+      type: object
+      required:
+      - host_name
+      - host_ip
+      - host_os
+      - device_id
+      - plugin_id
+      - name
+      - severity
+      - port
+      - protocol
+      - service
+      - cvss
+      - cves
+      - exploit
+      - synopsis
+      - solution
+      title: FindingOut
+    app__api__v1__endpoints__posture__FindingOut:
+      properties:
+        cloud_provider:
+          type: string
+          title: Cloud Provider
+        cloud_account:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cloud Account
+        cloud_region:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cloud Region
+        resource_type:
+          type: string
+          title: Resource Type
+        resource_id:
+          type: string
+          title: Resource Id
+        resource_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resource Name
+        rule_id:
+          type: string
+          title: Rule Id
+        rule_title:
+          type: string
+          title: Rule Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        severity:
+          type: string
+          title: Severity
+          default: medium
+        frameworks:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Frameworks
+        control_ids:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Control Ids
+        evidence:
+          additionalProperties: true
+          type: object
+          title: Evidence
+        remediation_guide:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Remediation Guide
+        id:
+          type: string
+          format: uuid
+          title: Id
+        tenant_id:
+          type: string
+          format: uuid
+          title: Tenant Id
+        status:
+          type: string
+          title: Status
+        auto_remediated:
+          type: boolean
+          title: Auto Remediated
+        first_detected_at:
+          type: string
+          format: date-time
+          title: First Detected At
+        last_evaluated_at:
+          type: string
+          format: date-time
+          title: Last Evaluated At
+        resolved_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Resolved At
+      type: object
+      required:
+      - cloud_provider
+      - resource_type
+      - resource_id
+      - rule_id
+      - rule_title
+      - id
+      - tenant_id
+      - status
+      - auto_remediated
+      - first_detected_at
+      - last_evaluated_at
+      title: FindingOut
   securitySchemes:
     HTTPBearer:
       type: http

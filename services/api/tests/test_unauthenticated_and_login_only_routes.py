@@ -153,6 +153,14 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's sign-ins (CIPP): authenticated by the core-feed token in the path, checked in the handler (401 without it); can only add sign-ins under that feed's own mapped client tenants",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/remote-tools",
+    ): "CORE's remote tools: the matches of a scan of one client's devices against the tool catalog. Authenticated by the core-feed token in the path, checked in the handler (401 without it); can only add or replace remote-tool sightings under that feed's own mapped client tenants, and an unmapped client stores nothing",
+    (
+        "GET",
+        "/api/v1/inbox/core-feed/{tenant_token}/remote-tools/catalog",
+    ): "The remote tool catalog (names and patterns, no client data) for CORE to match against: authenticated by the core-feed token in the path, checked in the handler (401 without it)",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/devices",
     ): "CORE's devices: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only add devices under that feed's own mapped client tenants",
     (

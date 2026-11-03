@@ -201,6 +201,11 @@ const navSections: NavSection[] = [
         icon: <DeviceIcon />,
       },
       {
+        label: 'Remote tools',
+        href: '/remote-tools',
+        icon: <ShieldIcon />,
+      },
+      {
         label: 'Identities',
         href: '/identities',
         icon: <UserIcon />,
