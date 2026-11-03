@@ -4,6 +4,11 @@ import type { RealtimeStatus } from '@/lib/realtime';
 
 const channel = vi.hoisted(() => ({ current: { last: null as unknown, status: 'closed' as string, problem: null as string | null, step: null as unknown } }));
 vi.mock('@/lib/realtime', () => ({ useRealtimeChannel: () => channel.current }));
+const stored = vi.hoisted(() => ({ rows: [] as unknown[], fail: false }));
+vi.mock('@/lib/api', async (orig) => ({
+  ...(await orig<typeof import('@/lib/api')>()),
+  alertsApi: { list: () => (stored.fail ? Promise.reject(new Error('down')) : Promise.resolve({ alerts: stored.rows })) },
+}));
 
 import { LiveFeedPanel, statusToLabel } from './LiveFeedPanel';
 
@@ -17,7 +22,11 @@ function setChannel(status: RealtimeStatus, last: unknown = null, extra: { probl
   channel.current = { last, status, problem: extra.problem ?? null, step: extra.step ?? null };
 }
 
-beforeEach(() => setChannel('closed'));
+beforeEach(() => {
+  setChannel('closed');
+  stored.rows = [];
+  stored.fail = false;
+});
 
 describe('statusToLabel', () => {
   const cases: [RealtimeStatus, boolean, string, string][] = [
@@ -143,5 +152,37 @@ describe('LiveFeedPanel while it cannot connect', () => {
     render(<LiveFeedPanel />);
     expect(screen.queryByTestId('live-feed-step')).toBeNull();
     expect(screen.queryByTestId('live-feed-problem')).toBeNull();
+  });
+});
+
+describe('LiveFeedPanel earlier alerts', () => {
+  const row = (id: string, title: string) => ({ id, title, severity: 'low', source: 'Generic JSON', createdAt: new Date().toISOString(), rawEvent: { source: 'huntress' }, device: 'PC-1' });
+
+  it('fills a quiet feed with the newest stored alerts, labelled as earlier and not as live', async () => {
+    stored.rows = [row('a1', 'Old alert one'), row('a2', 'Old alert two')];
+    setChannel('open');
+    render(<LiveFeedPanel />);
+    expect(await screen.findByText('Old alert one')).toBeInTheDocument();
+    expect(screen.getByText('Old alert two')).toBeInTheDocument();
+    expect(screen.getByTestId('live-feed-earlier')).toBeInTheDocument();
+    expect(screen.getByText('Waiting')).toBeInTheDocument(); // still not claiming to be live
+    expect(screen.queryByText('No events yet.')).toBeNull();
+  });
+
+  it('replaces them with live events as soon as one arrives', async () => {
+    stored.rows = [row('a1', 'Old alert one')];
+    setChannel('open', alert('live1', { title: 'Brand new alert' }));
+    render(<LiveFeedPanel />);
+    expect(await screen.findByText('Brand new alert')).toBeInTheDocument();
+    expect(screen.queryByText('Old alert one')).toBeNull();
+    expect(screen.queryByTestId('live-feed-earlier')).toBeNull();
+    expect(screen.getByText('Live')).toBeInTheDocument();
+  });
+
+  it('stays empty and still works when the stored alerts cannot be read', async () => {
+    stored.fail = true;
+    setChannel('open');
+    render(<LiveFeedPanel />);
+    expect(await screen.findByText('No events yet.')).toBeInTheDocument();
   });
 });

@@ -21,6 +21,7 @@
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useRealtimeChannel, type RealtimeStatus } from '@/lib/realtime';
+import { alertsApi } from '@/lib/api';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { ago } from '@/lib/ago';
 
@@ -167,8 +168,41 @@ export function LiveFeedPanel() {
     return () => window.clearInterval(id);
   }, []);
 
+  // The newest alerts already stored, shown while no live event has come in (the feed only carries what arrives after the page opens, so on a quiet hour it was an empty box). They are labelled as
+  // earlier alerts, never as live, and a live event replaces them.
+  const [earlier, setEarlier] = useState<LiveEvent[]>([]);
+  useEffect(() => {
+    let alive = true;
+    alertsApi
+      .list({ pageSize: MAX_VISIBLE })
+      .then((res) => {
+        if (!alive) return;
+        setEarlier(
+          res.alerts.slice(0, MAX_VISIBLE).map((a) => {
+            const at = Date.parse(a.createdAt);
+            const sender = a.rawEvent?.source;
+            return {
+              id: a.id,
+              severity: normalizeSeverity(a.severity),
+              text: a.title,
+              source: typeof sender === 'string' && /^[a-z0-9][a-z0-9_-]{0,39}$/.test(sender) ? vendorLabel(sender) : a.source || 'A.C.O.R.N',
+              device: a.device,
+              receivedAt: Number.isFinite(at) ? at : Date.now(),
+            };
+          }),
+        );
+      })
+      .catch(() => {
+        /* the live part still works; the list simply stays empty */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const hasReal = events.length > 0;
-  const visible = events;
+  const showingEarlier = !hasReal && earlier.length > 0;
+  const visible = hasReal ? events : earlier;
 
   const pill = statusToLabel(status, hasReal);
 
@@ -210,6 +244,12 @@ export function LiveFeedPanel() {
       {problem && pill.tone !== 'live' && pill.tone !== 'waiting' ? (
         <p className="mb-2 text-[11px] text-amber-300/90" data-testid="live-feed-problem">
           {problem} Trying again.
+        </p>
+      ) : null}
+
+      {showingEarlier ? (
+        <p className="mb-1 text-[11px] text-gray-500" data-testid="live-feed-earlier">
+          Latest alerts already in A.C.O.R.N. New ones appear here as they arrive.
         </p>
       ) : null}
 
