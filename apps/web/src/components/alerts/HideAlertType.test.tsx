@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ hideType: vi.fn(), suppressions: vi.fn(), liftSuppression: vi.fn() }));
-vi.mock('@/lib/api', () => ({ alertsApi: api }));
+const api = vi.hoisted(() => ({ hideType: vi.fn(), suppressions: vi.fn(), liftSuppression: vi.fn(), startMaintenance: vi.fn() }));
+const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
+vi.mock('@/lib/api', () => ({ alertsApi: api, msspApi: mssp }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
@@ -16,6 +17,8 @@ const out = (over: Record<string, unknown> = {}) => ({ id: 'r1', scope: 'client'
 
 beforeEach(() => {
   Object.values(api).forEach((m) => m.mockReset());
+  mssp.listChildren.mockReset();
+  mssp.listChildren.mockResolvedValue([{ id: 'c1', name: 'Acme Dental' }, { id: 'c2', name: 'Birch Law' }]);
   api.hideType.mockResolvedValue(out());
 });
 
@@ -163,5 +166,47 @@ describe('the hidden alert types page', () => {
     expect(coverage({ scope: 'device', client_name: 'Acme', device: 'pc-1' })).toBe('pc-1 (Acme)');
     expect(lasts({ indefinite: true, expires_at: null })).toBe('Hidden indefinitely');
     expect(lasts({ indefinite: false, expires_at: new Date(Date.now() - 1000).toISOString() })).toBe('Ending now');
+  });
+});
+
+describe('planned maintenance', () => {
+  const page = () => (
+    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+      <HiddenAlertTypes />
+    </SWRConfig>
+  );
+
+  it('starts a window for the chosen client and hours, with the reason, and reloads the list', async () => {
+    api.suppressions.mockResolvedValue([]);
+    api.startMaintenance.mockResolvedValue(out({ maintenance: true, hidden_alerts: 6 }));
+    render(page());
+    await screen.findByTestId('none');
+    expect(screen.getByRole('button', { name: 'Start maintenance window' })).toBeDisabled();
+    await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Client' }), 'c2');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Hours' }), '8');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Reason' }), 'Server migration');
+    await userEvent.click(screen.getByRole('button', { name: 'Start maintenance window' }));
+    await waitFor(() => expect(api.startMaintenance).toHaveBeenCalledWith({ clientId: 'c2', hours: 8, startsAt: undefined, reason: 'Server migration' }));
+    await waitFor(() => expect(api.suppressions.mock.calls.length).toBeGreaterThan(1));
+  });
+
+  it('says when it could not start and offers no more than 72 hours', async () => {
+    api.suppressions.mockResolvedValue([]);
+    api.startMaintenance.mockRejectedValue(new Error('Client not found'));
+    render(page());
+    await screen.findByTestId('none');
+    const hours = within(screen.getByRole('combobox', { name: 'Hours' })).getAllByRole('option').map((o) => Number(o.getAttribute('value')));
+    expect(Math.max(...hours)).toBe(72);
+    await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Client' }), 'c1');
+    await userEvent.click(screen.getByRole('button', { name: 'Start maintenance window' }));
+    const toast = (await import('react-hot-toast')).default;
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Client not found'));
+  });
+
+  it('shows a window as from-to, not as hidden indefinitely', () => {
+    const text = lasts({ indefinite: false, maintenance: true, starts_at: '2026-11-04T08:00:00Z', expires_at: '2026-11-04T12:00:00Z' });
+    expect(text).toContain(' to ');
+    expect(text).not.toContain('indefinitely');
+    expect(lasts({ indefinite: true, expires_at: null })).toBe('Hidden indefinitely');
   });
 });

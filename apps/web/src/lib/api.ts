@@ -1736,6 +1736,10 @@ export interface AlertSuppression {
   source: string | null;
   title: string;
   expires_at: string | null;
+  /** When a maintenance window starts (absent from an older server). */
+  starts_at?: string | null;
+  /** True for a maintenance window: every alert type of one client, between two times. */
+  maintenance?: boolean;
   indefinite: boolean;
   created_at: string;
   active: boolean;
@@ -1752,6 +1756,12 @@ export const alertsApi = {
     }),
   /** The rules that hide alert types, and with ``includeEnded`` the ones lifted or run out. */
   suppressions: (includeEnded = false) => request<AlertSuppression[]>('/api/v1/alert-suppressions', { params: includeEnded ? { include_ended: 'true' } : undefined }),
+  /** Hide one client's alerts (not critical ones) from ``startsAt`` (default now) for ``hours`` hours, at most 72. */
+  startMaintenance: (body: { clientId: string; hours: number; startsAt?: string; reason?: string }) =>
+    request<AlertSuppression>('/api/v1/alert-suppressions/maintenance', {
+      method: 'POST',
+      body: JSON.stringify({ client_id: body.clientId, hours: body.hours, starts_at: body.startsAt, reason: body.reason }),
+    }),
   /** Stop hiding an alert type: its alerts come back as they were. */
   liftSuppression: (id: string) => request<AlertSuppression>(`/api/v1/alert-suppressions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   /** Enter one alert by hand (the same endpoint `aisoc submit` uses). */

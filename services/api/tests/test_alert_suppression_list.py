@@ -28,6 +28,7 @@ def rule(scope="client", client=None, title="Printer offline"):
         source=None,
         title=title,
         expires_at=None,
+        starts_at=None,
         created_at=NOW - timedelta(days=1),
         revoked_at=None,
         signature="title:" + title,

@@ -26,6 +26,10 @@ from app.services.device_identity import hostname_key
 
 SCOPES = ("device", "client", "all")
 MAX_DAYS = 3650
+# A maintenance window is a client rule covering every alert type for a stretch of time. It is short on purpose, and critical alerts are never hidden by one.
+WINDOW_SIGNATURE = "window:all-types"
+MAX_WINDOW_HOURS = 72
+NEVER_WINDOWED_SEVERITY = "critical"
 _FINISHED = FINISHED_ALERT_STATUSES
 _CHUNK = 500
 
@@ -59,16 +63,29 @@ def expiry_from_days(days: int | None, now: datetime) -> datetime | None:
     return now + timedelta(days=days)
 
 
+def is_window(rule: Any) -> bool:
+    return rule.signature == WINDOW_SIGNATURE
+
+
+def has_ended(rule: Any, now: datetime) -> bool:
+    return rule.expires_at is not None and rule.expires_at <= now
+
+
+def has_started(rule: Any, now: datetime) -> bool:
+    starts = getattr(rule, "starts_at", None)
+    return starts is None or starts <= now
+
+
 def is_active(rule: Any, now: datetime) -> bool:
-    """A rule hides alerts while it is not lifted and has not run out."""
+    """A rule hides alerts while it is not lifted, has started and has not run out."""
     if rule.revoked_at is not None:
         return False
-    return rule.expires_at is None or rule.expires_at > now
+    return has_started(rule, now) and not has_ended(rule, now)
 
 
 def matches(rule: Any, *, tenant_id: uuid.UUID, rule_id: str | None, title: str | None, source: str | None, hosts: Any) -> bool:
     """Whether an alert (given by its tenant, rule id, title, tool and machine names) is of the type the rule hides, in the place the rule covers. The rule's own timing is checked by ``is_active``."""
-    if signature_of(rule_id, title) != rule.signature or (rule.source or None) != (source or None):
+    if not is_window(rule) and (signature_of(rule_id, title) != rule.signature or (rule.source or None) != (source or None)):
         return False
     if rule.scope == "all":
         return True
@@ -88,6 +105,8 @@ async def _tenants_of(db: Any, rule: Any) -> list[uuid.UUID]:
 
 
 def _type_filter(rule: Any) -> Any:
+    if is_window(rule):
+        return Alert.severity != NEVER_WINDOWED_SEVERITY  # a maintenance window covers every type, except what is critical
     kind, _, value = rule.signature.partition(":")
     return Alert.rule_id == value if kind == "rule" else and_(or_(Alert.rule_id.is_(None), Alert.rule_id == ""), Alert.title == value)
 
@@ -157,12 +176,13 @@ async def sweep(db: Any, now: datetime | None = None) -> dict[str, int]:
     out = {"expired": 0, "hidden": 0, "restored": 0}
     rules = (await db.execute(select(AlertSuppression).where(AlertSuppression.revoked_at.is_(None)))).scalars().all()
     for rule in rules:
-        if not is_active(rule, now):
+        if has_ended(rule, now):
             out["restored"] += await release_rule(db, rule, rule.tenant_id)
             rule.revoked_at = rule.expires_at or now
             rule.revoked_reason = "expired"
             out["expired"] += 1
-        else:
+        elif has_started(rule, now):
             out["hidden"] += await apply_rule(db, rule, rule.tenant_id)
+        # a window that has not started yet is left alone: nothing is hidden before its time
     await db.commit()
     return out

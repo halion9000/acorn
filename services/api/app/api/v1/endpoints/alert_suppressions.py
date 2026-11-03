@@ -7,7 +7,7 @@ Needs ``alerts:write``. Hiding is a view decision about noise; it never closes, 
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -21,6 +21,8 @@ from app.models.tenant import Tenant
 from app.services.alert_scope import alert_scope
 from app.services.alert_suppression import (
     MAX_DAYS,
+    MAX_WINDOW_HOURS,
+    WINDOW_SIGNATURE,
     SUPPRESSED,
     apply_rule,
     expiry_from_days,
@@ -56,6 +58,8 @@ class SuppressionOut(BaseModel):
     source: str | None = None
     title: str
     expires_at: datetime | None = None
+    starts_at: datetime | None = None
+    maintenance: bool = False
     indefinite: bool
     created_at: datetime
     active: bool
@@ -73,6 +77,8 @@ def _out(rule: AlertSuppression, now: datetime, names: dict[uuid.UUID, str], hid
         source=rule.source,
         title=rule.title,
         expires_at=rule.expires_at,
+        starts_at=rule.starts_at,
+        maintenance=rule.signature == WINDOW_SIGNATURE,
         indefinite=rule.expires_at is None,
         created_at=rule.created_at,
         active=is_active(rule, now),
@@ -128,6 +134,52 @@ async def hide_alert_type(body: SuppressionIn, user: AuthUser, db: DBSession) ->
         r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()
     }
     return _out(rule, now, names, hidden)
+
+
+class MaintenanceIn(BaseModel):
+    client_id: uuid.UUID
+    hours: int = Field(ge=1, le=MAX_WINDOW_HOURS, description=f"1 to {MAX_WINDOW_HOURS} hours")
+    # When it starts; leave out to start now. May not be in the past by more than a few minutes, nor more than 30 days away.
+    starts_at: datetime | None = None
+    reason: str = Field(default="", max_length=200)
+
+
+@router.post(
+    "/maintenance",
+    response_model=SuppressionOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission("alerts:write"))],
+    summary="Hide a client's alerts during planned maintenance",
+)
+async def start_maintenance(body: MaintenanceIn, user: AuthUser, db: DBSession) -> SuppressionOut:
+    """A maintenance window: every open and new alert of the client, except critical ones, is hidden from the start to the end (at most 72 hours) and comes back when it ends. Lift it early with DELETE."""
+    now = datetime.now(UTC)
+    starts = body.starts_at or now
+    if starts.tzinfo is None:
+        starts = starts.replace(tzinfo=UTC)
+    if starts < now - timedelta(minutes=5):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The window cannot start in the past")
+    if starts > now + timedelta(days=30):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The window cannot start more than 30 days from now")
+    kids = {r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()}
+    if body.client_id != user.tenant_id and body.client_id not in kids:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+    rule = AlertSuppression(
+        tenant_id=user.tenant_id,
+        scope="client",
+        client_tenant_id=body.client_id,
+        source=None,
+        signature=WINDOW_SIGNATURE,
+        title=(f"Maintenance: {body.reason.strip()}" if body.reason.strip() else "Maintenance window")[:500],
+        starts_at=starts,
+        expires_at=starts + timedelta(hours=body.hours),
+        created_by=user.user_id,
+    )
+    db.add(rule)
+    await db.flush()
+    hidden = await apply_rule(db, rule, user.tenant_id) if starts <= now else 0
+    await db.commit()
+    return _out(rule, now, kids, hidden)
 
 
 @router.get("", response_model=list[SuppressionOut], dependencies=[Depends(require_permission("alerts:read"))])

@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import toast from 'react-hot-toast';
 import { alertsApi, type AlertSuppression } from '@/lib/api';
 import { safeFormat } from '@/lib/safe-date';
+import { MaintenanceWindowForm } from './MaintenanceWindowForm';
 
 /** The API lists at most this many rules (newest first): a list that long may be cut. */
 export const RULE_LIST_CAP = 500;
@@ -17,8 +18,9 @@ export function coverage(r: Pick<AlertSuppression, 'scope' | 'client_name' | 'de
   return `${r.device ?? 'One device'}${r.client_name ? ` (${r.client_name})` : ''}`;
 }
 
-/** How long a rule lasts, in words. */
-export function lasts(r: Pick<AlertSuppression, 'indefinite' | 'expires_at'>): string {
+/** How long a rule lasts, in words. A maintenance window says from when to when. */
+export function lasts(r: Pick<AlertSuppression, 'indefinite' | 'expires_at'> & { maintenance?: boolean; starts_at?: string | null }): string {
+  if (r.maintenance && r.starts_at && r.expires_at) return `${safeFormat(r.starts_at, 'PP p')} to ${safeFormat(r.expires_at, 'PP p')}`;
   if (r.indefinite || !r.expires_at) return 'Hidden indefinitely';
   const days = Math.ceil((Date.parse(r.expires_at) - Date.now()) / 86_400_000);
   return days <= 0 ? 'Ending now' : `Until ${safeFormat(r.expires_at, 'PP')} (${days} day${days === 1 ? '' : 's'} left)`;
@@ -54,6 +56,8 @@ export function HiddenAlertTypes() {
           Back to alerts
         </Link>
       </div>
+
+      <MaintenanceWindowForm onStarted={() => void mutate()} />
 
       {error ? (
         <p role="alert" className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
