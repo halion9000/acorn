@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -904,6 +905,9 @@ class ManagedTenantRow(BaseModel):
     mttr_minutes: float | None = None
     sla_breaches: int | None = None
     connector_count: int | None = None
+    # The client's own connectors right now (not the snapshot): how many are switched on, and how many of those report unhealthy or degraded. None when they could not be read: never read that as "0 failing".
+    connectors_enabled: int | None = None
+    connectors_unhealthy: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -944,6 +948,31 @@ async def _latest_snapshots(db: AsyncSession, child_ids: list[uuid.UUID]) -> dic
         )
     )
     return {row.tenant_id: row for row in rows.scalars().all()}  # a tie on the same instant keeps one row per tenant
+
+
+BAD_CONNECTOR_STATES = ("unhealthy", "degraded")
+
+
+async def _connector_health(db: AsyncSession, child_ids: list[uuid.UUID]) -> dict[uuid.UUID, tuple[int, int]]:
+    """For each client: (enabled connectors, those reporting unhealthy or degraded). Clients with no connector are absent. Raises when the read fails; the caller decides what to show then."""
+    if not child_ids:
+        return {}
+    from app.db.rls_scope import cross_tenant_reads
+    from app.models.connector import Connector
+
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(Connector.tenant_id, Connector.health_status, func.count())
+                .where(Connector.tenant_id.in_(child_ids), Connector.is_enabled.is_(True))
+                .group_by(Connector.tenant_id, Connector.health_status)
+            )
+        ).all()
+    out: dict[uuid.UUID, tuple[int, int]] = {}
+    for tenant_id, state, n in rows:
+        enabled, bad = out.get(tenant_id, (0, 0))
+        out[tenant_id] = (enabled + n, bad + (n if state in BAD_CONNECTOR_STATES else 0))
+    return out
 
 
 def _mean(values: list[float]) -> float | None:
@@ -992,9 +1021,15 @@ async def list_managed_tenants(
         )
         for child_id, vendor in linked.all():
             sources.setdefault(child_id, set()).add(vendor)
+    try:
+        health: dict[uuid.UUID, tuple[int, int]] | None = await _connector_health(db, [c.id for c in children])
+    except Exception:  # noqa: BLE001 - the list must still load; the counts then read "unknown", not zero
+        logging.getLogger(__name__).warning("mssp: connector health could not be read", exc_info=True)
+        health = None
     rows: list[ManagedTenantRow] = []
     for child in children:
         snap = snaps.get(child.id)
+        enabled, bad = (health.get(child.id, (0, 0)) if health is not None else (None, None))
         rows.append(
             ManagedTenantRow(
                 tenant_id=str(child.id),
@@ -1011,6 +1046,8 @@ async def list_managed_tenants(
                 mttr_minutes=snap.mttr_minutes if snap is not None else None,
                 sla_breaches=snap.sla_breaches if snap is not None else None,
                 connector_count=snap.connector_count if snap is not None else None,
+                connectors_enabled=enabled,
+                connectors_unhealthy=bad,
             )
         )
     return rows

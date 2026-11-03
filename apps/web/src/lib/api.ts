@@ -598,6 +598,9 @@ export interface ManagedTenantRow {
   mttr_minutes: number | null;
   sla_breaches: number | null;
   connector_count: number | null;
+  /** The client's own connectors right now: switched on, and how many of those are unhealthy or degraded. Absent from an older server, null when they could not be read. */
+  connectors_enabled?: number | null;
+  connectors_unhealthy?: number | null;
 }
 
 export interface AlertScriptRun {

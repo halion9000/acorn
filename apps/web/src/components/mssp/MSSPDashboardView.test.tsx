@@ -100,9 +100,9 @@ describe('real tenants', () => {
 
     const table = await screen.findByRole('table');
     const reportingRow = within(table).getByText('Reporting Co').closest('tr') as HTMLElement;
-    expect(within(reportingRow).getAllByRole('cell').map((c) => c.textContent).slice(2, 9)).toEqual(['12', '2', '4', '30', '1', '3', '80']);
+    expect(within(reportingRow).getAllByRole('cell').map((c) => c.textContent).slice(2, 10)).toEqual(['12', '2', '4', '30', '1', '3', '—', '80']); // the dash is the connector health: this older row carries no reading of it
     const quietRow = within(table).getByText('Quiet Co').closest('tr') as HTMLElement;
-    expect(within(quietRow).getAllByRole('cell').map((c) => c.textContent).slice(1)).toEqual(['—', '—', '—', '—', '—', '—', '—', '—', 'No data yet', '', 'Hide']); // the empty cell is the automated-playbooks checkbox
+    expect(within(quietRow).getAllByRole('cell').map((c) => c.textContent).slice(1)).toEqual(['—', '—', '—', '—', '—', '—', '—', '—', '—', 'No data yet', '', 'Hide']); // the empty cell is the automated-playbooks checkbox
   });
 
   it('shows a real zero as 0 and an unreported figure as a dash: they are not the same thing', async () => {
@@ -392,5 +392,34 @@ describe('a client line opens its Client Posture page', () => {
 
   it('postureHref escapes the id', () => {
     expect(postureHref('a b/c')).toBe('/settings/client-posture?client=a%20b%2Fc');
+  });
+});
+
+describe('connector health per client', () => {
+  it('shows the failing count in red, all ok when none fail, none when there are none, and a dash when unknown', async () => {
+    overviewMock.mockResolvedValue(none);
+    tenantsMock.mockResolvedValue([
+      row({ name: 'Failing Co', connectors_enabled: 4, connectors_unhealthy: 2 }),
+      row({ name: 'Fine Co', connectors_enabled: 3, connectors_unhealthy: 0 }),
+      row({ name: 'Empty Co', connectors_enabled: 0, connectors_unhealthy: 0 }),
+      row({ name: 'Unknown Co', connectors_enabled: null, connectors_unhealthy: null }),
+    ]);
+    render(<MSSPDashboardView />);
+    await screen.findByText('Failing Co');
+    const cells = Object.fromEntries(screen.getAllByTestId('client-line').map((l) => [l.querySelector('a')?.textContent, within(l).getByTestId('connector-health')]));
+    expect(cells['Failing Co']).toHaveTextContent('2 of 4 failing');
+    expect(cells['Failing Co']).toHaveClass('text-red-400');
+    expect(cells['Fine Co']).toHaveTextContent('all 3 ok');
+    expect(cells['Fine Co']).not.toHaveClass('text-red-400');
+    expect(cells['Empty Co']).toHaveTextContent('none');
+    expect(cells['Unknown Co']).toHaveTextContent('—');
+  });
+
+  it('reads a server that does not send the fields as unknown, not as healthy', async () => {
+    overviewMock.mockResolvedValue(none);
+    tenantsMock.mockResolvedValue([row({ name: 'Old Server Co' })]);
+    render(<MSSPDashboardView />);
+    await screen.findByText('Old Server Co');
+    expect(screen.getByTestId('connector-health')).toHaveTextContent('—');
   });
 });
