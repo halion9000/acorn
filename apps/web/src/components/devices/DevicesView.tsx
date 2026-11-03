@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -172,22 +172,43 @@ export default function DevicesView() {
     if (filtersRestored) saveFilters('devices', { clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, offlineOnly, alertsOnly } satisfies SavedDeviceFilters);
   }, [filtersRestored, clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, offlineOnly, alertsOnly]);
 
+  // Only the answer to the NEWEST request may reach the page. The estate is large and a filtered query can answer slower than the one before it: without this, changing a filter showed the answer to
+  // the previous filter whenever it arrived last, and the list stayed wrong until the page was left and opened again.
+  const newest = useRef(0);
   const load = useCallback(async () => {
+    const mine = ++newest.current;
     setLoading(true);
     setError('');
     try {
-      setData(await devicesApi.list({ page, pageSize: 50, clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, hidden: hiddenOnly || undefined }));
+      const answer = await devicesApi.list({ page, pageSize: 50, clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, hidden: hiddenOnly || undefined });
+      if (mine === newest.current) setData(answer);
     } catch (err) {
-      setError(devicesLoadError(err));
+      if (mine === newest.current) setError(devicesLoadError(err));
     } finally {
-      setLoading(false);
+      if (mine === newest.current) setLoading(false);
     }
   }, [page, clientId, search, vendor, os, kind, gapsOnly, missing, offlineOnly, alertsOnly, attentionOnly, staleOnly, notEncryptedOnly, hiddenOnly]);
 
   useEffect(() => {
+    // Not before the remembered or linked filters are on the page: loading first with none asked the whole estate for an answer nobody wanted, which could land after the right one.
+    if (!filtersRestored) return;
     const t = setTimeout(() => void load(), search ? 250 : 0);
     return () => clearTimeout(t);
-  }, [load, search]);
+  }, [load, search, filtersRestored]);
+
+  // Following another link to this page while already on it (a different client or tool): the page stays mounted, so the new link's filters are applied here, not only on first show.
+  const linkKey = urlParams?.toString() ?? '';
+  const seenLinkKey = useRef(linkKey);
+  useEffect(() => {
+    if (seenLinkKey.current === linkKey) return;
+    seenLinkKey.current = linkKey;
+    const fromLink = filtersFromParams(urlParams);
+    if (fromLink) {
+      applyFilters(fromLink);
+      setPage(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkKey]);
 
   useEffect(() => {
     msspApi
