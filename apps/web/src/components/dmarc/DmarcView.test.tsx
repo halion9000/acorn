@@ -14,6 +14,7 @@ const row = (over: Record<string, unknown> = {}) => ({ client_id: 'c1', client_n
 let overview: Record<string, unknown>;
 let setup: Record<string, unknown>;
 let detail: Record<string, unknown>;
+let insights: Record<string, unknown> | null;
 
 const view = () => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
@@ -26,9 +27,18 @@ beforeEach(() => {
   overview = { days: 30, status, domains: [row()] };
   setup = { mailbox: 'lodmarc@goliveoak.com', mailbox_domain: 'goliveoak.com', lines: [{ client_id: 'c1', client_name: 'Acme Dental', domain: 'acmedental.com', alias: 'acme-dental@goliveoak.com', client_dmarc_rua: 'rua=mailto:acme-dental@goliveoak.com', authorization_record_name: 'acmedental.com._report._dmarc.goliveoak.com', authorization_record_value: 'v=DMARC1' }] };
   detail = { domain: 'acme.com', days: 30, reports: 4, total: 200, passed: 190, failed: 10, policy: 'none', series: [{ day: '2026-11-01', total: 100, passed: 95, failed: 5 }, { day: '2026-11-02', total: 100, passed: 95, failed: 5 }], failing_sources: [{ ip: '9.9.9.9', count: 10, header_from: 'acme.com', envelope_from: 'evil.example', disposition: 'quarantine' }] };
+  insights = {
+    days: 30, domain: null, emails: 100,
+    delivery: { passed: 80, failed_delivered: 8, overridden: 5, quarantined: 4, rejected: 3 },
+    rates: { dmarc: 12, dkim: 15.5, spf: 7 },
+    series: [{ day: '2026-11-01', total: 50, dmarc_fail: 5, dkim_fail: 8, spf_fail: 3 }, { day: '2026-11-02', total: 50, dmarc_fail: 7, dkim_fail: 7, spf_fail: 4 }],
+    senders: [{ name: 'Microsoft 365', identified: true, emails: 90, passed: 90, failed: 0, status: 'passing' }, { name: 'Unknown (9.9.9.9)', identified: false, emails: 10, passed: 0, failed: 10, status: 'failing' }],
+    sending_domains: [{ domain: 'acme.com', emails: 100, passed: 88, failed: 12, status: 'partly' }],
+  };
   authFetch.mockReset();
   authFetch.mockImplementation(async (url: string) => {
     if (url.startsWith('/api/v1/dmarc/overview')) return json(200, overview);
+    if (url.startsWith('/api/v1/dmarc/insights')) return insights ? json(200, insights) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/setup')) return json(200, setup);
     if (url.startsWith('/api/v1/dmarc/domains/')) return json(200, detail);
     return json(404, {});
@@ -327,5 +337,30 @@ describe('domains with no mail records', () => {
     await open();
     expect(screen.getAllByTestId('setup-row')).toHaveLength(1);
     expect(screen.queryByTestId('setup-nomail')).not.toBeInTheDocument();
+  });
+});
+
+describe('DMARC mail overview', () => {
+  it('shows the five delivery counts, the failure rates, the top senders and the top sending domains', async () => {
+    render(view());
+    expect(await screen.findByTestId('delivery-passed')).toHaveTextContent('80');
+    expect(screen.getByTestId('delivery-failed_delivered')).toHaveTextContent('8');
+    expect(screen.getByTestId('delivery-overridden')).toHaveTextContent('5');
+    expect(screen.getByTestId('delivery-quarantined')).toHaveTextContent('4');
+    expect(screen.getByTestId('delivery-rejected')).toHaveTextContent('3');
+    expect(screen.getByText(/DMARC 12%/)).toBeInTheDocument();
+    expect(screen.getByText(/DKIM 15.5%/)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Failure rate per day' })).toBeInTheDocument();
+    const senders = screen.getAllByTestId('sender-row');
+    expect(within(senders[0]).getByText('Microsoft 365')).toBeInTheDocument();
+    expect(within(senders[1]).getByText('failing')).toHaveClass('text-red-300');
+    expect(within(screen.getByTestId('sending-domain-row')).getByText('partly')).toBeInTheDocument();
+  });
+
+  it('shows nothing extra when the server has no insights, and the table still appears', async () => {
+    insights = null;
+    render(view());
+    expect(await screen.findAllByTestId('dmarc-row')).toHaveLength(1);
+    expect(screen.queryByTestId('delivery-passed')).toBeNull();
   });
 });

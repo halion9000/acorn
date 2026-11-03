@@ -47,6 +47,16 @@ export interface DmarcDetail {
   series: { day: string; total: number; passed: number; failed: number }[];
   failing_sources: { ip: string; count: number; header_from: string; envelope_from: string; disposition: string }[];
 }
+export interface DmarcInsights {
+  days: number;
+  domain: string | null;
+  emails: number;
+  delivery: { passed: number; failed_delivered: number; overridden: number; quarantined: number; rejected: number };
+  rates: { dmarc: number | null; dkim: number | null; spf: number | null };
+  series: { day: string; total: number; dmarc_fail: number; dkim_fail: number; spf_fail: number }[];
+  senders: { name: string; identified: boolean; emails: number; passed: number; failed: number; status: string }[];
+  sending_domains: { domain: string; emails: number; passed: number; failed: number; status: string }[];
+}
 export interface SetupLine {
   client_id: string;
   client_name: string;
@@ -209,6 +219,95 @@ function Detail({ domain, days, onClose }: { domain: string; days: number; onClo
   );
 }
 
+const DELIVERY_CARDS: { key: keyof DmarcInsights['delivery']; label: string; tone: string }[] = [
+  { key: 'passed', label: 'Passed and delivered', tone: 'text-emerald-300' },
+  { key: 'failed_delivered', label: 'Failed, delivered anyway', tone: 'text-amber-300' },
+  { key: 'overridden', label: 'Delivered, policy overridden', tone: 'text-sky-300' },
+  { key: 'quarantined', label: 'Quarantined', tone: 'text-orange-300' },
+  { key: 'rejected', label: 'Rejected', tone: 'text-red-300' },
+];
+
+const statusTone = (s: string) => (s === 'passing' ? 'text-emerald-300' : s === 'failing' ? 'text-red-300' : 'text-amber-300');
+
+/** The failure rate for each day as three lines (DMARC, DKIM, SPF), 0 to 100%. */
+function RateChart({ series }: { series: DmarcInsights['series'] }) {
+  const w = 600;
+  const h = 120;
+  const x = (i: number) => (series.length < 2 ? w / 2 : (i / (series.length - 1)) * w);
+  const y = (fail: number, total: number) => h - (total ? (fail / total) * h : 0);
+  const line = (pick: (p: DmarcInsights['series'][number]) => number) => series.map((p, i) => `${x(i).toFixed(1)},${y(pick(p), p.total).toFixed(1)}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Failure rate per day" className="h-32 w-full rounded-lg border border-gray-800 bg-gray-950">
+      <polyline points={line((p) => p.dmarc_fail)} fill="none" stroke="#f87171" strokeWidth="2" />
+      <polyline points={line((p) => p.dkim_fail)} fill="none" stroke="#fbbf24" strokeWidth="2" />
+      <polyline points={line((p) => p.spf_fail)} fill="none" stroke="#60a5fa" strokeWidth="2" />
+    </svg>
+  );
+}
+
+/** What happened to the mail, how often it failed, who sends it. Shown only when the server has insights and there is mail to show: a failure here never hides the table below. */
+function Insights({ days }: { days: number }) {
+  const { data } = useSWR<DmarcInsights>(`/api/v1/dmarc/insights?days=${days}`, fetcher, { shouldRetryOnError: false });
+  if (!data || data.emails === 0) return null;
+  const pct = (v: number | null) => (v === null ? '—' : `${v}%`);
+  return (
+    <section aria-label="Mail overview" className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {DELIVERY_CARDS.map((c) => (
+          <div key={c.key} data-testid={`delivery-${c.key}`} className="rounded-lg border border-gray-800 px-3 py-2">
+            <p className="text-xs text-gray-400">{c.label}</p>
+            <p className={`text-xl font-semibold ${c.tone}`}>{data.delivery[c.key].toLocaleString()}</p>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        <p className="text-sm text-gray-300">
+          Failure rate: <span className="text-red-300">DMARC {pct(data.rates.dmarc)}</span> · <span className="text-amber-300">DKIM {pct(data.rates.dkim)}</span> · <span className="text-sky-300">SPF {pct(data.rates.spf)}</span>
+        </p>
+        {data.series.length > 0 ? <RateChart series={data.series} /> : null}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <table className="w-full text-left text-sm" aria-label="Top senders">
+          <thead className="text-xs text-gray-400">
+            <tr>
+              <th className="py-1">Top senders</th>
+              <th className="py-1">Messages</th>
+              <th className="py-1">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.senders.map((s) => (
+              <tr key={s.name} data-testid="sender-row" className="border-t border-gray-800">
+                <td className={`py-1 ${s.identified ? 'text-gray-100' : 'font-mono text-gray-400'}`}>{s.name}</td>
+                <td className="py-1 text-gray-300">{s.emails.toLocaleString()}</td>
+                <td className={`py-1 ${statusTone(s.status)}`}>{s.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <table className="w-full text-left text-sm" aria-label="Top sending domains">
+          <thead className="text-xs text-gray-400">
+            <tr>
+              <th className="py-1">Top sending domains</th>
+              <th className="py-1">Messages</th>
+              <th className="py-1">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.sending_domains.map((d) => (
+              <tr key={d.domain} data-testid="sending-domain-row" className="border-t border-gray-800">
+                <td className="py-1 font-mono text-gray-200">{d.domain}</td>
+                <td className="py-1 text-gray-300">{d.emails.toLocaleString()}</td>
+                <td className={`py-1 ${statusTone(d.status)}`}>{d.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function Results() {
   const [days, setDays] = useState(30);
   const [open, setOpen] = useState<string | null>(null);
@@ -234,6 +333,7 @@ function Results() {
       ) : (
         <>
           <StatusStrip status={data.status} />
+          <Insights days={days} />
           {data.domains.length === 0 ? (
             <p className="rounded-lg border border-gray-800 px-4 py-6 text-sm text-gray-400">
               No reports in the last {data.days} days. Receivers send one a day per domain, starting about a day after a domain&rsquo;s DMARC record points at the shared mailbox. The Setup tab lists the line each client domain needs.
