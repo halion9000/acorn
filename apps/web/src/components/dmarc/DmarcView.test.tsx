@@ -17,6 +17,7 @@ let detail: Record<string, unknown>;
 let insights: Record<string, unknown> | null;
 let countries: Record<string, unknown> | null;
 let card: Record<string, unknown> | null;
+let lookalikes: Record<string, unknown> | null;
 
 const view = () => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
@@ -40,12 +41,14 @@ beforeEach(() => {
   };
   countries = null;
   card = null;
+  lookalikes = null;
   authFetch.mockReset();
   authFetch.mockImplementation(async (url: string) => {
     if (url.startsWith('/api/v1/dmarc/overview')) return json(200, overview);
     if (url.startsWith('/api/v1/dmarc/countries')) return countries ? json(200, countries) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/insights')) return insights ? json(200, insights) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/setup')) return json(200, setup);
+    if (url.includes('/lookalikes')) return lookalikes ? json(200, lookalikes) : json(404, {});
     if (url.includes('/card')) return card ? json(200, card) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/domains/')) return json(200, detail);
     return json(404, {});
@@ -448,5 +451,37 @@ describe('DMARC senders at risk', () => {
     render(view());
     await screen.findByTestId('delivery-passed');
     expect(screen.queryByTestId('at-risk')).toBeNull();
+  });
+});
+
+describe('DMARC look-alike domains', () => {
+  it('asks only when the button is pressed, then lists what exists with the mail-capable ones marked', async () => {
+    lookalikes = { domain: 'acme.com', checked: 27, found: [{ domain: 'acme.co', kind: 'other-ending', has_mail: true }, { domain: 'acm.com', kind: 'omission', has_mail: false }] };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    await screen.findByTestId('lookalikes');
+    expect(authFetch.mock.calls.some(([u]) => String(u).includes('/lookalikes'))).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Check for look-alikes' }));
+    const rows = await screen.findAllByTestId('lookalike-row');
+    expect(rows[0]).toHaveTextContent('acme.co');
+    expect(rows[0]).toHaveTextContent('can send mail');
+    expect(rows[1]).toHaveTextContent('letter dropped');
+    expect(rows[1]).toHaveTextContent('registered');
+  });
+
+  it('says none were found, with what that does not cover', async () => {
+    lookalikes = { domain: 'acme.com', checked: 27, found: [] };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Check for look-alikes' }));
+    expect(await screen.findByText(/None found among 27 names tried/)).toBeInTheDocument();
+  });
+
+  it('shows the reason when the check fails', async () => {
+    lookalikes = null;
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Check for look-alikes' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The server answered 404');
   });
 });

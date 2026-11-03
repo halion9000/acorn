@@ -584,3 +584,31 @@ def test_at_risk_lists_every_sender_with_failures_by_failing_volume_even_when_it
     assert "Unknown (30.0.0.1)" not in [x.name for x in out.senders]  # not among the top ten by volume
     assert [(x.name, x.failed) for x in out.at_risk] == [("Microsoft 365", 9), ("Unknown (30.0.0.1)", 3)]
     assert all(x.failed > 0 for x in out.at_risk)
+
+
+def test_lookalikes_are_scanned_only_for_a_domain_in_the_callers_reports_and_mail_capable_ones_come_first():
+    from app.services import lookalike
+
+    lookalike._CACHE.clear()
+    dns = DnsResolver(txt={}, mx={"acme.co": ["mx.acme.co"]})
+
+    async def a(name):
+        dns.calls.append(name)
+        return ["1.2.3.4"] if name in {"acme.net", "acme.co"} else []
+
+    dns.a = a
+
+    async def body(s):
+        owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
+        acme, theirs = await tenant(s, "Acme", owner.id), await tenant(s, "Theirs", other.id)
+        s.add_all([rep(acme.id, "acme.com", 10, 10, rows=[line_row("1.1.1.1", 10)]), rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)])])
+        await s.commit()
+        out = await ep.domain_lookalikes("acme.com", caller(owner), s, dns)
+        before = len(dns.calls)
+        with pytest.raises(HTTPException) as foreign:
+            await ep.domain_lookalikes("theirs.com", caller(owner), s, dns)
+        return out, foreign.value.status_code, before, len(dns.calls)
+
+    out, foreign, before, after = run(body)
+    assert [(x.domain, x.has_mail) for x in out.found] == [("acme.co", True), ("acme.net", False)]
+    assert out.checked > 20 and foreign == 404 and after == before  # the refused domain cost no lookups

@@ -27,6 +27,8 @@ from app.models.tenant import Tenant
 from app.services.dmarc_senders import identify_sender
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domain
 from app.services.ip_country import country_of
+from app.services.lookalike import generate as generate_lookalikes
+from app.services.lookalike import scan as scan_lookalikes
 
 router = APIRouter(prefix="/dmarc", tags=["dmarc"])
 
@@ -480,6 +482,33 @@ async def domain_report_card(
     posture = await check_domain(clean, resolver)
     rate = _pct(passed, total)
     return ReportCard(domain=clean, days=days, total=total, pass_rate=rate, policy=newest.policy, posture=posture, advice=report_card_advice(newest.policy, rate, total, posture))
+
+
+class LookalikeRow(BaseModel):
+    domain: str
+    kind: str
+    has_mail: bool  # can receive (and so send) mail: the ones that can pretend to be the client
+
+
+class Lookalikes(BaseModel):
+    domain: str
+    checked: int  # how many lookalike names were generated and asked about
+    found: list[LookalikeRow]
+
+
+@router.get("/domains/{domain}/lookalikes", response_model=Lookalikes, summary="Look-alike domains of one of the caller's domains that exist in DNS")
+async def domain_lookalikes(
+    domain: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    resolver: Annotated[Resolver, Depends(get_resolver)],
+) -> Lookalikes:
+    """Only a domain with reports in the caller's data is scanned. Read-only DNS questions about the lookalike names; no connection is made to them."""
+    reports, clean = await _scoped_reports(current_user, db, 365, domain, None)
+    if not reports or clean is None:
+        raise HTTPException(status_code=404, detail="No reports for that domain.")
+    found = await scan_lookalikes(clean, resolver)
+    return Lookalikes(domain=clean, checked=len(generate_lookalikes(clean)), found=[LookalikeRow(domain=x.domain, kind=x.kind, has_mail=x.has_mail) for x in found])
 
 
 @router.get("/insights", response_model=Insights, summary="Delivery, failure rates over time, top senders and top sending domains")

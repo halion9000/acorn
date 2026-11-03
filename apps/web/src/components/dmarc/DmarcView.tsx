@@ -81,6 +81,11 @@ export interface DmarcCard {
   posture: { domain: string; status: string; mx: string[]; mail_provider: string | null; spf: PostureFinding; dmarc: PostureFinding; dkim: PostureFinding };
   advice: string[];
 }
+export interface DmarcLookalikes {
+  domain: string;
+  checked: number;
+  found: { domain: string; kind: string; has_mail: boolean }[];
+}
 export interface SetupLine {
   client_id: string;
   client_name: string;
@@ -217,6 +222,54 @@ function ReportCardView({ domain, days }: { domain: string; days: number }) {
   );
 }
 
+const KIND_LABEL: Record<string, string> = {
+  omission: 'letter dropped',
+  repetition: 'letter doubled',
+  swap: 'letters swapped',
+  'lookalike-character': 'look-alike character',
+  hyphen: 'hyphen added',
+  'other-ending': 'different ending',
+};
+
+/** Names that could pass for this domain and exist in DNS. Run on request: it is a few hundred DNS questions, and it only asks DNS (nothing connects to those sites). */
+function LookalikesView({ domain }: { domain: string }) {
+  const [run, setRun] = useState(false);
+  const { data, error, isLoading } = useSWR<DmarcLookalikes>(run ? `/api/v1/dmarc/domains/${encodeURIComponent(domain)}/lookalikes` : null, fetcher, { shouldRetryOnError: false });
+  return (
+    <div data-testid="lookalikes" className="mt-4 rounded-lg border border-gray-800 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="text-sm font-medium text-gray-200">Look-alike domains</h4>
+        {!run ? (
+          <button type="button" onClick={() => setRun(true)} className="rounded-lg bg-gray-800 px-3 py-1 text-xs text-gray-100 hover:bg-gray-700">
+            Check for look-alikes
+          </button>
+        ) : null}
+      </div>
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-red-300">
+          {(error as Error).message}
+        </p>
+      ) : isLoading ? (
+        <p className="mt-2 text-sm text-gray-500">Checking… this takes a little while.</p>
+      ) : data ? (
+        data.found.length === 0 ? (
+          <p className="mt-2 text-sm text-emerald-300">None found among {data.checked} names tried. (A registered name with no address or mail records would not show.)</p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-sm">
+            {data.found.map((l) => (
+              <li key={l.domain} data-testid="lookalike-row" className="flex justify-between gap-3">
+                <span className="font-mono text-gray-100">{l.domain}</span>
+                <span className="text-gray-400">{KIND_LABEL[l.kind] ?? l.kind}</span>
+                <span className={l.has_mail ? 'text-red-300' : 'text-amber-300'}>{l.has_mail ? 'can send mail' : 'registered'}</span>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : null}
+    </div>
+  );
+}
+
 function Detail({ domain, days, onClose }: { domain: string; days: number; onClose: () => void }) {
   const { data, error } = useSWR<DmarcDetail>(`/api/v1/dmarc/domains/${encodeURIComponent(domain)}?days=${days}`, fetcher, { shouldRetryOnError: false });
   const max = Math.max(1, ...(data?.series.map((p) => p.total) ?? [1]));
@@ -248,6 +301,7 @@ function Detail({ domain, days, onClose }: { domain: string; days: number; onClo
             ))}
           </div>
           <ReportCardView domain={domain} days={days} />
+          <LookalikesView domain={domain} />
           <h4 className="mt-5 text-sm font-medium text-gray-200">Sources failing DMARC</h4>
           {data.failing_sources.length === 0 ? (
             <p className="mt-1 text-sm text-emerald-300">Nothing failed in this period.</p>
