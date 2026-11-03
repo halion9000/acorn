@@ -70,6 +70,7 @@ from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.db.rls_sessions import mark_platform
 from app.models.saved_hunt import SavedHunt
+from app.services import worker_heartbeat
 from app.services.event_warehouse import (
     HuntExecutionError,
     HuntNotConfigured,
@@ -479,12 +480,14 @@ async def run_forever() -> None:
     """Tick the scheduler until cancelled. Owned by the API ``lifespan``."""
     interval = max(int(getattr(settings, "HUNT_SCHEDULER_POLL_INTERVAL_SECONDS", 30)), 5)
     logger.info("hunt_scheduler started interval=%ds", interval)
+    worker_heartbeat.expect("hunt_scheduler", interval)
     try:
         while True:
             try:
                 fired = await run_once()
                 if fired:
                     logger.info("hunt_scheduler tick fired=%d", fired)
+                worker_heartbeat.beat("hunt_scheduler")
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # pragma: no cover - defensive
@@ -492,6 +495,7 @@ async def run_forever() -> None:
                     "hunt_scheduler tick failed err=%s",
                     type(exc).__name__,
                 )
+                worker_heartbeat.beat("hunt_scheduler", error=type(exc).__name__)
             await asyncio.sleep(interval)
     except asyncio.CancelledError:
         logger.info("hunt_scheduler stopped")

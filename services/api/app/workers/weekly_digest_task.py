@@ -48,6 +48,7 @@ from app.db.database import AsyncSessionLocal
 from app.db.rls_sessions import mark_tenant
 from app.models.report import ReportArtefact
 from app.models.tenant import Tenant
+from app.services import worker_heartbeat
 from app.services.digest_pdf import WeasyPrintUnavailableError, render_digest_pdf
 from app.services.executive_digest import build_weekly_digest
 
@@ -252,12 +253,14 @@ async def run_forever(*, stop_event: asyncio.Event | None = None) -> None:
     interval = max(60, getattr(settings, "WEEKLY_DIGEST_POLL_INTERVAL_SECONDS", 3600))
 
     logger.info("weekly_digest.started poll_interval=%ds", interval)
+    worker_heartbeat.expect("weekly_digest", interval)
 
     try:
         while True:
             if stop_event is not None and stop_event.is_set():
                 break
 
+            error: str | None = None
             now_utc = datetime.now(UTC)
             if now_utc.weekday() == _MONDAY and now_utc.hour == _TRIGGER_HOUR:
                 try:
@@ -270,12 +273,14 @@ async def run_forever(*, stop_event: asyncio.Event | None = None) -> None:
                     )
                 except Exception as exc:  # noqa: BLE001
                     logger.exception("weekly_digest.tick_failed err=%s", type(exc).__name__)
+                    error = type(exc).__name__
             else:
                 logger.debug(
                     "weekly_digest.idle weekday=%d hour=%d — not Monday 00:xx UTC",
                     now_utc.weekday(),
                     now_utc.hour,
                 )
+            worker_heartbeat.beat("weekly_digest", error=error)
 
             try:
                 if stop_event is not None:

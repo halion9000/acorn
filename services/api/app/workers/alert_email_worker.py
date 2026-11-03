@@ -30,6 +30,7 @@ from app.models.alert_email import AlertEmailLog
 from app.models.tenant import Tenant
 from app.services.alert_email.compose import SEVERITY_ORDER, AlertLine, build_message
 from app.services.alert_email.graph import GraphMailer, MailError, scrub
+from app.services import worker_heartbeat
 from app.services.alert_email.settings_store import get_settings
 
 logger = logging.getLogger(__name__)
@@ -191,13 +192,19 @@ async def run_forever(
     interval = settings.ALERT_EMAIL_POLL_INTERVAL_SECONDS
     failures = 0
     mailer = (mailer_factory or GraphMailer.from_settings)()
+    worker_heartbeat.expect("alert_email", interval)
     while True:
+        error: str | None = None
         try:
             result = await run_once(session_factory=session_factory, mailer=mailer)
             failures = failures + 1 if result.error else 0
+            error = "MailError" if result.error else None
         except asyncio.CancelledError:
             raise
-        except Exception:  # noqa: BLE001  # the loop must outlive a bad cycle
+        except Exception as exc:  # noqa: BLE001  # the loop must outlive a bad cycle
             logger.exception("alert email worker cycle failed")
             failures += 1
-        await sleep(interval * min(2**failures, _MAX_BACKOFF_FACTOR))
+            error = type(exc).__name__
+        wait = interval * min(2**failures, _MAX_BACKOFF_FACTOR)
+        worker_heartbeat.beat("alert_email", error=error, next_within_seconds=wait)
+        await sleep(wait)

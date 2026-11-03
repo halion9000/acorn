@@ -23,6 +23,7 @@ class _Worker:
     last_ok: bool = True
     last_error: str | None = None
     passes: int = 0
+    next_within: float | None = None  # this pass told us when to expect the next (a worker that backs off after failures)
 
 
 _WORKERS: dict[str, _Worker] = {}
@@ -34,8 +35,8 @@ def expect(name: str, interval_seconds: float, first_turn_after_seconds: float =
     _WORKERS[name] = _Worker(interval=max(1.0, float(interval_seconds)), first_turn_after=max(0.0, float(first_turn_after_seconds)), registered_at=t)
 
 
-def beat(name: str, error: str | None = None, now: float | None = None) -> None:
-    """One pass finished. ``error`` is a short reason when it failed (a type name, never a message that could carry a secret)."""
+def beat(name: str, error: str | None = None, now: float | None = None, next_within_seconds: float | None = None) -> None:
+    """One pass finished. ``error`` is a short reason when it failed (a type name, never a message that could carry a secret). A worker that waits longer after a failure says how long, so its slow retry is "failing", not "late"."""
     w = _WORKERS.get(name)
     if w is None:
         return
@@ -43,10 +44,11 @@ def beat(name: str, error: str | None = None, now: float | None = None) -> None:
     w.last_ok = error is None
     w.last_error = error[:80] if error else None
     w.passes += 1
+    w.next_within = None if next_within_seconds is None else max(w.interval, float(next_within_seconds))
 
 
 def _status(w: _Worker, t: float) -> str:
-    allowed = max(GRACE_FLOOR_SECONDS, w.interval * GRACE_FACTOR)
+    allowed = max(GRACE_FLOOR_SECONDS, (w.next_within or w.interval) * GRACE_FACTOR)
     if w.last_beat is None:
         return "waiting" if t - w.registered_at <= w.first_turn_after + allowed else "late"
     if t - w.last_beat > allowed:

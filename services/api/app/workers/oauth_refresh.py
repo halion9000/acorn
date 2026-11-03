@@ -44,6 +44,7 @@ from app.db.database import AsyncSessionLocal
 from app.db.rls_sessions import mark_platform
 from app.models.connector import Connector
 from app.models.oauth import OAuthAppCredential
+from app.services import worker_heartbeat
 from app.security.credential_vault import CredentialVaultError, get_vault
 
 logger = logging.getLogger(__name__)
@@ -503,12 +504,14 @@ async def run_forever(*, stop_event: asyncio.Event | None = None) -> None:
         settings.OAUTH_REFRESH_LEAD_TIME_SECONDS,
         settings.OAUTH_REFRESH_ALARM_THRESHOLD,
     )
+    worker_heartbeat.expect("oauth_refresh", interval)
     try:
         while True:
             if stop_event is not None and stop_event.is_set():
                 break
             try:
                 stats = await run_once()
+                worker_heartbeat.beat("oauth_refresh")
                 if stats["checked"]:
                     logger.info(
                         "oauth_refresh.tick checked=%d refreshed=%d failed=%d",
@@ -521,6 +524,7 @@ async def run_forever(*, stop_event: asyncio.Event | None = None) -> None:
                 # whole point of this worker is durability. The next
                 # tick gets a fresh DB session.
                 logger.exception("oauth_refresh.tick_failed err=%s", type(exc).__name__)
+                worker_heartbeat.beat("oauth_refresh", error=type(exc).__name__)
             try:
                 if stop_event is not None:
                     await asyncio.wait_for(stop_event.wait(), timeout=interval)

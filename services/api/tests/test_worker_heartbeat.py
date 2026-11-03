@@ -123,3 +123,93 @@ def test_each_worker_registers_itself_and_beats_after_a_pass_and_records_a_faile
         asyncio.run(sw.run_suppression_sweeper(sleep=sleep, session_factory=lambda: Session()))
     row = wh.snapshot()[0]
     assert (row["status"], row["last_error"]) == ("failing", "RuntimeError")  # the type, not the message
+
+
+def test_a_worker_that_backs_off_after_a_failure_is_failing_during_its_long_wait_not_late():
+    wh.expect("mail", 60, now=0)
+    wh.beat("mail", error="MailError", now=0, next_within_seconds=960)  # waits 16 intervals before its next try
+    assert status("mail", 2000) == "failing"
+    assert status("mail", 2401) == "late"  # 2.5 x 960: it really has gone quiet
+    wh.beat("mail", now=3000)  # a good pass puts it back on its own clock
+    assert status("mail", 3000 + 149) == "ok" and status("mail", 3000 + 151) == "late"
+
+
+def test_the_alert_email_loop_registers_beats_and_records_a_failed_cycle_with_its_backed_off_wait(monkeypatch):
+    from app.workers import alert_email_worker as ae
+
+    class Stop(Exception):
+        pass
+
+    results = iter([ae.RunResult(sent=1), ae.RunResult(error="x"), RuntimeError("boom with detail")])
+
+    async def fake_run_once(**kw):
+        r = next(results)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+    waits = []
+
+    async def sleep(n):
+        waits.append(n)
+        if len(waits) >= 3:
+            raise Stop()
+
+    monkeypatch.setattr(ae, "run_once", fake_run_once)
+    monkeypatch.setattr(ae.settings, "ALERT_EMAIL_POLL_INTERVAL_SECONDS", 60)
+    with pytest.raises(Stop):
+        asyncio.run(ae.run_forever(mailer_factory=lambda: object(), sleep=sleep))
+    row = wh.snapshot()[0]
+    assert waits == [60, 120, 240]
+    assert (row["name"], row["passes"], row["status"], row["last_error"]) == ("alert_email", 3, "failing", "RuntimeError")  # the type, not the message
+
+
+def _stop_after(n):
+    class Stop(Exception):
+        pass
+
+    count = {"n": 0}
+
+    async def sleep(_):
+        count["n"] += 1
+        if count["n"] >= n:
+            raise Stop()
+
+    return Stop, sleep
+
+
+def test_hunt_scheduler_oauth_refresh_and_weekly_digest_each_register_and_report_good_and_failed_passes(monkeypatch):
+    from app.workers import hunt_scheduler as hs
+    from app.workers import oauth_refresh as orf
+    from app.workers import weekly_digest_task as wd
+
+    for mod, name, ok in (
+        (hs, "hunt_scheduler", 0),
+        (orf, "oauth_refresh", {"checked": 0, "refreshed": 0, "failed": 0}),
+        (wd, "weekly_digest", {"tenants": 0, "generated": 0, "failed": 0}),
+    ):
+        for outcome in ("ok", "fail"):
+            wh.reset()
+            Stop, sleep = _stop_after(1)
+
+            async def run_once(ok=ok, outcome=outcome):
+                if outcome == "fail":
+                    raise ValueError("secret detail")
+                return ok
+
+            monkeypatch.setattr(mod, "run_once", run_once)
+            monkeypatch.setattr(mod.asyncio, "sleep", sleep)
+            if mod is wd:
+                import datetime as dt
+
+                class Monday(dt.datetime):
+                    @classmethod
+                    def now(cls, tz=None):
+                        return cls(2026, 11, 2, 0, 10, tzinfo=tz)  # a Monday, hour 0
+
+                monkeypatch.setattr(wd, "datetime", Monday)
+            with pytest.raises(Stop):
+                asyncio.run(mod.run_forever())
+            (row,) = wh.snapshot()
+            assert row["name"] == name and row["passes"] == 1, (name, outcome)
+            assert (row["status"], row["last_error"]) == (("ok", None) if outcome == "ok" else ("failing", "ValueError")), (name, outcome)
