@@ -30,6 +30,21 @@ class RemoteToolRule(Base):
     decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
 
 
+class CustomRemoteTool(Base):
+    """A tool the owner added to the catalog by hand (migration 143)."""
+
+    __tablename__ = "custom_remote_tools"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    tool_key: Mapped[str] = mapped_column(String(60), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    category: Mapped[str] = mapped_column(String(30), nullable=False)
+    match_text: Mapped[str] = mapped_column(String(80), nullable=False)
+    publisher_text: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
 class DeviceRemoteTool(Base):
     """One tool found on one device of a client."""
 

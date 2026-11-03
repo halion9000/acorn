@@ -105,3 +105,110 @@ def test_a_clients_own_rule_beats_the_one_for_everyone_and_nothing_decided_is_un
     assert rt.effective_verdict("putty", B, rules) == "allowed"
     assert rt.effective_verdict("teamviewer", A, rules) == "unreviewed"
     assert rt.effective_verdict("anydesk", A, {("anydesk", A): "garbage", ("anydesk", None): "blocked"}) == "blocked"  # an unknown value is ignored
+
+
+MORE = {
+    "Quick Assist": "quick_assist", "Remote Help": "remote_help", "RustDesk": "rustdesk", "NoMachine": "nomachine", "Parsec": "parsec", "MeshAgent": "meshcentral", "Mesh Agent": "meshcentral",
+    "Tactical RMM Agent": "tactical_rmm", "Action1 Agent": "action1", "Level Agent": "level", "ManageEngine Endpoint Central - Agent": "manageengine_rap", "Remote Access Plus": "manageengine_rap",
+    "DameWare Mini Remote Control": "dameware", "ISL Light": "isl_online", "Supremo": "supremo", "UltraViewer": "ultraviewer", "Ammyy Admin": "ammyy", "Remote Utilities - Host": "remote_utilities",
+    "DWAgent": "dwservice", "AnyViewer": "anyviewer", "HopToDesk": "hoptodesk", "Sunlogin": "sunlogin", "N-central Windows Agent": "nable_ncentral", "Tailscale": "tailscale", "ZeroTier One": "zerotier",
+    "ngrok": "ngrok",
+}
+
+
+@pytest.mark.parametrize(("name", "expected"), sorted(MORE.items()))
+def test_the_tools_added_later_are_recognised_and_each_matches_exactly_one_tool(name, expected):
+    found = rt.match_software(name)
+    assert found is not None and found.key == expected, (name, found)
+    hits = [t.key for t, ps in rt._COMPILED if any(p.search(name) for p in ps)]
+    assert hits == [expected], (name, hits)
+
+
+def test_a_program_named_level_is_found_by_its_publisher_alongside_it():
+    assert rt.match_software("Level", "Level").key == "level"
+    assert rt.match_software("Level") is None  # a bare, common word says nothing
+
+
+def test_the_catalog_now_has_the_original_list_and_the_additions_with_no_program_claimed_by_two_tools():
+    assert len(rt.CATALOG) >= 61
+    everything = {**MORE, "AnyDesk": "anydesk", "TeamViewer Host": "teamviewer", "ScreenConnect Client (798cebdb8316a8ff)": "screenconnect", "Splashtop Streamer": "splashtop", "Datto RMM Agent": "datto_rmm", "NinjaRMMAgent": "ninjaone"}
+    for name, key in everything.items():
+        hits = [t.key for t, ps in rt._COMPILED if any(p.search(name) for p in ps)]
+        assert hits == [key], (name, hits)
+
+
+def test_ordinary_software_is_still_not_flagged_after_the_additions():
+    for name in ("Level 3 Communications Client", "Remote Helpdesk Notes", "Quick Access", "Action Camera Viewer", "Microsoft Edge", "Visual Studio Code", "VLC media player"):
+        assert rt.match_software(name) is None, name
+
+
+# ---- tools the owner adds by hand ----------------------------------------------------------------------------------------------------------------------------
+
+
+def test_a_name_becomes_a_stable_key_and_nothing_else_does():
+    assert rt.slug_key("Acme  Remote Desk!") == "custom_acme_remote_desk"
+    assert rt.slug_key("***") == "" and rt.slug_key("") == ""
+    assert len(rt.slug_key("x" * 200)) <= 60
+
+
+def test_a_tool_to_add_is_cleaned_and_refused_with_a_reason_the_person_can_act_on():
+    assert rt.validate_custom("  Acme   Remote ", "remote_access", " Acme  Remote Desk ", "  Acme Inc ") == ("Acme Remote", "remote_access", "Acme Remote Desk", "Acme Inc")
+    for args, words in [
+        (("A", "remote_access", "Acme Remote"), "name"),
+        (("Acme", "nonsense", "Acme Remote"), "kind"),
+        (("Acme", "remote_access", "ab"), "3 to 80"),
+        (("Acme", "remote_access", "abc"), "too short"),
+        (("Acme", "remote_access", "Acme Remote", "x"), "publisher"),
+    ]:
+        with pytest.raises(ValueError, match=words):
+            rt.validate_custom(*args)
+
+
+def test_what_the_person_typed_is_matched_as_plain_whole_words_in_any_case_and_never_as_a_pattern():
+    t = rt.build_custom("custom_x", "X", "remote_access", "Acme (Remote) Desk+", None)
+    import re
+
+    assert re.search(t.patterns[0], "acme (remote) desk+ 2.1", re.I)
+    assert not re.search(t.patterns[0], "acme remote desk", re.I)  # the brackets and the plus are part of the name, not pattern characters
+    plain = rt.build_custom("custom_y", "Y", "remote_access", "Acme Remote", None)
+    assert re.search(plain.patterns[0], "ACME   REMOTE agent", re.I)
+    assert not re.search(plain.patterns[0], "Acme Remotely", re.I)  # whole words only
+
+
+def test_a_publisher_is_only_required_when_the_device_lists_one():
+    import re
+
+    t = rt.build_custom("custom_z", "Z", "rmm", "Acme Agent", "Acme Inc")
+    assert not re.search(t.patterns[0], "Acme Agent", re.I)  # on the name alone the publisher cannot be confirmed
+    assert re.search(t.patterns[0], "Acme Agent Acme Inc", re.I)  # the matcher tries name and publisher together
+    assert not re.search(t.patterns[0], "Acme Agent Other Corp", re.I)
+
+
+def test_a_program_the_built_in_list_already_knows_is_reported_as_covered():
+    assert rt.covered_by_builtin("AnyDesk").key == "anydesk"
+    assert rt.covered_by_builtin("Acme Remote Desk") is None
+
+
+def test_the_owners_own_tools_are_visible_to_the_request_that_set_them_and_to_no_other_context():
+    import asyncio
+
+    t = rt.build_custom("custom_acme", "Acme Remote", "remote_access", "Acme Remote", None)
+    assert rt.tool_by_key("custom_acme") is None
+
+    async def owner_a():
+        rt.set_custom([t])
+        await asyncio.sleep(0)
+        return rt.tool_by_key("custom_acme")
+
+    async def owner_b():
+        await asyncio.sleep(0)
+        return rt.tool_by_key("custom_acme")
+
+    async def both():
+        return await asyncio.gather(asyncio.create_task(owner_a()), asyncio.create_task(owner_b()))
+
+    a, b = asyncio.run(both())
+    assert a is not None and a.name == "Acme Remote"
+    assert b is None, "another request must not see this owner's tools"
+    assert rt.tool_by_key("custom_acme") is None
+    assert rt.tool_by_key("anydesk").name == "AnyDesk"  # the built-in list is always there

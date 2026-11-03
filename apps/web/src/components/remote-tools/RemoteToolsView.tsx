@@ -72,7 +72,18 @@ const CATEGORY_LABELS: Record<string, string> = {
   remote_support: 'Remote support',
   file_transfer: 'File transfer',
   remote_desktop_manager: 'Connection manager',
+  tunnel: 'Tunnel / VPN',
 };
+
+/** The kinds a tool added by hand can be, in the order the form offers them. */
+export const KIND_CHOICES: { value: string; label: string }[] = [
+  { value: 'remote_access', label: 'Remote access' },
+  { value: 'remote_support', label: 'Remote support' },
+  { value: 'rmm', label: 'Remote monitoring' },
+  { value: 'file_transfer', label: 'File transfer' },
+  { value: 'remote_desktop_manager', label: 'Connection manager' },
+  { value: 'tunnel', label: 'Tunnel / VPN' },
+];
 
 export function categoryLabel(category: string): string {
   return CATEGORY_LABELS[category] ?? category;
@@ -113,6 +124,149 @@ function when(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
+}
+
+interface CustomTool {
+  key: string;
+  name: string;
+  category: string;
+  match: string;
+  publisher: string | null;
+}
+
+/** Tools the owner adds by hand, for a program the built-in list does not know. */
+function CustomTools({ onChanged, disabled }: { onChanged: (message: string) => void; disabled: boolean }) {
+  const [tools, setTools] = useState<CustomTool[] | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('remote_access');
+  const [match, setMatch] = useState('');
+  const [publisher, setPublisher] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/v1/remote-tools/custom');
+      if (res.ok) setTools((await res.json()) as CustomTool[]);
+    } catch {
+      // the list stays as it was
+    }
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const add = async () => {
+    setSaving(true);
+    setProblem(null);
+    try {
+      const res = await authFetch('/api/v1/remote-tools/custom', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name, category, match, publisher: publisher.trim() || null }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { detail?: string } | null;
+        throw new Error(res.status === 403 ? 'You need permission to manage clients to add a tool.' : typeof body?.detail === 'string' ? body.detail : `The API answered ${res.status}`);
+      }
+      setName('');
+      setMatch('');
+      setPublisher('');
+      setAdding(false);
+      await load();
+      onChanged(`${name.trim()} added. It is looked for in the next scan of your devices (within a day).`);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : 'Could not add the tool');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (t: CustomTool) => {
+    if (!window.confirm(`Remove ${t.name}? What was found for it, and any decision about it, is removed too.`)) return;
+    try {
+      const res = await authFetch(`/api/v1/remote-tools/custom/${encodeURIComponent(t.key)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(res.status === 403 ? 'You need permission to manage clients to remove a tool.' : `The API answered ${res.status}`);
+      await load();
+      onChanged(`${t.name} removed.`);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : 'Could not remove the tool');
+    }
+  };
+
+  return (
+    <section aria-label="Tools you added" className="space-y-2" data-testid="custom-tools">
+      <div className="flex items-center gap-3">
+        <h2 className="text-sm font-medium text-gray-200">Tools you added</h2>
+        {!adding && (
+          <button type="button" disabled={disabled} onClick={() => setAdding(true)} className="rounded border border-sky-500/50 px-2 py-0.5 text-xs text-sky-300 disabled:opacity-40">
+            Add a tool
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-gray-500">For a remote tool the built-in list does not know. Give a piece of the program&apos;s name as it appears in the device&apos;s list of installed programs.</p>
+      {adding && (
+        <form
+          className="grid max-w-2xl gap-2 rounded border border-gray-700 p-3 text-xs"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void add();
+          }}
+        >
+          <label className="text-gray-400">
+            Name
+            <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Tool name" className="mt-1 block w-full rounded border border-gray-700 bg-gray-950 px-2 py-1 text-gray-100" placeholder="e.g. Acme Remote Desk" />
+          </label>
+          <label className="text-gray-400">
+            Kind
+            <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Tool kind" className="mt-1 block w-full rounded border border-gray-700 bg-gray-950 px-2 py-1 text-gray-100">
+              {KIND_CHOICES.map((k) => (
+                <option key={k.value} value={k.value}>
+                  {k.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-gray-400">
+            The program&apos;s name contains
+            <input value={match} onChange={(e) => setMatch(e.target.value)} aria-label="Program name contains" className="mt-1 block w-full rounded border border-gray-700 bg-gray-950 px-2 py-1 font-mono text-gray-100" placeholder="e.g. Acme Remote Desk" />
+          </label>
+          <label className="text-gray-400">
+            The publisher contains (optional, narrows it down)
+            <input value={publisher} onChange={(e) => setPublisher(e.target.value)} aria-label="Publisher contains" className="mt-1 block w-full rounded border border-gray-700 bg-gray-950 px-2 py-1 text-gray-100" />
+          </label>
+          <div className="space-x-2">
+            <button type="submit" disabled={saving} className="rounded border border-sky-500/50 px-2 py-0.5 text-sky-300 disabled:opacity-40">
+              Add
+            </button>
+            <button type="button" disabled={saving} onClick={() => setAdding(false)} className="text-gray-400 hover:underline">
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+      {problem && (
+        <p role="alert" className="text-xs text-red-300">
+          {problem}
+        </p>
+      )}
+      {tools !== null && tools.length > 0 && (
+        <ul className="space-y-1 text-xs" data-testid="custom-list">
+          {tools.map((t) => (
+            <li key={t.key} className="flex flex-wrap items-center gap-2 text-gray-300">
+              <span className="font-medium text-gray-100">{t.name}</span>
+              <span className="text-gray-500">{categoryLabel(t.category)}</span>
+              <span className="font-mono text-gray-400">&ldquo;{t.match}&rdquo;{t.publisher ? ` + ${t.publisher}` : ''}</span>
+              <button type="button" disabled={disabled} onClick={() => void remove(t)} aria-label={`Remove ${t.name}`} className="text-red-300 hover:underline disabled:opacity-40">
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function InstanceEditor({ tool, onSaved, disabled }: { tool: ToolRow; onSaved: (message: string) => void; disabled: boolean }) {
@@ -317,6 +471,14 @@ export default function RemoteToolsView() {
         </div>
       )}
 
+      <CustomTools
+        disabled={busy}
+        onChanged={(message) => {
+          setNotice(message);
+          void load();
+        }}
+      />
+
       {data && data.tools.length === 0 && (
         <p className="text-sm text-gray-400" data-testid="empty">
           {data.last_scanned
@@ -399,6 +561,7 @@ export default function RemoteToolsView() {
                                 <th scope="col" className="py-1 pr-3 text-left">Client</th>
                                 <th scope="col" className="pr-3 text-left">Device</th>
                                 <th scope="col" className="pr-3 text-left">Version</th>
+                                {t.has_instances ? <th scope="col" className="pr-3 text-left">Server ID</th> : null}
                                 <th scope="col" className="pr-3 text-left">Installed at</th>
                                 <th scope="col" className="pr-3 text-left">Decision for this client</th>
                                 <th scope="col"><span className="sr-only">Decide for this client</span></th>
@@ -414,13 +577,14 @@ export default function RemoteToolsView() {
                                     </Link>
                                   </td>
                                   <td className="pr-3">{d.version ?? '—'}</td>
+                                  {t.has_instances ? (
+                                    <td className={`pr-3 font-mono ${d.foreign ? 'font-medium text-red-300' : 'text-gray-300'}`} data-testid="server-id">
+                                      {d.instance_id ? d.instance_id : '—'}
+                                      {d.foreign ? <span className="ml-1 font-sans">(another server)</span> : null}
+                                    </td>
+                                  ) : null}
                                   <td className="pr-3 break-all font-mono text-gray-300" data-testid="install-path">
                                     {d.install_path ?? '—'}
-                                    {d.instance_id ? (
-                                      <div className={d.foreign ? 'font-sans font-medium text-red-300' : 'font-sans text-gray-500'}>
-                                        {d.foreign ? `Another server: ${d.instance_id}` : `Server ${d.instance_id}`}
-                                      </div>
-                                    ) : null}
                                   </td>
                                   <td className="pr-3"><Badge verdict={d.verdict} /></td>
                                   <td className="space-x-1 whitespace-nowrap text-right">

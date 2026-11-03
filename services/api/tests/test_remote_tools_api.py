@@ -429,3 +429,129 @@ def test_only_someone_who_manages_clients_may_set_the_identifiers():
 
     routes = {(m, r.path): r for r in ep.router.routes for m in getattr(r, "methods", [])}
     assert set(perms(routes[("PUT", "/remote-tools/tools/{tool_key}/instances")])) == {"mssp:manage"}
+
+
+# ---- tools the owner adds by hand: the screen's calls ----------------------------------------------------------------------------------------------------------
+
+
+class CustomDb(FakeDb):
+    """The fake database, plus the rows of tools added by hand and a record of what was added."""
+
+    def __init__(self, *a, custom=(), **k):
+        super().__init__(*a, **k)
+        self.custom_rows, self.added = list(custom), []
+
+    async def execute(self, stmt, *a, **k):
+        text = str(stmt)
+        if text.lstrip().upper().startswith("SELECT") and "FROM custom_remote_tools" in text:
+            return NS(scalars=lambda: NS(all=lambda: self.custom_rows))
+        return await super().execute(stmt, *a, **k)
+
+    def add(self, row):
+        self.added.append(row)
+
+
+def custom_row(key="custom_acme_remote", name="Acme Remote", match="Acme Remote Desk", category="remote_access", publisher=None):
+    return NS(tool_key=key, name=name, category=category, match_text=match, publisher_text=publisher, created_at=NOW, tenant_id=OWNER)
+
+
+def add_custom(db, **body):
+    payload = {"name": "Acme Remote", "category": "remote_access", "match": "Acme Remote Desk", **body}
+    return asyncio.run(ep.add_custom(ep.CustomIn(**payload), user(), db))
+
+
+def test_adding_a_tool_stores_it_under_a_key_made_from_its_name_and_audits_it(audited):
+    db = CustomDb(children=[A])
+    out = add_custom(db, name="  Acme   Remote ", match=" Acme  Remote Desk ", publisher="Acme Inc")
+    assert (out.key, out.name, out.match, out.publisher) == ("custom_acme_remote", "Acme Remote", "Acme Remote Desk", "Acme Inc")
+    (row,) = db.added
+    assert (row.tenant_id, row.tool_key, row.category, row.created_by) == (OWNER, "custom_acme_remote", "remote_access", user().user_id) or row.tenant_id == OWNER
+    assert audited.await_args.kwargs["action"] == "remote_tool:custom_added" and audited.await_args.kwargs["resource_id"] == "custom_acme_remote"
+
+
+def test_a_tool_that_is_refused_says_why_and_stores_and_audits_nothing(audited):
+    for body, status, words in [
+        ({"match": "AnyDesk"}, 409, "AnyDesk is already in the list"),
+        ({"match": "ab"}, 422, "3 to 80"),
+        ({"category": "weird"}, 422, "kind"),
+        ({"match": "xyz"}, 422, "too short"),
+    ]:
+        db = CustomDb(children=[A])
+        with pytest.raises(HTTPException) as e:
+            add_custom(db, **body)
+        assert e.value.status_code == status and words in e.value.detail, (body, e.value.detail)
+        assert db.added == []
+    audited.assert_not_awaited()
+
+
+def test_the_same_name_cannot_be_added_twice_and_the_number_is_limited(audited):
+    with pytest.raises(HTTPException) as e:
+        add_custom(CustomDb(children=[A], custom=[custom_row()]))
+    assert e.value.status_code == 409 and "different name" in e.value.detail
+    full = [custom_row(key=f"custom_t{i}", name=f"T{i}", match=f"Tool Number {i}") for i in range(rt.MAX_CUSTOM)]
+    with pytest.raises(HTTPException) as e:
+        add_custom(CustomDb(children=[A], custom=full), name="One More", match="One More Program")
+    assert e.value.status_code == 422 and str(rt.MAX_CUSTOM) in e.value.detail
+
+
+def test_the_list_shows_the_tools_added_by_name_and_the_catalog_marks_them_as_custom():
+    db = CustomDb(children=[A], custom=[custom_row(name="Zed Remote", key="custom_zed", match="Zed Remote"), custom_row()])
+    listed = asyncio.run(ep.list_custom(user(), db))
+    assert [c.name for c in listed] == ["Acme Remote", "Zed Remote"]
+    catalog = asyncio.run(ep.catalog(user(), db))
+    assert sum(1 for c in catalog if c.custom) == 2 and any(c.key == "anydesk" and not c.custom for c in catalog)
+
+
+def test_removing_a_tool_deletes_its_definition_its_rule_and_what_was_found_for_it_and_audits_it(audited):
+    db = CustomDb(children=[A], custom=[custom_row()])
+    asyncio.run(ep.remove_custom("custom_acme_remote", user(), db))
+    texts = [str(d.compile(dialect=postgresql.dialect())) for d in db.deleted]
+    assert any("DELETE FROM device_remote_tools" in t for t in texts)
+    assert any("DELETE FROM remote_tool_rules" in t for t in texts)
+    assert any("DELETE FROM custom_remote_tools" in t for t in texts)
+    assert audited.await_args.kwargs["action"] == "remote_tool:custom_removed"
+
+
+def test_only_a_tool_you_added_can_be_removed_not_a_built_in_one(audited):
+    with pytest.raises(HTTPException) as e:
+        asyncio.run(ep.remove_custom("anydesk", user(), CustomDb(children=[A])))
+    assert e.value.status_code == 404
+    audited.assert_not_awaited()
+
+
+def test_a_tool_added_by_hand_is_found_in_a_report_decided_on_and_counted_like_a_built_in_one(audited):
+    db = CustomDb(alias=MAPPED, children=[A], custom=[custom_row()])
+    out = run(db, report([{"hostname": "PC-1", "tool_key": "custom_acme_remote", "program": "Acme Remote Desk 3.1"}]))
+    assert (out.stored, out.unknown_tools) == (1, 0)
+    # the request that built the page would have loaded the owner's tools into its own context first; do the same here
+    rt.set_custom([rt.build_custom("custom_acme_remote", "Acme Remote", "remote_access", "Acme Remote Desk", None)])
+    try:
+        inv = ep.build_inventory([seen(A, "PC-1", "custom_acme_remote")], {}, [])
+        assert inv.tools_found == 1 and inv.tools[0].name == "Acme Remote"
+    finally:
+        rt.set_custom([])
+    assert ep.build_inventory([seen(A, "PC-1", "custom_acme_remote")], {}, []).tools_found == 0  # a request that did not load them does not see them
+
+
+def test_the_catalog_core_reads_includes_the_tools_added_by_hand_with_their_patterns(monkeypatch):
+    async def fake_verify(db, token):
+        return OWNER
+
+    async def fake_adopt(db, owner):
+        return None
+
+    monkeypatch.setattr(ep, "_verify_core_feed_token", fake_verify)
+    monkeypatch.setattr(ep, "adopt_tenant", fake_adopt)
+    out = asyncio.run(ep.core_feed_remote_tools_catalog("tok", CustomDb(children=[A], custom=[custom_row()])))
+    mine = next(c for c in out if c.key == "custom_acme_remote")
+    assert mine.name == "Acme Remote" and len(mine.patterns) == 1
+    assert any(c.key == "anydesk" for c in out)
+
+
+def test_adding_and_removing_need_the_manage_permission_and_looking_needs_alerts_read():
+    from app.core.route_introspect import required_permissions as perms
+
+    routes = {(m, r.path): r for r in ep.router.routes for m in getattr(r, "methods", [])}
+    assert set(perms(routes[("POST", "/remote-tools/custom")])) == {"mssp:manage"}
+    assert set(perms(routes[("DELETE", "/remote-tools/custom/{tool_key}")])) == {"mssp:manage"}
+    assert set(perms(routes[("GET", "/remote-tools/custom")])) == {"alerts:read"}

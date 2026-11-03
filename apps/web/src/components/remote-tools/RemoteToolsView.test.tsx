@@ -173,9 +173,13 @@ describe('where it is installed, and whose server it connects to', () => {
     const panel = await screen.findByTestId('devices-screenconnect');
     const paths = within(panel).getAllByTestId('install-path');
     expect(paths[0]).toHaveTextContent(PATH);
-    expect(paths[0]).toHaveTextContent('Another server: 1111222233334444');
-    expect(paths[1]).toHaveTextContent('Server 798cebdb8316a8ff');
-    expect(paths[1]).not.toHaveTextContent('Another server');
+    expect(within(panel).getByRole('columnheader', { name: 'Server ID' })).toBeInTheDocument();
+    const ids = within(panel).getAllByTestId('server-id');
+    expect(ids[0]).toHaveTextContent('1111222233334444');
+    expect(ids[0]).toHaveTextContent('(another server)');
+    expect(ids[0]).toHaveClass('text-red-300');
+    expect(ids[1]).toHaveTextContent('798cebdb8316a8ff');
+    expect(ids[1]).not.toHaveTextContent('another server');
   });
 
   it('says plainly when none of your identifiers is set, and shows them once they are', async () => {
@@ -219,5 +223,98 @@ describe('where it is installed, and whose server it connects to', () => {
     render(<RemoteToolsView />);
     await screen.findByTestId('tools-table');
     expect(screen.queryByTestId('instances-teamviewer')).toBeNull();
+  });
+});
+
+
+describe('adding a tool by hand', () => {
+  const mine = [{ key: 'custom_acme', name: 'Acme Remote', category: 'remote_access', match: 'Acme Remote Desk', publisher: null }];
+
+  function serveCustom(list: unknown[] = []) {
+    const calls: { url: string; method: string; body?: unknown }[] = [];
+    let current = list;
+    authFetch.mockImplementation((url: string, init?: { method?: string; body?: string }) => {
+      const method = init?.method ?? 'GET';
+      calls.push({ url, method, body: init?.body ? JSON.parse(init.body) : undefined });
+      if (url.endsWith('/custom') && method === 'POST') {
+        const b = JSON.parse(String(init!.body));
+        current = [...current, { key: 'custom_new', name: b.name, category: b.category, match: b.match, publisher: b.publisher }];
+        return json({ key: 'custom_new', ...b }, 201);
+      }
+      if (url.includes('/custom/') && method === 'DELETE') {
+        current = [];
+        return Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve(null) });
+      }
+      if (url.endsWith('/custom')) return json(current);
+      return json(inventory());
+    });
+    return calls;
+  }
+
+  it('lists the tools added with what each looks for, and offers a way to remove each', async () => {
+    serveCustom(mine);
+    render(<RemoteToolsView />);
+    const list = await screen.findByTestId('custom-list');
+    expect(list).toHaveTextContent('Acme Remote');
+    expect(list).toHaveTextContent('Remote access');
+    expect(list).toHaveTextContent('Acme Remote Desk');
+    expect(within(list).getByRole('button', { name: 'Remove Acme Remote' })).toBeInTheDocument();
+  });
+
+  it('adds a tool from the form, sends what was typed with the publisher left out when empty, says when it will be looked for, and shows it', async () => {
+    const calls = serveCustom([]);
+    render(<RemoteToolsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Add a tool' }));
+    await userEvent.type(screen.getByLabelText('Tool name'), 'Zed Remote');
+    await userEvent.selectOptions(screen.getByLabelText('Tool kind'), 'remote_support');
+    await userEvent.type(screen.getByLabelText('Program name contains'), 'Zed Remote Agent');
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Zed Remote added. It is looked for in the next scan of your devices (within a day).'));
+    const post = calls.find((c) => c.method === 'POST')!;
+    expect(post.body).toEqual({ name: 'Zed Remote', category: 'remote_support', match: 'Zed Remote Agent', publisher: null });
+    expect(await screen.findByTestId('custom-list')).toHaveTextContent('Zed Remote');
+    expect(screen.queryByLabelText('Tool name')).toBeNull(); // the form closed
+  });
+
+  it('keeps the form open and shows the reason when a tool is refused', async () => {
+    authFetch.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url.endsWith('/custom') && init?.method === 'POST') return json({ detail: 'AnyDesk is already in the list and a program called that is found already' }, 409);
+      if (url.endsWith('/custom')) return json([]);
+      return json(inventory());
+    });
+    render(<RemoteToolsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Add a tool' }));
+    await userEvent.type(screen.getByLabelText('Tool name'), 'Any');
+    await userEvent.type(screen.getByLabelText('Program name contains'), 'AnyDesk');
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('AnyDesk is already in the list');
+    expect(screen.getByLabelText('Tool name')).toHaveValue('Any');
+  });
+
+  it('removes a tool only after asking, and says a 403 plainly', async () => {
+    const calls = serveCustom(mine);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<RemoteToolsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove Acme Remote' }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Remove Acme Remote?'));
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
+    confirm.mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Acme Remote' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.url === '/api/v1/remote-tools/custom/custom_acme')).toBe(true));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Acme Remote removed.'));
+  });
+
+  it('says plainly that adding needs permission to manage clients', async () => {
+    authFetch.mockImplementation((url: string, init?: { method?: string }) => (url.endsWith('/custom') && init?.method === 'POST' ? json({ detail: 'forbidden' }, 403) : url.endsWith('/custom') ? json([]) : json(inventory())));
+    render(<RemoteToolsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Add a tool' }));
+    await userEvent.type(screen.getByLabelText('Tool name'), 'Zed');
+    await userEvent.type(screen.getByLabelText('Program name contains'), 'Zed Remote');
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('You need permission to manage clients to add a tool.');
+  });
+
+  it('names the new kind of tool, tunnels, in plain words', () => {
+    expect(categoryLabel('tunnel')).toBe('Tunnel / VPN');
   });
 });

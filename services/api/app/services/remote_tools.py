@@ -24,7 +24,7 @@ VERDICTS: tuple[str, ...] = ("allowed", "blocked", "unreviewed")
 class Tool:
     key: str  # stable id used in rules and alerts
     name: str  # how it is shown
-    category: str  # rmm | remote_access | remote_support | file_transfer | remote_desktop_manager
+    category: str  # rmm | remote_access | remote_support | file_transfer | remote_desktop_manager | tunnel
     # Regular expressions tried against "<program name>" (and "<program name> <publisher>" where the pattern says so with \b boundaries).
     patterns: tuple[str, ...]
     # Some tools are installed once per server they connect to, and the install says which server in its name or folder (ScreenConnect: "ScreenConnect Client (798cebdb8316a8ff)"). A regular
@@ -70,6 +70,31 @@ CATALOG: tuple[Tool, ...] = (
     Tool("vnc_connect", "VNC Connect", "remote_access", (r"\bvnc (connect|server|viewer)\b", r"\brealvnc\b")),
     Tool("winscp", "WinSCP", "file_transfer", (r"^winscp\b",)),
     Tool("zoho_assist", "Zoho Assist", "remote_support", (r"\bzoho assist\b", r"\bzohoassist\b", r"\bzoho meeting\b.*\bassist\b")),
+    # ---- more, added 2026-11-03: the tools criminals and careless technicians use most that the first list did not have
+    Tool("quick_assist", "Microsoft Quick Assist", "remote_support", (r"^quick assist\b", r"\bmicrosoft quick assist\b")),
+    Tool("remote_help", "Microsoft Remote Help", "remote_support", (r"^remote help\b(?!.*(nurse|doctor))", r"\bmicrosoft remote help\b")),
+    Tool("rustdesk", "RustDesk", "remote_access", (r"\brustdesk\b",)),
+    Tool("nomachine", "NoMachine", "remote_access", (r"\bnomachine\b",)),
+    Tool("parsec", "Parsec", "remote_access", (r"^parsec\b", r"\bparsec (host|app)\b")),
+    Tool("meshcentral", "MeshCentral", "rmm", (r"\bmeshcentral\b", r"\bmesh agent\b", r"\bmeshagent\b")),
+    Tool("tactical_rmm", "Tactical RMM", "rmm", (r"\btactical rmm\b", r"\btacticalrmm\b", r"\btacticalagent\b")),
+    Tool("action1", "Action1", "rmm", (r"\baction1\b",)),
+    Tool("level", "Level", "rmm", (r"^level\b(?=.*(agent|rmm))", r"^level level\b", r"\blevel\.io\b", r"\blevel remote\b")),
+    Tool("manageengine_rap", "ManageEngine Remote Access Plus / Endpoint Central", "rmm", (r"\bremote access plus\b", r"\bendpoint central\b", r"\bdesktop central\b", r"\bmanageengine\b.*\b(agent|uems)\b", r"\bzoho assist\b.*\bmanageengine\b")),
+    Tool("dameware", "DameWare", "remote_support", (r"\bdameware\b",)),
+    Tool("isl_online", "ISL Online", "remote_support", (r"\bisl (light|online|always on)\b", r"\bisl light\b")),
+    Tool("supremo", "Supremo", "remote_access", (r"^supremo\b", r"\bnanosystems\b.*\bsupremo\b")),
+    Tool("ultraviewer", "UltraViewer", "remote_access", (r"\bultraviewer\b",)),
+    Tool("ammyy", "Ammyy Admin", "remote_access", (r"\bammyy\b",)),
+    Tool("remote_utilities", "Remote Utilities", "remote_access", (r"\bremote utilities\b", r"\brutserv\b")),
+    Tool("dwservice", "DWService", "remote_access", (r"\bdwservice\b", r"\bdwagent\b")),
+    Tool("anyviewer", "AnyViewer", "remote_access", (r"\banyviewer\b",)),
+    Tool("hoptodesk", "HopToDesk", "remote_access", (r"\bhoptodesk\b",)),
+    Tool("sunlogin", "Sunlogin (Oray)", "remote_access", (r"\bsunlogin\b", r"\boray\b")),
+    Tool("nable_ncentral", "N-able N-central", "rmm", (r"\bn-central\b", r"\bncentral\b", r"^windows agent\b.*\bn-able\b")),
+    Tool("tailscale", "Tailscale", "tunnel", (r"^tailscale\b",)),
+    Tool("zerotier", "ZeroTier", "tunnel", (r"\bzerotier\b",)),
+    Tool("ngrok", "ngrok", "tunnel", (r"^ngrok\b", r"\bngrok agent\b")),
 )
 
 _BY_KEY = {t.key: t for t in CATALOG}
@@ -77,7 +102,7 @@ _COMPILED: list[tuple[Tool, list[re.Pattern[str]]]] = [(t, [re.compile(p, re.IGN
 
 
 def tool_by_key(key: str) -> Tool | None:
-    return _BY_KEY.get(key)
+    return _CUSTOM.get().get(key) or _BY_KEY.get(key)
 
 
 def categories() -> list[str]:
@@ -146,7 +171,7 @@ def blocked_findings(rows: Iterable[object], rules: dict[tuple[str, uuid.UUID | 
     out: list[tuple[uuid.UUID, object]] = []
     done: set[tuple[uuid.UUID, str]] = set()
     for r in sorted(rows, key=lambda r: (str(r.tenant_id), host_key(r.hostname), r.tool_key, getattr(r, "instance_id", "") or "")):  # type: ignore[attr-defined]
-        tool = _BY_KEY.get(r.tool_key)  # type: ignore[attr-defined]
+        tool = tool_by_key(r.tool_key)  # type: ignore[attr-defined]
         if tool is None or effective_verdict(r.tool_key, r.tenant_id, rules) != "blocked":  # type: ignore[attr-defined]
             continue
         once = (r.tenant_id, f"{r.tool_key}:{host_key(r.hostname)}")  # type: ignore[attr-defined]
@@ -186,7 +211,7 @@ SETTINGS_KEY = "remote_tool_instances"
 
 def instance_of(tool_key: str, *texts: str | None) -> str:
     """The identifier of the server an install belongs to, from its program name or install path (the first text that has one), lower case; '' when the tool has no such thing or none is found."""
-    tool = _BY_KEY.get(tool_key)
+    tool = tool_by_key(tool_key)
     if tool is None or tool.instance_pattern is None:
         return ""
     pattern = re.compile(tool.instance_pattern, re.IGNORECASE)
@@ -249,7 +274,7 @@ def foreign_findings(rows: Iterable[object], trusted: dict[str, list[str]], now)
     out: list[tuple[uuid.UUID, object]] = []
     for r in sorted(rows, key=lambda r: (str(r.tenant_id), host_key(r.hostname), r.tool_key, getattr(r, "instance_id", "") or "")):  # type: ignore[attr-defined]
         mine = trusted.get(r.tool_key)  # type: ignore[attr-defined]
-        tool = _BY_KEY.get(r.tool_key)  # type: ignore[attr-defined]
+        tool = tool_by_key(r.tool_key)  # type: ignore[attr-defined]
         instance = getattr(r, "instance_id", "") or ""
         if not mine or tool is None or not instance or instance in mine:
             continue
@@ -277,3 +302,71 @@ def foreign_findings(rows: Iterable[object], trusted: dict[str, list[str]], now)
             )
         )
     return out
+
+
+# ---- tools the owner adds by hand ----------------------------------------------------------------------------------------------------------------------------
+
+import contextvars  # noqa: E402
+
+CATEGORIES = ("rmm", "remote_access", "remote_support", "file_transfer", "remote_desktop_manager", "tunnel")
+MAX_CUSTOM = 100
+
+# The owner's own tools for the request being handled. A context variable, not a global: each request (each owner) sees only its own, and two requests at once never see each other's.
+_CUSTOM: contextvars.ContextVar[dict[str, Tool]] = contextvars.ContextVar("remote_tool_custom", default={})
+
+
+def set_custom(tools: Iterable[Tool]) -> None:
+    """Make these the owner's own tools for the rest of this request."""
+    _CUSTOM.set({t.key: t for t in tools})
+
+
+def custom_tools() -> list[Tool]:
+    return sorted(_CUSTOM.get().values(), key=lambda t: t.name.lower())
+
+
+def slug_key(name: str) -> str:
+    """The key a tool added by hand is stored under: ``custom_`` and the name in lower case with anything else turned into underscores."""
+    slug = re.sub(r"[^a-z0-9]+", "_", (name or "").lower()).strip("_")[:50]
+    return f"custom_{slug}" if slug else ""
+
+
+def _phrase(text: str) -> str:
+    """A piece of a program name as a pattern: whole words, any amount of white space between them, no special meaning for any character the person typed."""
+    words = [re.escape(w) for w in text.split()]
+    body = r"\s+".join(words)
+    start = r"\b" if text[:1].isalnum() else ""
+    end = r"\b" if text[-1:].isalnum() else ""
+    return f"{start}{body}{end}"
+
+
+def build_custom(key: str, name: str, category: str, match: str, publisher: str | None) -> Tool:
+    pattern = _phrase(match)
+    if publisher:
+        pattern = f"{pattern}(?=.*{_phrase(publisher)})"  # the publisher is only part of the text tried when the device lists one
+    return Tool(key, name, category, (pattern,))
+
+
+def validate_custom(name: str, category: str, match: str, publisher: str | None = None) -> tuple[str, str, str, str | None]:
+    """The cleaned fields of a tool to add, or ValueError saying what is wrong and what to do about it (the message is shown to the person)."""
+    name = " ".join((name or "").split())
+    match = " ".join((match or "").split())
+    publisher = " ".join((publisher or "").split()) or None
+    if not 2 <= len(name) <= 120:
+        raise ValueError("Give the tool a name of 2 to 120 characters.")
+    if category not in CATEGORIES:
+        raise ValueError("Pick what kind of tool it is.")
+    if not 3 <= len(match) <= 80:
+        raise ValueError("Give 3 to 80 characters of the program's name as the device lists it (the same as in Programs and Features).")
+    if publisher is not None and not 2 <= len(publisher) <= 80:
+        raise ValueError("The publisher, when given, is 2 to 80 characters.")
+    if len(match.split()) == 1 and len(match) < 4:
+        raise ValueError("That is too short to be specific: it would match unrelated programs. Use more of the name.")
+    return name, category, match, publisher
+
+
+def covered_by_builtin(match: str) -> Tool | None:
+    """The built-in tool that already recognises a program with this name, if any (so the same program is not added twice)."""
+    for tool, patterns in _COMPILED:
+        if any(p.search(match) for p in patterns):
+            return tool
+    return None

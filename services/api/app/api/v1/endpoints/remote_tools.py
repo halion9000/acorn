@@ -21,7 +21,7 @@ from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
 from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.db.rls_sessions import adopt_tenant
 from app.models.client_alias import ClientAlias
-from app.models.remote_tool import ALL_CLIENTS, DeviceRemoteTool, RemoteToolRule, RemoteToolScan
+from app.models.remote_tool import ALL_CLIENTS, CustomRemoteTool, DeviceRemoteTool, RemoteToolRule, RemoteToolScan
 from app.models.tenant import Tenant
 from app.services import remote_tools as rt
 from app.services.audit import emit_audit
@@ -42,6 +42,13 @@ _TOOL_KEY = r"^[a-z0-9_]{1,60}$"
 async def _clients(db: Any, owner: uuid.UUID) -> dict[uuid.UUID, str]:
     rows = (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == owner))).all()
     return {r.id: r.name for r in rows}
+
+
+async def _load_custom(db: Any, owner: uuid.UUID) -> list[CustomRemoteTool]:
+    """The owner's own tools, made known to this request (see ``remote_tools.set_custom``). Every handler that names or lists tools calls this first."""
+    rows = list((await db.execute(select(CustomRemoteTool).where(CustomRemoteTool.tenant_id == owner))).scalars().all())
+    rt.set_custom([rt.build_custom(r.tool_key, r.name, r.category, r.match_text, r.publisher_text) for r in rows])
+    return rows
 
 
 async def _rules(db: Any, owner: uuid.UUID) -> dict[tuple[str, uuid.UUID | None], str]:
@@ -138,6 +145,7 @@ def build_inventory(
 @router.get("/inventory", response_model=Inventory, summary="Every remote management and remote access tool found on client devices, with what has been decided about each")
 async def inventory(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> Inventory:
     owner = current_user.tenant_id
+    await _load_custom(db, owner)
     clients = await _clients(db, owner)
     scope = [owner, *clients]
     rules = await _rules(db, owner)
@@ -152,11 +160,13 @@ class CatalogEntry(BaseModel):
     key: str
     name: str
     category: str
+    custom: bool = False
 
 
-@router.get("/catalog", response_model=list[CatalogEntry], summary="The tools that are looked for")
-async def catalog(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))]) -> list[CatalogEntry]:
-    return [CatalogEntry(key=t.key, name=t.name, category=t.category) for t in rt.CATALOG]
+@router.get("/catalog", response_model=list[CatalogEntry], summary="The tools that are looked for, the built-in list and the ones added by hand")
+async def catalog(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> list[CatalogEntry]:
+    await _load_custom(db, current_user.tenant_id)
+    return [CatalogEntry(key=t.key, name=t.name, category=t.category) for t in rt.CATALOG] + [CatalogEntry(key=t.key, name=t.name, category=t.category, custom=True) for t in rt.custom_tools()]
 
 
 class DeviceRow(BaseModel):
@@ -184,9 +194,10 @@ async def tool_devices(
     client_id: uuid.UUID | None = None,
     limit: Annotated[int, Query(ge=1, le=5000)] = 2000,
 ) -> list[DeviceRow]:
+    owner = current_user.tenant_id
+    await _load_custom(db, owner)
     if rt.tool_by_key(tool_key) is None:
         raise HTTPException(status_code=404, detail="That is not a tool this page knows")
-    owner = current_user.tenant_id
     clients = await _clients(db, owner)
     scope = [owner, *clients]
     if client_id is not None:
@@ -295,10 +306,11 @@ async def set_verdict(
     db: DBSession,
     request: Request = None,  # type: ignore[assignment]
 ) -> VerdictOut:
+    owner = current_user.tenant_id
+    await _load_custom(db, owner)
     tool = rt.tool_by_key(tool_key)
     if tool is None:
         raise HTTPException(status_code=404, detail="That is not a tool this page knows")
-    owner = current_user.tenant_id
     clients = await _clients(db, owner)
     if body.client_id is not None and body.client_id not in clients and body.client_id != owner:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -362,6 +374,7 @@ async def set_instances(
     db: DBSession,
     request: Request = None,  # type: ignore[assignment]
 ) -> InstancesOut:
+    await _load_custom(db, current_user.tenant_id)
     tool = rt.tool_by_key(tool_key)
     if tool is None:
         raise HTTPException(status_code=404, detail="That is not a tool this page knows")
@@ -398,6 +411,103 @@ async def set_instances(
     return InstancesOut(tool_key=tool_key, ids=chosen, alerts_raised=raised)
 
 
+# ---- tools the owner adds by hand -----------------------------------------------------------------------------------------------------------------------------
+
+
+class CustomIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    category: str = Field(max_length=30)
+    match: str = Field(max_length=80, description="A piece of the program's name as the device lists it.")
+    publisher: str | None = Field(default=None, max_length=80)
+
+
+class CustomOut(BaseModel):
+    key: str
+    name: str
+    category: str
+    match: str
+    publisher: str | None
+    created_at: datetime | None = None
+
+
+def _custom_out(r: Any) -> CustomOut:
+    return CustomOut(key=r.tool_key, name=r.name, category=r.category, match=r.match_text, publisher=r.publisher_text, created_at=getattr(r, "created_at", None))
+
+
+@router.get("/custom", response_model=list[CustomOut], summary="The tools added by hand")
+async def list_custom(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> list[CustomOut]:
+    rows = await _load_custom(db, current_user.tenant_id)
+    return [_custom_out(r) for r in sorted(rows, key=lambda r: r.name.lower())]
+
+
+@router.post("/custom", response_model=CustomOut, status_code=201, summary="Add a remote tool to the catalog by hand")
+async def add_custom(
+    body: CustomIn,
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))],
+    db: DBSession,
+    request: Request = None,  # type: ignore[assignment]
+) -> CustomOut:
+    owner = current_user.tenant_id
+    existing = await _load_custom(db, owner)
+    try:
+        name, category, match, publisher = rt.validate_custom(body.name, body.category, body.match, body.publisher)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    if len(existing) >= rt.MAX_CUSTOM:
+        raise HTTPException(status_code=422, detail=f"At most {rt.MAX_CUSTOM} tools can be added by hand")
+    builtin = rt.covered_by_builtin(match)
+    if builtin is not None:
+        raise HTTPException(status_code=409, detail=f"{builtin.name} is already in the list and a program called that is found already")
+    key = rt.slug_key(name)
+    if not key or any(r.tool_key == key for r in existing) or rt.tool_by_key(key) is not None:
+        raise HTTPException(status_code=409, detail="A tool with that name is already in the list; give it a different name")
+    row = CustomRemoteTool(tenant_id=owner, tool_key=key, name=name, category=category, match_text=match, publisher_text=publisher, created_by=current_user.user_id)
+    db.add(row)
+    await db.flush()
+    await emit_audit(
+        db=db,
+        tenant_id=owner,
+        actor_id=current_user.user_id,
+        action="remote_tool:custom_added",
+        resource="remote_tool",
+        resource_id=key,
+        changes={"name": name, "category": category, "match": match, "publisher": publisher},
+        request=request,
+    )
+    await db.commit()
+    return _custom_out(row)
+
+
+@router.delete("/custom/{tool_key}", status_code=204, summary="Remove a tool that was added by hand, with what was found for it")
+async def remove_custom(
+    tool_key: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))],
+    db: DBSession,
+    request: Request = None,  # type: ignore[assignment]
+) -> None:
+    owner = current_user.tenant_id
+    existing = await _load_custom(db, owner)
+    row = next((r for r in existing if r.tool_key == tool_key), None)
+    if row is None:
+        raise HTTPException(status_code=404, detail="That is not a tool you added")
+    clients = await _clients(db, owner)
+    async with cross_tenant_reads(db):
+        await db.execute(delete(DeviceRemoteTool).where(DeviceRemoteTool.tenant_id.in_([owner, *clients]), DeviceRemoteTool.tool_key == tool_key))
+    await db.execute(delete(RemoteToolRule).where(RemoteToolRule.tenant_id == owner, RemoteToolRule.tool_key == tool_key))
+    await db.execute(delete(CustomRemoteTool).where(CustomRemoteTool.tenant_id == owner, CustomRemoteTool.tool_key == tool_key))
+    await emit_audit(
+        db=db,
+        tenant_id=owner,
+        actor_id=current_user.user_id,
+        action="remote_tool:custom_removed",
+        resource="remote_tool",
+        resource_id=tool_key,
+        changes={"name": row.name},
+        request=request,
+    )
+    await db.commit()
+
+
 # ---- CORE reports ---------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -427,6 +537,7 @@ class ReportOut(BaseModel):
 async def apply_report(db: Any, owner: uuid.UUID, report: RemoteToolsReport, now: datetime | None = None) -> ReportOut:
     """Replace what is stored for one client and source with what this scan found, then alert on blocked tools. A scan that looked at no devices never removes anything (nothing was checked)."""
     now = now or datetime.now(UTC)
+    await _load_custom(db, owner)
     target = owner
     if report.vendor_client_id:
         alias = (
@@ -495,5 +606,7 @@ class CatalogForCore(BaseModel):
 @ingest_router.get("/core-feed/{tenant_token}/remote-tools/catalog", response_model=list[CatalogForCore])
 async def core_feed_remote_tools_catalog(tenant_token: str, db: DBSession) -> list[CatalogForCore]:
     """The tools and the patterns that recognise them in a program name, so CORE matches on its side and sends only the matches (one list, kept here)."""
-    await _verify_core_feed_token(db, tenant_token)
-    return [CatalogForCore(key=t.key, name=t.name, patterns=list(t.patterns)) for t in rt.CATALOG]
+    owner = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, owner)
+    await _load_custom(db, owner)
+    return [CatalogForCore(key=t.key, name=t.name, patterns=list(t.patterns)) for t in [*rt.CATALOG, *rt.custom_tools()]]

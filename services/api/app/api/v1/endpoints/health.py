@@ -593,6 +593,21 @@ _SERVICE_PROBES: dict[str, str] = {
 }
 
 
+def optional_services() -> set[str]:
+    """Services that are allowed to be absent: one that is not running at all is reported as "off" (not switched on here), not as down. ``AISOC_OPTIONAL_SERVICES`` (comma separated) sets the list; the default is
+    purple-team, which only does anything alongside a test lab and is not started on this deployment. An empty value makes none optional. A service that is running but unwell is down whatever this says."""
+    import os
+
+    raw = os.environ.get("AISOC_OPTIONAL_SERVICES")
+    if raw is None:
+        return {"purple-team"}
+    return {n.strip() for n in raw.split(",") if n.strip()}
+
+
+# What a probe says when nothing is listening at all (the container does not exist or is stopped), as opposed to a service that answered badly or timed out.
+_NOT_RUNNING = {"ConnectError"}
+
+
 def _service_probes() -> dict[str, str]:
     import os
 
@@ -627,6 +642,8 @@ async def _probe(client: Any, name: str, url: str) -> dict[str, Any]:
             detail = _idle_detail(resp)
     except Exception as exc:  # noqa: BLE001 - any failure to answer is the finding
         ok, detail = False, type(exc).__name__
+        if detail in _NOT_RUNNING and name in optional_services():
+            return {"service": name, "status": "off", "latency_ms": round((time.monotonic() - started) * 1000), "detail": "not switched on here"}
     return {"service": name, "status": "up" if ok else "down", "latency_ms": round((time.monotonic() - started) * 1000), "detail": detail}
 
 
@@ -1120,8 +1137,8 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
 
     async with httpx.AsyncClient(timeout=3.0) as client:
         rows = await asyncio.gather(*(_probe(client, name, url) for name, url in _service_probes().items()))
-    rows = sorted(rows, key=lambda r: (r["status"] == "up", r["service"]))
-    down = [r["service"] for r in rows if r["status"] != "up"]
+    rows = sorted(rows, key=lambda r: (r["status"] != "down", r["status"] == "up", r["service"]))
+    down = [r["service"] for r in rows if r["status"] == "down"]
     feeds = await _device_feeds_or_none(db, user)
     core_feed = await _core_feed_or_none(db, user)
     signins = await _signins_or_none(db, user)

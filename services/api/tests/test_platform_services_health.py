@@ -107,3 +107,73 @@ def test_the_deployed_extras_are_probed_at_the_addresses_compose_gives_the_api(m
         configured = re.search(rf"{var}:\s*(http://[\w.-]+:\d+)", compose)
         assert configured, f"{var} is not set in compose"
         assert probes[name].startswith(configured.group(1)), f"{name} is probed somewhere other than where the API calls it"
+
+
+def _serve(monkeypatch, handler, probes):
+    monkeypatch.setattr(health, "_SERVICE_PROBES", probes)
+    real = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+
+
+@pytest.mark.asyncio
+async def test_an_optional_service_that_is_not_running_is_off_not_down_and_does_not_make_the_page_red(monkeypatch):
+    monkeypatch.delenv("AISOC_OPTIONAL_SERVICES", raising=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "purple-team":
+            raise httpx.ConnectError("name not resolved")
+        return httpx.Response(200)
+
+    _serve(monkeypatch, handler, {"fusion": "http://fusion/readyz", "purple-team": "http://purple-team/livez"})
+    out = await health.platform_services(user=object(), db=_Db(("app_user", False, False)))
+    by = {r["service"]: r for r in out["services"]}
+    assert by["purple-team"]["status"] == "off" and by["purple-team"]["detail"] == "not switched on here"
+    assert out["down"] == [] and out["overall"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_a_service_that_is_expected_to_run_is_down_when_it_does_not_answer_even_if_it_is_an_extra(monkeypatch):
+    monkeypatch.delenv("AISOC_OPTIONAL_SERVICES", raising=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused")
+
+    _serve(monkeypatch, handler, {"honeytokens": "http://honeytokens/livez"})
+    out = await health.platform_services(user=object(), db=_Db(("app_user", False, False)))
+    assert out["down"] == ["honeytokens"] and out["overall"] == "degraded"
+
+
+@pytest.mark.asyncio
+async def test_an_optional_service_that_is_running_but_unwell_is_still_down(monkeypatch):
+    monkeypatch.delenv("AISOC_OPTIONAL_SERVICES", raising=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503)
+
+    _serve(monkeypatch, handler, {"purple-team": "http://purple-team/livez"})
+    out = await health.platform_services(user=object(), db=_Db(("app_user", False, False)))
+    assert out["down"] == ["purple-team"]
+    assert out["services"][0]["detail"] == "HTTP 503"
+
+
+def test_the_list_of_optional_services_can_be_changed_or_emptied_by_a_setting(monkeypatch):
+    monkeypatch.delenv("AISOC_OPTIONAL_SERVICES", raising=False)
+    assert health.optional_services() == {"purple-team"}
+    monkeypatch.setenv("AISOC_OPTIONAL_SERVICES", "purple-team, honeytokens")
+    assert health.optional_services() == {"purple-team", "honeytokens"}
+    monkeypatch.setenv("AISOC_OPTIONAL_SERVICES", "")
+    assert health.optional_services() == set()
+
+
+@pytest.mark.asyncio
+async def test_the_ones_that_are_down_come_first_then_the_ones_that_are_off_then_the_ones_that_are_up(monkeypatch):
+    monkeypatch.delenv("AISOC_OPTIONAL_SERVICES", raising=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "purple-team":
+            raise httpx.ConnectError("x")
+        return httpx.Response(503 if request.url.host == "agents" else 200)
+
+    _serve(monkeypatch, handler, {"fusion": "http://fusion/readyz", "agents": "http://agents/readyz", "purple-team": "http://purple-team/livez"})
+    out = await health.platform_services(user=object(), db=_Db(("app_user", False, False)))
+    assert [r["service"] for r in out["services"]] == ["agents", "purple-team", "fusion"]

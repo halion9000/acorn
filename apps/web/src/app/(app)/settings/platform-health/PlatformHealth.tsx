@@ -20,7 +20,7 @@ export function isRestarting(minutesAgo: number | null): boolean {
 
 interface ServiceRow {
   service: string;
-  status: "up" | "down";
+  status: "up" | "down" | "off";
   latency_ms: number;
   detail: string;
 }
@@ -296,7 +296,7 @@ export function PlatformHealth() {
               {snapshot.services.map((s) => (
                 <tr key={s.service} className="border-b">
                   <td className="py-2 font-medium">{s.service}</td>
-                  <td className={s.status === "up" ? "text-emerald-700" : "text-red-700"}>{s.status}</td>
+                  <td className={s.status === "up" ? "text-emerald-700" : s.status === "off" ? "text-slate-500" : "text-red-700"}>{s.status === "off" ? "off (not switched on)" : s.status}</td>
                   <td>{s.latency_ms} ms</td>
                   <td className="text-slate-500">{s.detail}</td>
                 </tr>

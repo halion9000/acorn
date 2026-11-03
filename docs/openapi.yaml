@@ -10610,7 +10610,8 @@ paths:
     get:
       tags:
       - remote-tools
-      summary: The tools that are looked for
+      summary: The tools that are looked for, the built-in list and the ones added
+        by hand
       operationId: catalog_api_v1_remote_tools_catalog_get
       responses:
         '200':
@@ -10737,6 +10738,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InstancesOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/remote-tools/custom:
+    get:
+      tags:
+      - remote-tools
+      summary: The tools added by hand
+      operationId: list_custom_api_v1_remote_tools_custom_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/CustomOut'
+                type: array
+                title: Response List Custom Api V1 Remote Tools Custom Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - remote-tools
+      summary: Add a remote tool to the catalog by hand
+      operationId: add_custom_api_v1_remote_tools_custom_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/remote-tools/custom/{tool_key}:
+    delete:
+      tags:
+      - remote-tools
+      summary: Remove a tool that was added by hand, with what was found for it
+      operationId: remove_custom_api_v1_remote_tools_custom__tool_key__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: tool_key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tool Key
+      responses:
+        '204':
+          description: Successful Response
         '422':
           description: Validation Error
           content:
@@ -26030,6 +26099,10 @@ components:
         category:
           type: string
           title: Category
+        custom:
+          type: boolean
+          title: Custom
+          default: false
       type: object
       required:
       - key
@@ -28663,6 +28736,67 @@ components:
       - summary
       - evidence
       title: CspmScanResponse
+    CustomIn:
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          minLength: 2
+          title: Name
+        category:
+          type: string
+          maxLength: 30
+          title: Category
+        match:
+          type: string
+          maxLength: 80
+          title: Match
+          description: A piece of the program's name as the device lists it.
+        publisher:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Publisher
+      type: object
+      required:
+      - name
+      - category
+      - match
+      title: CustomIn
+    CustomOut:
+      properties:
+        key:
+          type: string
+          title: Key
+        name:
+          type: string
+          title: Name
+        category:
+          type: string
+          title: Category
+        match:
+          type: string
+          title: Match
+        publisher:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Publisher
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Created At
+      type: object
+      required:
+      - key
+      - name
+      - category
+      - match
+      - publisher
+      title: CustomOut
     CustomRoleRef:
       properties:
         id:
