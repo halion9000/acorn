@@ -363,6 +363,20 @@ describe('the Integrations column order', () => {
   });
 });
 
+describe('the Integrations column layout', () => {
+  it('lays the tool icons out four to a row however narrow the column gets, and shows a dash for a client with none', async () => {
+    overviewMock.mockResolvedValue({ ...none, total_tenants: 2 });
+    tenantsMock.mockResolvedValue([row({ name: 'Many', sources: ['halopsa', 'ninjaone', 'huntress', 'addigy', 'blumira', 'petra', 'liongard'] }), row({ name: 'None' })]);
+    render(<MSSPDashboardView />);
+    const table = await screen.findByRole('table');
+    const many = within(within(table).getByText('Many').closest('tr') as HTMLElement).getByTestId('sources');
+    expect(many).toHaveClass('grid-cols-4');
+    expect(many).not.toHaveClass('flex');
+    expect(within(many).getAllByRole('img')).toHaveLength(7);
+    expect(within(within(table).getByText('None').closest('tr') as HTMLElement).getByTestId('sources')).toHaveTextContent('—');
+  });
+});
+
 describe('orderSources', () => {
   it('puts halo first and keeps one fixed order for the rest', () => {
     expect(orderSources(['addigy', 'huntress', 'zzz', 'halopsa', 'ninjaone', 'threatmate'])).toEqual([

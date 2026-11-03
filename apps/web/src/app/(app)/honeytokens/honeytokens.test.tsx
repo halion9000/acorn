@@ -1,8 +1,9 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import HoneytokensPage from './page';
+import { PLANT_SCRIPT } from './HowTo';
 import { TOKEN_TYPES, TOKEN_TYPE_ORDER, canAlert, plantables } from './tokens';
 
 const authFetch = vi.fn();
@@ -129,5 +130,55 @@ describe('the Honeytokens page', () => {
     await user.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(screen.getByTestId('detection')).toBeInTheDocument());
     expect(screen.getByText(/api\/v1\/canary\/33333333/)).toBeInTheDocument();
+  });
+});
+
+
+describe('the How to panel', () => {
+  it('is closed until asked for, opens from the How to button and closes again', async () => {
+    render(<HoneytokensPage />);
+    await screen.findByText('Finance wiki bait');
+    expect(screen.queryByTestId('howto')).toBeNull();
+    const button = screen.getByRole('button', { name: 'How to' });
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(button);
+    expect(screen.getByTestId('howto')).toBeInTheDocument();
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByTestId('howto')).toBeNull();
+  });
+
+  it('explains what alerts, the steps, the ways to plant it, where not to, and inside against outside', async () => {
+    render(<HoneytokensPage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'How to' }));
+    const panel = screen.getByTestId('howto');
+    for (const heading of ['What it is', 'Steps', 'Ways to plant it', 'Where not to put it', 'Inside or outside your network']) {
+      expect(within(panel).getByRole('heading', { name: heading })).toBeInTheDocument();
+    }
+    expect(panel).toHaveTextContent('Only the Link and Document with a link types can do this');
+    expect(panel).toHaveTextContent('one token per place');
+    expect(panel).toHaveTextContent('Plain text files never open links');
+    expect(panel).toHaveTextContent('Inside, as it works today');
+    expect(panel).toHaveTextContent('/api/v1/canary/*');
+  });
+
+  it('gives a script that makes a shortcut file opening the pasted link, and copies it exactly', async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: write }, configurable: true });
+    render(<HoneytokensPage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'How to' }));
+    const shown = screen.getByTestId('howto-script').textContent ?? '';
+    expect(shown).toContain("$link = 'PASTE THE TOKEN LINK HERE'");
+    expect(shown).toContain('[InternetShortcut]');
+    expect(shown).toContain('URL=$link');
+    expect(shown).toContain('.url');
+    await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(write).toHaveBeenCalledWith(PLANT_SCRIPT);
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
+  });
+
+  it('the script has no token, secret or address of its own in it', () => {
+    expect(PLANT_SCRIPT).not.toMatch(/https?:\/\//);
+    expect(PLANT_SCRIPT.split('\n')).toHaveLength(2);
   });
 });

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import useSWR, { mutate } from "swr";
 import { authFetch } from "@/lib/auth-session";
+import { HowTo } from "./HowTo";
 import { TOKEN_TYPES, TOKEN_TYPE_ORDER, canAlert, plantables, type HoneytokenRecord, type TokenStatus } from "./tokens";
 
 // Same-origin by default — Next.js rewrites proxy `/api/v1/honeytokens/*`
@@ -288,6 +289,7 @@ export default function HoneytokensPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [showCreate, setShowCreate] = useState(false);
+  const [showHowTo, setShowHowTo] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const listKey = `${API}/api/v1/honeytokens?tenant_id=${TENANT_ID}${statusFilter ? `&status=${statusFilter}` : ""}${typeFilter ? `&token_type=${typeFilter}` : ""}`;
@@ -325,10 +327,21 @@ export default function HoneytokensPage() {
             Plant a decoy link or document where only an intruder would look; opening it raises an alert. The other types are decoy values only for now: nothing watches for their use.
           </p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
-          + New Token
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowHowTo((v) => !v)}
+            aria-expanded={showHowTo}
+            className="px-4 py-2 border border-sky-500/50 text-sky-300 text-sm font-medium rounded-lg hover:bg-sky-500/10"
+          >
+            How to
+          </button>
+          <button onClick={() => setShowCreate(true)} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+            + New Token
+          </button>
+        </div>
       </div>
+
+      {showHowTo && <HowTo onClose={() => setShowHowTo(false)} />}
 
       <div className="grid grid-cols-4 gap-4 mb-6">
         {[
