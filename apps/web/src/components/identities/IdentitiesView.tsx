@@ -343,6 +343,15 @@ export function IdentitiesView() {
         {tile('Administrators', summary?.admins, adminOnly, () => setAdminOnly((v) => !v))}
         {tile('Disabled accounts', summary?.disabled, disabledOnly, () => reset(() => setState(state === 'disabled' ? '' : 'disabled')))}
         {tile('In only one tool', summary?.in_one_tool, oneTool, () => setOneTool((v) => !v))}
+        {tile('External guests', summary?.guests, kind === 'guest', () => setKind(kind === 'guest' ? '' : 'guest'))}
+        <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-3" data-testid="failed-signins" title="Wrong-password and refused sign-ins in the last 24 hours. Steps that only ask for more proof are not counted.">
+          <div className="text-xs text-gray-400">Failed sign-ins (24 h)</div>
+          <div className="text-2xl font-semibold text-gray-100">{summary?.failed_signins_24h ?? '—'}</div>
+        </div>
+        <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-3" data-testid="brute-force" title="People with 10 or more failed sign-ins in the last 24 hours.">
+          <div className="text-xs text-gray-400">Possible brute force</div>
+          <div className={`text-2xl font-semibold ${summary?.brute_force ? 'text-red-300' : 'text-gray-100'}`}>{summary?.brute_force ?? '—'}</div>
+        </div>
       </div>
       {oneTool && !tool && <p className="text-xs text-amber-300">Pick a tool below to see the people only that tool knows.</p>}
 

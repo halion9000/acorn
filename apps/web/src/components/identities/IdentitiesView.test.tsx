@@ -446,3 +446,21 @@ describe('arriving from the search box', () => {
     }
   });
 });
+
+describe('the extra identity tiles', () => {
+  it('shows guests, failed sign-ins and possible brute force, and a guest tile filters to guests', async () => {
+    api.list.mockResolvedValue(list([person()], { summary: { total: 1, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {}, guests: 3, failed_signins_24h: 42, brute_force: 2 } }));
+    render(<IdentitiesView />);
+    expect(await screen.findByTestId('failed-signins')).toHaveTextContent('42');
+    expect(screen.getByTestId('brute-force')).toHaveTextContent('2');
+    expect(screen.getByTestId('brute-force').querySelector('div:last-child')).toHaveClass('text-red-300');
+    await userEvent.click(screen.getByRole('button', { name: /External guests/ }));
+    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'guest' })));
+  });
+
+  it('shows a dash when the server does not send them, and no alarm colour at zero', async () => {
+    api.list.mockResolvedValue(list([person()], { summary: { total: 1, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {} } }));
+    render(<IdentitiesView />);
+    expect(await screen.findByTestId('failed-signins')).toHaveTextContent('—');
+  });
+});

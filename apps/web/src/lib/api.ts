@@ -796,7 +796,7 @@ export interface IdentityPerson {
 }
 
 export interface IdentityList {
-  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number };
+  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; failed_signins_24h?: number; brute_force?: number };
   items: IdentityPerson[];
   total: number;
   page: number;

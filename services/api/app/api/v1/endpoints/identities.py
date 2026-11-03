@@ -113,6 +113,11 @@ class IdentitySummary(BaseModel):
     # People whose address turned up in a breach, and those where it was serious (a password, a stealer log or malware).
     exposed: int = 0
     exposed_serious: int = 0
+    # Guests (people from outside the organization with an account in it).
+    guests: int = 0
+    # Failed password sign-ins in the last 24 hours across the people in scope, and the people with BRUTE_FORCE_FAILURES or more of them. Steps that only ask for more proof (MFA prompts) are not failures.
+    failed_signins_24h: int = 0
+    brute_force: int = 0
 
 
 class IdentityList(BaseModel):
@@ -156,6 +161,29 @@ def _out(p: Person, with_sources: bool = False) -> PersonOut:
         if p.exposure is not None
         else None,
     )
+
+
+BRUTE_FORCE_FAILURES = 10
+# Microsoft "errors" that are the sign-in asking for more (MFA, enrolment, a challenge, "stay signed in?"), not a wrong password or a refusal.
+NOT_FAILURES = (50072, 50074, 50076, 50140, 50158)
+
+
+async def signin_failures(db: Any, scope: Any, now: datetime) -> tuple[int, int]:
+    """(failed sign-ins in the last 24 hours, people with BRUTE_FORCE_FAILURES or more of them) for the tenants in scope."""
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(SigninEvent.user_principal, func.count())
+                .where(
+                    SigninEvent.tenant_id.in_(scope),
+                    SigninEvent.success.is_(False),
+                    SigninEvent.occurred_at >= now - timedelta(hours=24),
+                    or_(SigninEvent.error_code.is_(None), SigninEvent.error_code.notin_(NOT_FAILURES)),
+                )
+                .group_by(SigninEvent.user_principal)
+            )
+        ).all()
+    return sum(n for _, n in rows), sum(1 for _, n in rows if n >= BRUTE_FORCE_FAILURES)
 
 
 async def _people(db: Any, owner: uuid.UUID, client_id: uuid.UUID | None) -> tuple[list[Person], dict[str, list[Any]]]:
@@ -208,6 +236,7 @@ def summarize(people: list[Person]) -> IdentitySummary:
         alert_sources=dict(sorted(alert_sources.items())),
         backup_problems=sum(1 for p in people if any(b.status != "ok" for b in p.backups)),
         exposed=sum(1 for p in people if p.exposure is not None),
+        guests=sum(1 for p in people if p.kind == "guest"),
         exposed_serious=sum(
             1 for p in people if p.exposure is not None and (p.exposure.password or p.exposure.stealer_log or p.exposure.malware)
         ),
@@ -251,6 +280,8 @@ async def list_identities(
     if sort not in SORTS:
         raise HTTPException(status_code=422, detail=f"sort must be one of: {', '.join(SORTS)}")
     people, _ = await _people(db, user.tenant_id, client_id)
+    scope, _clients = await _scope(db, user.tenant_id, client_id)
+    failed, brute = await signin_failures(db, scope, datetime.now(UTC))
     rows = sort_people(
         filter_people(
             people,
@@ -273,7 +304,7 @@ async def list_identities(
     start = (page - 1) * page_size
     items = [_out(p) for p in rows[start : start + page_size]]
     return IdentityList(
-        summary=summarize(people),
+        summary=summarize(people).model_copy(update={"failed_signins_24h": failed, "brute_force": brute}),
         items=await with_ticket_counts(db, items),
         total=total,
         page=page,
