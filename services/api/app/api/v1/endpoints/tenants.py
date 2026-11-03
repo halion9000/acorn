@@ -598,6 +598,20 @@ def _require_grantable_role(current_user: Any, role: str) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot assign a role that grants more than your own.")
 
 
+async def _audit_user(db: Any, current_user: Any, action: str, user_id: uuid.UUID, changes: dict[str, Any]) -> None:
+    """Record a change to a person in the tamper-evident audit trail, with what changed (old and new role, never a password). The caller commits."""
+    await emit_audit(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        actor_id=current_user.user_id,
+        actor_email=getattr(current_user, "email", None),
+        action=action,
+        resource="user",
+        resource_id=str(user_id),
+        changes=changes,
+    )
+
+
 @router.post("/me/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     request: CreateUserRequest,
@@ -644,6 +658,7 @@ async def create_user(
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This email address cannot be used. Choose a different one.")
 
     user = User(
+        id=uuid.uuid4(),  # known now, so the audit entry below can name the new person before anything is flushed
         tenant_id=current_user.tenant_id,
         email=email,
         account_name=name,
@@ -658,6 +673,7 @@ async def create_user(
         await db.flush()
         for role in custom_roles:
             db.add(UserRole(user_id=user.id, role_id=role.id, assigned_by=current_user.user_id))
+    await _audit_user(db, current_user, "user:created", user.id, {"account_name": name, "role": request.role, "custom_roles": [r.name for r in custom_roles]})
     try:
         await db.commit()
     except IntegrityError:
@@ -718,6 +734,12 @@ async def update_user(
         val = getattr(request, field, None)
         if val is not None:
             updates[field] = val
+    changed: dict[str, Any] = {"account_name": user.account_name}
+    for field in ["username", "role", "is_active"]:
+        if field in updates and updates[field] != getattr(user, field):
+            changed[field] = {"before": getattr(user, field), "after": updates[field]}
+    if new_custom is not None:
+        changed["custom_roles"] = [r.name for r in new_custom]
 
     if updates:
         updates["updated_at"] = datetime.now(UTC)
@@ -732,6 +754,8 @@ async def update_user(
         for role in new_custom:
             db.add(UserRole(user_id=user_id, role_id=role.id, assigned_by=current_user.user_id))
     if updates or new_custom is not None:
+        if len(changed) > 1:  # something actually changed, not only a request that repeated what was already so
+            await _audit_user(db, current_user, "user:updated", user_id, changed)
         await db.commit()
         await db.refresh(user)
 
@@ -774,6 +798,8 @@ async def sign_user_out_everywhere(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Could not end their sessions: the revocation store is unavailable. Try again.",
         ) from None
+    await _audit_user(db, current_user, "user:signed_out_everywhere", user.id, {"account_name": user.account_name})
+    await db.commit()
     logger.warning("user signed out everywhere", extra={"acting_user": str(current_user.user_id), "target_user": str(user.id)})
     return AdminActionResponse(done=True, detail="Every session of this person was ended.")
 
@@ -802,6 +828,7 @@ async def reset_user_password(
         .where(User.id == user.id, User.tenant_id == current_user.tenant_id)
         .values(hashed_password=get_password_hash(request.new_password), updated_at=datetime.now(UTC))
     )
+    await _audit_user(db, current_user, "user:password_reset", user.id, {"account_name": user.account_name})  # the new password is never recorded
     await db.commit()
     logger.warning("user password reset by an administrator", extra={"acting_user": str(current_user.user_id), "target_user": str(user.id)})
     try:
@@ -840,6 +867,7 @@ async def delete_user(
         await db.execute(delete(PasskeyCredential).where(PasskeyCredential.user_id == user.id))
         await db.execute(delete(UserRole).where(UserRole.user_id == user.id))
         await db.execute(delete(User).where(User.id == user.id, User.tenant_id == current_user.tenant_id))
+        await _audit_user(db, current_user, "user:deleted", user_id, {"account_name": name, "role": user.role})
         await db.commit()
     except IntegrityError:
         await db.rollback()
@@ -867,8 +895,9 @@ async def reset_user_mfa(
         .where(PasskeyCredential.user_id == user.id, PasskeyCredential.tenant_id == current_user.tenant_id, PasskeyCredential.revoked_at.is_(None))
         .values(revoked_at=datetime.now(UTC))
     )
-    await db.commit()
     count = result.rowcount or 0
+    await _audit_user(db, current_user, "user:mfa_reset", user.id, {"account_name": user.account_name, "passkeys_removed": count})
+    await db.commit()
     logger.warning("user passkeys removed by an administrator", extra={"acting_user": str(current_user.user_id), "target_user": str(user.id), "passkeys": count})
     try:
         await sign_out_everywhere(user.id)

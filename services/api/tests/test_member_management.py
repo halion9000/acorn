@@ -5,6 +5,7 @@ Real routers and a real (SQLite) database, the fake Redis from conftest, real si
 import asyncio
 import uuid
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 from app.api.v1 import deps
@@ -31,7 +32,9 @@ def make_user(tenant, name, role):
 
 
 @pytest.fixture
-def world(tmp_path):
+def world(tmp_path, monkeypatch):
+    audit = AsyncMock()
+    monkeypatch.setattr(tenants, "emit_audit", audit)  # the audit table is Postgres-side; what is recorded is checked below
     path = tmp_path / "members.db"
     sync = create_engine(f"sqlite:///{path}")
     # roles.hidden_nav's default is Postgres-only SQL; SQLite cannot create it, so drop the default for this test database only.
@@ -63,7 +66,7 @@ def world(tmp_path):
             yield s
 
     app.dependency_overrides[deps.get_db] = session
-    yield type("World", (), {"client": TestClient(app), "factory": factory, "boss": boss, "second": second, "ann": ann, "eve": eve, "mine": mine, "theirs": theirs, "tenant": tenant})
+    yield type("World", (), {"audit": audit, "client": TestClient(app), "factory": factory, "boss": boss, "second": second, "ann": ann, "eve": eve, "mine": mine, "theirs": theirs, "tenant": tenant})
     sync.dispose()
 
 
@@ -218,3 +221,62 @@ class TestResetMfa:
         h = login(world, "boss")
         assert world.client.post(f"/tenants/me/users/{world.eve.id}/reset-mfa", headers=h).status_code == 404
         assert world.client.post(f"/tenants/me/users/{world.second.id}/reset-mfa", headers=login(world, "ann")).status_code == 403
+
+
+class TestPeopleAreAudited:
+    """Every administrative change to a person is in the audit trail with what changed. A password is never in it."""
+
+    def calls(self, world):
+        return [c.kwargs for c in world.audit.await_args_list]
+
+    def test_creating_a_person_records_who_their_role_and_custom_role(self, world):
+        h = login(world, "boss")
+        r = new_member(world, h, role="custom", custom_role_ids=[str(world.mine.id)])
+        assert r.status_code == 201, r.text
+        (c,) = self.calls(world)
+        assert (c["action"], c["resource"], c["actor_id"], c["tenant_id"]) == ("user:created", "user", world.boss.id, world.tenant.id)
+        assert c["resource_id"] == r.json()["id"]
+        assert c["changes"] == {"account_name": "newbie", "role": "custom", "custom_roles": ["Client reviewer"]}
+        assert "passphrase" not in str(c)  # the password given when creating them is nowhere in the record
+
+    def test_a_role_change_records_the_old_and_the_new_role(self, world):
+        h = login(world, "boss")
+        r = world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "soc_lead"}, headers=h)
+        assert r.status_code == 200, r.text
+        (c,) = self.calls(world)
+        assert c["action"] == "user:updated" and c["resource_id"] == str(world.ann.id)
+        assert c["changes"] == {"account_name": "ann", "role": {"before": "soc_analyst", "after": "soc_lead"}}
+
+    def test_disabling_and_giving_a_custom_role_are_both_recorded(self, world):
+        h = login(world, "boss")
+        world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"is_active": False}, headers=h)
+        world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "custom", "custom_role_ids": [str(world.mine.id)]}, headers=h)
+        first, second = self.calls(world)
+        assert first["changes"]["is_active"] == {"before": True, "after": False}
+        assert second["changes"]["role"] == {"before": "soc_analyst", "after": "custom"} and second["changes"]["custom_roles"] == ["Client reviewer"]
+
+    def test_a_request_that_changes_nothing_is_not_recorded(self, world):
+        h = login(world, "boss")
+        world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "soc_analyst", "is_active": True}, headers=h)
+        assert self.calls(world) == []
+
+    def test_a_refused_change_leaves_no_record(self, world):
+        h = login(world, "boss")
+        r = world.client.patch(f"/tenants/me/users/{world.boss.id}", json={"role": "viewer"}, headers=h)  # nobody changes their own role
+        assert r.status_code == 403
+        assert self.calls(world) == []
+
+    def test_deleting_resetting_a_password_removing_passkeys_and_signing_out_are_recorded_without_secrets(self, world, monkeypatch):
+        from app.core import token_revocation
+
+        monkeypatch.setattr(token_revocation, "sign_out_everywhere", AsyncMock())
+        h = login(world, "boss")
+        assert world.client.post(f"/tenants/me/users/{world.ann.id}/sign-out", headers=h).status_code == 200
+        assert world.client.post(f"/tenants/me/users/{world.ann.id}/password", json={"new_password": "a brand new long passphrase 42"}, headers=h).status_code == 200
+        assert world.client.post(f"/tenants/me/users/{world.ann.id}/reset-mfa", headers=h).status_code == 200
+        assert world.client.delete(f"/tenants/me/users/{world.ann.id}", headers=h).status_code == 200
+        got = {c["action"]: c for c in self.calls(world)}
+        assert {"user:signed_out_everywhere", "user:password_reset", "user:mfa_reset"} <= set(got)
+        assert got["user:mfa_reset"]["changes"] == {"account_name": "ann", "passkeys_removed": 1}
+        assert "brand new" not in str(self.calls(world))  # the new password is never in the trail
+        assert got["user:deleted"]["changes"] == {"account_name": "ann", "role": "soc_analyst"}

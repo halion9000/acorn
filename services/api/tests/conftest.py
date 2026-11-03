@@ -89,3 +89,15 @@ def _the_chat_does_not_search_documentation_unless_a_test_says_so(monkeypatch):
     from app.api.v1.endpoints import copilot
 
     monkeypatch.setattr(copilot, "docs_snapshot", AsyncMock(return_value=None))
+
+
+@pytest.fixture(autouse=True)
+def _unit_tests_do_not_write_the_user_audit_trail(monkeypatch):
+    """Administering people records an audit entry (a Postgres-side table with a hash chain). Unit tests that drive those endpoints with a stand-in session have no such table, so the call is replaced
+    here; tests that check what is recorded (test_member_management) patch it themselves, after this, and read what it was called with."""
+    import sys
+    from unittest.mock import AsyncMock
+
+    module = sys.modules.get("app.api.v1.endpoints.tenants")
+    if module is not None:
+        monkeypatch.setattr(module, "emit_audit", AsyncMock())
