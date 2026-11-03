@@ -21,6 +21,7 @@ from app.api.v1.endpoints import devices as dev
 from app.api.v1.endpoints import identities as idn
 from app.api.v1.endpoints import identity as ident
 from app.api.v1.endpoints import inbox_core_feed as feed
+from app.api.v1.endpoints import remote_tools as rtools
 from app.api.v1.endpoints import secureframe as sframe
 from app.api.v1.endpoints import signins as sig
 from app.api.v1.endpoints import vcio_proposals as vp
@@ -38,6 +39,7 @@ MODELS = {
     "status": feed.StatusReport,
     "sync-requests-claim": None,
     "devices": dev.DevicesReport,
+    "remote-tools": rtools.RemoteToolsReport,
     "tickets": feed.TicketsReport,
     "state": feed.StateReport,
     "actions-claim-huntress": feed.ClaimRequest,
@@ -68,9 +70,7 @@ MODELS = {
 PUSH = "generic-json"
 
 # core-feed routes the API has that CORE does not call (and why)
-NOT_CALLED_BY_CORE: dict[str, str] = {
-    "/core-feed/{tenant_token}/remote-tools": "CORE's scan of installed software for remote tools is not built yet (A.C.O.R.N side first); when it is, record its request here and remove this line",
-}
+NOT_CALLED_BY_CORE: dict[str, str] = {}
 
 
 def api_routes() -> set[str]:

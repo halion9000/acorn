@@ -1,0 +1,21 @@
+{
+  "route": "remote-tools",
+  "method": "POST",
+  "body": {
+    "vendor": "ninjaone",
+    "vendor_client_id": "10",
+    "devices_scanned": 2,
+    "items": [
+      {
+        "hostname": "PC-01",
+        "tool_key": "anydesk",
+        "version": "8.0.1"
+      },
+      {
+        "hostname": "PC-02",
+        "tool_key": "teamviewer",
+        "version": "15.2"
+      }
+    ]
+  }
+}
