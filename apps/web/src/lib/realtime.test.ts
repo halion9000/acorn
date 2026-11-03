@@ -249,4 +249,23 @@ describe('useRealtimeChannel', () => {
     await flush();
     expect(result.current.problem).toBe('Could not get a connection ticket (Realtime ticket signing is not configured.).');
   });
+
+  it('says which step a try is on and which try it is, and clears that once connected', async () => {
+    api.channelUrl.mockReset().mockImplementation(() => new Promise(() => {}));
+    const { result } = renderHook(() => useRealtimeChannel('alerts', { connectTimeoutMs: 5000 }));
+    await flush();
+    expect(result.current.step).toEqual({ name: 'ticket', attempt: 1 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000 + 2000 + 1);
+    });
+    expect(result.current.step).toEqual({ name: 'ticket', attempt: 2 });
+    api.channelUrl.mockReset().mockImplementation(async (c: string) => `ws://rt/${c}?token=t`);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(result.current.step?.name).toBe('socket');
+    act(() => FakeSocket.all.at(-1)!.open());
+    expect(result.current.step).toBeNull();
+    expect(result.current.status).toBe('open');
+  });
 });

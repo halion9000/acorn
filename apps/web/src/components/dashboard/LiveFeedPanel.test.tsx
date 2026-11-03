@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { RealtimeStatus } from '@/lib/realtime';
 
-const channel = vi.hoisted(() => ({ current: { last: null as unknown, status: 'closed' as string } }));
+const channel = vi.hoisted(() => ({ current: { last: null as unknown, status: 'closed' as string, problem: null as string | null, step: null as unknown } }));
 vi.mock('@/lib/realtime', () => ({ useRealtimeChannel: () => channel.current }));
 
 import { LiveFeedPanel, statusToLabel } from './LiveFeedPanel';
@@ -13,8 +13,8 @@ function alert(id: string, over: Record<string, unknown> = {}) {
   return { type: 'alert', timestamp: new Date().toISOString(), payload: { alert: { id, title: `Alert ${id}`, severity: 'high', source: 'edr', ...over } } };
 }
 
-function setChannel(status: RealtimeStatus, last: unknown = null) {
-  channel.current = { last, status };
+function setChannel(status: RealtimeStatus, last: unknown = null, extra: { problem?: string | null; step?: unknown } = {}) {
+  channel.current = { last, status, problem: extra.problem ?? null, step: extra.step ?? null };
 }
 
 beforeEach(() => setChannel('closed'));
@@ -121,5 +121,27 @@ describe('LiveFeedPanel', () => {
     expect(container.querySelectorAll('.truncate').length).toBe(12);
     expect(screen.getByText('Event 14')).toBeInTheDocument();
     expect(screen.queryByText('Same alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('LiveFeedPanel while it cannot connect', () => {
+  it('says which step it is stuck on and which try it is', () => {
+    setChannel('connecting', null, { step: { name: 'ticket', attempt: 3 } });
+    render(<LiveFeedPanel />);
+    expect(screen.getByTestId('live-feed-step')).toHaveTextContent('Asking the server for a connection ticket (try 3)');
+  });
+
+  it('names the socket step too, and shows the reason a try failed', () => {
+    setChannel('connecting', null, { step: { name: 'socket', attempt: 1 }, problem: 'The live connection did not open within 10 seconds.' });
+    render(<LiveFeedPanel />);
+    expect(screen.getByTestId('live-feed-step')).toHaveTextContent('Opening the live connection (try 1)');
+    expect(screen.getByTestId('live-feed-problem')).toHaveTextContent('did not open within 10 seconds');
+  });
+
+  it('shows neither once it is connected', () => {
+    setChannel('open', null, { step: null, problem: null });
+    render(<LiveFeedPanel />);
+    expect(screen.queryByTestId('live-feed-step')).toBeNull();
+    expect(screen.queryByTestId('live-feed-problem')).toBeNull();
   });
 });

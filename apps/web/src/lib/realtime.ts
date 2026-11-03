@@ -42,6 +42,8 @@ interface UseRealtimeResult<T> {
   history: T[];
   /** Why the last try failed, in words a person can act on; null while connected or before any failure. */
   problem: string | null;
+  /** Which step the current try is on, and which try it is (1 for the first), so a stuck "connecting" can say where it is stuck. */
+  step: { name: 'ticket' | 'socket'; attempt: number } | null;
   send: (message: unknown) => void;
   reset: () => void;
 }
@@ -57,6 +59,7 @@ export function useRealtimeChannel<T = unknown>(
   const [last, setLast] = useState<T | null>(null);
   const [history, setHistory] = useState<T[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
+  const [step, setStep] = useState<{ name: 'ticket' | 'socket'; attempt: number } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number>(0);
 
@@ -66,6 +69,7 @@ export function useRealtimeChannel<T = unknown>(
     let cancelled = false;
     let timer: number | undefined;
     let watchdog: number | undefined;
+    let tries = 0;
     const retryLater = (delay: number) => {
       timer = window.setTimeout(connect, delay);
     };
@@ -78,6 +82,9 @@ export function useRealtimeChannel<T = unknown>(
     async function connect() {
       if (cancelled) return;
       setStatus('connecting');
+      const attempt = tries + 1;
+      tries = attempt;
+      setStep({ name: 'ticket', attempt });
 
       // Mint a fresh short-lived ticket and attach it as `?token=` immediately
       // before opening the socket (Issue #239). On reconnect this re-mints, so
@@ -102,6 +109,7 @@ export function useRealtimeChannel<T = unknown>(
       }
       if (cancelled) return;
 
+      setStep({ name: 'socket', attempt });
       const ws = new WebSocket(target);
       wsRef.current = ws;
 
@@ -120,6 +128,7 @@ export function useRealtimeChannel<T = unknown>(
         window.clearTimeout(watchdog);
         reconnectRef.current = 0;
         setProblem(null);
+        setStep(null);
         setStatus('open');
       };
 
@@ -177,7 +186,7 @@ export function useRealtimeChannel<T = unknown>(
     setHistory([]);
   }
 
-  return { status, last, history, problem, send, reset };
+  return { status, last, history, problem, step, send, reset };
 }
 
 class TimeoutError extends Error {}

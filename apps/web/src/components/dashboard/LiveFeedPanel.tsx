@@ -143,7 +143,7 @@ function eventFromMessage(msg: RealtimeAlertMessage, fallbackId: number): LiveEv
 }
 
 export function LiveFeedPanel() {
-  const { last, status, problem } = useRealtimeChannel<RealtimeAlertMessage>('alerts');
+  const { last, status, problem, step } = useRealtimeChannel<RealtimeAlertMessage>('alerts');
 
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -200,6 +200,12 @@ export function LiveFeedPanel() {
           {pill.label}
         </span>
       </div>
+
+      {step && pill.tone !== 'live' && pill.tone !== 'waiting' ? (
+        <p className="mb-1 text-[11px] text-gray-500" data-testid="live-feed-step">
+          {step.name === 'ticket' ? 'Asking the server for a connection ticket' : 'Opening the live connection'} (try {step.attempt})
+        </p>
+      ) : null}
 
       {problem && pill.tone !== 'live' && pill.tone !== 'waiting' ? (
         <p className="mb-2 text-[11px] text-amber-300/90" data-testid="live-feed-problem">
