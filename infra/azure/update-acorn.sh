@@ -117,6 +117,24 @@ ensure_plain_database_url() {
   say "removed ?ssl= from AZURE_DATABASE_URL in .env (PGSSLMODE=require carries it now)"
 }
 
+# Optional services that are not started with the rest (the compose file's "extras" profile): honeytokens (planted tripwire links and files that alert when touched) and purple-team (attack
+# simulation to test detections). Which ones run is the ACORN_EXTRAS setting in .env, a space-separated list; when it is not there, honeytokens runs and purple-team does not. An empty
+# ACORN_EXTRAS= turns them all off. A failure to start one is said but never fails the update: the rest of the platform does not depend on them.
+start_extras() {
+  local extras
+  if grep -qE '^ACORN_EXTRAS=' "$REPO/.env" 2>/dev/null; then
+    extras=$(grep -E '^ACORN_EXTRAS=' "$REPO/.env" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
+  else
+    extras="honeytokens"
+  fi
+  [ -n "$extras" ] || return 0
+  case "$extras" in *[!a-z\ -]*) say "ACORN_EXTRAS has something other than service names: left alone"; return 0 ;; esac
+  say "starting extras: $extras..."
+  $COMPOSE --profile extras build $extras 2>&1 | grep -E "^#[0-9]+ ERROR|error|Error" | tail -3
+  $COMPOSE --profile extras up -d $extras 2>&1 | grep -E "Error|error" | head -3
+  return 0
+}
+
 deploy() {  # build and start whatever is checked out now
   ensure_ingest_dsn || return 1
   ensure_plain_database_url
@@ -133,6 +151,7 @@ deploy() {  # build and start whatever is checked out now
   [ "${PIPESTATUS[0]}" -eq 0 ] || return 1
   # The proxy reads its file once when it starts, and a changed file does not recreate it: tell it to read the file again. A file it cannot accept is refused and the old one stays in force.
   $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>&1 | tail -2 || true
+  start_extras
   migrate && healthy
 }
 

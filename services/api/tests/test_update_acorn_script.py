@@ -235,3 +235,42 @@ def test_the_proxy_gets_its_whole_folder_so_a_changed_file_is_seen_by_the_runnin
     compose = (SCRIPT.parent / "docker-compose.azure.yml").read_text(encoding="utf-8")
     assert "- ./infra/azure/caddy:/etc/caddy:ro" in compose
     assert "caddy/Caddyfile:/etc/caddy/Caddyfile" not in compose, "a single-file mount goes stale when git replaces the file"
+
+
+def run_extras(tmp_path: Path, env_text: str | None):
+    (tmp_path / "compose.log").unlink(missing_ok=True)  # each call starts with an empty record of what was run
+    if env_text is not None:
+        (tmp_path / ".env").write_text(env_text)
+    program = (
+        f'say() {{ echo "$*"; }}\nREPO={tmp_path.as_posix()}\n'
+        f'COMPOSE() {{ echo "compose $*" >> {tmp_path.as_posix()}/compose.log; }}\n'
+        f"eval \"$(sed -n '/^start_extras() {{/,/^}}/p' {SCRIPT.as_posix()} | sed 's/\$COMPOSE /COMPOSE /g')\"\n"
+        'start_extras; echo "exit=$?"\n'
+    )
+    out = subprocess.run([BASH, "-c", program], capture_output=True, text=True, timeout=60)
+    log = tmp_path / "compose.log"
+    return out.stdout + (log.read_text() if log.exists() else "")
+
+
+def test_honeytokens_start_by_default_and_purple_team_does_not(tmp_path):
+    said = run_extras(tmp_path, "OTHER=1\n")
+    assert "compose --profile extras build honeytokens" in said and "compose --profile extras up -d honeytokens" in said
+    assert "purple-team" not in said and "exit=0" in said
+
+
+def test_the_owner_can_choose_which_extras_run_and_an_empty_list_turns_them_all_off(tmp_path):
+    said = run_extras(tmp_path, 'ACORN_EXTRAS="honeytokens purple-team"\n')
+    assert "up -d honeytokens purple-team" in said
+    assert "compose" not in run_extras(tmp_path, "ACORN_EXTRAS=\n")
+
+
+def test_a_setting_that_is_not_a_list_of_service_names_is_refused_not_run(tmp_path):
+    said = run_extras(tmp_path, "ACORN_EXTRAS=honeytokens; rm -rf /\n")
+    assert "left alone" in said and "compose" not in said
+
+
+def test_the_extras_step_comes_after_the_services_start_and_never_fails_the_update():
+    script = SCRIPT.read_text(encoding="utf-8")
+    assert script.index("$COMPOSE up -d") < script.index("\n  start_extras\n") < script.index("migrate && healthy")
+    body = script[script.index("start_extras() {") : script.index("deploy() {")]
+    assert body.rstrip().endswith("}") and "return 0" in body.rsplit("}", 1)[0].splitlines()[-1] + "\n  return 0"
