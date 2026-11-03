@@ -111,16 +111,16 @@ function StageCard({ stage }: { stage: PipelineStage }) {
   const styles = statusStyles(stage.status);
   return (
     <div className="bg-gray-900/60 border border-gray-800/60 rounded-xl p-4 min-w-0">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-sm font-semibold text-gray-100 truncate">
+      <div className="flex items-start justify-between mb-1">
+        <p className="text-sm font-semibold text-gray-100 break-words min-w-0">
           {STAGE_LABELS[stage.stage]}
         </p>
         <span
-          className={clsx('h-2.5 w-2.5 rounded-full ring-2', styles.dot, styles.ring)}
+          className={clsx('h-2.5 w-2.5 shrink-0 ml-2 rounded-full ring-2', styles.dot, styles.ring)}
           aria-label={`status ${stage.status}`}
         />
       </div>
-      <p className="text-[11px] text-gray-500 truncate">
+      <p className="text-[11px] text-gray-500 break-words">
         {STAGE_DESCRIPTIONS[stage.stage]}
       </p>
 
@@ -130,21 +130,21 @@ function StageCard({ stage }: { stage: PipelineStage }) {
         </p>
       ) : (
       <dl className="mt-3 space-y-1.5">
-        <div className="flex items-baseline justify-between text-xs">
+        <div className="flex items-baseline justify-between gap-2 text-xs">
           <dt className="text-gray-500">Backlog</dt>
-          <dd className="font-medium text-gray-200 tabular-nums">
+          <dd className="font-medium text-gray-200 tabular-nums whitespace-nowrap">
             {formatBacklog(stage.backlog)}
           </dd>
         </div>
-        <div className="flex items-baseline justify-between text-xs">
+        <div className="flex items-baseline justify-between gap-2 text-xs">
           <dt className="text-gray-500">p95</dt>
-          <dd className="font-medium text-gray-200 tabular-nums">
+          <dd className="font-medium text-gray-200 tabular-nums whitespace-nowrap">
             {formatLatency(stage.p95_latency_ms)}
           </dd>
         </div>
-        <div className="flex items-baseline justify-between text-xs">
+        <div className="flex items-baseline justify-between gap-2 text-xs">
           <dt className="text-gray-500">Errors</dt>
-          <dd className={clsx('font-medium tabular-nums', styles.text)}>
+          <dd className={clsx('font-medium tabular-nums whitespace-nowrap', styles.text)}>
             {formatErrorRate(stage.error_rate)}
           </dd>
         </div>
@@ -157,13 +157,13 @@ function StageCard({ stage }: { stage: PipelineStage }) {
 function LoadingStage({ stage }: { stage: PipelineStage['stage'] }) {
   return (
     <div className="bg-gray-900/60 border border-gray-800/60 rounded-xl p-4 min-w-0">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-sm font-semibold text-gray-100 truncate">
+      <div className="flex items-start justify-between mb-1">
+        <p className="text-sm font-semibold text-gray-100 break-words min-w-0">
           {STAGE_LABELS[stage]}
         </p>
-        <span className="h-2.5 w-2.5 rounded-full bg-gray-700 animate-pulse" />
+        <span className="h-2.5 w-2.5 shrink-0 ml-2 rounded-full bg-gray-700 animate-pulse" />
       </div>
-      <p className="text-[11px] text-gray-500 truncate">
+      <p className="text-[11px] text-gray-500 break-words">
         {STAGE_DESCRIPTIONS[stage]}
       </p>
       <div className="mt-3 space-y-2">
@@ -209,7 +209,7 @@ export function PipelineHealth() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-3" data-testid="pipeline-tiles">
         {STAGE_ORDER.map((name) => {
           const stage = stagesByName[name];
           if (isLoading || !stage) return <LoadingStage key={name} stage={name} />;

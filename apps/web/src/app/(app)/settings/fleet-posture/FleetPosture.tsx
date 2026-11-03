@@ -38,6 +38,8 @@ export interface BoardRow {
   owner?: string | null;
   due_date?: string | null;
   overdue?: boolean;
+  /** A worsening of this check opens an alert in the client's tenant. */
+  raises_alerts?: boolean;
 }
 
 export interface FleetChange {
@@ -66,6 +68,11 @@ const STATUS_TEXT: Record<string, { text: string; className: string }> = {
 /** The page a client's own posture is on, opened on that client. */
 export function clientHref(clientId: string): string {
   return `/settings/client-posture?client=${encodeURIComponent(clientId)}`;
+}
+
+/** The alerts page on that client's posture-change alerts, every status (an alert may already be closed). Only the clients' own checks raise these. */
+export function alertsHref(clientId: string): string {
+  return `/alerts?client=${encodeURIComponent(clientId)}&status=all&source=aisoc-checks`;
 }
 
 /** "Worse", "better" or "new" for a change, from what the check was before. */
@@ -324,6 +331,15 @@ function Board({ board, title, source }: { board: string; title: string; source?
                     {r.overdue ? " (overdue)" : ""}
                   </div>
                 ) : null}
+                <div className="mt-0.5" data-testid={`board-alert-${r.client_id}-${r.key}`}>
+                  {r.raises_alerts ? (
+                    <Link href={alertsHref(r.client_id)} className="text-sky-300 hover:underline">
+                      Open this client&apos;s alerts for it
+                    </Link>
+                  ) : (
+                    <span className="text-slate-500">No alert is raised for this check; it is shown here only.</span>
+                  )}
+                </div>
                 {r.items && r.items.length > 0 ? (
                   <details className="mt-0.5">
                     <summary className="cursor-pointer text-slate-500">Which ones ({r.items.length})</summary>

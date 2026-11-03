@@ -33,6 +33,11 @@ WATCHED: dict[str, tuple[str, str, str]] = {
 }
 
 
+def raises_alert(key: str) -> bool:
+    """Whether a worsening of this check opens an alert (so a page can offer to open it). Most checks are only shown, never alerted on."""
+    return key in WATCHED
+
+
 def worsened(previous: str | None, status: str, least: str) -> bool:
     """True when ``status`` is worse than ``previous`` (which must exist) and at least as bad as ``least``."""
     if previous not in RANK or status not in RANK:

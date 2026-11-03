@@ -32,12 +32,16 @@ interface UseRealtimeOptions {
   url?: string;
   /** Reconnect backoff cap in ms. */
   maxBackoffMs?: number;
+  /** How long the ticket request and the opening of the socket may each take before it counts as a failed try. */
+  connectTimeoutMs?: number;
 }
 
 interface UseRealtimeResult<T> {
   status: RealtimeStatus;
   last: T | null;
   history: T[];
+  /** Why the last try failed, in words a person can act on; null while connected or before any failure. */
+  problem: string | null;
   send: (message: unknown) => void;
   reset: () => void;
 }
@@ -48,10 +52,11 @@ export function useRealtimeChannel<T = unknown>(
   channel: RealtimeChannel,
   options: UseRealtimeOptions = {},
 ): UseRealtimeResult<T> {
-  const { enabled = true, url, maxBackoffMs = 15_000 } = options;
+  const { enabled = true, url, maxBackoffMs = 15_000, connectTimeoutMs = 10_000 } = options;
   const [status, setStatus] = useState<RealtimeStatus>('connecting');
   const [last, setLast] = useState<T | null>(null);
   const [history, setHistory] = useState<T[]>([]);
+  const [problem, setProblem] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number>(0);
 
@@ -60,8 +65,14 @@ export function useRealtimeChannel<T = unknown>(
     // Local to THIS run of the effect. A flag shared between runs let a reconnect timer left over from the previous channel see "not cancelled" once the next run reset it, and open a second connection for the old channel.
     let cancelled = false;
     let timer: number | undefined;
+    let watchdog: number | undefined;
     const retryLater = (delay: number) => {
       timer = window.setTimeout(connect, delay);
+    };
+    const retryWithBackoff = () => {
+      const attempt = reconnectRef.current + 1;
+      reconnectRef.current = attempt;
+      retryLater(Math.min(1000 * 2 ** Math.min(attempt, 6), maxBackoffMs));
     };
 
     async function connect() {
@@ -74,17 +85,19 @@ export function useRealtimeChannel<T = unknown>(
       // bypasses ticketing.
       let target: string;
       try {
-        target = url ?? (await realtimeApi.channelUrl(channel));
-      } catch {
+        target = url ?? (await withTimeout(realtimeApi.channelUrl(channel), connectTimeoutMs, 'ticket'));
+      } catch (e) {
         // Could not authenticate (e.g. signed-out, or realtime ticketing is
         // not configured server-side → 503). Surface as error and retry with
         // backoff rather than opening an unauthenticated socket.
         if (cancelled) return;
         setStatus('error');
-        const attempt = reconnectRef.current + 1;
-        reconnectRef.current = attempt;
-        const delay = Math.min(1000 * 2 ** Math.min(attempt, 6), maxBackoffMs);
-        retryLater(delay);
+        setProblem(
+          e instanceof TimeoutError
+            ? `Asking for a connection ticket took more than ${Math.round(connectTimeoutMs / 1000)} seconds.`
+            : `Could not get a connection ticket${e instanceof Error && e.message ? ` (${e.message.slice(0, 120)})` : ''}.`,
+        );
+        retryWithBackoff();
         return;
       }
       if (cancelled) return;
@@ -92,8 +105,21 @@ export function useRealtimeChannel<T = unknown>(
       const ws = new WebSocket(target);
       wsRef.current = ws;
 
+      // A socket that never opens (a proxy holding the upgrade, a blocked port) stays "connecting" for a long time and says nothing; give it a limit and say what happened.
+      watchdog = window.setTimeout(() => {
+        if (cancelled || ws.readyState === WebSocket.OPEN) return;
+        setProblem(`The live connection did not open within ${Math.round(connectTimeoutMs / 1000)} seconds.`);
+        setStatus('error');
+        ws.onclose = null; // this try is over; the retry is scheduled here, once, not by the socket's own close event
+        ws.onerror = null;
+        ws.close();
+        retryWithBackoff();
+      }, connectTimeoutMs);
+
       ws.onopen = () => {
+        window.clearTimeout(watchdog);
         reconnectRef.current = 0;
+        setProblem(null);
         setStatus('open');
       };
 
@@ -110,15 +136,16 @@ export function useRealtimeChannel<T = unknown>(
         }
       };
 
-      ws.onerror = () => setStatus('error');
+      ws.onerror = () => {
+        setStatus('error');
+        setProblem((prev) => prev ?? 'The live connection was refused or dropped.');
+      };
 
       ws.onclose = () => {
-        setStatus('closed');
+        window.clearTimeout(watchdog);
         if (cancelled) return;
-        const attempt = reconnectRef.current + 1;
-        reconnectRef.current = attempt;
-        const delay = Math.min(1000 * 2 ** Math.min(attempt, 6), maxBackoffMs);
-        retryLater(delay);
+        setStatus('closed');
+        retryWithBackoff();
       };
     }
 
@@ -127,6 +154,7 @@ export function useRealtimeChannel<T = unknown>(
     return () => {
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
+      if (watchdog !== undefined) window.clearTimeout(watchdog);
       const ws = wsRef.current;
       if (ws && ws.readyState === WebSocket.OPEN) {
         setStatus('closing');
@@ -149,5 +177,23 @@ export function useRealtimeChannel<T = unknown>(
     setHistory([]);
   }
 
-  return { status, last, history, send, reset };
+  return { status, last, history, problem, send, reset };
+}
+
+class TimeoutError extends Error {}
+
+function withTimeout<V>(work: Promise<V>, ms: number, what: string): Promise<V> {
+  return new Promise<V>((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new TimeoutError(what)), ms);
+    work.then(
+      (v) => {
+        window.clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        window.clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
 }

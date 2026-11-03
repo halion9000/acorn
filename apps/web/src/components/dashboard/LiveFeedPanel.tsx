@@ -143,7 +143,7 @@ function eventFromMessage(msg: RealtimeAlertMessage, fallbackId: number): LiveEv
 }
 
 export function LiveFeedPanel() {
-  const { last, status } = useRealtimeChannel<RealtimeAlertMessage>('alerts');
+  const { last, status, problem } = useRealtimeChannel<RealtimeAlertMessage>('alerts');
 
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -195,11 +195,17 @@ export function LiveFeedPanel() {
             pill.tone === 'waiting' && 'bg-gray-500/10 text-gray-400 border-gray-700',
             pill.tone === 'offline' && 'bg-red-500/10 text-red-300 border-red-500/30',
           )}
-          title={`${pill.hint} (WebSocket: ${status})`}
+          title={`${pill.hint}${problem ? ` ${problem}` : ''} (WebSocket: ${status})`}
         >
           {pill.label}
         </span>
       </div>
+
+      {problem && pill.tone !== 'live' && pill.tone !== 'waiting' ? (
+        <p className="mb-2 text-[11px] text-amber-300/90" data-testid="live-feed-problem">
+          {problem} Trying again.
+        </p>
+      ) : null}
 
       <div className="space-y-2.5 overflow-y-auto max-h-52 pr-1">
         {visible.length === 0 ? (

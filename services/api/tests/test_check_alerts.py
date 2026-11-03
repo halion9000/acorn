@@ -144,3 +144,17 @@ def test_a_surge_of_failed_google_sign_ins_raises_a_medium_alert():
         [check("threatmate_google_failed_logins", "met")], [check("threatmate_google_failed_logins", "not_met", "63 failed sign-ins")]
     )
     assert [(a["key"], a["severity"]) for a in out] == [("threatmate_google_failed_logins", "medium")]
+
+
+def test_raises_alert_is_true_only_for_checks_that_open_an_alert():
+    from app.services.check_alerts import WATCHED, raises_alert
+
+    assert raises_alert("threatmate_deep_dark_web") and raises_alert("huntress_protection")
+    assert not raises_alert("meraki_wan") and not raises_alert("")
+    assert all(raises_alert(k) for k in WATCHED)
+
+
+def test_the_fleet_board_rows_say_whether_an_alert_exists_for_the_check():
+    from app.api.v1.endpoints.client_posture import FleetBoardRow
+
+    assert FleetBoardRow.model_fields["raises_alerts"].default is False

@@ -196,4 +196,57 @@ describe('useRealtimeChannel', () => {
     expect(channels.filter((c) => c === 'alerts')).toHaveLength(1);
     expect(channels).toContain('cases');
   });
+
+  it('a ticket request that never answers is given up on after the limit, with the reason, and tried again', async () => {
+    api.channelUrl.mockReset().mockImplementation(() => new Promise(() => {}));
+    const { result } = renderHook(() => useRealtimeChannel('alerts', { connectTimeoutMs: 5000 }));
+    await flush();
+    expect(result.current.status).toBe('connecting');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(result.current.status).toBe('error');
+    expect(result.current.problem).toBe('Asking for a connection ticket took more than 5 seconds.');
+    expect(FakeSocket.all).toHaveLength(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000 + 1);
+    });
+    expect(api.channelUrl).toHaveBeenCalledTimes(2);
+  });
+
+  it('a socket that never opens is closed after the limit, says so, and a new one is tried once', async () => {
+    const { result } = renderHook(() => useRealtimeChannel('alerts', { connectTimeoutMs: 5000 }));
+    await flush();
+    expect(FakeSocket.all).toHaveLength(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(FakeSocket.all[0].closed).toBe(true);
+    expect(result.current.status).toBe('error');
+    expect(result.current.problem).toBe('The live connection did not open within 5 seconds.');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000 + 1);
+    });
+    await flush();
+    expect(FakeSocket.all).toHaveLength(2); // one retry, not two (the closed socket's own close event must not schedule another)
+  });
+
+  it('a socket that opens in time is left alone and clears the problem', async () => {
+    const { result } = renderHook(() => useRealtimeChannel('alerts', { connectTimeoutMs: 5000 }));
+    await flush();
+    act(() => FakeSocket.all[0].open());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(result.current.status).toBe('open');
+    expect(result.current.problem).toBeNull();
+    expect(FakeSocket.all[0].closed).toBe(false);
+  });
+
+  it('a ticket refusal names the cause the server gave', async () => {
+    api.channelUrl.mockReset().mockRejectedValue(new Error('Realtime ticket signing is not configured.'));
+    const { result } = renderHook(() => useRealtimeChannel('alerts'));
+    await flush();
+    expect(result.current.problem).toBe('Could not get a connection ticket (Realtime ticket signing is not configured.).');
+  });
 });

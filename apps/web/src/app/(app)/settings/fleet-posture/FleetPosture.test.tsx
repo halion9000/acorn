@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
 
-import { FleetPosture, changeWord, clientHref, endsText, groupSelection, pointsText, compareText } from './FleetPosture';
+import { FleetPosture, alertsHref, changeWord, clientHref, endsText, groupSelection, pointsText, compareText } from './FleetPosture';
 
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 
@@ -61,6 +61,35 @@ describe('endsText', () => {
   const now = Date.parse('2026-10-25T12:00:00Z');
   it('says how long an acceptance has left', () => {
     expect([endsText(null, now), endsText('2026-10-26T01:00:00Z', now), endsText('2026-10-30T12:00:00Z', now), endsText('2026-10-25T09:00:00Z', now)]).toEqual(['no end date', 'ends in 1 day', 'ends in 5 days', 'ends today']);
+  });
+});
+
+describe('opening the alert behind a check', () => {
+  it('builds a link to the posture-change alerts of that client, any status', () => {
+    expect(alertsHref('a b')).toBe('/alerts?client=a%20b&status=all&source=aisoc-checks');
+  });
+
+  it('offers the alerts only on a check that raises one, and says plainly when it does not', async () => {
+    authFetch.mockImplementation((url: string) =>
+      url.includes('/fleet/boards/renewals')
+        ? json({
+            board: 'renewals',
+            title: 'Renewals',
+            keys: [],
+            rows: [
+              { client_id: 'c1', client_name: 'Acme', source: 'threatmate', key: 'threatmate_deep_dark_web', status: 'not_met', evidence: '925 findings', accepted: false, raises_alerts: true },
+              { client_id: 'c1', client_name: 'Acme', source: 'meraki', key: 'meraki_licence', status: 'not_met', evidence: 'expired', accepted: false, raises_alerts: false },
+            ],
+          })
+        : originalFetch(url),
+    );
+    render(<FleetPosture />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Renewals and expiries' }));
+    const withAlert = await screen.findByTestId('board-alert-c1-threatmate_deep_dark_web');
+    expect(within(withAlert).getByRole('link')).toHaveAttribute('href', '/alerts?client=c1&status=all&source=aisoc-checks');
+    const without = screen.getByTestId('board-alert-c1-meraki_licence');
+    expect(within(without).queryByRole('link')).toBeNull();
+    expect(without).toHaveTextContent('No alert is raised for this check');
   });
 });
 

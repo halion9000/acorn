@@ -39,6 +39,7 @@ from app.models.signin import (
 )
 from app.models.tenant import Tenant
 from app.services import fleet_cache
+from app.services.check_alerts import raises_alert
 from app.services.audit import emit_audit
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.fleet_posture import (
@@ -1285,6 +1286,7 @@ class FleetBoardRow(BaseModel):
     owner: str | None = None
     due_date: date | None = None
     overdue: bool = False
+    raises_alerts: bool = False  # a worsening of this check opens an alert in the client's tenant (see check_alerts.WATCHED)
 
 
 class FleetBoardOut(BaseModel):
@@ -1330,6 +1332,7 @@ async def fleet_board(
                 owner=r.owner,
                 due_date=r.due_date,
                 overdue=is_overdue(r.status, r.due_date, datetime.now(UTC).date()),
+                raises_alerts=raises_alert(r.key),
             )
             for r in rows
         ],
@@ -1369,6 +1372,7 @@ async def fleet_tool_checks(
                 owner=r.owner,
                 due_date=r.due_date,
                 overdue=is_overdue(r.status, r.due_date, today),
+                raises_alerts=raises_alert(r.key),
             )
             for r in rows
         ],
