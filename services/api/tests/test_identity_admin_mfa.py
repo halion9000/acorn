@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace as NS
 
-from app.services.identity_detections import alert_id, alert_values, detect_admins_without_mfa
+from app.services.identity_detections import alert_id, alert_values, detect_admins_mfa_not_required, detect_admins_without_mfa
 
 NOW = datetime(2026, 11, 3, 9, 0, tzinfo=UTC)
 TENANT = uuid.uuid4()
@@ -71,3 +71,29 @@ def test_the_alert_row_is_an_identity_alert_for_that_client():
 def test_a_flood_is_capped():
     many = [user(f"a{i}@x.com") for i in range(120)]
     assert len(detect_admins_without_mfa(many, NOW)) == 50
+
+
+def test_an_admin_with_mfa_registered_but_not_required_gets_a_medium_alert_and_is_not_also_called_unprotected():
+    users = [user("amy@x.com", registered=True, methods="authenticator")]  # registered, nothing requires it
+    assert detect_admins_without_mfa(users, NOW) == []
+    out = detect_admins_mfa_not_required(users, NOW)
+    assert len(out) == 1
+    f = out[0]
+    assert (f.rule_id, f.severity, f.users) == ("aisoc-id-admin-mfa-not-required", "medium", ["amy@x.com"])
+    assert ("Second factor registered", "yes") in f.fields and ("Second factor required", "no") in f.fields
+
+
+def test_an_admin_who_is_required_to_use_it_or_has_none_is_not_in_the_not_required_list():
+    covered = user("a@x.com", registered=True, methods="authenticator", ca_enforced=True)
+    none = user("b@x.com")
+    assert detect_admins_mfa_not_required([covered, someone_protected()], NOW) == []
+    assert detect_admins_mfa_not_required([someone_protected(), none], NOW) == []  # no second factor at all is the high alert's job
+
+
+def test_the_not_required_rule_leaves_out_guests_disabled_and_non_admins_and_repeats_monthly():
+    users = [user("g@partner.com", registered=True, methods="x", user_type="Guest"), user("old@x.com", registered=True, methods="x", enabled=False), user("staff@x.com", registered=True, methods="x", admin=False)]
+    assert detect_admins_mfa_not_required(users, NOW) == []
+    a = detect_admins_mfa_not_required([user("amy@x.com", registered=True, methods="x")], NOW)[0]
+    later = detect_admins_mfa_not_required([user("amy@x.com", registered=True, methods="x")], datetime(2026, 12, 3, tzinfo=UTC))[0]
+    assert alert_id(TENANT, a) != alert_id(TENANT, later)
+    assert alert_id(TENANT, a) != alert_id(TENANT, detect_admins_without_mfa([user("amy@x.com")], NOW)[0]), "the two rules never share an alert"

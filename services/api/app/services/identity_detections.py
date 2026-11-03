@@ -721,8 +721,41 @@ def detect_admins_without_mfa(users: list[Any], now: datetime) -> list[Finding]:
     return out[:MAX_ADMIN_MFA_FINDINGS]
 
 
+def detect_admins_mfa_not_required(users: list[Any], now: datetime) -> list[Finding]:
+    """An enabled administrator who has registered a second factor but nothing requires it: they can still sign in with the password alone (the Identities page calls this "registered, not required").
+    Medium, because the protection exists and only needs turning on. One finding per person per month; guests and disabled accounts are left out."""
+    from app.services.identity_people import mfa_state
+    from app.services.mfa_registration import GOOGLE_SOURCES, microsoft_rows, registration_known
+
+    known_microsoft = registration_known(microsoft_rows(users))
+    out: list[Finding] = []
+    for u in users:
+        if not (u.admin and u.enabled) or str(u.user_type or "").lower() == "guest":
+            continue
+        known = True if (getattr(u, "source", None) or "") in GOOGLE_SOURCES else known_microsoft
+        if mfa_state(u, known) != "registered_not_required":
+            continue
+        who = str(u.upn).lower()
+        out.append(
+            Finding(
+                rule_id="aisoc-id-admin-mfa-not-required",
+                rule_name="Administrator's multi-factor is not required",
+                title=f"Administrator {who} has multi-factor registered but not required",
+                severity="medium",
+                tactic="Initial Access",
+                technique="T1078.004",
+                key=f"{who}:{now:%Y-%m}",
+                occurred_at=now,
+                summary="This administrator signed up for a second factor, but no policy, security default or per-user setting requires it, so the password alone still signs them in. Requiring it closes the gap.",
+                fields=[("Account", who), ("Second factor registered", "yes"), ("Second factor required", "no")],
+                users=[who],
+            )
+        )
+    return out[:MAX_ADMIN_MFA_FINDINGS]
+
+
 async def run_mfa_detections(db: Any, tenant_id: uuid.UUID, now: datetime | None = None) -> int:
-    """After a client's multi-factor snapshot is complete: raise an alert for each administrator without multi-factor. Never raises. Returns how many alerts were new."""
+    """After a client's multi-factor snapshot is complete: raise an alert for each administrator without multi-factor (high) and each whose multi-factor is registered but not required (medium). Never raises. Returns how many alerts were new."""
     from sqlalchemy import select
 
     from app.models.signin import IdentityMfaUser
@@ -731,7 +764,7 @@ async def run_mfa_detections(db: Any, tenant_id: uuid.UUID, now: datetime | None
     try:
         async with db.begin_nested():  # a failure rolls back to here, never the snapshot that triggered it
             users = (await db.execute(select(IdentityMfaUser).where(IdentityMfaUser.tenant_id == tenant_id))).scalars().all()
-            return await save_findings(db, tenant_id, detect_admins_without_mfa(list(users), now), now)
+            return await save_findings(db, tenant_id, detect_admins_without_mfa(list(users), now) + detect_admins_mfa_not_required(list(users), now), now)
     except Exception:  # noqa: BLE001
         logger.warning("identity detections: the multi-factor rule failed for tenant=%s", tenant_id, exc_info=True)
         return 0
