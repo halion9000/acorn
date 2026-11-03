@@ -21,3 +21,18 @@ acorn.goliveoak.com {
 		}
 	}
 }
+
+# The public tripwire address (honeytokens). Only the Cloudflare tunnel (the cloudflared service) reaches this port, from inside the docker network; it is not published on the server. It answers the
+# tripwire path and nothing else: every other path is a 404, so the internet-facing name never exposes the console or the rest of the API.
+:8088 {
+	@canary path_regexp canary ^/api/v1/canary/[0-9a-fA-F-]{36}$
+	handle @canary {
+		reverse_proxy api:8000 {
+			# The visitor's address as Cloudflare saw it, so the alert names who opened the file. The API takes the last X-Forwarded-For entry from our own proxy.
+			header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}
+		}
+	}
+	handle {
+		respond "Not found" 404
+	}
+}

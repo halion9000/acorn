@@ -101,12 +101,26 @@ services:
       DATABASE_URL: ${AZURE_DATABASE_URL:?set AZURE_DATABASE_URL}
       PGSSLMODE: require   # encryption is required through this setting, not through ?ssl= in the address: services that open raw asyncpg connections cannot read that
       # The address written into every honeytoken's tripwire link. Its default is localhost, which a real attacker's machine cannot reach, so a planted token would never fire.
-      HONEYTOKEN_CANARY_BASE_URL: ${ACORN_PUBLIC_URL:-https://acorn.goliveoak.com}
+      # ACORN_CANARY_URL (in .env) is the public tripwire address once the Cloudflare tunnel is set up; until then links use the console address, which only works inside the network.
+      HONEYTOKEN_CANARY_BASE_URL: ${ACORN_CANARY_URL:-${ACORN_PUBLIC_URL:-https://acorn.goliveoak.com}}
     depends_on: !override
       redis:
         condition: service_healthy
       kafka:
         condition: service_healthy
+  cloudflared:
+    # The tunnel that makes the public tripwire address (ACORN_CANARY_URL) reach caddy's :8088 listener, which serves only /api/v1/canary/<id>. Started only when ACORN_EXTRAS in .env lists cloudflared and
+    # CLOUDFLARED_TUNNEL_TOKEN is set there. The token comes from the Cloudflare dashboard (Zero Trust, Networks, Tunnels) and is never committed.
+    image: cloudflare/cloudflared:2024.12.2
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN:-}
+    profiles: ["extras"]
+    networks:
+      - aisoc
+    depends_on:
+      - caddy
   purple-team:
     environment:
       DATABASE_URL: ${AZURE_DATABASE_URL:?set AZURE_DATABASE_URL}
