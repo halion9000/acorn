@@ -16,7 +16,7 @@ import structlog
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.services.dmarc_mailbox import GraphMailboxReader, ingest_once
-from app.services.dmarc_store import store_report
+from app.services.dmarc_store import store_report, store_tls_policy
 
 logger = structlog.get_logger()
 
@@ -50,8 +50,8 @@ async def run_dmarc_ingest(*, sleep: Callable[[float], Any] = asyncio.sleep) -> 
             if owner is None or not reader.configured:
                 logger.info("dmarc_ingest.not_set_up")
             else:
-                result = await ingest_once(AsyncSessionLocal, reader, owner, store=store_report)
-                logger.info("dmarc_ingest.pass", stored=result.stored, duplicates=result.duplicates, rejected=result.rejected, messages=result.messages, error=result.error)
+                result = await ingest_once(AsyncSessionLocal, reader, owner, store=store_report, store_tls=store_tls_policy)
+                logger.info("dmarc_ingest.pass", stored=result.stored, tls_stored=result.tls_stored, duplicates=result.duplicates, rejected=result.rejected, messages=result.messages, error=result.error)
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001  # the reader must outlive a bad pass

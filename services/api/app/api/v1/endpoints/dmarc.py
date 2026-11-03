@@ -21,7 +21,7 @@ from sqlalchemy import select
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.core.config import settings
 from app.db.rls_scope import cross_tenant_reads
-from app.models.dmarc import DmarcIngestState, DmarcReport
+from app.models.dmarc import DmarcIngestState, DmarcReport, TlsReport
 from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
@@ -107,6 +107,9 @@ class SetupLine(BaseModel):
     # False when the domain has no mail records (MX), so it cannot receive or send mail and has nothing to report. True when it has some, or when that could not be told (a domain is never
     # hidden on a failed lookup).
     has_mx: bool = True
+    # The record that asks receivers for TLS reports (TLS-RPT, RFC 8460). Unlike DMARC it needs no authorisation record in the shared mailbox's zone.
+    tls_rpt_name: str = ""
+    tls_rpt_value: str = ""
 
 
 class Setup(BaseModel):
@@ -642,6 +645,66 @@ async def domain_reputation(
     return Reputation(domain=clean, facts=[ReputationFact(label=f.label, text=f.text, tone=f.tone) for f in items])
 
 
+class TlsFailureKind(BaseModel):
+    type: str
+    count: int
+
+
+class TlsDomainRow(BaseModel):
+    domain: str
+    client_id: str
+    matched: bool
+    reports: int
+    success: int
+    failure: int
+    success_rate: float | None
+    failures: list[TlsFailureKind]  # why sessions failed, most common first
+    last_report: datetime
+
+
+class TlsOverview(BaseModel):
+    days: int
+    domains: list[TlsDomainRow]
+
+
+@router.get("/tls", response_model=TlsOverview, summary="TLS reports per domain: how many TLS-protected connections to the domain's mail servers worked, and why the rest failed")
+async def tls_overview(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    days: int = Query(30, ge=1, le=365),
+) -> TlsOverview:
+    owner = current_user.tenant_id
+    clients = await _children(db, owner)
+    since = datetime.now(UTC) - timedelta(days=days)
+    async with cross_tenant_reads(db):
+        rows = (await db.execute(select(TlsReport).where(TlsReport.tenant_id.in_([owner, *clients]), TlsReport.end_at >= since))).scalars().all()
+    groups: dict[tuple[uuid.UUID, str], list[TlsReport]] = defaultdict(list)
+    for r in rows:
+        groups[(r.tenant_id, r.domain)].append(r)
+    out: list[TlsDomainRow] = []
+    for (tenant_id, domain), items in groups.items():
+        success, failure = sum(i.success for i in items), sum(i.failure for i in items)
+        kinds: Counter[str] = Counter()
+        for i in items:
+            for f in i.failures or []:
+                kinds[str(f.get("type", ""))] += int(f.get("count", 0))
+        out.append(
+            TlsDomainRow(
+                domain=domain,
+                client_id=str(tenant_id),
+                matched=all(i.matched for i in items),
+                reports=len(items),
+                success=success,
+                failure=failure,
+                success_rate=_pct(success, success + failure),
+                failures=[TlsFailureKind(type=k, count=n) for k, n in kinds.most_common(5) if k],
+                last_report=max(i.end_at for i in items),
+            )
+        )
+    out.sort(key=lambda r: (r.success_rate if r.success_rate is not None else 101.0, r.domain))  # the worst first
+    return TlsOverview(days=days, domains=out)
+
+
 @router.get("/insights", response_model=Insights, summary="Delivery, failure rates over time, top senders and top sending domains")
 async def insights(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
@@ -736,6 +799,8 @@ async def setup(
                         client_dmarc_rua=f"rua=mailto:{alias}",
                         authorization_record_name=f"{domain}._report._dmarc.{mailbox_domain}",
                         authorization_record_value="v=DMARC1",
+                        tls_rpt_name=f"_smtp._tls.{domain}",
+                        tls_rpt_value=f"v=TLSRPTv1; rua=mailto:{alias}",
                     )
                 )
     if lines:

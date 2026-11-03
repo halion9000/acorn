@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 import httpx
 import pytest
 from app.db.database import Base
-from app.models.dmarc import DmarcIngestState, DmarcReport
+from app.models.dmarc import DmarcIngestState, DmarcReport, TlsReport
 from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
@@ -139,7 +139,7 @@ def make_factory():
 
 async def prepare(engine, factory):
     async with engine.begin() as c:
-        await c.run_sync(lambda conn: Base.metadata.create_all(conn, tables=[m.__table__ for m in (Tenant, IdentitySource, IdentityMfaUser, DmarcReport, DmarcIngestState)]))
+        await c.run_sync(lambda conn: Base.metadata.create_all(conn, tables=[m.__table__ for m in (Tenant, IdentitySource, IdentityMfaUser, DmarcReport, DmarcIngestState, TlsReport)]))
     async with factory() as s:
         owner = Tenant(id=uuid.uuid4(), name="Owner", slug="o-" + uuid.uuid4().hex[:6])
         s.add(owner)
@@ -247,3 +247,52 @@ def test_the_listing_filter_starts_with_the_date_the_list_is_sorted_by_or_micros
         assert query["$orderby"] == ["receivedDateTime asc"]
         assert query["$filter"][0].startswith("receivedDateTime gt "), query["$filter"]
         assert query["$filter"][0].endswith("and hasAttachments eq true")
+
+
+def tls_json(report_id="t1", domain="client.com"):
+    import json
+
+    return json.dumps(
+        {
+            "organization-name": "Google Inc.",
+            "date-range": {"start-datetime": "2026-11-01T00:00:00Z", "end-datetime": "2026-11-01T23:59:59Z"},
+            "report-id": report_id,
+            "policies": [{"policy": {"policy-type": "sts", "policy-domain": domain}, "summary": {"total-successful-session-count": 90, "total-failure-session-count": 10}}],
+        }
+    ).encode()
+
+
+def test_a_tls_report_in_the_mailbox_is_stored_apart_from_dmarc_reports_and_not_counted_as_rejected():
+
+    async def go():
+        engine, factory = make_factory()
+        owner, acme = await prepare(engine, factory)
+        async with engine.begin() as c:
+            await c.run_sync(lambda conn: Base.metadata.create_all(conn, tables=[TlsReport.__table__]))
+        r = FakeReader(mailbox(("google.com!client.com!1!2!001.json.gz", gzip.compress(tls_json()), "2026-11-02T10:00:00+00:00"), ("a.xml", xml(report_id="r1"), "2026-11-02T11:00:00+00:00")))
+        out = await mb.ingest_once(factory, r, owner, store=store.store_report, store_tls=store.store_tls_policy, now=lambda: datetime(2026, 11, 2, 12, tzinfo=UTC))
+        again = await mb.ingest_once(factory, FakeReader(mailbox(("google.com!client.com!1!2!001.json.gz", gzip.compress(tls_json()), "2026-11-02T13:00:00+00:00"))), owner, store=store.store_report, store_tls=store.store_tls_policy)
+        async with factory() as s:
+            tls = (await s.execute(select(TlsReport))).scalars().all()
+            state = (await s.execute(select(DmarcIngestState))).scalar_one()
+        await engine.dispose()
+        return out, again, tls, state, acme
+
+    out, again, tls, state, acme = asyncio.run(go())
+    assert (out.stored, out.tls_stored, out.rejected) == (1, 1, 0)
+    assert (again.tls_stored, again.duplicates) == (0, 1)
+    assert [(t.tenant_id, t.success, t.failure) for t in tls] == [(acme, 90, 10)]
+    assert state.stored == 2  # the page's "reports stored" counts both kinds
+
+
+def test_a_tls_report_with_nowhere_to_keep_it_is_counted_as_rejected_and_a_broken_one_too():
+    async def go():
+        engine, factory = make_factory()
+        owner, _ = await prepare(engine, factory)
+        r = FakeReader(mailbox(("t.json.gz", gzip.compress(tls_json()), "2026-11-02T10:00:00+00:00"), ("bad.json.gz", gzip.compress(b'{"policies": 1}'), "2026-11-02T11:00:00+00:00")))
+        out = await mb.ingest_once(factory, r, owner, store=store.store_report)
+        await engine.dispose()
+        return out
+
+    out = asyncio.run(go())
+    assert (out.stored, out.tls_stored, out.rejected) == (0, 0, 2)

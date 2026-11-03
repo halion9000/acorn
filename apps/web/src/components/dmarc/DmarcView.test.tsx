@@ -6,7 +6,7 @@ import { SWRConfig } from 'swr';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { DmarcView, aliasScript, cleanAliasName, dnsRecordsText, policyLabel, rateTone } from './DmarcView';
+import { DmarcView, aliasScript, cleanAliasName, dnsRecordsText, policyLabel, rateTone, tlsRecordsText } from './DmarcView';
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const status = { configured: true, mailbox: 'lodmarc@goliveoak.com', last_run_at: new Date().toISOString(), last_error: null, stored: 14, rejected: 0, unmatched_reports: 0 };
@@ -21,6 +21,7 @@ let lookalikes: Record<string, unknown> | null;
 let bimi: Record<string, unknown> | null;
 let blocklists: Record<string, unknown> | null;
 let reputation: Record<string, unknown> | null;
+let tls: Record<string, unknown> | null;
 
 const view = () => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
@@ -48,12 +49,14 @@ beforeEach(() => {
   bimi = null;
   blocklists = null;
   reputation = null;
+  tls = null;
   authFetch.mockReset();
   authFetch.mockImplementation(async (url: string) => {
     if (url.startsWith('/api/v1/dmarc/overview')) return json(200, overview);
     if (url.startsWith('/api/v1/dmarc/countries')) return countries ? json(200, countries) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/insights')) return insights ? json(200, insights) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/setup')) return json(200, setup);
+    if (url.startsWith('/api/v1/dmarc/tls')) return tls ? json(200, tls) : json(404, {});
     if (url.includes('/reputation')) return reputation ? json(200, reputation) : json(404, {});
     if (url.includes('/blocklists')) return blocklists ? json(200, blocklists) : json(404, {});
     if (url.includes('/bimi')) return bimi ? json(200, bimi) : json(404, {});
@@ -588,5 +591,38 @@ describe('DMARC domain reputation', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'acme.com' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Check reputation' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('The server answered 404');
+  });
+});
+
+describe('DMARC TLS reports', () => {
+  it('shows each domain with how much encrypted delivery worked and why the rest failed', async () => {
+    tls = { days: 30, domains: [{ domain: 'acme.com', client_id: 'c1', matched: true, reports: 2, success: 190, failure: 10, success_rate: 95, failures: [{ type: 'certificate-expired', count: 6 }, { type: 'starttls-not-supported', count: 4 }], last_report: '2026-11-02T00:00:00Z' }] };
+    render(view());
+    const row = await screen.findByTestId('tls-row');
+    expect(row).toHaveTextContent('acme.com');
+    expect(row).toHaveTextContent('200');
+    expect(within(row).getByText('95%')).toHaveClass('text-amber-300');
+    expect(row).toHaveTextContent('certificate-expired (6), starttls-not-supported (4)');
+  });
+
+  it('is left out when no TLS report has arrived', async () => {
+    tls = { days: 30, domains: [] };
+    render(view());
+    await screen.findByTestId('delivery-passed');
+    expect(screen.queryByTestId('tls-row')).toBeNull();
+  });
+
+  it('writes the TLS-reporting record for each ticked domain at the alias chosen for it', () => {
+    const line = { client_id: 'c1', client_name: 'Acme', domain: 'acme.com', alias: 'acme.dmarc@goliveoak.com', client_dmarc_rua: '', authorization_record_name: '', authorization_record_value: '' };
+    expect(tlsRecordsText([line], () => 'lonestar.dmarc@goliveoak.com')).toBe('_smtp._tls.acme.com\tTXT\tv=TLSRPTv1; rua=mailto:lonestar.dmarc@goliveoak.com');
+  });
+
+  it('has a Setup button that copies the TLS records for the ticked domains', async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: write }, configurable: true });
+    render(view());
+    await userEvent.click(await screen.findByRole('tab', { name: 'Setup' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Copy the TLS report records for the selected domains' }));
+    expect(write).toHaveBeenCalledWith('_smtp._tls.acmedental.com\tTXT\tv=TLSRPTv1; rua=mailto:acme-dental@goliveoak.com');
   });
 });

@@ -111,6 +111,10 @@ export interface DmarcReputation {
   domain: string;
   facts: { label: string; text: string; tone: 'good' | 'warn' | 'bad' | 'unknown' }[];
 }
+export interface DmarcTls {
+  days: number;
+  domains: { domain: string; client_id: string; matched: boolean; reports: number; success: number; failure: number; success_rate: number | null; failures: { type: string; count: number }[]; last_report: string }[];
+}
 export interface SetupLine {
   client_id: string;
   client_name: string;
@@ -646,6 +650,42 @@ function Insights({ days }: { days: number }) {
   );
 }
 
+/** TLS reports (TLS-RPT): how many encrypted connections to each domain's mail servers worked, and why the rest failed. Hidden when none have arrived. */
+function TlsSection({ days }: { days: number }) {
+  const { data } = useSWR<DmarcTls>(`/api/v1/dmarc/tls?days=${days}`, fetcher, { shouldRetryOnError: false });
+  if (!data || data.domains.length === 0) return null;
+  return (
+    <section aria-label="TLS reports" className="space-y-2">
+      <h3 className="text-sm font-medium text-gray-200">Encrypted delivery (TLS reports)</h3>
+      <table className="w-full text-left text-sm">
+        <thead className="text-xs text-gray-400">
+          <tr>
+            <th className="py-1">Domain</th>
+            <th className="py-1">Sessions</th>
+            <th className="py-1">Encrypted OK</th>
+            <th className="py-1">Why the rest failed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.domains.map((d) => (
+            <tr key={`${d.client_id}-${d.domain}`} data-testid="tls-row" className="border-t border-gray-800">
+              <td className="py-1 font-mono text-gray-200">{d.domain}</td>
+              <td className="py-1 text-gray-300">{(d.success + d.failure).toLocaleString()}</td>
+              <td className={`py-1 font-medium ${rateTone(d.success_rate)}`}>{d.success_rate === null ? '—' : `${d.success_rate}%`}</td>
+              <td className="py-1 text-gray-400">{d.failures.length === 0 ? '—' : d.failures.map((f) => `${f.type} (${f.count})`).join(', ')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+/** The records that ask receivers for TLS reports: these go in each client's own DNS zone (not yours), pointing at the same alias as the DMARC reports. */
+export function tlsRecordsText(lines: SetupLine[], aliasOf: (l: SetupLine) => string): string {
+  return lines.map((l) => `_smtp._tls.${l.domain}\tTXT\tv=TLSRPTv1; rua=mailto:${aliasOf(l)}`).join('\n');
+}
+
 function Results() {
   const [days, setDays] = useState(30);
   const [open, setOpen] = useState<string | null>(null);
@@ -672,6 +712,7 @@ function Results() {
         <>
           <StatusStrip status={data.status} />
           <Insights days={days} />
+          <TlsSection days={days} />
           {data.domains.length === 0 ? (
             <p className="rounded-lg border border-gray-800 px-4 py-6 text-sm text-gray-400">
               No reports in the last {data.days} days. Receivers send one a day per domain, starting about a day after a domain&rsquo;s DMARC record points at the shared mailbox. The Setup tab lists the line each client domain needs.
@@ -841,6 +882,9 @@ function Setup() {
             </button>
             <button type="button" disabled={included.length === 0} aria-label="Copy the DNS records for the selected domains" onClick={() => void navigator.clipboard?.writeText(dnsRecordsText(included))} className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40">
               Copy DNS records
+            </button>
+            <button type="button" disabled={included.length === 0} aria-label="Copy the TLS report records for the selected domains" title="These go in each client's own DNS zone" onClick={() => void navigator.clipboard?.writeText(tlsRecordsText(included, aliasOf))} className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40">
+              Copy TLS report records
             </button>
           </div>
           <div className="overflow-x-auto rounded-lg border border-gray-800">

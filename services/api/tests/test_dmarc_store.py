@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 import pytest
 from app.db.database import Base
-from app.models.dmarc import DmarcReport
+from app.models.dmarc import DmarcReport, TlsReport
 from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
@@ -17,7 +17,7 @@ from app.services.dmarc_report import Record
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-TABLES = [m.__table__ for m in (Tenant, IdentitySource, IdentityMfaUser, DmarcReport)]
+TABLES = [m.__table__ for m in (Tenant, IdentitySource, IdentityMfaUser, DmarcReport, TlsReport)]
 
 
 @pytest.fixture(autouse=True)
@@ -154,3 +154,45 @@ def test_the_managing_companys_own_domain_is_matched_to_itself_not_left_unmatche
 def test_the_override_reason_is_stored_with_each_source_line():
     rows = store.compact_rows(report(records=[Record("1.1.1.1", 4, "none", False, False, "client.com", "client.com", reason="forwarded"), Record("2.2.2.2", 1, "none", True, True, "client.com", "client.com")]))
     assert [r["reason"] for r in rows] == ["forwarded", ""]
+
+
+def tls_report(domain="client.com", report_id="t1", policy_type="sts", success=100, failure=4):
+    from app.services.tls_report import TlsPolicy
+    from app.services.tls_report import TlsReport as ParsedTls
+
+    pol = TlsPolicy(domain, policy_type, success, failure, [("certificate-expired", failure)])
+    return ParsedTls("google.com", report_id, datetime(2026, 11, 1, tzinfo=UTC), datetime(2026, 11, 2, tzinfo=UTC), [pol]), pol
+
+
+def test_a_tls_report_goes_to_the_client_whose_people_use_the_domain_and_is_stored_once():
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        acme = await tenant(s, "Acme", owner.id)
+        s.add(person(acme.id, "a@client.com"))
+        await s.commit()
+        rep, pol = tls_report()
+        first = await store.store_tls_policy(s, owner.id, rep, pol)
+        await s.commit()
+        again = await store.store_tls_policy(s, owner.id, rep, pol)
+        other_kind = await store.store_tls_policy(s, owner.id, rep, tls_report(policy_type="tlsa")[1])  # the same report under another policy type is a separate row
+        await s.commit()
+        rows = (await s.execute(select(TlsReport))).scalars().all()
+        return first, again, other_kind, rows, acme.id
+
+    first, again, other_kind, rows, acme_id = run(body)
+    assert (first.outcome, first.tenant_id, first.matched) == ("stored", acme_id, True)
+    assert again.outcome == "duplicate" and other_kind.outcome == "stored" and len(rows) == 2
+    assert (rows[0].success, rows[0].failure, rows[0].failures) == (100, 4, [{"type": "certificate-expired", "count": 4}])
+
+
+def test_a_tls_report_about_a_domain_nobody_is_matched_to_is_kept_under_the_owner_unmatched():
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        await s.commit()
+        rep, pol = tls_report(domain="stranger.example")
+        out = await store.store_tls_policy(s, owner.id, rep, pol)
+        await s.commit()
+        return out, owner.id
+
+    out, owner_id = run(body)
+    assert (out.outcome, out.tenant_id, out.matched) == ("stored", owner_id, False)

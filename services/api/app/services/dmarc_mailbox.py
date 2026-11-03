@@ -16,7 +16,8 @@ from typing import Any, Protocol
 from urllib.parse import quote
 
 from app.services.alert_email.graph import GraphMailer, MailError, _graph_error
-from app.services.dmarc_report import MAX_COMPRESSED, DmarcReportError, parse_report
+from app.services.dmarc_report import MAX_COMPRESSED, DmarcReportError, parse_report, unpack
+from app.services.tls_report import looks_like_tls_report, parse_tls_report
 
 REPORT_SUFFIXES = (".xml", ".gz", ".zip", ".xml.gz")
 PAGE = 50
@@ -95,6 +96,7 @@ class GraphMailboxReader(GraphMailer):
 @dataclass
 class IngestResult:
     stored: int = 0
+    tls_stored: int = 0
     duplicates: int = 0
     rejected: int = 0
     messages: int = 0
@@ -107,6 +109,7 @@ async def ingest_once(
     owner_id: uuid.UUID,
     *,
     store: Callable[..., Awaitable[Any]],
+    store_tls: Callable[..., Awaitable[Any]] | None = None,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> IngestResult:
     """One pass: read what arrived since the cursor, store each report, and move the cursor to the newest message that was handled. A failure from the mailbox keeps the cursor where it was."""
@@ -135,6 +138,19 @@ async def ingest_once(
             result.messages += 1
             for name, blob in message.attachments:
                 try:
+                    unpacked = unpack(blob)
+                    if looks_like_tls_report(unpacked):
+                        tls = parse_tls_report(unpacked)
+                        if store_tls is None:
+                            result.rejected += 1  # a TLS report with nowhere to keep it
+                            continue
+                        for policy in tls.policies:
+                            kept = await store_tls(db, owner_id, tls, policy)
+                            if kept.outcome == "stored":
+                                result.tls_stored += 1
+                            else:
+                                result.duplicates += 1
+                        continue
                     report = parse_report(blob)
                 except DmarcReportError:
                     result.rejected += 1
@@ -147,7 +163,7 @@ async def ingest_once(
             if newest is None or message.received > newest:
                 newest = message.received
         state.cursor, state.last_run_at, state.last_error = newest, now(), None
-        state.stored += result.stored
+        state.stored += result.stored + result.tls_stored
         state.rejected += result.rejected
         await db.commit()
     return result

@@ -10,14 +10,14 @@ import pytest
 from app.services import bimi as bimi_check_module
 from app.api.v1.endpoints import dmarc as ep
 from app.db.database import Base
-from app.models.dmarc import DmarcIngestState, DmarcReport
+from app.models.dmarc import DmarcIngestState, DmarcReport, TlsReport
 from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-TABLES = [m.__table__ for m in (Tenant, IdentitySource, IdentityMfaUser, DmarcReport, DmarcIngestState)]
+TABLES = [m.__table__ for m in (Tenant, IdentitySource, IdentityMfaUser, DmarcReport, DmarcIngestState, TlsReport)]
 NOW = datetime.now(UTC)
 
 
@@ -708,3 +708,50 @@ def test_reputation_combines_registration_with_the_domains_own_mail_and_says_unk
     assert facts["DMARC policy"].tone == "good" and asked == ["https://rdap.org/domain/acme.com"]
     assert {f.label: f for f in down.facts}["Registered"].tone == "unknown" and "did not answer" in {f.label: f for f in down.facts}["Registered"].text
     assert foreign == 404 and after == before  # no lookup for another owner's domain
+
+
+def tls_row(tenant_id, domain, success, failure, failures=(), days_ago=1, matched=True, rid=None):
+    from app.models.dmarc import TlsReport
+
+    end = NOW - timedelta(days=days_ago)
+    return TlsReport(tenant_id=tenant_id, matched=matched, domain=domain, reporter="google.com", report_id=rid or uuid.uuid4().hex, policy_type="sts", begin_at=end - timedelta(days=1), end_at=end,
+                     success=success, failure=failure, failures=[{"type": t, "count": n} for t, n in failures])
+
+
+def test_tls_reports_are_summed_per_domain_with_the_worst_first_and_never_include_another_owners():
+    from app.models.dmarc import TlsReport  # noqa: F401  (the table exists in the test database below)
+
+    async def body(s):
+        owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
+        acme, theirs = await tenant(s, "Acme", owner.id), await tenant(s, "Theirs", other.id)
+        s.add_all(
+            [
+                tls_row(acme.id, "acme.com", 90, 10, [("certificate-expired", 6), ("starttls-not-supported", 4)]),
+                tls_row(acme.id, "acme.com", 100, 0),
+                tls_row(owner.id, "goliveoak.com", 500, 0),
+                tls_row(acme.id, "old.example", 1, 99, days_ago=200),  # outside the period
+                tls_row(theirs.id, "theirs.com", 1, 1),
+            ]
+        )
+        await s.commit()
+        return await ep.tls_overview(caller(owner), s, days=30)
+
+    out = run(body)
+    assert [d.domain for d in out.domains] == ["acme.com", "goliveoak.com"]  # worst first; the old report and the other owner's are left out
+    acme_row = out.domains[0]
+    assert (acme_row.reports, acme_row.success, acme_row.failure, acme_row.success_rate) == (2, 190, 10, 95.0)
+    assert [(f.type, f.count) for f in acme_row.failures] == [("certificate-expired", 6), ("starttls-not-supported", 4)]
+    assert out.domains[1].success_rate == 100.0 and out.domains[1].failures == []
+
+
+def test_the_setup_lists_the_tls_reporting_record_for_each_domain_pointing_at_the_same_alias():
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        acme = await tenant(s, "Acme Dental", owner.id)
+        s.add(IdentityMfaUser(tenant_id=acme.id, source="m365", user_id="u1", upn="a@acmedental.com", snapshot_id=uuid.uuid4()))
+        await s.commit()
+        return await ep.setup(caller(owner), s, FakeResolver({"acmedental.com": ["mx.acmedental.com"]}))
+
+    line = run(body).lines[0]
+    assert line.tls_rpt_name == "_smtp._tls.acmedental.com"
+    assert line.tls_rpt_value == f"v=TLSRPTv1; rua=mailto:{line.alias}"

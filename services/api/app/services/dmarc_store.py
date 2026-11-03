@@ -15,11 +15,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.db.rls_scope import cross_tenant_reads
-from app.models.dmarc import DmarcReport
+from app.models.dmarc import DmarcReport, TlsReport
 from app.models.signin import IdentityMfaUser
 from app.models.identity_source import IdentitySource
 from app.models.tenant import Tenant
 from app.services.dmarc_report import DmarcReport as ParsedReport
+from app.services.tls_report import TlsPolicy
+from app.services.tls_report import TlsReport as ParsedTls
 
 MAX_ROWS_STORED = 500
 
@@ -112,6 +114,43 @@ async def store_report(db, owner_id: uuid.UUID, report: ParsedReport) -> Stored:
         await db.flush()
     except IntegrityError:
         # Two readers stored the same report at once: the unique index decided.
+        await db.rollback()
+        return Stored("duplicate", tenant_id, matched)
+    return Stored("stored", tenant_id, matched)
+
+
+async def store_tls_policy(db, owner_id: uuid.UUID, report: ParsedTls, policy: TlsPolicy) -> Stored:
+    """Store one policy of a TLS report under its client (or the owner when none matches), once however often the report is read."""
+    async with cross_tenant_reads(db):
+        existing = (
+            await db.execute(
+                select(TlsReport.id, TlsReport.tenant_id, TlsReport.matched).where(
+                    TlsReport.domain == policy.domain, TlsReport.reporter == report.reporter, TlsReport.report_id == report.report_id, TlsReport.policy_type == policy.policy_type
+                )
+            )
+        ).first()
+    if existing is not None:
+        return Stored("duplicate", existing.tenant_id, existing.matched)
+    client = await client_for_domain(db, owner_id, policy.domain)
+    tenant_id, matched = (client, True) if client is not None else (owner_id, False)
+    db.add(
+        TlsReport(
+            tenant_id=tenant_id,
+            matched=matched,
+            domain=policy.domain,
+            reporter=report.reporter,
+            report_id=report.report_id,
+            policy_type=policy.policy_type,
+            begin_at=report.begin,
+            end_at=report.end,
+            success=policy.success,
+            failure=policy.failure,
+            failures=[{"type": t, "count": n} for t, n in policy.failures],
+        )
+    )
+    try:
+        await db.flush()
+    except IntegrityError:
         await db.rollback()
         return Stored("duplicate", tenant_id, matched)
     return Stored("stored", tenant_id, matched)

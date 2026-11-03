@@ -32,6 +32,26 @@ class DmarcReport(Base):
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
 
 
+class TlsReport(Base):
+    """One policy of a TLS-RPT report (migration 138)."""
+
+    __tablename__ = "tls_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    matched: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    domain: Mapped[str] = mapped_column(String(255), nullable=False)
+    reporter: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    report_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    policy_type: Mapped[str] = mapped_column(String(30), default="unknown", nullable=False)
+    begin_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    success: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failure: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failures: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
 class DmarcIngestState(Base):
     __tablename__ = "dmarc_ingest_state"
 
