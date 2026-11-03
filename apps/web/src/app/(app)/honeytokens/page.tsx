@@ -4,7 +4,7 @@ import { useState } from "react";
 import useSWR, { mutate } from "swr";
 import { authFetch } from "@/lib/auth-session";
 import { HowTo } from "./HowTo";
-import { TOKEN_TYPES, TOKEN_TYPE_ORDER, canAlert, plantables, type HoneytokenRecord, type TokenStatus } from "./tokens";
+import { TOKEN_TYPES, TOKEN_TYPE_ORDER, canAlert, plantScript, plantables, type HoneytokenRecord, type TokenStatus } from "./tokens";
 
 // Same-origin by default — Next.js rewrites proxy `/api/v1/honeytokens/*`
 // to the honeytokens service. Override with `NEXT_PUBLIC_HONEYTOKENS_URL`
@@ -202,6 +202,7 @@ function TokenDetails({ token, onClose }: { token: HoneytokenRecord; onClose: ()
   const info = TOKEN_TYPES[token.token_type];
   const alerts = canAlert(token);
   const link = plantables(token).find(([k]) => k === "url" || k === "beacon_url")?.[1];
+  const script = plantScript(token);
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -230,6 +231,20 @@ function TokenDetails({ token, onClose }: { token: HoneytokenRecord; onClose: ()
               ))}
             </ul>
           </div>
+
+          {script && token.status === "active" && (
+            <div data-testid="plant-script">
+              <p className="text-xs font-medium text-gray-400 mb-1">Plant it on a Windows computer</p>
+              <p className="text-xs text-gray-500 mb-2">
+                Copy this PowerShell, change the folder on the second line to where it should sit (a shared folder, a user&apos;s Documents), and run it with NinjaOne&apos;s script tool or on the computer itself. It creates a shortcut file that
+                calls A.C.O.R.N when opened.
+              </p>
+              <div className="flex items-start gap-2">
+                <pre className="flex-1 text-xs font-mono text-gray-300 bg-gray-950 border border-gray-800 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">{script}</pre>
+                <CopyButton value={script} />
+              </div>
+            </div>
+          )}
 
           {link && token.status === "active" && (
             <p className="text-xs text-gray-500">

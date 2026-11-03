@@ -96,7 +96,7 @@ describe('the Honeytokens page', () => {
     await userEvent.setup().click(await screen.findByText('Finance wiki bait'));
     const detection = await screen.findByTestId('detection');
     expect(detection.textContent).toContain('alerts when its link is opened');
-    expect(screen.getByText(/api\/v1\/canary\/11111111/)).toBeInTheDocument();
+    expect(screen.getAllByText(/api\/v1\/canary\/11111111/).length).toBeGreaterThan(0); // in the list of values and in the plant script
     expect(screen.getByRole('link', { name: 'open the link' })).toHaveAttribute('href', linkToken.metadata.token_data.url);
     expect(screen.getByText(/No triggers yet/)).toBeInTheDocument();
   });
@@ -129,7 +129,7 @@ describe('the Honeytokens page', () => {
     await user.type(screen.getByPlaceholderText(/Finance share passwords note/), 'Fresh');
     await user.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(screen.getByTestId('detection')).toBeInTheDocument());
-    expect(screen.getByText(/api\/v1\/canary\/33333333/)).toBeInTheDocument();
+    expect(screen.getAllByText(/api\/v1\/canary\/33333333/).length).toBeGreaterThan(0);
   });
 });
 

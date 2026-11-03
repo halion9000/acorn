@@ -70,6 +70,33 @@ export function plantables(token: Pick<HoneytokenRecord, "metadata">): Array<[st
   return keys.filter((k) => data[k] !== null && data[k] !== undefined && String(data[k]) !== "").map((k) => [k, String(data[k])]);
 }
 
+/** A file name made only of letters, digits, spaces, dots, dashes and underscores (so it cannot carry a path or a quote into the script). */
+export function safeFileName(name: string): string {
+  const cleaned = name.replace(/[^A-Za-z0-9 ._-]/g, "").replace(/\s+/g, " ").trim().replace(/^\.+/, "");
+  return cleaned.slice(0, 80) || "Document";
+}
+
+/**
+ * A PowerShell script that plants a token's link on a Windows computer as an internet shortcut (a .url file) in a folder the person edits first, for pasting into a remote script tool such as NinjaOne's.
+ * Only for a token that can alert (a link), and only when the link is a plain web address: anything else returns null rather than a script that could carry a stray quote or command.
+ */
+export function plantScript(token: Pick<HoneytokenRecord, "name" | "token_type" | "metadata">): string | null {
+  if (!canAlert(token)) return null;
+  const link = plantables(token).find(([k]) => k === "url" || k === "beacon_url")?.[1];
+  if (!link || !/^https?:\/\/[^\s'"`$;|&<>()]+$/.test(link)) return null;
+  const file = safeFileName(token.name);
+  return [
+    "# Plants a tripwire shortcut. Opening it calls A.C.O.R.N and raises an alert. Change the folder, then run it as the person or as SYSTEM.",
+    "$folder = 'C:\\Users\\Public\\Documents'",
+    `$file = '${file}.url'`,
+    "if (-not (Test-Path -LiteralPath $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }",
+    "$path = Join-Path $folder $file",
+    `Set-Content -LiteralPath $path -Value @('[InternetShortcut]', 'URL=${link}') -Encoding ASCII`,
+    "Write-Output \"Planted $path\"",
+    "",
+  ].join("\r\n");
+}
+
 /** Whether anything will notice this token being used. The service says so when it makes the token; a token made before that label existed is judged by its type. */
 export function canAlert(token: Pick<HoneytokenRecord, "token_type" | "metadata">): boolean {
   const stored = token.metadata?.detection;
