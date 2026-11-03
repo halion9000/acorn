@@ -86,7 +86,9 @@ def test_no_bound_is_so_large_that_the_value_can_still_overflow_a_64_bit_integer
 def test_the_bounds_are_wide_enough_for_what_clients_and_cipher_actually_ask_for():
     """CORE's tools page with offset up to 100,000 and limit up to 200; the web console asks for limit 100. None of that may be refused."""
     by_name: dict[str, list[int]] = {}
-    for name, _, _, schema in PARAMS:
+    for name, _, path, schema in PARAMS:
+        if path == "/api/v1/search":
+            continue  # the top-box search returns at most ten hits per kind by design (global_search.PER_KIND); nothing pages through it
         if "maximum" in schema:
             by_name.setdefault(name, []).append(schema["maximum"])
     assert min(by_name["offset"]) >= 100_000 and min(by_name["page"]) >= 1000
