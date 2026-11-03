@@ -370,7 +370,8 @@ describe('the Integrations column layout', () => {
     render(<MSSPDashboardView />);
     const table = await screen.findByRole('table');
     const many = within(within(table).getByText('Many').closest('tr') as HTMLElement).getByTestId('sources');
-    expect(many).toHaveClass('grid-cols-4');
+    // four columns of the icon's own width, rows no taller than the icons: the table cell can be as narrow or as tall as it likes without squeezing or stretching them
+    expect(many).toHaveClass('grid-cols-[repeat(4,1.5rem)]', 'content-start', 'items-center');
     expect(many).not.toHaveClass('flex');
     expect(within(many).getAllByRole('img')).toHaveLength(7);
     expect(within(within(table).getByText('None').closest('tr') as HTMLElement).getByTestId('sources')).toHaveTextContent('—');
