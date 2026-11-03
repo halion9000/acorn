@@ -4,6 +4,7 @@ import asyncio
 import base64
 import contextlib
 import gzip
+import urllib.parse
 import uuid
 from datetime import UTC, datetime
 
@@ -33,7 +34,7 @@ def xml(domain="client.com", report_id="r1"):
 
 
 def attachment(name, data, kind="#microsoft.graph.fileAttachment"):
-    return {"@odata.type": kind, "name": name, "size": len(data), "contentBytes": base64.b64encode(data).decode()}
+    return {"@odata.type": kind, "id": "att-" + name, "name": name, "size": len(data), "contentBytes": base64.b64encode(data).decode()}
 
 
 def graph(messages, attachments, calls):
@@ -47,7 +48,14 @@ def graph(messages, attachments, calls):
         assert request.headers["authorization"] == "Bearer tok"
         if "/attachments" in url:
             mid = url.split("/messages/")[1].split("/attachments")[0]
-            return httpx.Response(200, json={"value": attachments[mid]})
+            rest = url.split("/attachments")[1]
+            if rest.startswith("/"):  # one attachment by id: the full file, with its contents
+                att_id = urllib.parse.unquote(rest[1:].split("?")[0])
+                return httpx.Response(200, json=next(a for a in attachments[mid] if a["id"] == att_id))
+            # the list: Microsoft refuses contentBytes here (it is on a file attachment only), and the contents are not sent
+            if "contentBytes" in url:
+                return httpx.Response(400, json={"error": {"message": "Could not find a property named 'contentBytes' on type 'microsoft.graph.attachment'."}})
+            return httpx.Response(200, json={"value": [{k: v for k, v in a.items() if k != "contentBytes"} for a in attachments[mid]]})
         if "page2" in url:
             return httpx.Response(200, json={"value": messages[1:]})
         return httpx.Response(200, json={"value": messages[:1] if len(messages) > 1 else messages, **({"@odata.nextLink": "https://graph.test/page2"} if len(messages) > 1 else {})})

@@ -74,16 +74,17 @@ class GraphMailboxReader(GraphMailer):
         return out
 
     async def _attachments(self, mailbox: str, message_id: str) -> list[tuple[str, bytes]]:
-        data = await self._get(
-            f"{self.base_url}/users/{mailbox}/messages/{quote(message_id, safe='')}/attachments", {"$select": "name,contentType,contentBytes,size"}
-        )
+        # The list may only ask for the properties every attachment has: contentBytes exists on a file attachment alone, so asking for it here is a 400 from Microsoft. Each report file is then fetched by itself.
+        base = f"{self.base_url}/users/{mailbox}/messages/{quote(message_id, safe='')}/attachments"
+        data = await self._get(base, {"$select": "id,name,contentType,size"})
         out: list[tuple[str, bytes]] = []
-        for att in data.get("value", []):
-            name = str(att.get("name") or "")
-            if att.get("@odata.type", "#microsoft.graph.fileAttachment") != "#microsoft.graph.fileAttachment" or not looks_like_report(name):
+        for listed in data.get("value", []):
+            name = str(listed.get("name") or "")
+            if listed.get("@odata.type", "#microsoft.graph.fileAttachment") != "#microsoft.graph.fileAttachment" or not looks_like_report(name):
                 continue
-            if int(att.get("size") or 0) > MAX_COMPRESSED:
+            if int(listed.get("size") or 0) > MAX_COMPRESSED:
                 continue  # too big to be a report: the parser would refuse it anyway
+            att = await self._get(f"{base}/{quote(str(listed.get('id') or ''), safe='')}", None)
             try:
                 out.append((name, base64.b64decode(att.get("contentBytes") or "", validate=False)))
             except (binascii.Error, ValueError):
