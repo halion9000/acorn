@@ -378,6 +378,18 @@ describe('the Integrations column layout', () => {
   });
 });
 
+describe('the tenant table fits the window', () => {
+  it('uses the narrow cell padding on every cell of its 13 columns, so the page does not need sideways scrolling', async () => {
+    overviewMock.mockResolvedValue({ ...none, total_tenants: 1 });
+    tenantsMock.mockResolvedValue([row({ name: 'One', sources: ['halopsa'] })]);
+    render(<MSSPDashboardView />);
+    const table = await screen.findByRole('table');
+    const cells = [...table.querySelectorAll('th, td')];
+    expect(cells).toHaveLength(26);
+    expect(cells.filter((c) => !c.className.includes('px-2.5'))).toEqual([]);
+  });
+});
+
 describe('orderSources', () => {
   it('puts halo first and keeps one fixed order for the rest', () => {
     expect(orderSources(['addigy', 'huntress', 'zzz', 'halopsa', 'ninjaone', 'threatmate'])).toEqual([

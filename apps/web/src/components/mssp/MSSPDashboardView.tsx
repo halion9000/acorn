@@ -310,19 +310,19 @@ export default function MSSPDashboardView() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-800/60 text-left text-gray-400">
-                      <th scope="col" className="px-5 py-3 font-medium">Tenant</th>
-                      <th scope="col" className="px-5 py-3 font-medium">Integrations</th>
-                      <th scope="col" className="px-5 py-3 font-medium text-right">Open Alerts</th>
-                      <th scope="col" className="px-5 py-3 font-medium text-right">Critical</th>
-                      <th scope="col" className="px-5 py-3 font-medium text-right">Open Cases</th>
-                      <th scope="col" className="px-5 py-3 font-medium text-right">MTTR (min)</th>
-                      <th scope="col" className="px-5 py-3 font-medium text-right">SLA Breaches</th>
-                      <th scope="col" className="px-5 py-3 font-medium text-right">Connectors</th>
-                      <th scope="col" className="px-5 py-3 font-medium text-right" title="Connectors switched on for this client, and how many of them report a problem right now">Connector health</th>
-                      <th scope="col" className="px-5 py-3 font-medium text-right">Health</th>
-                      <th scope="col" className="px-5 py-3 font-medium">Last Snapshot</th>
-                      <th scope="col" className="px-5 py-3 font-medium" title="Which clients automated playbooks may run for. Playbooks do not start by themselves yet; this records the choice.">Automated playbooks</th>
-                      <th scope="col" className="px-5 py-3 font-medium"><span className="sr-only">Actions</span></th>
+                      <th scope="col" className="px-2.5 py-3 font-medium">Tenant</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium">Integrations</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right">Open Alerts</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right">Critical</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right">Open Cases</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right">MTTR (min)</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right">SLA Breaches</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right">Connectors</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Connectors switched on for this client, and how many of them report a problem right now">Connector health</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right">Health</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium">Last Snapshot</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium" title="Which clients automated playbooks may run for. Playbooks do not start by themselves yet; this records the choice.">Automated playbooks</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium"><span className="sr-only">Actions</span></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -337,13 +337,13 @@ export default function MSSPDashboardView() {
                         }}
                         className="cursor-pointer border-b border-gray-800/40 hover:bg-gray-800/30 transition-colors"
                       >
-                        <td className={clsx('px-5 py-3 font-medium', t.hidden ? 'text-gray-500' : 'text-white')}>
+                        <td className={clsx('px-2.5 py-3 font-medium', t.hidden ? 'text-gray-500' : 'text-white')}>
                           <Link href={postureHref(t.tenant_id)} className="hover:text-sky-300 hover:underline" title="Open this client's posture">
                             {t.name}
                           </Link>
                           {t.hidden ? <span className="ml-2 text-xs font-normal text-gray-500">hidden</span> : null}
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-2.5 py-3">
                           <span className="inline-grid grid-cols-[repeat(4,1.5rem)] content-start items-center gap-1" data-testid="sources">
                             {(t.sources ?? []).length === 0 ? (
                               <span className="text-gray-600">—</span>
@@ -352,18 +352,18 @@ export default function MSSPDashboardView() {
                             )}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-right text-gray-300">{figure(t.open_alerts)}</td>
-                        <td className="px-5 py-3 text-right text-gray-300">{figure(t.critical_alerts)}</td>
-                        <td className="px-5 py-3 text-right text-gray-300">{figure(t.open_cases)}</td>
-                        <td className="px-5 py-3 text-right text-gray-300">{figure(t.mttr_minutes, { decimals: 0 })}</td>
-                        <td className={clsx('px-5 py-3 text-right', (t.sla_breaches ?? 0) > 0 ? 'font-medium text-red-400' : 'text-gray-300')}>{figure(t.sla_breaches)}</td>
-                        <td className="px-5 py-3 text-right text-gray-300">{figure(t.connector_count)}</td>
-                        <td data-testid="connector-health" className={clsx('px-5 py-3 text-right', (t.connectors_unhealthy ?? 0) > 0 ? 'font-medium text-red-400' : 'text-gray-300')}>
+                        <td className="px-2.5 py-3 text-right text-gray-300">{figure(t.open_alerts)}</td>
+                        <td className="px-2.5 py-3 text-right text-gray-300">{figure(t.critical_alerts)}</td>
+                        <td className="px-2.5 py-3 text-right text-gray-300">{figure(t.open_cases)}</td>
+                        <td className="px-2.5 py-3 text-right text-gray-300">{figure(t.mttr_minutes, { decimals: 0 })}</td>
+                        <td className={clsx('px-2.5 py-3 text-right', (t.sla_breaches ?? 0) > 0 ? 'font-medium text-red-400' : 'text-gray-300')}>{figure(t.sla_breaches)}</td>
+                        <td className="px-2.5 py-3 text-right text-gray-300">{figure(t.connector_count)}</td>
+                        <td data-testid="connector-health" className={clsx('px-2.5 py-3 text-right', (t.connectors_unhealthy ?? 0) > 0 ? 'font-medium text-red-400' : 'text-gray-300')}>
                           {connectorHealthLabel(t.connectors_enabled, t.connectors_unhealthy)}
                         </td>
-                        <td className="px-5 py-3 text-right text-gray-300">{figure(t.health_score, { decimals: 0 })}</td>
-                        <td className="px-5 py-3 text-gray-400">{snapshotLabel(t.snapshot_at)}</td>
-                        <td className="px-5 py-3">
+                        <td className="px-2.5 py-3 text-right text-gray-300">{figure(t.health_score, { decimals: 0 })}</td>
+                        <td className="px-2.5 py-3 text-gray-400">{snapshotLabel(t.snapshot_at)}</td>
+                        <td className="px-2.5 py-3">
                           <input
                             type="checkbox"
                             aria-label={`Allow automated playbooks for ${t.name}`}
@@ -372,7 +372,7 @@ export default function MSSPDashboardView() {
                             className="h-4 w-4 cursor-pointer rounded border-gray-600 bg-gray-900 accent-blue-500"
                           />
                         </td>
-                        <td className="px-5 py-3 text-right">
+                        <td className="px-2.5 py-3 text-right">
                           <button type="button" onClick={() => void setHidden(t, !t.hidden)} className="text-sm text-gray-400 hover:text-gray-200 transition-colors">
                             {t.hidden ? 'Show' : 'Hide'}
                           </button>
