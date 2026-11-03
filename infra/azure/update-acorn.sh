@@ -131,6 +131,8 @@ deploy() {  # build and start whatever is checked out now
   say "starting..."
   $COMPOSE up -d 2>&1 | grep -E "Error|error" | head -5
   [ "${PIPESTATUS[0]}" -eq 0 ] || return 1
+  # The proxy reads its file once when it starts, and a changed file does not recreate it: tell it to read the file again. A file it cannot accept is refused and the old one stays in force.
+  $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>&1 | tail -2 || true
   migrate && healthy
 }
 

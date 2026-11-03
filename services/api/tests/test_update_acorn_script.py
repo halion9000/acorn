@@ -194,3 +194,38 @@ def test_the_settings_the_health_page_reads_actually_reach_the_api_container():
     # the container only receives what is listed here: the DMARC mailbox reader needs these, or it silently does nothing
     for name in ("DMARC_MAILBOX", "DMARC_OWNER_TENANT_ID", "DMARC_GRAPH_TENANT_ID", "DMARC_GRAPH_CLIENT_ID", "DMARC_GRAPH_CLIENT_SECRET", "ALERT_EMAIL_GRAPH_TENANT_ID", "ALERT_EMAIL_GRAPH_CLIENT_ID", "ALERT_EMAIL_GRAPH_CLIENT_SECRET"):
         assert env[name] == "${" + name + ":-}", name
+
+
+CADDYFILE = SCRIPT.parent / "caddy" / "Caddyfile"
+
+
+def _handles(text: str) -> dict[str, str]:
+    """Each top-level `handle` block of the Caddyfile: its matcher (or '' for the catch-all) and the address it proxies to."""
+    import re
+
+    out: dict[str, str] = {}
+    for m in re.finditer(r"^\thandle\s*(@\w+)?\s*\{(.*?)^\t\}", text, flags=re.S | re.M):
+        target = re.search(r"reverse_proxy\s+(\S+)", m.group(2))
+        out[m.group(1) or ""] = target.group(1) if target else ""
+    return out
+
+
+def test_the_live_feed_websocket_and_the_event_stream_go_straight_to_the_realtime_service_and_everything_else_to_the_web_container():
+    import re
+
+    text = CADDYFILE.read_text(encoding="utf-8")
+    assert _handles(text) == {"@realtime": "realtime:4000", "": "web:3000"}
+    matcher = re.search(r"^\t@realtime\s+path\s+(.+)$", text, flags=re.M)
+    assert matcher is not None and set(matcher.group(1).split()) == {"/ws", "/ws/*", "/sse"}
+    assert "flush_interval -1" in text, "the event stream must not be buffered"
+
+
+def test_a_changed_proxy_file_is_loaded_when_an_update_runs_not_only_when_the_container_is_recreated():
+    script = SCRIPT.read_text(encoding="utf-8")
+    start = script.index("$COMPOSE up -d")
+    assert "caddy reload --config /etc/caddy/Caddyfile" in script[start : start + 900], "the proxy is not told to read its file again after the services start"
+
+
+def test_a_failing_reload_never_fails_the_update():
+    line = next(l for l in SCRIPT.read_text(encoding="utf-8").splitlines() if "caddy reload" in l)
+    assert line.rstrip().endswith("|| true"), line

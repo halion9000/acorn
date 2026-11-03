@@ -4,10 +4,20 @@ acorn.goliveoak.com {
 		dns cloudflare {env.CF_API_TOKEN}
 	}
 	encode gzip
-	# Leafy's answers can take minutes; match the web container's own limit.
-	reverse_proxy web:3000 {
-		transport http {
-			response_header_timeout 200s
+	# The live feed (a WebSocket) and the event stream go straight to the realtime service. They used to go through the web container, which hands a WebSocket upgrade on as a plain request,
+	# so the live connection never opened (the Live Feed sat on "Connecting" for good).
+	@realtime path /ws /ws/* /sse
+	handle @realtime {
+		reverse_proxy realtime:4000 {
+			flush_interval -1
+		}
+	}
+	handle {
+		# Leafy's answers can take minutes; match the web container's own limit.
+		reverse_proxy web:3000 {
+			transport http {
+				response_header_timeout 200s
+			}
 		}
 	}
 }
