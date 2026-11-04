@@ -31,6 +31,7 @@ CLIENT_ID_FIELD: dict[str, str] = {
     "addigy": "addigy_client_id",
     "blumira": "blumira_account_id",
     "fieldeffect": "fieldeffect_org_id",
+    "cipp": "cipp_tenant_id",  # Microsoft Defender alerts CORE reads through CIPP; the id is the CIPP customer (tenant) id the client is mapped to
 }
 
 _MATCH = (
