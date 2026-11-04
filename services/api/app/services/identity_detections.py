@@ -47,6 +47,7 @@ GUESS_FAILURES = 5  # wrong passwords before a success counts as a guessed one
 DORMANT_DAYS = 60  # a person with no successful sign-in for this long, signing in from a country they have never used, is worth a look
 HISTORY_DAYS = 400  # how far back the dormant rule looks for a person's earlier sign-ins
 GUEST_BURST = 5  # outside guests invited by one person within a day
+STALE_ADMIN_DAYS = 90  # an enabled administrator with no successful sign-in for this long
 # Microsoft's own error codes: a wrong password, an account locked by too many tries, and a multi-factor request that failed.
 WRONG_PASSWORD = {50126, 50053}
 MFA_FAILED = {500121, 50074, 50076}
@@ -848,17 +849,63 @@ def detect_admins_mfa_not_required(users: list[Any], now: datetime) -> list[Find
     return out[:MAX_ADMIN_MFA_FINDINGS]
 
 
+def detect_stale_admins(users: list[Any], last_signin: dict[str, datetime], history_start: datetime | None, now: datetime) -> list[Finding]:
+    """An enabled administrator who has not signed in successfully for STALE_ADMIN_DAYS: an unused account with admin rights is a standing way in that nobody would notice being used. Said only when the
+    client's sign-in history really reaches back that far (``history_start`` is its oldest sign-in), so "no sign-in seen" is not mistaken for "no sign-in happened". One finding per person per quarter."""
+    if history_start is None or _utc(history_start) > now - timedelta(days=STALE_ADMIN_DAYS):
+        return []
+    out: list[Finding] = []
+    for u in users:
+        if not (u.admin and u.enabled) or str(u.user_type or "").lower() == "guest":
+            continue
+        who = str(u.upn).lower()
+        last = last_signin.get(who)
+        if last is not None and _utc(last) > now - timedelta(days=STALE_ADMIN_DAYS):
+            continue
+        quiet = f"{(now - _utc(last)).days} days" if last is not None else f"the whole {(now - _utc(history_start)).days} days we hold"
+        out.append(
+            Finding(
+                rule_id="aisoc-id-admin-stale",
+                rule_name="Administrator account unused",
+                title=f"Administrator {who} has not signed in for {STALE_ADMIN_DAYS} days",
+                severity="medium",
+                tactic="Persistence",
+                technique="T1078.004",
+                key=f"{who}:{now.year}-Q{(now.month - 1) // 3 + 1}",
+                occurred_at=now,
+                summary=f"This account holds an administrator role and has not signed in for {quiet}. An admin account nobody uses is one nobody would miss: remove the role or disable the account if it is not needed.",
+                fields=[("Account", who), ("Last sign-in", _stamp(last) if last is not None else "none in the history we hold"), ("Quiet for", quiet)],
+                users=[who],
+            )
+        )
+    return out[:MAX_ADMIN_MFA_FINDINGS]
+
+
 async def run_mfa_detections(db: Any, tenant_id: uuid.UUID, now: datetime | None = None) -> int:
     """After a client's multi-factor snapshot is complete: raise an alert for each administrator without multi-factor (high) and each whose multi-factor is registered but not required (medium). Never raises. Returns how many alerts were new."""
-    from sqlalchemy import select
+    from sqlalchemy import func, select
 
-    from app.models.signin import IdentityMfaUser
+    from app.models.signin import IdentityMfaUser, SigninEvent
 
     now = now or datetime.now(UTC)
     try:
         async with db.begin_nested():  # a failure rolls back to here, never the snapshot that triggered it
             users = (await db.execute(select(IdentityMfaUser).where(IdentityMfaUser.tenant_id == tenant_id))).scalars().all()
-            return await save_findings(db, tenant_id, detect_admins_without_mfa(list(users), now) + detect_admins_mfa_not_required(list(users), now), now)
+            admins = {str(u.upn).lower() for u in users if u.admin and u.enabled}
+            last_signin: dict[str, datetime] = {}
+            history_start = None
+            if admins:
+                history_start = (await db.execute(select(func.min(SigninEvent.occurred_at)).where(SigninEvent.tenant_id == tenant_id))).scalar_one_or_none()
+                for who, last in (
+                    await db.execute(
+                        select(func.lower(SigninEvent.user_principal), func.max(SigninEvent.occurred_at))
+                        .where(SigninEvent.tenant_id == tenant_id, SigninEvent.success.is_(True), func.lower(SigninEvent.user_principal).in_(admins))
+                        .group_by(func.lower(SigninEvent.user_principal))
+                    )
+                ).all():
+                    last_signin[who] = last
+            findings = detect_admins_without_mfa(list(users), now) + detect_admins_mfa_not_required(list(users), now) + detect_stale_admins(list(users), last_signin, history_start, now)
+            return await save_findings(db, tenant_id, findings, now)
     except Exception:  # noqa: BLE001
         logger.warning("identity detections: the multi-factor rule failed for tenant=%s", tenant_id, exc_info=True)
         return 0

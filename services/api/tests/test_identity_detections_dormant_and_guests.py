@@ -94,3 +94,39 @@ def test_failed_invites_and_other_activities_do_not_count():
 
 def test_an_app_doing_it_is_high():
     assert detect_guest_burst([invite(i, app=True) for i in range(GUEST_BURST)])[0].severity == "high"
+
+
+# ---- stale administrators ----------------------------------------------------------------------------------------------------------------------------------
+
+from app.services.identity_detections import STALE_ADMIN_DAYS, detect_stale_admins  # noqa: E402
+
+
+def admin(upn="root@x.com", enabled=True, is_admin=True, user_type="Member"):
+    return NS(upn=upn, enabled=enabled, admin=is_admin, user_type=user_type)
+
+
+def test_an_enabled_admin_with_no_sign_in_for_ninety_days_is_flagged_once_the_history_reaches_that_far():
+    found = detect_stale_admins([admin()], {"root@x.com": NOW - timedelta(days=120)}, LONG_AGO, NOW)
+    assert len(found) == 1
+    f = found[0]
+    assert (f.rule_id, f.severity, f.technique) == ("aisoc-id-admin-stale", "medium", "T1078.004")
+    assert "120 days" in f.summary and f.key == "root@x.com:2026-Q4"
+
+
+def test_an_admin_never_seen_signing_in_is_flagged_with_the_history_we_hold_when_it_is_long_enough():
+    found = detect_stale_admins([admin()], {}, LONG_AGO, NOW)
+    assert len(found) == 1 and "400 days we hold" in found[0].summary
+
+
+def test_an_admin_who_signed_in_recently_is_fine():
+    assert detect_stale_admins([admin()], {"root@x.com": NOW - timedelta(days=STALE_ADMIN_DAYS - 1)}, LONG_AGO, NOW) == []
+
+
+def test_with_less_history_than_ninety_days_nobody_is_called_stale():
+    assert detect_stale_admins([admin()], {}, NOW - timedelta(days=30), NOW) == []
+    assert detect_stale_admins([admin()], {}, None, NOW) == []
+
+
+def test_disabled_accounts_guests_and_people_who_are_not_admins_are_left_out():
+    people = [admin(enabled=False), admin(user_type="Guest"), admin(is_admin=False)]
+    assert detect_stale_admins(people, {}, LONG_AGO, NOW) == []
