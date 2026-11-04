@@ -1,0 +1,19 @@
+{
+  "route": "bec/{case_id}/result",
+  "method": "POST",
+  "body": {
+    "status": "done",
+    "message": "CIPP finished the search for pat@acme.com.",
+    "report": {
+      "Waiting": false,
+      "Score": 3
+    },
+    "summary": {
+      "sections": [
+        "Waiting",
+        "Score"
+      ],
+      "guid": "g1"
+    }
+  }
+}

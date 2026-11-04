@@ -8,7 +8,10 @@ Automatic rules, all inside ONE client (a person at another client is never join
 * ``display_name``: a person's display name is itself another address that exists for the client (a tool that names the account by its primary address).
 * ``guest``: ``name_domain.com#EXT#@client.onmicrosoft.com`` is how Microsoft writes the guest sign-in name of ``name@domain.com``; when that address exists, they are one person.
 * ``hash``: a 32-character hexadecimal prefix on an ``.onmicrosoft.com`` address is a system prefix on the same address without it.
-* ``onmicrosoft``: an ``.onmicrosoft.com`` address and exactly ONE real-domain address with the same name before the ``@`` (not a generic name such as admin or support, which are often different accounts).
+* ``onmicrosoft``: an ``.onmicrosoft.com`` address and exactly ONE real-domain address with the same name before the ``@``, both ordinary (member) accounts and the real address on one of the client's OWN
+  domains (not a generic name such as admin or support, which are often different accounts, and not a guest from another company who happens to share a first name).
+
+Two accounts that each hold a licence are never joined automatically: each is a paid seat, so they are two accounts a person is paying for, whatever their names say. (A hand merge is still allowed.)
 
 A person can also be merged by hand, and "not the same person" is remembered: an automatic rule never joins two groups that hold a pair marked separate. A hand merge is the owner's word and wins.
 """
@@ -75,20 +78,34 @@ def find_links(people: dict[str, Any]) -> list[Link]:
         if h and is_onmicrosoft(e):
             link(p, by_addr.get((t, f"{h.group(1)}@{domain}")), "hash")
 
-    # Same name on the client's Microsoft address and on exactly one real domain.
+    # Same name on the client's Microsoft address and on exactly one real domain of the client's own.
+    members_by_domain: dict[tuple[uuid.UUID, str], int] = {}
+    for p in people.values():
+        if p.kind == "user":
+            key = (p.tenant_id, p.email.partition("@")[2])
+            members_by_domain[key] = members_by_domain.get(key, 0) + 1
     by_local: dict[tuple[uuid.UUID, str], list[Any]] = {}
     for p in people.values():
         by_local.setdefault((p.tenant_id, p.email.partition("@")[0]), []).append(p)
-    for (_, local), group in by_local.items():
+    for (t, local), group in by_local.items():
         if len(group) < 2 or len(local) < MIN_LOCAL or local in GENERIC_LOCALS:
             continue
         real = [p for p in group if not is_onmicrosoft(p.email)]
-        if len(real) != 1:
+        if len(real) != 1 or real[0].kind != "user" or not _own_domain(t, real[0].email, members_by_domain, group):
             continue
         for p in group:
-            if is_onmicrosoft(p.email):
+            if is_onmicrosoft(p.email) and p.kind == "user":
                 link(p, real[0], "onmicrosoft")
     return links
+
+
+def _own_domain(tenant: uuid.UUID, address: str, members_by_domain: dict[tuple[uuid.UUID, str], int], group: list[Any]) -> bool:
+    """Whether the real address is on a domain the client itself uses: two or more ordinary accounts of the client have it, or it is named like the client's Microsoft address (tecovas.com for tecovas.onmicrosoft.com)."""
+    domain = address.partition("@")[2]
+    if members_by_domain.get((tenant, domain), 0) >= 2:
+        return True
+    label = domain.split(".")[0]
+    return any(is_onmicrosoft(p.email) and p.email.partition("@")[2].split(".")[0] == label for p in group)
 
 
 _MFA_RANK = {"covered": 3, "registered_not_required": 2, "none": 1, "unknown": 0}
@@ -158,13 +175,17 @@ def merge_people(
     blocked = [(addr_key(t, a), addr_key(t, b)) for t, a, b in (separate or [])]
     blocked = [(x, y) for x, y in blocked if x and y]
 
+    # How many licensed accounts each group holds: two licensed accounts are two paid seats, so no rule joins them (a chain of rules cannot either).
+    licensed = {k: (1 if people[k].licensed is True else 0) for k in people}
+
     def union(a: str, b: str, reason: str, respect_blocked: bool) -> None:
         ra, rb = find(a), find(b)
         if ra == rb:
             return
-        if respect_blocked and any({find(x), find(y)} == {ra, rb} for x, y in blocked):
+        if respect_blocked and (any({find(x), find(y)} == {ra, rb} for x, y in blocked) or licensed[ra] + licensed[rb] > 1):
             return
         parent[ra] = rb
+        licensed[rb] += licensed[ra]
         for k in (a, b):
             reasons.setdefault(k, reason)
 

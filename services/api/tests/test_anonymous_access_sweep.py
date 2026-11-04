@@ -145,6 +145,12 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/actions/{action_id}/result"): (
         "CORE reports how a claimed vendor action went: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); only a claimed action of that tenant can be answered (the 422 here is the empty body)"
     ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/bec/{case_id}/progress"): (
+        "CORE reports how far a business email compromise search has got: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); only an open case of that tenant's scope can be updated (the 422 here is the empty body)"
+    ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/bec/{case_id}/result"): (
+        "CORE hands over a finished business email compromise report: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); only an open case of that tenant's scope can be answered, once (the 422 here is the empty body)"
+    ),
 }
 
 

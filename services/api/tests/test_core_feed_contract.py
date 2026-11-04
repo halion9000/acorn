@@ -47,6 +47,8 @@ MODELS = {
     "actions-claim-fieldeffect": feed.ClaimRequest,
     "actions-claim-core": feed.ClaimRequest,
     "actions-result": feed.ActionResult,
+    "bec-progress": feed.BecProgress,
+    "bec-result": feed.BecResult,
     "signins": sig.SignInsReport,
     "directory-audits": ident.DirectoryAuditsReport,
     "person-tickets": idn.PersonTicketsReport,

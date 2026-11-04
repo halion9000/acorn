@@ -11582,6 +11582,109 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/identities/bec:
+    post:
+      tags:
+      - identities
+      summary: Start Bec Search
+      description: 'Start a search. Returns 202: nothing has been looked at yet; the
+        case fills in as CORE reports.'
+      operationId: start_bec_search_api_v1_identities_bec_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartBody'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseItem'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - identities
+      summary: Recent Bec Searches
+      description: A person's searches in the last month, newest first, without their
+        reports.
+      operationId: recent_bec_searches_api_v1_identities_bec_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: email
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 320
+          title: Email
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/identities/bec/{case_id}:
+    get:
+      tags:
+      - identities
+      summary: Read Bec Case
+      description: One search with its whole report.
+      operationId: read_bec_case_api_v1_identities_bec__case_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Case Id
+      - name: client_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/identities/merges:
     post:
       tags:
@@ -21682,6 +21785,88 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/bec/{case_id}/progress:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Bec Progress
+      description: CORE says how far a BEC search has got. Only an open case of this
+        tenant's scope can be updated.
+      operationId: report_bec_progress_api_v1_inbox_core_feed__tenant_token__bec__case_id__progress_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BecProgress'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BecAck'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/bec/{case_id}/result:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Bec Result
+      description: 'CORE hands over the finished report (or says why there is none).
+        Answered once: a finished case cannot be overwritten.'
+      operationId: report_bec_result_api_v1_inbox_core_feed__tenant_token__bec__case_id__result_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BecResult'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BecAck'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/scripts:
     post:
       tags:
@@ -25460,6 +25645,68 @@ components:
       - recorded_by_id
       - created_at
       title: BaselineResponse
+    BecAck:
+      properties:
+        recorded:
+          type: boolean
+          title: Recorded
+      type: object
+      required:
+      - recorded
+      title: BecAck
+    BecProgress:
+      properties:
+        step:
+          type: integer
+          maximum: 1000.0
+          minimum: 0.0
+          title: Step
+        steps_total:
+          type: integer
+          maximum: 1000.0
+          minimum: 0.0
+          title: Steps Total
+          default: 0
+        label:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Label
+      type: object
+      required:
+      - step
+      title: BecProgress
+    BecResult:
+      properties:
+        status:
+          type: string
+          enum:
+          - done
+          - failed
+          title: Status
+        message:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Message
+        report:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Report
+          description: CIPP's finished report, kept whole.
+        summary:
+          additionalProperties: true
+          type: object
+          title: Summary
+          description: What the page shows at a glance.
+      type: object
+      required:
+      - status
+      title: BecResult
     Bimi:
       properties:
         domain:
@@ -26129,6 +26376,77 @@ components:
       title: CaseCounts
       description: How many cases are in each group the console shows. ``open`` is
         new and triaged, ``in_progress`` is investigating and contained.
+    CaseDetail:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        case_ref:
+          type: string
+          title: Case Ref
+        email:
+          type: string
+          title: Email
+        status:
+          type: string
+          enum:
+          - pending
+          - running
+          - done
+          - failed
+          title: Status
+        step:
+          type: integer
+          title: Step
+        steps_total:
+          type: integer
+          title: Steps Total
+        step_label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Step Label
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        summary:
+          additionalProperties: true
+          type: object
+          title: Summary
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+        report:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Report
+      type: object
+      required:
+      - id
+      - case_ref
+      - email
+      - status
+      - step
+      - steps_total
+      - created_at
+      - updated_at
+      title: CaseDetail
     CaseDevice:
       properties:
         hostname:
@@ -26175,6 +26493,82 @@ components:
       - label
       - url
       title: CaseDeviceLink
+    CaseItem:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        case_ref:
+          type: string
+          title: Case Ref
+        email:
+          type: string
+          title: Email
+        status:
+          type: string
+          enum:
+          - pending
+          - running
+          - done
+          - failed
+          title: Status
+        step:
+          type: integer
+          title: Step
+        steps_total:
+          type: integer
+          title: Steps Total
+        step_label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Step Label
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        summary:
+          additionalProperties: true
+          type: object
+          title: Summary
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+      type: object
+      required:
+      - id
+      - case_ref
+      - email
+      - status
+      - step
+      - steps_total
+      - created_at
+      - updated_at
+      title: CaseItem
+    CaseList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/CaseItem'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: CaseList
     CaseMetrics:
       properties:
         open:
@@ -26564,6 +26958,7 @@ components:
           - revoke_sessions
           - disable_user
           - enable_user
+          - bec_search
           title: Action
         incident_uid:
           type: string
@@ -43723,6 +44118,26 @@ components:
       - microsoft
       - password_login
       title: SsoStatus
+    StartBody:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        email:
+          type: string
+          maxLength: 320
+          title: Email
+        confirm:
+          type: boolean
+          title: Confirm
+          description: True only when the person pressed Yes in the confirmation window.
+          default: false
+      type: object
+      required:
+      - client_id
+      - email
+      title: StartBody
     StateItem:
       properties:
         uid:

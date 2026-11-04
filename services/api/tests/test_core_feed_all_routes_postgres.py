@@ -31,6 +31,8 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures" / "core_feed"
 PREFIX = "/core-feed/{tenant_token}/"
 SIGNED_IN_ONLY_404 = {
     "actions/{action_id}/result",
+    "bec/{case_id}/progress",
+    "bec/{case_id}/result",
     "vcio-proposals/{proposal_id}/result",
 }  # they answer one claimed row; with none, 404 is the right answer
 

@@ -55,6 +55,7 @@ from app.api.v1.endpoints import (
     hunts,
     identities,
     identity_actions,
+    identity_bec,
     identity_merges,
     identity,
     identity_graph,
@@ -229,6 +230,7 @@ api_router.include_router(identity.ingest_router)
 api_router.include_router(identities.router)
 api_router.include_router(identities.ingest_router)
 api_router.include_router(identity_actions.router)
+api_router.include_router(identity_bec.router)
 api_router.include_router(identity_merges.router)
 api_router.include_router(identity.router)
 api_router.include_router(cipp_actions.ingest_router)

@@ -199,6 +199,14 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
         "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/actions/{action_id}/result",
     ): "CORE reports a claimed vendor action's outcome: authenticated by the core-feed token in the path, checked in the handler (401 without it); only a claimed action of that tenant can be answered",
+    (
+        "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/bec/{case_id}/progress",
+    ): "CORE reports how far a business email compromise search has got: authenticated by the core-feed token in the path, checked in the handler (401 without it); only an open case of that tenant's scope can be updated",
+    (
+        "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/bec/{case_id}/result",
+    ): "CORE hands over a finished business email compromise report: authenticated by the core-feed token in the path, checked in the handler (401 without it); only an open case of that tenant's scope can be answered, once",
 }
 
 LOGIN_ONLY_NO_CHECK: dict[tuple[str, str], str] = {

@@ -495,7 +495,7 @@ class ClaimRequest(BaseModel):
 
 class ClaimedAction(BaseModel):
     id: uuid.UUID
-    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user"]
+    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user", "bec_search"]
     incident_uid: str
     params: dict[str, Any]
 
@@ -626,6 +626,82 @@ async def report_core_feed_action_result(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such claimed action")
     await db.commit()
     return ActionResultResponse(recorded=True)
+
+
+# ---- business email compromise searches --------------------------------------------------------------------------------------------------------------------
+# An analyst starts a search on the Identities page (``identity_bec.py``); CORE collects it with the other queued actions, starts CIPP's BEC investigation and then reports how far it has got and,
+# at the end, the finished report. Same path-token authentication as the routes above.
+
+
+class BecProgress(BaseModel):
+    step: int = Field(ge=0, le=1000)
+    steps_total: int = Field(default=0, ge=0, le=1000)
+    label: str | None = Field(default=None, max_length=300)
+
+
+class BecResult(BaseModel):
+    status: Literal["done", "failed"]
+    message: str | None = Field(default=None, max_length=2000)
+    report: dict[str, Any] | None = Field(default=None, description="CIPP's finished report, kept whole.")
+    summary: dict[str, Any] = Field(default_factory=dict, description="What the page shows at a glance.")
+
+
+class BecAck(BaseModel):
+    recorded: bool
+
+
+MAX_BEC_REPORT_BYTES = 3_000_000
+
+
+async def _bec_case_for(db: Any, tenant_id: Any, case_id: uuid.UUID) -> Any:
+    """The open case (pending or running) this token may answer, found in the owner's scope, or None. Runs ``acting_as_tenant`` for the case's own client on return via the second value."""
+    from app.models.bec_case import BecCase  # noqa: PLC0415
+
+    for tid in await _scope_ids(db, tenant_id):
+        async with acting_as_tenant(db, tid):
+            row = (await db.execute(select(BecCase).where(BecCase.id == case_id, BecCase.tenant_id == tid))).scalars().first()
+            if row is not None:
+                return row, tid
+    return None, None
+
+
+@router.post("/core-feed/{tenant_token}/bec/{case_id}/progress", response_model=BecAck)
+async def report_bec_progress(tenant_token: str, case_id: uuid.UUID, body: BecProgress, db: DBSession) -> BecAck:
+    """CORE says how far a BEC search has got. Only an open case of this tenant's scope can be updated."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    row, tid = await _bec_case_for(db, tenant_id, case_id)
+    if row is None or row.status not in ("pending", "running"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such open case")
+    async with acting_as_tenant(db, tid):
+        row.status = "running"
+        row.step, row.steps_total, row.step_label = body.step, body.steps_total, body.label
+        row.updated_at = datetime.now(UTC)
+        await db.commit()
+    return BecAck(recorded=True)
+
+
+@router.post("/core-feed/{tenant_token}/bec/{case_id}/result", response_model=BecAck)
+async def report_bec_result(tenant_token: str, case_id: uuid.UUID, body: BecResult, db: DBSession) -> BecAck:
+    """CORE hands over the finished report (or says why there is none). Answered once: a finished case cannot be overwritten."""
+    import json  # noqa: PLC0415
+
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    if body.report is not None and len(json.dumps(body.report)) > MAX_BEC_REPORT_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="The report is too large")
+    row, tid = await _bec_case_for(db, tenant_id, case_id)
+    if row is None or row.status not in ("pending", "running"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such open case")
+    now = datetime.now(UTC)
+    async with acting_as_tenant(db, tid):
+        row.status = body.status
+        row.message = body.message
+        row.report = body.report
+        row.summary = body.summary
+        row.updated_at = row.finished_at = now
+        await db.commit()
+    return BecAck(recorded=True)
 
 
 class ScriptItem(BaseModel):

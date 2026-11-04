@@ -1,0 +1,9 @@
+{
+  "route": "bec/{case_id}/progress",
+  "method": "POST",
+  "body": {
+    "step": 0,
+    "steps_total": 1,
+    "label": "Audit log"
+  }
+}
