@@ -657,12 +657,11 @@ async def _bec_case_for(db: Any, tenant_id: Any, case_id: uuid.UUID) -> Any:
     """The open case (pending or running) this token may answer, found in the owner's scope, or None. Runs ``acting_as_tenant`` for the case's own client on return via the second value."""
     from app.models.bec_case import BecCase  # noqa: PLC0415
 
-    for tid in await _scope_ids(db, tenant_id):
-        async with acting_as_tenant(db, tid):
-            row = (await db.execute(select(BecCase).where(BecCase.id == case_id, BecCase.tenant_id == tid))).scalars().first()
-            if row is not None:
-                return row, tid
-    return None, None
+    # ONE read inside the cross-tenant block, naming exactly the owner's scope: entering each client in turn cost four or more statements apiece on every progress call from CORE.
+    scope = await _scope_ids(db, tenant_id)
+    async with cross_tenant_reads(db):
+        row = (await db.execute(select(BecCase).where(BecCase.id == case_id, BecCase.tenant_id.in_(scope)))).scalars().first()
+    return (row, row.tenant_id) if row is not None else (None, None)
 
 
 @router.post("/core-feed/{tenant_token}/bec/{case_id}/progress", response_model=BecAck)
