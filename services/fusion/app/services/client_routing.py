@@ -27,6 +27,7 @@ CLIENT_ID_FIELD: dict[str, str] = {
     "addigy": "addigy_client_id",
     "blumira": "blumira_account_id",
     "fieldeffect": "fieldeffect_org_id",
+    "liongard": "liongard_environment_id",  # Liongard's own alerts; the id is the Liongard environment the client is mapped to
     "cipp": "cipp_tenant_id",  # Microsoft Defender alerts CORE reads through CIPP; the id is the CIPP customer (tenant) id the client is mapped to
 }
 

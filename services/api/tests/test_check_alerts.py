@@ -166,3 +166,9 @@ def test_more_than_three_google_apps_with_mail_or_drive_access_raise_a_medium_al
     assert specs([check("threatmate_google_apps", "met")], [check("threatmate_google_apps", "partly", "2 of 9 third-party apps can read mail or every Drive file")]) == [], "a few chosen apps is not news"
     assert specs([check("threatmate_google_apps", "not_met")], [check("threatmate_google_apps", "not_met")]) == [], "an unchanged result raises nothing again"
 
+
+def test_liongard_losing_sight_of_a_client_raises_a_medium_alert_only_when_it_is_not_met():
+    out = specs([check("liongard_inspections", "met")], [check("liongard_inspections", "not_met", "3 of 4 inspections have stopped or failed")])
+    assert [(a["key"], a["severity"]) for a in out] == [("liongard_inspections", "medium")]
+    assert specs([check("liongard_inspections", "met")], [check("liongard_inspections", "partly", "1 of 20 inspections has failed")]) == []
+

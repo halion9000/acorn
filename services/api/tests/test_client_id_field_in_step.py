@@ -24,5 +24,5 @@ def test_both_maps_name_the_same_vendors_and_fields():
 
 
 def test_the_vendors_with_a_client_list_are_routable():
-    for vendor in ("huntress", "petra", "ninjaone", "threatmate", "addigy", "blumira", "fieldeffect", "cipp"):
+    for vendor in ("huntress", "petra", "ninjaone", "threatmate", "addigy", "blumira", "fieldeffect", "cipp", "liongard"):
         assert vendor in CLIENT_ID_FIELD
