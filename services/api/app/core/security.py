@@ -324,6 +324,7 @@ _UNGRANTED_PERMISSIONS = frozenset(
         "connectors:view",
         "cases:work",
         "billing:view",
+        "identities:respond",
     }
 )  # hunts:read: held through lake:query (IMPLIED_BY below) or granted on its own  # noqa: E501
 
@@ -406,7 +407,7 @@ def has_permission(role: str, permission: str) -> bool:
 
 # What the CONSOLE needs to know to decide which controls to show. The server is still the only boundary (every route checks its own permission); this just lets the screen not dangle controls a person cannot use, without
 # copying the role table into the browser. Each name is derived from a real permission, here and nowhere else.
-UI_CAPABILITIES: dict[str, str] = {"platform_admin": "platform:cross_tenant_query", "manage_users": "users:write"}
+UI_CAPABILITIES: dict[str, str] = {"platform_admin": "platform:cross_tenant_query", "manage_users": "users:write", "respond_identities": "identities:respond"}
 
 
 def capabilities_for_role(role: str) -> list[str]:

@@ -87,3 +87,54 @@ def test_nobody_failing_gives_zero_not_none():
 def test_guests_are_counted_from_the_kind_of_account():
     people = ip.build_people({A: "Acme"}, [ms(A, "amy@acme.com"), ms(A, "ext@partner.com", user_type="Guest")], [src(A, "cipp", "g2@other.com", kind="guest")], NOW)
     assert ep.summarize(people).guests == 2
+
+
+# ---- the two sign-in tiles open lists, and disabled accounts are not "missing" anything --------------------------------------------------------------------
+
+
+def test_the_failed_signin_and_brute_force_lists_hold_exactly_the_people_the_tiles_counted():
+    async def body(s):
+        other = uuid.uuid4()
+        s.add_all([Tenant(id=A, name="Acme", slug="acme"), Tenant(id=other, name="Other", slug="other")])
+        await s.flush()
+        s.add_all(
+            [event(A, "Bob@Acme.com", False) for _ in range(10)]  # ten: brute force (and failed); the address is matched ignoring case
+            + [event(A, "amy@acme.com", False) for _ in range(2)]  # failed only
+            + [event(A, "ok@acme.com", True) for _ in range(30)]  # successes never count
+            + [event(A, "mfa@acme.com", False, code=50074) for _ in range(20)]  # asked for more proof: not a failure
+            + [event(A, "old@acme.com", False, minutes_ago=60 * 25)]  # older than a day
+            + [event(other, "x@other.com", False) for _ in range(40)]  # outside the scope
+        )
+        await s.commit()
+        now = datetime.now(UTC)
+        return await ep.failing_people(s, [A], now, 1), await ep.failing_people(s, [A], now, ep.BRUTE_FORCE_FAILURES), await ep.signin_failures(s, [A], now)
+
+    failed, brute, (total, flagged) = run(body)
+    assert failed == {(A, "bob@acme.com"), (A, "amy@acme.com")}
+    assert brute == {(A, "bob@acme.com")}
+    assert len(brute) == flagged and total == 12
+
+
+def test_the_signin_filter_keeps_only_those_people_and_leaves_the_tile_numbers_alone():
+    people = ip.build_people({A: "Acme"}, [ms(A, "bob@acme.com"), ms(A, "amy@acme.com"), ms(A, "zed@acme.com")], [], NOW)
+    failing = {(A, "bob@acme.com")}
+    kept = [p for p in people if (p.tenant_id, p.email.lower()) in failing]
+    assert [p.email for p in ip.filter_people(kept)] == ["bob@acme.com"]
+    assert ep.summarize(people).total == 3  # the summary is always everyone
+
+
+def test_a_disabled_account_is_not_counted_or_listed_as_missing_multi_factor_or_a_backup_problem():
+    people = ip.build_people(
+        {A: "Acme"},
+        [ms(A, "on@acme.com", enabled=True), ms(A, "off@acme.com", enabled=False)],
+        [src(A, "dropsuite", "on@acme.com", enabled=True, details={"last_backup": None}), src(A, "dropsuite", "off@acme.com", enabled=True, details={"last_backup": None})],
+        NOW,
+    )
+    for p in people:
+        p.mfa = "none"
+    problems = [p.email for p in ip.filter_people(people, backup="problem")]
+    no_mfa = [p.email for p in ip.filter_people(people, mfa="none")]
+    assert problems == ["on@acme.com"] and no_mfa == ["on@acme.com"]
+    s = ep.summarize(people)
+    assert (s.backup_problems, s.without_mfa) == (1, 1)  # the tiles and the lists agree
+    assert [p.email for p in ip.filter_people(people, disabled=True)] == ["off@acme.com"]  # a disabled account is still found as disabled

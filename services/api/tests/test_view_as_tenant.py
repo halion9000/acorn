@@ -1216,16 +1216,16 @@ class TestCapabilities:
     def test_the_capability_names_are_derived_from_real_permissions(self):
         from app.core.security import UI_CAPABILITIES, capabilities_for_role
 
-        assert UI_CAPABILITIES == {"platform_admin": "platform:cross_tenant_query", "manage_users": "users:write"}
-        assert capabilities_for_role("platform_admin") == ["manage_users", "platform_admin"]
+        assert UI_CAPABILITIES == {"platform_admin": "platform:cross_tenant_query", "manage_users": "users:write", "respond_identities": "identities:respond"}
+        assert capabilities_for_role("platform_admin") == ["manage_users", "platform_admin", "respond_identities"]
         assert capabilities_for_role("no-such-role") == []
 
     @pytest.mark.parametrize(
         "who,expected",
         [
-            ("platform", ["manage_users", "platform_admin"]),
-            ("p_admin", ["manage_users"]),
-            ("c1_admin", ["manage_users"]),
+            ("platform", ["manage_users", "platform_admin", "respond_identities"]),
+            ("p_admin", ["manage_users", "respond_identities"]),
+            ("c1_admin", ["manage_users", "respond_identities"]),
             ("p_lead", []),
             ("p_analyst", []),
             ("p_viewer", []),
@@ -1242,8 +1242,8 @@ class TestCapabilities:
         got = {role: capabilities_for_role(role) for role in ROLE_PERMISSIONS}
         assert got == {
             "custom": [],  # a custom-role person's capabilities come from that role (capabilities_for_permissions)
-            "platform_admin": ["manage_users", "platform_admin"],
-            "admin": ["manage_users"],
+            "platform_admin": ["manage_users", "platform_admin", "respond_identities"],
+            "admin": ["manage_users", "respond_identities"],
             "tenant_admin": ["manage_users"],
             "soc_lead": [],
             "soc_analyst": [],
@@ -1262,7 +1262,7 @@ class TestCapabilities:
 
     def test_saving_a_preference_does_not_make_the_console_lose_them(self, world):
         r = world.client.patch("/api/v1/auth/me/preferences", headers=world.auth("p_admin"), json={"preferences": {"theme": "dark"}})
-        assert r.status_code == 200 and r.json()["capabilities"] == ["manage_users"]
+        assert r.status_code == 200 and r.json()["capabilities"] == ["manage_users", "respond_identities"]
 
 
 class TestManageableTenants:

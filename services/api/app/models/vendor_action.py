@@ -17,7 +17,7 @@ class VendorAction(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
-    alert_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("alerts.id", ondelete="CASCADE"), nullable=False)
+    alert_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("alerts.id", ondelete="CASCADE"), nullable=True)  # empty for an account action (migration 144)
     vendor: Mapped[str] = mapped_column(String(40), nullable=False)
     incident_uid: Mapped[str] = mapped_column(String(200), nullable=False)
     action: Mapped[str] = mapped_column(String(20), nullable=False)

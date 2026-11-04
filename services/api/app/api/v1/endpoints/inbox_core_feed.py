@@ -495,7 +495,7 @@ class ClaimRequest(BaseModel):
 
 class ClaimedAction(BaseModel):
     id: uuid.UUID
-    action: Literal["approve", "reject", "resolve", "run_script"]
+    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user"]
     incident_uid: str
     params: dict[str, Any]
 

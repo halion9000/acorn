@@ -2,7 +2,7 @@
 
 /**
  * Identities: every person (e-mail identity) the connected tools know, one row each. Shows which tools know them (as logos), their multi-factor state, and the open alerts that name them; a row opens to
- * every tool's record of the person, the alerts, and a summary of their recent sign-ins. Read only. Backed by GET /api/v1/identities.
+ * every tool's record of the person, the alerts, and a summary of their recent sign-ins. Backed by GET /api/v1/identities. For a Microsoft 365 person, someone with the permission can also ask CORE to sign them out, block or allow their sign-in (AccountActions).
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -14,6 +14,7 @@ import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { safeDistance } from '@/lib/safe-date';
 import { daysAgo } from '@/lib/ago';
 import { clientFromAddress } from '@/components/mssp/ClientPicker';
+import { AccountActions } from './AccountActions';
 
 const SEVERITY_STYLE: Record<string, string> = {
   critical: 'bg-red-500/15 text-red-300 border-red-500/30',
@@ -107,6 +108,9 @@ function Detail({ person }: { person: IdentityPerson }) {
           ))}
         </ul>
         {data.person.mfa_methods && <p className="mt-2 text-xs text-gray-400">Second factor methods: {data.person.mfa_methods}</p>}
+        <div className="mt-3">
+          <AccountActions clientId={person.client_id} email={data.person.email} knownTo={data.person.sources.map((s) => s.vendor)} />
+        </div>
         {data.person.exposure && (
           <div className="mt-3" data-testid="exposure-detail">
             <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">Found in breaches ({data.person.exposure.count})</h4>
@@ -263,6 +267,8 @@ export function IdentitiesView() {
   const [alertTool, setAlertTool] = useState('');
   const [mfa, setMfa] = useState('');
   const [backup, setBackup] = useState('');
+  // Only people with a failed sign-in in the last 24 hours ('failed') or ten or more ('brute_force'): what the two sign-in tiles count.
+  const [signin, setSignin] = useState<'' | 'failed' | 'brute_force'>('');
   const [exposed, setExposed] = useState('');
   const [kind, setKind] = useState('');
   const [hasAlerts, setHasAlerts] = useState(false);
@@ -280,8 +286,8 @@ export function IdentitiesView() {
   }, [search]);
 
   const query: IdentityQuery = useMemo(
-    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, alertSource: alertTool || undefined, backup: backup || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', onlyIn: oneTool && tool ? tool : undefined, sort }),
-    [page, clientId, debounced, tool, alertTool, mfa, backup, exposed, kind, hasAlerts, adminOnly, state, oneTool, sort],
+    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, alertSource: alertTool || undefined, backup: backup || undefined, signin: signin || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', onlyIn: oneTool && tool ? tool : undefined, sort }),
+    [page, clientId, debounced, tool, alertTool, mfa, backup, signin, exposed, kind, hasAlerts, adminOnly, state, oneTool, sort],
   );
   const { data, error, isLoading, mutate } = useSWR(['identities', query], () => identitiesApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
   const { data: clients } = useSWR('mssp-children', () => msspApi.listChildren().catch(() => []), { revalidateOnFocus: false });
@@ -344,14 +350,28 @@ export function IdentitiesView() {
         {tile('Disabled accounts', summary?.disabled, disabledOnly, () => reset(() => setState(state === 'disabled' ? '' : 'disabled')))}
         {tile('In only one tool', summary?.in_one_tool, oneTool, () => setOneTool((v) => !v))}
         {tile('External guests', summary?.guests, kind === 'guest', () => setKind(kind === 'guest' ? '' : 'guest'))}
-        <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-3" data-testid="failed-signins" title="Wrong-password and refused sign-ins in the last 24 hours. Steps that only ask for more proof are not counted.">
+        <button
+          type="button"
+          data-testid="failed-signins"
+          aria-pressed={signin === 'failed'}
+          onClick={() => reset(() => setSignin(signin === 'failed' ? '' : 'failed'))}
+          title="Wrong-password and refused sign-ins in the last 24 hours. Steps that only ask for more proof are not counted. Press to list the people."
+          className={`rounded-lg border p-3 text-left ${signin === 'failed' ? 'border-blue-500 bg-blue-500/10' : 'border-gray-800 bg-gray-900/60'}`}
+        >
           <div className="text-xs text-gray-400">Failed sign-ins (24 h)</div>
           <div className="text-2xl font-semibold text-gray-100">{summary?.failed_signins_24h ?? '—'}</div>
-        </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-3" data-testid="brute-force" title="People with 10 or more failed sign-ins in the last 24 hours.">
+        </button>
+        <button
+          type="button"
+          data-testid="brute-force"
+          aria-pressed={signin === 'brute_force'}
+          onClick={() => reset(() => setSignin(signin === 'brute_force' ? '' : 'brute_force'))}
+          title="People with 10 or more failed sign-ins in the last 24 hours. Press to list them."
+          className={`rounded-lg border p-3 text-left ${signin === 'brute_force' ? 'border-blue-500 bg-blue-500/10' : 'border-gray-800 bg-gray-900/60'}`}
+        >
           <div className="text-xs text-gray-400">Possible brute force</div>
           <div className={`text-2xl font-semibold ${summary?.brute_force ? 'text-red-300' : 'text-gray-100'}`}>{summary?.brute_force ?? '—'}</div>
-        </div>
+        </button>
       </div>
       {oneTool && !tool && <p className="text-xs text-amber-300">Pick a tool below to see the people only that tool knows.</p>}
 
@@ -393,6 +413,11 @@ export function IdentitiesView() {
           <option value="ok">Backed up</option>
           <option value="problem">Backup problem</option>
           <option value="none">No backup tool knows them</option>
+        </select>
+        <select aria-label="Sign-ins" value={signin} onChange={(e) => reset(() => setSignin(e.target.value as '' | 'failed' | 'brute_force'))} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white">
+          <option value="">Any sign-in history</option>
+          <option value="failed">Failed sign-ins (24 h)</option>
+          <option value="brute_force">Possible brute force</option>
         </select>
         <select aria-label="Multi-Factor" value={mfa} onChange={(e) => reset(() => setMfa(e.target.value))} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white">
           <option value="">Any Multi-Factor</option>

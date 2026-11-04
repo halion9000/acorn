@@ -11229,6 +11229,19 @@ paths:
             pattern: ^(user|guest|shared|other)$
           - type: 'null'
           title: Kind
+      - name: signin
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(failed|brute_force)$
+          - type: 'null'
+          description: 'failed: at least one failed sign-in in the last 24 hours;
+            brute_force: ten or more (the two tiles'' lists).'
+          title: Signin
+        description: 'failed: at least one failed sign-in in the last 24 hours; brute_force:
+          ten or more (the two tiles'' lists).'
       - name: sort
         in: query
         required: false
@@ -11369,6 +11382,15 @@ paths:
             pattern: ^(user|guest|shared|other)$
           - type: 'null'
           title: Kind
+      - name: signin
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(failed|brute_force)$
+          - type: 'null'
+          title: Signin
       - name: sort
         in: query
         required: false
@@ -11488,6 +11510,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PersonTicketsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/identities/actions:
+    post:
+      tags:
+      - identities
+      summary: Request Identity Action
+      description: 'Queue one account action for CORE. Returns 202: nothing has happened
+        in Microsoft 365 yet.'
+      operationId: request_identity_action_api_v1_identities_actions_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionBody'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionItem'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - identities
+      summary: Recent Identity Actions
+      description: What was asked for this person in the last week and how each went
+        (read only; anyone who can read alerts can see it).
+      operationId: recent_identity_actions_api_v1_identities_actions_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: email
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 320
+          title: Email
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionList'
         '422':
           description: Validation Error
           content:
@@ -22307,6 +22395,34 @@ components:
       - granted_by
       - created_at
       title: AccessGrantResponse
+    ActionBody:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        email:
+          type: string
+          maxLength: 320
+          title: Email
+        action:
+          type: string
+          enum:
+          - revoke_sessions
+          - disable_user
+          - enable_user
+          title: Action
+        confirm:
+          type: boolean
+          title: Confirm
+          description: True only when the person pressed Yes in the confirmation window.
+          default: false
+      type: object
+      required:
+      - client_id
+      - email
+      - action
+      title: ActionBody
     ActionCount:
       properties:
         action:
@@ -22349,6 +22465,69 @@ components:
       - reversible
       - summary
       title: ActionInfo
+    ActionItem:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        action:
+          type: string
+          title: Action
+        label:
+          type: string
+          title: Label
+        email:
+          type: string
+          title: Email
+        status:
+          type: string
+          enum:
+          - pending
+          - running
+          - done
+          - failed
+          title: Status
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        requested_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requested By
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+      type: object
+      required:
+      - id
+      - action
+      - label
+      - email
+      - status
+      - created_at
+      title: ActionItem
+    ActionList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ActionItem'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: ActionList
     ActionPolicy:
       properties:
         action:
@@ -26315,6 +26494,9 @@ components:
           - reject
           - resolve
           - run_script
+          - revoke_sessions
+          - disable_user
+          - enable_user
           title: Action
         incident_uid:
           type: string

@@ -186,6 +186,29 @@ async def signin_failures(db: Any, scope: Any, now: datetime) -> tuple[int, int]
     return sum(n for _, n in rows), sum(1 for _, n in rows if n >= BRUTE_FORCE_FAILURES)
 
 
+async def failing_people(db: Any, scope: Any, now: datetime, minimum: int) -> set[tuple[uuid.UUID, str]]:
+    """The (client, address) of each person with at least ``minimum`` failed sign-ins in the last 24 hours: 1 is "failed sign-ins", BRUTE_FORCE_FAILURES is "possible brute force". The same rows and the same
+    exclusions as ``signin_failures``, so the list a tile opens holds exactly the people the tile counted."""
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(SigninEvent.tenant_id, SigninEvent.user_principal, func.count())
+                .where(
+                    SigninEvent.tenant_id.in_(scope),
+                    SigninEvent.success.is_(False),
+                    SigninEvent.occurred_at >= now - timedelta(hours=24),
+                    or_(SigninEvent.error_code.is_(None), SigninEvent.error_code.notin_(NOT_FAILURES)),
+                )
+                .group_by(SigninEvent.tenant_id, SigninEvent.user_principal)
+            )
+        ).all()
+    counts: dict[tuple[uuid.UUID, str], int] = {}
+    for tenant, principal, n in rows:
+        key = (tenant, str(principal or "").lower())
+        counts[key] = counts.get(key, 0) + int(n)
+    return {k for k, n in counts.items() if n >= minimum}
+
+
 async def _people(db: Any, owner: uuid.UUID, client_id: uuid.UUID | None) -> tuple[list[Person], dict[str, list[Any]]]:
     """Every person in scope with alerts attached, and the alerts by person."""
     scope, clients = await _scope(db, owner, client_id)
@@ -234,7 +257,7 @@ def summarize(people: list[Person]) -> IdentitySummary:
         in_one_tool=sum(1 for p in people if len(p.vendors) == 1),
         tools=dict(sorted(tools.items())),
         alert_sources=dict(sorted(alert_sources.items())),
-        backup_problems=sum(1 for p in people if any(b.status != "ok" for b in p.backups)),
+        backup_problems=sum(1 for p in people if p.enabled is not False and any(b.status != "ok" for b in p.backups)),
         exposed=sum(1 for p in people if p.exposure is not None),
         guests=sum(1 for p in people if p.kind == "guest"),
         exposed_serious=sum(
@@ -274,6 +297,9 @@ async def list_identities(
     disabled: bool = Query(default=False),
     enabled: bool = Query(default=False, description="Only accounts that are not disabled."),
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
+    signin: str | None = Query(
+        default=None, pattern="^(failed|brute_force)$", description="failed: at least one failed sign-in in the last 24 hours; brute_force: ten or more (the two tiles' lists)."
+    ),
     sort: str = Query(default="alerts"),
 ) -> IdentityList:
     """The people across the connected tools, with the tools that know each, their multi-factor state and their open alerts. The summary counts everyone in scope, whatever the filters."""
@@ -282,9 +308,14 @@ async def list_identities(
     people, _ = await _people(db, user.tenant_id, client_id)
     scope, _clients = await _scope(db, user.tenant_id, client_id)
     failed, brute = await signin_failures(db, scope, datetime.now(UTC))
+    if signin:
+        failing = await failing_people(db, scope, datetime.now(UTC), 1 if signin == "failed" else BRUTE_FORCE_FAILURES)
+        people_in_filter = [p for p in people if (p.tenant_id, p.email.lower()) in failing]
+    else:
+        people_in_filter = people
     rows = sort_people(
         filter_people(
-            people,
+            people_in_filter,
             search=search,
             source=source,
             only_in=only_in,
@@ -359,11 +390,16 @@ async def export_identities(
     disabled: bool = Query(default=False),
     enabled: bool = Query(default=False, description="Only accounts that are not disabled."),
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
+    signin: str | None = Query(default=None, pattern="^(failed|brute_force)$"),
     sort: str = Query(default="alerts"),
 ) -> Response:
     if sort not in SORTS:
         raise HTTPException(status_code=422, detail=f"sort must be one of: {', '.join(SORTS)}")
     people, _ = await _people(db, user.tenant_id, client_id)
+    if signin:
+        scope, _clients = await _scope(db, user.tenant_id, client_id)
+        failing = await failing_people(db, scope, datetime.now(UTC), 1 if signin == "failed" else BRUTE_FORCE_FAILURES)
+        people = [p for p in people if (p.tenant_id, p.email.lower()) in failing]
     rows = sort_people(
         filter_people(
             people,

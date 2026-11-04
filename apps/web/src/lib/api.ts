@@ -834,6 +834,8 @@ export interface IdentityQuery {
   hasAlerts?: boolean;
   alertSource?: string;
   backup?: string;
+  /** failed: a failed sign-in in the last 24 hours; brute_force: ten or more. */
+  signin?: string;
   exposed?: string;
   admin?: boolean;
   disabled?: boolean;
@@ -862,6 +864,7 @@ export const identitiesApi = {
         admin: q.admin ? 'true' : undefined,
         disabled: q.disabled ? 'true' : undefined,
         enabled: q.enabled ? 'true' : undefined,
+        signin: q.signin,
         sort: q.sort,
       } as unknown as Record<string, string>,
     }),
@@ -878,6 +881,7 @@ export const identitiesApi = {
     set('alert_source', q.alertSource);
     set('backup', q.backup);
     set('exposed', q.exposed);
+    set('signin', q.signin);
     set('sort', q.sort);
     if (q.hasAlerts) p.set('has_alerts', 'true');
     if (q.admin) p.set('admin', 'true');
@@ -890,7 +894,26 @@ export const identitiesApi = {
   },
   /** One person: every tool's record of them, their open alerts and a summary of their sign-ins. */
   detail: (clientId: string, email: string) => request<IdentityDetail>('/api/v1/identities/detail', { params: { client_id: clientId, email } }),
+  /** What was asked for this person in the last week (sign out, block, allow) and how each went. */
+  accountActions: (clientId: string, email: string) => request<{ items: AccountActionItem[] }>('/api/v1/identities/actions', { params: { client_id: clientId, email } }),
+  /** Ask CORE to sign a person out everywhere, block their sign-in, or allow it. Returns at once: the answer comes back through accountActions. */
+  requestAccountAction: (body: { client_id: string; email: string; action: AccountActionKind; confirm: boolean }) =>
+    request<AccountActionItem>('/api/v1/identities/actions', { method: 'POST', body: JSON.stringify(body) }),
 };
+
+export type AccountActionKind = 'revoke_sessions' | 'disable_user' | 'enable_user';
+
+export interface AccountActionItem {
+  id: string;
+  action: AccountActionKind | string;
+  label: string;
+  email: string;
+  status: 'pending' | 'running' | 'done' | 'failed';
+  message: string | null;
+  requested_by: string | null;
+  created_at: string;
+  finished_at: string | null;
+}
 
 // ---- inventory: the stock Live Oak holds for clients ----------------------------------------------------------------------------------------------------
 

@@ -335,7 +335,8 @@ def filter_people(
     if backup == "ok":
         rows = [p for p in rows if p.backups and all(b.status == "ok" for b in p.backups)]
     elif backup == "problem":
-        rows = [p for p in rows if any(b.status != "ok" for b in p.backups)]
+        # A disabled account is not a backup problem: nobody signs in to it, so an unprotected or stale mailbox is not something to fix (the tile counts the same way).
+        rows = [p for p in rows if p.enabled is not False and any(b.status != "ok" for b in p.backups)]
     elif backup == "none":
         rows = [p for p in rows if not p.backups]
     if exposed == "any":
@@ -345,7 +346,8 @@ def filter_people(
     if alert_source:
         rows = [p for p in rows if p.alerts_by_source.get(alert_source, 0) > 0]
     if mfa:
-        rows = [p for p in rows if p.mfa == mfa]
+        # "No multi-factor" leaves out disabled accounts, as the tile does: a blocked account cannot be signed in to, with or without a second factor.
+        rows = [p for p in rows if p.mfa == mfa and not (mfa == "none" and p.enabled is False)]
     if admin:
         rows = [p for p in rows if p.admin]
     if disabled:
