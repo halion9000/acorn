@@ -368,6 +368,12 @@ export const authApi = {
     clearSession();
   },
 
+  /** What the server says this person may do right now. The copy kept at sign-in goes stale when a permission is added later, so a control that depends on a new one asks again. */
+  async freshCapabilities(): Promise<string[]> {
+    const user = await request<AuthUser>('/api/v1/auth/me');
+    return user.capabilities ?? [];
+  },
+
   currentUser(): AuthUser | null {
     if (typeof window === 'undefined') return null;
     try {

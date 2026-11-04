@@ -45,9 +45,12 @@ export function canOfferAccountActions(capabilities: string[] | undefined, known
 }
 
 export function AccountActions({ clientId, email, knownTo }: { clientId: string; email: string; knownTo: string[] }) {
-  const [capabilities, setCapabilities] = useState<string[]>([]);
-  useEffect(() => setCapabilities(authApi.currentUser()?.capabilities ?? []), []);
-  const allowed = canOfferAccountActions(capabilities, knownTo);
+  // What the person may do is asked of the server (shared by every row, once a minute), not read only from the copy kept at sign-in: that copy predates a permission added later, and the buttons stayed hidden until
+  // the next sign-in. The cached copy is used until the answer arrives, and if the server cannot be asked.
+  const [cached, setCached] = useState<string[]>([]);
+  useEffect(() => setCached(authApi.currentUser()?.capabilities ?? []), []);
+  const { data: fresh } = useSWR('my-capabilities', () => authApi.freshCapabilities(), { revalidateOnFocus: false, dedupingInterval: 60_000, shouldRetryOnError: false });
+  const allowed = canOfferAccountActions(fresh ?? cached, knownTo);
   const [asking, setAsking] = useState<AccountActionKind | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');

@@ -3,9 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
-const api = vi.hoisted(() => ({ caps: [] as string[], accountActions: vi.fn(), requestAccountAction: vi.fn() }));
+const api = vi.hoisted(() => ({ caps: [] as string[], fresh: null as string[] | null, accountActions: vi.fn(), requestAccountAction: vi.fn() }));
 vi.mock('@/lib/api', () => ({
-  authApi: { currentUser: () => ({ capabilities: api.caps }) },
+  authApi: { currentUser: () => ({ capabilities: api.caps }), freshCapabilities: () => (api.fresh ? Promise.resolve(api.fresh) : Promise.reject(new Error('down'))) },
   identitiesApi: { accountActions: api.accountActions, requestAccountAction: api.requestAccountAction },
 }));
 
@@ -21,6 +21,7 @@ const renderIt = (knownTo = ['cipp', 'huntress']) =>
 
 beforeEach(() => {
   api.caps = ['respond_identities'];
+  api.fresh = null;
   api.accountActions.mockReset().mockResolvedValue({ items: [] });
   api.requestAccountAction.mockReset().mockResolvedValue(item());
 });
@@ -31,6 +32,19 @@ describe('who sees the buttons', () => {
     expect(canOfferAccountActions(['manage_users'], ['cipp'])).toBe(false);
     expect(canOfferAccountActions(undefined, ['cipp'])).toBe(false);
     expect(canOfferAccountActions(['respond_identities'], ['huntress'])).toBe(false);
+  });
+
+  it('shows the buttons when the server says yes even though the copy kept at sign-in predates the permission', async () => {
+    api.caps = ['manage_users'];
+    api.fresh = ['manage_users', 'respond_identities'];
+    renderIt();
+    expect(await screen.findByRole('button', { name: 'Block sign-in' })).toBeInTheDocument();
+  });
+
+  it('hides them when the server says no, even if the old copy said yes', async () => {
+    api.fresh = ['manage_users'];
+    const { container } = renderIt();
+    await waitFor(() => expect(container.textContent).toBe(''));
   });
 
   it('shows nothing, and asks the server nothing, without the permission', () => {
