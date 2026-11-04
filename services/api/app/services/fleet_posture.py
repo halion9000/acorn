@@ -56,6 +56,7 @@ BOARDS: dict[str, tuple[str, tuple[str, ...]]] = {
             "fieldeffect_account_risk",
             "threatmate_google_admins",
             "threatmate_google_failed_logins",
+            "threatmate_google_apps",
         ),
     ),
     "leaks": ("Leaked credentials and documents", ("threatmate_deep_dark_web",)),

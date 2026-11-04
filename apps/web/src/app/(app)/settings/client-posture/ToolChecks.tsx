@@ -99,6 +99,7 @@ const TITLE: Record<string, string> = {
   threatmate_google_admins: 'Google super administrators without 2-Step',
   threatmate_google_stale_accounts: 'Google accounts nobody uses',
   threatmate_google_failed_logins: 'Google accounts with many failed sign-ins',
+  threatmate_google_apps: 'Third-party apps with access to Google mail or Drive',
 };
 
 const STATUS: Record<string, { text: string; className: string }> = {

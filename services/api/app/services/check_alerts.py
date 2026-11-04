@@ -24,6 +24,7 @@ CONNECTOR_TYPE = "aisoc-checks"
 WATCHED: dict[str, tuple[str, str, str]] = {
     "threatmate_google_admins": ("Google super administrators without 2-Step Verification", "high", "not_met"),
     "threatmate_google_failed_logins": ("Many failed Google sign-ins for this client", "medium", "not_met"),
+    "threatmate_google_apps": ("Several third-party apps can read this client's Google mail or every Drive file", "medium", "not_met"),
     "threatmate_deep_dark_web": ("New deep and dark web findings for this client", "high", "partly"),
     "meraki_admin_2fa": ("Meraki administrators without two-factor sign-in", "high", "not_met"),
     "dnsfilter_org_mfa": ("DNSFilter organization without multi-factor sign-in", "medium", "not_met"),

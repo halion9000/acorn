@@ -158,3 +158,11 @@ def test_the_fleet_board_rows_say_whether_an_alert_exists_for_the_check():
     from app.api.v1.endpoints.client_posture import FleetBoardRow
 
     assert FleetBoardRow.model_fields["raises_alerts"].default is False
+
+
+def test_more_than_three_google_apps_with_mail_or_drive_access_raise_a_medium_alert_but_a_few_do_not():
+    worse = specs([check("threatmate_google_apps", "met")], [check("threatmate_google_apps", "not_met", "5 of 9 third-party apps can read mail or every Drive file")])
+    assert [(a["key"], a["severity"]) for a in worse] == [("threatmate_google_apps", "medium")]
+    assert specs([check("threatmate_google_apps", "met")], [check("threatmate_google_apps", "partly", "2 of 9 third-party apps can read mail or every Drive file")]) == [], "a few chosen apps is not news"
+    assert specs([check("threatmate_google_apps", "not_met")], [check("threatmate_google_apps", "not_met")]) == [], "an unchanged result raises nothing again"
+
