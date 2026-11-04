@@ -28,10 +28,20 @@ async def record_scope(_db, tenant_id):
 
 
 
+crossed: list[int] = []
+
+
+@contextlib.asynccontextmanager
+async def record_cross(_db):
+    crossed.append(1)
+    yield
+
+
 @pytest.fixture(autouse=True)
 def _record_scope(monkeypatch):
     """The real one sets a Postgres setting; these tests run on SQLite. Patched per test (not at import): other alert test files replace the same name, and whichever imported last used to win."""
     monkeypatch.setattr(ep, "acting_as_tenant", record_scope)
+    monkeypatch.setattr(ep, "cross_tenant_reads", record_cross)
 
 
 def run(fn):
@@ -46,6 +56,7 @@ def run(fn):
                 await engine.dispose()
 
     scoped.clear()
+    crossed.clear()
     return asyncio.run(main())
 
 
@@ -164,13 +175,58 @@ def test_a_client_sees_only_itself_and_a_plain_tenant_reads_unscoped():
     run(go)
 
 
-def test_each_tenant_is_read_as_itself():
+def test_several_tenants_are_read_in_one_block_across_them_not_entered_one_by_one():
     async def go(s):
-        parent, a, b, _ = await seed(s)
-        await call(s, parent.id)
-        assert set(scoped) == {parent.id, a.id, b.id}
+        parent, a, b, other = await seed(s)
+        scoped.clear()
+        crossed.clear()
+        out = await call(s, parent.id)
+        assert scoped == [], "no client is entered on its own any more: entering each cost four statements before its query"
+        assert crossed, "the read is made inside the cross-tenant read block"
+        assert {i.title for i in out.items} == {"own", "setpoint-new", "setpoint-old", "tecovas"}, "the organization and its clients, and nobody else (the unrelated tenant's alert is not here)"
 
     run(go)
+
+
+def test_the_number_of_statements_does_not_grow_with_the_number_of_clients():
+    async def counted(extra):
+        statements = []
+
+        async def go(s):
+            parent, a, b, _other = await seed(s)
+            for i in range(extra):
+                c = tenant(f"Extra {i}", parent.id)
+                s.add(c)
+                await s.flush()
+                s.add(alert(c, f"extra-{i}", i))
+            await s.commit()
+            original = s.execute
+
+            async def counting(*args, **kwargs):
+                statements.append(1)
+                return await original(*args, **kwargs)
+
+            s.execute = counting  # type: ignore[method-assign]
+            out = await call(s, parent.id)
+            s.execute = original  # type: ignore[method-assign]
+            return out.total
+
+        return await go_with(counted_go=go), len(statements)
+
+    async def go_with(counted_go):
+        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+        async with engine.begin() as c:
+            await c.run_sync(lambda conn: Base.metadata.create_all(conn, tables=[Tenant.__table__, Alert.__table__]))
+        async with async_sessionmaker(engine, expire_on_commit=False)() as s:
+            try:
+                return await counted_go(s)
+            finally:
+                await engine.dispose()
+
+    few_total, few = asyncio.run(counted(2))
+    many_total, many = asyncio.run(counted(40))
+    assert (few_total, many_total) == (6, 44)
+    assert many == few, f"{few} statements for 5 clients but {many} for 43: the list must not cost more per client"
 
 
 def test_summary_counts_the_whole_scope_whatever_the_severity_and_status_filters_say():
@@ -368,9 +424,7 @@ def test_a_client_with_no_alerts_adds_nothing_and_is_never_entered_but_the_count
         out = await call(s, parent.id, severity="critical")
         assert (out.total, out.items) == (0, []), "the filter matches nothing"
         assert out.summary.total == 4, "but the counts still cover every client with alerts"
-        assert (
-            empty.id not in scoped
-        ), "a client with no alerts is found out in one grouped read and never entered (entering each of 224 clients took seven seconds)"
+        assert scoped == [], "no client is entered on its own (entering each of 224 clients took seven seconds)"
         full = await call(s, parent.id)
         assert full.total == 4 and out.summary.total == full.summary.total
 
@@ -384,9 +438,7 @@ def test_skipping_the_empty_clients_changes_no_result_and_the_old_way_is_the_fal
         await s.commit()
         fast = await call(s, parent.id)
         with patch.object(ep, "tenants_holding_alerts", AsyncMock(return_value=None)):
-            scoped.clear()
             slow = await call(s, parent.id)
-            assert len(set(scoped)) >= 6, "with the grouped read unavailable every client is entered, as before"
         assert fast.model_dump() == slow.model_dump()
         assert (fast.total, fast.summary.total) == (4, 4)
 
@@ -411,19 +463,13 @@ def test_the_tenants_holding_alerts_are_the_ones_with_a_row_and_a_failed_read_gi
     run(go)
 
 
-def test_the_counts_and_the_list_see_each_client_in_one_scope_not_two():
-    """Each client is entered once for its counts and the page's newest alerts. A client that has rows on the page is entered once more, to read those rows in full (the first read is only of times and ids)."""
-
+def test_the_counts_and_the_list_come_from_the_same_one_read_and_agree():
     async def go(s):
         parent, a, b, _other = await seed(s)
-        scoped.clear()
         got = await call(s, parent.id)
-        entered = {tid: scoped.count(tid) for tid in set(scoped)}
-        assert set(entered) == {parent.id, a.id, b.id}
-        on_the_page = {i.client_name for i in got.items}
-        assert len(on_the_page) == 3
-        assert all(n <= 2 for n in entered.values()), entered
-        assert sum(entered.values()) == 3 + 3, "three for the counts and the list, three more to read the page's rows"
+        assert len(crossed) >= 1 and scoped == []
+        assert {i.client_name for i in got.items} == {None, "Setpoint", "Tecovas"}
+        assert got.total == 4 and got.summary.total == 4
 
     run(go)
 

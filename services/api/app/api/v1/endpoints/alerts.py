@@ -9,7 +9,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import Text, and_, cast, func, not_, or_, select, update
+from sqlalchemy import Text, and_, cast, false, func, not_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -723,7 +723,8 @@ def _aware(moment: datetime) -> datetime:
 
 def _repeat_key() -> tuple:
     """What makes two alerts repeats of each other: the same rule (or title) about the same machines and the same users."""
-    return (func.lower(func.coalesce(Alert.rule_name, Alert.title)), cast(Alert.affected_hosts, Text), cast(Alert.affected_users, Text))
+    # The client is part of the key: two clients can each have a machine called PC-01, and their alerts are never repeats of each other (this lets several clients be read in one query).
+    return (Alert.tenant_id, func.lower(func.coalesce(Alert.rule_name, Alert.title)), cast(Alert.affected_hosts, Text), cast(Alert.affected_users, Text))
 
 
 async def _newest_of_each_repeat(db: Any, flt: Any, limit: int, offset: int) -> tuple[int, list[tuple[Alert, int]]]:
@@ -844,8 +845,8 @@ async def list_alerts(
         else ""
     )
 
-    def filters_for(tenant_id: uuid.UUID) -> list:
-        filters = [Alert.tenant_id == tenant_id, *date_filters]
+    def filters_for(tenant_id: uuid.UUID, tenant_predicate: Any = None) -> list:
+        filters = [tenant_predicate if tenant_predicate is not None else Alert.tenant_id == tenant_id, *date_filters]
         if severity:
             filters.append(Alert.severity == severity)
         if status == OPEN_STATUS:
@@ -934,49 +935,39 @@ async def list_alerts(
             (await db.execute(select(Alert).where(flt).order_by(Alert.created_at.desc()).offset(offset).limit(page_size))).scalars().all()
         )
     else:
-        # Several tenants: each is read as itself (row-level security keeps every read inside one tenant), then merged newest first.
-        total = 0
-        merged: list[Alert] = []
-        # Without collapsing, only the (time, id) of each client's newest ``offset + page_size`` alerts is read to find the page; the full alerts (with their raw events) are then read for the page's own rows only.
-        heads: list[tuple[datetime, uuid.UUID, uuid.UUID]] = []
+        # Several tenants: ONE read across all of them. Entering each client in turn (four or more statements apiece before the query itself) took two to eight seconds for an organization with a hundred
+        # clients holding alerts, and the database itself answers in well under a second. Every query still names exactly the clients it reads (``tenant_id IN`` the caller's scope), inside the
+        # sanctioned cross-tenant read block, and clients that hold no alerts are left out as before.
         holding = await tenants_holding_alerts(db, scope)
-        for tid in scope:
-            if holding is not None and tid not in holding:
-                continue  # holds no alerts: nothing to list and nothing to count
-            flt = and_(*filters_for(tid))
-            async with acting_as_tenant(db, tid):
-                held = await add_tally(tid)  # read in the same scope, so a tenant is entered once for the list and its counts
-                tallied.add(tid)
-                if held == 0:
-                    continue  # no alerts at all, so none match whatever the filters say
-                if collapse:
-                    groups, found = await _newest_of_each_repeat(db, flt, offset + page_size, 0)
-                    total += groups
-                    merged.extend(alert for alert, _n in found)
-                    repeats.update({alert.id: n for alert, n in found})
-                    continue
-                total += (await db.execute(select(func.count()).select_from(Alert).where(flt))).scalar_one()
-                newest = (
-                    await db.execute(
-                        select(Alert.created_at, Alert.id).where(flt).order_by(Alert.created_at.desc(), Alert.id).limit(offset + page_size)
-                    )
-                ).all()
-                heads.extend((_aware(created), alert_id, tid) for created, alert_id in newest)
-        if collapse:
-            merged.sort(key=lambda a: _aware(a.created_at), reverse=True)
-            rows = merged[offset : offset + page_size]
-        else:
-            heads.sort(key=lambda h: (h[0], h[1].int), reverse=True)
-            page_heads = heads[offset : offset + page_size]
-            by_tenant: dict[uuid.UUID, list[uuid.UUID]] = {}
-            for _created, alert_id, tid in page_heads:
-                by_tenant.setdefault(tid, []).append(alert_id)
-            loaded: dict[uuid.UUID, Alert] = {}
-            for tid, ids in by_tenant.items():
-                async with acting_as_tenant(db, tid):
-                    for alert in (await db.execute(select(Alert).where(Alert.tenant_id == tid, Alert.id.in_(ids)))).scalars().all():
-                        loaded[alert.id] = alert
-            rows = [loaded[alert_id] for _created, alert_id, _tid in page_heads if alert_id in loaded]
+        reading = [t for t in scope if holding is None or t in holding]
+        hit = [t for t in reading if t in client_hits]
+        rest = [t for t in reading if t not in client_hits]
+        parts = []
+        if hit:  # a client whose name matched the search: all its alerts, the text is not asked of them
+            parts.append(and_(*filters_for(hit[0], Alert.tenant_id.in_(hit))))
+        if rest:
+            parts.append(and_(*filters_for(rest[0], Alert.tenant_id.in_(rest))))
+        flt = or_(*parts) if parts else false()
+        async with cross_tenant_reads(db):
+            if reading:
+                scoped_base = and_(Alert.tenant_id.in_(reading), *date_filters, Alert.raw_event["source"].astext == source) if source else and_(Alert.tenant_id.in_(reading), *date_filters)
+                for sev, st, n in (await db.execute(select(Alert.severity, Alert.status, func.count()).where(scoped_base).group_by(Alert.severity, Alert.status))).all():
+                    tally["total"] += n
+                    tally["critical"] += n if sev == "critical" else 0
+                    tally["high"] += n if sev == "high" else 0
+                    tally["unresolved"] += n if st in _UNRESOLVED else 0
+                if tally["total"]:
+                    tally["no_ticket"] += (
+                        await db.execute(select(func.count()).select_from(Alert).where(and_(scoped_base, Alert.status.notin_(FINISHED_STATUSES), not_(has_ticket_expr()))))
+                    ).scalar_one() or 0
+            tallied.update(scope)
+            if collapse:
+                total, found = await _newest_of_each_repeat(db, flt, page_size, offset)
+                rows = [alert for alert, _n in found]
+                repeats = {alert.id: n for alert, n in found}
+            else:
+                total = (await db.execute(select(func.count()).select_from(Alert).where(flt))).scalar_one()
+                rows = (await db.execute(select(Alert).where(flt).order_by(Alert.created_at.desc(), Alert.id).offset(offset).limit(page_size))).scalars().all()
 
     # The tally covers the whole scope (within the chosen dates), so it doesn't change as the severity / status buttons are used.
     for tid in scope:
