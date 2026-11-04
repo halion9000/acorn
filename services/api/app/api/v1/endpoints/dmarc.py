@@ -26,7 +26,7 @@ from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services import bimi as bimi_check
-from app.services import blocklist, safe_fetch
+from app.services import blocklist, mta_sts, safe_fetch
 from app.services import reputation as reputation_service
 from app.services.dmarc_senders import identify_sender
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domain
@@ -433,6 +433,15 @@ async def countries(
     )
 
 
+class MtaStsOut(BaseModel):
+    state: str  # none (no record), unreadable (record but no readable policy), ok
+    mode: str | None = None  # enforce, testing or none
+    max_age: int | None = None  # seconds senders remember the policy
+    mx_patterns: list[str] = []
+    uncovered_mx: list[str] = []  # real mail servers the policy's list does not cover
+    issues: list[str] = []
+
+
 class ReportCard(BaseModel):
     domain: str
     days: int
@@ -442,13 +451,16 @@ class ReportCard(BaseModel):
     posture: DomainPosture  # the live DNS check: mail records, SPF, DMARC, DKIM
     spf_lookups: int | None = None  # DNS lookups the SPF record costs through every include (the limit is 10); None when there is no SPF record
     spf_lookups_complete: bool = True  # False when part of the chain could not be read: spf_lookups is then a minimum
+    mta_sts: MtaStsOut | None = None  # the MTA-STS policy (RFC 8461): whether senders must use an encrypted, correctly named connection
     advice: list[str]  # plain-language next steps, most useful first
 
 
 MIN_MAIL_TO_JUDGE = 100
 
 
-def report_card_advice(policy: str, pass_rate: float | None, total: int, posture: DomainPosture, lookups: SpfLookups | None = None) -> list[str]:
+def report_card_advice(
+    policy: str, pass_rate: float | None, total: int, posture: DomainPosture, lookups: SpfLookups | None = None, sts: mta_sts.MtaSts | None = None
+) -> list[str]:
     """What to do next for one domain, from its published policy, how much of its mail passes, and what DNS says. Rules only: no guessing about senders."""
     out: list[str] = []
     has_mail = bool(posture.mx)
@@ -482,7 +494,14 @@ def report_card_advice(policy: str, pass_rate: float | None, total: int, posture
             )
         elif lookups.complete and lookups.count >= SPF_WARN_AT:
             out.append(f"SPF uses {lookups.count} of the {SPF_LIMIT} DNS lookups receivers allow. Adding one more sender could push it over and break SPF for everyone.")
+    if sts is not None:
+        out.extend(mta_sts.advice(sts, has_mail))
     return out
+
+
+def get_mta_sts_fetcher() -> mta_sts.Fetcher:
+    """How the MTA-STS policy file is fetched (replaced in tests)."""
+    return mta_sts.public_fetch
 
 
 @router.get("/domains/{domain}/card", response_model=ReportCard, summary="One domain's report card: results, live DNS check and next steps")
@@ -491,6 +510,7 @@ async def domain_report_card(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
     db: DBSession,
     resolver: Annotated[Resolver, Depends(get_resolver)],
+    sts_fetch: Annotated[mta_sts.Fetcher, Depends(get_mta_sts_fetcher)],
     days: int = Query(30, ge=1, le=365),
 ) -> ReportCard:
     """Only a domain that has reports in the caller's data is checked (so this cannot be used to probe arbitrary domains)."""
@@ -503,6 +523,7 @@ async def domain_report_card(
     posture = await check_domain(clean, resolver)
     has_spf = posture.spf.status != "missing"
     lookups = await count_spf_lookups(clean, resolver) if has_spf else None
+    sts = await mta_sts.check(clean, resolver, sts_fetch, mx=posture.mx)
     rate = _pct(passed, total)
     return ReportCard(
         domain=clean,
@@ -513,7 +534,8 @@ async def domain_report_card(
         posture=posture,
         spf_lookups=lookups.count if lookups is not None else None,
         spf_lookups_complete=lookups.complete if lookups is not None else True,
-        advice=report_card_advice(newest.policy, rate, total, posture, lookups),
+        mta_sts=MtaStsOut(state=sts.state, mode=sts.mode, max_age=sts.max_age, mx_patterns=sts.mx_patterns, uncovered_mx=sts.uncovered_mx, issues=sts.issues),
+        advice=report_card_advice(newest.policy, rate, total, posture, lookups, sts),
     )
 
 

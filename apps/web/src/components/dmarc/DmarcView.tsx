@@ -83,6 +83,15 @@ export interface DmarcCard {
   spf_lookups?: number | null;
   /** False when part of the chain could not be read, so spf_lookups is a minimum. */
   spf_lookups_complete?: boolean;
+  /** The MTA-STS policy: whether senders must use an encrypted, correctly named connection. Absent from an older server. */
+  mta_sts?: {
+    state: 'none' | 'unreadable' | 'ok';
+    mode: 'enforce' | 'testing' | 'none' | null;
+    max_age: number | null;
+    mx_patterns: string[];
+    uncovered_mx: string[];
+    issues: string[];
+  } | null;
   advice: string[];
 }
 export interface DmarcLookalikes {
@@ -226,6 +235,19 @@ export function spfLookupRow(count: number | null | undefined, complete: boolean
   return [['SPF lookups', tone, `${partial ? 'at least ' : ''}${count} of 10${partial ? ' (part of the chain could not be read)' : count > 10 ? ': receivers treat SPF as failed' : ''}`]];
 }
 
+/** The MTA-STS row. No policy is only "needs work" for a domain that receives mail (the caller decides by passing hasMail); a policy that misses a real mail server is the one red result. Nothing when the server did not say. */
+export function mtaStsRow(sts: DmarcCard['mta_sts'], hasMail: boolean): [string, string, string][] {
+  if (!sts) return [];
+  if (sts.state === 'none') return hasMail ? [['MTA-STS', 'needs_work', 'No policy published']] : [];
+  if (sts.state === 'unreadable') return [['MTA-STS', 'unknown', 'A record exists but the policy could not be read']];
+  const days = sts.max_age === null ? null : Math.round(sts.max_age / 86400);
+  const age = days === null ? '' : `, remembered ${days < 1 ? 'under a day' : `${days} day${days === 1 ? '' : 's'}`}`;
+  if (sts.mode === 'enforce' && sts.uncovered_mx.length > 0) return [['MTA-STS', 'missing', `Enforced but does not list ${sts.uncovered_mx[0]}: senders will refuse that server`]];
+  if (sts.mode === 'enforce') return [['MTA-STS', sts.issues.length > 0 ? 'needs_work' : 'good', `Enforced${age}`]];
+  if (sts.mode === 'testing') return [['MTA-STS', 'needs_work', `Testing only${age}`]];
+  return [['MTA-STS', 'needs_work', sts.mode === 'none' ? 'Switched off (mode none)' : 'Policy has no readable mode']];
+}
+
 const findingTone = (status: string) => (status === 'good' ? 'text-emerald-300' : status === 'needs_work' ? 'text-amber-300' : status === 'unknown' ? 'text-gray-400' : 'text-red-300');
 
 /** One domain's report card: what DNS says right now about its mail, SPF, DMARC and DKIM, and plain-language next steps. Left out when the server cannot produce it. */
@@ -239,6 +261,7 @@ function ReportCardView({ domain, days }: { domain: string; days: number }) {
     ['DMARC', p.dmarc.status, p.dmarc.summary],
     ['DKIM', p.dkim.status, p.dkim.summary],
     ...spfLookupRow(data.spf_lookups, data.spf_lookups_complete),
+    ...mtaStsRow(data.mta_sts, p.mx.length > 0),
   ];
   return (
     <div data-testid="report-card" className="mt-4 rounded-lg border border-gray-800 p-3">

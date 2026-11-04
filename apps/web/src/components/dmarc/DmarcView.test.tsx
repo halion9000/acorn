@@ -6,7 +6,7 @@ import { SWRConfig } from 'swr';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { DmarcView, aliasScript, cleanAliasName, dnsRecordsText, policyLabel, rateTone, spfLookupRow, tlsRecordsText } from './DmarcView';
+import { DmarcView, aliasScript, cleanAliasName, dnsRecordsText, policyLabel, mtaStsRow, rateTone, spfLookupRow, tlsRecordsText } from './DmarcView';
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const status = { configured: true, mailbox: 'lodmarc@goliveoak.com', last_run_at: new Date().toISOString(), last_error: null, stored: 14, rejected: 0, unmatched_reports: 0 };
@@ -668,5 +668,24 @@ describe('the SPF lookup row', () => {
     const shown = await screen.findByTestId('report-card');
     expect(within(shown).getByTestId('card-spf-lookups')).toHaveTextContent('9 of 10');
     expect(within(shown).getByTestId('card-spf-lookups')).toHaveClass('text-amber-300');
+  });
+});
+
+describe('the MTA-STS row', () => {
+  const sts = (o: Record<string, unknown>) => ({ state: 'ok', mode: 'enforce', max_age: 604800, mx_patterns: [], uncovered_mx: [], issues: [], ...o }) as never;
+  it('says nothing without an answer, and mentions a missing policy only for a domain that receives mail', () => {
+    expect(mtaStsRow(undefined, true)).toEqual([]);
+    expect(mtaStsRow(sts({ state: 'none', mode: null, max_age: null }), false)).toEqual([]);
+    expect(mtaStsRow(sts({ state: 'none', mode: null, max_age: null }), true)[0]).toEqual(['MTA-STS', 'needs_work', 'No policy published']);
+  });
+  it('is green for a clean enforced policy and red when an enforced one misses a real mail server', () => {
+    expect(mtaStsRow(sts({}), true)[0]).toEqual(['MTA-STS', 'good', 'Enforced, remembered 7 days']);
+    const red = mtaStsRow(sts({ uncovered_mx: ['mx2.acme.com'] }), true)[0];
+    expect(red[1]).toBe('missing');
+    expect(red[2]).toContain('mx2.acme.com');
+  });
+  it('calls testing and an unreadable policy what they are, never fine', () => {
+    expect(mtaStsRow(sts({ mode: 'testing', max_age: 600 }), true)[0]).toEqual(['MTA-STS', 'needs_work', 'Testing only, remembered under a day']);
+    expect(mtaStsRow(sts({ state: 'unreadable', mode: null }), true)[0][1]).toBe('unknown');
   });
 });

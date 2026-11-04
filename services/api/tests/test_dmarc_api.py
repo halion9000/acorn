@@ -88,6 +88,11 @@ def rep(tenant_id, domain, total, passed, days_ago=1, matched=True, rid=None, po
     )
 
 
+async def no_policy_fetch(url):
+    raise AssertionError("no MTA-STS record was published, so no policy file should be fetched")
+
+
+
 def caller(owner):
     return SimpleNamespace(tenant_id=owner.id)
 
@@ -554,14 +559,14 @@ def test_the_card_checks_dns_only_for_a_domain_that_has_reports_and_combines_it_
         acme, theirs = await tenant(s, "Acme", owner.id), await tenant(s, "Theirs", other.id)
         s.add_all([rep(acme.id, "acme.com", 1000, 990, rows=[line_row("1.1.1.1", 1000)]), rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)])])
         await s.commit()
-        card = await ep.domain_report_card("Acme.com.", caller(owner), s, resolver, days=30)
+        card = await ep.domain_report_card("Acme.com.", caller(owner), s, resolver, no_policy_fetch, days=30)
         before = len(resolver.calls)
         with pytest.raises(HTTPException) as unknown:
-            await ep.domain_report_card("theirs.com", caller(owner), s, resolver, days=30)  # another owner's domain
+            await ep.domain_report_card("theirs.com", caller(owner), s, resolver, no_policy_fetch, days=30)  # another owner's domain
         with pytest.raises(HTTPException) as nothing:
-            await ep.domain_report_card("never-reported.example", caller(owner), s, resolver, days=30)
+            await ep.domain_report_card("never-reported.example", caller(owner), s, resolver, no_policy_fetch, days=30)
         with pytest.raises(HTTPException) as bad:
-            await ep.domain_report_card("not a domain!", caller(owner), s, resolver, days=30)
+            await ep.domain_report_card("not a domain!", caller(owner), s, resolver, no_policy_fetch, days=30)
         return card, before, len(resolver.calls), unknown.value.status_code, nothing.value.status_code, bad.value.status_code
 
     card, before, after, unknown, nothing, bad = run(body)
@@ -787,10 +792,30 @@ def test_the_card_reports_the_spf_lookup_count_through_the_includes_and_none_wit
         acme, bare = await tenant(s, "Acme", owner.id), await tenant(s, "Bare", owner.id)
         s.add_all([rep(acme.id, "acme.com", 1000, 990, rows=[line_row("1.1.1.1", 1000)]), rep(bare.id, "bare.example", 1000, 990, rows=[line_row("2.2.2.2", 1000)])])
         await s.commit()
-        full = await ep.domain_report_card("acme.com", caller(owner), s, DnsResolver(records, {"acme.com": ["mx.acme.com"]}), days=30)
-        none = await ep.domain_report_card("bare.example", caller(owner), s, DnsResolver({}, {}), days=30)
+        full = await ep.domain_report_card("acme.com", caller(owner), s, DnsResolver(records, {"acme.com": ["mx.acme.com"]}), no_policy_fetch, days=30)
+        none = await ep.domain_report_card("bare.example", caller(owner), s, DnsResolver({}, {}), no_policy_fetch, days=30)
         return full, none
 
     full, none = run(body)
     assert (full.spf_lookups, full.spf_lookups_complete) == (2 + 3 + 1 + 1, True)  # two includes, then a+mx+include, mx, and c's a
     assert (none.spf_lookups, none.spf_lookups_complete) == (None, True)
+
+
+def test_the_card_carries_the_mta_sts_result_and_its_advice_with_the_real_mail_servers():
+    # The published policy lists one mail server; the domain's real MX is another: enforced, so senders would refuse to deliver.
+    async def policy(url):
+        assert url == "https://mta-sts.acme.com/.well-known/mta-sts.txt"
+        return "\n".join(["version: STSv1", "mode: enforce", "mx: other.example.net", "max_age: 604800", ""]).encode()
+
+    records = {"acme.com": ["v=spf1 -all"], "_mta-sts.acme.com": ["v=STSv1; id=1"]}
+
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        acme = await tenant(s, "Acme", owner.id)
+        s.add(rep(acme.id, "acme.com", 1000, 990, rows=[line_row("1.1.1.1", 1000)]))
+        await s.commit()
+        return await ep.domain_report_card("acme.com", caller(owner), s, DnsResolver(records, {"acme.com": ["mx.acme.com"]}), policy, days=30)
+
+    card = run(body)
+    assert card.mta_sts.state == "ok" and card.mta_sts.mode == "enforce" and card.mta_sts.uncovered_mx == ["mx.acme.com"]
+    assert any("mx.acme.com" in line and "refuse to deliver" in line for line in card.advice)
