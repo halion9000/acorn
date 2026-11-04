@@ -10624,7 +10624,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DuplicatesOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__devices__DuplicatesOut'
         '422':
           description: Validation Error
           content:
@@ -11690,6 +11690,54 @@ paths:
           content:
             application/json:
               schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/identities/duplicates:
+    get:
+      tags:
+      - identities
+      summary: Pairs of people of one client who may be the same human, that no automatic
+        rule joined
+      description: 'Likely-but-uncertain pairs, strongest first: the same name, or
+        the same name before the @ on another domain, inside one client. A pair the
+        owner marked "not the same person" is left out; confirming one
+
+        is the existing Merge (POST /identities/merges) and dismissing one is the
+        existing Not the same person (POST /identities/merges/separate). Nothing here
+        changes anything.'
+      operationId: list_duplicates_api_v1_identities_duplicates_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__identities__DuplicatesOut'
         '422':
           description: Validation Error
           content:
@@ -31775,6 +31823,46 @@ components:
       required:
       - tenants
       title: DuplicateGroupOut
+    DuplicateOut:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        a:
+          $ref: '#/components/schemas/PersonOut'
+        b:
+          $ref: '#/components/schemas/PersonOut'
+        score:
+          type: integer
+          title: Score
+        confidence:
+          type: string
+          title: Confidence
+        reasons:
+          items:
+            type: string
+          type: array
+          title: Reasons
+        both_licensed:
+          type: boolean
+          title: Both Licensed
+      type: object
+      required:
+      - client_id
+      - client_name
+      - a
+      - b
+      - score
+      - confidence
+      - reasons
+      - both_licensed
+      title: DuplicateOut
     DuplicatePairOut:
       properties:
         a:
@@ -31818,17 +31906,6 @@ components:
       - name
       - mapped_from
       title: DuplicateTenantOut
-    DuplicatesOut:
-      properties:
-        items:
-          items:
-            $ref: '#/components/schemas/DuplicatePairOut'
-          type: array
-          title: Items
-      type: object
-      required:
-      - items
-      title: DuplicatesOut
     EdgeCreate:
       properties:
         source_id:
@@ -49578,6 +49655,17 @@ components:
       - accepted
       - unmapped
       title: DevicesResponse
+    app__api__v1__endpoints__devices__DuplicatesOut:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DuplicatePairOut'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: DuplicatesOut
     app__api__v1__endpoints__devices__MergeOut:
       properties:
         id:
@@ -49837,6 +49925,21 @@ components:
       - activity
       - actor
       title: ChangeRow
+    app__api__v1__endpoints__identities__DuplicatesOut:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DuplicateOut'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - items
+      - total
+      title: DuplicatesOut
     app__api__v1__endpoints__identities__IdentitySummary:
       properties:
         total:

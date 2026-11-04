@@ -16,6 +16,7 @@ import { daysAgo } from '@/lib/ago';
 import { clientFromAddress } from '@/components/mssp/ClientPicker';
 import { AccountActions } from './AccountActions';
 import { MergePanel } from './MergePanel';
+import { PossibleDuplicates } from './PossibleDuplicates';
 import { BecSearch } from './BecSearch';
 
 const SEVERITY_STYLE: Record<string, string> = {
@@ -289,6 +290,8 @@ export function IdentitiesView() {
   const [state, setState] = useState<'' | 'enabled' | 'disabled'>('');
   const disabledOnly = state === 'disabled';
   const [oneTool, setOneTool] = useState(false);
+  // The possible-duplicates panel: closed until asked for, because finding the pairs reads every person once more.
+  const [showDuplicates, setShowDuplicates] = useState(false);
   // Active identities: a licensed Microsoft 365 or Google account that is not a guest and not disabled (what the first tile counts).
   // The page opens on the active identities (the first tile). A link that asks for one person or one client (?search=, ?client=) opens on everyone instead, so a disabled account or a guest is not hidden from it.
   const [activeOnly, setActiveOnly] = useState(true);
@@ -459,6 +462,14 @@ export function IdentitiesView() {
         </button>
         <button
           type="button"
+          aria-pressed={showDuplicates}
+          onClick={() => setShowDuplicates((v) => !v)}
+          className={`rounded-md border px-2 py-1.5 text-sm text-white ${showDuplicates ? 'border-blue-500 bg-blue-500/10' : 'border-gray-700 bg-gray-900 hover:bg-gray-800'}`}
+        >
+          Possible duplicates
+        </button>
+        <button
+          type="button"
           onClick={() => {
             // What was typed is applied now (not after the short typing pause), then the list is asked for again.
             setDebounced(search);
@@ -475,6 +486,7 @@ export function IdentitiesView() {
           </span>
         ) : null}
       </div>
+      {showDuplicates ? <PossibleDuplicates clientId={clientId || undefined} onChanged={() => void mutate()} /> : null}
       {exportError && (
         <p role="alert" className="text-xs text-red-300">
           {exportError}

@@ -575,6 +575,60 @@ class PersonDetail(BaseModel):
     changes: list[ChangeRow] = Field(default_factory=list)
 
 
+class DuplicateOut(BaseModel):
+    client_id: uuid.UUID
+    client_name: str | None
+    a: PersonOut
+    b: PersonOut
+    score: int
+    confidence: str  # high or medium
+    reasons: list[str]
+    both_licensed: bool  # two paid seats: merging is a deliberate choice
+
+
+class DuplicatesOut(BaseModel):
+    items: list[DuplicateOut]
+    total: int
+
+
+@router.get(
+    "/duplicates",
+    response_model=DuplicatesOut,
+    dependencies=[Depends(require_permission("alerts:read"))],
+    summary="Pairs of people of one client who may be the same human, that no automatic rule joined",
+)
+async def list_duplicates(
+    user: AuthUser,
+    db: DBSession,
+    client_id: uuid.UUID | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> DuplicatesOut:
+    """Likely-but-uncertain pairs, strongest first: the same name, or the same name before the @ on another domain, inside one client. A pair the owner marked "not the same person" is left out; confirming one
+    is the existing Merge (POST /identities/merges) and dismissing one is the existing Not the same person (POST /identities/merges/separate). Nothing here changes anything."""
+    from app.services.identity_duplicates import find_duplicates  # noqa: PLC0415
+
+    people, _ = await _people(db, user.tenant_id, client_id)
+    scope, _clients = await _scope(db, user.tenant_id, client_id)
+    _merges, separate = await owner_decisions(db, scope)
+    found = find_duplicates(people, separate, limit)
+    return DuplicatesOut(
+        items=[
+            DuplicateOut(
+                client_id=p.client_id,
+                client_name=p.a.client_name,
+                a=_out(p.a),
+                b=_out(p.b),
+                score=p.score,
+                confidence=p.label,
+                reasons=p.reasons,
+                both_licensed=p.both_licensed,
+            )
+            for p in found
+        ],
+        total=len(found),
+    )
+
+
 @router.get("/detail", response_model=PersonDetail, dependencies=[Depends(require_permission("alerts:read"))])
 async def identity_detail(
     user: AuthUser, db: DBSession, client_id: uuid.UUID, email: Annotated[str, Query(max_length=320)]

@@ -3,8 +3,8 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), listChildren: vi.fn(), exportCsv: vi.fn() }));
-vi.mock('@/lib/api', () => ({ identitiesApi: { list: api.list, detail: api.detail, exportCsv: api.exportCsv, decisions: () => Promise.resolve({ items: [] }) }, msspApi: { listChildren: api.listChildren }, authApi: { currentUser: () => ({ capabilities: [] }) } }));
+const api = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), listChildren: vi.fn(), exportCsv: vi.fn(), duplicates: vi.fn(), mergePeople: vi.fn(), separatePeople: vi.fn() }));
+vi.mock('@/lib/api', () => ({ identitiesApi: { list: api.list, detail: api.detail, exportCsv: api.exportCsv, duplicates: api.duplicates, mergePeople: api.mergePeople, separatePeople: api.separatePeople, decisions: () => Promise.resolve({ items: [] }) }, msspApi: { listChildren: api.listChildren }, authApi: { currentUser: () => ({ capabilities: [] }) } }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
 import { IdentitiesView, ticketAge } from './IdentitiesView';
@@ -451,6 +451,22 @@ describe('the export', () => {
   });
 });
 
+
+describe('the possible duplicates panel', () => {
+  it('is closed until asked for (nothing is looked up), opens with the button, and closes again', async () => {
+    api.duplicates.mockResolvedValue({ items: [], total: 0 });
+    show();
+    await screen.findAllByTestId('identity-row');
+    expect(api.duplicates).not.toHaveBeenCalled();
+    expect(screen.queryByRole('region', { name: 'Possible duplicates' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Possible duplicates' }));
+    expect(await screen.findByRole('region', { name: 'Possible duplicates' })).toBeInTheDocument();
+    await waitFor(() => expect(api.duplicates).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: 'Possible duplicates' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Possible duplicates' }));
+    expect(screen.queryByRole('region', { name: 'Possible duplicates' })).not.toBeInTheDocument();
+  });
+});
 
 describe('refreshing the list', () => {
   it('asks again when Refresh is pressed, even though nothing was changed', async () => {

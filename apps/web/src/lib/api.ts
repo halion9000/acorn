@@ -809,6 +809,19 @@ export interface IdentityPerson {
   exposure?: { count: number; latest: string | null; password: boolean; stealer_log: boolean; malware: boolean; breaches: { name: string | null; date: string | null; data: string[] }[] } | null;
 }
 
+/** Two people of one client who may be the same human (GET /api/v1/identities/duplicates). */
+export interface IdentityDuplicate {
+  client_id: string;
+  client_name: string | null;
+  a: IdentityPerson;
+  b: IdentityPerson;
+  score: number;
+  confidence: 'high' | 'medium' | string;
+  reasons: string[];
+  /** Both hold a licence: two paid seats, so merging is a deliberate choice. */
+  both_licensed: boolean;
+}
+
 export interface IdentityList {
   summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; active?: number; failed_signins_24h?: number; brute_force?: number };
   items: IdentityPerson[];
@@ -912,6 +925,9 @@ export const identitiesApi = {
   startBec: (body: { client_id: string; email: string; confirm: boolean }) => request<BecCaseItem>('/api/v1/identities/bec', { method: 'POST', body: JSON.stringify(body) }),
   /** One search with its whole report. */
   becCase: (clientId: string, id: string) => request<BecCaseDetail>(`/api/v1/identities/bec/${encodeURIComponent(id)}`, { params: { client_id: clientId } }),
+  /** Pairs of people of one client who may be the same human, strongest first. Nothing changes until one is merged or dismissed. */
+  duplicates: (clientId?: string) =>
+    request<{ items: IdentityDuplicate[]; total: number }>('/api/v1/identities/duplicates', { params: { client_id: clientId, limit: 100 } as unknown as Record<string, string> }),
   /** Say two addresses are one person. Returns once stored; the next list shows them as one row. */
   mergePeople: (body: { client_id: string; email: string; with_email: string }) =>
     request<{ kind: string; email: string; other: string }>('/api/v1/identities/merges', { method: 'POST', body: JSON.stringify(body) }),
