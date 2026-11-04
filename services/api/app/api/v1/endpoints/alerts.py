@@ -854,7 +854,7 @@ async def list_alerts(
             filters.append(Alert.status == status)
         else:
             # Alerts hidden by a "hide this alert type" rule stay out of the list unless they are asked for (status=suppressed).
-            filters.append(Alert.status != "suppressed")
+            filters.append(Alert.status.notin_(("suppressed", "stale")))
         if category:
             filters.append(Alert.category == category)
         if ticket == "linked":

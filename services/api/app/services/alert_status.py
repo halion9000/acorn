@@ -6,6 +6,8 @@ Eight modules each wrote their own list, and they disagreed: the shift handoff, 
 from __future__ import annotations
 
 SUPPRESSED = "suppressed"
+# Set aside for review after a long quiet spell (see alert_stale.py): nothing is left to do about it unless someone restores it.
+STALE = "stale"
 
 # Both spellings are in use: the alerts API and the bulk close write ``false_positive``, older code and imports write ``fp``.
 FALSE_POSITIVE_STATUSES: tuple[str, ...] = ("false_positive", "fp")
@@ -14,7 +16,7 @@ FALSE_POSITIVE_STATUSES: tuple[str, ...] = ("false_positive", "fp")
 HANDLED_ALERT_STATUSES: tuple[str, ...] = ("resolved", "closed", *FALSE_POSITIVE_STATUSES)
 
 # Nothing is left to do: handled, or hidden by a suppression rule.
-FINISHED_ALERT_STATUSES: tuple[str, ...] = (*HANDLED_ALERT_STATUSES, SUPPRESSED)
+FINISHED_ALERT_STATUSES: tuple[str, ...] = (*HANDLED_ALERT_STATUSES, SUPPRESSED, STALE)
 
 
 def is_finished(status: str | None) -> bool:

@@ -42,6 +42,9 @@ class Alert(Base):
     # Set while a "hide this alert type" rule hides the alert (status is then 'suppressed'): the status it had, and the rule, so lifting the rule puts it back (migration 100).
     status_before_suppression: Mapped[str | None] = mapped_column(String(30), nullable=True)
     suppression_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    # Set while the alert is set aside as stale (status is then 'stale'): what it was, and when (migration 147), so a restore puts it back.
+    status_before_stale: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    stale_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     disposition: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     # Timestamp when an analyst first viewed / started triaging the alert (for MTTD)

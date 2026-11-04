@@ -1513,6 +1513,95 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-stale:
+    get:
+      tags:
+      - alerts
+      summary: Stale Summary
+      description: How many alerts are set aside as stale, by client and severity,
+        and the rule that sets them aside.
+      operationId: stale_summary_api_v1_alert_stale_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaleSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-stale/restore:
+    post:
+      tags:
+      - alerts
+      summary: Restore
+      description: Put stale alerts back as they were.
+      operationId: restore_api_v1_alert_stale_restore_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Selection'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Changed'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/alert-stale/close:
+    post:
+      tags:
+      - alerts
+      summary: Close
+      description: Close stale alerts for good.
+      operationId: close_api_v1_alert_stale_close_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Selection'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Changed'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/alerts/{alert_id}/explain:
     post:
       tags:
@@ -26822,6 +26911,15 @@ components:
       - changed
       - detail
       title: ChangePasswordResponse
+    Changed:
+      properties:
+        changed:
+          type: integer
+          title: Changed
+      type: object
+      required:
+      - changed
+      title: Changed
     CheckAcceptanceOut:
       properties:
         reason:
@@ -27072,6 +27170,20 @@ components:
       - match_source
       - suggestions
       title: ClientAliasOut
+    ClientCount:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        count:
+          type: integer
+          title: Count
+      type: object
+      required:
+      - client_id
+      - count
+      title: ClientCount
     ClientCounts:
       properties:
         client_id:
@@ -43241,6 +43353,32 @@ components:
       - can_select_other_tenants
       - tenants
       title: SelectableTenantsResponse
+    Selection:
+      properties:
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+          description: Only this client's stale alerts; none given means every client's.
+        alert_ids:
+          anyOf:
+          - items:
+              type: string
+              format: uuid
+            type: array
+            maxItems: 500
+          - type: 'null'
+          title: Alert Ids
+          description: Only these alerts; none given means all in the client scope.
+        confirm:
+          type: boolean
+          title: Confirm
+          description: True only when the person pressed Yes in the confirmation window.
+          default: false
+      type: object
+      title: Selection
     SenderRow:
       properties:
         name:
@@ -44118,6 +44256,37 @@ components:
       - microsoft
       - password_login
       title: SsoStatus
+    StaleSummary:
+      properties:
+        days:
+          type: integer
+          title: Days
+        exempt_severities:
+          items:
+            type: string
+          type: array
+          title: Exempt Severities
+        total:
+          type: integer
+          title: Total
+        by_client:
+          items:
+            $ref: '#/components/schemas/ClientCount'
+          type: array
+          title: By Client
+        by_severity:
+          additionalProperties:
+            type: integer
+          type: object
+          title: By Severity
+      type: object
+      required:
+      - days
+      - exempt_severities
+      - total
+      - by_client
+      - by_severity
+      title: StaleSummary
     StartBody:
       properties:
         client_id:

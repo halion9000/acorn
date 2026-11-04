@@ -11,11 +11,15 @@ import structlog
 from app.db.database import AsyncSessionLocal
 from app.db.rls_sessions import mark_platform
 from app.services import worker_heartbeat
+from app.core.config import settings
+from app.services.alert_stale import exempt_severities, sweep_stale
 from app.services.alert_suppression import sweep
 
 logger = structlog.get_logger()
 
 INTERVAL_SECONDS = 60
+# Setting alerts aside as stale needs no more than an hourly look.
+STALE_EVERY_SECONDS = 3600
 
 
 async def run_suppression_sweeper(
@@ -24,6 +28,7 @@ async def run_suppression_sweeper(
     """The long-running loop (started under the scheduler lock from the API lifespan). A failed pass never ends it; cancellation does."""
     worker_heartbeat.expect("alert_suppression", INTERVAL_SECONDS, first_turn_after_seconds=20)
     await sleep(20)
+    since_stale = STALE_EVERY_SECONDS  # the first pass checks at once
     while True:
         try:
             async with session_factory() as session:
@@ -31,6 +36,14 @@ async def run_suppression_sweeper(
                 done = await sweep(session)
                 if done["hidden"] or done["expired"]:
                     logger.info("alert_suppression.sweep", **done)
+            if since_stale >= STALE_EVERY_SECONDS:
+                since_stale = 0
+                async with session_factory() as session:
+                    mark_platform(session)
+                    n = await sweep_stale(session, settings.ALERT_STALE_DAYS, exempt_severities(settings.ALERT_STALE_EXEMPT_SEVERITIES))
+                    await session.commit()
+                    if n:
+                        logger.info("alert_stale.swept", set_aside=n)
             worker_heartbeat.beat("alert_suppression")
         except asyncio.CancelledError:
             raise
@@ -38,3 +51,4 @@ async def run_suppression_sweeper(
             logger.warning("alert_suppression.sweeper_error", error=str(exc))
             worker_heartbeat.beat("alert_suppression", error=type(exc).__name__)
         await sleep(INTERVAL_SECONDS)
+        since_stale += INTERVAL_SECONDS

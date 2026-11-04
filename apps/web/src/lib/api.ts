@@ -1823,7 +1823,21 @@ export interface HideSuggestion {
   days: number;
 }
 
+export interface StaleSummary {
+  days: number;
+  exempt_severities: string[];
+  total: number;
+  by_client: { client_id: string; count: number }[];
+  by_severity: Record<string, number>;
+}
+
 export const alertsApi = {
+  /** Alerts set aside as stale (quiet for a month, not critical or high, in no case): how many, and the rule. */
+  staleSummary: (clientId?: string) => request<StaleSummary>('/api/v1/alert-stale', { params: clientId ? { client_id: clientId } : {} }),
+  /** Put stale alerts back as they were. With a client, only that client's. */
+  restoreStale: (body: { client_id?: string; confirm: boolean }) => request<{ changed: number }>('/api/v1/alert-stale/restore', { method: 'POST', body: JSON.stringify(body) }),
+  /** Close stale alerts for good. */
+  closeStale: (body: { client_id?: string; confirm: boolean }) => request<{ changed: number }>('/api/v1/alert-stale/close', { method: 'POST', body: JSON.stringify(body) }),
   /** Hide this alert's type for a device, its client or all clients, for ``days`` days or (null) without end. */
   hideType: (body: { alertId: string; scope: 'device' | 'client' | 'all'; days: number | null; device?: string }) =>
     request<AlertSuppression>('/api/v1/alert-suppressions', {

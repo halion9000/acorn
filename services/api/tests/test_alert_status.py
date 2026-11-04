@@ -25,7 +25,7 @@ from sqlalchemy.dialects import postgresql
 def test_the_lists_say_what_they_mean():
     assert set(FALSE_POSITIVE_STATUSES) == {"false_positive", "fp"}
     assert set(HANDLED_ALERT_STATUSES) == {"resolved", "closed", "false_positive", "fp"}
-    assert set(FINISHED_ALERT_STATUSES) == {"resolved", "closed", "false_positive", "fp", "suppressed"}
+    assert set(FINISHED_ALERT_STATUSES) == {"resolved", "closed", "false_positive", "fp", "suppressed", "stale"}
     assert all(is_finished(s) for s in FINISHED_ALERT_STATUSES)
     assert not any(is_finished(s) for s in ("new", "triaging", "in_progress", "", None))
     assert sql_in(("a", "b'c")) == "'a','b''c'"

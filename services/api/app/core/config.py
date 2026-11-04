@@ -329,6 +329,9 @@ class Settings(BaseSettings):
     RETENTION_RESPONSE_ACTIONS_DEFAULT_DAYS: int = 730
     # Opt in to deleting FINISHED, case-less alerts older than this many days. 0 (the default) keeps every alert forever.
     RETENTION_ALERTS_DAYS: int = 0
+    # Alerts nobody has touched for this many days (not critical or high, in no case) are set aside as stale for review, never deleted. 0 turns it off.
+    ALERT_STALE_DAYS: int = 30
+    ALERT_STALE_EXEMPT_SEVERITIES: str = "critical,high"
     # With RETENTION_ALERTS_DAYS at 0 alerts are kept forever and the platform health page says so, so that is a choice and not an accident. Set this true to say it is a choice and silence the notice.
     RETENTION_ALERTS_KEEP_FOREVER_OK: bool = False
     # Opt in to deleting the posture and count history (each check's status changes, each count's changes and the daily score) older than this many days. 0 (the default) keeps it all.

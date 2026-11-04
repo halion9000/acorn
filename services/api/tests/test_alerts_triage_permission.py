@@ -118,15 +118,15 @@ class TestTheRoutes:
             assert required_permissions(route) == {"alerts:write"}, f"{method} {path}"
         assert NAMED_WRITE_ONLY <= WRITE_ONLY and not (_satisfied_by(["alerts:triage"]) & WRITE_ONLY)
 
-    def test_there_are_32_other_alerts_write_routes_and_whoever_held_alerts_write_still_reaches_all_35(self):
+    def test_there_are_36_other_alerts_write_routes_and_whoever_held_alerts_write_still_reaches_all_39(self):
         assert (
-            len(WRITE_ONLY) == 32
-        ), "a route moved onto or off alerts:write: re-read why, and update this number deliberately (28 + hide and unhide an alert type + bulk close + planned maintenance window, which hides a client's non-critical alerts like a hide rule does)"
+            len(WRITE_ONLY) == 36
+        ), "a route moved onto or off alerts:write: re-read why, and update this number deliberately (28 + hide and unhide an alert type + bulk close + planned maintenance window, which hides a client's non-critical alerts like a hide rule does, + merge two people and mark two addresses as not the same person on the Identities page, + restore and close stale alerts in bulk)"
         assert _satisfied_by(["alerts:write"]) >= TRIAGE_ROUTES | WRITE_ONLY
 
 
 class TestCoresKeyNoLongerReachesTheOtherWrites:
-    def test_cores_real_key_scopes_satisfy_none_of_the_32_other_alerts_write_routes(self):
+    def test_cores_real_key_scopes_satisfy_none_of_the_36_other_alerts_write_routes(self):
         reached = _satisfied_by(bp.CORE_KEY_SCOPES)
         assert not (reached & WRITE_ONLY), sorted(reached & WRITE_ONLY)
 

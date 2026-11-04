@@ -20,6 +20,7 @@ import { loadFilters, saveFilters } from '@/lib/remembered-filters';
 import { rememberable, restoreFilters } from '@/lib/alert-filter-memory';
 import { DATE_PRESETS, dateRangeError, isDateLimited, type DatePreset } from '@/lib/alert-date-range';
 import { sourceLink } from './AlertContext';
+import { StaleReview } from './StaleReview';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
 
 // Wave 1 of the A.C.O.R.N v6 capability roadmap. The "entities" tab renders the
@@ -141,7 +142,7 @@ export function FiltersBar({
   const clients = Array.isArray(clientData) ? [...clientData].sort((a, b) => a.name.localeCompare(b.name)) : [];
   const severities = ['all', 'critical', 'high', 'medium', 'low', 'info'] as const;
   // "open" is every alert that is not finished (resolved, closed or a false positive); "all" has no status filter at all.
-  const statuses = ['open', 'new', 'investigating', 'resolved', 'false_positive', 'all'] as const;
+  const statuses = ['open', 'new', 'investigating', 'resolved', 'false_positive', 'stale', 'all'] as const;
 
   // The box is typed into freely; the list is only re-queried a moment after typing stops (and straight away on Enter or clear).
   const [text, setText] = useState(filters.search ?? '');
@@ -695,6 +696,7 @@ function AlertsTable({
       />
 
       <FiltersBar filters={filters} onChange={onFilterChange} total={total} />
+      {filters.status === 'stale' && <StaleReview clientId={filters.clientId} onChanged={onChanged} />}
 
       {/*
         v1.5 W6 — two-pane layout. On wide screens the queue takes the left
