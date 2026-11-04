@@ -34,3 +34,23 @@ Audit of every value-limiting constraint added since 080 (2026-10-23): each colu
 | `097_client_m365_checks.sql` | Each client's Microsoft 365 baseline checks, read through CIPP (see `docs/M365_CHECKS.md`) |
 | `098_vendor_actions_run_script.sql` | Lets the vendor-actions queue carry `run_script` (the Run script button, single and bulk) |
 | `135_saved_views_devices.sql` | Lets a person save named filter views on the Devices page (`saved_views.view_type` gains `devices`) |
+
+## What 138 to 148 are for
+
+| File | Adds |
+|---|---|
+| `138_tls_reports.sql` | TLS-RPT reports kept per client and domain (one row per policy) |
+| `139_alert_suppression_starts_at.sql` | A start time on a hide rule, so a maintenance window can begin later |
+| `140_domain_registrations.sql` | When each client domain's registration ends (RDAP lookup) |
+| `141_remote_tools.sql` | Remote management and access tools found on client devices, and the owner's decision about each |
+| `142_remote_tool_installs.sql` | Each install of a remote tool on a device, with the server it belongs to |
+| `143_custom_remote_tools.sql` | Remote tools the owner adds to the catalog by hand |
+| `144_identity_actions.sql` | Account actions on the Identities page (sign out everywhere, block, unblock) and the permission for them |
+| `145_identity_merges.sql` | The owner's own merge and "not the same person" decisions on the Identities page |
+| `146_bec_cases.sql` | Business email compromise searches started from the Identities page |
+| `147_alert_stale.sql` | The `stale` alert status and the review of alerts nobody has touched |
+| `148_identity_merges_binary_order.sql` | Fixes the order check on `identity_merges` (see below) |
+
+### Lesson from 148: a text CHECK compares with the database's collation, not Python's
+
+`identity_merges` stores each pair sorted (`address_a < address_b`). The code sorted with Python, which compares by character code. The database's default collation (en_US) ignores punctuation when it compares, so a pair Python called sorted could be refused by the CHECK (or the reverse), and only on a real Postgres. 148 pins the check to `COLLATE "C"`, which is byte order, the same as Python for these addresses. Any new constraint, index or ORDER BY that has to agree with Python's ordering of text needs `COLLATE "C"`, and a test on a real Postgres that compares pairs both ways (`tests/test_identity_merges_postgres.py`).
