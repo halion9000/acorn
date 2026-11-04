@@ -6,7 +6,7 @@ import { SWRConfig } from 'swr';
 const api = vi.hoisted(() => ({ vendorDetections: vi.fn() }));
 vi.mock('@/lib/api', () => ({ detectionApi: { vendorDetections: api.vendorDetections } }));
 
-import { VendorDetectionsView, alertsHref } from './VendorDetectionsView';
+import { VendorDetectionsView, alertsHref, forResolution } from './VendorDetectionsView';
 
 const DATA = {
   window_days: 30,
@@ -116,5 +116,33 @@ describe('VendorDetectionsView', () => {
 
   it('builds the address safely for names with spaces, symbols and quotes', () => {
     expect(alertsHref({ source: 'threatmate', name: 'A&B "x" = 100%?' })).toBe('/alerts?status=all&source=threatmate&q=A%26B%20%22x%22%20%3D%20100%25%3F');
+  });
+
+  it('shows all, only unresolved or only resolved detections, with the counts and the links of that state', async () => {
+    api.vendorDetections.mockResolvedValue(DATA);
+    const user = userEvent.setup();
+    show();
+    const table = await screen.findByRole('table');
+    expect(screen.getByRole('button', { name: 'all (6)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'unresolved (2)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'resolved (4)' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'unresolved (2)' }));
+    expect(within(table).queryByText('Impossible travel')).toBeNull(); // nothing open
+    expect(within(table).getByRole('link', { name: '2' })).toHaveAttribute('href', '/alerts?status=open&source=huntress&q=Malicious%20Process');
+
+    await user.click(screen.getByRole('button', { name: 'resolved (4)' }));
+    expect(within(table).getByRole('link', { name: '3' })).toHaveAttribute('href', '/alerts?status=resolved&source=huntress&q=Malicious%20Process');
+    expect(within(table).getByText('Impossible travel')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'all (6)' }));
+    expect(within(table).getByRole('link', { name: '5' })).toHaveAttribute('href', '/alerts?status=all&source=huntress&q=Malicious%20Process');
+  });
+
+  it('forResolution counts resolved as alerts less open, leaves out detections with none, and never goes negative', () => {
+    const rows = [{ count: 5, open: 2 }, { count: 1, open: 0 }, { count: 3, open: 3 }, { count: 2, open: 9 }];
+    expect(forResolution(rows, 'all')).toEqual(rows);
+    expect(forResolution(rows, 'unresolved').map((r) => r.count)).toEqual([2, 3, 9]);
+    expect(forResolution(rows, 'resolved').map((r) => r.count)).toEqual([3, 1]);
   });
 });
