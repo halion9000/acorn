@@ -18,7 +18,7 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.devices import _as, _scope
 from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
 from app.api.v1.endpoints.signins import targets_by_tenant
-from app.db.rls_scope import acting_as_tenant
+from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.db.rls_sessions import adopt_tenant
 from app.models.client_alias import ClientAlias
 from app.models.signin import BillingDifferenceNote, BillingItemMap, ClientLicenseCount, ClientLicenseHistory
@@ -46,6 +46,15 @@ from app.services.license_counts import (
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
+
+
+async def _all_count_rows(db: Any, client_ids: list[uuid.UUID]) -> list[Any]:
+    """Every count row of the given clients in ONE read (inside the cross-tenant read block, naming exactly those clients). Entering each client in turn cost four statements apiece, which for two hundred clients was the
+    whole of the several seconds these pages took; the database answers the one read in a few milliseconds."""
+    if not client_ids:
+        return []
+    async with cross_tenant_reads(db):
+        return list((await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id.in_(client_ids)))).scalars().all())
 
 
 class WasteOut(BaseModel):
@@ -78,10 +87,7 @@ async def licence_waste(
 
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, None)
-    counts: list[Any] = []
-    for cid in ids[1:]:
-        async with _as(db, owner, cid):
-            counts += list((await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == cid))).scalars().all())
+    counts = await _all_count_rows(db, ids[1:])
     rows = waste_rows(counts, names, datetime.now(UTC), minimum)
     return WasteReport(
         rows=[WasteOut(**r.__dict__) for r in rows[:limit]],
@@ -427,11 +433,9 @@ class MapOut(BaseModel):
 
 async def _all_client_counts(db: Any, owner: uuid.UUID) -> tuple[dict[uuid.UUID, list[dict[str, Any]]], dict[uuid.UUID, str]]:
     ids, names = await _scope(db, owner, None)
-    out: dict[uuid.UUID, list[dict[str, Any]]] = {}
-    for cid in ids[1:]:
-        async with _as(db, owner, cid):
-            held = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == cid))).scalars().all()
-        out[cid] = [{"source": r.source, "item": r.item, "count": r.count, "unit": r.unit} for r in held]
+    out: dict[uuid.UUID, list[dict[str, Any]]] = {cid: [] for cid in ids[1:]}
+    for r in await _all_count_rows(db, ids[1:]):
+        out[r.tenant_id].append({"source": r.source, "item": r.item, "count": r.count, "unit": r.unit})
     return out, names
 
 
@@ -769,15 +773,7 @@ async def last_reported_grid(
 ) -> list[LastReportedRow]:
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, None)
-    rows: list[dict[str, Any]] = []
-    for cid in ids[1:]:
-        async with _as(db, owner, cid):
-            held = (
-                await db.execute(
-                    select(ClientLicenseCount.source, ClientLicenseCount.updated_at).where(ClientLicenseCount.tenant_id == cid)
-                )
-            ).all()
-        rows += [{"client": cid, "source": src, "updated_at": at} for src, at in held]
+    rows: list[dict[str, Any]] = [{"client": r.tenant_id, "source": r.source, "updated_at": r.updated_at} for r in await _all_count_rows(db, ids[1:])]
     out = [
         LastReportedRow(
             client_id=r["client"],

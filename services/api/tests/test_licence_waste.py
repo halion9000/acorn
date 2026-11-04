@@ -51,18 +51,20 @@ def test_the_route_adds_the_rows_and_needs_the_billing_permission(monkeypatch):
     import app.api.v1.endpoints.billing as module
 
     monkeypatch.setattr(module, "_scope", AsyncMock(return_value=([uuid.uuid4(), A, B], NAMES)))
-    monkeypatch.setattr(module, "_as", lambda db, owner, tid: contextlib.nullcontext())
-    held = {A: [count(A, "Business Premium", 50, 5)], B: [count(B, "E3", 20, 12)]}
-    calls = iter([held[A], held[B]])
+    monkeypatch.setattr(module, "cross_tenant_reads", lambda db: contextlib.nullcontext())
+    every = [count(A, "Business Premium", 50, 5), count(B, "E3", 20, 12)]
+    statements = []
 
-    async def execute(_statement):
+    async def execute(statement):
+        statements.append(statement)
         out = MagicMock()
-        out.scalars.return_value.all.return_value = next(calls)
+        out.scalars.return_value.all.return_value = every
         return out
 
     db = NS(execute=AsyncMock(side_effect=execute))
     out = asyncio.run(module.licence_waste(NS(tenant_id=uuid.uuid4()), db, 1, 500))
     assert (out.total_bought, out.total_unassigned, out.clients) == (70, 17, 2)
+    assert len(statements) == 1, "every client is read in one statement, not one by one"
     assert [r.client_name for r in out.rows] == ["Zed", "Acme"]
     assert not any("price" in k or "cost" in k for k in out.rows[0].model_dump())
 
@@ -71,3 +73,26 @@ def test_the_route_adds_the_rows_and_needs_the_billing_permission(monkeypatch):
 
     found = {(m, p.replace("/api/v1", "", 1)): r for p, r in walk_routes(app.routes) for m in r.methods}
     assert set(required_permissions(found[("GET", "/billing/licence-waste")])) == {"billing:view"}
+
+
+def test_the_billing_pages_read_every_clients_counts_in_one_statement_however_many_clients_there_are(monkeypatch):
+    import app.api.v1.endpoints.billing as module
+
+    for clients in (3, 120):
+        ids = [uuid.uuid4() for _ in range(clients)]
+        names = {c: f"Client {i}" for i, c in enumerate(ids)}
+        monkeypatch.setattr(module, "_scope", AsyncMock(return_value=([uuid.uuid4(), *ids], names)))
+        monkeypatch.setattr(module, "cross_tenant_reads", lambda db: contextlib.nullcontext())
+        rows = [NS(tenant_id=c, source="m365", item="E3", unit="licence", count=5, available=1, updated_at=NOW) for c in ids]
+        statements = []
+
+        async def execute(statement, rows=rows, statements=statements):
+            statements.append(statement)
+            out = MagicMock()
+            out.scalars.return_value.all.return_value = rows
+            return out
+
+        db = NS(execute=AsyncMock(side_effect=execute))
+        counts, got_names = asyncio.run(module._all_client_counts(db, uuid.uuid4()))
+        assert len(counts) == clients and all(len(v) == 1 for v in counts.values()), clients
+        assert len(statements) == 1, f"{len(statements)} statements for {clients} clients"
