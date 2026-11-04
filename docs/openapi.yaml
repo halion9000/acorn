@@ -11582,6 +11582,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/identities/merges:
+    post:
+      tags:
+      - identities
+      summary: Merge People By Hand
+      operationId: merge_people_by_hand_api_v1_identities_merges_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MergeBody'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergeResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/identities/merges/separate:
+    post:
+      tags:
+      - identities
+      summary: Say Not The Same Person
+      operationId: say_not_the_same_person_api_v1_identities_merges_separate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeparateBody'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergeResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/identity/mfa-summary:
     get:
       tags:
@@ -23848,6 +23902,19 @@ components:
           title: Case Id
       type: object
       title: AlertUpdateRequest
+    AliasOut:
+      properties:
+        email:
+          type: string
+          title: Email
+        reason:
+          type: string
+          title: Reason
+      type: object
+      required:
+      - email
+      - reason
+      title: AliasOut
     AllAccessGrantResponse:
       properties:
         user_id:
@@ -35842,6 +35909,28 @@ components:
       - changed_at
       - created_at
       title: MaturityOut
+    MergeBody:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        email:
+          type: string
+          maxLength: 320
+          title: Email
+          description: Any address of the first person.
+        with_email:
+          type: string
+          maxLength: 320
+          title: With Email
+          description: Any address of the second person.
+      type: object
+      required:
+      - client_id
+      - email
+      - with_email
+      title: MergeBody
     MergeIn:
       properties:
         keep:
@@ -35859,6 +35948,26 @@ components:
       - keep
       - remove
       title: MergeIn
+    MergeResult:
+      properties:
+        kind:
+          type: string
+          enum:
+          - merge
+          - separate
+          title: Kind
+        email:
+          type: string
+          title: Email
+        other:
+          type: string
+          title: Other
+      type: object
+      required:
+      - kind
+      - email
+      - other
+      title: MergeResult
     MetricsOut:
       properties:
         tenant_id:
@@ -37991,6 +38100,11 @@ components:
             format: date-time
           - type: 'null'
           title: Last Ticket At
+        aliases:
+          items:
+            $ref: '#/components/schemas/AliasOut'
+          type: array
+          title: Aliases
       type: object
       required:
       - key
@@ -42826,6 +42940,28 @@ components:
       - batch_id
       - recipient_count
       title: SentAlert
+    SeparateBody:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        email:
+          type: string
+          maxLength: 320
+          title: Email
+          description: The address that does not belong.
+        from_email:
+          type: string
+          maxLength: 320
+          title: From Email
+          description: The address (or the person's shown address) it was joined to.
+      type: object
+      required:
+      - client_id
+      - email
+      - from_email
+      title: SeparateBody
     SeriesPoint:
       properties:
         at:

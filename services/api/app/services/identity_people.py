@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from app.services.identity_merge import merge_people
 from app.services.mfa_registration import has_second_factor, registration_known, required_of
 
 MICROSOFT = "cipp"
@@ -145,10 +146,17 @@ class Person:
     alerts_by_source: dict[str, int] = field(default_factory=dict)
     backups: list[BackupInfo] = field(default_factory=list)
     exposure: Exposure | None = None
+    # The other addresses of the same human, folded into this person (see identity_merge), and why each was.
+    aliases: list[str] = field(default_factory=list)
+    alias_reasons: dict[str, str] = field(default_factory=dict)
 
     @property
     def key(self) -> str:
         return f"{self.tenant_id}:{self.email}"
+
+    @property
+    def addresses(self) -> list[str]:
+        return [self.email, *self.aliases]
 
     @property
     def vendors(self) -> list[str]:
@@ -184,6 +192,8 @@ def build_people(
     sources: list[Any],
     now: datetime,
     stale_days: int = STALE_DAYS,
+    merges: list[tuple[uuid.UUID, str, str]] | None = None,
+    separate: list[tuple[uuid.UUID, str, str]] | None = None,
 ) -> list[Person]:
     """Every person, one row each, with the tools that know them. ``microsoft_users`` are IdentityMfaUser rows and ``sources`` IdentitySource rows (anything with the same fields)."""
     people: dict[str, Person] = {}
@@ -241,11 +251,12 @@ def build_people(
         p.sources.append(SourceRef(vendor=s.vendor, external_id=s.external_id, enabled=s.enabled, details=dict(s.details or {})))
         if (s.details or {}).get("directory"):
             _apply_directory(p, s)
-    out = list(people.values())
+    # One human, one person: fold the addresses that are the same human (the rules and the owner's own merges are in identity_merge).
+    out = merge_people(people, merges, separate)
     for p in out:
         p.sources.sort(key=lambda r: (r.vendor != MICROSOFT, r.vendor, r.external_id))
         p.backups = backup_infos(p.sources, now)
-        p.exposure = exposure_of(exposure_rows.get(p.key, []))
+        p.exposure = exposure_of([row for address in p.addresses for row in exposure_rows.get(f"{p.tenant_id}:{address}", [])])
     return out
 
 
@@ -253,11 +264,20 @@ def build_people(
 ALERT_TOOLS = frozenset({"huntress", "petra", "fieldeffect", "blumira"})
 
 
+def address_index(people: list[Person]) -> dict[str, Person]:
+    """Every address of every person (the shown one and the folded-in aliases), as "client:address", to its person."""
+    index: dict[str, Person] = {}
+    for p in people:
+        for address in p.addresses:
+            index[f"{p.tenant_id}:{address}"] = p
+    return index
+
+
 def add_alert_sources(
     people: list[Person], alerts: list[Any], names: dict[uuid.UUID, str], source_of: Any, tools: frozenset[str] = ALERT_TOOLS
 ) -> list[Person]:
     """Add each MDR tool that raised an alert naming a person to that person's tools (creating the person when no other tool knows them). Returns the people, with any new ones added."""
-    index = {p.key: p for p in people}
+    index = address_index(people)
     out = list(people)
     for a in alerts:
         tool = source_of(a.raw_event, getattr(a, "connector_type", None))
@@ -282,19 +302,21 @@ def add_alert_sources(
 
 def attach_alerts(people: list[Person], alerts: list[Any], source_of: Any = None) -> dict[str, list[Any]]:
     """Tie open alerts to the people they name (by e-mail address, same client). Sets each person's count and highest severity; returns the alerts by person key, newest first."""
-    index = {p.key: p for p in people}
+    index = address_index(people)
+    by_person = {p.key: p for p in people}
     by_key: dict[str, list[Any]] = {}
     for a in alerts:
         seen: set[str] = set()
         for raw in a.affected_users if isinstance(a.affected_users, list) else []:
             email = normalize_email(raw)
-            key = f"{a.tenant_id}:{email}" if email else ""
-            if key and key in index and key not in seen:
-                seen.add(key)
-                by_key.setdefault(key, []).append(a)
+            who = index.get(f"{a.tenant_id}:{email}") if email else None
+            # An alert that names two addresses of the same human counts once for that person.
+            if who is not None and who.key not in seen:
+                seen.add(who.key)
+                by_key.setdefault(who.key, []).append(a)
     for key, rows in by_key.items():
         rows.sort(key=lambda a: a.created_at, reverse=True)
-        p = index[key]
+        p = by_person[key]
         p.open_alerts = len(rows)
         counts: dict[str, int] = {}
         for a in rows:
@@ -325,7 +347,7 @@ def filter_people(
     rows = people
     if search:
         needle = search.strip().lower()
-        rows = [p for p in rows if needle in p.email or needle in (p.display_name or "").lower() or needle in (p.client_name or "").lower()]
+        rows = [p for p in rows if any(needle in address for address in p.addresses) or needle in (p.display_name or "").lower() or needle in (p.client_name or "").lower()]
     if source:
         rows = [p for p in rows if source in p.vendors]
     if only_in:

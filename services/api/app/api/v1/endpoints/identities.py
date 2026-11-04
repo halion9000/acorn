@@ -23,6 +23,7 @@ from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
 from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
+from app.models.identity_merge import IdentityMerge
 from app.models.identity_source import IdentitySource
 from app.models.person_ticket import PersonTicket
 from app.models.signin import DirectoryAuditEvent, IdentityMfaUser, SigninEvent
@@ -73,6 +74,11 @@ class ExposureOut(BaseModel):
     breaches: list[dict] = Field(default_factory=list)
 
 
+class AliasOut(BaseModel):
+    email: str
+    reason: str
+
+
 class PersonOut(BaseModel):
     key: str
     client_id: uuid.UUID
@@ -95,6 +101,8 @@ class PersonOut(BaseModel):
     # HaloPSA tickets about this person in the window CORE reads, and when the newest was opened (the list page only; the person's own panel lists the tickets).
     tickets: int = 0
     last_ticket_at: datetime | None = None
+    # The other addresses of this same human, folded into this row, each with why (a rule, or "merged by hand").
+    aliases: list[AliasOut] = Field(default_factory=list)
 
 
 class IdentitySummary(BaseModel):
@@ -143,6 +151,7 @@ def _out(p: Person, with_sources: bool = False) -> PersonOut:
         mfa=p.mfa,
         mfa_methods=p.mfa_methods,
         tools=p.vendors,
+        aliases=[AliasOut(email=a, reason=p.alias_reasons.get(a, "merged")) for a in p.aliases],
         sources=[SourceOut(vendor=s.vendor, external_id=s.external_id, enabled=s.enabled, details=s.details) for s in p.sources]
         if with_sources
         else [],
@@ -209,6 +218,15 @@ async def failing_people(db: Any, scope: Any, now: datetime, minimum: int) -> se
     return {k for k, n in counts.items() if n >= minimum}
 
 
+async def owner_decisions(db: Any, scope: Any) -> tuple[list[tuple[uuid.UUID, str, str]], list[tuple[uuid.UUID, str, str]]]:
+    """The owner's hand merges and "not the same person" marks for the clients in scope, as (client, address, address)."""
+    async with cross_tenant_reads(db):
+        rows = (await db.execute(select(IdentityMerge).where(IdentityMerge.tenant_id.in_(scope)))).scalars().all()
+    merges = [(r.tenant_id, r.address_a, r.address_b) for r in rows if r.kind == "merge"]
+    separate = [(r.tenant_id, r.address_a, r.address_b) for r in rows if r.kind == "separate"]
+    return merges, separate
+
+
 async def _people(db: Any, owner: uuid.UUID, client_id: uuid.UUID | None) -> tuple[list[Person], dict[str, list[Any]]]:
     """Every person in scope with alerts attached, and the alerts by person."""
     scope, clients = await _scope(db, owner, client_id)
@@ -236,7 +254,8 @@ async def _people(db: Any, owner: uuid.UUID, client_id: uuid.UUID | None) -> tup
             .all()
         )
     named = [a for a in alerts if a.affected_users]
-    people = add_alert_sources(build_people(names, list(users), list(sources), now), named, names, source_of)
+    merges, separate = await owner_decisions(db, scope)
+    people = add_alert_sources(build_people(names, list(users), list(sources), now, merges=merges, separate=separate), named, names, source_of)
     return people, attach_alerts(people, [a for a in named if a.status not in FINISHED_STATUSES], source_of)
 
 
@@ -310,7 +329,7 @@ async def list_identities(
     failed, brute = await signin_failures(db, scope, datetime.now(UTC))
     if signin:
         failing = await failing_people(db, scope, datetime.now(UTC), 1 if signin == "failed" else BRUTE_FORCE_FAILURES)
-        people_in_filter = [p for p in people if (p.tenant_id, p.email.lower()) in failing]
+        people_in_filter = [p for p in people if any((p.tenant_id, a.lower()) in failing for a in p.addresses)]
     else:
         people_in_filter = people
     rows = sort_people(
@@ -399,7 +418,7 @@ async def export_identities(
     if signin:
         scope, _clients = await _scope(db, user.tenant_id, client_id)
         failing = await failing_people(db, scope, datetime.now(UTC), 1 if signin == "failed" else BRUTE_FORCE_FAILURES)
-        people = [p for p in people if (p.tenant_id, p.email.lower()) in failing]
+        people = [p for p in people if any((p.tenant_id, a.lower()) in failing for a in p.addresses)]
     rows = sort_people(
         filter_people(
             people,
@@ -553,9 +572,10 @@ async def identity_detail(
     if wanted is None:
         raise HTTPException(status_code=422, detail="That is not an e-mail address")
     people, alerts = await _people(db, user.tenant_id, client_id)
-    found = next((p for p in people if p.email == wanted and p.tenant_id == client_id), None)
+    found = next((p for p in people if p.tenant_id == client_id and wanted in p.addresses), None)
     if found is None:
         raise HTTPException(status_code=404, detail="No such person")
+    addresses = found.addresses
     since = datetime.now(UTC) - timedelta(days=30)
     async with cross_tenant_reads(db):
         events = (
@@ -563,7 +583,7 @@ async def identity_detail(
                 await db.execute(
                     select(SigninEvent).where(
                         SigninEvent.tenant_id == client_id,
-                        func.lower(SigninEvent.user_principal) == wanted,
+                        func.lower(SigninEvent.user_principal).in_(addresses),
                         SigninEvent.occurred_at >= since,
                     )
                 )
@@ -586,7 +606,7 @@ async def identity_detail(
             .where(
                 DirectoryAuditEvent.tenant_id == client_id,
                 DirectoryAuditEvent.occurred_at >= since,
-                or_(func.lower(DirectoryAuditEvent.target) == wanted, func.lower(DirectoryAuditEvent.actor) == wanted),
+                or_(func.lower(DirectoryAuditEvent.target).in_(addresses), func.lower(DirectoryAuditEvent.actor).in_(addresses)),
             )
             .order_by(DirectoryAuditEvent.occurred_at.desc())
             .limit(CHANGES_SHOWN),
@@ -594,7 +614,7 @@ async def identity_detail(
         ticket_rows = await _tolerant(
             db,
             select(PersonTicket)
-            .where(PersonTicket.tenant_id == client_id, PersonTicket.user_email == wanted)
+            .where(PersonTicket.tenant_id == client_id, PersonTicket.user_email.in_(addresses))
             .order_by(PersonTicket.opened_at.desc())
             .limit(TICKETS_SHOWN),
         )

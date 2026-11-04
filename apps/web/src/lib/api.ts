@@ -796,6 +796,8 @@ export interface IdentityPerson {
   sources: { vendor: string; external_id: string; enabled: boolean | null; details: Record<string, unknown> }[];
   open_alerts: number;
   top_severity: string | null;
+  /** The other addresses of this same human, folded into this row, each with why. Absent from an older API. */
+  aliases?: { email: string; reason: string }[];
   /** HaloPSA tickets about this person and when the newest was opened. Absent from an older API. */
   tickets?: number;
   last_ticket_at?: string | null;
@@ -900,6 +902,12 @@ export const identitiesApi = {
   },
   /** One person: every tool's record of them, their open alerts and a summary of their sign-ins. */
   detail: (clientId: string, email: string) => request<IdentityDetail>('/api/v1/identities/detail', { params: { client_id: clientId, email } }),
+  /** Say two addresses are one person. Returns once stored; the next list shows them as one row. */
+  mergePeople: (body: { client_id: string; email: string; with_email: string }) =>
+    request<{ kind: string; email: string; other: string }>('/api/v1/identities/merges', { method: 'POST', body: JSON.stringify(body) }),
+  /** Say an address is NOT the same person as another (undoes a merge, and stops the automatic rules joining them again). */
+  separatePeople: (body: { client_id: string; email: string; from_email: string }) =>
+    request<{ kind: string; email: string; other: string }>('/api/v1/identities/merges/separate', { method: 'POST', body: JSON.stringify(body) }),
   /** What was asked for this person in the last week (sign out, block, allow) and how each went. */
   accountActions: (clientId: string, email: string) => request<{ items: AccountActionItem[] }>('/api/v1/identities/actions', { params: { client_id: clientId, email } }),
   /** Ask CORE to sign a person out everywhere, block their sign-in, or allow it. Returns at once: the answer comes back through accountActions. */

@@ -15,6 +15,7 @@ import { safeDistance } from '@/lib/safe-date';
 import { daysAgo } from '@/lib/ago';
 import { clientFromAddress } from '@/components/mssp/ClientPicker';
 import { AccountActions } from './AccountActions';
+import { MergePanel } from './MergePanel';
 
 const SEVERITY_STYLE: Record<string, string> = {
   critical: 'bg-red-500/15 text-red-300 border-red-500/30',
@@ -108,6 +109,9 @@ function Detail({ person }: { person: IdentityPerson }) {
           ))}
         </ul>
         {data.person.mfa_methods && <p className="mt-2 text-xs text-gray-400">Second factor methods: {data.person.mfa_methods}</p>}
+        <div className="mt-3">
+          <MergePanel person={data.person} />
+        </div>
         <div className="mt-3">
           <AccountActions clientId={person.client_id} email={data.person.email} knownTo={data.person.sources.map((s) => s.vendor)} />
         </div>
@@ -495,7 +499,12 @@ export function IdentitiesView() {
                         <div className="text-gray-100">{p.display_name ?? p.email}</div>
                         <div className="text-xs text-gray-500">
                           {p.display_name ? `${p.email} · ` : ''}
-                          {p.admin && <span className="mr-1 text-amber-300">admin</span>}
+                          {(p.aliases?.length ?? 0) > 0 && (
+                            <span className="mr-1 text-blue-300" title={(p.aliases ?? []).map((a) => a.email).join(', ')} data-testid="alias-count">
+                              +{p.aliases!.length} address{p.aliases!.length === 1 ? '' : 'es'} ·
+                            </span>
+                          )}
+                          {p.admin &&<span className="mr-1 text-amber-300">admin</span>}
                           {p.enabled === false && <span className="mr-1 text-red-300">disabled</span>}
                           {p.kind !== 'user' && <span className="text-gray-400">{p.kind}</span>}
                         </div>
