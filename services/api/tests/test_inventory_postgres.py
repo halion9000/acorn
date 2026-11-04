@@ -40,7 +40,7 @@ async def world():
                 text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, :n, :s, :p)"),
                 {"t": tid, "n": name, "s": f"inv-{tag}-{str(tid)[:6]}", "p": parent},
             )
-    user = SimpleNamespace(tenant_id=owner, email="hal@goliveoak.com")
+    user = SimpleNamespace(tenant_id=owner, user_id=None, email="hal@goliveoak.com")
     return engine, user, SimpleNamespace(owner=owner, acme=acme, birch=birch, stranger=stranger, stranger_client=stranger_client)
 
 
@@ -185,7 +185,7 @@ async def test_an_organization_never_sees_or_changes_another_organizations_stock
     engine, user, w = await world()
     try:
         async with AsyncSession(engine) as db:
-            theirs = SimpleNamespace(tenant_id=w.stranger, email="x@other.com")
+            theirs = SimpleNamespace(tenant_id=w.stranger, user_id=None, email="x@other.com")
             hidden = await ep.create_item(item(name="Their laptop", client_id=w.stranger_client), theirs, db)
             assert (await ls(user, db)).total == 0
             for call in (

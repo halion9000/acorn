@@ -7,13 +7,13 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
-from app.services import bimi as bimi_check_module
 from app.api.v1.endpoints import dmarc as ep
 from app.db.database import Base
 from app.models.dmarc import DmarcIngestState, DmarcReport, TlsReport
 from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
+from app.services import bimi as bimi_check_module
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 

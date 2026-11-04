@@ -59,7 +59,7 @@ async def shown(t):
 
 async def test_a_hidden_device_is_hidden_until_a_tool_sees_it_online_afterwards(tenant):
     t = tenant
-    old = (datetime.now(UTC) - timedelta(days=30)).isoformat()
+    old = (datetime.now(UTC) - timedelta(days=ep.SOURCE_STALE_DAYS - 3)).isoformat()  # inside the days after which a silent device hides by itself
     device_id = await run(
         t, lambda db: upsert_device(db, t, DeviceReport("ninjaone", "1", "LAPTOP-1", details={"last_contact": old}, ip_addresses=[]))
     )
@@ -69,7 +69,7 @@ async def test_a_hidden_device_is_hidden_until_a_tool_sees_it_online_afterwards(
         db.add(ep.DeviceSnooze(device_id=device_id, tenant_id=t, snoozed_at=datetime.now(UTC)))
 
     await run(t, hide)
-    assert (await shown(t))["LAPTOP-1"].hidden_since is not None, "last seen a month ago, hidden now: stays hidden"
+    assert (await shown(t))["LAPTOP-1"].hidden_since is not None, "last seen a few days ago, hidden now: stays hidden until a tool sees it again"
 
     back = (datetime.now(UTC) + timedelta(minutes=5)).isoformat()
     await run(

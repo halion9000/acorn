@@ -10,8 +10,8 @@ import re
 import time
 import uuid
 from collections import Counter, defaultdict
-from datetime import UTC, datetime, timedelta
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -31,12 +31,12 @@ from app.services import reputation as reputation_service
 from app.services.dmarc_senders import identify_sender
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domain
 from app.services.ip_country import country_of
+from app.services.lookalike import generate as generate_lookalikes
+from app.services.lookalike import scan as scan_lookalikes
 from app.services.spf_lookups import LIMIT as SPF_LIMIT
 from app.services.spf_lookups import WARN_AT as SPF_WARN_AT
 from app.services.spf_lookups import SpfLookups
 from app.services.spf_lookups import count_lookups as count_spf_lookups
-from app.services.lookalike import generate as generate_lookalikes
-from app.services.lookalike import scan as scan_lookalikes
 
 router = APIRouter(prefix="/dmarc", tags=["dmarc"])
 
