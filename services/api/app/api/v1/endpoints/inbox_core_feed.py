@@ -651,6 +651,7 @@ class BecAck(BaseModel):
 
 
 MAX_BEC_REPORT_BYTES = 3_000_000
+MAX_BEC_SUMMARY_BYTES = 100_000  # what the page shows at a glance: a few facts, never a second copy of the report
 
 
 async def _bec_case_for(db: Any, tenant_id: Any, case_id: uuid.UUID) -> Any:
@@ -689,6 +690,8 @@ async def report_bec_result(tenant_token: str, case_id: uuid.UUID, body: BecResu
     await adopt_tenant(db, tenant_id)
     if body.report is not None and len(json.dumps(body.report)) > MAX_BEC_REPORT_BYTES:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="The report is too large")
+    if len(json.dumps(body.summary)) > MAX_BEC_SUMMARY_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="The summary is too large")
     row, tid = await _bec_case_for(db, tenant_id, case_id)
     if row is None or row.status not in ("pending", "running"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such open case")

@@ -286,3 +286,11 @@ def test_an_oversized_report_is_refused_before_anything_is_stored(core, monkeypa
     with pytest.raises(HTTPException) as e:
         run(feed.report_bec_result("tok", case.id, feed.BecResult(status="done", report={"x": "y" * 500}), db))
     assert e.value.status_code == 413 and case.status == "pending" and db.commits == 0
+
+
+def test_an_oversized_summary_is_refused_too_so_the_glance_line_cannot_hold_a_second_report(core, monkeypatch):
+    case, db = core
+    monkeypatch.setattr(feed, "MAX_BEC_SUMMARY_BYTES", 100)
+    with pytest.raises(HTTPException) as e:
+        run(feed.report_bec_result("tok", case.id, feed.BecResult(status="done", report={"a": 1}, summary={"x": "y" * 500}), db))
+    assert e.value.status_code == 413 and case.status == "pending" and db.commits == 0
