@@ -699,6 +699,17 @@ async def report_bec_result(tenant_token: str, case_id: uuid.UUID, body: BecResu
         row.report = body.report
         row.summary = body.summary
         row.updated_at = row.finished_at = now
+        if body.status == "done":
+            # CIPP's own High or Medium rating becomes an alert for the client (one per search); a Low or missing rating raises none. Never raises: the report is kept whatever happens here.
+            from app.services.bec_findings import finding_for_case  # noqa: PLC0415
+            from app.services.identity_detections import save_findings  # noqa: PLC0415
+
+            try:
+                finding = finding_for_case(case_ref=row.case_ref, case_id=str(row.id), email=row.email, summary=body.summary or {}, report=body.report, now=now)
+                if finding is not None:
+                    await save_findings(db, tid, [finding], now)
+            except Exception:  # noqa: BLE001
+                logger.warning("bec result: the alert could not be made for case=%s", row.id, exc_info=True)
         await db.commit()
     return BecAck(recorded=True)
 

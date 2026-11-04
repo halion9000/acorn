@@ -193,7 +193,7 @@ from app.api.v1.endpoints import inbox_core_feed as feed  # noqa: E402
 
 @pytest.fixture
 def core(monkeypatch):
-    case = NS(id=uuid.uuid4(), status="pending", step=0, steps_total=0, step_label=None, message=None, report=None, summary={}, updated_at=NOW - timedelta(minutes=1), finished_at=None)
+    case = NS(id=uuid.uuid4(), case_ref="BEC-1", email="pat@acme.com", status="pending", step=0, steps_total=0, step_label=None, message=None, report=None, summary={}, updated_at=NOW - timedelta(minutes=1), finished_at=None)
     monkeypatch.setattr(feed, "_verify_core_feed_token", AsyncMock(return_value=OWNER))
     monkeypatch.setattr(feed, "adopt_tenant", AsyncMock())
     monkeypatch.setattr(feed, "_bec_case_for", AsyncMock(return_value=(case, CLIENT)))
@@ -214,6 +214,47 @@ def test_a_result_stores_the_whole_report_and_finishes_the_case(core):
     report = {"Score": 3, "MailboxRules": []}
     run(feed.report_bec_result("tok", case.id, feed.BecResult(status="done", message="CIPP finished", report=report, summary={"sections": ["Score"]}), db))
     assert (case.status, case.report, case.summary, case.finished_at is not None) == ("done", report, {"sections": ["Score"]}, True)
+
+
+def test_a_high_rating_from_cipp_saves_an_alert_for_that_person_and_the_report_is_kept_either_way(core, monkeypatch):
+    case, db = core
+    saved = []
+
+    async def fake_save(db_, tenant_id, findings, now=None):
+        saved.append((tenant_id, findings))
+        return len(findings)
+
+    monkeypatch.setattr("app.services.identity_detections.save_findings", fake_save)
+    summary = {"score": 9, "level": "High", "incomplete": ["SignIns"]}
+    run(feed.report_bec_result("tok", case.id, feed.BecResult(status="done", report={"Score": {"Value": 9, "Level": "High"}}, summary=summary), db))
+    assert case.status == "done" and db.commits == 1
+    assert len(saved) == 1 and saved[0][0] == CLIENT
+    finding = saved[0][1][0]
+    assert (finding.severity, finding.users, finding.key) == ("high", ["pat@acme.com"], str(case.id))
+
+
+def test_a_low_rating_or_a_failed_search_saves_no_alert(core, monkeypatch):
+    case, db = core
+    saved = []
+
+    async def fake_save(*a, **k):
+        saved.append(a)
+        return 1
+
+    monkeypatch.setattr("app.services.identity_detections.save_findings", fake_save)
+    run(feed.report_bec_result("tok", case.id, feed.BecResult(status="done", report={"Score": {"Value": 1, "Level": "Low"}}, summary={"level": "Low", "score": 1}), db))
+    assert saved == [] and case.status == "done"
+
+
+def test_an_odd_summary_or_a_failure_making_the_alert_never_loses_the_report(core, monkeypatch):
+    case, db = core
+
+    async def boom(*a, **k):
+        raise RuntimeError("database trouble")
+
+    monkeypatch.setattr("app.services.identity_detections.save_findings", boom)
+    run(feed.report_bec_result("tok", case.id, feed.BecResult(status="done", report={"Score": {"Level": "High"}}, summary={"level": "High", "incomplete": 5, "score": "nine"}), db))
+    assert case.status == "done" and case.report == {"Score": {"Level": "High"}} and db.commits == 1
 
 
 def test_a_failed_result_keeps_the_reason_and_no_report(core):

@@ -100,3 +100,33 @@ async def test_another_organizations_case_is_not_found(world):
         await call(feed.report_bec_progress, cases["stranger"], feed.BecProgress(step=1, steps_total=5, label="x"))
     assert e.value.status_code == 404
     assert (await stored(cases["stranger"]))[0] == "pending"
+
+
+async def alerts_of(tenant_id):
+    owner = create_async_engine(PG_URL, poolclass=NullPool)
+    try:
+        async with owner.connect() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            return (await conn.execute(text("select title, severity, rule_id, affected_users from alerts where tenant_id = :t"), {"t": tenant_id})).all()
+    finally:
+        await owner.dispose()
+
+
+async def test_a_finished_search_rated_high_by_cipp_raises_one_alert_for_the_client_and_a_low_one_raises_none(world):
+    ids, cases = world
+    report = {"Score": {"Value": 9, "Level": "High"}, "NewRules": [{"Name": "x"}], "Completeness": {"SignIns": {"Complete": False}}}
+    summary = {"score": 9, "level": "High", "incomplete": ["SignIns"], "guid": "g1"}
+    await call(feed.report_bec_result, cases["acme"], feed.BecResult(status="done", message="ok", report=report, summary=summary))
+    rows = await alerts_of(ids["acme"])
+    assert [(r[1], r[2], list(r[3])) for r in rows] == [("high", "aisoc-id-bec-findings", ["p@x.com"])]
+    assert "CIPP rates it High" in rows[0][0]
+    assert await alerts_of(ids["parent"]) == [], "the alert belongs to the client, not the organization"
+    with pytest.raises(HTTPException):
+        await call(feed.report_bec_result, cases["acme"], feed.BecResult(status="done", report=report, summary=summary))
+    assert len(await alerts_of(ids["acme"])) == 1, "an answer that arrives twice makes one alert"
+
+
+async def test_a_low_rating_and_a_failed_search_raise_no_alert(world):
+    ids, cases = world
+    await call(feed.report_bec_result, cases["acme"], feed.BecResult(status="done", report={"Score": {"Value": 1, "Level": "Low"}}, summary={"score": 1, "level": "Low"}))
+    assert await alerts_of(ids["acme"]) == []

@@ -87,6 +87,22 @@ describe('following a search', () => {
     expect(list.textContent).toContain('CIPP returned 403');
     expect(screen.getAllByRole('button', { name: 'View report' })).toHaveLength(1);
   });
+  it("shows CIPP's own rating and the checks that could not finish beside a finished search, and invents nothing when CIPP gave none", async () => {
+    api.becCases.mockResolvedValue({
+      items: [
+        item({ id: 'h', case_ref: 'BEC-H', status: 'done', summary: { level: 'High', score: 9, incomplete: ['SignIns', 'MobileDevices'] } }),
+        item({ id: 'l', case_ref: 'BEC-L', status: 'done', summary: { level: 'Low', score: 1 } }),
+        item({ id: 'n', case_ref: 'BEC-N', status: 'done', summary: {} }),
+      ],
+    });
+    show();
+    expect(await screen.findByText('CIPP rates it High (score 9)')).toBeInTheDocument();
+    expect(screen.getByText('2 checks could not finish: SignIns, MobileDevices')).toBeInTheDocument();
+    expect(screen.getByText('CIPP rates it Low (score 1)')).toBeInTheDocument();
+    expect(screen.getAllByText(/CIPP rates it/)).toHaveLength(2);
+    expect(screen.queryByText(/clean|safe|compromised/i)).toBeNull();
+  });
+
   it('opens the report as CIPP returned it and says a missing section is not a pass', async () => {
     api.becCases.mockResolvedValue({ items: [item({ status: 'done' })] });
     api.becCase.mockResolvedValue({ ...item({ status: 'done' }), report: { MailboxRules: [], PermissionChanges: [{ Operation: 'Add-MailboxPermission', User: 'x' }], Score: 3 } });

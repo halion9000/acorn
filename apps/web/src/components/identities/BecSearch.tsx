@@ -18,6 +18,20 @@ const STATUS_TEXT: Record<BecCaseItem['status'], { text: string; className: stri
   failed: { text: 'Failed', className: 'text-red-300' },
 };
 
+/** CIPP's own rating of a finished search and the checks that could not finish, from the summary A.C.O.R.N keeps. Only what CIPP gave: no rating and no list means nothing is shown (never "clean"). */
+export function ratingOf(summary: Record<string, unknown> | null | undefined): { text: string; className: string; incomplete: string | null } | null {
+  const level = typeof summary?.level === 'string' ? summary.level : '';
+  const score = typeof summary?.score === 'number' ? summary.score : null;
+  const missing = Array.isArray(summary?.incomplete) ? (summary!.incomplete as unknown[]).filter((x): x is string => typeof x === 'string') : [];
+  if (!level && missing.length === 0) return null;
+  const className = /^high$/i.test(level) ? 'text-red-300' : /^medium$/i.test(level) ? 'text-amber-300' : 'text-gray-400';
+  return {
+    text: level ? `CIPP rates it ${level}${score !== null ? ` (score ${score})` : ''}` : '',
+    className,
+    incomplete: missing.length > 0 ? `${missing.length} check${missing.length === 1 ? '' : 's'} could not finish: ${missing.join(', ')}` : null,
+  };
+}
+
 export function canOfferBec(capabilities: string[] | undefined, knownTo: string[]): boolean {
   return (capabilities ?? []).includes('run_bec') && knownTo.includes('cipp');
 }
@@ -207,6 +221,12 @@ export function BecSearch({ clientId, email, knownTo }: { clientId: string; emai
                   </button>
                 )}
               </div>
+              {i.status === 'done' && ratingOf(i.summary) ? (
+                <div className="mt-0.5">
+                  <span className={ratingOf(i.summary)!.className}>{ratingOf(i.summary)!.text}</span>
+                  {ratingOf(i.summary)!.incomplete ? <span className="block text-gray-400">{ratingOf(i.summary)!.incomplete}</span> : null}
+                </div>
+              ) : null}
               {(i.status === 'running' || i.status === 'pending') && (
                 <div className="mt-1">
                   {i.steps_total > 0 ? (
