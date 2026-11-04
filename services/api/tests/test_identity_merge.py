@@ -18,6 +18,7 @@ def acct(tenant, upn, **over):
     """An ordinary Microsoft 365 account with no licence (the merge rules never join two that hold one)."""
     return ms(tenant, upn, **{"licensed": False, **over})
 
+
 A, B = uuid.uuid4(), uuid.uuid4()
 NAMES = {A: "Acme", B: "Other"}
 
@@ -38,7 +39,12 @@ def emails(people):
 
 
 def test_a_display_name_that_is_another_existing_address_joins_the_two():
-    people = build([acct(A, "bmoore@grcooling.com", display_name="brandon@grcooling.com"), acct(A, "brandon@grcooling.com", display_name="Brandon Moore")])
+    people = build(
+        [
+            acct(A, "bmoore@grcooling.com", display_name="brandon@grcooling.com"),
+            acct(A, "brandon@grcooling.com", display_name="Brandon Moore"),
+        ]
+    )
     assert len(people) == 1
     p = people[0]
     assert set(p.addresses) == {"bmoore@grcooling.com", "brandon@grcooling.com"}
@@ -60,7 +66,12 @@ def test_a_guest_sign_in_name_joins_the_real_address_when_it_exists_and_not_when
 
 
 def test_a_system_prefix_on_a_microsoft_address_joins_the_plain_one():
-    people = build([acct(A, "3fc24b428b1340e981aed11fd961b331jordan.welling@tecovas.onmicrosoft.com"), acct(A, "jordan.welling@tecovas.onmicrosoft.com")])
+    people = build(
+        [
+            acct(A, "3fc24b428b1340e981aed11fd961b331jordan.welling@tecovas.onmicrosoft.com"),
+            acct(A, "jordan.welling@tecovas.onmicrosoft.com"),
+        ]
+    )
     assert len(people) == 1 and people[0].email == "jordan.welling@tecovas.onmicrosoft.com"
 
 
@@ -75,7 +86,14 @@ def test_two_real_domains_with_the_same_name_are_not_joined_automatically_so_the
 
 
 def test_a_name_like_admin_or_support_is_never_joined_by_name_alone():
-    people = build([acct(A, "admin@acme.onmicrosoft.com"), acct(A, "admin@acme.com"), acct(A, "support@acme.onmicrosoft.com"), acct(A, "support@acme.com")])
+    people = build(
+        [
+            acct(A, "admin@acme.onmicrosoft.com"),
+            acct(A, "admin@acme.com"),
+            acct(A, "support@acme.onmicrosoft.com"),
+            acct(A, "support@acme.com"),
+        ]
+    )
     assert len(people) == 4
 
 
@@ -98,7 +116,11 @@ def test_a_shared_mailbox_is_not_joined_by_any_rule():
 
 def test_the_merged_person_carries_every_tool_of_every_address_once_and_the_facts_that_matter():
     users = [acct(A, "adam@tecovas.com", admin=False, enabled=True), acct(A, "adam@tecovas.onmicrosoft.com", admin=True, enabled=False)]
-    sources = [src(A, "datto-saas", "adam@tecovas.com"), src(A, "huntress", "adam@tecovas.onmicrosoft.com"), src(A, "huntress", "adam@tecovas.onmicrosoft.com")]
+    sources = [
+        src(A, "datto-saas", "adam@tecovas.com"),
+        src(A, "huntress", "adam@tecovas.onmicrosoft.com"),
+        src(A, "huntress", "adam@tecovas.onmicrosoft.com"),
+    ]
     (p,) = build(users, sources)
     assert p.vendors == ["cipp", "datto-saas", "huntress"]
     assert p.admin is True, "an administrator under any address is an administrator"
@@ -109,13 +131,28 @@ def test_the_merged_person_carries_every_tool_of_every_address_once_and_the_fact
 def test_a_person_known_to_one_tool_per_address_becomes_known_to_both():
     before = build([acct(A, "adam@tecovas.com")], [])
     assert one(before, "adam@tecovas.com").vendors == ["cipp"]
-    (p,) = build([acct(A, "adam@tecovas.onmicrosoft.com")], [src(A, "dropsuite", "adam@tecovas.com", details={"last_backup": (NOW - timedelta(hours=2)).isoformat(), "errors": 0})])
+    (p,) = build(
+        [acct(A, "adam@tecovas.onmicrosoft.com")],
+        [src(A, "dropsuite", "adam@tecovas.com", details={"last_backup": (NOW - timedelta(hours=2)).isoformat(), "errors": 0})],
+    )
     assert p.vendors == ["cipp", "dropsuite"] and len(p.backups) == 1, "the backup of one address counts for the person"
 
 
 def test_an_open_alert_naming_any_address_counts_once_for_the_person():
     people = build([acct(A, "adam@tecovas.com"), acct(A, "adam@tecovas.onmicrosoft.com")])
-    alert = lambda addrs, n: type("Al", (), {"tenant_id": A, "affected_users": addrs, "created_at": NOW - timedelta(minutes=n), "severity": "high", "raw_event": {}, "connector_type": None, "status": "new"})()  # noqa: E731
+    alert = lambda addrs, n: type(  # noqa: E731
+        "Al",
+        (),
+        {
+            "tenant_id": A,
+            "affected_users": addrs,
+            "created_at": NOW - timedelta(minutes=n),
+            "severity": "high",
+            "raw_event": {},
+            "connector_type": None,
+            "status": "new",
+        },
+    )()  # noqa: E731
     alerts = [alert(["adam@tecovas.onmicrosoft.com"], 1), alert(["adam@tecovas.com", "adam@tecovas.onmicrosoft.com"], 2)]
     by_key = ip.attach_alerts(people, alerts)
     assert people[0].open_alerts == 2 and len(by_key[people[0].key]) == 2
@@ -137,7 +174,9 @@ def test_the_summary_counts_people_not_addresses():
 
 
 def test_a_hand_merge_joins_two_addresses_no_rule_would():
-    people = build([acct(A, "brandon.moore@acme.com"), acct(A, "bmoore@acme.com")], merges=[(A, "bmoore@acme.com", "brandon.moore@acme.com")])
+    people = build(
+        [acct(A, "brandon.moore@acme.com"), acct(A, "bmoore@acme.com")], merges=[(A, "bmoore@acme.com", "brandon.moore@acme.com")]
+    )
     assert len(people) == 1 and list(people[0].alias_reasons.values()) == ["merged by hand"]
     assert len(build([acct(A, "brandon.moore@acme.com"), acct(A, "bmoore@acme.com")])) == 2
 
@@ -145,14 +184,30 @@ def test_a_hand_merge_joins_two_addresses_no_rule_would():
 def test_not_the_same_person_stops_a_rule_from_joining_them_and_a_hand_merge_still_wins_over_a_stale_mark():
     users = [acct(A, "adam@tecovas.com"), acct(A, "adam@tecovas.onmicrosoft.com")]
     assert len(build(users, separate=[(A, "adam@tecovas.com", "adam@tecovas.onmicrosoft.com")])) == 2
-    assert len(build(users, merges=[(A, "adam@tecovas.com", "adam@tecovas.onmicrosoft.com")], separate=[(A, "adam@tecovas.com", "adam@tecovas.onmicrosoft.com")])) == 1
+    assert (
+        len(
+            build(
+                users,
+                merges=[(A, "adam@tecovas.com", "adam@tecovas.onmicrosoft.com")],
+                separate=[(A, "adam@tecovas.com", "adam@tecovas.onmicrosoft.com")],
+            )
+        )
+        == 1
+    )
 
 
 def test_a_mark_holds_even_when_a_third_address_would_have_joined_them_through_a_chain():
-    users = [acct(A, "adam@tecovas.com", display_name="adam2@tecovas.com"), acct(A, "adam2@tecovas.com"), acct(A, "adam2@tecovas.onmicrosoft.com")]
+    users = [
+        acct(A, "adam@tecovas.com", display_name="adam2@tecovas.com"),
+        acct(A, "adam2@tecovas.com"),
+        acct(A, "adam2@tecovas.onmicrosoft.com"),
+    ]
     # adam@ ~ adam2@ (name), adam2@ ~ adam2@...onmicrosoft (same name): all one, until the owner says adam@ is not the onmicrosoft one
     assert len(build(users)) == 1
-    marked = build(users, separate=[(A, "adam2@tecovas.onmicrosoft.com", "adam@tecovas.com"), (A, "adam2@tecovas.onmicrosoft.com", "adam2@tecovas.com")])
+    marked = build(
+        users,
+        separate=[(A, "adam2@tecovas.onmicrosoft.com", "adam@tecovas.com"), (A, "adam2@tecovas.onmicrosoft.com", "adam2@tecovas.com")],
+    )
     assert sorted(len(p.addresses) for p in marked) == [1, 2]
     assert not any({"adam2@tecovas.onmicrosoft.com", "adam@tecovas.com"} <= set(p.addresses) for p in marked)
 
@@ -184,7 +239,14 @@ class Fake:
 
 @pytest.fixture
 def wired(monkeypatch):
-    people = build([acct(A, "brandon.moore@acme.com"), acct(A, "bmoore@acme.com"), acct(A, "adam@tecovas.com"), acct(A, "adam@tecovas.onmicrosoft.com")])
+    people = build(
+        [
+            acct(A, "brandon.moore@acme.com"),
+            acct(A, "bmoore@acme.com"),
+            acct(A, "adam@tecovas.com"),
+            acct(A, "adam@tecovas.onmicrosoft.com"),
+        ]
+    )
     monkeypatch.setattr(ep, "_scope", AsyncMock(return_value=([A], {A: "Acme"})))
     monkeypatch.setattr(ep, "_as", lambda db, owner, tid: contextlib.nullcontext())
     monkeypatch.setattr(ep, "_people", AsyncMock(return_value=(people, {})))
@@ -211,7 +273,11 @@ def test_a_merge_stores_one_sorted_decision_and_audits_it(wired):
 
 
 def test_merging_a_person_with_themselves_or_with_someone_unknown_is_refused(wired):
-    for a, b, code in [("adam@tecovas.com", "adam@tecovas.onmicrosoft.com", 409), ("adam@tecovas.com", "nobody@acme.com", 404), ("adam@tecovas.com", "not an address", 422)]:
+    for a, b, code in [
+        ("adam@tecovas.com", "adam@tecovas.onmicrosoft.com", 409),
+        ("adam@tecovas.com", "nobody@acme.com", 404),
+        ("adam@tecovas.com", "not an address", 422),
+    ]:
         db = Fake()
         with pytest.raises(HTTPException) as e:
             merge(db, a, b)
@@ -220,7 +286,11 @@ def test_merging_a_person_with_themselves_or_with_someone_unknown_is_refused(wir
 
 def test_not_the_same_person_marks_the_address_against_every_other_address_of_the_group(wired):
     db = Fake()
-    out = run(ep.say_not_the_same_person(ep.SeparateBody(client_id=A, email="adam@tecovas.onmicrosoft.com", from_email="adam@tecovas.com"), MagicMock(), USER, db))
+    out = run(
+        ep.say_not_the_same_person(
+            ep.SeparateBody(client_id=A, email="adam@tecovas.onmicrosoft.com", from_email="adam@tecovas.com"), MagicMock(), USER, db
+        )
+    )
     assert out.kind == "separate" and len(db.added) == 1
     assert db.added[0].kind == "separate" and db.added[0].address_a < db.added[0].address_b
     assert wired.await_args.kwargs["action"] == "identities:separated"
@@ -241,7 +311,10 @@ def test_the_routes_need_alerts_write():
 def test_two_licensed_accounts_are_never_joined_by_a_rule_but_can_be_by_hand():
     users = [ms(A, "adam@tecovas.com", licensed=True), ms(A, "adam@tecovas.onmicrosoft.com", licensed=True)]
     assert len(build(users)) == 2
-    named = [ms(A, "bmoore@grcooling.com", display_name="brandon@grcooling.com", licensed=True), ms(A, "brandon@grcooling.com", licensed=True)]
+    named = [
+        ms(A, "bmoore@grcooling.com", display_name="brandon@grcooling.com", licensed=True),
+        ms(A, "brandon@grcooling.com", licensed=True),
+    ]
     assert len(build(named)) == 2
     assert len(build(users, merges=[(A, "adam@tecovas.com", "adam@tecovas.onmicrosoft.com")])) == 1
 
@@ -276,7 +349,12 @@ def test_a_real_domain_the_client_does_not_use_is_not_joined_by_name_alone():
 
 
 def test_nothing_is_joined_across_clients_by_any_rule_even_with_identical_addresses_and_names():
-    users = [acct(A, "adam@tecovas.onmicrosoft.com"), acct(B, "adam@tecovas.com"), acct(A, "x@acme.com", display_name="y@acme.com"), acct(B, "y@acme.com")]
+    users = [
+        acct(A, "adam@tecovas.onmicrosoft.com"),
+        acct(B, "adam@tecovas.com"),
+        acct(A, "x@acme.com", display_name="y@acme.com"),
+        acct(B, "y@acme.com"),
+    ]
     assert len(build(users)) == 4
     same = [acct(A, "bmoore@acme.com"), acct(B, "bmoore@acme.com")]
     assert len(build(same)) == 2
@@ -307,3 +385,91 @@ def test_a_chain_of_rules_never_builds_a_person_of_more_than_six_addresses_but_a
     assert max(len(p.addresses) for p in people) <= 6
     pairs = [(A, f"u{i}@x.com", f"u{i + 1}@x.com") for i in range(9)]
     assert max(len(p.addresses) for p in build(users, merges=pairs)) == 10
+
+
+# ---- the same person on two of the client's domains: the same display name AND the same name before the @ --------------------------------------------------------
+
+
+def test_the_same_display_name_and_the_same_name_before_the_at_join_two_domains_of_one_client():
+    people = build(
+        [
+            acct(A, "marla@practicecompliance.com", display_name="Marla Falcon"),
+            acct(A, "marla@practiceperformance.com", display_name="Marla Falcon @ PPP"),
+        ]
+    )
+    assert len(people) == 1
+    assert set(people[0].addresses) == {"marla@practicecompliance.com", "marla@practiceperformance.com"}
+    assert list(people[0].alias_reasons.values()) == ["the same display name and the same name before the @"]
+
+
+def test_a_microsoft_address_next_to_a_real_one_joins_on_the_two_signs_even_when_the_real_domain_looks_unrelated_to_it():
+    people = build(
+        [acct(A, "chris@onnitlabs.onmicrosoft.com", display_name="Chris Park"), acct(A, "chris@onnit.com", display_name="Chris Park")]
+    )
+    assert len(people) == 1 and people[0].email == "chris@onnit.com", "the real address is the one shown"
+    assert people[0].aliases == ["chris@onnitlabs.onmicrosoft.com"]
+
+
+@pytest.mark.parametrize(
+    "first,second",
+    [
+        (
+            {"email": "marla@a.com", "display_name": "Marla Falcon"},
+            {"email": "mfalcon@b.com", "display_name": "Marla Falcon"},
+        ),  # the name alone
+        (
+            {"email": "marla@a.com", "display_name": "Marla Falcon"},
+            {"email": "marla@b.com", "display_name": "Someone Else"},
+        ),  # the local part alone
+        ({"email": "marla@a.com", "display_name": "Marla"}, {"email": "marla@b.com", "display_name": "Marla"}),  # one word is not a name
+        ({"email": "admin@a.com", "display_name": "Pat Lee"}, {"email": "admin@b.com", "display_name": "Pat Lee"}),  # a role name
+        (
+            {"email": "marla@a.com", "display_name": "Marla Falcon"},
+            {"email": "marla@b.com", "display_name": "Marla Falcon", "user_type": "Guest"},
+        ),  # a guest
+    ],
+)
+def test_one_sign_alone_joins_nothing(first, second):
+    def make(spec):
+        spec = dict(spec)
+        email = spec.pop("email")
+        return acct(A, email, **spec)
+
+    assert len(build([make(first), make(second)])) == 2
+
+
+def test_three_accounts_with_the_name_and_the_local_part_are_ambiguous_and_stay_apart():
+    people = build([acct(A, f"marla@{d}.com", display_name="Marla Falcon") for d in ("a", "b", "c")])
+    assert len(people) == 3
+
+
+def test_two_licensed_accounts_are_not_joined_by_this_rule_either():
+    people = build(
+        [ms(A, "marla@a.com", display_name="Marla Falcon", licensed=True), ms(A, "marla@b.com", display_name="Marla Falcon", licensed=True)]
+    )
+    assert len(people) == 2
+
+
+def test_the_two_signs_never_join_across_clients_and_not_the_same_person_still_wins():
+    assert len(build([acct(A, "marla@a.com", display_name="Marla Falcon"), acct(B, "marla@b.com", display_name="Marla Falcon")])) == 2
+    pair = [acct(A, "marla@a.com", display_name="Marla Falcon"), acct(A, "marla@b.com", display_name="Marla Falcon")]
+    assert len(build(pair, separate=[(A, "marla@a.com", "marla@b.com")])) == 2
+    assert len(build(pair)) == 1
+
+
+def test_a_pair_the_rule_joined_is_no_longer_offered_as_a_possible_duplicate():
+    from app.services.identity_duplicates import find_duplicates
+
+    people = build(
+        [
+            acct(A, "marla@a.com", display_name="Marla Falcon"),
+            acct(A, "marla@b.com", display_name="Marla Falcon"),
+            acct(A, "kim@a.com", display_name="Kim Lee"),
+            acct(A, "kl@b.com", display_name="Kim Lee"),
+        ]
+    )
+    assert len(people) == 3
+    offered = find_duplicates(people, [])
+    assert [(p.a.email, p.b.email) for p in offered] == [
+        ("kim@a.com", "kl@b.com")
+    ], "only the pair no rule was sure of is left for the owner"

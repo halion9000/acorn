@@ -15,14 +15,12 @@ Two licensed accounts are still suggested (it is exactly the case a rule will no
 
 from __future__ import annotations
 
-import re
-import unicodedata
 import uuid
 from dataclasses import dataclass, field
 from itertools import combinations
 from typing import Any
 
-from app.services.identity_merge import GENERIC_LOCALS, MIN_LOCAL
+from app.services.identity_merge import GENERIC_LOCALS, MIN_LOCAL, name_key
 
 # A name shared by more people than this in one client is a common name, not a sign: every one of the pairs would be a guess.
 MAX_BUCKET = 6
@@ -32,20 +30,6 @@ LOCAL_SCORE = 30
 PATTERN_SCORE = 25
 MIN_SHOWN = 55
 HIGH = 85
-
-_TAG = re.compile(r"\s+(@|-|–|—|\(|\[|\|)\s*.*$")
-_NON_WORD = re.compile(r"[^a-z0-9 ]+")
-
-
-def name_key(display_name: str | None) -> str | None:
-    """A display name reduced to what identifies a person: lower case, accents and punctuation gone, a trailing tag ("@ PPP", "- old", "(contractor)") taken off. None when fewer than two words remain
-    (a first name alone says nothing) or when the name is itself an address."""
-    if not display_name or "@" in display_name.split(" ")[0]:
-        return None
-    text = unicodedata.normalize("NFKD", display_name).encode("ascii", "ignore").decode("ascii").lower()
-    text = _TAG.sub("", text.strip())
-    text = " ".join(_NON_WORD.sub(" ", text).split())
-    return text if len(text.split()) >= 2 else None
 
 
 def local_key(address: str) -> str | None:

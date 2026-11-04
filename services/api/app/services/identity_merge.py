@@ -9,6 +9,8 @@ Automatic rules, all inside ONE client (a person at another client is never join
   primary address). A name shared by several accounts, or an address on another domain, joins nothing.
 * ``guest``: ``name_domain.com#EXT#@client.onmicrosoft.com`` is how Microsoft writes the guest sign-in name of ``name@domain.com``; when that address exists, they are one person.
 * ``hash``: a 32-character hexadecimal prefix on an ``.onmicrosoft.com`` address is a system prefix on the same address without it.
+* ``same_person``: two accounts of the client with the SAME display name (two or more words, a tag such as "@ PPP" ignored) AND the same name before the ``@`` on different domains, and nobody else
+  of the client has that name and local part. Two independent signs, one pair: the client's second domain, or its Microsoft address next to its real one. Ordinary member accounts only.
 * ``onmicrosoft``: an ``.onmicrosoft.com`` address and exactly ONE real-domain address with the same name before the ``@``, both ordinary (member) accounts and the real address on one of the client's OWN
   domains (not a generic name such as admin or support, which are often different accounts, and not a guest from another company who happens to share a first name).
 
@@ -20,6 +22,7 @@ A person can also be merged by hand, and "not the same person" is remembered: an
 from __future__ import annotations
 
 import re
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -35,6 +38,21 @@ MIN_LOCAL = 3
 # No automatic rule builds a person out of more than this many addresses: a real person has a handful, and a longer chain means a rule is joining people it should not. A hand merge is not limited.
 MAX_GROUP = 6
 
+_TAG = re.compile(r"\s+(@|-|–|—|\(|\[|\|)\s*.*$")
+_NON_WORD = re.compile(r"[^a-z0-9 ]+")
+
+
+def name_key(display_name: str | None) -> str | None:
+    """A display name reduced to what identifies a person: lower case, accents and punctuation gone, a trailing tag ("@ PPP", "- old", "(contractor)") taken off. None when fewer than two words remain
+    (a first name alone says nothing) or when the name is itself an address."""
+    if not display_name or "@" in display_name.split(" ")[0]:
+        return None
+    text = unicodedata.normalize("NFKD", display_name).encode("ascii", "ignore").decode("ascii").lower()
+    text = _TAG.sub("", text.strip())
+    text = " ".join(_NON_WORD.sub(" ", text).split())
+    return text if len(text.split()) >= 2 else None
+
+
 _EXT = re.compile(r"^(.+)_([^_#@]+)#ext#@[^@]+$")
 _HASH = re.compile(r"^[0-9a-f]{32}(.+)$")
 
@@ -43,6 +61,7 @@ REASON_TEXT = {
     "guest": "the guest sign-in name of this address",
     "hash": "the same address with a system prefix",
     "onmicrosoft": "the same name on the client's Microsoft address",
+    "same_person": "the same display name and the same name before the @",
     "manual": "merged by hand",
 }
 
@@ -104,6 +123,18 @@ def find_links(people: dict[str, Any]) -> list[Link]:
         for p in group:
             if is_onmicrosoft(p.email) and p.kind == "user":
                 link(p, real[0], "onmicrosoft")
+
+    # The same display name AND the same name before the @ on two different domains, with nobody else of the client holding that pair: the same human on two of the client's domains.
+    by_person: dict[tuple[uuid.UUID, str, str], list[Any]] = {}
+    for p in people.values():
+        key_name = name_key(p.display_name)
+        local = p.email.partition("@")[0]
+        if key_name is None or p.kind != "user" or len(local) < MIN_LOCAL or local in GENERIC_LOCALS or _EXT.match(p.email):
+            continue
+        by_person.setdefault((p.tenant_id, key_name, local), []).append(p)
+    for group in by_person.values():
+        if len(group) == 2 and group[0].email.partition("@")[2] != group[1].email.partition("@")[2]:
+            link(group[0], group[1], "same_person")
     return links
 
 
@@ -191,7 +222,9 @@ def merge_people(
         ra, rb = find(a), find(b)
         if ra == rb:
             return
-        if respect_blocked and (any({find(x), find(y)} == {ra, rb} for x, y in blocked) or licensed[ra] + licensed[rb] > 1 or size[ra] + size[rb] > MAX_GROUP):
+        if respect_blocked and (
+            any({find(x), find(y)} == {ra, rb} for x, y in blocked) or licensed[ra] + licensed[rb] > 1 or size[ra] + size[rb] > MAX_GROUP
+        ):
             return
         parent[ra] = rb
         licensed[rb] += licensed[ra]
