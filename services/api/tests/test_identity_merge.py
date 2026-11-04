@@ -498,12 +498,14 @@ def test_two_accounts_a_client_has_no_cipp_for_are_still_two_seats_when_both_hol
     assert len(people) == 2, "with no CIPP list to say the second address is not an account, both licences count"
 
 
-def test_an_account_another_tool_also_knows_is_a_real_account_of_its_own_and_counts_as_a_seat():
+def test_an_address_the_psa_and_threatmate_hold_but_cipp_does_not_list_is_still_the_same_account():
     people = build(
-        [ms(A, "chris@onnit.com", display_name="Chris Park", licensed=True)],
-        [threatmate(A, "chris@onnitlabs.onmicrosoft.com", display_name="Chris Park"), src(A, "huntress", "chris@onnitlabs.onmicrosoft.com", enabled=True)],
+        [ms(A, "cwcnurse@gsnetx.org", display_name="CWC Nurse", licensed=True)],
+        [threatmate(A, "cwcnurse@gsnetx.onmicrosoft.com", display_name="CWC Nurse"), src(A, "halopsa", "cwcnurse@gsnetx.onmicrosoft.com", enabled=True)],
     )
-    assert len(people) == 2
+    assert len(people) == 1
+    assert people[0].email == "cwcnurse@gsnetx.org" and people[0].aliases == ["cwcnurse@gsnetx.onmicrosoft.com"]
+    assert {"halopsa", "threatmate", "cipp"} <= set(people[0].vendors), "every tool that knew either address now knows the one person"
 
 
 def test_two_accounts_cipp_lists_that_both_hold_a_licence_are_never_joined_by_a_name():
