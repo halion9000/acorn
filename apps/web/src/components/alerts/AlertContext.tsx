@@ -199,6 +199,19 @@ export function AlertContext({ alert }: { alert: Alert }) {
                   <Link href={`/alerts?status=all&user=${encodeURIComponent(u)}`} className="text-blue-400 hover:text-blue-300" title="Every alert that names this person">
                     {u}
                   </Link>
+                  {u.includes('@') && (
+                    <>
+                      {' '}
+                      <Link
+                        href={`/identities?search=${encodeURIComponent(u)}`}
+                        aria-label={`Identity of ${u}`}
+                        className="text-xs text-gray-400 hover:text-gray-200"
+                        title="This person's tools, multi-factor and account actions"
+                      >
+                        (identity)
+                      </Link>
+                    </>
+                  )}
                 </span>
               ))}
               {tool.user && (
