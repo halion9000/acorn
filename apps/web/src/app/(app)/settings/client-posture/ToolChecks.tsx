@@ -101,6 +101,9 @@ const TITLE: Record<string, string> = {
   threatmate_google_failed_logins: 'Google accounts with many failed sign-ins',
   threatmate_google_apps: 'Third-party apps with access to Google mail or Drive',
   liongard_inspections: 'Liongard inspections still running',
+  liongard_m365_external_forwarding: 'Mailboxes forwarding mail outside the client',
+  liongard_m365_admin_mfa_policy: 'Privileged Microsoft 365 users covered by an MFA policy',
+  liongard_addigy_firewall: 'Macs with the firewall off',
 };
 
 const STATUS: Record<string, { text: string; className: string }> = {
