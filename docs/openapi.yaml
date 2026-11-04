@@ -1550,7 +1550,7 @@ paths:
         required: false
         schema:
           type: integer
-          maximum: 50
+          maximum: 100
           minimum: 1
           default: 10
           title: Limit
@@ -11919,17 +11919,100 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/identities/merges:
+    get:
+      tags:
+      - identities
+      summary: List Decisions
+      description: 'The owner''s hand decisions for one client: all of them, or only
+        those that involve one person''s addresses (any address the person is known
+        by). Newest first.'
+      operationId: list_decisions_api_v1_identities_merges_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: email
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 320
+          - type: 'null'
+          title: Email
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - identities
+      summary: Remove Decision
+      description: Take one hand decision back (a merge, or a "not the same person"
+        mark) so the automatic rules judge the pair again. Audited. 404 when there
+        is no such decision.
+      operationId: remove_decision_api_v1_identities_merges_delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: address_a
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 320
+          title: Address A
+      - name: address_b
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 320
+          title: Address B
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     post:
       tags:
       - identities
       summary: Merge People By Hand
       operationId: merge_people_by_hand_api_v1_identities_merges_post
+      security:
+      - HTTPBearer: []
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/MergeBody'
-        required: true
       responses:
         '201':
           description: Successful Response
@@ -11943,8 +12026,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-      security:
-      - HTTPBearer: []
   /api/v1/identities/merges/separate:
     post:
       tags:
@@ -29961,6 +30042,42 @@ components:
       - passed
       - failed
       title: DayPoint
+    Decision:
+      properties:
+        address_a:
+          type: string
+          title: Address A
+        address_b:
+          type: string
+          title: Address B
+        kind:
+          type: string
+          enum:
+          - merge
+          - separate
+          title: Kind
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - address_a
+      - address_b
+      - kind
+      - created_at
+      title: Decision
+    DecisionList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Decision'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: DecisionList
     DecisionRequest:
       properties:
         decision:
@@ -37409,6 +37526,43 @@ components:
           title: Note
       type: object
       title: MoveIn
+    MtaStsOut:
+      properties:
+        state:
+          type: string
+          title: State
+        mode:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mode
+        max_age:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Max Age
+        mx_patterns:
+          items:
+            type: string
+          type: array
+          title: Mx Patterns
+          default: []
+        uncovered_mx:
+          items:
+            type: string
+          type: array
+          title: Uncovered Mx
+          default: []
+        issues:
+          items:
+            type: string
+          type: array
+          title: Issues
+          default: []
+      type: object
+      required:
+      - state
+      title: MtaStsOut
     NLDetectionRequest:
       properties:
         description:
@@ -40661,6 +40815,10 @@ components:
           type: boolean
           title: Spf Lookups Complete
           default: true
+        mta_sts:
+          anyOf:
+          - $ref: '#/components/schemas/MtaStsOut'
+          - type: 'null'
         advice:
           items:
             type: string

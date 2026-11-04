@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), mergePeople: vi.fn(), separatePeople: vi.fn() }));
-vi.mock('@/lib/api', () => ({ identitiesApi: { list: api.list, mergePeople: api.mergePeople, separatePeople: api.separatePeople } }));
+const api = vi.hoisted(() => ({ list: vi.fn(), mergePeople: vi.fn(), separatePeople: vi.fn(), decisions: vi.fn(), removeDecision: vi.fn() }));
+vi.mock('@/lib/api', () => ({ identitiesApi: { list: api.list, mergePeople: api.mergePeople, separatePeople: api.separatePeople, decisions: api.decisions, removeDecision: api.removeDecision } }));
 
 import { MergePanel } from './MergePanel';
 
@@ -14,6 +14,8 @@ beforeEach(() => {
   api.list.mockReset().mockResolvedValue({ items: [other, { ...other, key: 'self', email: person.email }] });
   api.mergePeople.mockReset().mockResolvedValue({ kind: 'merge' });
   api.separatePeople.mockReset().mockResolvedValue({ kind: 'separate' });
+  api.decisions.mockReset().mockResolvedValue({ items: [] });
+  api.removeDecision.mockReset().mockResolvedValue(undefined);
 });
 
 describe('MergePanel', () => {
@@ -66,5 +68,26 @@ describe('MergePanel', () => {
     await user.click(screen.getByRole('button', { name: 'Yes, merge' }));
     expect(await screen.findByText('They are already one person.')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('lists the hand decisions about the person and takes one back, then asks again', async () => {
+    api.decisions
+      .mockResolvedValueOnce({ items: [{ address_a: 'adam@tecovas.com', address_b: 'adam@tecovas.onmicrosoft.com', kind: 'separate', created_at: '2026-11-04T00:00:00Z' }] })
+      .mockResolvedValue({ items: [] });
+    const onChanged = vi.fn();
+    render(<MergePanel person={person} onChanged={onChanged} />);
+    expect(await screen.findByText(/Kept apart by you: adam@tecovas.com and adam@tecovas.onmicrosoft.com/)).toBeInTheDocument();
+    expect(api.decisions).toHaveBeenCalledWith('c1', 'adam@tecovas.com');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Take back: adam@tecovas.com and adam@tecovas.onmicrosoft.com' }));
+    await waitFor(() => expect(api.removeDecision).toHaveBeenCalledWith('c1', 'adam@tecovas.com', 'adam@tecovas.onmicrosoft.com'));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId('merge-decisions')).toBeNull());
+  });
+
+  it('shows no decisions section when there are none, or when the list cannot be read', async () => {
+    api.decisions.mockRejectedValue(new Error('nope'));
+    render(<MergePanel person={person} onChanged={vi.fn()} />);
+    await waitFor(() => expect(api.decisions).toHaveBeenCalled());
+    expect(screen.queryByTestId('merge-decisions')).toBeNull();
   });
 });

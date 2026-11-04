@@ -914,6 +914,11 @@ export const identitiesApi = {
   /** Say an address is NOT the same person as another (undoes a merge, and stops the automatic rules joining them again). */
   separatePeople: (body: { client_id: string; email: string; from_email: string }) =>
     request<{ kind: string; email: string; other: string }>('/api/v1/identities/merges/separate', { method: 'POST', body: JSON.stringify(body) }),
+  /** The hand decisions (merges and "not the same person" marks) that involve this person's addresses, newest first. */
+  decisions: (clientId: string, email: string) => request<{ items: PeopleDecision[] }>('/api/v1/identities/merges', { params: { client_id: clientId, email } }),
+  /** Take one hand decision back, so the automatic rules judge the pair again. */
+  removeDecision: (clientId: string, addressA: string, addressB: string) =>
+    request<void>('/api/v1/identities/merges', { method: 'DELETE', params: { client_id: clientId, address_a: addressA, address_b: addressB } }),
   /** What was asked for this person in the last week (sign out, block, allow) and how each went. */
   accountActions: (clientId: string, email: string) => request<{ items: AccountActionItem[] }>('/api/v1/identities/actions', { params: { client_id: clientId, email } }),
   /** Ask CORE to sign a person out everywhere, block their sign-in, or allow it. Returns at once: the answer comes back through accountActions. */
@@ -938,6 +943,13 @@ export interface BecCaseItem {
 
 export interface BecCaseDetail extends BecCaseItem {
   report: Record<string, unknown> | null;
+}
+
+export interface PeopleDecision {
+  address_a: string;
+  address_b: string;
+  kind: 'merge' | 'separate';
+  created_at: string;
 }
 
 export type AccountActionKind = 'revoke_sessions' | 'disable_user' | 'enable_user';

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
 const api = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), listChildren: vi.fn(), exportCsv: vi.fn() }));
-vi.mock('@/lib/api', () => ({ identitiesApi: { list: api.list, detail: api.detail, exportCsv: api.exportCsv }, msspApi: { listChildren: api.listChildren }, authApi: { currentUser: () => ({ capabilities: [] }) } }));
+vi.mock('@/lib/api', () => ({ identitiesApi: { list: api.list, detail: api.detail, exportCsv: api.exportCsv, decisions: () => Promise.resolve({ items: [] }) }, msspApi: { listChildren: api.listChildren }, authApi: { currentUser: () => ({ capabilities: [] }) } }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
 import { IdentitiesView, ticketAge } from './IdentitiesView';

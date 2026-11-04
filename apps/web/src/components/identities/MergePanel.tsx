@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { mutate as refresh } from 'swr';
-import { identitiesApi, type IdentityPerson } from '@/lib/api';
+import { identitiesApi, type IdentityPerson, type PeopleDecision } from '@/lib/api';
 
 /** Refreshes the list and every opened person after a merge or a split. */
 export function refreshPeople(): Promise<unknown> {
@@ -28,6 +28,20 @@ export function MergePanel({
   const [chosen, setChosen] = useState<IdentityPerson | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
+  const [decisions, setDecisions] = useState<PeopleDecision[]>([]);
+  const [reload, setReload] = useState(0);
+
+  // The hand decisions about this person, so a "not the same person" mark (which nothing else shows) can be taken back.
+  useEffect(() => {
+    let live = true;
+    identitiesApi
+      .decisions(person.client_id, person.email)
+      .then((r) => live && setDecisions(r.items))
+      .catch(() => live && setDecisions([]));
+    return () => {
+      live = false;
+    };
+  }, [person.client_id, person.email, reload]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 250);
@@ -53,6 +67,7 @@ export function MergePanel({
     setProblem('');
     try {
       await job();
+      setReload((n) => n + 1);
       setChosen(null);
       setSearching(false);
       setQ('');
@@ -87,6 +102,31 @@ export function MergePanel({
         ))}
       </ul>
       {problem && !chosen && <p className="mt-1 text-xs text-red-300">{problem}</p>}
+
+      {decisions.length > 0 && (
+        <div className="mt-2" data-testid="merge-decisions">
+          <h5 className="text-xs font-semibold uppercase text-gray-500">Your decisions</h5>
+          <ul className="mt-1 space-y-1 text-xs text-gray-300">
+            {decisions.map((d) => (
+              <li key={`${d.address_a}|${d.address_b}`} className="flex flex-wrap items-center gap-2">
+                <span>
+                  {d.kind === 'merge' ? 'Joined by you: ' : 'Kept apart by you: '}
+                  {d.address_a} and {d.address_b}
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void run(() => identitiesApi.removeDecision(person.client_id, d.address_a, d.address_b))}
+                  className="text-blue-300 hover:text-blue-200"
+                  aria-label={`Take back: ${d.address_a} and ${d.address_b}`}
+                >
+                  Take back
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {!searching ? (
         <button type="button" onClick={() => setSearching(true)} className="mt-2 text-xs text-blue-300 hover:text-blue-200">
