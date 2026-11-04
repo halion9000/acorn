@@ -810,7 +810,7 @@ export interface IdentityPerson {
 }
 
 export interface IdentityList {
-  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; failed_signins_24h?: number; brute_force?: number };
+  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; active?: number; failed_signins_24h?: number; brute_force?: number };
   items: IdentityPerson[];
   total: number;
   page: number;
@@ -849,6 +849,8 @@ export interface IdentityQuery {
   disabled?: boolean;
   /** Only accounts that are not disabled. */
   enabled?: boolean;
+  /** Only active identities: a licensed Microsoft 365 or Google account, not a guest, not disabled. */
+  active?: boolean;
   sort?: IdentitySort;
 }
 
@@ -872,6 +874,7 @@ export const identitiesApi = {
         admin: q.admin ? 'true' : undefined,
         disabled: q.disabled ? 'true' : undefined,
         enabled: q.enabled ? 'true' : undefined,
+        active: q.active ? 'true' : undefined,
         signin: q.signin,
         sort: q.sort,
       } as unknown as Record<string, string>,
@@ -895,6 +898,7 @@ export const identitiesApi = {
     if (q.admin) p.set('admin', 'true');
     if (q.disabled) p.set('disabled', 'true');
     if (q.enabled) p.set('enabled', 'true');
+    if (q.active) p.set('active', 'true');
     const qs = p.toString();
     const response = await authFetch(`${API_BASE}/api/v1/identities/export.csv${qs ? `?${qs}` : ''}`);
     if (!response.ok) throw new Error(`Export failed (${response.status})`);

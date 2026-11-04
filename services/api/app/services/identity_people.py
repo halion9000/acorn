@@ -327,6 +327,12 @@ def attach_alerts(people: list[Person], alerts: list[Any], source_of: Any = None
     return by_key
 
 
+def is_active(p: Person) -> bool:
+    """An active identity: a person with a LICENSED account (Microsoft 365 or Google), who is not a guest and whose account is not disabled. Unknown is not enough: an account no tool says is licensed is not counted,
+    and an account that only some tool leaves silent about (enabled unknown) is not called disabled."""
+    return p.licensed is True and p.kind != "guest" and p.enabled is not False
+
+
 def filter_people(
     people: list[Person],
     *,
@@ -342,12 +348,19 @@ def filter_people(
     alert_source: str | None = None,
     backup: str | None = None,
     exposed: str | None = None,
+    active: bool = False,
 ) -> list[Person]:
     """The people a page asked for: every filter given must hold. ``only_in`` keeps people known to just that one tool."""
     rows = people
     if search:
         needle = search.strip().lower()
-        rows = [p for p in rows if any(needle in address for address in p.addresses) or needle in (p.display_name or "").lower() or needle in (p.client_name or "").lower()]
+        rows = [
+            p
+            for p in rows
+            if any(needle in address for address in p.addresses)
+            or needle in (p.display_name or "").lower()
+            or needle in (p.client_name or "").lower()
+        ]
     if source:
         rows = [p for p in rows if source in p.vendors]
     if only_in:
@@ -379,6 +392,8 @@ def filter_people(
         rows = [p for p in rows if p.enabled is not False]
     if kind:
         rows = [p for p in rows if p.kind == kind]
+    if active:
+        rows = [p for p in rows if is_active(p)]
     return rows
 
 

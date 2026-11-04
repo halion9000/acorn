@@ -285,6 +285,8 @@ export function IdentitiesView() {
   const [state, setState] = useState<'' | 'enabled' | 'disabled'>('');
   const disabledOnly = state === 'disabled';
   const [oneTool, setOneTool] = useState(false);
+  // Active identities: a licensed Microsoft 365 or Google account that is not a guest and not disabled (what the first tile counts).
+  const [activeOnly, setActiveOnly] = useState(false);
   const [sort, setSort] = useState<IdentitySort>('alerts');
   const [open, setOpen] = useState<string | null>(null);
 
@@ -294,8 +296,8 @@ export function IdentitiesView() {
   }, [search]);
 
   const query: IdentityQuery = useMemo(
-    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, alertSource: alertTool || undefined, backup: backup || undefined, signin: signin || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', onlyIn: oneTool && tool ? tool : undefined, sort }),
-    [page, clientId, debounced, tool, alertTool, mfa, backup, signin, exposed, kind, hasAlerts, adminOnly, state, oneTool, sort],
+    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, alertSource: alertTool || undefined, backup: backup || undefined, signin: signin || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', active: activeOnly, onlyIn: oneTool && tool ? tool : undefined, sort }),
+    [page, clientId, debounced, tool, alertTool, mfa, backup, signin, exposed, kind, hasAlerts, adminOnly, state, oneTool, activeOnly, sort],
   );
   const { data, error, isLoading, mutate } = useSWR(['identities', query], () => identitiesApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
   const { data: clients } = useSWR('mssp-children', () => msspApi.listChildren().catch(() => []), { revalidateOnFocus: false });
@@ -343,8 +345,9 @@ export function IdentitiesView() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-3">
-          <div className="text-xs text-gray-400">People</div>
+        {tile('Active Identities', summary?.active, activeOnly, () => setActiveOnly((v) => !v))}
+        <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-3" title="Every person the connected tools know, whatever the filters">
+          <div className="text-xs text-gray-400">All Identities</div>
           <div className="text-2xl font-semibold text-white" data-testid="identities-total">
             {summary?.total ?? '—'}
           </div>

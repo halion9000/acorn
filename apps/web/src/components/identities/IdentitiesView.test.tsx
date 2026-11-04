@@ -28,7 +28,7 @@ const person = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 const list = (items: unknown[], over: Record<string, unknown> = {}) => ({
-  summary: { total: items.length, with_alerts: 1, without_mfa: 2, admins: 1, disabled: 0, in_one_tool: 3, tools: { cipp: 5, dropsuite: 2, 'datto-saas': 1 } },
+  summary: { total: items.length, with_alerts: 1, without_mfa: 2, admins: 1, disabled: 0, in_one_tool: 3, active: 1, tools: { cipp: 5, dropsuite: 2, 'datto-saas': 1 } },
   items,
   total: items.length,
   page: 1,
@@ -68,6 +68,22 @@ describe('the Identities page', () => {
     expect(rows[1]).toHaveTextContent('admin');
     expect(rows[1]).toHaveTextContent('disabled');
     expect(screen.getByTestId('identities-total')).toHaveTextContent('2');
+  });
+
+  it('puts Active Identities first, calls the total All Identities, and the tile lists only active identities', async () => {
+    show();
+    await screen.findAllByTestId('identity-row');
+    const tiles = screen.getAllByRole('button', { pressed: false }).filter((b) => /Identities/.test(b.textContent ?? ''));
+    expect(tiles[0]).toHaveTextContent('Active Identities');
+    expect(tiles[0]).toHaveTextContent('1');
+    expect(screen.getByText('All Identities')).toBeInTheDocument();
+    expect(screen.queryByText('People')).not.toBeInTheDocument();
+    expect(lastQuery().active).toBe(false);
+    await userEvent.click(tiles[0]);
+    await waitFor(() => expect(lastQuery().active).toBe(true));
+    expect(screen.getByTestId('identities-total')).toHaveTextContent('2'); // everyone is still counted under All Identities
+    await userEvent.click(screen.getByRole('button', { name: /Active Identities/, pressed: true }));
+    await waitFor(() => expect(lastQuery().active).toBe(false));
   });
 
   it('filters by account state: enabled only, disabled only, or both, and the Disabled accounts tile does the same as the disabled choice', async () => {

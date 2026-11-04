@@ -36,6 +36,7 @@ from app.services.identity_people import (
     attach_alerts,
     build_people,
     filter_people,
+    is_active,
     normalize_email,
     sort_people,
 )
@@ -123,6 +124,8 @@ class IdentitySummary(BaseModel):
     exposed_serious: int = 0
     # Guests (people from outside the organization with an account in it).
     guests: int = 0
+    # Active identities: a licensed Microsoft 365 or Google account, not a guest, not disabled (identity_people.is_active).
+    active: int = 0
     # Failed password sign-ins in the last 24 hours across the people in scope, and the people with BRUTE_FORCE_FAILURES or more of them. Steps that only ask for more proof (MFA prompts) are not failures.
     failed_signins_24h: int = 0
     brute_force: int = 0
@@ -255,7 +258,9 @@ async def _people(db: Any, owner: uuid.UUID, client_id: uuid.UUID | None) -> tup
         )
     named = [a for a in alerts if a.affected_users]
     merges, separate = await owner_decisions(db, scope)
-    people = add_alert_sources(build_people(names, list(users), list(sources), now, merges=merges, separate=separate), named, names, source_of)
+    people = add_alert_sources(
+        build_people(names, list(users), list(sources), now, merges=merges, separate=separate), named, names, source_of
+    )
     return people, attach_alerts(people, [a for a in named if a.status not in FINISHED_STATUSES], source_of)
 
 
@@ -279,6 +284,7 @@ def summarize(people: list[Person]) -> IdentitySummary:
         backup_problems=sum(1 for p in people if p.enabled is not False and any(b.status != "ok" for b in p.backups)),
         exposed=sum(1 for p in people if p.exposure is not None),
         guests=sum(1 for p in people if p.kind == "guest"),
+        active=sum(1 for p in people if is_active(p)),
         exposed_serious=sum(
             1 for p in people if p.exposure is not None and (p.exposure.password or p.exposure.stealer_log or p.exposure.malware)
         ),
@@ -315,9 +321,12 @@ async def list_identities(
     admin: bool = Query(default=False),
     disabled: bool = Query(default=False),
     enabled: bool = Query(default=False, description="Only accounts that are not disabled."),
+    active: bool = Query(default=False, description="Only active identities: a licensed account, not a guest, not disabled."),
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
     signin: str | None = Query(
-        default=None, pattern="^(failed|brute_force)$", description="failed: at least one failed sign-in in the last 24 hours; brute_force: ten or more (the two tiles' lists)."
+        default=None,
+        pattern="^(failed|brute_force)$",
+        description="failed: at least one failed sign-in in the last 24 hours; brute_force: ten or more (the two tiles' lists).",
     ),
     sort: str = Query(default="alerts"),
 ) -> IdentityList:
@@ -346,6 +355,7 @@ async def list_identities(
             admin=admin,
             disabled=disabled,
             enabled=enabled,
+            active=active,
             kind=kind,
         ),
         sort,
@@ -408,6 +418,7 @@ async def export_identities(
     admin: bool = Query(default=False),
     disabled: bool = Query(default=False),
     enabled: bool = Query(default=False, description="Only accounts that are not disabled."),
+    active: bool = Query(default=False, description="Only active identities: a licensed account, not a guest, not disabled."),
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
     signin: str | None = Query(default=None, pattern="^(failed|brute_force)$"),
     sort: str = Query(default="alerts"),
@@ -433,6 +444,7 @@ async def export_identities(
             admin=admin,
             disabled=disabled,
             enabled=enabled,
+            active=active,
             kind=kind,
         ),
         sort,

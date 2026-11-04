@@ -11453,6 +11453,17 @@ paths:
           default: false
           title: Enabled
         description: Only accounts that are not disabled.
+      - name: active
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: 'Only active identities: a licensed account, not a guest, not
+            disabled.'
+          default: false
+          title: Active
+        description: 'Only active identities: a licensed account, not a guest, not
+          disabled.'
       - name: kind
         in: query
         required: false
@@ -11606,6 +11617,17 @@ paths:
           default: false
           title: Enabled
         description: Only accounts that are not disabled.
+      - name: active
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: 'Only active identities: a licensed account, not a guest, not
+            disabled.'
+          default: false
+          title: Active
+        description: 'Only active identities: a licensed account, not a guest, not
+          disabled.'
       - name: kind
         in: query
         required: false
@@ -49797,6 +49819,10 @@ components:
         guests:
           type: integer
           title: Guests
+          default: 0
+        active:
+          type: integer
+          title: Active
           default: 0
         failed_signins_24h:
           type: integer
