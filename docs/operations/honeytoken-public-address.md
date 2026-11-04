@@ -4,7 +4,16 @@ Why: a planted link only alerts if the machine that opens it can reach A.C.O.R.N
 
 What the server already has (deployed): a listener on the server's internal network that answers `/api/v1/canary/<token id>` and returns 404 for every other path (checked: `/`, `/api/v1/health`, `/api/v1/alerts`, and the tripwire path with extra text all give 404), and a `cloudflared` service that connects out to Cloudflare, so no port is opened to the internet. It replaces any visitor-supplied address header with the one Cloudflare saw, so the alert names the real visitor.
 
-## Steps (about 15 minutes)
+## The easy way: the "Cloudflare canary" card in CORE
+
+1. In Cloudflare create the tunnel and copy its token (steps 1 to 3 below; the OS buttons on the install screen do not matter, install nothing).
+2. In CORE open the connector settings, find the **Cloudflare canary** card, paste the token and press Save. To change it later, paste a new one.
+3. CORE sends it to A.C.O.R.N (checked there: it must be a real tunnel token; it is never shown again). The next A.C.O.R.N update, from CORE's rebuild button or A.C.O.R.N's Update button, puts it into `.env`, adds `cloudflared` to `ACORN_EXTRAS`, sets `ACORN_CANARY_URL` to `https://canary.goliveoak.com` if none is set, and starts the tunnel. An update with no new code still applies a new token.
+4. Check it as in step 6 below. The change is in the audit log as `honeytokens:tunnel_token_changed` (without the token).
+
+The manual steps below do the same by hand and still work.
+
+## Steps by hand (about 15 minutes)
 
 1. In the Cloudflare dashboard open **Zero Trust**, then **Networks**, then **Tunnels**, then **Create a tunnel**, choose **Cloudflared**, name it `acorn-canary`.
 2. On the "Install connector" screen, copy the **token** (the long text after `--token` in the command shown). Do not run the command it shows; the server runs the connector itself. Treat the token like a password.

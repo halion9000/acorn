@@ -135,6 +135,38 @@ start_extras() {
   return 0
 }
 
+# The Cloudflare tunnel token for the public honeytoken address. CORE's "Cloudflare canary" card sends it to the API, which keeps it in $CTL/cloudflared.token (see services/api/app/services/canary_tunnel.py);
+# this puts it into .env, makes sure cloudflared is in ACORN_EXTRAS and sets the public address if none is set yet (https://canary.goliveoak.com; change ACORN_CANARY_URL in .env to use another). The file is only
+# ever read here, and only a value made of base64 characters is written, so nothing can add or change another line of .env. Never fails an update: the tunnel is not needed by the rest of the platform.
+CTL=${ACORN_UPDATE_CTL:-/srv/acorn/update-ctl}
+canary_token() { tr -d '
+ ' < "$CTL/cloudflared.token" 2>/dev/null; }
+canary_pending() {  # true when a token is waiting that .env does not hold yet
+  local want have
+  want=$(canary_token); [ -n "$want" ] || return 1
+  case "$want" in *[!A-Za-z0-9+/_=-]*) return 1 ;; esac
+  have=$(grep -E '^CLOUDFLARED_TUNNEL_TOKEN=' "$REPO/.env" 2>/dev/null | tail -1 | cut -d= -f2-)
+  [ "$want" != "$have" ]
+}
+apply_canary_tunnel() {
+  canary_pending || return 0
+  local want envfile=$REPO/.env extras
+  want=$(canary_token)
+  say "applying the Cloudflare tunnel token from CORE..."
+  touch "$envfile"
+  { grep -vE '^CLOUDFLARED_TUNNEL_TOKEN=' "$envfile"; echo "CLOUDFLARED_TUNNEL_TOKEN=$want"; } > "$envfile.new" && cat "$envfile.new" > "$envfile"; rm -f "$envfile.new"
+  grep -qE '^ACORN_CANARY_URL=.+' "$envfile" || echo "ACORN_CANARY_URL=https://canary.goliveoak.com" >> "$envfile"
+  if grep -qE '^ACORN_EXTRAS=' "$envfile"; then
+    extras=$(grep -E '^ACORN_EXTRAS=' "$envfile" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
+    case " $extras " in *" cloudflared "*) ;; *) { grep -vE '^ACORN_EXTRAS=' "$envfile"; echo "ACORN_EXTRAS=\"$extras cloudflared\""; } > "$envfile.new" && cat "$envfile.new" > "$envfile"; rm -f "$envfile.new" ;; esac
+  else
+    echo 'ACORN_EXTRAS="honeytokens cloudflared"' >> "$envfile"
+  fi
+  # the tunnel container, and the honeytokens service (which reads ACORN_CANARY_URL), start again with the new values
+  $COMPOSE --profile extras up -d --force-recreate cloudflared honeytokens 2>&1 | grep -E "Error|error" | head -3
+  return 0
+}
+
 deploy() {  # build and start whatever is checked out now
   # The version being started, handed to the API container (compose reads it as ACORN_COMMIT) so the health page can say what is running.
   ACORN_COMMIT=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -154,6 +186,7 @@ deploy() {  # build and start whatever is checked out now
   [ "${PIPESTATUS[0]}" -eq 0 ] || return 1
   # The proxy reads its file once when it starts, and a changed file does not recreate it: tell it to read the file again. A file it cannot accept is refused and the old one stays in force.
   $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>&1 | tail -2 || true
+  apply_canary_tunnel
   start_extras
   migrate && healthy
 }
@@ -182,7 +215,11 @@ before=$(head_commit)
 say "fetching $BRANCH..."
 git fetch -q origin "$BRANCH" || { say "FAILED: could not fetch from GitHub (is the deploy key added to the repository?)"; exit 1; }
 target=$(git rev-parse --short FETCH_HEAD)
-if [ "$before" = "$target" ] && [ "$MODE" != force ]; then say "already up to date at $target"; STATUS=up_to_date; exit 0; fi
+if [ "$before" = "$target" ] && [ "$MODE" != force ]; then
+  # Nothing new to build, but a tunnel token sent from CORE since the last run still needs putting to use.
+  if canary_pending; then (cd "$REPO" && apply_canary_tunnel); fi
+  say "already up to date at $target"; STATUS=up_to_date; exit 0
+fi
 [ "$before" != none ] && git rev-parse --verify -q "$before" >/dev/null && echo "$before" > "$STATE/previous-commit"
 say "updating $before -> $target"
 git log --oneline "$before..FETCH_HEAD" 2>/dev/null | head -20

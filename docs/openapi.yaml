@@ -15054,6 +15054,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/canary-tunnel:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Receive Tunnel Token
+      description: CORE's "Cloudflare canary" card sends the tunnel token here. Checked,
+        kept for the update script, never echoed; a change is audited (without the
+        token).
+      operationId: receive_tunnel_token_api_v1_inbox_core_feed__tenant_token__canary_tunnel_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TunnelIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TunnelStored'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/canary-tunnel:
+    get:
+      tags:
+      - honeytokens
+      summary: Whether the Cloudflare tunnel token for the public honeytoken address
+        is stored
+      operationId: tunnel_state_api_v1_canary_tunnel_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TunnelStateOut'
+      security:
+      - HTTPBearer: []
   /api/v1/inbox/core-feed/{tenant_token}/vcio-reviews:
     post:
       tags:
@@ -47414,6 +47465,50 @@ components:
       - healthy
       title: TuningSummary
       description: Top-line counts for the workbench header.
+    TunnelIn:
+      properties:
+        token:
+          type: string
+          maxLength: 2200
+          minLength: 1
+          title: Token
+      type: object
+      required:
+      - token
+      title: TunnelIn
+    TunnelStateOut:
+      properties:
+        stored:
+          type: boolean
+          title: Stored
+        tunnel_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tunnel Id
+        changed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Changed At
+      type: object
+      required:
+      - stored
+      title: TunnelStateOut
+    TunnelStored:
+      properties:
+        stored:
+          type: boolean
+          title: Stored
+        changed:
+          type: boolean
+          title: Changed
+      type: object
+      required:
+      - stored
+      - changed
+      title: TunnelStored
     UnmappedClient:
       properties:
         vendor_client_id:
