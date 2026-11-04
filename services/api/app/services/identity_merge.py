@@ -215,7 +215,15 @@ def merge_people(
     blocked = [(x, y) for x, y in blocked if x and y]
 
     # How many licensed accounts each group holds: two licensed accounts are two paid seats, so no rule joins them (a chain of rules cannot either).
-    licensed = {k: (1 if people[k].licensed is True else 0) for k in people}
+    # One account seen under two addresses is not two seats: a person only ThreatMate lists, in a client whose Microsoft accounts CIPP lists, is not an account CIPP knows (CIPP lists every account of a tenant it
+    # manages), so it is the same account under another address (its .onmicrosoft.com name) and its licence is not counted a second time.
+    cipp_tenants = {p.tenant_id for p in people.values() if any(s.vendor == "cipp" for s in p.sources)}
+
+    def echo_only(p: Any) -> bool:
+        vendors = {s.vendor for s in p.sources}
+        return bool(vendors) and "cipp" not in vendors and vendors <= {"threatmate"} and p.tenant_id in cipp_tenants
+
+    licensed = {k: (1 if people[k].licensed is True and not echo_only(people[k]) else 0) for k in people}
     size = {k: 1 for k in people}
 
     def union(a: str, b: str, reason: str, respect_blocked: bool) -> None:

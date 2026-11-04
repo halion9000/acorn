@@ -28,7 +28,7 @@ MAX_BUCKET = 6
 NAME_SCORE = 60
 LOCAL_SCORE = 30
 PATTERN_SCORE = 25
-MIN_SHOWN = 55
+MIN_SHOWN = 60
 HIGH = 85
 
 
@@ -65,6 +65,16 @@ class DuplicatePair:
     @property
     def label(self) -> str:
         return "high" if self.score >= HIGH else "medium"
+
+
+def _names_compatible(a: Any, b: Any) -> bool:
+    """False only when both people have a real name and the names are different people's (Adam Smith and Amy Smith both fit asmith@...). A missing name, an equal one, or one that holds the other's
+    words (Marla Falcon, Marla Falcon-Smith) is compatible."""
+    x, y = name_key(a.display_name), name_key(b.display_name)
+    if x is None or y is None or x == y:
+        return True
+    xs, ys = set(x.split()), set(y.split())
+    return xs <= ys or ys <= xs
 
 
 def _eligible(p: Any) -> bool:
@@ -126,7 +136,7 @@ def find_duplicates(people: list[Any], separate: list[tuple[uuid.UUID, str, str]
         members = list({id(p): p for p in group}.values())
         if 2 <= len(members) <= MAX_BUCKET:
             for a, b in combinations(members, 2):
-                if a.email.split("@")[-1].lower() != b.email.split("@")[-1].lower():
+                if a.email.split("@")[-1].lower() != b.email.split("@")[-1].lower() and _names_compatible(a, b):
                     add(a, b, LOCAL_SCORE, f"The same name before the @: {local}")
     # A display name that matches the other person's address: supports a pair another sign already found; never makes one alone.
     for pair in list(pairs.values()):

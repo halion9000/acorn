@@ -148,3 +148,20 @@ def test_the_endpoint_returns_the_pairs_with_both_people_and_leaves_out_what_the
     )
     assert item.score == 90 and any("before the @" in r for r in item.reasons)
     assert item.a.client_id == A
+
+
+def test_two_different_people_who_happen_to_share_a_short_address_are_not_suggested():
+    adam, amy = person(A, "asmith@a.com", "Adam Smith"), person(A, "asmith@b.com", "Amy Smith")
+    assert find_duplicates([adam, amy], []) == [], "the same initial and surname, two different first names"
+    assert (
+        find_duplicates([person(A, "asmith@a.com", "Adam Smith"), person(A, "asmith@b.com", None)], []) == []
+    ), "one local part alone is still not enough"
+
+
+def test_a_name_that_holds_the_others_words_is_compatible_and_a_missing_name_is_too():
+    from app.services.identity_duplicates import _names_compatible
+
+    assert _names_compatible(person(A, "x@a.com", "Marla Falcon"), person(A, "x@b.com", "Marla Falcon-Smith"))
+    assert _names_compatible(person(A, "x@a.com", "Marla Falcon"), person(A, "x@b.com", None))
+    assert _names_compatible(person(A, "x@a.com", "Marla"), person(A, "x@b.com", "Adam Smith")), "a first name alone is no name"
+    assert not _names_compatible(person(A, "x@a.com", "Adam Smith"), person(A, "x@b.com", "Amy Smith"))

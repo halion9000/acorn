@@ -473,3 +473,39 @@ def test_a_pair_the_rule_joined_is_no_longer_offered_as_a_possible_duplicate():
     assert [(p.a.email, p.b.email) for p in offered] == [
         ("kim@a.com", "kl@b.com")
     ], "only the pair no rule was sure of is left for the owner"
+
+
+# ---- one account seen under two addresses is not two seats ---------------------------------------------------------------------------------------------------
+
+
+def threatmate(tenant, email, **over):
+    """A person ThreatMate's directory lists (and nobody else), with a licence."""
+    return src(tenant, "threatmate", email, enabled=True, details={"directory": True, "licensed": True}, **over)
+
+
+def test_a_microsoft_address_only_threatmate_lists_is_the_same_account_as_the_real_one_cipp_lists_and_the_licence_counts_once():
+    people = build(
+        [ms(A, "chris@onnit.com", display_name="Chris Park", licensed=True)],
+        [threatmate(A, "chris@onnitlabs.onmicrosoft.com", display_name="Chris Park")],
+    )
+    assert len(people) == 1
+    assert people[0].email == "chris@onnit.com" and people[0].aliases == ["chris@onnitlabs.onmicrosoft.com"]
+    assert people[0].licensed is True
+
+
+def test_two_accounts_a_client_has_no_cipp_for_are_still_two_seats_when_both_hold_a_licence():
+    people = build([], [threatmate(A, "chris@onnit.com", display_name="Chris Park"), threatmate(A, "chris@onnitlabs.onmicrosoft.com", display_name="Chris Park")])
+    assert len(people) == 2, "with no CIPP list to say the second address is not an account, both licences count"
+
+
+def test_an_account_another_tool_also_knows_is_a_real_account_of_its_own_and_counts_as_a_seat():
+    people = build(
+        [ms(A, "chris@onnit.com", display_name="Chris Park", licensed=True)],
+        [threatmate(A, "chris@onnitlabs.onmicrosoft.com", display_name="Chris Park"), src(A, "huntress", "chris@onnitlabs.onmicrosoft.com", enabled=True)],
+    )
+    assert len(people) == 2
+
+
+def test_two_accounts_cipp_lists_that_both_hold_a_licence_are_never_joined_by_a_name():
+    people = build([ms(A, "chris@onnit.com", display_name="Chris Park", licensed=True), ms(A, "chris@onnitlabs.onmicrosoft.com", display_name="Chris Park", licensed=True)])
+    assert len(people) == 2
