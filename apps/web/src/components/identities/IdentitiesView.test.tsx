@@ -73,17 +73,18 @@ describe('the Identities page', () => {
   it('puts Active Identities first, calls the total All Identities, and the tile lists only active identities', async () => {
     show();
     await screen.findAllByTestId('identity-row');
-    const tiles = screen.getAllByRole('button', { pressed: false }).filter((b) => /Identities/.test(b.textContent ?? ''));
+    const tiles = screen.getAllByRole('button').filter((b) => /Identities/.test(b.textContent ?? ''));
     expect(tiles[0]).toHaveTextContent('Active Identities');
     expect(tiles[0]).toHaveTextContent('1');
     expect(screen.getByText('All Identities')).toBeInTheDocument();
     expect(screen.queryByText('People')).not.toBeInTheDocument();
-    expect(lastQuery().active).toBe(false);
-    await userEvent.click(tiles[0]);
-    await waitFor(() => expect(lastQuery().active).toBe(true));
+    expect(lastQuery().active).toBe(true); // the page opens on the active identities
+    expect(tiles[0]).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('identities-total')).toHaveTextContent('2'); // everyone is still counted under All Identities
-    await userEvent.click(screen.getByRole('button', { name: /Active Identities/, pressed: true }));
+    await userEvent.click(tiles[0]);
     await waitFor(() => expect(lastQuery().active).toBe(false));
+    await userEvent.click(screen.getByRole('button', { name: /Active Identities/, pressed: false }));
+    await waitFor(() => expect(lastQuery().active).toBe(true));
   });
 
   it('filters by account state: enabled only, disabled only, or both, and the Disabled accounts tile does the same as the disabled choice', async () => {
@@ -106,6 +107,7 @@ describe('the Identities page', () => {
       show();
       await screen.findAllByTestId('identity-row');
       await waitFor(() => expect(lastQuery().clientId).toBe('c2'));
+      await waitFor(() => expect(lastQuery().active).toBe(false)); // a client's People link lists everyone, not only the active
     } finally {
       window.history.pushState({}, '', '/');
     }
@@ -455,7 +457,7 @@ describe('arriving from the search box', () => {
     window.history.replaceState({}, '', '/identities?client=c1&search=amy%40acme.com');
     try {
       show();
-      await waitFor(() => expect(lastQuery()).toMatchObject({ search: 'amy@acme.com', clientId: 'c1' }));
+      await waitFor(() => expect(lastQuery()).toMatchObject({ search: 'amy@acme.com', clientId: 'c1', active: false })); // a disabled or guest account must not be hidden from a link to it
       expect((screen.getByLabelText('Search people') as HTMLInputElement).value).toBe('amy@acme.com');
     } finally {
       window.history.replaceState({}, '', '/');

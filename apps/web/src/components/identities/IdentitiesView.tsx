@@ -263,12 +263,16 @@ export function IdentitiesView() {
   // A link can open the list of one client's people (?client=<id>), as Client Posture's People button does.
   useEffect(() => {
     const wanted = clientFromAddress(window.location.search);
-    if (wanted) setClientId(wanted);
+    if (wanted) {
+      setClientId(wanted);
+      setActiveOnly(false);
+    }
     // A link from the search box (?search=<name or e-mail>) opens the list already searching for that person.
     const asked = (new URLSearchParams(window.location.search).get('search') ?? '').slice(0, 100);
     if (asked) {
       setSearch(asked);
       setDebounced(asked);
+      setActiveOnly(false);
     }
   }, []);
   const [tool, setTool] = useState('');
@@ -286,7 +290,8 @@ export function IdentitiesView() {
   const disabledOnly = state === 'disabled';
   const [oneTool, setOneTool] = useState(false);
   // Active identities: a licensed Microsoft 365 or Google account that is not a guest and not disabled (what the first tile counts).
-  const [activeOnly, setActiveOnly] = useState(false);
+  // The page opens on the active identities (the first tile). A link that asks for one person or one client (?search=, ?client=) opens on everyone instead, so a disabled account or a guest is not hidden from it.
+  const [activeOnly, setActiveOnly] = useState(true);
   const [sort, setSort] = useState<IdentitySort>('alerts');
   const [open, setOpen] = useState<string | null>(null);
 

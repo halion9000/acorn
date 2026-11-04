@@ -2,7 +2,7 @@
 
 /**
  * Business email compromise (BEC) search for one person. Shown only to someone who holds the permission (the server checks it again) and only for a person Microsoft 365 knows. A press asks "Are you sure?",
- * then CORE has CIPP investigate the person (read only; a few minutes, up to ten). The list under the button follows each search live: Waiting for CORE, Running with its step, Done with the report, or
+ * then CORE has CIPP investigate the person (read only; usually a few minutes, up to half an hour or more when Microsoft's mail trace is slow). The list under the button follows each search live: Waiting for CORE, Running with its step, Done with the report, or
  * Failed with the reason. The report is shown as CIPP returned it, section by section; nothing is summarised as "clean" that CIPP did not say.
  */
 
@@ -205,7 +205,7 @@ export function BecSearch({ clientId, email, knownTo }: { clientId: string; emai
       >
         Run BEC search
       </button>
-      <p className="mt-1 text-[11px] text-gray-500">CIPP checks rules, forwarding, consents, sign-ins and mail activity. Read only; a few minutes, up to ten.</p>
+      <p className="mt-1 text-[11px] text-gray-500">CIPP checks rules, forwarding, consents, sign-ins and mail activity. Read only; usually a few minutes, but a slow mail trace can take half an hour or more.</p>
       {problem && !asking && <p className="mt-1 text-xs text-red-300">{problem}</p>}
 
       {(data?.items ?? []).length > 0 && (
