@@ -1710,6 +1710,42 @@ paths:
                 title: Response Data Retention Api V1 Data Retention Get
       security:
       - HTTPBearer: []
+  /api/v1/client-onboarding:
+    get:
+      tags:
+      - clients
+      summary: Client Onboarding
+      description: Every client (or one), least onboarded first, so the ones that
+        need attention are at the top.
+      operationId: client_onboarding_api_v1_client_onboarding_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnboardingRow'
+                title: Response Client Onboarding Api V1 Client Onboarding Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}/explain:
     post:
       tags:
@@ -14430,6 +14466,50 @@ paths:
       responses:
         '204':
           description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/licence-waste:
+    get:
+      tags:
+      - billing
+      summary: Licences bought but not assigned to anyone, per client and licence
+        (quantities, never prices)
+      description: Each licence a client holds with at least ``minimum`` unassigned,
+        most first, with the share of what was bought. A licence a tool did not say
+        the unassigned number for is left out, not counted as zero.
+      operationId: licence_waste_api_v1_billing_licence_waste_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: minimum
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 10000
+          minimum: 1
+          default: 1
+          title: Minimum
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 2000
+          minimum: 1
+          default: 500
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WasteReport'
         '422':
           description: Validation Error
           content:
@@ -38204,6 +38284,51 @@ components:
       required:
       - status
       title: OnCallUpdateRequest
+    OnboardingRow:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        steps:
+          items:
+            $ref: '#/components/schemas/Step'
+          type: array
+          title: Steps
+        done:
+          type: integer
+          title: Done
+        total:
+          type: integer
+          title: Total
+        percent:
+          type: integer
+          title: Percent
+        next_step:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next Step
+        first_data_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: First Data At
+      type: object
+      required:
+      - client_id
+      - client_name
+      - steps
+      - done
+      - total
+      - percent
+      - next_step
+      - first_data_at
+      title: OnboardingRow
     OverrideEntryModel:
       properties:
         key:
@@ -44648,6 +44773,27 @@ components:
       required:
       - updated
       title: StatusResponse
+    Step:
+      properties:
+        key:
+          type: string
+          title: Key
+        label:
+          type: string
+          title: Label
+        done:
+          type: boolean
+          title: Done
+        detail:
+          type: string
+          title: Detail
+      type: object
+      required:
+      - key
+      - label
+      - done
+      - detail
+      title: Step
     StoredMessage:
       properties:
         id:
@@ -48627,6 +48773,67 @@ components:
         Same shape whether the email was net-new or already on the list —
 
         the prospect should not be able to enumerate existing signups.'
+    WasteOut:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        source:
+          type: string
+          title: Source
+        item:
+          type: string
+          title: Item
+        bought:
+          type: integer
+          title: Bought
+        unassigned:
+          type: integer
+          title: Unassigned
+        percent:
+          type: integer
+          title: Percent
+        stale:
+          type: boolean
+          title: Stale
+      type: object
+      required:
+      - client_id
+      - client_name
+      - source
+      - item
+      - bought
+      - unassigned
+      - percent
+      - stale
+      title: WasteOut
+    WasteReport:
+      properties:
+        rows:
+          items:
+            $ref: '#/components/schemas/WasteOut'
+          type: array
+          title: Rows
+        total_bought:
+          type: integer
+          title: Total Bought
+        total_unassigned:
+          type: integer
+          title: Total Unassigned
+        clients:
+          type: integer
+          title: Clients
+      type: object
+      required:
+      - rows
+      - total_bought
+      - total_unassigned
+      - clients
+      title: WasteReport
     WatchlistUpdate:
       properties:
         is_watchlisted:

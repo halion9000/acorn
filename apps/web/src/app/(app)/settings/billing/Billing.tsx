@@ -796,9 +796,67 @@ function DataQuality() {
   );
 }
 
+export interface WasteRow {
+  client_id: string;
+  client_name: string;
+  source: string;
+  item: string;
+  bought: number;
+  unassigned: number;
+  percent: number;
+  stale: boolean;
+}
+
+/** Licences a client pays for that nobody has been given: a quantity to hand back or reassign (never a price), biggest first. A count that has not refreshed for a week is marked, so it is not read as today's. */
+export function LicenceWaste() {
+  const waste = useJson<{ rows: WasteRow[]; total_bought: number; total_unassigned: number; clients: number }>("/api/v1/billing/licence-waste");
+  return (
+    <div className="space-y-3">
+      {waste.error && <p role="alert" className="text-sm text-red-300">{waste.error}</p>}
+      {!waste.data && !waste.error && <p className="text-sm text-slate-500">Loading…</p>}
+      {waste.data && (
+        <>
+          <p className="text-sm text-slate-300" data-testid="waste-summary">
+            {waste.data.total_unassigned} of {waste.data.total_bought} licences are not assigned to anyone, across {waste.data.clients} client{waste.data.clients === 1 ? "" : "s"}.
+          </p>
+          <p className="text-xs text-slate-500">Only licences the tool says the unassigned number for are listed: a tool that does not say is left out, not counted as zero.</p>
+          {waste.data.rows.length === 0 ? (
+            <p className="text-sm text-slate-400">No unassigned licences found.</p>
+          ) : (
+            <table className="w-full text-left text-sm" data-testid="waste-table">
+              <thead className="text-xs uppercase text-slate-500">
+                <tr>
+                  <th scope="col" className="py-1 pr-3">Client</th>
+                  <th scope="col" className="pr-3">Licence</th>
+                  <th scope="col" className="pr-3 text-right">Bought</th>
+                  <th scope="col" className="pr-3 text-right">Unassigned</th>
+                  <th scope="col" className="text-right">Share</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {waste.data.rows.map((r) => (
+                  <tr key={`${r.client_id}:${r.source}:${r.item}`}>
+                    <td className="py-1 pr-3 text-slate-100">{r.client_name}</td>
+                    <td className="pr-3 text-slate-300">
+                      {r.item} {r.stale ? <span className="text-xs text-amber-300" title="Not refreshed for over a week">(old count)</span> : null}
+                    </td>
+                    <td className="pr-3 text-right tabular-nums text-slate-300">{r.bought}</td>
+                    <td className="pr-3 text-right tabular-nums text-slate-100">{r.unassigned}</td>
+                    <td className="text-right tabular-nums text-slate-400">{r.percent}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function Billing() {
-  const [tab, setTab] = useState<"totals" | "client" | "changes" | "reconcile" | "mapping" | "quality">("totals");
-  const tabs: [typeof tab, string][] = [["totals", "Totals by tool"], ["client", "By client"], ["changes", "Changes"], ["reconcile", "Billed vs counted"], ["mapping", "Invoice mapping"], ["quality", "Data quality"]];
+  const [tab, setTab] = useState<"totals" | "client" | "changes" | "reconcile" | "mapping" | "quality" | "waste">("totals");
+  const tabs: [typeof tab, string][] = [["totals", "Totals by tool"], ["client", "By client"], ["changes", "Changes"], ["reconcile", "Billed vs counted"], ["mapping", "Invoice mapping"], ["quality", "Data quality"], ["waste", "Licence waste"]];
   return (
     <div className="space-y-4 p-6">
       <div>
@@ -817,7 +875,7 @@ export function Billing() {
           </button>
         ))}
       </div>
-      {tab === "totals" ? <Totals /> : tab === "client" ? <ByClient /> : tab === "reconcile" ? <Reconcile /> : tab === "mapping" ? <Mapping /> : tab === "quality" ? <DataQuality /> : <Changes />}
+      {tab === "totals" ? <Totals /> : tab === "client" ? <ByClient /> : tab === "reconcile" ? <Reconcile /> : tab === "mapping" ? <Mapping /> : tab === "quality" ? <DataQuality /> : tab === "waste" ? <LicenceWaste /> : <Changes />}
     </div>
   );
 }

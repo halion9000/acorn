@@ -47,6 +47,49 @@ from app.services.license_counts import (
 router = APIRouter(prefix="/billing", tags=["billing"])
 ingest_router = APIRouter(prefix="/inbox", tags=["inbox-core-feed"])
 
+
+class WasteOut(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    source: str
+    item: str
+    bought: int
+    unassigned: int
+    percent: int
+    stale: bool
+
+
+class WasteReport(BaseModel):
+    rows: list[WasteOut]
+    total_bought: int
+    total_unassigned: int
+    clients: int
+
+
+@router.get("/licence-waste", response_model=WasteReport, summary="Licences bought but not assigned to anyone, per client and licence (quantities, never prices)")
+async def licence_waste(
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
+    db: DBSession,
+    minimum: Annotated[int, Query(ge=1, le=10_000)] = 1,
+    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
+) -> WasteReport:
+    """Each licence a client holds with at least ``minimum`` unassigned, most first, with the share of what was bought. A licence a tool did not say the unassigned number for is left out, not counted as zero."""
+    from app.services.licence_waste import waste_rows  # noqa: PLC0415
+
+    owner = current_user.tenant_id
+    ids, names = await _scope(db, owner, None)
+    counts: list[Any] = []
+    for cid in ids[1:]:
+        async with _as(db, owner, cid):
+            counts += list((await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == cid))).scalars().all())
+    rows = waste_rows(counts, names, datetime.now(UTC), minimum)
+    return WasteReport(
+        rows=[WasteOut(**r.__dict__) for r in rows[:limit]],
+        total_bought=sum(r.bought for r in rows),
+        total_unassigned=sum(r.unassigned for r in rows),
+        clients=len({r.client_id for r in rows}),
+    )
+
 Unit = Literal["licence", "device", "user", "seat", "mailbox", "ticket", "other"]
 
 

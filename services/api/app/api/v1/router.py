@@ -27,6 +27,7 @@ from app.api.v1.endpoints import (
     cases,
     cipp_actions,
     client_documents,
+    client_onboarding,
     client_posture,
     dmarc,
     nessus,
@@ -131,6 +132,7 @@ api_router.include_router(alert_related.router)
 api_router.include_router(alert_suppressions.router)
 api_router.include_router(alert_stale_review.router)
 api_router.include_router(data_retention.router)
+api_router.include_router(client_onboarding.router)
 # Structured AI explainer (POST /alerts/{id}/explain) — single-shot
 # JSON envelope counterpart to the agent service's NDJSON stream.
 api_router.include_router(alert_explain.router)

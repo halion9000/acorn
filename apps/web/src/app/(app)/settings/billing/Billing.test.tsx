@@ -31,6 +31,8 @@ beforeEach(() => {
       return json({ generated_at: '', baseline_tool: 'ninjaone', no_counts: ['blumira', 'petra'], unbilled: [{ client_id: 'c9', client_name: 'Gamma', tool: 'halopsa', tool_count: 0, baseline_count: 30, gap: -30 }, { client_id: 'c8', client_name: 'Delta', tool: 'halopsa', tool_count: 0, baseline_count: 1, gap: -1 }], rows: [{ client_id: 'c1', client_name: 'Acme', tool: 'huntress', tool_count: 30, baseline_count: 50, gap: -20 }] });
     if (url.startsWith('/api/v1/billing/last-reported'))
       return json([{ client_id: 'c2', client_name: 'Beta', source: 'dnsfilter', last_reported_at: '2026-10-19T00:00:00Z', days_ago: 6, silent: true }]);
+    if (url.startsWith('/api/v1/billing/licence-waste'))
+      return json({ rows: [{ client_id: 'c1', client_name: 'Acme', source: 'cipp', item: 'Business Premium', bought: 50, unassigned: 5, percent: 10, stale: true }], total_bought: 50, total_unassigned: 5, clients: 1 });
     if (url.startsWith('/api/v1/billing/changes'))
       return json([{ client_id: 'c1', client_name: 'Acme', source: 'ninjaone', item: 'Windows workstations', unit: 'device', count: 13, previous_count: 15, observed_at: '2026-10-24T00:00:00Z' }, { client_id: 'c2', client_name: 'Beta', source: 'cipp', item: 'Business Basic', unit: 'licence', count: 5, previous_count: null, observed_at: '2026-10-23T00:00:00Z' }, { client_id: 'c1', client_name: 'Acme', source: 'ninjaone', item: 'Macs', unit: 'device', count: 3, previous_count: 10, observed_at: '2026-10-22T00:00:00Z', unusual: true }]);
     return json({});
@@ -331,5 +333,18 @@ describe('spreadsheet safety', () => {
     const line = trueUpCsv([row]).split('\n')[1];
     expect(line.startsWith('"\'=cmd()","\'+Huntress","1","3"')).toBe(true);
     expect(clientCsv([{ source: 'ninjaone', item: '-Macs', unit: 'device', count: 4, available: null, change: -2, first_seen_at: '', updated_at: '' }], '=Acme', 30).split('\n')[1]).toBe("'=Acme,NinjaOne,'-Macs,device,4,,-2");
+  });
+});
+
+describe('licence waste tab', () => {
+  it('says how many licences are unassigned, lists them biggest first as quantities, and marks an old count', async () => {
+    render(<Billing />);
+    await userEvent.setup().click(screen.getByRole('tab', { name: 'Licence waste' }));
+    expect(await screen.findByTestId('waste-summary')).toHaveTextContent('5 of 50 licences are not assigned to anyone, across 1 client.');
+    const table = screen.getByTestId('waste-table');
+    expect(within(table).getByText('Business Premium')).toBeInTheDocument();
+    expect(within(table).getByText('(old count)')).toBeInTheDocument();
+    expect(within(table).getByText('10%')).toBeInTheDocument();
+    expect(table.textContent).not.toMatch(/\$|price|cost/i);
   });
 });

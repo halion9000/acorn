@@ -268,6 +268,7 @@ export const MORE_SETTINGS: { href: string; label: string; description: string }
   { href: '/settings/audit', label: 'Audit log', description: 'Every administrative and security event, searchable' },
   { href: '/settings/client-cleanup', label: 'Client cleanup', description: 'Clients with nothing in them, and tool clients mapped to the wrong one' },
   { href: '/settings/platform-health', label: 'Platform health', description: 'Whether every service is answering' },
+  { href: '/settings/onboarding', label: 'Client onboarding', description: 'How far each client has got: tools linked, devices, people, checks and alerts' },
   { href: '/settings/retention', label: 'Data retention', description: 'What is kept, for how long, and what ends it' },
   { href: '/settings/costs', label: 'Cost dashboard', description: 'AI spend, automation activity and savings from bringing your own key' },
   { href: '/settings/triage', label: 'Auto-close', description: 'How sure AI triage must be to close an alert itself' },
