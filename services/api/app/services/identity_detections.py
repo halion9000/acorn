@@ -44,6 +44,9 @@ MASS_DELETE_WINDOW = timedelta(minutes=15)
 SPRAY_PEOPLE = 5  # distinct people failing from one address within an hour
 FATIGUE_PROMPTS = 5  # refused or unanswered multi-factor prompts for one person within an hour
 GUESS_FAILURES = 5  # wrong passwords before a success counts as a guessed one
+DORMANT_DAYS = 60  # a person with no successful sign-in for this long, signing in from a country they have never used, is worth a look
+HISTORY_DAYS = 400  # how far back the dormant rule looks for a person's earlier sign-ins
+GUEST_BURST = 5  # outside guests invited by one person within a day
 # Microsoft's own error codes: a wrong password, an account locked by too many tries, and a multi-factor request that failed.
 WRONG_PASSWORD = {50126, 50053}
 MFA_FAILED = {500121, 50074, 50076}
@@ -111,6 +114,57 @@ def detect_rare_country(new: list[Any], baseline_countries: set[str], baseline_t
                     ("Address", r.ip_address or "unknown"),
                     ("App", r.app or "unknown"),
                     ("Multi-factor", "not used" if no_mfa else "used" if r.mfa else "unknown"),
+                    ("Time", _stamp(r.occurred_at)),
+                ],
+                users=[r.user_principal],
+                ips=[r.ip_address] if r.ip_address else [],
+                source_ids=[r.source_id],
+            )
+        )
+    return out
+
+
+def detect_dormant_active(
+    new: list[Any],
+    last_before: dict[str, datetime],
+    countries_before: dict[str, set[str]],
+    history_start: datetime | None,
+) -> list[Finding]:
+    """A person quiet for DORMANT_DAYS who signs in successfully from a country they have never used. Only said when the history really reaches back that far (``history_start`` is the oldest sign-in
+    the client has): with less history "quiet for 60 days" cannot be told from "not collected yet". One finding per person and country."""
+    out: list[Finding] = []
+    seen: set[tuple[str, str]] = set()
+    for r in sorted(new, key=lambda x: _utc(x.occurred_at)):
+        country = (r.country or "").strip()
+        last = last_before.get(r.user_principal)
+        if not r.success or not r.interactive or not country or last is None or history_start is None:
+            continue
+        when = _utc(r.occurred_at)
+        if _utc(history_start) > when - timedelta(days=DORMANT_DAYS):
+            continue  # the client's history is too short to call anyone dormant
+        quiet = when - _utc(last)
+        if quiet < timedelta(days=DORMANT_DAYS) or country in countries_before.get(r.user_principal, set()) or (r.user_principal, country) in seen:
+            continue
+        seen.add((r.user_principal, country))
+        days = quiet.days
+        out.append(
+            Finding(
+                rule_id="aisoc-id-dormant-active",
+                rule_name="A long-quiet account signed in from a new country",
+                title=f"Quiet account active again from {country} - {r.user_principal}",
+                severity="high" if r.mfa is False else "medium",
+                tactic="Initial Access",
+                technique="T1078",
+                key=f"dormant:{r.user_principal}:{country}",
+                occurred_at=r.occurred_at,
+                summary=f"{r.user_principal} had not signed in for {days} days and has now signed in from {country}, a country they have never signed in from here.",
+                fields=[
+                    ("Person", r.user_principal),
+                    ("Quiet for", f"{days} days"),
+                    ("Country", country),
+                    ("City", r.city or "unknown"),
+                    ("Address", r.ip_address or "unknown"),
+                    ("Multi-factor", "not used" if r.mfa is False else "used" if r.mfa else "unknown"),
                     ("Time", _stamp(r.occurred_at)),
                 ],
                 users=[r.user_principal],
@@ -506,6 +560,46 @@ def detect_mass_deletion(audits: list[Any]) -> list[Finding]:
     return out
 
 
+_GUEST_INVITE = re.compile(r"^invite external user", re.IGNORECASE)
+
+
+def detect_guest_burst(audits: list[Any]) -> list[Finding]:
+    """One person inviting GUEST_BURST or more outside guests in a day: a way to hand a stranger a seat at the client's data. One finding per inviter per day."""
+    by_day: dict[tuple[str, str], list[Any]] = {}
+    for a in audits:
+        if a.success and _GUEST_INVITE.search(a.activity or "") and a.actor:
+            by_day.setdefault((a.actor, _utc(a.occurred_at).strftime("%Y-%m-%d")), []).append(a)
+    out: list[Finding] = []
+    for (actor, day), rows in by_day.items():
+        if len(rows) < GUEST_BURST:
+            continue
+        rows.sort(key=lambda x: _utc(x.occurred_at))
+        guests = [r.target for r in rows if r.target]
+        out.append(
+            Finding(
+                rule_id="aisoc-id-guest-burst",
+                rule_name="Many outside guests invited in a day",
+                title=f"{len(rows)} outside guests invited in a day - {actor}",
+                severity="high" if rows[0].actor_is_app else "medium",
+                tactic="Persistence",
+                technique="T1136",
+                key=f"guests:{actor}:{day}",
+                occurred_at=rows[-1].occurred_at,
+                summary=f"{actor} invited {len(rows)} outside guests on {day}. A burst of guests is how someone with a stolen account adds their own people.",
+                fields=[
+                    ("Invited by", actor + (" (an app)" if rows[0].actor_is_app else "")),
+                    ("Guests", str(len(rows))),
+                    ("Some of them", ", ".join(guests[:5]) or "unknown"),
+                    ("Day", day),
+                ],
+                users=[actor],
+                ips=sorted({r.actor_ip for r in rows if r.actor_ip})[:3],
+                source_ids=[r.source_id for r in rows][:20],
+            )
+        )
+    return out
+
+
 def detect_privileged_role_change(audits: list[Any]) -> list[Finding]:
     """Someone was added to a directory role."""
     out: list[Finding] = []
@@ -786,6 +880,7 @@ PLAYBOOK_TAGS: dict[str, list[str]] = {
     "aisoc-id-failed-after-revoke": ["account-takeover"],
     "aisoc-id-admin-security-info": ["account-takeover"],
     "aisoc-id-app-consent": ["account-takeover"],
+    "aisoc-id-dormant-active": ["account-takeover"],
 }
 
 
@@ -913,8 +1008,41 @@ async def run_signin_detections(db: Any, tenant_id: uuid.UUID, rows: list[Any], 
             )
         ).all():
             known_ips[who].add(address)
+        # Each person's earlier history, far enough back to tell a long-quiet account: when they last signed in, from where, and how far back the client's history goes at all.
+        last_before: dict[str, datetime] = {}
+        countries_before: dict[str, set[str]] = defaultdict(set)
+        history_start = (await db.execute(select(func.min(SigninEvent.occurred_at)).where(SigninEvent.tenant_id == tenant_id))).scalar_one_or_none()
+        for who, last in (
+            await db.execute(
+                select(SigninEvent.user_principal, func.max(SigninEvent.occurred_at))
+                .where(
+                    SigninEvent.tenant_id == tenant_id,
+                    SigninEvent.user_principal.in_(users),
+                    SigninEvent.success.is_(True),
+                    SigninEvent.occurred_at >= first - timedelta(days=HISTORY_DAYS),
+                    SigninEvent.occurred_at < first,
+                )
+                .group_by(SigninEvent.user_principal)
+            )
+        ).all():
+            last_before[who] = last
+        for who, country in (
+            await db.execute(
+                select(SigninEvent.user_principal, SigninEvent.country)
+                .where(
+                    SigninEvent.tenant_id == tenant_id,
+                    SigninEvent.user_principal.in_(users),
+                    SigninEvent.success.is_(True),
+                    SigninEvent.country.is_not(None),
+                    SigninEvent.occurred_at < first,
+                )
+                .distinct()
+            )
+        ).all():
+            countries_before[who].add(country)
         findings = (
             detect_rare_country(rows, countries, total)
+            + detect_dormant_active(rows, last_before, countries_before, history_start)
             + detect_impossible_travel([*earlier, *rows], new_ids)
             + detect_device_code(rows)
             + detect_legacy_protocol(rows)
@@ -946,6 +1074,7 @@ async def run_audit_detections(db: Any, tenant_id: uuid.UUID, rows: list[Any], n
             + detect_security_info_changed_by_admin(rows)
             + detect_app_consent(rows)
             + detect_app_credentials_added(rows)
+            + detect_guest_burst(rows)
         )
         revokes = [r for r in rows if r.success and r.target and _REVOKE.search(r.activity or "")]
         if revokes:
