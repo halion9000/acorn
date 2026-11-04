@@ -16,6 +16,7 @@ import { SavedViewsBar } from '@/components/saved-views/SavedViewsBar';
 import BulkTicketBar from './BulkTicketBar';
 import BulkScriptBar from './BulkScriptBar';
 import BulkCloseBar from './BulkCloseBar';
+import BulkAssignBar from './BulkAssignBar';
 import { loadFilters, saveFilters } from '@/lib/remembered-filters';
 import { rememberable, restoreFilters } from '@/lib/alert-filter-memory';
 import { DATE_PRESETS, dateRangeError, isDateLimited, type DatePreset } from '@/lib/alert-date-range';
@@ -782,6 +783,7 @@ export function AlertsTableGrid({
   return (
     <div className="bg-gray-900/60 border border-gray-800/60 rounded-xl overflow-hidden">
       <BulkTicketBar alertIds={tickedIds} onDone={onChanged} onClear={() => setTicked(new Set())} />
+      <BulkAssignBar alertIds={tickedIds} onDone={onChanged} onClear={() => setTicked(new Set())} />
       <BulkCloseBar alertIds={tickedIds} onDone={onChanged} onClear={() => setTicked(new Set())} />
       <BulkScriptBar
         alertIds={tickedIds}

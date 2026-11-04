@@ -16,7 +16,7 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.db.rls import TenantDBSession
 from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.models.alert import Alert
-from app.models.tenant import Tenant
+from app.models.tenant import Tenant, User
 from app.services.alert_queue import (
     AlertAlreadyClaimedError,
     AlertNotFoundError,
@@ -1293,6 +1293,72 @@ async def bulk_close_alerts(
             missing += 1
     await db.commit()
     return BulkCloseResponse(closed=closed, already_finished=already, not_found=missing, status=body.status, reason=reason)
+
+
+class BulkAssignRequest(BaseModel):
+    alert_ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+    assignee_id: uuid.UUID | None = Field(default=None, description="Who the alerts go to; none unassigns them.")
+    note: str | None = Field(default=None, max_length=500, description="Why, kept in the audit log against each alert.")
+
+
+class BulkAssignResponse(BaseModel):
+    assigned: int
+    already_finished: int
+    not_found: int
+    assignee_id: uuid.UUID | None
+    assignee_name: str | None
+
+
+@router.post("/bulk-assign", response_model=BulkAssignResponse)
+async def bulk_assign_alerts(
+    body: BulkAssignRequest,
+    request: Request,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:write"))],
+    db: DBSession,
+) -> BulkAssignResponse:
+    """Assign (or, with no assignee, unassign) up to 200 alerts at once, with an optional note. The assignee must be someone in the caller's own workspace. A finished alert is left as it is (and counted); one
+    the caller cannot see is counted as not found. Who, from whom and the note are written to the audit log for each alert."""
+    note = " ".join((body.note or "").split()) or None
+    name: str | None = None
+    if body.assignee_id is not None:
+        person = (await db.execute(select(User).where(User.id == body.assignee_id, User.tenant_id == current_user.tenant_id, User.is_active.is_(True)))).scalar_one_or_none()
+        if person is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That person is not in this workspace, or is switched off.")
+        name = person.email or person.account_name
+    assigned = already = missing = 0
+    for alert_id in dict.fromkeys(body.alert_ids):
+        try:
+            async with alert_scope(db, current_user.tenant_id, alert_id) as tid:
+                alert = (await db.execute(select(Alert).where(Alert.id == alert_id, Alert.tenant_id == tid))).scalar_one_or_none()
+                if alert is None:
+                    missing += 1
+                    continue
+                if alert.status in FINISHED_STATUSES:
+                    already += 1
+                    continue
+                before = alert.assigned_to_id
+                now = datetime.now(UTC)
+                values: dict = {"assigned_to_id": body.assignee_id, "assigned_at": now if body.assignee_id else None, "updated_at": now}
+                if body.assignee_id is not None and alert.first_seen_at is None:
+                    values["first_seen_at"] = now  # the first time a person acted on it: what MTTA is measured to
+                await db.execute(update(Alert).where(Alert.id == alert_id).values(**values))
+                await emit_audit(
+                    db=db,
+                    tenant_id=tid,
+                    actor_id=current_user.user_id,
+                    action="alerts:bulk_assign",
+                    resource="alert",
+                    resource_id=str(alert_id),
+                    changes={"assignee_from": str(before) if before else None, "assignee_to": str(body.assignee_id) if body.assignee_id else None, "note": note},
+                    request=request,
+                )
+                assigned += 1
+        except HTTPException as exc:
+            if exc.status_code != status.HTTP_404_NOT_FOUND:
+                raise
+            missing += 1
+    await db.commit()
+    return BulkAssignResponse(assigned=assigned, already_finished=already, not_found=missing, assignee_id=body.assignee_id, assignee_name=name)
 
 
 @router.patch("/{alert_id}", response_model=AlertResponse)

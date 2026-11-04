@@ -868,6 +868,39 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/alerts/bulk-assign:
+    post:
+      tags:
+      - alerts
+      summary: Bulk Assign Alerts
+      description: 'Assign (or, with no assignee, unassign) up to 200 alerts at once,
+        with an optional note. The assignee must be someone in the caller''s own workspace.
+        A finished alert is left as it is (and counted); one
+
+        the caller cannot see is counted as not found. Who, from whom and the note
+        are written to the audit log for each alert.'
+      operationId: bulk_assign_alerts_api_v1_alerts_bulk_assign_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkAssignRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkAssignResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/alerts/{alert_id}/escalate:
     post:
       tags:
@@ -26085,6 +26118,64 @@ components:
       - accepted
       - skipped
       title: BulkAcceptOut
+    BulkAssignRequest:
+      properties:
+        alert_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Alert Ids
+        assignee_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Assignee Id
+          description: Who the alerts go to; none unassigns them.
+        note:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Note
+          description: Why, kept in the audit log against each alert.
+      type: object
+      required:
+      - alert_ids
+      title: BulkAssignRequest
+    BulkAssignResponse:
+      properties:
+        assigned:
+          type: integer
+          title: Assigned
+        already_finished:
+          type: integer
+          title: Already Finished
+        not_found:
+          type: integer
+          title: Not Found
+        assignee_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Assignee Id
+        assignee_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Assignee Name
+      type: object
+      required:
+      - assigned
+      - already_finished
+      - not_found
+      - assignee_id
+      - assignee_name
+      title: BulkAssignResponse
     BulkCloseRequest:
       properties:
         alert_ids:

@@ -1823,6 +1823,14 @@ export interface HideSuggestion {
   days: number;
 }
 
+export interface BulkAssignResult {
+  assigned: number;
+  already_finished: number;
+  not_found: number;
+  assignee_id: string | null;
+  assignee_name: string | null;
+}
+
 export interface NoisyRule {
   name: string;
   source: string | null;
@@ -1938,6 +1946,9 @@ export const alertsApi = {
 
   /** One script for the machines of many alerts: one request (and one new HaloPSA ticket) per machine, one approval in CORE. `preview` queues nothing and says what would happen. */
   /** Close up to 200 alerts at once with one reason (kept in the audit log against each). */
+  /** Assign (or unassign: no assignee) up to 200 alerts at once, with an optional note kept in the audit log. */
+  bulkAssign: (body: { alert_ids: string[]; assignee_id: string | null; note?: string }) =>
+    request<BulkAssignResult>('/api/v1/alerts/bulk-assign', { method: 'POST', body: JSON.stringify(body) }),
   bulkClose: (body: { alert_ids: string[]; status: 'resolved' | 'false_positive' | 'closed'; reason: string }) =>
     request<BulkCloseResult>('/api/v1/alerts/bulk-close', { method: 'POST', body: JSON.stringify(body) }),
   runScriptBulk: (body: { script_id: number; alert_ids: string[]; preview?: boolean }) =>
