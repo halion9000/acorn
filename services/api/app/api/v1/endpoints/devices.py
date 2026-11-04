@@ -468,13 +468,14 @@ def host_key(name: str | None) -> str:
     return n if _IP_ADDRESS.match(n) else n.split(".")[0]
 
 
-async def _alerts_by_host(db: Any, tid: uuid.UUID) -> dict[str, list[DeviceAlertOut]]:
-    """This tenant's open alerts that name a device, grouped by lower-cased device name, worst severity then newest first. The caller has put ``db`` in the tenant's scope."""
+async def _alerts_by_host_many(db: Any, tids: list[uuid.UUID]) -> dict[uuid.UUID, dict[str, list[DeviceAlertOut]]]:
+    """These tenants' open alerts that name a device, in ONE read: for each tenant, grouped by lower-cased device name, worst severity then newest first. The caller has put ``db`` inside the cross-tenant read block."""
     # The device a vendor named in its own context (RMM-style tools), else the host fusion recorded on the alert (SIEM/EDR alerts carry it only there).
     host = func.lower(func.coalesce(Alert.raw_event["unmapped"]["context"]["device_name"].astext, Alert.affected_hosts[0].astext))
     rows = (
         await db.execute(
             select(
+                Alert.tenant_id,
                 Alert.id,
                 Alert.title,
                 Alert.severity,
@@ -482,17 +483,23 @@ async def _alerts_by_host(db: Any, tid: uuid.UUID) -> dict[str, list[DeviceAlert
                 Alert.created_at,
                 Alert.raw_event["source"].astext.label("source"),
                 host.label("host"),
-            ).where(Alert.tenant_id == tid, host.isnot(None), Alert.status.notin_(_CLOSED))
+            ).where(Alert.tenant_id.in_(tids), host.isnot(None), Alert.status.notin_(_CLOSED))
         )
     ).all()
-    grouped: dict[str, list[DeviceAlertOut]] = {}
+    out: dict[uuid.UUID, dict[str, list[DeviceAlertOut]]] = {}
     for r in rows:
-        grouped.setdefault(host_key(r.host), []).append(
+        out.setdefault(r.tenant_id, {}).setdefault(host_key(r.host), []).append(
             DeviceAlertOut(id=r.id, title=r.title, severity=r.severity, status=r.status, source=r.source, created_at=r.created_at)
         )
-    for items in grouped.values():
-        items.sort(key=lambda a: (_SEVERITY_RANK.get((a.severity or "").lower(), 5), -(a.created_at.timestamp() if a.created_at else 0)))
-    return grouped
+    for grouped in out.values():
+        for items in grouped.values():
+            items.sort(key=lambda a: (_SEVERITY_RANK.get((a.severity or "").lower(), 5), -(a.created_at.timestamp() if a.created_at else 0)))
+    return out
+
+
+async def _alerts_by_host(db: Any, tid: uuid.UUID) -> dict[str, list[DeviceAlertOut]]:
+    """One tenant's open alerts that name a device, grouped by lower-cased device name. The caller has put ``db`` in the tenant's scope (or inside the cross-tenant read block)."""
+    return (await _alerts_by_host_many(db, [tid])).get(tid, {})
 
 
 # Building every device of a client (or of all of them) takes seconds and a database connection, and the page asks for the list AND the duplicates together, often twice. Left alone those
@@ -594,18 +601,27 @@ async def _load(db: Any, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[
         row.id: sorted(tool_exclusions.of_settings(row.settings))
         for row in (await db.execute(select(Tenant.id, Tenant.settings).where(Tenant.id.in_(tids)))).all()
     }
+    # ONE read of everything for all the clients (inside the sanctioned cross-tenant read block, every query naming exactly the clients asked for). Entering each client in turn cost four or more statements
+    # apiece before its own queries: seven seconds for a cold build with two hundred clients, though the database answers these four reads in well under a second.
+    async with cross_tenant_reads(db):
+        all_devices = (await db.execute(select(Device).where(Device.tenant_id.in_(tids)))).scalars().all()
+        all_sources = (await db.execute(select(DeviceSource).where(DeviceSource.tenant_id.in_(tids)))).scalars().all()
+        all_alerts = await _alerts_by_host_many(db, tids)
+        all_snoozes = (await db.execute(select(DeviceSnooze).where(DeviceSnooze.tenant_id.in_(tids)))).scalars().all()
+    devices_of: dict[uuid.UUID, list[Device]] = {}
+    for d in all_devices:
+        devices_of.setdefault(d.tenant_id, []).append(d)
+    sources_of: dict[uuid.UUID, dict[uuid.UUID, list[DeviceSource]]] = {}
+    for src in all_sources:
+        sources_of.setdefault(src.tenant_id, {}).setdefault(src.device_id, []).append(src)
+    snoozes_of: dict[uuid.UUID, dict[uuid.UUID, datetime]] = {}
+    for row in all_snoozes:
+        snoozes_of.setdefault(row.tenant_id, {})[row.device_id] = row.snoozed_at
     for tid in tids:
-        async with _as(db, owner, tid):
-            devices = (await db.execute(select(Device).where(Device.tenant_id == tid))).scalars().all()
-            sources = (await db.execute(select(DeviceSource).where(DeviceSource.tenant_id == tid))).scalars().all()
-            alerts = await _alerts_by_host(db, tid)
-            snoozes = {
-                row.device_id: row.snoozed_at
-                for row in (await db.execute(select(DeviceSnooze).where(DeviceSnooze.tenant_id == tid))).scalars().all()
-            }
-        by_device: dict[uuid.UUID, list[DeviceSource]] = {}
-        for s in sources:
-            by_device.setdefault(s.device_id, []).append(s)
+        devices = devices_of.get(tid, [])
+        by_device = sources_of.get(tid, {})
+        alerts = all_alerts.get(tid, {})
+        snoozes = snoozes_of.get(tid, {})
         for d in devices:
             srcs = sorted(by_device.get(d.id, []), key=lambda s: s.vendor)
             auto = auto_hidden_of([checkin_of(s) for s in srcs], online_now_of(srcs))

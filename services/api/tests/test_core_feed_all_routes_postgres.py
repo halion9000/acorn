@@ -133,6 +133,8 @@ async def call(w, suffix, token, route=None):
         kwargs["action_id"] = uuid.uuid4()
     if "{proposal_id}" in suffix:
         kwargs["proposal_id"] = uuid.uuid4()
+    if "{case_id}" in suffix:
+        kwargs["case_id"] = uuid.uuid4()
     async with w["factory"]() as s:
         return await route.endpoint(db=s, **kwargs)
 
