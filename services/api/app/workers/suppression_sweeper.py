@@ -8,10 +8,10 @@ from typing import Any
 
 import structlog
 
+from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.db.rls_sessions import mark_platform
 from app.services import worker_heartbeat
-from app.core.config import settings
 from app.services.alert_stale import exempt_severities, sweep_stale
 from app.services.alert_suppression import sweep
 

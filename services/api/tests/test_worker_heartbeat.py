@@ -92,12 +92,18 @@ def test_each_worker_registers_itself_and_beats_after_a_pass_and_records_a_faile
     async def fake_sweep(session):
         return {"hidden": 0, "expired": 0, "restored": 0}
 
+    async def fake_stale(session, days, exempt, now=None):
+        return 0  # the hourly stale pass runs on the first turn too
+
     class Session:
         async def __aenter__(self):
             return self
 
         async def __aexit__(self, *a):
             return False
+
+        async def commit(self):
+            return None
 
     sleeps = []
 
@@ -107,6 +113,7 @@ def test_each_worker_registers_itself_and_beats_after_a_pass_and_records_a_faile
             raise Stop()
 
     monkeypatch.setattr(sw, "sweep", fake_sweep)
+    monkeypatch.setattr(sw, "sweep_stale", fake_stale)
     monkeypatch.setattr(sw, "mark_platform", lambda s: None)
     with pytest.raises(Stop):
         asyncio.run(sw.run_suppression_sweeper(sleep=sleep, session_factory=lambda: Session()))
@@ -213,3 +220,42 @@ def test_hunt_scheduler_oauth_refresh_and_weekly_digest_each_register_and_report
             (row,) = wh.snapshot()
             assert row["name"] == name and row["passes"] == 1, (name, outcome)
             assert (row["status"], row["last_error"]) == (("ok", None) if outcome == "ok" else ("failing", "ValueError")), (name, outcome)
+
+
+def test_a_failing_hourly_stale_pass_shows_as_a_failing_worker_not_a_silent_one(monkeypatch):
+    from app.workers import suppression_sweeper as sw
+
+    class Stop(Exception):
+        pass
+
+    async def fine_sweep(session):
+        return {"hidden": 0, "expired": 0, "restored": 0}
+
+    async def failing_stale(session, days, exempt, now=None):
+        raise RuntimeError("secret detail that must not be kept")
+
+    class Session:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def commit(self):
+            return None
+
+    sleeps = []
+
+    async def sleep(n):
+        sleeps.append(n)
+        if len(sleeps) >= 2:
+            raise Stop()
+
+    wh.reset()
+    monkeypatch.setattr(sw, "sweep", fine_sweep)
+    monkeypatch.setattr(sw, "sweep_stale", failing_stale)
+    monkeypatch.setattr(sw, "mark_platform", lambda s: None)
+    with pytest.raises(Stop):
+        asyncio.run(sw.run_suppression_sweeper(sleep=sleep, session_factory=lambda: Session()))
+    row = wh.snapshot()[0]
+    assert (row["status"], row["last_error"]) == ("failing", "RuntimeError")

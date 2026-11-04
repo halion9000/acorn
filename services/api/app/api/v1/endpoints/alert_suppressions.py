@@ -277,7 +277,7 @@ async def noisy_rules(
     db: DBSession,
     client_id: uuid.UUID | None = None,
     days: int = Query(default=30, ge=1, le=365),
-    limit: int = Query(default=10, ge=1, le=50),
+    limit: int = Query(default=10, ge=1, le=100),
 ) -> list[NoisyRule]:
     """The rules that raised the most alerts in the last ``days`` (for one client, or all), most first. Alerts hidden by a rule or set aside as stale are not counted: they are already dealt with."""
     from app.api.v1.endpoints.devices import _scope  # noqa: PLC0415
