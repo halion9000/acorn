@@ -981,16 +981,25 @@ async def save_findings(db: Any, tenant_id: uuid.UUID, findings: list[Finding], 
 
     now = now or datetime.now(UTC)
     made = 0
+    fresh: list[Finding] = []
     try:
         async with db.begin_nested():  # a failure rolls back to here, not the whole request
             for f in findings:
                 res = await db.execute(
                     pg_insert(Alert).values(**alert_values(tenant_id, f, now)).on_conflict_do_nothing(index_elements=["id"])
                 )
+                if res.rowcount:
+                    fresh.append(f)
                 made += res.rowcount or 0
     except Exception:  # noqa: BLE001
         logger.warning("identity detections: saving alerts failed for tenant=%s", tenant_id, exc_info=True)
         return 0
+    if fresh:
+        # A new alert that says an account may be taken over starts a read-only BEC search for that person (see bec_auto.py). Never raises.
+        from app.core.config import settings  # noqa: PLC0415
+        from app.services.bec_auto import auto_bec  # noqa: PLC0415
+
+        await auto_bec(db, tenant_id, fresh, settings, now)
     return made
 
 

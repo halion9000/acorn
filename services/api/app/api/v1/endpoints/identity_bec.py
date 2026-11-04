@@ -95,6 +95,30 @@ def microsoft_id_of(person: Any) -> str | None:
     return next((str(s.external_id) for s in person.sources if s.vendor == "cipp" and s.external_id), None)
 
 
+def queue_case(
+    db: Any, *, client_id: uuid.UUID, email: str, microsoft_id: str, cipp_customer_id: str, requested_by: uuid.UUID | None, requested_by_name: str | None, now: datetime
+) -> BecCase:
+    """Add one case and the queue row CORE will collect for it (the caller owns the transaction). Used by the button and by the automatic trigger, so both make exactly the same thing."""
+    cid = uuid.uuid4()
+    case = BecCase(id=cid, tenant_id=client_id, case_ref=case_ref(now, cid), email=email, status="pending", step=0, steps_total=0, summary={}, requested_by=requested_by, created_at=now, updated_at=now)
+    db.add(case)
+    db.add(
+        VendorAction(
+            id=uuid.uuid4(),
+            tenant_id=client_id,
+            alert_id=None,
+            vendor="core",
+            incident_uid=f"bec:{cid}",
+            action="bec_search",
+            params={"client_id": cipp_customer_id, "user": email, "user_id": microsoft_id, "case_id": str(cid), "case_ref": case.case_ref, "requested_by_name": (requested_by_name or "")[:200] or None},
+            status="pending",
+            requested_by=requested_by,
+            created_at=now,
+        )
+    )
+    return case
+
+
 @router.post("", response_model=CaseItem, status_code=status.HTTP_202_ACCEPTED)
 async def start_bec_search(
     body: StartBody, request: Request, user: Annotated[AuthUser, Depends(require_permission("identities:bec"))], db: DBSession
@@ -133,22 +157,15 @@ async def start_bec_search(
         )
         if running:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A search for this person is already running.")
-        cid = uuid.uuid4()
-        case = BecCase(id=cid, tenant_id=body.client_id, case_ref=case_ref(now, cid), email=person.email, status="pending", requested_by=user.user_id, created_at=now, updated_at=now)
-        db.add(case)
-        db.add(
-            VendorAction(
-                id=uuid.uuid4(),
-                tenant_id=body.client_id,
-                alert_id=None,
-                vendor="core",
-                incident_uid=f"bec:{cid}",
-                action="bec_search",
-                params={"client_id": cipp, "user": person.email, "user_id": microsoft_id_of(person), "case_id": str(cid), "case_ref": case.case_ref, "requested_by_name": (getattr(user, "email", None) or "")[:200] or None},
-                status="pending",
-                requested_by=user.user_id,
-                created_at=now,
-            )
+        case = queue_case(
+            db,
+            client_id=body.client_id,
+            email=person.email,
+            microsoft_id=uid,
+            cipp_customer_id=cipp,
+            requested_by=user.user_id,
+            requested_by_name=getattr(user, "email", None),
+            now=now,
         )
         await db.flush()
         await emit_audit(

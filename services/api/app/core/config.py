@@ -332,6 +332,10 @@ class Settings(BaseSettings):
     # Alerts nobody has touched for this many days (not critical or high, in no case) are set aside as stale for review, never deleted. 0 turns it off.
     ALERT_STALE_DAYS: int = 30
     ALERT_STALE_EXEMPT_SEVERITIES: str = "critical,high"
+    # A new high or critical account-takeover alert starts a read-only BEC search for the person it names (see app/services/bec_auto.py), within these limits. BEC_AUTO_ENABLED=false turns it off.
+    BEC_AUTO_ENABLED: bool = True
+    BEC_AUTO_PER_CLIENT_PER_DAY: int = 3
+    BEC_AUTO_PER_DAY: int = 15
     # With RETENTION_ALERTS_DAYS at 0 alerts are kept forever and the platform health page says so, so that is a choice and not an accident. Set this true to say it is a choice and silence the notice.
     RETENTION_ALERTS_KEEP_FOREVER_OK: bool = False
     # Opt in to deleting the posture and count history (each check's status changes, each count's changes and the daily score) older than this many days. 0 (the default) keeps it all.
