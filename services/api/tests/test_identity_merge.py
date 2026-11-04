@@ -280,3 +280,30 @@ def test_nothing_is_joined_across_clients_by_any_rule_even_with_identical_addres
     assert len(build(users)) == 4
     same = [acct(A, "bmoore@acme.com"), acct(B, "bmoore@acme.com")]
     assert len(build(same)) == 2
+
+
+# ---- what a live look at the real data showed: names shared by many accounts and long chains --------------------------------------------------------------------
+
+
+def test_a_name_that_is_the_display_name_of_several_accounts_joins_none_of_them():
+    users = [acct(A, f"alias{i}@sellers.com", display_name="liz@sellers.com") for i in range(5)] + [acct(A, "liz@sellers.com")]
+    assert len(build(users)) == 6
+
+
+def test_a_display_name_on_another_domain_joins_nothing_even_when_that_address_exists():
+    users = [acct(A, "tranquilit@gsctx.org", display_name="ron@tranquil-it.com"), acct(A, "ron@tranquil-it.com")]
+    assert len(build(users)) == 2
+
+
+def test_the_same_name_on_two_domains_is_left_to_the_owner():
+    users = [acct(A, "bgeha@grcooling.com", display_name="bgeha@minimusservers.com"), acct(A, "bgeha@minimusservers.com")]
+    assert len(build(users)) == 2
+
+
+def test_a_chain_of_rules_never_builds_a_person_of_more_than_six_addresses_but_a_hand_merge_can():
+    # ten accounts, each named by the next one's address: one long chain
+    users = [acct(A, f"u{i}@x.com", display_name=f"u{i + 1}@x.com") for i in range(9)] + [acct(A, "u9@x.com")]
+    people = build(users)
+    assert max(len(p.addresses) for p in people) <= 6
+    pairs = [(A, f"u{i}@x.com", f"u{i + 1}@x.com") for i in range(9)]
+    assert max(len(p.addresses) for p in build(users, merges=pairs)) == 10
