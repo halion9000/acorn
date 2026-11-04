@@ -216,6 +216,15 @@ describe('Export CSV really exports', () => {
     expect(lines[3]).toBe('"Smith, ""Jones"" & Co","id-Smith, ""Jones"" & Co",no,,,,,,,,');
   });
 
+  it('writes a tenant name that a spreadsheet would run as a formula as plain text', () => {
+    const csv = tenantsToCsv([row({ name: '=HYPERLINK("http://evil.example","open")' }), row({ name: '@SUM(1+1)' }), row({ name: '-2+3' }), row({ name: 'Fine Co' })]);
+    const lines = csv.trimEnd().split('\n');
+    expect(lines[1].startsWith(`"'=HYPERLINK(""http://evil.example"",""open"")",`)).toBe(true);
+    expect(lines[2].startsWith("'@SUM(1+1),")).toBe(true);
+    expect(lines[3].startsWith("'-2+3,")).toBe(true);
+    expect(lines[4].startsWith('Fine Co,')).toBe(true);
+  });
+
   it('downloads the rows on screen when clicked, and is disabled when there are none', async () => {
     const created: Blob[] = [];
     const createObjectURL = vi.fn((blob: Blob) => (created.push(blob), 'blob:test'));

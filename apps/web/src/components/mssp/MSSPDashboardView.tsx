@@ -46,7 +46,9 @@ export function matchesFilter(row: ManagedTenantRow, filter: Filter): boolean {
 }
 
 function csvCell(value: string | number | null): string {
-  const text = value === null ? '' : String(value);
+  let text = value === null ? '' : String(value);
+  // Names come from other systems: text a spreadsheet would run as a formula (it starts with =, +, - or @) is written as text. A number is left alone.
+  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
