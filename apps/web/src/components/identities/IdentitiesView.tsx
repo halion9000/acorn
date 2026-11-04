@@ -16,6 +16,7 @@ import { daysAgo } from '@/lib/ago';
 import { clientFromAddress } from '@/components/mssp/ClientPicker';
 import { AccountActions } from './AccountActions';
 import { MergePanel } from './MergePanel';
+import { BecSearch } from './BecSearch';
 
 const SEVERITY_STYLE: Record<string, string> = {
   critical: 'bg-red-500/15 text-red-300 border-red-500/30',
@@ -111,6 +112,9 @@ function Detail({ person }: { person: IdentityPerson }) {
         {data.person.mfa_methods && <p className="mt-2 text-xs text-gray-400">Second factor methods: {data.person.mfa_methods}</p>}
         <div className="mt-3">
           <MergePanel person={data.person} />
+        </div>
+        <div className="mt-3">
+          <BecSearch clientId={person.client_id} email={data.person.email} knownTo={data.person.sources.map((s) => s.vendor)} />
         </div>
         <div className="mt-3">
           <AccountActions clientId={person.client_id} email={data.person.email} knownTo={data.person.sources.map((s) => s.vendor)} />

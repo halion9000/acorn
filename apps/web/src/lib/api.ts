@@ -902,6 +902,12 @@ export const identitiesApi = {
   },
   /** One person: every tool's record of them, their open alerts and a summary of their sign-ins. */
   detail: (clientId: string, email: string) => request<IdentityDetail>('/api/v1/identities/detail', { params: { client_id: clientId, email } }),
+  /** A person's business email compromise searches of the last month, newest first, without their reports. */
+  becCases: (clientId: string, email: string) => request<{ items: BecCaseItem[] }>('/api/v1/identities/bec', { params: { client_id: clientId, email } }),
+  /** Start a search. Returns at once (the case fills in as CORE reports). */
+  startBec: (body: { client_id: string; email: string; confirm: boolean }) => request<BecCaseItem>('/api/v1/identities/bec', { method: 'POST', body: JSON.stringify(body) }),
+  /** One search with its whole report. */
+  becCase: (clientId: string, id: string) => request<BecCaseDetail>(`/api/v1/identities/bec/${encodeURIComponent(id)}`, { params: { client_id: clientId } }),
   /** Say two addresses are one person. Returns once stored; the next list shows them as one row. */
   mergePeople: (body: { client_id: string; email: string; with_email: string }) =>
     request<{ kind: string; email: string; other: string }>('/api/v1/identities/merges', { method: 'POST', body: JSON.stringify(body) }),
@@ -914,6 +920,25 @@ export const identitiesApi = {
   requestAccountAction: (body: { client_id: string; email: string; action: AccountActionKind; confirm: boolean }) =>
     request<AccountActionItem>('/api/v1/identities/actions', { method: 'POST', body: JSON.stringify(body) }),
 };
+
+export interface BecCaseItem {
+  id: string;
+  case_ref: string;
+  email: string;
+  status: 'pending' | 'running' | 'done' | 'failed';
+  step: number;
+  steps_total: number;
+  step_label: string | null;
+  message: string | null;
+  summary: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  finished_at: string | null;
+}
+
+export interface BecCaseDetail extends BecCaseItem {
+  report: Record<string, unknown> | null;
+}
 
 export type AccountActionKind = 'revoke_sessions' | 'disable_user' | 'enable_user';
 
