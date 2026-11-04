@@ -9,7 +9,7 @@ vi.mock('@/lib/api', () => ({
   identitiesApi: { becCases: api.becCases, startBec: api.startBec, becCase: api.becCase },
 }));
 
-import { BecSearch, Section, canOfferBec, sectionTitle } from './BecSearch';
+import { BecSearch, Section, canOfferBec, sectionTitle, shortenedNote } from './BecSearch';
 
 const item = (over: Record<string, unknown> = {}) => ({
   id: 'c1', case_ref: 'BEC-1', email: 'pat@acme.com', status: 'running', step: 2, steps_total: 15, step_label: 'Sign-ins and mobile devices', message: null, summary: {},
@@ -125,3 +125,21 @@ describe('the report viewer', () => {
     expect(screen.getByText(/Showing 50 of 60/)).toBeInTheDocument();
   });
 });
+
+describe('the note about shortened lists', () => {
+  it('says which lists were cut and how many were kept, and nothing when none were', () => {
+    expect(shortenedNote({ shortened: [{ path: 'SignIns', kept: 100, total: 3000 }] })).toBe('Some long lists were shortened to keep the report (SignIns: first 100 of 3,000). The rest is unchanged.');
+    expect(shortenedNote({ shortened: [] })).toBeNull();
+    expect(shortenedNote({ level: 'High' })).toBeNull();
+    expect(shortenedNote(null)).toBeNull();
+  });
+
+  it('names at most six and counts the rest, and ignores entries that are not lists of numbers', () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({ path: `L${i}`, kept: 10, total: 20 + i }));
+    const note = shortenedNote({ shortened: [...many, { path: 7 }, 'junk'] })!;
+    expect(note).toContain('L5: first 10 of 25');
+    expect(note).not.toContain('L6:');
+    expect(note).toContain('and 5 more');
+  });
+});
+

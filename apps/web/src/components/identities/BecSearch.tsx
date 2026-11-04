@@ -32,6 +32,19 @@ export function ratingOf(summary: Record<string, unknown> | null | undefined): {
   };
 }
 
+/** When CORE had to cut CIPP's longest lists to keep the report, say which and how many were kept: "Sign-ins: first 100 of 3,000". Null when nothing was cut. Never hides that something was. */
+export function shortenedNote(summary: Record<string, unknown> | null | undefined): string | null {
+  const raw = Array.isArray(summary?.shortened) ? (summary!.shortened as unknown[]) : [];
+  const parts = raw
+    .map((x) => (x && typeof x === 'object' ? (x as Record<string, unknown>) : null))
+    .filter((x): x is Record<string, unknown> => x !== null && typeof x.path === 'string' && typeof x.kept === 'number' && typeof x.total === 'number')
+    .slice(0, 6)
+    .map((x) => `${String(x.path)}: first ${(x.kept as number).toLocaleString('en-US')} of ${(x.total as number).toLocaleString('en-US')}`);
+  if (parts.length === 0) return null;
+  const more = raw.length > parts.length ? ` and ${raw.length - parts.length} more` : '';
+  return `Some long lists were shortened to keep the report (${parts.join('; ')}${more}). The rest is unchanged.`;
+}
+
 export function canOfferBec(capabilities: string[] | undefined, knownTo: string[]): boolean {
   return (capabilities ?? []).includes('run_bec') && knownTo.includes('cipp');
 }
@@ -227,6 +240,7 @@ export function BecSearch({ clientId, email, knownTo }: { clientId: string; emai
                   {ratingOf(i.summary)!.incomplete ? <span className="block text-gray-400">{ratingOf(i.summary)!.incomplete}</span> : null}
                 </div>
               ) : null}
+              {i.status === 'done' && shortenedNote(i.summary) ? <div className="mt-0.5 text-xs text-gray-400">{shortenedNote(i.summary)}</div> : null}
               {(i.status === 'running' || i.status === 'pending') && (
                 <div className="mt-1">
                   {i.steps_total > 0 ? (
