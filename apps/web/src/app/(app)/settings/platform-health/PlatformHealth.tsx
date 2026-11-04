@@ -77,6 +77,15 @@ export function runningLabel(v: { commit: string | null; up_seconds: number }): 
   return v.commit ? `Running version ${v.commit}, up ${up}.` : `Running version unknown (started by hand, not by the update), up ${up}.`;
 }
 
+/** "148 database updates applied, newest 148_x.sql (2 Nov)": says plainly when the database could not be read. */
+export function migrationsLabel(m: { applied: number; newest: string | null; applied_at: string | null } | null | undefined): string {
+  if (!m) return "Database updates: could not be read.";
+  if (!m.newest) return "No database updates are recorded yet.";
+  const when = m.applied_at ? new Date(m.applied_at) : null;
+  const day = when && !Number.isNaN(when.getTime()) ? ` (${when.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })})` : "";
+  return `${m.applied} database updates applied, newest ${m.newest}${day}.`;
+}
+
 /** What a worker's status reads as on the page, in plain words. */
 export function workerLabel(w: Pick<WorkerRow, "status" | "seconds_since_pass" | "last_error">): string {
   if (w.status === "late") return w.seconds_since_pass === null ? "never ran: something is wrong" : `quiet for ${Math.floor(w.seconds_since_pass / 60)} min: something is wrong`;
@@ -104,6 +113,7 @@ interface Snapshot {
   warnings?: { key: string; level: "error" | "warn"; text: string }[];
   database?: DatabaseSecurity;
   feed_routes?: { since_minutes_ago: number; routes: FeedRoute[] };
+  migrations?: { applied: number; newest: string | null; applied_at: string | null } | null;
   runtime?: { version?: { commit: string | null; up_seconds: number }; loop?: { samples: number; max_seconds?: number; typical_seconds?: number; window_seconds: number }; slow_routes?: SlowRoute[]; workers?: WorkerRow[] };
   generated_at: string;
 }
@@ -159,6 +169,11 @@ export function PlatformHealth() {
             <p role="note" data-testid="pool-warning" className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
               The database connection pool is {snapshot.database.pool.percent}% full ({snapshot.database.pool.in_use} of {snapshot.database.pool.limit} in use). When it is full, pages start failing with 500
               errors until requests finish.
+            </p>
+          )}
+          {snapshot.migrations !== undefined && (
+            <p data-testid="migrations-line" className="text-sm text-slate-400">
+              {migrationsLabel(snapshot.migrations)}
             </p>
           )}
           {snapshot.runtime?.version && (

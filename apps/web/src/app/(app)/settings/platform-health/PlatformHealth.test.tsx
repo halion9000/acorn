@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PlatformHealth, agoLabel, runningLabel, workerLabel } from './PlatformHealth';
+import { PlatformHealth, agoLabel, migrationsLabel, runningLabel, workerLabel } from './PlatformHealth';
 
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
@@ -309,6 +309,17 @@ describe('background workers', () => {
 });
 
 
+
+describe('the database updates line', () => {
+  it('names the count and the newest update with its day', () => {
+    expect(migrationsLabel({ applied: 148, newest: '148_identity_merges_binary_order.sql', applied_at: '2026-11-04T10:00:00Z' })).toBe('148 database updates applied, newest 148_identity_merges_binary_order.sql (4 Nov).');
+  });
+
+  it('says so when none are recorded or the database could not be read, never a made-up number', () => {
+    expect(migrationsLabel({ applied: 0, newest: null, applied_at: null })).toBe('No database updates are recorded yet.');
+    expect(migrationsLabel(null)).toBe('Database updates: could not be read.');
+  });
+});
 
 describe('the running version line', () => {
   it('says which commit is running and for how long, in plain units', () => {

@@ -87,9 +87,9 @@ from app.api.v1.endpoints.metrics import PipelineHealth, PipelineStage
 from app.core.config import settings
 from app.models.alert import Alert
 from app.models.connector import Connector
+from app.services import worker_heartbeat
 from app.services.connector_freshness import compute_freshness
 from app.services.llm_health import llm_status
-from app.services import worker_heartbeat
 from app.services.runtime_stats import feed_receipts, loop_lag, slow_routes
 
 logger = logging.getLogger(__name__)
@@ -656,7 +656,12 @@ async def _probe(client: Any, name: str, url: str) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001 - any failure to answer is the finding
         ok, detail = False, type(exc).__name__
         if detail in _NOT_RUNNING and name in optional_services():
-            return {"service": name, "status": "off", "latency_ms": round((time.monotonic() - started) * 1000), "detail": "not switched on here"}
+            return {
+                "service": name,
+                "status": "off",
+                "latency_ms": round((time.monotonic() - started) * 1000),
+                "detail": "not switched on here",
+            }
     return {"service": name, "status": "up" if ok else "down", "latency_ms": round((time.monotonic() - started) * 1000), "detail": detail}
 
 
@@ -890,6 +895,25 @@ async def pending_migrations(db: Any) -> list[str] | None:
     return sorted(files - applied)
 
 
+async def migration_summary(db: Any) -> dict[str, Any] | None:
+    """How many migrations the database has recorded and the newest one (with when it was applied), or None when this cannot be read. Names are zero-padded, so the last by name is the newest."""
+    from sqlalchemy import text
+
+    try:
+        count = (await db.execute(text("SELECT count(*) FROM aisoc_schema_migrations"))).scalar_one()
+        last = (await db.execute(text("SELECT name, applied_at FROM aisoc_schema_migrations ORDER BY name DESC LIMIT 1"))).first()
+    except Exception:  # noqa: BLE001 - extra detail on a health page must not take it down
+        return None
+    if last is None:
+        return {"applied": int(count), "newest": None, "applied_at": None}
+    when = last[1]
+    return {
+        "applied": int(count),
+        "newest": last[0],
+        "applied_at": when.isoformat() if hasattr(when, "isoformat") else (str(when) if when else None),
+    }
+
+
 CONNECTOR_FAILING_AFTER = timedelta(hours=24)
 
 
@@ -1023,8 +1047,17 @@ def platform_warnings(
     quiet = [w for w in workers or [] if w["status"] == "late"]
     failing_workers = [w for w in workers or [] if w["status"] == "failing"]
     if quiet:
-        names = ", ".join(f"{w['name']} ({'never ran' if w['seconds_since_pass'] is None else str(w['seconds_since_pass'] // 60) + ' minutes since its last pass'})" for w in quiet)
-        out.append({"key": "workers_quiet", "level": "error", "text": f"Background work has gone quiet: {names}. What it does (reading the DMARC mailbox, sweeping hidden alerts, retention) is not happening; restart the API if it stays so"})
+        names = ", ".join(
+            f"{w['name']} ({'never ran' if w['seconds_since_pass'] is None else str(w['seconds_since_pass'] // 60) + ' minutes since its last pass'})"
+            for w in quiet
+        )
+        out.append(
+            {
+                "key": "workers_quiet",
+                "level": "error",
+                "text": f"Background work has gone quiet: {names}. What it does (reading the DMARC mailbox, sweeping hidden alerts, retention) is not happening; restart the API if it stays so",
+            }
+        )
     if failing_workers:
         names = ", ".join(f"{w['name']} ({w['last_error'] or 'error'})" for w in failing_workers)
         out.append({"key": "workers_failing", "level": "warn", "text": f"Background work is running but its last pass failed: {names}"})
@@ -1172,6 +1205,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
         "signins": signins,
         "disk": disk,
         "pending_migrations": pending or [],
+        "migrations": await migration_summary(db),
         "runtime": {"loop": loop, "slow_routes": slow_routes(), "workers": workers, "version": running_version()},
         "feed_routes": feed_receipts(),
         "warnings": platform_warnings(
