@@ -476,8 +476,9 @@ export function IdentitiesView() {
             setPage(1);
             void mutate();
           }}
-          className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white hover:bg-gray-800"
+          className="ml-auto flex items-center gap-1.5 rounded-md border border-blue-400 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300"
         >
+          <span aria-hidden="true">&#8635;</span>
           Refresh
         </button>
         {isValidating && data ? (
