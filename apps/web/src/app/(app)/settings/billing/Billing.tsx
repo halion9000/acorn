@@ -809,13 +809,28 @@ export interface WasteRow {
 
 /** Licences a client pays for that nobody has been given: a quantity to hand back or reassign (never a price), biggest first. A count that has not refreshed for a week is marked, so it is not read as today's. */
 export function LicenceWaste() {
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportCsv = async () => {
+    setExportError(null);
+    try {
+      const res = await authFetch("/api/v1/billing/licence-waste.csv");
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      download("licence-waste.csv", await res.text());
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Could not export.");
+    }
+  };
   const waste = useJson<{ rows: WasteRow[]; total_bought: number; total_unassigned: number; clients: number }>("/api/v1/billing/licence-waste");
   return (
     <div className="space-y-3">
       {waste.error && <p role="alert" className="text-sm text-red-300">{waste.error}</p>}
+      {exportError && <p role="alert" className="text-sm text-red-300">{exportError}</p>}
       {!waste.data && !waste.error && <p className="text-sm text-slate-500">Loading…</p>}
       {waste.data && (
         <>
+          <button type="button" onClick={() => void exportCsv()} className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100 hover:bg-slate-800">
+            Export CSV
+          </button>
           <p className="text-sm text-slate-300" data-testid="waste-summary">
             {waste.data.total_unassigned} of {waste.data.total_bought} licences are not assigned to anyone, across {waste.data.clients} client{waste.data.clients === 1 ? "" : "s"}.
           </p>

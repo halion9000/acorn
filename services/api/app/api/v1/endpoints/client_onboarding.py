@@ -9,9 +9,9 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
@@ -89,8 +89,51 @@ def build_row(client_id: uuid.UUID, name: str, f: Facts) -> OnboardingRow:
 
 
 @router.get("", response_model=list[OnboardingRow])
-async def client_onboarding(user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, client_id: uuid.UUID | None = Query(default=None)) -> list[OnboardingRow]:
+async def client_onboarding(
+    user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, client_id: uuid.UUID | None = Query(default=None)
+) -> list[OnboardingRow]:
     """Every client (or one), least onboarded first, so the ones that need attention are at the top."""
+    return await _onboarding_rows(user, db, client_id)
+
+
+def onboarding_csv(rows: list[OnboardingRow]) -> str:
+    """The onboarding table as CSV: one row per client, a yes or no for each step, how far along, and the next thing to do. A cell that would run as a formula is made text."""
+    import csv
+    import io
+
+    from app.api.v1.endpoints.devices import csv_cell
+
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["Client", "Percent", "Steps done", "Steps", *[label for _k, label, _h in STEPS], "Next step", "First data"])
+    for r in rows:
+        by_key = {s.key: s for s in r.steps}
+        writer.writerow(
+            [
+                csv_cell(r.client_name),
+                r.percent,
+                r.done,
+                r.total,
+                *["yes" if by_key[k].done else "no" for k, _l, _h in STEPS if k in by_key],
+                csv_cell(r.next_step),
+                r.first_data_at.isoformat() if r.first_data_at else "",
+            ]
+        )
+    return out.getvalue()
+
+
+@router.get("/export.csv", summary="The client onboarding table as a CSV file")
+async def export_client_onboarding(
+    user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, client_id: uuid.UUID | None = Query(default=None)
+) -> Response:
+    """The same rows the page shows (least onboarded first), as a file."""
+    rows = await _onboarding_rows(user, db, client_id)
+    return Response(
+        content=onboarding_csv(rows), media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="client-onboarding.csv"'}
+    )
+
+
+async def _onboarding_rows(user: Any, db: Any, client_id: uuid.UUID | None) -> list[OnboardingRow]:
     scope, names = await _scope(db, user.tenant_id, client_id)
     clients = [t for t in scope if t != user.tenant_id]
     facts = {t: Facts() for t in clients}
@@ -104,21 +147,43 @@ async def client_onboarding(user: Annotated[AuthUser, Depends(require_permission
             )
         ).all():
             facts[tid].tools = int(n)
-        for tid, n, at in (await db.execute(select(Device.tenant_id, func.count(), func.min(Device.first_seen)).where(Device.tenant_id.in_(clients)).group_by(Device.tenant_id))).all():
+        for tid, n, at in (
+            await db.execute(
+                select(Device.tenant_id, func.count(), func.min(Device.first_seen))
+                .where(Device.tenant_id.in_(clients))
+                .group_by(Device.tenant_id)
+            )
+        ).all():
             facts[tid].devices = int(n)
             if at:
                 first[tid].append(at)
-        for tid, n in (await db.execute(select(IdentityMfaUser.tenant_id, func.count()).where(IdentityMfaUser.tenant_id.in_(clients)).group_by(IdentityMfaUser.tenant_id))).all():
+        for tid, n in (
+            await db.execute(
+                select(IdentityMfaUser.tenant_id, func.count())
+                .where(IdentityMfaUser.tenant_id.in_(clients))
+                .group_by(IdentityMfaUser.tenant_id)
+            )
+        ).all():
             facts[tid].people = int(n)
         for tid, n, met in (
             await db.execute(
-                select(ClientCheckHistory.tenant_id, func.count(func.distinct(ClientCheckHistory.key)), func.count(func.distinct(ClientCheckHistory.key)).filter(ClientCheckHistory.status == "met"))
+                select(
+                    ClientCheckHistory.tenant_id,
+                    func.count(func.distinct(ClientCheckHistory.key)),
+                    func.count(func.distinct(ClientCheckHistory.key)).filter(ClientCheckHistory.status == "met"),
+                )
                 .where(ClientCheckHistory.tenant_id.in_(clients))
                 .group_by(ClientCheckHistory.tenant_id)
             )
         ).all():
             facts[tid].checks, facts[tid].checks_met = int(n), int(met)
-        for tid, n, at in (await db.execute(select(Alert.tenant_id, func.count(), func.min(Alert.created_at)).where(Alert.tenant_id.in_(clients)).group_by(Alert.tenant_id))).all():
+        for tid, n, at in (
+            await db.execute(
+                select(Alert.tenant_id, func.count(), func.min(Alert.created_at))
+                .where(Alert.tenant_id.in_(clients))
+                .group_by(Alert.tenant_id)
+            )
+        ).all():
             facts[tid].alerts = int(n)
             if at:
                 first[tid].append(at)

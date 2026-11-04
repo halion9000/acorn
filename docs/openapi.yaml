@@ -1746,6 +1746,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-onboarding/export.csv:
+    get:
+      tags:
+      - clients
+      summary: The client onboarding table as a CSV file
+      description: The same rows the page shows (least onboarded first), as a file.
+      operationId: export_client_onboarding_api_v1_client_onboarding_export_csv_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}/explain:
     post:
       tags:
@@ -14613,6 +14644,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WasteReport'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/licence-waste.csv:
+    get:
+      tags:
+      - billing
+      summary: The unassigned licences as a CSV file (quantities, never prices)
+      description: Every licence with at least ``minimum`` unassigned (no row limit),
+        most first, the same rows the Licence waste tab shows.
+      operationId: licence_waste_csv_api_v1_billing_licence_waste_csv_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: minimum
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 10000
+          minimum: 1
+          default: 1
+          title: Minimum
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
         '422':
           description: Validation Error
           content:

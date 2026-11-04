@@ -2,7 +2,7 @@
 
 import uuid
 
-from app.api.v1.endpoints.client_onboarding import Facts, build_row
+from app.api.v1.endpoints.client_onboarding import Facts, build_row, onboarding_csv
 
 CID = uuid.uuid4()
 
@@ -84,8 +84,37 @@ def test_the_clients_come_back_least_onboarded_first_with_the_earliest_data_date
         [(A, 5, early)],  # alerts
     )
     out = asyncio.run(ep.client_onboarding(NS(tenant_id=OWNER), db, None))
-    assert [r.client_name for r in out] == ["Acme", "Zed Co"], "B has nothing done so it is first, and the owner's own tenant is not a client"
+    assert [r.client_name for r in out] == [
+        "Acme",
+        "Zed Co",
+    ], "B has nothing done so it is first, and the owner's own tenant is not a client"
     assert [r.done for r in out] == [0, 5]
     zed = out[1]
     assert zed.first_data_at == early and zed.next_step is None and "7 met" in zed.steps[3].detail
     assert out[0].first_data_at is None and out[0].next_step.startswith("Link this client")
+
+
+def test_the_csv_has_a_yes_or_no_per_step_the_next_step_and_never_a_formula():
+    import csv
+    import io
+
+    done = build_row(CID, '=HYPERLINK("http://x")', Facts(tools=1, devices=1, people=1, checks=1, checks_met=1, alerts=1))
+    part = build_row(uuid.uuid4(), "Birch", Facts(tools=2, devices=10))
+    rows = list(csv.reader(io.StringIO(onboarding_csv([part, done]))))
+    assert rows[0] == [
+        "Client",
+        "Percent",
+        "Steps done",
+        "Steps",
+        "Tools linked",
+        "Devices seen",
+        "People seen",
+        "Checks run",
+        "Alerts arriving",
+        "Next step",
+        "First data",
+    ]
+    assert rows[1][:4] == ["Birch", "40", "2", "5"] and rows[1][4:9] == ["yes", "yes", "no", "no", "no"]
+    assert "Microsoft 365 people" in rows[1][9]
+    assert rows[2][0].startswith("'="), "a client name that starts with = is made text"
+    assert rows[2][4:9] == ["yes"] * 5 and rows[2][9] == ""

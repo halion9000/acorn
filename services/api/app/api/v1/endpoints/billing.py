@@ -9,7 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -75,7 +75,11 @@ class WasteReport(BaseModel):
     clients: int
 
 
-@router.get("/licence-waste", response_model=WasteReport, summary="Licences bought but not assigned to anyone, per client and licence (quantities, never prices)")
+@router.get(
+    "/licence-waste",
+    response_model=WasteReport,
+    summary="Licences bought but not assigned to anyone, per client and licence (quantities, never prices)",
+)
 async def licence_waste(
     current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
     db: DBSession,
@@ -95,6 +99,23 @@ async def licence_waste(
         total_unassigned=sum(r.unassigned for r in rows),
         clients=len({r.client_id for r in rows}),
     )
+
+
+@router.get("/licence-waste.csv", summary="The unassigned licences as a CSV file (quantities, never prices)")
+async def licence_waste_csv(
+    current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
+    db: DBSession,
+    minimum: Annotated[int, Query(ge=1, le=10_000)] = 1,
+) -> Response:
+    """Every licence with at least ``minimum`` unassigned (no row limit), most first, the same rows the Licence waste tab shows."""
+    from app.services.licence_waste import waste_csv, waste_rows  # noqa: PLC0415
+
+    ids, names = await _scope(db, current_user.tenant_id, None)
+    rows = waste_rows(await _all_count_rows(db, ids[1:]), names, datetime.now(UTC), minimum)
+    return Response(
+        content=waste_csv(rows), media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="licence-waste.csv"'}
+    )
+
 
 Unit = Literal["licence", "device", "user", "seat", "mailbox", "ticket", "other"]
 
@@ -773,7 +794,9 @@ async def last_reported_grid(
 ) -> list[LastReportedRow]:
     owner = current_user.tenant_id
     ids, names = await _scope(db, owner, None)
-    rows: list[dict[str, Any]] = [{"client": r.tenant_id, "source": r.source, "updated_at": r.updated_at} for r in await _all_count_rows(db, ids[1:])]
+    rows: list[dict[str, Any]] = [
+        {"client": r.tenant_id, "source": r.source, "updated_at": r.updated_at} for r in await _all_count_rows(db, ids[1:])
+    ]
     out = [
         LastReportedRow(
             client_id=r["client"],

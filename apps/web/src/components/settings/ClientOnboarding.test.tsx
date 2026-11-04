@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
 const authFetch = vi.hoisted(() => vi.fn());
@@ -41,3 +42,35 @@ describe('ClientOnboarding', () => {
     expect(await screen.findByText('Could not load this page.')).toBeInTheDocument();
   });
 });
+
+const CSV = ['Client,Percent', 'Acme,100', ''].join('\n');
+
+describe('exporting the table', () => {
+  const rows = [{ client_id: 'a', client_name: 'Acme', steps: steps([true, true, true, true, true]), done: 5, total: 5, percent: 100, next_step: null, first_data_at: null }];
+
+  it('asks the server for the file and hands it to the browser as a download', async () => {
+    const created: Blob[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL = (b: Blob) => (created.push(b), 'blob:x');
+    (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL = () => {};
+    authFetch.mockImplementation((url?: string) =>
+      String(url).endsWith('/export.csv') ? Promise.resolve({ ok: true, text: () => Promise.resolve(CSV) }) : Promise.resolve({ ok: true, json: () => Promise.resolve(rows) }),
+    );
+    show();
+    await screen.findByText('Acme');
+    await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(authFetch).toHaveBeenCalledWith('/api/v1/client-onboarding/export.csv');
+    expect(await created[0]!.text()).toBe(CSV);
+    click.mockRestore();
+  });
+
+  it('says so when the export fails', async () => {
+    authFetch.mockImplementation((url?: string) => (String(url).endsWith('/export.csv') ? Promise.resolve({ ok: false, status: 403, text: () => Promise.resolve('') }) : Promise.resolve({ ok: true, json: () => Promise.resolve(rows) })));
+    show();
+    await screen.findByText('Acme');
+    await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Export failed (403)');
+  });
+});
+

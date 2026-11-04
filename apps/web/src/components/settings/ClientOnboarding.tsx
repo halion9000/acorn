@@ -2,6 +2,7 @@
 
 /** How far each client has got from "added" to "everything is flowing": five steps read from what is really there, least onboarded first, each with the one next thing to do. */
 
+import { useState } from 'react';
 import useSWR from 'swr';
 import { authFetch } from '@/lib/auth-session';
 
@@ -28,13 +29,39 @@ async function load(): Promise<Row[]> {
   return res.json();
 }
 
+/** The table as a CSV file: asks the server for the same rows and hands them to the browser as a download. Throws with a short reason when it cannot. */
+export async function downloadOnboardingCsv(): Promise<void> {
+  const res = await authFetch('/api/v1/client-onboarding/export.csv');
+  if (!res.ok) throw new Error(`Export failed (${res.status})`);
+  const url = URL.createObjectURL(new Blob([await res.text()], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'client-onboarding.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export function ClientOnboarding() {
+  const [exportError, setExportError] = useState<string | null>(null);
   const { data, error, isLoading } = useSWR<Row[]>('client-onboarding', load, { revalidateOnFocus: false });
   const unfinished = (data ?? []).filter((r) => r.done < r.total).length;
   return (
     <div className="max-w-6xl space-y-4 p-6">
       <div>
-        <h1 className="text-xl font-semibold text-gray-100">Client onboarding</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-gray-100">Client onboarding</h1>
+          <button
+            type="button"
+            onClick={() => {
+              setExportError(null);
+              downloadOnboardingCsv().catch((err: unknown) => setExportError(err instanceof Error ? err.message : 'Could not export.'));
+            }}
+            className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white hover:bg-gray-800"
+          >
+            Export CSV
+          </button>
+        </div>
+        {exportError ? <p role="alert" className="text-sm text-red-300">{exportError}</p> : null}
         <p className="mt-0.5 text-sm text-gray-500">
           Five steps per client, each counted from what is really there. {data ? `${unfinished} of ${data.length} clients still have a step to do.` : ''}
         </p>

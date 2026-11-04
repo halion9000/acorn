@@ -47,3 +47,20 @@ def waste_rows(counts: list[Any], names: dict[uuid.UUID, str], now: datetime, mi
             )
         )
     return sorted(out, key=lambda r: (-r.unassigned, r.client_name.lower(), r.item))
+
+
+def waste_csv(rows: list[WasteRow]) -> str:
+    """The unassigned licences as CSV: client, tool, licence, bought, unassigned, share, and whether the number is old. Quantities only, never prices. A cell that would run as a formula is made text."""
+    import csv
+    import io
+
+    from app.api.v1.endpoints.devices import csv_cell
+
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["Client", "Tool", "Licence", "Bought", "Unassigned", "Percent unassigned", "Number is old"])
+    for r in rows:
+        writer.writerow(
+            [csv_cell(r.client_name), csv_cell(r.source), csv_cell(r.item), r.bought, r.unassigned, r.percent, "yes" if r.stale else "no"]
+        )
+    return out.getvalue()

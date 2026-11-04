@@ -31,6 +31,7 @@ beforeEach(() => {
       return json({ generated_at: '', baseline_tool: 'ninjaone', no_counts: ['blumira', 'petra'], unbilled: [{ client_id: 'c9', client_name: 'Gamma', tool: 'halopsa', tool_count: 0, baseline_count: 30, gap: -30 }, { client_id: 'c8', client_name: 'Delta', tool: 'halopsa', tool_count: 0, baseline_count: 1, gap: -1 }], rows: [{ client_id: 'c1', client_name: 'Acme', tool: 'huntress', tool_count: 30, baseline_count: 50, gap: -20 }] });
     if (url.startsWith('/api/v1/billing/last-reported'))
       return json([{ client_id: 'c2', client_name: 'Beta', source: 'dnsfilter', last_reported_at: '2026-10-19T00:00:00Z', days_ago: 6, silent: true }]);
+    if (url.startsWith('/api/v1/billing/licence-waste.csv')) return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(WASTE_CSV) } as Response);
     if (url.startsWith('/api/v1/billing/licence-waste'))
       return json({ rows: [{ client_id: 'c1', client_name: 'Acme', source: 'cipp', item: 'Business Premium', bought: 50, unassigned: 5, percent: 10, stale: true }], total_bought: 50, total_unassigned: 5, clients: 1 });
     if (url.startsWith('/api/v1/billing/changes'))
@@ -336,6 +337,8 @@ describe('spreadsheet safety', () => {
   });
 });
 
+const WASTE_CSV = ['Client,Tool,Licence,Bought,Unassigned,Percent unassigned,Number is old', 'Acme,cipp,Business Premium,50,5,10,yes', ''].join(String.fromCharCode(10));
+
 describe('licence waste tab', () => {
   it('says how many licences are unassigned, lists them biggest first as quantities, and marks an old count', async () => {
     render(<Billing />);
@@ -348,3 +351,21 @@ describe('licence waste tab', () => {
     expect(table.textContent).not.toMatch(/\$|price|cost/i);
   });
 });
+
+describe('exporting the licence waste', () => {
+  it('asks the server for the file and downloads it', async () => {
+    const made: Blob[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL = (b: Blob) => (made.push(b), 'blob:x');
+    (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL = () => {};
+    render(<Billing />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'Licence waste' }));
+    await screen.findByTestId('waste-summary');
+    await user.click(screen.getByRole('button', { name: 'Export CSV' }));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(await made[0]!.text()).toBe(WASTE_CSV);
+    click.mockRestore();
+  });
+});
+

@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace as NS
 from unittest.mock import AsyncMock, MagicMock
 
-from app.services.licence_waste import waste_rows
+from app.services.licence_waste import waste_csv, waste_rows
 
 NOW = datetime(2026, 11, 4, 12, 0, tzinfo=UTC)
 A, B = uuid.uuid4(), uuid.uuid4()
@@ -15,17 +15,29 @@ NAMES = {A: "Acme", B: "Zed"}
 
 
 def count(tenant, item, bought, available, unit="licence", days=0, source="m365"):
-    return NS(tenant_id=tenant, source=source, item=item, unit=unit, count=bought, available=available, updated_at=NOW - timedelta(days=days))
+    return NS(
+        tenant_id=tenant, source=source, item=item, unit=unit, count=bought, available=available, updated_at=NOW - timedelta(days=days)
+    )
 
 
 def test_the_gap_between_bought_and_assigned_is_the_waste_biggest_first_with_its_share():
     rows = waste_rows([count(A, "Business Premium", 50, 5), count(B, "E3", 20, 12), count(A, "Exchange Online", 10, 1)], NAMES, NOW)
-    assert [(r.client_name, r.item, r.bought, r.unassigned, r.percent) for r in rows] == [("Zed", "E3", 20, 12, 60), ("Acme", "Business Premium", 50, 5, 10), ("Acme", "Exchange Online", 10, 1, 10)]
+    assert [(r.client_name, r.item, r.bought, r.unassigned, r.percent) for r in rows] == [
+        ("Zed", "E3", 20, 12, 60),
+        ("Acme", "Business Premium", 50, 5, 10),
+        ("Acme", "Exchange Online", 10, 1, 10),
+    ]
 
 
 def test_only_licences_with_a_stated_unassigned_number_above_the_minimum_count():
     rows = waste_rows(
-        [count(A, "none stated", 10, None), count(A, "all used", 10, 0), count(A, "a device", 10, 4, unit="device"), count(A, "zero bought", 0, 0), count(A, "real", 10, 3)],
+        [
+            count(A, "none stated", 10, None),
+            count(A, "all used", 10, 0),
+            count(A, "a device", 10, 4, unit="device"),
+            count(A, "zero bought", 0, 0),
+            count(A, "real", 10, 3),
+        ],
         NAMES,
         NOW,
     )
@@ -43,7 +55,9 @@ def test_a_count_not_refreshed_for_a_week_is_marked_stale():
 
 
 def test_a_client_with_no_name_is_shown_by_its_id_and_a_naive_time_is_read_as_utc():
-    r = waste_rows([NS(tenant_id=B, source="m", item="x", unit="licence", count=4, available=1, updated_at=datetime(2026, 11, 4, 11, 0))], {}, NOW)[0]
+    r = waste_rows(
+        [NS(tenant_id=B, source="m", item="x", unit="licence", count=4, available=1, updated_at=datetime(2026, 11, 4, 11, 0))], {}, NOW
+    )[0]
     assert r.client_name == str(B) and r.stale is False
 
 
@@ -96,3 +110,15 @@ def test_the_billing_pages_read_every_clients_counts_in_one_statement_however_ma
         counts, got_names = asyncio.run(module._all_client_counts(db, uuid.uuid4()))
         assert len(counts) == clients and all(len(v) == 1 for v in counts.values()), clients
         assert len(statements) == 1, f"{len(statements)} statements for {clients} clients"
+
+
+def test_the_csv_lists_quantities_only_and_a_name_that_starts_with_equals_is_made_text():
+    import csv
+    import io
+
+    rows = waste_rows([count(A, "Business Premium", 50, 5, days=9), count(B, "=E3", 20, 12)], {A: "Acme", B: "=Zed"}, NOW)
+    table = list(csv.reader(io.StringIO(waste_csv(rows))))
+    assert table[0] == ["Client", "Tool", "Licence", "Bought", "Unassigned", "Percent unassigned", "Number is old"]
+    assert table[1] == ["'=Zed", "m365", "'=E3", "20", "12", "60", "no"]
+    assert table[2] == ["Acme", "m365", "Business Premium", "50", "5", "10", "yes"]
+    assert not any("price" in h.lower() or "cost" in h.lower() for h in table[0]), "quantities, never prices"
