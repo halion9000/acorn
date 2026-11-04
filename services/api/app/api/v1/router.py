@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     alert_related,
     alert_scripts,
     alert_stale_review,
+    data_retention,
     alert_stale_review,
     alert_suppressions,
     alert_vendor_actions,
@@ -129,6 +130,7 @@ api_router.include_router(alert_scripts.router)
 api_router.include_router(alert_related.router)
 api_router.include_router(alert_suppressions.router)
 api_router.include_router(alert_stale_review.router)
+api_router.include_router(data_retention.router)
 # Structured AI explainer (POST /alerts/{id}/explain) — single-shot
 # JSON envelope counterpart to the agent service's NDJSON stream.
 api_router.include_router(alert_explain.router)

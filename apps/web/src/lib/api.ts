@@ -1823,6 +1823,16 @@ export interface HideSuggestion {
   days: number;
 }
 
+export interface NoisyRule {
+  name: string;
+  source: string | null;
+  total: number;
+  open: number;
+  false_positives: number;
+  false_positive_rate: number;
+  suggest_hide: boolean;
+}
+
 export interface StaleSummary {
   days: number;
   exempt_severities: string[];
@@ -1845,6 +1855,9 @@ export const alertsApi = {
       body: JSON.stringify({ alert_id: body.alertId, scope: body.scope, days: body.days, device: body.device }),
     }),
   /** The rules that hide alert types, and with ``includeEnded`` the ones lifted or run out. */
+  /** The rules that raised the most alerts lately, with open and false-positive counts. */
+  noisyRules: (days = 30, clientId?: string) =>
+    request<NoisyRule[]>('/api/v1/alert-suppressions/noisy', { params: { days: String(days), ...(clientId ? { client_id: clientId } : {}) } }),
   suppressions: (includeEnded = false) => request<AlertSuppression[]>('/api/v1/alert-suppressions', { params: includeEnded ? { include_ended: 'true' } : undefined }),
   /** Hide one client's alerts (not critical ones) from ``startsAt`` (default now) for ``hours`` hours, at most 72. */
   startMaintenance: (body: { clientId: string; hours: number; startsAt?: string; reason?: string }) =>

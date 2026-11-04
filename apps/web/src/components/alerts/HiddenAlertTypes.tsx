@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { alertsApi, type AlertSuppression } from '@/lib/api';
 import { safeFormat } from '@/lib/safe-date';
 import { MaintenanceWindowForm } from './MaintenanceWindowForm';
+import { NoisyRules } from './NoisyRules';
 
 /** The API lists at most this many rules (newest first): a list that long may be cut. */
 export const RULE_LIST_CAP = 500;
@@ -58,6 +59,7 @@ export function HiddenAlertTypes() {
       </div>
 
       <MaintenanceWindowForm onStarted={() => void mutate()} />
+      <NoisyRules />
 
       {error ? (
         <p role="alert" className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">

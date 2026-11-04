@@ -237,6 +237,76 @@ async def hide_suggestion(alert_id: uuid.UUID, user: AuthUser, db: DBSession) ->
     return HideSuggestion(suggest=should_suggest_hiding(int(count), int(hiding) > 0), false_positives=int(count))
 
 
+class NoisyRule(BaseModel):
+    name: str
+    source: str | None = None
+    total: int
+    open: int
+    false_positives: int
+    false_positive_rate: float
+    suggest_hide: bool
+
+
+NOISY_MIN_TOTAL = 10  # fewer alerts than this is not noise, whatever share was false
+NOISY_SUGGEST_RATE = 0.5
+
+
+def noisy_row(name: str, source: str | None, total: int, open_: int, false_positives: int) -> NoisyRule:
+    """One rule's line: how many alerts it raised, how many are still open, how many were closed as false positives, and whether hiding it is worth suggesting (at least ``SUGGEST_AFTER`` false positives,
+    half or more of what it raised, and enough alerts to call it a pattern). It suggests; it hides nothing."""
+    rate = round(false_positives / total, 3) if total else 0.0
+    return NoisyRule(
+        name=name,
+        source=source,
+        total=total,
+        open=open_,
+        false_positives=false_positives,
+        false_positive_rate=rate,
+        suggest_hide=total >= NOISY_MIN_TOTAL and false_positives >= SUGGEST_AFTER and rate >= NOISY_SUGGEST_RATE,
+    )
+
+
+@router.get(
+    "/noisy",
+    response_model=list[NoisyRule],
+    dependencies=[Depends(require_permission("alerts:read"))],
+    summary="The noisiest alert rules, with how many were closed as false positives",
+)
+async def noisy_rules(
+    user: AuthUser,
+    db: DBSession,
+    client_id: uuid.UUID | None = None,
+    days: int = Query(default=30, ge=1, le=365),
+    limit: int = Query(default=10, ge=1, le=50),
+) -> list[NoisyRule]:
+    """The rules that raised the most alerts in the last ``days`` (for one client, or all), most first. Alerts hidden by a rule or set aside as stale are not counted: they are already dealt with."""
+    from app.api.v1.endpoints.devices import _scope  # noqa: PLC0415
+    from app.db.rls_scope import cross_tenant_reads  # noqa: PLC0415
+    from app.services.alert_status import FINISHED_ALERT_STATUSES, SUPPRESSED, STALE  # noqa: PLC0415
+
+    scope, _ = await _scope(db, user.tenant_id, client_id)
+    since = datetime.now(UTC) - timedelta(days=days)
+    name = func.coalesce(Alert.rule_name, Alert.title)
+    is_fp = or_(Alert.status.in_(("false_positive", "fp")), Alert.disposition == "false_positive")
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(
+                    name.label("name"),
+                    func.max(Alert.connector_type),
+                    func.count(),
+                    func.count().filter(Alert.status.notin_(FINISHED_ALERT_STATUSES)),
+                    func.count().filter(is_fp),
+                )
+                .where(Alert.tenant_id.in_(scope), Alert.created_at >= since, Alert.status.notin_((SUPPRESSED, STALE)))
+                .group_by(name)
+                .order_by(func.count().desc(), name)
+                .limit(limit)
+            )
+        ).all()
+    return [noisy_row(str(r[0])[:200], r[1], int(r[2]), int(r[3]), int(r[4])) for r in rows]
+
+
 @router.get("", response_model=list[SuppressionOut], dependencies=[Depends(require_permission("alerts:read"))])
 async def list_suppressions(
     user: AuthUser,

@@ -36,6 +36,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/settings/signin-scores': { title: 'Sign-in Scores', description: 'The most unusual sign-ins, across clients' },
   '/settings/client-cleanup': { title: 'Client Cleanup', description: 'Clients with nothing in them' },
   '/settings/platform-health': { title: 'Platform Health', description: 'Is every service answering' },
+  '/settings/retention': { title: 'Data retention', description: 'What is kept, for how long' },
   '/dashboard': { title: 'SOC Dashboard', description: 'SOC overview and metrics' },
   '/alerts': { title: 'Alerts', description: 'Security alerts and incidents' },
   '/cases': { title: 'Cases', description: 'Incident case management' },

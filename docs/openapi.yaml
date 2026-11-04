@@ -1482,6 +1482,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-suppressions/noisy:
+    get:
+      tags:
+      - alerts
+      summary: The noisiest alert rules, with how many were closed as false positives
+      description: 'The rules that raised the most alerts in the last ``days`` (for
+        one client, or all), most first. Alerts hidden by a rule or set aside as stale
+        are not counted: they are already dealt with.'
+      operationId: noisy_rules_api_v1_alert_suppressions_noisy_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 30
+          title: Days
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 50
+          minimum: 1
+          default: 10
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NoisyRule'
+                title: Response Noisy Rules Api V1 Alert Suppressions Noisy Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alert-suppressions/{suppression_id}:
     delete:
       tags:
@@ -1600,6 +1655,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/data-retention:
+    get:
+      tags:
+      - settings
+      summary: Data Retention
+      description: Each kind of data, how long it is kept, and what ends it. Read
+        only.
+      operationId: data_retention_api_v1_data_retention_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/RetentionLine'
+                type: array
+                title: Response Data Retention Api V1 Data Retention Get
       security:
       - HTTPBearer: []
   /api/v1/alerts/{alert_id}/explain:
@@ -37697,6 +37772,40 @@ components:
       - created_at
       - updated_at
       title: NodeOut
+    NoisyRule:
+      properties:
+        name:
+          type: string
+          title: Name
+        source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source
+        total:
+          type: integer
+          title: Total
+        open:
+          type: integer
+          title: Open
+        false_positives:
+          type: integer
+          title: False Positives
+        false_positive_rate:
+          type: number
+          title: False Positive Rate
+        suggest_hide:
+          type: boolean
+          title: Suggest Hide
+      type: object
+      required:
+      - name
+      - total
+      - open
+      - false_positives
+      - false_positive_rate
+      - suggest_hide
+      title: NoisyRule
     NoteIn:
       properties:
         client_id:
@@ -40526,6 +40635,23 @@ components:
       required:
       - new_password
       title: ResetPasswordRequest
+    RetentionLine:
+      properties:
+        what:
+          type: string
+          title: What
+        kept:
+          type: string
+          title: Kept
+        ends:
+          type: string
+          title: Ends
+      type: object
+      required:
+      - what
+      - kept
+      - ends
+      title: RetentionLine
     RetentionOut:
       properties:
         raw_events_days:
