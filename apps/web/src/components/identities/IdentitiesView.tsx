@@ -304,7 +304,7 @@ export function IdentitiesView() {
     () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, alertSource: alertTool || undefined, backup: backup || undefined, signin: signin || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', active: activeOnly, onlyIn: oneTool && tool ? tool : undefined, sort }),
     [page, clientId, debounced, tool, alertTool, mfa, backup, signin, exposed, kind, hasAlerts, adminOnly, state, oneTool, activeOnly, sort],
   );
-  const { data, error, isLoading, mutate } = useSWR(['identities', query], () => identitiesApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
+  const { data, error, isLoading, isValidating, mutate } = useSWR(['identities', query], () => identitiesApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
   const { data: clients } = useSWR('mssp-children', () => msspApi.listChildren().catch(() => []), { revalidateOnFocus: false });
 
   const [exportError, setExportError] = useState<string | null>(null);
@@ -457,6 +457,23 @@ export function IdentitiesView() {
         <button type="button" onClick={() => void exportCsv()} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white hover:bg-gray-800">
           Export CSV
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            // What was typed is applied now (not after the short typing pause), then the list is asked for again.
+            setDebounced(search);
+            setPage(1);
+            void mutate();
+          }}
+          className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white hover:bg-gray-800"
+        >
+          Refresh
+        </button>
+        {isValidating && data ? (
+          <span role="status" className="self-center text-xs text-gray-400">
+            Updating…
+          </span>
+        ) : null}
       </div>
       {exportError && (
         <p role="alert" className="text-xs text-red-300">

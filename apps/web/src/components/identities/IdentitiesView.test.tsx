@@ -452,6 +452,38 @@ describe('the export', () => {
 });
 
 
+describe('refreshing the list', () => {
+  it('asks again when Refresh is pressed, even though nothing was changed', async () => {
+    show();
+    await screen.findAllByTestId('identity-row');
+    const before = api.list.mock.calls.length;
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(api.list.mock.calls.length).toBeGreaterThan(before));
+  });
+
+  it('says it is updating while the answer is awaited, keeps the old rows on screen, and stops saying so when it arrives', async () => {
+    show();
+    await screen.findAllByTestId('identity-row');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    let release: (v: ReturnType<typeof list>) => void = () => {};
+    api.list.mockImplementationOnce(() => new Promise((r) => (release = r)));
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Updating…');
+    expect(screen.getAllByTestId('identity-row')).toHaveLength(2);
+    release(list([person()]));
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByTestId('identity-row')).toHaveLength(1));
+  });
+
+  it('applies the typed text at once, without waiting for the typing pause', async () => {
+    show();
+    await screen.findAllByTestId('identity-row');
+    await userEvent.type(screen.getByLabelText('Search people'), 'marla');
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(lastQuery().search).toBe('marla'));
+  });
+});
+
 describe('arriving from the search box', () => {
   it('opens already searching for the person, in that client', async () => {
     window.history.replaceState({}, '', '/identities?client=c1&search=amy%40acme.com');
