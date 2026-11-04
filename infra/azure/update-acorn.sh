@@ -139,8 +139,8 @@ start_extras() {
 # this puts it into .env, makes sure cloudflared is in ACORN_EXTRAS and sets the public address if none is set yet (https://canary.goliveoak.com; change ACORN_CANARY_URL in .env to use another). The file is only
 # ever read here, and only a value made of base64 characters is written, so nothing can add or change another line of .env. Never fails an update: the tunnel is not needed by the rest of the platform.
 CTL=${ACORN_UPDATE_CTL:-/srv/acorn/update-ctl}
-canary_token() { tr -d '
- ' < "$CTL/cloudflared.token" 2>/dev/null; }
+canary_token() { [ -s "$CTL/cloudflared.token" ] && tr -d '
+ ' < "$CTL/cloudflared.token"; return 0; }
 canary_pending() {  # true when a token is waiting that .env does not hold yet
   local want have
   want=$(canary_token); [ -n "$want" ] || return 1
