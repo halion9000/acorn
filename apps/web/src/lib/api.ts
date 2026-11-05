@@ -596,6 +596,8 @@ export interface ManagedTenantRow {
   hidden?: boolean;
   /** The MSSP allows automated playbooks for this client. A recorded choice: nothing starts playbooks by itself yet. */
   playbook_automation?: boolean;
+  /** Quiet alerts of this client are never set aside as stale. Absent from an older server. */
+  stale_exempt?: boolean;
   /** Tools (vendors) whose clients are mapped to this tenant. */
   sources?: string[];
   has_metrics: boolean;
@@ -1260,6 +1262,10 @@ export const msspApi = {
   /** Allow automated playbooks for one client, or stop allowing them. A recorded choice: nothing starts playbooks by itself yet. */
   async setPlaybookAutomation(tenantId: string, enabled: boolean): Promise<void> {
     await request<void>(`/api/v1/mssp/tenants/${tenantId}/playbook-automation`, { method: 'PUT', body: JSON.stringify({ enabled }) });
+  },
+  /** Keep one client's quiet alerts open (never set aside as stale), or stop. Alerts already set aside stay so. */
+  async setStaleExempt(tenantId: string, exempt: boolean): Promise<void> {
+    await request<void>(`/api/v1/mssp/tenants/${tenantId}/stale-exempt`, { method: 'PUT', body: JSON.stringify({ exempt }) });
   },
   /** Every rule pack with its rules and the clients it is applied to. */
   async rulePacks(): Promise<RulePackOverview[]> {

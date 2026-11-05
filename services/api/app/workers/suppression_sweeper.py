@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.db.rls_sessions import mark_platform
 from app.services import worker_heartbeat
-from app.services.alert_stale import exempt_severities, sweep_stale
+from app.services.alert_stale import exempt_severities, exempt_tenant_ids, sweep_stale
 from app.services.alert_suppression import sweep
 
 logger = structlog.get_logger()
@@ -40,7 +40,7 @@ async def run_suppression_sweeper(
                 since_stale = 0
                 async with session_factory() as session:
                     mark_platform(session)
-                    n = await sweep_stale(session, settings.ALERT_STALE_DAYS, exempt_severities(settings.ALERT_STALE_EXEMPT_SEVERITIES))
+                    n = await sweep_stale(session, settings.ALERT_STALE_DAYS, exempt_severities(settings.ALERT_STALE_EXEMPT_SEVERITIES), skip_tenants=await exempt_tenant_ids(session))
                     await session.commit()
                     if n:
                         logger.info("alert_stale.swept", set_aside=n)

@@ -186,6 +186,20 @@ export default function MSSPDashboardView() {
     }
   };
 
+  const [staleChoice, setStaleChoice] = useState<Record<string, boolean>>({});
+  const setStale = async (t: ManagedTenantRow, exempt: boolean) => {
+    setStaleChoice((c) => ({ ...c, [t.tenant_id]: exempt }));
+    try {
+      await msspApi.setStaleExempt(t.tenant_id, exempt);
+    } catch (err) {
+      setStaleChoice((c) => {
+        const { [t.tenant_id]: _undone, ...rest } = c;
+        return rest;
+      });
+      toast.error(err instanceof Error && err.message ? err.message : 'Could not save that.');
+    }
+  };
+
   const setHidden = async (t: ManagedTenantRow, hidden: boolean) => {
     try {
       await msspApi.setClientHidden(t.tenant_id, hidden);
@@ -325,6 +339,7 @@ export default function MSSPDashboardView() {
                       <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Alerts nobody touched for a while that were set aside for review (never deleted). They are not in the open count.">Stale alerts</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Health</th>
                       <th scope="col" className="px-2.5 py-3 font-medium">Last Snapshot</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium" title="Tick a client to keep its quiet alerts open: they are never set aside as stale">Keep alerts open</th>
                       <th scope="col" className="px-2.5 py-3 font-medium" title="Which clients automated playbooks may run for. Playbooks do not start by themselves yet; this records the choice.">Automated playbooks</th>
                       <th scope="col" className="px-2.5 py-3 font-medium"><span className="sr-only">Actions</span></th>
                     </tr>
@@ -369,6 +384,15 @@ export default function MSSPDashboardView() {
                         <td data-testid="stale-alerts" className="px-2.5 py-3 text-right text-gray-300">{figure(t.stale_alerts)}</td>
                         <td className="px-2.5 py-3 text-right text-gray-300">{figure(t.health_score, { decimals: 0 })}</td>
                         <td className="px-2.5 py-3 text-gray-400">{snapshotLabel(t.snapshot_at)}</td>
+                        <td className="px-2.5 py-3">
+                          <input
+                            type="checkbox"
+                            aria-label={`Never set aside stale alerts for ${t.name}`}
+                            checked={staleChoice[t.tenant_id] ?? t.stale_exempt ?? false}
+                            onChange={(e) => void setStale(t, e.target.checked)}
+                            className="h-4 w-4 cursor-pointer rounded border-gray-600 bg-gray-900 accent-blue-500"
+                          />
+                        </td>
                         <td className="px-2.5 py-3">
                           <input
                             type="checkbox"

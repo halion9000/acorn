@@ -16754,6 +16754,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/mssp/tenants/{tenant_id}/stale-exempt:
+    put:
+      tags:
+      - mssp
+      summary: Set Client Stale Exempt
+      description: 'Keep one client''s quiet alerts open: they are never set aside
+        as stale. Alerts already set aside stay so (restore them from the Stale filter).'
+      operationId: set_client_stale_exempt_api_v1_mssp_tenants__tenant_id__stale_exempt_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: tenant_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Tenant Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaleExemptRequest'
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/mssp/clients/duplicates/dismiss:
     post:
       tags:
@@ -36827,6 +36860,10 @@ components:
           - type: integer
           - type: 'null'
           title: Unreviewed Remote Tools
+        stale_exempt:
+          type: boolean
+          title: Stale Exempt
+          default: false
       type: object
       required:
       - tenant_id
@@ -45005,6 +45042,15 @@ components:
       - microsoft
       - password_login
       title: SsoStatus
+    StaleExemptRequest:
+      properties:
+        exempt:
+          type: boolean
+          title: Exempt
+      type: object
+      required:
+      - exempt
+      title: StaleExemptRequest
     StaleSummary:
       properties:
         days:

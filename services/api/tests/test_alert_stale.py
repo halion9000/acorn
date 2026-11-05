@@ -118,7 +118,7 @@ def test_nothing_changes_without_the_confirmation():
 def test_the_worker_sets_stale_alerts_aside_on_its_first_pass_and_then_only_once_an_hour(monkeypatch):
     calls = {"stale": 0, "suppress": 0}
 
-    async def fake_stale(session, days, exempt, now=None):
+    async def fake_stale(session, days, exempt, now=None, skip_tenants=()):
         calls["stale"] += 1
         return 3
 
@@ -136,6 +136,7 @@ def test_the_worker_sets_stale_alerts_aside_on_its_first_pass_and_then_only_once
             return False
 
     monkeypatch.setattr(sw, "sweep_stale", fake_stale)
+    monkeypatch.setattr(sw, "exempt_tenant_ids", _no_exempt_clients)
     monkeypatch.setattr(sw, "sweep", fake_sweep)
     monkeypatch.setattr(sw, "mark_platform", lambda s: None)
     passes = {"n": 0}
@@ -149,3 +150,26 @@ def test_the_worker_sets_stale_alerts_aside_on_its_first_pass_and_then_only_once
         run(sw.run_suppression_sweeper(sleep=sleep, session_factory=lambda: Session()))
     assert calls["suppress"] == 61
     assert calls["stale"] == 2, "once at the start and once more after sixty minutes, not every minute"
+
+
+def test_an_exempt_client_is_left_out_of_the_rule_in_both_the_pick_and_the_update_and_no_one_exempt_changes_nothing():
+    skip = uuid.uuid4()
+    assert f"alerts.tenant_id NOT IN ('{skip}')" in sql(select(Alert.id).where(*st.stale_conditions(NOW, 30, ("high",), [skip])))
+    assert "tenant_id NOT IN" not in sql(select(Alert.id).where(*st.stale_conditions(NOW, 30, ("high",))))
+    db = Db([uuid.uuid4()])
+    run(st.sweep_stale(db, 30, ("high",), NOW, skip_tenants=[skip]))
+    assert all(f"alerts.tenant_id NOT IN ('{skip}')" in sql(s) for s in db.statements), "the update checks it again too"
+
+
+def test_the_exempt_clients_are_the_ones_whose_settings_say_so():
+    a, b = NS(id=uuid.uuid4(), settings={"stale_exempt": True}), NS(id=uuid.uuid4(), settings={"hidden": True})
+    c = NS(id=uuid.uuid4(), settings=None)
+    db = MagicMock()
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = [a, b, c]
+    db.execute = AsyncMock(return_value=result)
+    assert run(st.exempt_tenant_ids(db)) == [a.id]
+
+
+async def _no_exempt_clients(_session):
+    return []

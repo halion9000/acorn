@@ -9,8 +9,9 @@ const tenantsMock = vi.fn();
 const createClientMock = vi.fn();
 const hiddenMock = vi.fn();
 const playbooksMock = vi.fn();
+const staleExemptMock = vi.fn();
 vi.mock('@/lib/api', () => ({
-  msspApi: { overview: () => overviewMock(), tenants: (h?: boolean) => tenantsMock(h), setClientHidden: (...a: unknown[]) => hiddenMock(...a), setPlaybookAutomation: (...a: unknown[]) => playbooksMock(...a), clients: async () => ({ clients: [], unmapped: unmapped.n }), createClient: (n: string) => createClientMock(n) },
+  msspApi: { overview: () => overviewMock(), tenants: (h?: boolean) => tenantsMock(h), setClientHidden: (...a: unknown[]) => hiddenMock(...a), setPlaybookAutomation: (...a: unknown[]) => playbooksMock(...a), setStaleExempt: (...a: unknown[]) => staleExemptMock(...a), clients: async () => ({ clients: [], unmapped: unmapped.n }), createClient: (n: string) => createClientMock(n) },
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 const push = vi.hoisted(() => vi.fn());
@@ -102,7 +103,7 @@ describe('real tenants', () => {
     const reportingRow = within(table).getByText('Reporting Co').closest('tr') as HTMLElement;
     expect(within(reportingRow).getAllByRole('cell').map((c) => c.textContent).slice(2, 12)).toEqual(['12', '2', '4', '30', '1', '3', '—', '—', '—', '80']); // the dashes are the connector health, the unreviewed tools and the stale alerts: this older row carries no reading of either
     const quietRow = within(table).getByText('Quiet Co').closest('tr') as HTMLElement;
-    expect(within(quietRow).getAllByRole('cell').map((c) => c.textContent).slice(1)).toEqual(['—', '—', '—', '—', '—', '—', '—', '—', '—', '—', '—', 'No data yet', '', 'Hide']); // the empty cell is the automated-playbooks checkbox
+    expect(within(quietRow).getAllByRole('cell').map((c) => c.textContent).slice(1)).toEqual(['—', '—', '—', '—', '—', '—', '—', '—', '—', '—', '—', 'No data yet', '', '', 'Hide']); // the empty cells are the keep-alerts-open and automated-playbooks checkboxes
   });
 
   it('shows a real zero as 0 and an unreported figure as a dash: they are not the same thing', async () => {
@@ -327,6 +328,37 @@ describe('the automated playbooks column', () => {
   });
 });
 
+describe('the keep alerts open column', () => {
+  it('shows the choice per client, off unless the server says on, and saves a change', async () => {
+    overviewMock.mockResolvedValue({ ...none, total_tenants: 2 });
+    tenantsMock.mockResolvedValue([row({ name: 'Acme' }), row({ name: 'Beta', stale_exempt: true })]);
+    const user = userEvent.setup();
+    render(<MSSPDashboardView />);
+    const acme = await screen.findByRole('checkbox', { name: 'Never set aside stale alerts for Acme' });
+    const beta = screen.getByRole('checkbox', { name: 'Never set aside stale alerts for Beta' });
+    expect(acme).not.toBeChecked();
+    expect(beta).toBeChecked();
+    await user.click(acme);
+    expect(staleExemptMock).toHaveBeenCalledWith('id-Acme', true);
+    expect(acme).toBeChecked();
+    await user.click(beta);
+    expect(staleExemptMock).toHaveBeenCalledWith('id-Beta', false);
+    expect(beta).not.toBeChecked();
+  });
+
+  it('puts the box back and says so when the change cannot be saved', async () => {
+    overviewMock.mockResolvedValue({ ...none, total_tenants: 1 });
+    tenantsMock.mockResolvedValue([row({ name: 'Acme' })]);
+    staleExemptMock.mockRejectedValue(new Error('Permission denied: mssp:manage'));
+    const user = userEvent.setup();
+    render(<MSSPDashboardView />);
+    const acme = await screen.findByRole('checkbox', { name: 'Never set aside stale alerts for Acme' });
+    await user.click(acme);
+    await waitFor(() => expect(acme).not.toBeChecked());
+    expect(toast.error).toHaveBeenCalledWith('Permission denied: mssp:manage');
+  });
+});
+
 describe('hiding test clients', () => {
   it('hides a tenant from its row, and "Show hidden" asks the server for the hidden ones too', async () => {
     overviewMock.mockResolvedValue({ ...none, total_tenants: 1 });
@@ -388,13 +420,13 @@ describe('the Integrations column layout', () => {
 });
 
 describe('the tenant table fits the window', () => {
-  it('uses the narrow cell padding on every cell of its 15 columns, so the page does not need sideways scrolling', async () => {
+  it('uses the narrow cell padding on every cell of its 16 columns, so the page does not need sideways scrolling', async () => {
     overviewMock.mockResolvedValue({ ...none, total_tenants: 1 });
     tenantsMock.mockResolvedValue([row({ name: 'One', sources: ['halopsa'] })]);
     render(<MSSPDashboardView />);
     const table = await screen.findByRole('table');
     const cells = [...table.querySelectorAll('th, td')];
-    expect(cells).toHaveLength(30);
+    expect(cells).toHaveLength(32);
     expect(cells.filter((c) => !c.className.includes('px-2.5'))).toEqual([]);
   });
 });

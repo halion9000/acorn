@@ -77,7 +77,11 @@ def test_the_health_page_warns_in_plain_words_of_quiet_and_failing_workers_and_s
     ok = {"name": "alert_suppression", "status": "ok", "seconds_since_pass": 10, "last_error": None}
     waiting = {"name": "x", "status": "waiting", "seconds_since_pass": None, "last_error": None}
     out = {w["key"]: w for w in warn([quiet, never, failing, ok, waiting])}
-    assert out["workers_quiet"]["level"] == "error" and "dmarc_ingest (90 minutes since its last pass)" in out["workers_quiet"]["text"] and "retention (never ran)" in out["workers_quiet"]["text"]
+    assert (
+        out["workers_quiet"]["level"] == "error"
+        and "dmarc_ingest (90 minutes since its last pass)" in out["workers_quiet"]["text"]
+        and "retention (never ran)" in out["workers_quiet"]["text"]
+    )
     assert out["workers_failing"]["level"] == "warn" and "platform_watch (TimeoutError)" in out["workers_failing"]["text"]
     assert "alert_suppression" not in str(out) and "x (" not in str(out)
     assert warn([ok, waiting]) == [] and warn(None) == [] and warn([]) == []
@@ -92,7 +96,7 @@ def test_each_worker_registers_itself_and_beats_after_a_pass_and_records_a_faile
     async def fake_sweep(session):
         return {"hidden": 0, "expired": 0, "restored": 0}
 
-    async def fake_stale(session, days, exempt, now=None):
+    async def fake_stale(session, days, exempt, now=None, skip_tenants=()):
         return 0  # the hourly stale pass runs on the first turn too
 
     class Session:
@@ -114,6 +118,7 @@ def test_each_worker_registers_itself_and_beats_after_a_pass_and_records_a_faile
 
     monkeypatch.setattr(sw, "sweep", fake_sweep)
     monkeypatch.setattr(sw, "sweep_stale", fake_stale)
+    monkeypatch.setattr(sw, "exempt_tenant_ids", _no_exempt_clients)
     monkeypatch.setattr(sw, "mark_platform", lambda s: None)
     with pytest.raises(Stop):
         asyncio.run(sw.run_suppression_sweeper(sleep=sleep, session_factory=lambda: Session()))
@@ -168,7 +173,12 @@ def test_the_alert_email_loop_registers_beats_and_records_a_failed_cycle_with_it
         asyncio.run(ae.run_forever(mailer_factory=lambda: object(), sleep=sleep))
     row = wh.snapshot()[0]
     assert waits == [60, 120, 240]
-    assert (row["name"], row["passes"], row["status"], row["last_error"]) == ("alert_email", 3, "failing", "RuntimeError")  # the type, not the message
+    assert (row["name"], row["passes"], row["status"], row["last_error"]) == (
+        "alert_email",
+        3,
+        "failing",
+        "RuntimeError",
+    )  # the type, not the message
 
 
 def _stop_after(n):
@@ -231,7 +241,7 @@ def test_a_failing_hourly_stale_pass_shows_as_a_failing_worker_not_a_silent_one(
     async def fine_sweep(session):
         return {"hidden": 0, "expired": 0, "restored": 0}
 
-    async def failing_stale(session, days, exempt, now=None):
+    async def failing_stale(session, days, exempt, now=None, skip_tenants=()):
         raise RuntimeError("secret detail that must not be kept")
 
     class Session:
@@ -254,8 +264,13 @@ def test_a_failing_hourly_stale_pass_shows_as_a_failing_worker_not_a_silent_one(
     wh.reset()
     monkeypatch.setattr(sw, "sweep", fine_sweep)
     monkeypatch.setattr(sw, "sweep_stale", failing_stale)
+    monkeypatch.setattr(sw, "exempt_tenant_ids", _no_exempt_clients)
     monkeypatch.setattr(sw, "mark_platform", lambda s: None)
     with pytest.raises(Stop):
         asyncio.run(sw.run_suppression_sweeper(sleep=sleep, session_factory=lambda: Session()))
     row = wh.snapshot()[0]
     assert (row["status"], row["last_error"]) == ("failing", "RuntimeError")
+
+
+async def _no_exempt_clients(_session):
+    return []

@@ -34,6 +34,7 @@ from app.services.client_mapping import (
     set_sync_vendors,
     set_tenant_hidden,
     set_tenant_playbooks_allowed,
+    set_tenant_stale_exempt,
     suggestions_with_devices,
     sync_vendors,
     tenant_hidden,
@@ -416,6 +417,38 @@ async def set_client_playbook_automation(
         tenant_id=current_user.tenant_id,
         actor_id=current_user.user_id,
         action="mssp:playbook_automation_on" if body.enabled else "mssp:playbook_automation_off",
+        resource="tenant",
+        resource_id=str(child.id),
+        changes={"name": child.name},
+        request=request,
+    )
+    await db.commit()
+
+
+class StaleExemptRequest(BaseModel):
+    exempt: bool
+
+
+@router.put("/tenants/{tenant_id}/stale-exempt", status_code=status.HTTP_204_NO_CONTENT)
+async def set_client_stale_exempt(
+    tenant_id: uuid.UUID,
+    body: StaleExemptRequest,
+    request: Request,
+    current_user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))],
+    db: TenantDBSession,
+) -> None:
+    """Keep one client's quiet alerts open: they are never set aside as stale. Alerts already set aside stay so (restore them from the Stale filter)."""
+    child = (
+        await db.execute(select(Tenant).where(Tenant.id == tenant_id, Tenant.parent_tenant_id == current_user.tenant_id))
+    ).scalar_one_or_none()
+    if child is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    set_tenant_stale_exempt(child, body.exempt)
+    await emit_audit(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        actor_id=current_user.user_id,
+        action="mssp:stale_exempt_on" if body.exempt else "mssp:stale_exempt_off",
         resource="tenant",
         resource_id=str(child.id),
         changes={"name": child.name},

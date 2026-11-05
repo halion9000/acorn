@@ -273,7 +273,7 @@ from app.models.mssp import (  # noqa: E402
     MSSPRulePackAssignment,
     MSSPRulePackRule,
 )
-from app.services.client_mapping import tenant_hidden, tenant_playbooks_allowed  # noqa: E402
+from app.services.client_mapping import tenant_hidden, tenant_playbooks_allowed, tenant_stale_exempt  # noqa: E402
 from app.services.mssp_rule_resolver import count_effective_rules, resolve_effective_rules  # noqa: E402
 
 
@@ -919,6 +919,8 @@ class ManagedTenantRow(BaseModel):
     stale_alerts: int | None = None
     # Remote management tools found on this client's devices that nobody has allowed or blocked yet. None when they could not be read.
     unreviewed_remote_tools: int | None = None
+    # Quiet alerts of this client are never set aside as stale.
+    stale_exempt: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1098,6 +1100,7 @@ async def list_managed_tenants(
                 connectors_unhealthy=bad,
                 stale_alerts=(stale.get(child.id, 0) if stale is not None else None),
                 unreviewed_remote_tools=(unreviewed.get(child.id, 0) if unreviewed is not None else None),
+                stale_exempt=tenant_stale_exempt(child),
             )
         )
     return rows

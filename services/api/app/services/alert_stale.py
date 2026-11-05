@@ -26,9 +26,11 @@ def exempt_severities(raw: str | None) -> tuple[str, ...]:
     return tuple(s for s in (part.strip().lower() for part in (raw or "").split(",")) if s)
 
 
-def stale_conditions(now: datetime, days: int, exempt: Iterable[str]) -> list[Any]:
+def stale_conditions(now: datetime, days: int, exempt: Iterable[str], skip_tenants: Iterable[uuid.UUID] = ()) -> list[Any]:
     """The test an alert must pass to be set aside, as SQL conditions (also used by the summary, so the count and the sweep can never differ)."""
+    skip = tuple(skip_tenants)
     return [
+        *([Alert.tenant_id.notin_(skip)] if skip else []),
         Alert.status.in_(CANDIDATE_STATUSES),
         Alert.updated_at < now - timedelta(days=days),
         Alert.case_id.is_(None),
@@ -36,18 +38,27 @@ def stale_conditions(now: datetime, days: int, exempt: Iterable[str]) -> list[An
     ]
 
 
-async def sweep_stale(db: Any, days: int, exempt: Iterable[str], now: datetime | None = None) -> int:
+async def exempt_tenant_ids(db: Any) -> list[uuid.UUID]:
+    """The clients whose alerts are never set aside (the owner switched it on for them). Read from the tenants' settings; a handful of rows, so it is filtered here, not in SQL."""
+    from app.models.tenant import Tenant
+    from app.services.client_mapping import tenant_stale_exempt
+
+    rows = (await db.execute(select(Tenant))).scalars().all()
+    return [t.id for t in rows if tenant_stale_exempt(t)]
+
+
+async def sweep_stale(db: Any, days: int, exempt: Iterable[str], now: datetime | None = None, skip_tenants: Iterable[uuid.UUID] = ()) -> int:
     """Set aside every alert that has been quiet for ``days``. Returns how many. ``days`` of 0 or less does nothing. The caller owns the transaction."""
     if days <= 0:
         return 0
     now = now or datetime.now(UTC)
-    ids = (await db.execute(select(Alert.id).where(*stale_conditions(now, days, exempt)).limit(MAX_PER_PASS))).scalars().all()
+    ids = (await db.execute(select(Alert.id).where(*stale_conditions(now, days, exempt, skip_tenants)).limit(MAX_PER_PASS))).scalars().all()
     if not ids:
         return 0
     # onupdate would stamp updated_at with now; the alert's own last-touched time is what "quiet since" means, so it is kept.
     result = await db.execute(
         update(Alert)
-        .where(Alert.id.in_(ids), *stale_conditions(now, days, exempt))
+        .where(Alert.id.in_(ids), *stale_conditions(now, days, exempt, skip_tenants))
         .values(status=STALE, status_before_stale=Alert.status, stale_at=now, updated_at=Alert.updated_at)
     )
     return int(result.rowcount or 0)

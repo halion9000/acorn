@@ -115,6 +115,20 @@ def set_tenant_playbooks_allowed(tenant: Any, allowed: bool) -> None:
     tenant.settings = settings  # a new dict, so the JSONB column is seen as changed
 
 
+def tenant_stale_exempt(tenant: Any) -> bool:
+    """A client whose quiet alerts are never set aside as stale (off unless someone switched it on). Kept in the tenant's settings, so no schema change."""
+    return bool((getattr(tenant, "settings", None) or {}).get("stale_exempt"))
+
+
+def set_tenant_stale_exempt(tenant: Any, exempt: bool) -> None:
+    settings = dict(getattr(tenant, "settings", None) or {})
+    if exempt:
+        settings["stale_exempt"] = True
+    else:
+        settings.pop("stale_exempt", None)
+    tenant.settings = settings  # a new dict, so the JSONB column is seen as changed
+
+
 def set_tenant_hidden(tenant: Any, hidden: bool) -> None:
     settings = dict(getattr(tenant, "settings", None) or {})
     if hidden:

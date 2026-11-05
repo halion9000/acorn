@@ -651,3 +651,30 @@ async def test_import_skips_a_client_whose_exact_name_is_taken_and_carries_on():
     created, linked = await cm.import_unmapped(_db([], [a, b]), PARENT, "petra", make, skipped)
     assert (created, linked) == (1, 0)
     assert skipped == ["Hidden Co"] and a.child_tenant_id is None and b.child_tenant_id is not None
+
+
+def test_a_client_is_exempt_from_the_stale_sweep_only_once_someone_switches_it_on():
+    t = _tenant("Acme")
+    t.settings = {"keep": 1}
+    assert cm.tenant_stale_exempt(t) is False
+    cm.set_tenant_stale_exempt(t, True)
+    assert cm.tenant_stale_exempt(t) is True and t.settings == {"keep": 1, "stale_exempt": True}
+    cm.set_tenant_stale_exempt(t, False)
+    assert cm.tenant_stale_exempt(t) is False and t.settings == {"keep": 1}
+
+
+@pytest.mark.asyncio
+async def test_exempting_a_client_from_the_stale_sweep_saves_it_and_leaves_the_other_settings():
+    t = _tenant("Acme")
+    t.settings = {"keep": 1}
+    db = _db([t])
+    await mc.set_client_stale_exempt(t.id, mc.StaleExemptRequest(exempt=True), MagicMock(), USER, db)
+    assert cm.tenant_stale_exempt(t) and t.settings["keep"] == 1
+    db.commit.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_the_stale_exemption_for_a_tenant_that_is_not_yours_is_404():
+    with pytest.raises(HTTPException) as e:
+        await mc.set_client_stale_exempt(uuid.uuid4(), mc.StaleExemptRequest(exempt=True), MagicMock(), USER, _db([]))
+    assert e.value.status_code == 404
