@@ -186,3 +186,72 @@ async def test_a_ticket_made_for_an_alert_is_linked_once_among_the_hand_entered_
     ).scalar_one()
     assert [(t["system"], t["id"], t["added_by"]) for t in manual] == [("halopsa", "4521", "ticket rule")]
     assert await svc.link_created_ticket(world, client, uuid.uuid4(), "1", NOW) is False, "an alert that is not there gets nothing"
+
+
+async def test_a_cipp_closure_for_a_released_message_closes_its_alert_records_who_and_queues_the_ticket_note(world):
+    from app.api.v1.endpoints.inbox_core_feed import ClosedItem, ClosedReport, apply_closed
+
+    await off(world)
+    client = world.info["client"]
+    uids = {k: f"quarantine-release:t1:{k}" for k in ("fresh", "working", "other_kind")}
+    ids = {}
+    for key, status, uid in (
+        ("fresh", "new", uids["fresh"]),
+        ("working", "investigating", uids["working"]),
+        ("other_kind", "new", "phish-report:t1:x"),
+    ):
+        ids[key] = uuid.uuid4()
+        await world.execute(
+            text(
+                "insert into alerts (id, tenant_id, title, severity, status, priority, raw_event, enrichment_data, created_at, updated_at) "
+                "values (:i, :t, :title, 'low', :st, 50, cast(:raw as jsonb), cast(:enr as jsonb), :at, :at)"
+            ),
+            {
+                "i": ids[key],
+                "t": client,
+                "title": key,
+                "st": status,
+                "raw": json.dumps({"source": "cipp", "finding": {"uid": uid}}),
+                "enr": json.dumps({"tickets": [{"system": "halopsa", "id": "555"}]}),
+                "at": NOW,
+            },
+        )
+    await world.commit()
+    await off(world)
+    report = ClosedReport(
+        vendor="cipp",
+        closed=[
+            ClosedItem(uid=uids["fresh"], state="released"),
+            ClosedItem(uid=uids["working"], state="released"),
+            ClosedItem(uid="phish-report:t1:x", state="not junk"),
+        ],
+    )
+    await apply_closed(world, client, report, NOW)
+    await world.commit()
+    await off(world)
+    rows = {
+        r[0]: r
+        for r in (
+            await world.execute(
+                text("select title, status, enrichment_data -> 'quarantine_release' ->> 'by' from alerts where id = any(:ids)"),
+                {"ids": list(ids.values())},
+            )
+        ).all()
+    }
+    assert rows["fresh"][1] == "resolved" and rows["fresh"][2] == "someone else"
+    assert (
+        rows["working"][1] == "investigating" and rows["working"][2] == "someone else"
+    ), "noted, but an analyst's open work is not closed under them"
+    assert (
+        rows["other_kind"][1] == "resolved" and rows["other_kind"][2] is None
+    ), "a different kind of CIPP record is closed on its own state and gets no release record"
+    notes = (
+        await world.execute(
+            text(
+                "select alert_id, params ->> 'note', params -> 'ticket_ids' from vendor_actions where action = 'ticket_note' and tenant_id = :t"
+            ),
+            {"t": client},
+        )
+    ).all()
+    assert {n[0] for n in notes} == {ids["fresh"], ids["working"]}
+    assert all("someone else" in n[1] and n[2] == ["555"] for n in notes)

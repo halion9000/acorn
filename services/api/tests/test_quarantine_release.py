@@ -152,8 +152,8 @@ def release(db, confirm=True):
     return asyncio.run(ep.release_quarantine(uuid.uuid4(), ep.ReleaseRequest(confirm=confirm), MagicMock(), user(), db))
 
 
-def alert(**over):
-    return NS(id=uuid.uuid4(), raw_event=raw(**over))
+def alert(enrichment=None, **over):
+    return NS(id=uuid.uuid4(), raw_event=raw(**over), enrichment_data=enrichment or {})
 
 
 def test_a_confirmed_request_queues_one_release_for_core_naming_the_message_and_audits_who_asked(wired):
@@ -216,9 +216,106 @@ def test_the_routes_need_the_right_permissions():
     assert set(required_permissions(found[("GET", "/alerts/{alert_id}/quarantine")])) == {"alerts:read"}
 
 
-def test_a_finished_release_is_noted_on_the_alert_without_losing_what_was_there():
-    a = NS(enrichment_data={"keep": 1})
+def open_alert(status="new", enrichment=None):
+    return NS(
+        id=uuid.uuid4(),
+        status=status,
+        resolved_at=None,
+        updated_at=None,
+        enrichment_data=enrichment if enrichment is not None else {"keep": 1},
+    )
+
+
+def noted(a, **kw):
     db = FakeDB(Rows([a]))
-    assert asyncio.run(qr.note_quarantine_released(db, TENANT, uuid.uuid4(), NOW)) is True
-    assert a.enrichment_data == {"keep": 1, "quarantine_release": {"released_at": NOW.isoformat()}}
+    return asyncio.run(qr.note_quarantine_released(db, TENANT, a.id, NOW, **kw)), db
+
+
+def test_a_release_from_here_is_recorded_with_who_closes_an_open_alert_and_asks_core_to_note_the_tickets():
+    a = open_alert(
+        "in_progress", {"keep": 1, "tickets": [{"system": "halopsa", "id": "555"}], "manual_tickets": [{"id": "556"}, {"id": "555"}]}
+    )
+    done, db = noted(a, by="hal@goliveoak.com")
+    assert done is True
+    assert (
+        a.enrichment_data["quarantine_release"] == {"released_at": NOW.isoformat(), "by": "hal@goliveoak.com"}
+        and a.enrichment_data["keep"] == 1
+    )
+    assert (a.status, a.resolved_at) == ("resolved", NOW), "an analyst who released it has decided: the alert is closed whatever it was"
+    (note,) = db.added
+    assert (note.vendor, note.action, note.status, note.alert_id) == ("core", "ticket_note", "pending", a.id)
+    assert note.params["ticket_ids"] == ["555", "556"]
+    assert "released from A.C.O.R.N by hal@goliveoak.com at 2026-11-05 12:00 UTC" in note.params["note"]
+
+
+def test_a_release_seen_elsewhere_is_credited_to_someone_else_and_leaves_an_analysts_open_alert_alone():
+    working = open_alert("investigating", {"tickets": [{"id": "9"}]})
+    done, db = noted(working, by=qr.ELSEWHERE, resolve_any_open=False)
+    assert done is True and working.status == "investigating", "somebody else released it; the analyst's own work is not closed under them"
+    assert working.enrichment_data["quarantine_release"]["by"] == "someone else"
+    assert "released by someone else" in db.added[0].params["note"] and "Nothing more to release" in db.added[0].params["note"]
+    fresh = open_alert("new", {})
+    noted(fresh, by=qr.ELSEWHERE, resolve_any_open=False)
+    assert fresh.status == "resolved"
+
+
+def test_an_alert_with_no_ticket_gets_no_note_and_a_finished_alert_is_not_reopened_or_changed():
+    a = open_alert("new", {})
+    done, db = noted(a)
+    assert done is True and db.added == []
+    finished = open_alert("closed", {})
+    noted(finished)
+    assert finished.status == "closed" and finished.resolved_at is None
+
+
+def test_it_is_recorded_once_so_a_second_report_changes_nothing_and_queues_nothing():
+    a = open_alert("new", {"tickets": [{"id": "5"}]})
+    first, _ = noted(a)
+    second, db = noted(a)
+    assert (first, second) == (True, False) and db.added == []
     assert asyncio.run(qr.note_quarantine_released(FakeDB(Rows([])), TENANT, uuid.uuid4(), NOW)) is False
+
+
+def test_halo_ticket_numbers_come_from_both_kinds_of_link_once_each_and_ignore_other_systems_and_junk():
+    e = {
+        "tickets": [{"system": "halopsa", "id": 5}, {"system": "jira", "id": "J-1"}, "x"],
+        "manual_tickets": [{"id": "5"}, {"id": " 7 "}, {"id": ""}],
+    }
+    assert qr.halo_ticket_ids(e) == ["5", "7"]
+    assert qr.halo_ticket_ids(None) == [] and qr.halo_ticket_ids({"tickets": "no"}) == []
+
+
+def test_an_alert_that_records_a_release_reads_as_done_in_words_that_say_who_and_cannot_be_released_again(wired):
+    e = {"quarantine_release": {"released_at": "2026-11-05T12:00:00+00:00", "by": "someone else"}}
+    info = asyncio.run(ep.quarantine_info(uuid.uuid4(), user(), FakeDB(Rows([alert(enrichment=e)]), Rows([]))))
+    assert info.state == "done" and info.message == "Already released by someone else in Microsoft 365 (2026-11-05 12:00 UTC)."
+    mine = {"quarantine_release": {"released_at": "2026-11-05T12:00:00+00:00", "by": "hal@goliveoak.com"}}
+    assert "released from A.C.O.R.N by hal@goliveoak.com" in ep.released_record(mine, "none", None, None)[1]
+    assert ep.released_record({}, "failed", "x", None) == ("failed", "x", None), "no record, nothing changes"
+    db = FakeDB(Rows([alert(enrichment=e)]), Rows([]))
+    with pytest.raises(HTTPException) as err:
+        release(db)
+    assert err.value.status_code == 409 and db.added == [], "a message someone else already released is not released again"
+
+
+def test_a_closure_for_a_cipp_alert_may_name_any_of_its_four_kinds_of_record_and_other_vendors_keep_their_own_prefix():
+    from app.api.v1.endpoints.inbox_core_feed import closed_prefixes
+
+    for uid in ("quarantine-release:t:1", "defender:t:2", "entra-risk:t:3", "phish-report:t:4", "cipp:5", "cipp-escalation:6"):
+        assert uid.startswith(closed_prefixes("cipp")), uid
+    assert not "huntress:1".startswith(closed_prefixes("cipp"))
+    assert closed_prefixes("huntress") == ("huntress:", "huntress-")
+    assert not "defender:t:1".startswith(closed_prefixes("huntress"))
+
+
+def test_core_can_say_the_message_was_already_released_and_that_credits_someone_else_not_the_person_who_asked():
+    from app.api.v1.endpoints.inbox_core_feed import ActionResult
+
+    assert ActionResult(status="done", already_released=True).already_released is True
+    assert ActionResult(status="done").already_released is False, "an ordinary answer is not an 'already released' one"
+    a = open_alert("new", {})
+    asked_by_hal, _ = noted(a, by="hal@goliveoak.com")
+    assert asked_by_hal is True and a.enrichment_data["quarantine_release"]["by"] == "hal@goliveoak.com"
+    b = open_alert("new", {})
+    noted(b, by=qr.ELSEWHERE)
+    assert b.enrichment_data["quarantine_release"]["by"] == "someone else"

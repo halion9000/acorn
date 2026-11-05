@@ -33,13 +33,13 @@ from app.models.tenant import Tenant
 from app.models.vendor_action import VendorAction
 from app.services import core_approvals
 from app.services.alert_ticket_rules import link_created_ticket
-from app.services.quarantine_release import note_quarantine_released
 from app.services.client_mapping import IncomingClient, upsert_clients
 from app.services.connector_run_log import record_if_changed
 from app.services.core_feed_cases import close_finished_cases, open_cases_for_new_alerts
 from app.services.core_feed_sla import record_closure_events
 from app.services.iocs_from_alerts import sync_children_throttled as sync_iocs_throttled
 from app.services.mssp_snapshots import snapshot_children_throttled
+from app.services.quarantine_release import ELSEWHERE, UID_PREFIX, note_quarantine_released
 from app.services.vendor_actions import CLAIMED_TTL, PENDING_TTL
 
 logger = logging.getLogger(__name__)
@@ -337,6 +337,25 @@ class ClosedResponse(BaseModel):
     resolved: int
 
 
+# A vendor's incident ids normally start with its own name (``huntress:4821``). CORE's CIPP feed (vendor ``cipp``) carries four kinds of record with their own prefixes; a closure for any of them must match too.
+EXTRA_UID_PREFIXES: dict[str, tuple[str, ...]] = {"cipp": ("defender:", "entra-risk:", "phish-report:", "quarantine-release:")}
+
+
+def closed_prefixes(vendor: str) -> tuple[str, ...]:
+    """The incident-id prefixes a closure reported for ``vendor`` may match."""
+    return (f"{vendor}:", f"{vendor}-", *EXTRA_UID_PREFIXES.get(vendor, ()))
+
+
+async def note_released_elsewhere(db: Any, tenant_id: Any, uids: list[str], now: datetime) -> int:
+    """For quarantine-release alerts whose message Microsoft 365 now shows as released (by someone else): record it on the alert and queue the ticket note. Safe to run again. Returns how many alerts were noted."""
+    ids = (await db.execute(select(Alert.id).where(Alert.tenant_id == tenant_id, Alert.raw_event["finding"]["uid"].astext.in_(uids)))).scalars().all()
+    noted = 0
+    for alert_id in ids:
+        if await note_quarantine_released(db, tenant_id, alert_id, now, by=ELSEWHERE, resolve_any_open=False):
+            noted += 1
+    return noted
+
+
 async def apply_closed(db: Any, tenant_id: Any, report: ClosedReport, now: datetime | None = None) -> int:
     """Resolve this tenant's alerts whose incident the vendor has closed. The caller owns the transaction. Returns how many alerts changed.
 
@@ -345,7 +364,7 @@ async def apply_closed(db: Any, tenant_id: Any, report: ClosedReport, now: datet
     """
     now = now or datetime.now(UTC)
     # A vendor's uids are ``huntress:4821`` (incident reports) but also ``huntress-escalation:9`` and ``huntress-signal:3``: all of them are the vendor's own, so all can be closed.
-    prefixes = (f"{report.vendor}:", f"{report.vendor}-")
+    prefixes = closed_prefixes(report.vendor)
     by_uid = {item.uid: item.state for item in report.closed if item.uid.startswith(prefixes)}
     uids = sorted(by_uid)
     changed = 0
@@ -373,6 +392,9 @@ async def apply_closed(db: Any, tenant_id: Any, report: ClosedReport, now: datet
             )
         )
         changed += result.rowcount or 0
+    released = [u for u in uids if u.startswith(UID_PREFIX) and str(by_uid[u]).lower() == "released"]
+    if released:
+        await note_released_elsewhere(db, tenant_id, released, now)
     return changed
 
 
@@ -382,7 +404,7 @@ async def report_core_feed_closed(tenant_token: str, body: ClosedReport, db: DBS
     tenant_id = await _verify_core_feed_token(db, tenant_token)
     await adopt_tenant(db, tenant_id)
     now = datetime.now(UTC)
-    prefixes = (f"{body.vendor}:", f"{body.vendor}-")
+    prefixes = closed_prefixes(body.vendor)
     holders = await _tenants_holding(db, tenant_id, [i.uid for i in body.closed if i.uid.startswith(prefixes)])
     held = dict(holders)
     changed = await _across(
@@ -497,7 +519,7 @@ class ClaimRequest(BaseModel):
 
 class ClaimedAction(BaseModel):
     id: uuid.UUID
-    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user", "bec_search", "create_ticket", "release_quarantine"]
+    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user", "bec_search", "create_ticket", "release_quarantine", "ticket_note"]
     incident_uid: str
     params: dict[str, Any]
 
@@ -592,6 +614,8 @@ class ActionResult(BaseModel):
     message: str | None = Field(default=None, max_length=1000)
     # For a create_ticket action that worked: the number HaloPSA gave the new ticket (digits). It is linked to the alert.
     ticket_id: str | None = Field(default=None, pattern=r"^[0-9]{1,12}$")
+    # For a release_quarantine action: CORE looked first and the message had already been released by someone else, so it sent nothing.
+    already_released: bool = False
 
 
 class ActionResultResponse(BaseModel):
@@ -614,12 +638,13 @@ async def report_core_feed_action_result(
                     update(VendorAction)
                     .where(VendorAction.id == action_id, VendorAction.tenant_id == tid, VendorAction.status == "claimed")
                     .values(status=body.status, result_message=body.message, finished_at=now)
-                    .returning(VendorAction.alert_id, VendorAction.action)
+                    .returning(VendorAction.alert_id, VendorAction.action, VendorAction.params)
                 )
             ).first()
             if row is not None:
                 if body.status == "done" and row.action == "release_quarantine" and row.alert_id is not None:
-                    await note_quarantine_released(db, tid, row.alert_id, now)
+                    by = ELSEWHERE if body.already_released else str((row.params or {}).get("requested_by_name") or "A.C.O.R.N")[:200]
+                    await note_quarantine_released(db, tid, row.alert_id, now, by=by)
                 if body.status == "done" and row.action == "create_ticket" and body.ticket_id and row.alert_id is not None:
                     await link_created_ticket(db, tid, row.alert_id, body.ticket_id, now)
                 if body.status == "done" and row.action == "resolve":

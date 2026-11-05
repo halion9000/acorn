@@ -20,7 +20,7 @@ from app.models.alert import Alert
 from app.models.vendor_action import VendorAction
 from app.services.alert_scope import alert_scope
 from app.services.audit import emit_audit
-from app.services.quarantine_release import ACTION, VENDOR, quarantine_of
+from app.services.quarantine_release import ACTION, ELSEWHERE, VENDOR, quarantine_of
 from app.services.vendor_actions import PENDING_TTL
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -56,6 +56,23 @@ def state_of(rows: list[Any], now: datetime) -> tuple[str, str | None, datetime 
     return "none", None, None
 
 
+def released_record(enrichment: Any, state: str, said: str | None, asked: datetime | None) -> tuple[str, str | None, datetime | None]:
+    """A release the alert records (done from here, or seen released in Microsoft 365 by someone else) settles it as done, in words that say who (pure)."""
+    rec = enrichment.get("quarantine_release") if isinstance(enrichment, dict) else None
+    if not isinstance(rec, dict):
+        return state, said, asked
+    by = str(rec.get("by") or "")
+    when = str(rec.get("released_at") or "")[:16].replace("T", " ")
+    who = (
+        "released by someone else in Microsoft 365"
+        if by == ELSEWHERE
+        else f"released from A.C.O.R.N by {by}"
+        if by and by != "A.C.O.R.N"
+        else "released from A.C.O.R.N"
+    )
+    return "done", f"Already {who}{f' ({when} UTC)' if when else ''}.", asked
+
+
 async def _actions(db: Any, tid: uuid.UUID, alert_id: uuid.UUID) -> list[Any]:
     return list(
         (
@@ -88,6 +105,7 @@ async def quarantine_info(
         if message is None:
             return QuarantineInfo(available=False)
         state, said, asked = state_of(await _actions(db, tid, alert_id), datetime.now(UTC))
+        state, said, asked = released_record(alert.enrichment_data, state, said, asked)
     return QuarantineInfo(
         available=True,
         recipient=message["recipient"] or None,
@@ -122,6 +140,7 @@ async def release_quarantine(
                 detail="This alert is not about a quarantined message that can be released from here.",
             )
         state, said, asked = state_of(await _actions(db, tid, alert_id), now)
+        state, said, asked = released_record(alert.enrichment_data, state, said, asked)
         if state == "done":
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This message was already released.")
         if state in ("pending", "claimed"):

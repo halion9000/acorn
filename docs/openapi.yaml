@@ -23639,6 +23639,10 @@ components:
             pattern: ^[0-9]{1,12}$
           - type: 'null'
           title: Ticket Id
+        already_released:
+          type: boolean
+          title: Already Released
+          default: false
       type: object
       required:
       - status
@@ -27878,6 +27882,7 @@ components:
           - bec_search
           - create_ticket
           - release_quarantine
+          - ticket_note
           title: Action
         incident_uid:
           type: string
