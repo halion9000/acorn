@@ -19,12 +19,12 @@ describe('TicketRuleButton', () => {
     api.make.mockResolvedValue({ id: 'r1', queued_now: 1 });
     const user = userEvent.setup();
     render(<TicketRuleButton alertId="a1" clientName="Pirkey Barber PLLC" />);
-    await user.click(screen.getByTestId('ticket-rule-open'));
+    await user.click(screen.getByRole('button', { name: 'Auto-ticket' }));
     expect(api.make).not.toHaveBeenCalled();
     expect(screen.getByLabelText('for Pirkey Barber PLLC only')).toBeChecked();
     await user.click(screen.getByRole('button', { name: 'Make the rule' }));
     await waitFor(() => expect(api.make).toHaveBeenCalledWith('a1', 'client'));
-    expect(await screen.findByTestId('ticket-rule-made')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Auto-ticket: on' })).toBeInTheDocument();
     expect(api.toast.success).toHaveBeenCalledWith('Rule made. A ticket for this alert is being opened.');
   });
 
@@ -32,10 +32,10 @@ describe('TicketRuleButton', () => {
     api.make.mockResolvedValue({ id: 'r1', queued_now: 0 });
     const user = userEvent.setup();
     render(<TicketRuleButton alertId="a1" />);
-    await user.click(screen.getByTestId('ticket-rule-open'));
+    await user.click(screen.getByRole('button', { name: 'Auto-ticket' }));
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(api.make).not.toHaveBeenCalled();
-    await user.click(screen.getByTestId('ticket-rule-open'));
+    await user.click(screen.getByRole('button', { name: 'Auto-ticket' }));
     expect(screen.getByLabelText('for this client only')).toBeChecked();
     await user.click(screen.getByLabelText('for every client'));
     await user.click(screen.getByRole('button', { name: 'Make the rule' }));
@@ -47,10 +47,10 @@ describe('TicketRuleButton', () => {
     api.make.mockRejectedValueOnce(new Error('There is already a ticket rule for this type of alert here.'));
     const user = userEvent.setup();
     render(<TicketRuleButton alertId="a1" />);
-    await user.click(screen.getByTestId('ticket-rule-open'));
+    await user.click(screen.getByRole('button', { name: 'Auto-ticket' }));
     await user.click(screen.getByRole('button', { name: 'Make the rule' }));
     await waitFor(() => expect(api.toast.error).toHaveBeenCalledWith('There is already a ticket rule for this type of alert here.'));
     expect(screen.getByTestId('ticket-rule-form')).toBeInTheDocument();
-    expect(screen.queryByTestId('ticket-rule-made')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Auto-ticket: on' })).toBeNull();
   });
 });

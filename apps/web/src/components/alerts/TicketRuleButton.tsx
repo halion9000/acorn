@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * "Open a HaloPSA ticket for alerts like this": makes a rule from this alert, for its client or for every client. From then on each new alert of the type that has no ticket gets one (opened by CORE),
- * and this alert gets one now if it has none. Asks first, because it acts on its own afterwards. The rules are listed (and can be turned off) under Settings, Tickets.
+ * "Auto-ticket": a button in the alert's top row, next to "Hide alert type". It opens a small window that makes a rule from this alert: from now on every new alert of this type that has no HaloPSA ticket gets
+ * one (opened by CORE), for this client or for every client, and this alert gets one now if it has none. It asks first, because it acts on its own afterwards. The rules are listed (and turned off) under
+ * Settings, Tickets.
  */
 
 import { useState } from 'react';
@@ -29,33 +30,41 @@ export function TicketRuleButton({ alertId, clientName }: { alertId: string; cli
     }
   }
 
-  if (made) return <p className="text-xs text-green-300" data-testid="ticket-rule-made">A ticket rule is on for this type of alert. See Settings, Tickets.</p>;
-  if (!open) {
-    return (
-      <button type="button" onClick={() => setOpen(true)} className="text-xs text-gray-400 hover:text-gray-200" data-testid="ticket-rule-open">
-        Open a ticket for alerts like this…
-      </button>
-    );
-  }
   return (
-    <div className="space-y-2 rounded border border-gray-700 p-3 text-sm text-gray-300" data-testid="ticket-rule-form">
-      <p>From now on, open a HaloPSA ticket for every new alert of this type that has none:</p>
-      <label className="flex items-center gap-2">
-        <input type="radio" name="ticket-rule-scope" checked={scope === 'client'} onChange={() => setScope('client')} />
-        <span>for {clientName ? clientName : 'this client'} only</span>
-      </label>
-      <label className="flex items-center gap-2">
-        <input type="radio" name="ticket-rule-scope" checked={scope === 'all'} onChange={() => setScope('all')} />
-        <span>for every client</span>
-      </label>
-      <div className="flex gap-2">
-        <button type="button" disabled={busy} onClick={() => void make()} className="rounded border border-gray-600 px-3 py-1 text-gray-100 hover:bg-gray-800 disabled:opacity-50">
-          {busy ? 'Making…' : 'Make the rule'}
-        </button>
-        <button type="button" disabled={busy} onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-200">
-          Cancel
-        </button>
-      </div>
-    </div>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Open a HaloPSA ticket automatically for every alert of this type"
+        className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 text-sm px-3 py-1.5 rounded-lg transition-colors"
+        data-testid="ticket-rule-open"
+      >
+        {made ? 'Auto-ticket: on' : 'Auto-ticket'}
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Open a ticket for alerts like this" onClick={() => !busy && setOpen(false)}>
+          <div className="w-full max-w-md space-y-3 rounded-xl border border-gray-800 bg-gray-900 p-5 text-sm text-gray-300 shadow-2xl" onClick={(e) => e.stopPropagation()} data-testid="ticket-rule-form">
+            <h2 className="text-base font-semibold text-white">Open a ticket for alerts like this</h2>
+            <p>From now on, open a HaloPSA ticket for every new alert of this type that has none. CORE opens it, and the ticket number is linked here. Make or turn off rules under Settings, Tickets.</p>
+            <label className="flex items-center gap-2">
+              <input type="radio" name="ticket-rule-scope" checked={scope === 'client'} onChange={() => setScope('client')} />
+              <span>for {clientName ? clientName : 'this client'} only</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="radio" name="ticket-rule-scope" checked={scope === 'all'} onChange={() => setScope('all')} />
+              <span>for every client</span>
+            </label>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" disabled={busy} onClick={() => setOpen(false)} className="rounded-lg px-4 py-2 text-gray-300 hover:bg-gray-800">
+                Cancel
+              </button>
+              <button type="button" disabled={busy} onClick={() => void make()} className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-500 disabled:opacity-50">
+                {busy ? 'Making…' : 'Make the rule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -886,6 +886,7 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
           >
             Hide alert type
           </button>
+          <TicketRuleButton alertId={alertId} clientName={alert.clientName} />
           <button
             type="button"
             onClick={() => setCreateCaseOpen(true)}
@@ -956,7 +957,6 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
 
             <WhyRaised alertId={alert.id} />
 
-            <TicketRuleButton alertId={alert.id} clientName={alert.clientName} />
 
             {alert.confidenceLabel && (
               <ConfidenceExplainability
