@@ -26196,6 +26196,28 @@ components:
       required:
       - recorded
       title: BecAck
+    BecBadge:
+      properties:
+        status:
+          type: string
+          title: Status
+        level:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Level
+        at:
+          type: string
+          format: date-time
+          title: At
+      type: object
+      required:
+      - status
+      - at
+      title: BecBadge
+      description: 'The newest business email compromise search for any of the person''s
+        addresses: how it stands, CIPP''s own rating when it finished, and when it
+        was started.'
     BecProgress:
       properties:
         step:
@@ -39304,6 +39326,10 @@ components:
             $ref: '#/components/schemas/AliasOut'
           type: array
           title: Aliases
+        bec:
+          anyOf:
+          - $ref: '#/components/schemas/BecBadge'
+          - type: 'null'
       type: object
       required:
       - key

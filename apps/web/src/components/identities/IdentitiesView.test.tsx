@@ -52,6 +52,25 @@ beforeEach(() => {
   api.list.mockResolvedValue(list([person(), person({ key: 'c1:bob@acme.com', email: 'bob@acme.com', display_name: null, mfa: 'none', tools: ['dropsuite'], open_alerts: 3, top_severity: 'high', admin: true, enabled: false })]));
 });
 
+describe('the last BEC search on a row', () => {
+  it('shows its answer, searching or failed, and nothing for a person never searched', async () => {
+    api.list.mockResolvedValue(
+      list([
+        person({ key: 'c1:a@acme.com', email: 'a@acme.com', display_name: null, bec: { status: 'done', level: 'High', at: '2026-11-01T00:00:00Z' } }),
+        person({ key: 'c1:b@acme.com', email: 'b@acme.com', display_name: null, bec: { status: 'running', at: '2026-11-01T00:00:00Z' } }),
+        person({ key: 'c1:c@acme.com', email: 'c@acme.com', display_name: null, bec: { status: 'failed', at: '2026-11-01T00:00:00Z' } }),
+        person({ key: 'c1:d@acme.com', email: 'd@acme.com', display_name: null }),
+      ]),
+    );
+    show();
+    const rows = await screen.findAllByTestId('identity-row');
+    expect(within(rows[0]!).getByTestId('bec-badge')).toHaveTextContent('BEC: High');
+    expect(within(rows[1]!).getByTestId('bec-badge')).toHaveTextContent('BEC: searching…');
+    expect(within(rows[2]!).getByTestId('bec-badge')).toHaveTextContent('BEC: failed');
+    expect(within(rows[3]!).queryByTestId('bec-badge')).toBeNull();
+  });
+});
+
 describe('the Identities page', () => {
   it('lists each person once with their tools as logos, multi-factor state and alerts', async () => {
     show();

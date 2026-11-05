@@ -52,6 +52,26 @@ export const BACKUP_STYLE: Record<string, { label: string; className: string }> 
 const SORT_FOR_COLUMN: Record<string, IdentitySort> = { person: 'email', client: 'client', tools: 'tools', alerts: 'alerts', exposure: 'exposure' };
 
 /** How long ago a ticket was opened, in whole days ("today", "1 day ago", "12 days ago"). */
+/** The newest BEC search on a row: its answer when it finished, "searching…" while it runs, "failed" when it gave up. */
+export function becBadgeText(bec: NonNullable<IdentityPerson['bec']>): { text: string; tone: string } {
+  if (bec.status === 'done') {
+    const level = (bec.level ?? '').toLowerCase();
+    const tone = level === 'high' || level === 'critical' ? 'text-red-300' : level === 'medium' ? 'text-amber-300' : 'text-green-300';
+    return { text: `BEC: ${bec.level ?? 'done'}`, tone };
+  }
+  if (bec.status === 'failed') return { text: 'BEC: failed', tone: 'text-gray-400' };
+  return { text: 'BEC: searching…', tone: 'text-blue-300' };
+}
+
+function BecBadge({ bec }: { bec: NonNullable<IdentityPerson['bec']> }) {
+  const { text, tone } = becBadgeText(bec);
+  return (
+    <span className={`mr-1 ${tone}`} title={`Last BEC search started ${ticketAge(bec.at)}`} data-testid="bec-badge">
+      {text}
+    </span>
+  );
+}
+
 export function ticketAge(openedAt: string, now: number = Date.now()): string {
   return daysAgo(openedAt, { now, missing: 'date unknown' });
 }
@@ -549,6 +569,7 @@ export function IdentitiesView() {
                           {p.admin &&<span className="mr-1 text-amber-300">admin</span>}
                           {p.enabled === false && <span className="mr-1 text-red-300">disabled</span>}
                           {p.kind !== 'user' && <span className="text-gray-400">{p.kind}</span>}
+                          {p.bec && <BecBadge bec={p.bec} />}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-gray-300">{p.client_name ?? 'â€”'}</td>

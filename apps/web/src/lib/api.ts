@@ -801,6 +801,8 @@ export interface IdentityPerson {
   /** HaloPSA tickets about this person and when the newest was opened. Absent from an older API. */
   tickets?: number;
   last_ticket_at?: string | null;
+  /** The newest BEC search for this person (or any of their addresses). Absent when none was run, or from an older API. */
+  bec?: { status: 'pending' | 'running' | 'done' | 'failed'; level?: string | null; at: string } | null;
   /** Open alerts by the tool that raised them. Absent from an older API. */
   alerts_by_source?: Record<string, number>;
   /** What each backup tool says about this person's data. Absent from an older API. */

@@ -80,6 +80,14 @@ class AliasOut(BaseModel):
     reason: str
 
 
+class BecBadge(BaseModel):
+    """The newest business email compromise search for any of the person's addresses: how it stands, CIPP's own rating when it finished, and when it was started."""
+
+    status: str  # pending, running, done or failed (an open one nobody reported on for a long time is failed)
+    level: str | None = None
+    at: datetime
+
+
 class PersonOut(BaseModel):
     key: str
     client_id: uuid.UUID
@@ -104,6 +112,8 @@ class PersonOut(BaseModel):
     last_ticket_at: datetime | None = None
     # The other addresses of this same human, folded into this row, each with why (a rule, or "merged by hand").
     aliases: list[AliasOut] = Field(default_factory=list)
+    # The newest BEC search for any of this person's addresses, on the list page only.
+    bec: BecBadge | None = None
 
 
 class IdentitySummary(BaseModel):
@@ -365,7 +375,7 @@ async def list_identities(
     items = [_out(p) for p in rows[start : start + page_size]]
     return IdentityList(
         summary=summarize(people).model_copy(update={"failed_signins_24h": failed, "brute_force": brute}),
-        items=await with_ticket_counts(db, items),
+        items=await with_bec_badges(db, await with_ticket_counts(db, items)),
         total=total,
         page=page,
         page_size=page_size,
@@ -546,6 +556,57 @@ async def with_ticket_counts(db: Any, items: list[PersonOut]) -> list[PersonOut]
         logging.getLogger(__name__).warning("identity list: ticket counts could not be read", exc_info=True)
         return items
     return attach_ticket_counts(items, {(t, e): (n, newest) for t, e, n, newest in rows})
+
+
+def attach_bec(items: list[PersonOut], cases: dict[tuple[uuid.UUID, str], tuple[str, str | None, datetime]]) -> list[PersonOut]:
+    """Each person with their newest BEC search, looked up by the client and every address they are known by (a search may have been made for an alias), the newest start winning."""
+    out = []
+    for p in items:
+        addresses = [p.email, *(a.email for a in p.aliases)]
+        found = [cases[(p.client_id, a.lower())] for a in addresses if (p.client_id, a.lower()) in cases]
+        if not found:
+            out.append(p)
+            continue
+        status, level, at = max(found, key=lambda c: c[2])
+        out.append(p.model_copy(update={"bec": BecBadge(status=status, level=level, at=at)}))
+    return out
+
+
+async def with_bec_badges(db: Any, items: list[PersonOut]) -> list[PersonOut]:
+    """One read for the people on this page: their newest BEC search each. A database without the table yet shows no badge and the list still loads."""
+    if not items:
+        return items
+    from app.api.v1.endpoints.identity_bec import effective_status  # noqa: PLC0415
+    from app.models.bec_case import BecCase  # noqa: PLC0415
+
+    tenants = {p.client_id for p in items}
+    emails = {a.lower() for p in items for a in [p.email, *(x.email for x in p.aliases)]}
+    now = datetime.now(UTC)
+    try:
+        async with cross_tenant_reads(db), db.begin_nested():
+            rows = (
+                (
+                    await db.execute(
+                        select(BecCase)
+                        .where(BecCase.tenant_id.in_(tenants), func.lower(BecCase.email).in_(emails))
+                        .order_by(BecCase.created_at.desc())
+                    )
+                )
+                .scalars()
+                .all()
+            )
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).warning("identity list: BEC searches could not be read", exc_info=True)
+        return items
+    newest: dict[tuple[uuid.UUID, str], tuple[str, str | None, datetime]] = {}
+    for r in rows:
+        key = (r.tenant_id, r.email.lower())
+        if key in newest:
+            continue
+        status, _message = effective_status(r, now)
+        level = (r.summary or {}).get("level") if status == "done" else None
+        newest[key] = (status, level if isinstance(level, str) else None, r.created_at)
+    return attach_bec(items, newest)
 
 
 def signin_rows(events: list[Any]) -> list[SigninRow]:
