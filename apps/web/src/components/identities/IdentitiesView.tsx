@@ -52,7 +52,7 @@ export const BACKUP_STYLE: Record<string, { label: string; className: string }> 
 const SORT_FOR_COLUMN: Record<string, IdentitySort> = { person: 'email', client: 'client', tools: 'tools', alerts: 'alerts', exposure: 'exposure' };
 
 /** How long ago a ticket was opened, in whole days ("today", "1 day ago", "12 days ago"). */
-/** The newest BEC search on a row: its answer when it finished, "searching…" while it runs, "failed" when it gave up. */
+/** The newest BEC search on a row: its answer when it finished, "searchingâ€¦" while it runs, "failed" when it gave up. */
 export function becBadgeText(bec: NonNullable<IdentityPerson['bec']>): { text: string; tone: string } {
   if (bec.status === 'done') {
     const level = (bec.level ?? '').toLowerCase();
@@ -60,7 +60,7 @@ export function becBadgeText(bec: NonNullable<IdentityPerson['bec']>): { text: s
     return { text: `BEC: ${bec.level ?? 'done'}`, tone };
   }
   if (bec.status === 'failed') return { text: 'BEC: failed', tone: 'text-gray-400' };
-  return { text: 'BEC: searching…', tone: 'text-blue-300' };
+  return { text: 'BEC: searchingâ€¦', tone: 'text-blue-300' };
 }
 
 function BecBadge({ bec }: { bec: NonNullable<IdentityPerson['bec']> }) {

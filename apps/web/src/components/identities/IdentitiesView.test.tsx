@@ -65,7 +65,7 @@ describe('the last BEC search on a row', () => {
     show();
     const rows = await screen.findAllByTestId('identity-row');
     expect(within(rows[0]!).getByTestId('bec-badge')).toHaveTextContent('BEC: High');
-    expect(within(rows[1]!).getByTestId('bec-badge')).toHaveTextContent('BEC: searching…');
+    expect(within(rows[1]!).getByTestId('bec-badge')).toHaveTextContent('BEC: searchingâ€¦');
     expect(within(rows[2]!).getByTestId('bec-badge')).toHaveTextContent('BEC: failed');
     expect(within(rows[3]!).queryByTestId('bec-badge')).toBeNull();
   });
