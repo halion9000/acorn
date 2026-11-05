@@ -36901,6 +36901,11 @@ components:
             type: array
           - type: 'null'
           title: Health Trend
+        sla_due_soon:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Sla Due Soon
       type: object
       required:
       - tenant_id

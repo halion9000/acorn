@@ -618,6 +618,8 @@ export interface ManagedTenantRow {
   unreviewed_remote_tools?: number | null;
   /** The health score over the last two weeks, oldest first. Absent from an older server, null when unreadable. */
   health_trend?: number[] | null;
+  /** Unfinished alerts that will pass their response target within half an hour. Absent from an older server, null when unreadable. */
+  sla_due_soon?: number | null;
 }
 
 export interface AlertScriptRun {

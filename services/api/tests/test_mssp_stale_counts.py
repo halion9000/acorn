@@ -246,3 +246,98 @@ def test_the_list_gives_each_client_its_trend_empty_when_none_and_unknown_when_u
     good, bad = run(body)
     assert {r.name: r.health_trend for r in good} == {"Acme": [60.0, 80.0], "Quiet": []}
     assert [r.health_trend for r in bad] == [None, None]
+
+
+# ---- alerts due soon ----------------------------------------------------------------------------------------------------------------------------------
+
+from sqlalchemy.dialects import postgresql  # noqa: E402
+
+
+def pg(statement):
+    return str(statement.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+
+
+class SoonDb:
+    def __init__(self, own=(), grouped=()):
+        self.own, self.grouped, self.statements, self.scalars = list(own), list(grouped), [], []
+
+    async def execute(self, statement):
+        self.statements.append(statement)
+        text = pg(statement)
+        return Rows([(t,) for t in self.own] if "tenant_sla_config" in text else self.grouped)
+
+    async def scalar(self, statement):
+        self.scalars.append(statement)
+        return 4
+
+
+def test_due_soon_counts_unfinished_alerts_inside_the_target_but_within_half_an_hour_of_passing_it():
+    a, b = uuid.uuid4(), uuid.uuid4()
+    now = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+    db = SoonDb(grouped=[(a, 2), (b, 5)])
+    assert asyncio.run(mssp._sla_due_soon(db, [], now)) == {}
+    out = asyncio.run(mssp._sla_due_soon(db, [a, b], now))
+    assert out == {a: 2, b: 5}
+    text = pg(db.statements[1])
+    assert (
+        "alerts.first_seen +" in text and ">= '2026-11-05 12:00:00+00:00'" in text and "< '2026-11-05 12:30:00+00:00'" in text
+    ), "late alerts are the breach count's, not this one's"
+    assert "NOT IN" in text and "resolved" in text, "finished alerts are not counted"
+    assert db.scalars == [], "a client with no targets of its own is counted in the grouped statement, not one by one"
+
+
+def test_a_client_with_its_own_targets_is_counted_on_its_own_and_zero_is_left_out():
+    own = uuid.uuid4()
+    now = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+    db = SoonDb(own=[own])
+
+    async def targets(_db, _tid):
+        return {"critical": 5, "high": 15, "medium": 60, "low": 240, "info": 480}
+
+    import app.services.alert_queue as aq
+
+    real = aq.load_sla_targets
+    aq.load_sla_targets = targets
+    try:
+        assert asyncio.run(mssp._sla_due_soon(db, [own], now)) == {own: 4}
+    finally:
+        aq.load_sla_targets = real
+    assert len(db.scalars) == 1 and f"alerts.tenant_id = '{own}'" in pg(db.scalars[0])
+    own_text = pg(db.scalars[0])
+    assert (
+        ">= '2026-11-05 12:00:00+00:00'" in own_text and "< '2026-11-05 12:30:00+00:00'" in own_text
+    ), "the same window as the default path"
+
+
+def test_the_list_gives_each_client_its_due_soon_count_and_unknown_when_unreadable(monkeypatch):
+    async def stale(_db, _ids):
+        return {}
+
+    async def unreviewed(_db, _owner, _ids):
+        return {}
+
+    monkeypatch.setattr(mssp, "_stale_counts", stale)
+    monkeypatch.setattr(mssp, "_unreviewed_remote_tools", unreviewed)
+    fail = {"on": False}
+
+    async def soon(_db, ids, now=None):
+        if fail["on"]:
+            raise RuntimeError("alerts unreadable")
+        return {ids[0]: 3}
+
+    monkeypatch.setattr(mssp, "_sla_due_soon", soon)
+
+    async def body(s):
+        parent = await make(s, "Parent")
+        await make(s, "Acme", parent.id)
+        await make(s, "Birch", parent.id)
+        await s.commit()
+        user = SimpleNamespace(tenant_id=parent.id)
+        good = await mssp.list_managed_tenants(include_hidden=False, db=s, current_user=user)
+        fail["on"] = True
+        bad = await mssp.list_managed_tenants(include_hidden=False, db=s, current_user=user)
+        return good, bad
+
+    good, bad = run(body)
+    assert sorted(r.sla_due_soon for r in good) == [0, 3]
+    assert [r.sla_due_soon for r in bad] == [None, None]

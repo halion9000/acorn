@@ -101,9 +101,9 @@ describe('real tenants', () => {
 
     const table = await screen.findByRole('table');
     const reportingRow = within(table).getByText('Reporting Co').closest('tr') as HTMLElement;
-    expect(within(reportingRow).getAllByRole('cell').map((c) => c.textContent).slice(2, 12)).toEqual(['12', '2', '4', '30', '1', '3', '—', '—', '—', '80']); // the dashes are the connector health, the unreviewed tools and the stale alerts: this older row carries no reading of either
+    expect(within(reportingRow).getAllByRole('cell').map((c) => c.textContent).slice(2, 13)).toEqual(['12', '2', '4', '30', '1', '3', '—', '—', '—', '—', '80']); // the dashes are the connector health, the due-soon alerts, the unreviewed tools and the stale alerts: this older row carries no reading of either
     const quietRow = within(table).getByText('Quiet Co').closest('tr') as HTMLElement;
-    expect(within(quietRow).getAllByRole('cell').map((c) => c.textContent).slice(1)).toEqual(['—', '—', '—', '—', '—', '—', '—', '—', '—', '—', '—', 'No data yet', '', '', 'Hide']); // the empty cells are the keep-alerts-open and automated-playbooks checkboxes
+    expect(within(quietRow).getAllByRole('cell').map((c) => c.textContent).slice(1)).toEqual(['—', '—', '—', '—', '—', '—', '—', '—', '—', '—', '—', '—', 'No data yet', '', '', 'Hide']); // the empty cells are the keep-alerts-open and automated-playbooks checkboxes
   });
 
   it('shows a real zero as 0 and an unreported figure as a dash: they are not the same thing', async () => {
@@ -420,13 +420,13 @@ describe('the Integrations column layout', () => {
 });
 
 describe('the tenant table fits the window', () => {
-  it('uses the narrow cell padding on every cell of its 16 columns, so the page does not need sideways scrolling', async () => {
+  it('uses the narrow cell padding on every cell of its 17 columns, so the page does not need sideways scrolling', async () => {
     overviewMock.mockResolvedValue({ ...none, total_tenants: 1 });
     tenantsMock.mockResolvedValue([row({ name: 'One', sources: ['halopsa'] })]);
     render(<MSSPDashboardView />);
     const table = await screen.findByRole('table');
     const cells = [...table.querySelectorAll('th, td')];
-    expect(cells).toHaveLength(32);
+    expect(cells).toHaveLength(34);
     expect(cells.filter((c) => !c.className.includes('px-2.5'))).toEqual([]);
   });
 });
@@ -540,5 +540,18 @@ describe('the health trend', () => {
     expect(trendPath([5])).toBe('');
     expect(trendPath([0, 10], 56, 16)).toBe('M0.0,15.0 L56.0,1.0');
     expect(trendPath([7, 7], 56, 16)).toBe('M0.0,15.0 L56.0,15.0');
+  });
+});
+
+describe('alerts due soon per client', () => {
+  it('shows the count, amber when some are about to breach, and a dash when unknown or not sent', async () => {
+    overviewMock.mockResolvedValue(none);
+    tenantsMock.mockResolvedValue([row({ name: 'Some Co', sla_due_soon: 3 }), row({ name: 'Zero Co', sla_due_soon: 0 }), row({ name: 'Unknown Co', sla_due_soon: null }), row({ name: 'Old Server Co' })]);
+    render(<MSSPDashboardView />);
+    await screen.findByText('Some Co');
+    const cells = Object.fromEntries(screen.getAllByTestId('client-line').map((l) => [l.querySelector('a')?.textContent, within(l).getByTestId('sla-due-soon')]));
+    expect(Object.fromEntries(Object.entries(cells).map(([k, v]) => [k, v.textContent]))).toEqual({ 'Some Co': '3', 'Zero Co': '0', 'Unknown Co': '—', 'Old Server Co': '—' });
+    expect(cells['Some Co']).toHaveClass('text-amber-300');
+    expect(cells['Zero Co']).not.toHaveClass('text-amber-300');
   });
 });

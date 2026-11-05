@@ -923,6 +923,8 @@ class ManagedTenantRow(BaseModel):
     stale_exempt: bool = False
     # The client's health score over the last two weeks, oldest first, one per snapshot that had one. None when it could not be read; a list of fewer than two points draws no trend.
     health_trend: list[float] | None = None
+    # Unfinished alerts that will pass their response target within ``SLA_SOON`` (not yet late). None when it could not be read.
+    sla_due_soon: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -990,6 +992,49 @@ async def _connector_health(db: AsyncSession, child_ids: list[uuid.UUID]) -> dic
     return out
 
 
+SLA_SOON = timedelta(minutes=30)
+
+
+async def _sla_due_soon(db: AsyncSession, child_ids: list[uuid.UUID], now: datetime | None = None) -> dict[uuid.UUID, int]:
+    """For each client: how many unfinished alerts are still inside their response target but will pass it within ``SLA_SOON``. Clients with none are absent. Raises when the read fails.
+
+    The same targets the breach count uses: the default per severity in one grouped statement, and the few clients that set their own one by one."""
+    if not child_ids:
+        return {}
+    from app.db.rls_scope import cross_tenant_reads
+    from app.models.alert import Alert
+    from app.models.sla import TenantSLAConfig
+    from app.services.alert_queue import load_sla_targets, sla_due_at_expression
+    from app.services.alert_status import FINISHED_ALERT_STATUSES
+    from app.services.sla import DEFAULT_SLA_TARGETS
+
+    now = now or datetime.now(UTC)
+    out: dict[uuid.UUID, int] = {}
+    async with cross_tenant_reads(db):
+        own = {
+            r[0]
+            for r in (await db.execute(select(TenantSLAConfig.tenant_id).where(TenantSLAConfig.tenant_id.in_(child_ids)).distinct())).all()
+        }
+        rest = [t for t in child_ids if t not in own]
+        unfinished = Alert.status.notin_(FINISHED_ALERT_STATUSES)
+        if rest:
+            due = sla_due_at_expression({sev: cfg["mttd_target"] for sev, cfg in DEFAULT_SLA_TARGETS.items()})
+            for tid, n in (
+                await db.execute(
+                    select(Alert.tenant_id, func.count())
+                    .where(Alert.tenant_id.in_(rest), unfinished, due >= now, due < now + SLA_SOON)
+                    .group_by(Alert.tenant_id)
+                )
+            ).all():
+                out[tid] = int(n)
+        for tid in own:
+            due = sla_due_at_expression(await load_sla_targets(db, tid))
+            n = await db.scalar(select(func.count()).where(Alert.tenant_id == tid, unfinished, due >= now, due < now + SLA_SOON))
+            if n:
+                out[tid] = int(n)
+    return out
+
+
 TREND_DAYS = 14
 TREND_MAX_POINTS = 60
 
@@ -1002,7 +1047,11 @@ async def _health_trend(db: AsyncSession, child_ids: list[uuid.UUID], now: datet
     rows = (
         await db.execute(
             select(MSSPTenantMetrics.tenant_id, MSSPTenantMetrics.health_score)
-            .where(MSSPTenantMetrics.tenant_id.in_(child_ids), MSSPTenantMetrics.snapshot_at >= since, MSSPTenantMetrics.health_score.isnot(None))
+            .where(
+                MSSPTenantMetrics.tenant_id.in_(child_ids),
+                MSSPTenantMetrics.snapshot_at >= since,
+                MSSPTenantMetrics.health_score.isnot(None),
+            )
             .order_by(MSSPTenantMetrics.snapshot_at)
         )
     ).all()
@@ -1091,6 +1140,11 @@ async def list_managed_tenants(
         logging.getLogger(__name__).warning("mssp: connector health could not be read", exc_info=True)
         health = None
     try:
+        soon: dict[uuid.UUID, int] | None = await _sla_due_soon(db, [c.id for c in children])
+    except Exception:  # noqa: BLE001 - same: the list still loads, the column then reads unknown
+        logging.getLogger(__name__).warning("mssp: alerts due soon could not be read", exc_info=True)
+        soon = None
+    try:
         trend: dict[uuid.UUID, list[float]] | None = await _health_trend(db, [c.id for c in children])
     except Exception:  # noqa: BLE001 - same: the list still loads, the trend is then left out
         logging.getLogger(__name__).warning("mssp: health trend could not be read", exc_info=True)
@@ -1130,6 +1184,7 @@ async def list_managed_tenants(
                 stale_alerts=(stale.get(child.id, 0) if stale is not None else None),
                 unreviewed_remote_tools=(unreviewed.get(child.id, 0) if unreviewed is not None else None),
                 stale_exempt=tenant_stale_exempt(child),
+                sla_due_soon=(soon.get(child.id, 0) if soon is not None else None),
                 health_trend=(trend.get(child.id, []) if trend is not None else None),
             )
         )
