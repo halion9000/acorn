@@ -46,6 +46,12 @@
         "summary": "Mark a risky sign-in user as safe in Entra ID Protection"
       },
       {
+        "action": "release_quarantine",
+        "risk": "high",
+        "reversible": false,
+        "summary": "Release one quarantined message to the people it was sent to (the sender is not allow-listed)"
+      },
+      {
         "action": "contain_user",
         "risk": "high",
         "reversible": false,

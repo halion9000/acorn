@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 from app.api.v1.endpoints import billing
+from app.api.v1.endpoints import canary_tunnel as tunnel_ep
 from app.api.v1.endpoints import cipp_actions as cipp_act
 from app.api.v1.endpoints import client_documents as cdocs
 from app.api.v1.endpoints import client_review as cr
@@ -49,6 +50,7 @@ MODELS = {
     "actions-result": feed.ActionResult,
     "bec-progress": feed.BecProgress,
     "bec-result": feed.BecResult,
+    "canary-tunnel": tunnel_ep.TunnelIn,
     "signins": sig.SignInsReport,
     "directory-audits": ident.DirectoryAuditsReport,
     "person-tickets": idn.PersonTicketsReport,

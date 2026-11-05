@@ -1,0 +1,7 @@
+{
+  "route": "canary-tunnel",
+  "method": "POST",
+  "body": {
+    "token": "eyJhIjoiYWNjdCIsInQiOiJ0dW5uZWwtaWQiLCJzIjoiYzJWamNtVjAifQ=="
+  }
+}
