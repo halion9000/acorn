@@ -38844,6 +38844,12 @@ components:
             $ref: '#/components/schemas/DomainRow'
           type: array
           title: Domains
+        progress:
+          items:
+            $ref: '#/components/schemas/PolicyProgress'
+          type: array
+          title: Progress
+          default: []
       type: object
       required:
       - days
@@ -39635,6 +39641,41 @@ components:
       - loaded_at
       - error
       title: PluginOut
+    PolicyProgress:
+      properties:
+        client_id:
+          type: string
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        domains:
+          type: integer
+          title: Domains
+        rejecting:
+          type: integer
+          title: Rejecting
+        quarantining:
+          type: integer
+          title: Quarantining
+        monitoring:
+          type: integer
+          title: Monitoring
+        ready_to_enforce:
+          type: integer
+          title: Ready To Enforce
+      type: object
+      required:
+      - client_id
+      - client_name
+      - domains
+      - rejecting
+      - quarantining
+      - monitoring
+      - ready_to_enforce
+      title: PolicyProgress
+      description: How far one client's domains have come on the way from monitoring
+        to enforcing (none, then quarantine, then reject).
     PostureAlerts:
       properties:
         open:

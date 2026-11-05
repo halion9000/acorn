@@ -6,7 +6,7 @@ import { SWRConfig } from 'swr';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { DmarcView, aliasScript, cleanAliasName, dnsRecordsText, policyLabel, mtaStsRow, rateTone, spfLookupRow, tlsRecordsText } from './DmarcView';
+import { DmarcView, PolicyProgressPanel, aliasScript, cleanAliasName, dnsRecordsText, policyLabel, mtaStsRow, rateTone, spfLookupRow, tlsRecordsText } from './DmarcView';
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const status = { configured: true, mailbox: 'lodmarc@goliveoak.com', last_run_at: new Date().toISOString(), last_error: null, stored: 14, rejected: 0, unmatched_reports: 0 };
@@ -687,5 +687,31 @@ describe('the MTA-STS row', () => {
   it('calls testing and an unreadable policy what they are, never fine', () => {
     expect(mtaStsRow(sts({ mode: 'testing', max_age: 600 }), true)[0]).toEqual(['MTA-STS', 'needs_work', 'Testing only, remembered under a day']);
     expect(mtaStsRow(sts({ state: 'unreadable', mode: null }), true)[0][1]).toBe('unknown');
+  });
+});
+
+describe('the policy progress panel', () => {
+  const progress = [
+    { client_id: 'c1', client_name: 'Acme Dental', domains: 3, rejecting: 0, quarantining: 1, monitoring: 2, ready_to_enforce: 1 },
+    { client_id: 'c2', client_name: 'Birch Law', domains: 1, rejecting: 1, quarantining: 0, monitoring: 0, ready_to_enforce: 0 },
+  ];
+  it('says how many domains enforce overall, and gives each client its counts, amber only where one is ready', () => {
+    render(<PolicyProgressPanel progress={progress} />);
+    expect(screen.getByTestId('policy-progress')).toHaveTextContent('2 of 4 domains enforce (quarantine or reject); 1 still monitoring is ready to start enforcing.');
+    const rows = screen.getAllByTestId('policy-progress-row');
+    expect(rows.map((r) => r.textContent)).toEqual(['Acme Dental30121', 'Birch Law11000']);
+    expect(within(rows[0]!).getAllByRole('cell')[5]).toHaveClass('text-amber-300');
+    expect(within(rows[1]!).getAllByRole('cell')[5]).not.toHaveClass('text-amber-300');
+  });
+  it('shows nothing for a server that sends no progress or none', () => {
+    const { container, rerender } = render(<PolicyProgressPanel progress={undefined} />);
+    expect(container).toBeEmptyDOMElement();
+    rerender(<PolicyProgressPanel progress={[]} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+  it('appears on the Results tab from the overview', async () => {
+    overview = { days: 30, status, domains: [row()], progress };
+    render(view());
+    expect(await screen.findByTestId('policy-progress')).toBeInTheDocument();
   });
 });

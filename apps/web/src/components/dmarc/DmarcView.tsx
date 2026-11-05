@@ -31,10 +31,21 @@ export interface DmarcRow {
   policy: string;
   last_report: string;
 }
+export interface DmarcProgress {
+  client_id: string;
+  client_name: string;
+  domains: number;
+  rejecting: number;
+  quarantining: number;
+  monitoring: number;
+  ready_to_enforce: number;
+}
 export interface DmarcOverview {
   days: number;
   status: DmarcStatus;
   domains: DmarcRow[];
+  /** How far each client's domains have come towards enforcing. Absent from an older server. */
+  progress?: DmarcProgress[];
 }
 export interface DmarcDetail {
   domain: string;
@@ -724,6 +735,47 @@ export function tlsRecordsText(lines: SetupLine[], aliasOf: (l: SetupLine) => st
   return lines.map((l) => `_smtp._tls.${l.domain}\tTXT\tv=TLSRPTv1; rua=mailto:${aliasOf(l)}`).join('\n');
 }
 
+/** Per client: how many domains reject, quarantine or only monitor, and how many of the monitoring ones are ready to enforce. Clients furthest behind first. */
+export function PolicyProgressPanel({ progress }: { progress: DmarcProgress[] | undefined }) {
+  if (!progress || progress.length === 0) return null;
+  const enforcing = progress.reduce((n, p) => n + p.rejecting + p.quarantining, 0);
+  const total = progress.reduce((n, p) => n + p.domains, 0);
+  const ready = progress.reduce((n, p) => n + p.ready_to_enforce, 0);
+  return (
+    <section aria-label="Policy progress" className="rounded-lg border border-gray-800 bg-gray-900/40 p-4" data-testid="policy-progress">
+      <h3 className="text-sm font-medium text-gray-100">Policy progress</h3>
+      <p className="mb-2 text-xs text-gray-500">
+        {enforcing} of {total} domain{total === 1 ? '' : 's'} enforce (quarantine or reject)
+        {ready > 0 ? `; ${ready} still monitoring ${ready === 1 ? 'is' : 'are'} ready to start enforcing` : ''}.
+      </p>
+      <table className="w-full text-left text-sm">
+        <thead className="text-xs uppercase text-gray-500">
+          <tr>
+            <th className="py-1">Client</th>
+            <th className="py-1 text-right">Domains</th>
+            <th className="py-1 text-right">Reject</th>
+            <th className="py-1 text-right">Quarantine</th>
+            <th className="py-1 text-right">Monitoring</th>
+            <th className="py-1 text-right">Ready to enforce</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-800">
+          {progress.map((p) => (
+            <tr key={p.client_id} data-testid="policy-progress-row">
+              <td className="py-1 text-gray-100">{p.client_name}</td>
+              <td className="py-1 text-right tabular-nums text-gray-300">{p.domains}</td>
+              <td className="py-1 text-right tabular-nums text-green-300">{p.rejecting}</td>
+              <td className="py-1 text-right tabular-nums text-gray-300">{p.quarantining}</td>
+              <td className="py-1 text-right tabular-nums text-gray-300">{p.monitoring}</td>
+              <td className={`py-1 text-right tabular-nums ${p.ready_to_enforce > 0 ? 'font-medium text-amber-300' : 'text-gray-500'}`}>{p.ready_to_enforce}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 function Results() {
   const [days, setDays] = useState(30);
   const [open, setOpen] = useState<string | null>(null);
@@ -749,6 +801,7 @@ function Results() {
       ) : (
         <>
           <StatusStrip status={data.status} />
+          <PolicyProgressPanel progress={data.progress} />
           <Insights days={days} />
           <TlsSection days={days} />
           {data.domains.length === 0 ? (

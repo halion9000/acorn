@@ -67,10 +67,24 @@ class DomainRow(BaseModel):
     last_report: datetime
 
 
+class PolicyProgress(BaseModel):
+    """How far one client's domains have come on the way from monitoring to enforcing (none, then quarantine, then reject)."""
+
+    client_id: str
+    client_name: str
+    domains: int
+    rejecting: int
+    quarantining: int
+    monitoring: int
+    # Domains still only monitoring whose mail passes and are ready to start enforcing (enough mail to judge, 98% or more passing).
+    ready_to_enforce: int
+
+
 class Overview(BaseModel):
     days: int
     status: Status
     domains: list[DomainRow]
+    progress: list[PolicyProgress] = []
 
 
 class DayPoint(BaseModel):
@@ -193,6 +207,27 @@ async def _status(db: Any, owner: Any) -> Status:
     )
 
 
+READY_PASS_RATE = 98.0  # the same bar report_card_advice uses to say "reasonable to start enforcing"
+
+
+def policy_progress(rows: list[DomainRow]) -> list[PolicyProgress]:
+    """One line per client: how many of its domains reject, quarantine or only monitor, and how many of the monitoring ones are ready to enforce. Least enforced first, so the clients furthest behind lead (pure)."""
+    by_client: dict[str, PolicyProgress] = {}
+    for r in rows:
+        p = by_client.setdefault(r.client_id, PolicyProgress(client_id=r.client_id, client_name=r.client_name, domains=0, rejecting=0, quarantining=0, monitoring=0, ready_to_enforce=0))
+        p.domains += 1
+        policy = (r.policy or "").lower()
+        if policy == "reject":
+            p.rejecting += 1
+        elif policy == "quarantine":
+            p.quarantining += 1
+        else:
+            p.monitoring += 1
+            if r.total >= MIN_MAIL_TO_JUDGE and r.pass_rate is not None and r.pass_rate >= READY_PASS_RATE:
+                p.ready_to_enforce += 1
+    return sorted(by_client.values(), key=lambda p: ((p.rejecting + p.quarantining) / p.domains, p.client_name.lower()))
+
+
 @router.get("/overview", response_model=Overview, summary="Each client domain's DMARC results over the last N days")
 async def overview(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = Query(30, ge=1, le=365)
@@ -231,7 +266,7 @@ async def overview(
             )
         )
     rows.sort(key=lambda r: (r.pass_rate if r.pass_rate is not None else 101.0, r.client_name, r.domain))  # the worst first
-    return Overview(days=days, status=await _status(db, owner), domains=rows)
+    return Overview(days=days, status=await _status(db, owner), domains=rows, progress=policy_progress(rows))
 
 
 @router.get("/domains/{domain}", response_model=DomainDetail, summary="One domain: its daily results and the sources failing DMARC")
