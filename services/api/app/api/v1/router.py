@@ -7,10 +7,12 @@ from app.api.v1.endpoints import (
     agents,
     airgap,
     alert_explain,
+    alert_quarantine_release,
     alert_related,
     alert_scripts,
     alert_stale_review,
     alert_suppressions,
+    alert_ticket_rules,
     alert_vendor_actions,
     alert_why,
     alerts,
@@ -133,6 +135,8 @@ api_router.include_router(alert_vendor_actions.router)
 api_router.include_router(alert_scripts.router)
 api_router.include_router(alert_related.router)
 api_router.include_router(alert_suppressions.router)
+api_router.include_router(alert_ticket_rules.router)
+api_router.include_router(alert_quarantine_release.router)
 api_router.include_router(alert_why.router)
 api_router.include_router(abuse.router)
 api_router.include_router(alert_stale_review.router)

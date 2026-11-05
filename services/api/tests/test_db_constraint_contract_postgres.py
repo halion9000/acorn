@@ -14,6 +14,8 @@ import typing
 import pytest
 from app.api.v1.endpoints import alert_scripts as scripts
 from app.api.v1.endpoints.inbox_core_feed import SourceReport
+from app.services import alert_ticket_rules as ticket_rules
+from app.services import quarantine_release
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
@@ -28,8 +30,8 @@ CONTRACT = [
     (
         "vendor_actions",
         "action",
-        ["approve", "reject", "resolve", scripts.SCRIPT_ACTION],
-        "alert_vendor_actions.py (approve, reject, resolve) and alert_scripts.SCRIPT_ACTION",
+        ["approve", "reject", "resolve", scripts.SCRIPT_ACTION, ticket_rules.ACTION, quarantine_release.ACTION],
+        "alert_vendor_actions.py (approve, reject, resolve), alert_scripts.SCRIPT_ACTION and alert_ticket_rules.ACTION",
     ),
     (
         "vendor_actions",

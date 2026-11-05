@@ -32,6 +32,8 @@ from app.models.connector import Connector
 from app.models.tenant import Tenant
 from app.models.vendor_action import VendorAction
 from app.services import core_approvals
+from app.services.alert_ticket_rules import link_created_ticket
+from app.services.quarantine_release import note_quarantine_released
 from app.services.client_mapping import IncomingClient, upsert_clients
 from app.services.connector_run_log import record_if_changed
 from app.services.core_feed_cases import close_finished_cases, open_cases_for_new_alerts
@@ -495,7 +497,7 @@ class ClaimRequest(BaseModel):
 
 class ClaimedAction(BaseModel):
     id: uuid.UUID
-    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user", "bec_search"]
+    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user", "bec_search", "create_ticket", "release_quarantine"]
     incident_uid: str
     params: dict[str, Any]
 
@@ -588,6 +590,8 @@ async def claim_core_feed_actions(tenant_token: str, body: ClaimRequest, db: DBS
 class ActionResult(BaseModel):
     status: Literal["done", "failed"]
     message: str | None = Field(default=None, max_length=1000)
+    # For a create_ticket action that worked: the number HaloPSA gave the new ticket (digits). It is linked to the alert.
+    ticket_id: str | None = Field(default=None, pattern=r"^[0-9]{1,12}$")
 
 
 class ActionResultResponse(BaseModel):
@@ -614,6 +618,10 @@ async def report_core_feed_action_result(
                 )
             ).first()
             if row is not None:
+                if body.status == "done" and row.action == "release_quarantine" and row.alert_id is not None:
+                    await note_quarantine_released(db, tid, row.alert_id, now)
+                if body.status == "done" and row.action == "create_ticket" and body.ticket_id and row.alert_id is not None:
+                    await link_created_ticket(db, tid, row.alert_id, body.ticket_id, now)
                 if body.status == "done" and row.action == "resolve":
                     # The vendor accepted the resolution: mirror it now rather than waiting for the next closed-incident sweep. Same narrow rule as ``apply_closed``: never override an analyst's decision.
                     await db.execute(

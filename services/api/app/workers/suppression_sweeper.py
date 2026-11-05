@@ -14,6 +14,7 @@ from app.db.rls_sessions import mark_platform
 from app.services import worker_heartbeat
 from app.services.alert_stale import exempt_severities, exempt_tenant_ids, sweep_stale
 from app.services.alert_suppression import sweep
+from app.services.alert_ticket_rules import sweep_ticket_rules
 
 logger = structlog.get_logger()
 
@@ -36,6 +37,10 @@ async def run_suppression_sweeper(
                 done = await sweep(session)
                 if done["hidden"] or done["expired"]:
                     logger.info("alert_suppression.sweep", **done)
+                queued = await sweep_ticket_rules(session)
+                await session.commit()
+                if queued:
+                    logger.info("alert_ticket_rules.queued", queued=queued)
             if since_stale >= STALE_EVERY_SECONDS:
                 since_stale = 0
                 async with session_factory() as session:

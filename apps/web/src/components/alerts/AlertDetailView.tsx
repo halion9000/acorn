@@ -5,6 +5,8 @@ import { RunScriptButton } from './RunScriptButton';
 import { ScriptRunsSection } from './ScriptRunsSection';
 import { AlertContext, sourceLink } from './AlertContext';
 import { WhyRaised } from './WhyRaised';
+import { QuarantineRelease } from './QuarantineRelease';
+import { TicketRuleButton } from './TicketRuleButton';
 import { AlertDescription } from './AlertDescription';
 import { useState } from 'react';
 import useSWR from 'swr';
@@ -946,11 +948,15 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
 
             <AlertContext alert={alert} />
 
+            <QuarantineRelease alertId={alert.id} />
+
             <Section title="Description">
               <AlertDescription text={alert.description} />
             </Section>
 
             <WhyRaised alertId={alert.id} />
+
+            <TicketRuleButton alertId={alert.id} clientName={alert.clientName} />
 
             {alert.confidenceLabel && (
               <ConfidenceExplainability

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { TicketRules } from "./TicketRules";
 import { TicketSettings } from "./TicketSettings";
 
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function TicketSettingsPage() {
-  return <TicketSettings />;
+  return (
+    <>
+      <TicketSettings />
+      <TicketRules />
+    </>
+  );
 }

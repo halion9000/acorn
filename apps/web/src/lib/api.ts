@@ -1899,6 +1899,37 @@ export interface StaleSummary {
   by_severity: Record<string, number>;
 }
 
+/** A quarantined message an alert is about, and where releasing it stands (none, pending, claimed, done or failed). */
+export interface QuarantineInfo {
+  available: boolean;
+  recipient?: string | null;
+  sender?: string | null;
+  kind?: string | null;
+  state: 'none' | 'pending' | 'claimed' | 'done' | 'failed';
+  message?: string | null;
+  asked_at?: string | null;
+}
+
+/** A rule that opens a HaloPSA ticket for every alert of one type. */
+export interface TicketRule {
+  id: string;
+  scope: 'client' | 'all';
+  client_id?: string | null;
+  client_name?: string | null;
+  source?: string | null;
+  title: string;
+  created_at: string;
+  active: boolean;
+  queued_now?: number;
+}
+
+export const ticketRulesApi = {
+  /** Make a rule from an alert: its type, for its client or for every client, from now on (and this alert now if it has no ticket). */
+  make: (alertId: string, scope: 'client' | 'all') => request<TicketRule>('/api/v1/alert-ticket-rules', { method: 'POST', body: JSON.stringify({ alert_id: alertId, scope }) }),
+  list: () => request<TicketRule[]>('/api/v1/alert-ticket-rules'),
+  turnOff: (id: string) => request<TicketRule>(`/api/v1/alert-ticket-rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
 export const alertsApi = {
   /** Alerts set aside as stale (quiet for a month, not critical or high, in no case): how many, and the rule. */
   staleSummary: (clientId?: string) => request<StaleSummary>('/api/v1/alert-stale', { params: clientId ? { client_id: clientId } : {} }),
@@ -2008,6 +2039,10 @@ export const alertsApi = {
   related: (id: string) => request<{ items: RelatedAlert[]; more: number }>(`/api/v1/alerts/${id}/related`),
   /** The facts behind one alert: the tool, the rule, how sure it was and what it names. */
   why: (id: string) => request<{ facts: { label: string; value: string }[] }>(`/api/v1/alerts/${id}/why`),
+  /** Whether this alert is about a quarantined message that can be released from here, and where a release stands. */
+  quarantine: (id: string) => request<QuarantineInfo>(`/api/v1/alerts/${id}/quarantine`),
+  /** Ask CORE to release the quarantined message (the person has confirmed it is safe). */
+  releaseQuarantine: (id: string) => request<QuarantineInfo>(`/api/v1/alerts/${id}/release-quarantine`, { method: 'POST', body: JSON.stringify({ confirm: true }) }),
 
   /** Link a ticket to the alert by hand, for one CORE could not match. Returns every ticket now linked. */
   addTicket: (id: string, body: { id: string; summary?: string; url?: string }) =>

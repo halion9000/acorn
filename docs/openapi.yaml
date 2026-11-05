@@ -1601,6 +1601,153 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-ticket-rules:
+    get:
+      tags:
+      - alerts
+      summary: List Ticket Rules
+      description: The active ticket rules, newest first.
+      operationId: list_ticket_rules_api_v1_alert_ticket_rules_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/TicketRuleOut'
+                type: array
+                title: Response List Ticket Rules Api V1 Alert Ticket Rules Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - alerts
+      summary: Make Ticket Rule
+      description: 'Make a rule from an alert: every alert of its type (for its client,
+        or for all clients) from now on gets a HaloPSA ticket, and this alert gets
+        one now if it has none.'
+      operationId: make_ticket_rule_api_v1_alert_ticket_rules_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketRuleIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketRuleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/alert-ticket-rules/{rule_id}:
+    delete:
+      tags:
+      - alerts
+      summary: Turn Off Ticket Rule
+      description: Turn a rule off. Tickets already requested or opened stay; no new
+        ones are made for the type.
+      operationId: turn_off_ticket_rule_api_v1_alert_ticket_rules__rule_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: rule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Rule Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketRuleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alerts/{alert_id}/quarantine:
+    get:
+      tags:
+      - alerts
+      summary: Quarantine Info
+      description: Whether this alert is about a quarantined message that can be released
+        from here, who it was for and where a release stands.
+      operationId: quarantine_info_api_v1_alerts__alert_id__quarantine_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuarantineInfo'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alerts/{alert_id}/release-quarantine:
+    post:
+      tags:
+      - alerts
+      summary: Release Quarantine
+      description: 'Ask CORE to release the quarantined message. Returns 202: nothing
+        has happened yet. Needs ``confirm: true``.'
+      operationId: release_quarantine_api_v1_alerts__alert_id__release_quarantine_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseRequest'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuarantineInfo'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}/why:
     get:
       tags:
@@ -23486,6 +23633,12 @@ components:
             maxLength: 1000
           - type: 'null'
           title: Message
+        ticket_id:
+          anyOf:
+          - type: string
+            pattern: ^[0-9]{1,12}$
+          - type: 'null'
+          title: Ticket Id
       type: object
       required:
       - status
@@ -27723,6 +27876,8 @@ components:
           - disable_user
           - enable_user
           - bec_search
+          - create_ticket
+          - release_quarantine
           title: Action
         incident_uid:
           type: string
@@ -40508,6 +40663,45 @@ components:
       - view_count
       - created_at
       title: PublishedSummary
+    QuarantineInfo:
+      properties:
+        available:
+          type: boolean
+          title: Available
+        recipient:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Recipient
+        sender:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sender
+        kind:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Kind
+        state:
+          type: string
+          title: State
+          default: none
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        asked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Asked At
+      type: object
+      required:
+      - available
+      title: QuarantineInfo
     QueryRequest:
       properties:
         question:
@@ -41239,6 +41433,14 @@ components:
         under (``principal``, ``network``, ``workflow``, ``tenant``). One
 
         entity belongs to exactly one group; we don''t duplicate rows.'
+    ReleaseRequest:
+      properties:
+        confirm:
+          type: boolean
+          title: Confirm
+          default: false
+      type: object
+      title: ReleaseRequest
     RemoteToolsReport:
       properties:
         vendor:
@@ -47062,6 +47264,70 @@ components:
       required:
       - mode
       title: TicketChoice
+    TicketRuleIn:
+      properties:
+        alert_id:
+          type: string
+          format: uuid
+          title: Alert Id
+        scope:
+          type: string
+          enum:
+          - client
+          - all
+          title: Scope
+      type: object
+      required:
+      - alert_id
+      - scope
+      title: TicketRuleIn
+    TicketRuleOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        scope:
+          type: string
+          title: Scope
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source
+        title:
+          type: string
+          title: Title
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        active:
+          type: boolean
+          title: Active
+        queued_now:
+          type: integer
+          title: Queued Now
+          default: 0
+      type: object
+      required:
+      - id
+      - scope
+      - title
+      - created_at
+      - active
+      title: TicketRuleOut
     TicketSettings:
       properties:
         close_status:
