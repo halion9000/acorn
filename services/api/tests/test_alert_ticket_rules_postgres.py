@@ -255,3 +255,160 @@ async def test_a_cipp_closure_for_a_released_message_closes_its_alert_records_wh
     ).all()
     assert {n[0] for n in notes} == {ids["fresh"], ids["working"]}
     assert all("someone else" in n[1] and n[2] == ["555"] for n in notes)
+
+
+async def _release_alert(world, key, *, status="new", minutes_ago=5, uid=None, enrichment=None):
+    client = world.info["client"]
+    alert_id = uuid.uuid4()
+    world.info["ids"][key] = alert_id
+    raw = {
+        "source": "cipp",
+        "finding": {"uid": uid or f"quarantine-release:t1:{key}"},
+        "unmapped": {
+            "context": {
+                "cipp_tenant_id": "t1-guid",
+                "quarantine_identity": f"id-{key}",
+                "username": "kim@acme.com",
+                "sender": "x@y.example",
+                "quarantine_type": "HighConfPhish",
+            }
+        },
+    }
+    await world.execute(
+        text(
+            "insert into alerts (id, tenant_id, title, severity, status, priority, raw_event, enrichment_data, created_at, updated_at) "
+            "values (:i, :t, 'A user asked to release a quarantined message', 'low', :st, 50, cast(:raw as jsonb), cast(:enr as jsonb), :at, :at)"
+        ),
+        {
+            "i": alert_id,
+            "t": client,
+            "st": status,
+            "raw": json.dumps(raw),
+            "enr": json.dumps(enrichment or {}),
+            "at": NOW - timedelta(minutes=minutes_ago),
+        },
+    )
+    return alert_id
+
+
+async def test_each_new_release_alert_is_checked_once_as_it_arrives_and_nothing_else_is(world):
+    from app.services.quarantine_release import queue_auto_checks
+
+    await off(world)
+    fresh = await _release_alert(world, "r_fresh")
+    await _release_alert(world, "r_old", minutes_ago=4 * 24 * 60)
+    await _release_alert(world, "r_done", status="resolved")
+    await _release_alert(world, "r_other_kind", uid="phish-report:t1:x")
+    asked_before = await _release_alert(world, "r_asked_before")
+    await world.execute(
+        text(
+            "insert into vendor_actions (id, tenant_id, alert_id, vendor, incident_uid, action, params, status) values (gen_random_uuid(), :t, :a, 'core', 'q', 'quarantine_check', '{}'::jsonb, 'failed')"
+        ),
+        {"t": world.info["client"], "a": asked_before},
+    )
+    await world.commit()
+    await off(world)
+    assert (
+        await queue_auto_checks(world, NOW) == 1
+    ), "the fresh release alert only: not an old one, a finished one, another kind of alert, or one already checked (even if that check failed)"
+    await world.commit()
+    await off(world)
+    rows = (
+        await world.execute(
+            text("select alert_id, params, status, vendor from vendor_actions where action = 'quarantine_check' and alert_id = :a"),
+            {"a": fresh},
+        )
+    ).all()
+    assert len(rows) == 1 and rows[0][2] == "pending" and rows[0][3] == "core"
+    assert rows[0][1] == {
+        "client_id": "t1-guid",
+        "quarantine_identity": "id-r_fresh",
+        "auto": True,
+    }, "only which message and which client: a read, never a release"
+    assert await queue_auto_checks(world, NOW) == 0, "a second pass asks for nothing more"
+
+
+async def test_a_finished_check_is_kept_on_the_alert_and_put_on_its_tickets_once_whenever_the_ticket_comes(world):
+    from app.services.quarantine_release import store_quarantine_check
+
+    await off(world)
+    client = world.info["client"]
+    with_ticket = await _release_alert(world, "c_ticket", enrichment={"tickets": [{"system": "halopsa", "id": "555"}]})
+    without = await _release_alert(world, "c_none")
+    await world.commit()
+    await off(world)
+    assert await store_quarantine_check(world, client, with_ticket, "Looks malicious or fake: do not release it.", NOW) is True
+    assert await store_quarantine_check(world, client, without, "Not clear either way.", NOW) is True
+    await world.commit()
+    await off(world)
+    notes = (
+        await world.execute(
+            text(
+                "select alert_id, params ->> 'note', params -> 'ticket_ids' from vendor_actions where action = 'ticket_note' and tenant_id = :t"
+            ),
+            {"t": client},
+        )
+    ).all()
+    assert [n[0] for n in notes] == [with_ticket], "a ticket exists: the note is queued; none exists yet: not"
+    assert notes[0][2] == ["555"] and "Looks malicious or fake" in notes[0][1] and "read only" in notes[0][1]
+    saved = {
+        r[0]: r[1]
+        for r in (
+            await world.execute(
+                text("select id, enrichment_data -> 'quarantine_check' from alerts where id = any(:ids)"), {"ids": [with_ticket, without]}
+            )
+        ).all()
+    }
+    assert (
+        saved[with_ticket]["ticketed"] is True and saved[without]["ticketed"] is False and saved[without]["text"] == "Not clear either way."
+    )
+    # the ticket for the second alert is made later by a rule: the finished check goes on it then, once
+    assert await svc.link_created_ticket(world, client, without, "9001", NOW) is True
+    assert await svc.link_created_ticket(world, client, without, "9001", NOW) is False
+    await world.commit()
+    await off(world)
+    late = (
+        await world.execute(
+            text("select params -> 'ticket_ids', params ->> 'note' from vendor_actions where action = 'ticket_note' and alert_id = :a"),
+            {"a": without},
+        )
+    ).all()
+    assert len(late) == 1 and late[0][0] == ["9001"] and "Not clear either way." in late[0][1]
+
+
+async def test_the_script_runs_of_an_alert_and_the_one_at_a_time_rule_for_scripts_ignore_tickets_releases_and_checks(world):
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints import alert_scripts as sc
+
+    await off(world)
+    client, alert_id = world.info["client"], await _release_alert(world, "s_alert")
+    for action in ("create_ticket", "release_quarantine", "ticket_note", "quarantine_check", "run_script"):
+        await world.execute(
+            text(
+                "insert into vendor_actions (id, tenant_id, alert_id, vendor, incident_uid, action, params, status) values (gen_random_uuid(), :t, :a, 'core', 'u', :act, cast(:p as jsonb), 'pending')"
+            ),
+            {
+                "t": client,
+                "a": alert_id,
+                "act": action,
+                "p": json.dumps({"script_name": "Clean temp files"} if action == "run_script" else {}),
+            },
+        )
+    await world.commit()
+    await off(world)
+    import contextlib
+
+    @contextlib.asynccontextmanager
+    async def scope(_db, _own, _id):
+        yield client
+
+    real = sc.alert_scope
+    sc.alert_scope = scope
+    try:
+        runs = await sc.alert_script_runs(alert_id, SimpleNamespace(tenant_id=world.info["owner"]), world)
+    finally:
+        sc.alert_scope = real
+    assert [r.script_name for r in runs] == [
+        "Clean temp files"
+    ], "only the script run: the ticket, the release, the note and the check are not scripts"

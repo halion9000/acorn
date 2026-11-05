@@ -15,6 +15,7 @@ from app.services import worker_heartbeat
 from app.services.alert_stale import exempt_severities, exempt_tenant_ids, sweep_stale
 from app.services.alert_suppression import sweep
 from app.services.alert_ticket_rules import sweep_ticket_rules
+from app.services.quarantine_release import queue_auto_checks
 
 logger = structlog.get_logger()
 
@@ -38,9 +39,12 @@ async def run_suppression_sweeper(
                 if done["hidden"] or done["expired"]:
                     logger.info("alert_suppression.sweep", **done)
                 queued = await sweep_ticket_rules(session)
+                checks = await queue_auto_checks(session)
                 await session.commit()
                 if queued:
                     logger.info("alert_ticket_rules.queued", queued=queued)
+                if checks:
+                    logger.info("quarantine_checks.queued", queued=checks)
             if since_stale >= STALE_EVERY_SECONDS:
                 since_stale = 0
                 async with session_factory() as session:

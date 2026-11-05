@@ -67,14 +67,10 @@ def released_record(enrichment: Any, state: str, said: str | None, asked: dateti
         return state, said, asked
     by = str(rec.get("by") or "")
     when = str(rec.get("released_at") or "")[:16].replace("T", " ")
-    who = (
-        "released by someone else in Microsoft 365"
-        if by == ELSEWHERE
-        else f"released from A.C.O.R.N by {by}"
-        if by and by != "A.C.O.R.N"
-        else "released from A.C.O.R.N"
-    )
-    return "done", f"Already {who}{f' ({when} UTC)' if when else ''}.", asked
+    stamp = f" ({when} UTC)" if when else ""
+    if by == ELSEWHERE:
+        return "done", f"Already released by someone else in Microsoft 365{stamp}.", asked
+    return "done", f"Released from A.C.O.R.N{f' by {by}' if by and by != 'A.C.O.R.N' else ''}{stamp}.", asked
 
 
 def check_state_of(rows: list[Any], now: datetime) -> tuple[str, str | None, datetime | None]:

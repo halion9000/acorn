@@ -39,7 +39,7 @@ from app.services.core_feed_cases import close_finished_cases, open_cases_for_ne
 from app.services.core_feed_sla import record_closure_events
 from app.services.iocs_from_alerts import sync_children_throttled as sync_iocs_throttled
 from app.services.mssp_snapshots import snapshot_children_throttled
-from app.services.quarantine_release import ELSEWHERE, UID_PREFIX, note_quarantine_released
+from app.services.quarantine_release import ELSEWHERE, UID_PREFIX, note_quarantine_released, store_quarantine_check
 from app.services.vendor_actions import CLAIMED_TTL, PENDING_TTL
 
 logger = logging.getLogger(__name__)
@@ -642,6 +642,8 @@ async def report_core_feed_action_result(
                 )
             ).first()
             if row is not None:
+                if body.status == "done" and row.action == "quarantine_check" and row.alert_id is not None and body.message:
+                    await store_quarantine_check(db, tid, row.alert_id, body.message, now)
                 if body.status == "done" and row.action == "release_quarantine" and row.alert_id is not None:
                     by = ELSEWHERE if body.already_released else str((row.params or {}).get("requested_by_name") or "A.C.O.R.N")[:200]
                     await note_quarantine_released(db, tid, row.alert_id, now, by=by)

@@ -290,7 +290,7 @@ def test_an_alert_that_records_a_release_reads_as_done_in_words_that_say_who_and
     info = asyncio.run(ep.quarantine_info(uuid.uuid4(), user(), FakeDB(Rows([alert(enrichment=e)]), Rows([]))))
     assert info.state == "done" and info.message == "Already released by someone else in Microsoft 365 (2026-11-05 12:00 UTC)."
     mine = {"quarantine_release": {"released_at": "2026-11-05T12:00:00+00:00", "by": "hal@goliveoak.com"}}
-    assert "released from A.C.O.R.N by hal@goliveoak.com" in ep.released_record(mine, "none", None, None)[1]
+    assert "Released from A.C.O.R.N by hal@goliveoak.com" in ep.released_record(mine, "none", None, None)[1]
     assert ep.released_record({}, "failed", "x", None) == ("failed", "x", None), "no record, nothing changes"
     db = FakeDB(Rows([alert(enrichment=e)]), Rows([]))
     with pytest.raises(HTTPException) as err:
@@ -383,3 +383,13 @@ def test_the_check_route_needs_identities_respond():
 
     found = {(m, p.replace("/api/v1", "", 1)): r for p, r in walk_routes(app.routes) for m in r.methods}
     assert set(required_permissions(found[("POST", "/alerts/{alert_id}/check-quarantine")])) == {"identities:respond"}
+
+
+def test_a_release_made_from_here_reads_as_released_and_only_one_made_elsewhere_reads_as_already_released():
+    mine = {"quarantine_release": {"released_at": "2026-11-05T18:16:00+00:00", "by": "hal@goliveoak.com"}}
+    assert ep.released_record(mine, "none", None, None)[1] == "Released from A.C.O.R.N by hal@goliveoak.com (2026-11-05 18:16 UTC)."
+    anon = {"quarantine_release": {"released_at": "2026-11-05T18:16:00+00:00", "by": "A.C.O.R.N"}}
+    assert ep.released_record(anon, "none", None, None)[1] == "Released from A.C.O.R.N (2026-11-05 18:16 UTC)."
+    other = {"quarantine_release": {"released_at": "2026-11-05T18:16:00+00:00", "by": "someone else"}}
+    assert ep.released_record(other, "none", None, None)[1] == "Already released by someone else in Microsoft 365 (2026-11-05 18:16 UTC)."
+    assert "Already" not in ep.released_record(mine, "none", None, None)[1]

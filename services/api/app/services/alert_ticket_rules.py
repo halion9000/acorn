@@ -27,7 +27,7 @@ from app.models.tenant import Tenant
 from app.models.vendor_action import VendorAction
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.alert_suppression import _acting, signature_of, source_of
-from app.services.quarantine_release import quarantine_of, release_link
+from app.services.quarantine_release import _queue_ticket_note, check_note, quarantine_of, release_link
 
 ACTION = "create_ticket"
 VENDOR = "core"
@@ -224,6 +224,11 @@ async def link_created_ticket(db: Any, tenant_id: uuid.UUID, alert_id: uuid.UUID
         }
     )
     enrichment["manual_tickets"] = manual
+    check = enrichment.get("quarantine_check")
+    if isinstance(check, dict) and check.get("text") and not check.get("ticketed"):
+        # The look into why the message was held finished before this ticket existed: put it on the ticket now (once).
+        _queue_ticket_note(db, tenant_id, alert.id, [ticket_id], check_note(str(check["text"])), now)
+        enrichment["quarantine_check"] = {**check, "ticketed": True}
     alert.enrichment_data = enrichment  # a new dict, so the JSONB column is seen as changed
     return True
 

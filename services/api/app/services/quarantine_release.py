@@ -8,7 +8,7 @@ allow list) to release it. Releasing is a decision a person makes each time: not
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -109,17 +109,96 @@ async def note_quarantine_released(
         alert.updated_at = now
     tickets = halo_ticket_ids(enrichment)
     if tickets:
-        db.add(
-            VendorAction(
-                id=uuid.uuid4(),
-                tenant_id=tenant_id,
-                alert_id=alert.id,
-                vendor=VENDOR,
-                incident_uid=f"ticket-note:{alert.id}"[:200],
-                action=TICKET_NOTE_ACTION,
-                params={"ticket_ids": tickets[:20], "note": release_note(by, now)},
-                status="pending",
-                created_at=now,
-            )
-        )
+        _queue_ticket_note(db, tenant_id, alert.id, tickets, release_note(by, now), now)
     return True
+
+
+AUTO_CHECK_WINDOW = timedelta(days=3)
+AUTO_CHECK_PER_PASS = 50
+
+
+async def queue_auto_checks(db: Any, now: datetime | None = None) -> int:
+    """Ask CORE to look into why the message was held for each new quarantine-release alert, once, as the alert arrives (so the answer is waiting when someone opens it). The caller owns the transaction.
+
+    Only alerts still open and raised in the last three days; never twice for one alert (any earlier check request, whatever became of it, stops another, so a failing read never loops); at most
+    ``AUTO_CHECK_PER_PASS`` a pass. Read-only on the Microsoft side: this only queues the look, never a release. Returns how many were queued."""
+    from app.db.rls_scope import acting_as_tenant, cross_tenant_reads  # noqa: PLC0415
+
+    now = now or datetime.now(UTC)
+    uid = Alert.raw_event["finding"]["uid"].astext
+    asked = select(VendorAction.alert_id).where(
+        VendorAction.vendor == VENDOR, VendorAction.action == CHECK_ACTION, VendorAction.alert_id.isnot(None)
+    )
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(Alert.id, Alert.tenant_id, Alert.raw_event)
+                .where(
+                    uid.like(f"{UID_PREFIX}%"),
+                    Alert.status.notin_(FINISHED_ALERT_STATUSES),
+                    Alert.created_at >= now - AUTO_CHECK_WINDOW,
+                    Alert.id.notin_(asked),
+                )
+                .order_by(Alert.created_at.desc())
+                .limit(AUTO_CHECK_PER_PASS)
+            )
+        ).all()
+    queued = 0
+    for alert_id, tenant_id, raw_event in rows:
+        message = quarantine_of(raw_event)
+        if message is None:
+            continue
+        async with acting_as_tenant(db, tenant_id):
+            db.add(
+                VendorAction(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant_id,
+                    alert_id=alert_id,
+                    vendor=VENDOR,
+                    incident_uid=f"quarantine:{message['identity']}"[:200],
+                    action=CHECK_ACTION,
+                    params={"client_id": message["client"], "quarantine_identity": message["identity"], "auto": True},
+                    status="pending",
+                    created_at=now,
+                )
+            )
+            await db.flush()
+        queued += 1
+    return queued
+
+
+def check_note(text: str) -> str:
+    """The note written on a ticket: what the look into the message found (pure)."""
+    return ("A.C.O.R.N looked into why the message was quarantined (read only):\n" + text)[:1500]
+
+
+async def store_quarantine_check(db: Any, tenant_id: Any, alert_id: Any, text: str, now: datetime) -> bool:
+    """Keep what CORE found on the alert, and put it on the alert's HaloPSA tickets as a note (once). Returns whether it was stored. The caller owns the transaction."""
+    alert = (await db.execute(select(Alert).where(Alert.id == alert_id, Alert.tenant_id == tenant_id))).scalar_one_or_none()
+    if alert is None:
+        return False
+    enrichment = dict(alert.enrichment_data) if isinstance(alert.enrichment_data, dict) else {}
+    record = {"text": text[:1000], "at": now.isoformat(), "ticketed": False}
+    tickets = halo_ticket_ids(enrichment)
+    if tickets:
+        _queue_ticket_note(db, tenant_id, alert.id, tickets, check_note(text), now)
+        record["ticketed"] = True
+    enrichment["quarantine_check"] = record
+    alert.enrichment_data = enrichment  # a new dict, so the JSONB column is seen as changed
+    return True
+
+
+def _queue_ticket_note(db: Any, tenant_id: Any, alert_id: Any, tickets: list[str], note: str, now: datetime) -> None:
+    db.add(
+        VendorAction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            alert_id=alert_id,
+            vendor=VENDOR,
+            incident_uid=f"ticket-note:{alert_id}"[:200],
+            action=TICKET_NOTE_ACTION,
+            params={"ticket_ids": tickets[:20], "note": note},
+            status="pending",
+            created_at=now,
+        )
+    )

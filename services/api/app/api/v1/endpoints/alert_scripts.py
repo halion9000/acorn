@@ -168,7 +168,7 @@ async def alert_script_runs(
             (
                 await db.execute(
                     select(VendorAction)
-                    .where(VendorAction.alert_id == alert_id, VendorAction.tenant_id == tid, VendorAction.vendor == SCRIPT_VENDOR)
+                    .where(VendorAction.alert_id == alert_id, VendorAction.tenant_id == tid, VendorAction.vendor == SCRIPT_VENDOR, VendorAction.action == SCRIPT_ACTION)
                     .order_by(VendorAction.created_at.desc())
                     .limit(20)
                 )
@@ -271,6 +271,7 @@ async def run_alert_script(
                     VendorAction.alert_id == alert.id,
                     VendorAction.tenant_id == tid,
                     VendorAction.vendor == SCRIPT_VENDOR,
+                    VendorAction.action == SCRIPT_ACTION,
                     VendorAction.status.in_(("pending", "claimed")),
                     VendorAction.created_at > now - PENDING_TTL,
                 )
@@ -393,6 +394,7 @@ async def run_script_bulk(
                             VendorAction.alert_id == alert.id,
                             VendorAction.tenant_id == tid,
                             VendorAction.vendor == SCRIPT_VENDOR,
+                            VendorAction.action == SCRIPT_ACTION,
                             VendorAction.status.in_(("pending", "claimed")),
                             VendorAction.created_at > now - PENDING_TTL,
                         )

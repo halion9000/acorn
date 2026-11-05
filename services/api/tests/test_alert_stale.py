@@ -138,6 +138,7 @@ def test_the_worker_sets_stale_alerts_aside_on_its_first_pass_and_then_only_once
     monkeypatch.setattr(sw, "sweep_stale", fake_stale)
     monkeypatch.setattr(sw, "exempt_tenant_ids", _no_exempt_clients)
     monkeypatch.setattr(sw, "sweep_ticket_rules", _no_ticket_rules)
+    monkeypatch.setattr(sw, "queue_auto_checks", _no_auto_checks)
     monkeypatch.setattr(sw, "sweep", fake_sweep)
     monkeypatch.setattr(sw, "mark_platform", lambda s: None)
     passes = {"n": 0}
@@ -177,4 +178,8 @@ async def _no_exempt_clients(_session):
 
 
 async def _no_ticket_rules(_session):
+    return 0
+
+
+async def _no_auto_checks(_session):
     return 0
