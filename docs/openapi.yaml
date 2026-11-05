@@ -6461,6 +6461,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/platform/credential-expiries:
+    get:
+      tags:
+      - platform
+      summary: List Credential Expiries
+      operationId: list_credential_expiries_api_v1_platform_credential_expiries_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rows'
+      security:
+      - HTTPBearer: []
+    put:
+      tags:
+      - platform
+      summary: Replace Credential Expiries
+      operationId: replace_credential_expiries_api_v1_platform_credential_expiries_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Entries'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rows'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/platform/update:
     get:
       tags:
@@ -32288,6 +32329,48 @@ components:
       - source
       - neighbors
       title: EntityNeighborsResponse
+    Entries:
+      properties:
+        entries:
+          items:
+            $ref: '#/components/schemas/Entry'
+          type: array
+          title: Entries
+      additionalProperties: false
+      type: object
+      required:
+      - entries
+      title: Entries
+    Entry:
+      properties:
+        name:
+          type: string
+          title: Name
+        expires_on:
+          type: string
+          title: Expires On
+      type: object
+      required:
+      - name
+      - expires_on
+      title: Entry
+    EntryRow:
+      properties:
+        name:
+          type: string
+          title: Name
+        expires_on:
+          type: string
+          title: Expires On
+        days_left:
+          type: integer
+          title: Days Left
+      type: object
+      required:
+      - name
+      - expires_on
+      - days_left
+      title: EntryRow
     EvalAttachRequest:
       properties:
         eval_report:
@@ -41796,6 +41879,17 @@ components:
           title: Hidden Nav
       type: object
       title: RoleUpdate
+    Rows:
+      properties:
+        entries:
+          items:
+            $ref: '#/components/schemas/EntryRow'
+          type: array
+          title: Entries
+      type: object
+      required:
+      - entries
+      title: Rows
     RuleActionWire:
       properties:
         set_severity:

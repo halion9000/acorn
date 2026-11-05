@@ -87,7 +87,8 @@ from app.api.v1.endpoints.metrics import PipelineHealth, PipelineStage
 from app.core.config import settings
 from app.models.alert import Alert
 from app.models.connector import Connector
-from app.services import worker_heartbeat
+from app.models.tenant import Tenant
+from app.services import credential_expiry, worker_heartbeat
 from app.services.connector_freshness import compute_freshness
 from app.services.llm_health import llm_status
 from app.services.runtime_stats import feed_receipts, loop_lag, slow_routes
@@ -1024,6 +1025,18 @@ def old_credentials(
     return sorted(out, key=lambda c: -c["age_days"])
 
 
+async def _credential_expiries_or_none(db: Any, user: Any) -> list[dict[str, Any]] | None:
+    """The owner's credential reminders with days left, or None when they cannot be read (the page then shows no reminder warnings rather than failing)."""
+    try:
+        async with db.begin_nested():
+            owner = await db.get(Tenant, user.tenant_id)
+        return credential_expiry.with_days_left(
+            credential_expiry.stored_entries(getattr(owner, "settings", None)), datetime.now(UTC).date()
+        )
+    except Exception:  # noqa: BLE001 - extra detail on a health page must not take it down
+        return None
+
+
 async def _old_credentials_or_none(db: Any, user: Any) -> list[dict[str, Any]] | None:
     """Old credentials of the caller's own tenant, or None when they cannot be read."""
     try:
@@ -1074,6 +1087,7 @@ def platform_warnings(
     loop: dict[str, Any] | None = None,
     failing_connectors: list[str] | None = None,
     secret: dict[str, Any] | None = None,
+    credential_expiries: list[dict[str, Any]] | None = None,
     old_creds: list[dict[str, Any]] | None = None,
     alerts_kept_forever: bool = False,
     llm: dict[str, Any] | None = None,
@@ -1135,6 +1149,7 @@ def platform_warnings(
                 "text": f"The Microsoft sign-in client secret {when} ({secret['expires_on']}): create a new one in Entra (Certificates & secrets) and update it, or nobody can sign in with Microsoft",
             }
         )
+    out.extend(credential_expiry.warning_rows(credential_expiries or []))
     if old_creds:
         shown = ", ".join(f"{c['kind']} ({c['age_days']} days)" for c in old_creds[:4]) + (
             f" and {len(old_creds) - 4} more" if len(old_creds) > 4 else ""
@@ -1241,6 +1256,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
     workers = worker_heartbeat.snapshot()
     failing = await _failing_connectors_or_none(db, user)
     secret = secret_expiry_row(settings.MICROSOFT_CLIENT_SECRET_EXPIRES, datetime.now(UTC).date())
+    expiries = await _credential_expiries_or_none(db, user)
     old_creds = await _old_credentials_or_none(db, user)
     return {
         "overall": "degraded" if down else "ok",
@@ -1265,6 +1281,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
             loop=loop,
             failing_connectors=failing,
             secret=secret,
+            credential_expiries=expiries,
             old_creds=old_creds,
             alerts_kept_forever=settings.RETENTION_ALERTS_DAYS <= 0 and not settings.RETENTION_ALERTS_KEEP_FOREVER_OK,
             llm=llm_status(),

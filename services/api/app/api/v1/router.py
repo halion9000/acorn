@@ -89,6 +89,7 @@ from app.api.v1.endpoints import (
     phishing,
     platform_alert_email,
     platform_azure_spend,
+    platform_credential_expiries,
     platform_tenant_access,
     platform_update,
     playbook_dry_runs,
@@ -172,6 +173,7 @@ api_router.include_router(graph.router)
 api_router.include_router(playbooks.router)
 api_router.include_router(playbook_dry_runs.router)
 api_router.include_router(platform_alert_email.router)
+api_router.include_router(platform_credential_expiries.router)
 api_router.include_router(platform_update.router)
 api_router.include_router(platform_azure_spend.router)
 api_router.include_router(global_search.router)
