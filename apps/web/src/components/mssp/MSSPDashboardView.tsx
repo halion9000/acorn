@@ -321,6 +321,7 @@ export default function MSSPDashboardView() {
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">SLA Breaches</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Connectors</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Connectors switched on for this client, and how many of them report a problem right now">Connector health</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Alerts nobody touched for a while that were set aside for review (never deleted). They are not in the open count.">Stale alerts</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Health</th>
                       <th scope="col" className="px-2.5 py-3 font-medium">Last Snapshot</th>
                       <th scope="col" className="px-2.5 py-3 font-medium" title="Which clients automated playbooks may run for. Playbooks do not start by themselves yet; this records the choice.">Automated playbooks</th>
@@ -363,6 +364,7 @@ export default function MSSPDashboardView() {
                         <td data-testid="connector-health" className={clsx('px-2.5 py-3 text-right', (t.connectors_unhealthy ?? 0) > 0 ? 'font-medium text-red-400' : 'text-gray-300')}>
                           {connectorHealthLabel(t.connectors_enabled, t.connectors_unhealthy)}
                         </td>
+                        <td data-testid="stale-alerts" className="px-2.5 py-3 text-right text-gray-300">{figure(t.stale_alerts)}</td>
                         <td className="px-2.5 py-3 text-right text-gray-300">{figure(t.health_score, { decimals: 0 })}</td>
                         <td className="px-2.5 py-3 text-gray-400">{snapshotLabel(t.snapshot_at)}</td>
                         <td className="px-2.5 py-3">

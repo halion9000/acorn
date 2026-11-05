@@ -36817,6 +36817,11 @@ components:
           - type: integer
           - type: 'null'
           title: Connectors Unhealthy
+        stale_alerts:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Stale Alerts
       type: object
       required:
       - tenant_id

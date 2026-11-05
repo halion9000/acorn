@@ -610,6 +610,8 @@ export interface ManagedTenantRow {
   /** The client's own connectors right now: switched on, and how many of those are unhealthy or degraded. Absent from an older server, null when they could not be read. */
   connectors_enabled?: number | null;
   connectors_unhealthy?: number | null;
+  /** Alerts set aside as stale right now. Absent from an older server, null when they could not be read. */
+  stale_alerts?: number | null;
 }
 
 export interface AlertScriptRun {

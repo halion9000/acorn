@@ -429,12 +429,19 @@ async def child_progress(
     end_day = datetime.now(UTC).date()
     start_day = end_day - timedelta(days=days - 1)
     rows = (
-        await db.execute(
-            select(MSSPTenantMetrics)
-            .where(MSSPTenantMetrics.tenant_id == child_id, MSSPTenantMetrics.snapshot_at >= datetime.combine(start_day, datetime.min.time(), tzinfo=UTC))
-            .order_by(MSSPTenantMetrics.snapshot_at)
+        (
+            await db.execute(
+                select(MSSPTenantMetrics)
+                .where(
+                    MSSPTenantMetrics.tenant_id == child_id,
+                    MSSPTenantMetrics.snapshot_at >= datetime.combine(start_day, datetime.min.time(), tzinfo=UTC),
+                )
+                .order_by(MSSPTenantMetrics.snapshot_at)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     measures = []
     for key, label, lower_is_better in _PROGRESS_MEASURES:
         series = daily_series([(r.snapshot_at, getattr(r, key)) for r in rows], start_day, end_day)
@@ -908,6 +915,8 @@ class ManagedTenantRow(BaseModel):
     # The client's own connectors right now (not the snapshot): how many are switched on, and how many of those report unhealthy or degraded. None when they could not be read: never read that as "0 failing".
     connectors_enabled: int | None = None
     connectors_unhealthy: int | None = None
+    # Alerts set aside as stale (never deleted) right now. None when they could not be read: never read that as "0".
+    stale_alerts: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -975,6 +984,23 @@ async def _connector_health(db: AsyncSession, child_ids: list[uuid.UUID]) -> dic
     return out
 
 
+async def _stale_counts(db: AsyncSession, child_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    """For each client: how many alerts are set aside as stale. Clients with none are absent. Raises when the read fails; the caller decides what to show then."""
+    if not child_ids:
+        return {}
+    from app.db.rls_scope import cross_tenant_reads
+    from app.models.alert import Alert
+    from app.services.alert_status import STALE
+
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(Alert.tenant_id, func.count()).where(Alert.tenant_id.in_(child_ids), Alert.status == STALE).group_by(Alert.tenant_id)
+            )
+        ).all()
+    return {tenant_id: int(n) for tenant_id, n in rows}
+
+
 def _mean(values: list[float]) -> float | None:
     return round(sum(values) / len(values), 1) if values else None
 
@@ -1026,10 +1052,15 @@ async def list_managed_tenants(
     except Exception:  # noqa: BLE001 - the list must still load; the counts then read "unknown", not zero
         logging.getLogger(__name__).warning("mssp: connector health could not be read", exc_info=True)
         health = None
+    try:
+        stale: dict[uuid.UUID, int] | None = await _stale_counts(db, [c.id for c in children])
+    except Exception:  # noqa: BLE001 - same: the list still loads, the column then reads unknown
+        logging.getLogger(__name__).warning("mssp: stale alert counts could not be read", exc_info=True)
+        stale = None
     rows: list[ManagedTenantRow] = []
     for child in children:
         snap = snaps.get(child.id)
-        enabled, bad = (health.get(child.id, (0, 0)) if health is not None else (None, None))
+        enabled, bad = health.get(child.id, (0, 0)) if health is not None else (None, None)
         rows.append(
             ManagedTenantRow(
                 tenant_id=str(child.id),
@@ -1048,6 +1079,7 @@ async def list_managed_tenants(
                 connector_count=snap.connector_count if snap is not None else None,
                 connectors_enabled=enabled,
                 connectors_unhealthy=bad,
+                stale_alerts=(stale.get(child.id, 0) if stale is not None else None),
             )
         )
     return rows
