@@ -1172,8 +1172,9 @@ paths:
         vendor. CORE collects it within about
 
         15 seconds, reads that tool''s changed and open incidents, and reports back;
-        the alert''s state then updates by itself. Only an alert that carries its
-        tool''s incident id can be re-checked.'
+        the alert''s state then updates by itself. Works for a tool alert (Huntress,
+        Blumira, Field Effect), a CIPP finding (the CIPP feed is re-read) and a remote-tool
+        alert (CORE scans the devices again); anything else answers 422.'
       operationId: refresh_alert_status_api_v1_alerts__alert_id__refresh_post
       security:
       - HTTPBearer: []

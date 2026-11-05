@@ -34,6 +34,7 @@ from app.services.vendor_actions import (
     effective_status,
     problem_with_request,
     problem_with_resolve_only,
+    refresh_vendor_and_uid,
     vendor_account_id,
 )
 
@@ -413,15 +414,15 @@ async def refresh_alert_status(
     """Ask CORE to re-read this alert's tool now, so its status here catches up with the tool's.
 
     It leaves the same request the Sync button on a connector card leaves, for that one tool only: other tools are not asked, and nothing here reaches the vendor. CORE collects it within about
-    15 seconds, reads that tool's changed and open incidents, and reports back; the alert's state then updates by itself. Only an alert that carries its tool's incident id can be re-checked.
+    15 seconds, reads that tool's changed and open incidents, and reports back; the alert's state then updates by itself. Works for a tool alert (Huntress, Blumira, Field Effect), a CIPP finding (the CIPP feed is re-read) and a remote-tool alert (CORE scans the devices again); anything else answers 422.
     """
     async with alert_scope(db, current_user.tenant_id, alert_id) as tid:
         alert = await _alert(db, alert_id, tid)
-        found = alert_vendor_and_uid(alert.raw_event)
+        found = refresh_vendor_and_uid(alert.raw_event)
     if found is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Only a Huntress, Blumira or Field Effect alert that carries its incident id can be re-checked.",
+            detail="This alert has no source A.C.O.R.N can ask CORE to re-read (a Huntress, Blumira, Field Effect, CIPP or remote-tool alert can be).",
         )
     vendor, uid = found
     now = datetime.now(UTC)

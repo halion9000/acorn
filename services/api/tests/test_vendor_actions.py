@@ -427,3 +427,34 @@ async def test_refresh_says_so_when_nothing_feeds_that_tool_or_the_alert_has_no_
     with pytest.raises(HTTPException) as e:
         await _refresh(_refresh_db(_alert(source="petra", uid="petra:7")))
     assert e.value.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_refresh_also_works_for_a_cipp_finding_and_a_remote_tool_alert_by_asking_the_feed_that_reads_them(_audit):
+    for source, uid, feed in (
+        ("cipp", "defender:abc123", "cipp"),
+        ("cipp", "quarantine-release:t:1", "cipp"),
+        ("cipp", "entra-risk:u1", "cipp"),
+        ("aisoc-remote-tools", "aisoc-remote-foreign:screenconnect:pc-1:d031906d9b70af1e", "ninjaone"),
+    ):
+        db = _refresh_db(_alert(source=source, uid=uid, state=None))
+        out = await _refresh(db)
+        sql, params = _sql(db.seen[-1])
+        assert out.vendor == feed, (source, uid)
+        assert sql.startswith("UPDATE connectors") and feed in params.values() and "core_feed" in params.values()
+    # an alert with no readable source (a rule A.C.O.R.N runs itself) is still refused, and says what can be re-read
+    with pytest.raises(HTTPException) as e:
+        await _refresh(_refresh_db(_alert(source="aisoc-identity-detections", uid="aisoc-id-impossible-travel:u1", state=None)))
+    assert e.value.status_code == 422 and "CIPP" in e.value.detail
+
+
+def test_which_feed_re_reads_an_alerts_source_is_decided_by_its_record_alone():
+    from app.services.vendor_actions import refresh_vendor_and_uid as which
+
+    assert which({"source": "huntress", "finding": {"uid": "huntress:7"}}) == ("huntress", "huntress:7")
+    assert which({"source": "aisoc-remote-tools", "finding": {"uid": "x:1"}}) == ("ninjaone", "x:1")
+    assert which({"source": "aisoc-remote-tools"}) == ("ninjaone", None)
+    assert which({"finding": {"uid": "phish-report:9"}}) == ("cipp", "phish-report:9")
+    assert which({"finding": {"uid": "petra:9"}}) is None
+    for odd in (None, "x", [], {}, {"finding": "defender:1"}, {"finding": {"uid": 5}}):
+        assert which(odd) is None

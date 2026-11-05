@@ -78,6 +78,30 @@ def alert_vendor_and_uid(raw_event: Any) -> tuple[str, str] | None:
     return None
 
 
+# What re-reading an alert's source means when it is not one of the tools A.C.O.R.N can act on: CORE's CIPP feed carries these kinds of record, and the remote-tool alerts A.C.O.R.N raises itself come from the
+# device scan CORE does through NinjaOne (its Sync request also rescans the remote tools).
+CIPP_UID_PREFIXES = ("defender:", "entra-risk:", "phish-report:", "quarantine-release:")
+REMOTE_TOOLS_SOURCE = "aisoc-remote-tools"
+REMOTE_TOOLS_FEED = "ninjaone"
+
+
+def refresh_vendor_and_uid(raw_event: Any) -> tuple[str, str | None] | None:
+    """(the CORE feed whose Sync re-reads this alert's source, the alert's incident id if it has one), or None when nothing can be re-read for it (pure).
+    A tool alert (Huntress, Blumira, Field Effect) as before; a CIPP finding (Defender, risky sign-in, phish report, quarantined message) re-reads the CIPP feed; a remote-tool alert asks for a new device scan."""
+    acted = alert_vendor_and_uid(raw_event)
+    if acted is not None:
+        return acted
+    if not isinstance(raw_event, dict):
+        return None
+    finding = raw_event.get("finding")
+    uid = finding.get("uid") if isinstance(finding, dict) else None
+    if raw_event.get("source") == REMOTE_TOOLS_SOURCE:
+        return REMOTE_TOOLS_FEED, uid if isinstance(uid, str) else None
+    if isinstance(uid, str) and uid.startswith(CIPP_UID_PREFIXES):
+        return "cipp", uid
+    return None
+
+
 def vendor_account_id(raw_event: Any) -> str | None:
     """The Blumira account (client) id an alert came from, kept in the record's context; needed to resolve through an MSP key. None when absent."""
     ctx = (
