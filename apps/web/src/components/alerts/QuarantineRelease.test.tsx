@@ -3,11 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
-const api = vi.hoisted(() => ({ quarantine: vi.fn(), releaseQuarantine: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/lib/api', () => ({ alertsApi: { quarantine: api.quarantine, releaseQuarantine: api.releaseQuarantine } }));
+const api = vi.hoisted(() => ({ quarantine: vi.fn(), releaseQuarantine: vi.fn(), checkQuarantine: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/api', () => ({ alertsApi: { quarantine: api.quarantine, releaseQuarantine: api.releaseQuarantine, checkQuarantine: api.checkQuarantine } }));
 vi.mock('react-hot-toast', () => ({ default: api.toast }));
 
-import { QuarantineRelease, releaseStateText } from './QuarantineRelease';
+import { QuarantineRelease, checkLines, releaseStateText } from './QuarantineRelease';
 
 const info = (over: Record<string, unknown> = {}) => ({ available: true, recipient: 'kim@acme.com', sender: 'ceo@lookalike.example', kind: 'HighConfPhish', state: 'none', ...over });
 const show = () =>
@@ -20,6 +20,7 @@ const show = () =>
 beforeEach(() => {
   api.quarantine.mockReset();
   api.releaseQuarantine.mockReset();
+  api.checkQuarantine.mockReset();
   api.toast.success.mockReset();
   api.toast.error.mockReset();
 });
@@ -87,5 +88,69 @@ describe('releaseStateText', () => {
     expect(t('done')).toBe('Released.');
     expect(t('failed')).toBe('Not released: CORE did not say why.');
     expect(t('none')).toBe('');
+  });
+});
+
+const TEXT = 'Looks malicious or fake: do not release it.\n[BAD] Sender checks: SPF fail, DKIM none, DMARC fail (action reject)\n[CHECK] Replies go elsewhere: the reply address is at elsewhere.example\n[-] Why Microsoft held it: classified as spam\n[OK] Something fine: ok';
+
+describe('checkLines', () => {
+  it('splits the advice from the findings and reads each mark', () => {
+    const c = checkLines(TEXT);
+    expect(c.advice).toBe('Looks malicious or fake: do not release it.');
+    expect(c.findings.map((f) => [f.word, f.text.slice(0, 20)])).toEqual([
+      ['bad', 'Sender checks: SPF f'],
+      ['check', 'Replies go elsewhere'],
+      ['info', 'Why Microsoft held i'],
+      ['ok', 'Something fine: ok'],
+    ]);
+    expect(checkLines('Only an advice').findings).toEqual([]);
+    expect(checkLines('Advice\nplain line without a mark').findings[0]).toMatchObject({ word: 'info', text: 'plain line without a mark' });
+  });
+});
+
+describe('checking why it was held', () => {
+  it('offers the check, asks for it, and shows CORE as looking', async () => {
+    api.quarantine.mockResolvedValue(info({ check_state: 'none' }));
+    api.checkQuarantine.mockResolvedValue(info({ check_state: 'pending' }));
+    const user = userEvent.setup();
+    show();
+    await user.click(await screen.findByRole('button', { name: 'Check why it was held' }));
+    await waitFor(() => expect(api.checkQuarantine).toHaveBeenCalledWith('a1'));
+  });
+
+  it('shows what was found: the advice first, then each finding marked', async () => {
+    api.quarantine.mockResolvedValue(info({ check_state: 'done', check_text: TEXT }));
+    show();
+    expect(await screen.findByTestId('check-advice')).toHaveTextContent('Looks malicious or fake: do not release it.');
+    const findings = screen.getAllByTestId('check-finding');
+    expect(findings).toHaveLength(4);
+    expect(findings[0]).toHaveTextContent('bad');
+    expect(findings[0]).toHaveTextContent('SPF fail, DKIM none, DMARC fail');
+    expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument();
+  });
+
+  it('says while CORE is looking, with no button, and says why a check failed', async () => {
+    api.quarantine.mockResolvedValue(info({ check_state: 'claimed' }));
+    const a = show();
+    expect(await screen.findByText('CORE is looking into why it was held…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Check why it was held|Check again/ })).toBeNull();
+    a.unmount();
+    api.quarantine.mockResolvedValue(info({ check_state: 'failed', check_text: 'Microsoft 365 does not list this message any more.' }));
+    show();
+    expect(await screen.findByText(/Could not check it: Microsoft 365 does not list this message any more\./)).toBeInTheDocument();
+  });
+
+  it('offers no check from a server that does not know about it, and says what was refused', async () => {
+    api.quarantine.mockResolvedValue(info());
+    const a = show();
+    await screen.findByTestId('quarantine-release');
+    expect(screen.queryByRole('button', { name: 'Check why it was held' })).toBeNull();
+    a.unmount();
+    api.quarantine.mockResolvedValue(info({ check_state: 'none' }));
+    api.checkQuarantine.mockRejectedValueOnce(new Error('A check for this message is already waiting for CORE'));
+    const user = userEvent.setup();
+    show();
+    await user.click(await screen.findByRole('button', { name: 'Check why it was held' }));
+    await waitFor(() => expect(api.toast.error).toHaveBeenCalledWith('A check for this message is already waiting for CORE'));
   });
 });

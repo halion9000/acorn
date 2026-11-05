@@ -1908,6 +1908,10 @@ export interface QuarantineInfo {
   state: 'none' | 'pending' | 'claimed' | 'done' | 'failed';
   message?: string | null;
   asked_at?: string | null;
+  /** The read-only look at why it was held, and what CORE found (plain text, first line is the advice). Absent from an older server. */
+  check_state?: 'none' | 'pending' | 'claimed' | 'done' | 'failed';
+  check_text?: string | null;
+  check_at?: string | null;
 }
 
 /** A rule that opens a HaloPSA ticket for every alert of one type. */
@@ -2042,6 +2046,7 @@ export const alertsApi = {
   /** Whether this alert is about a quarantined message that can be released from here, and where a release stands. */
   quarantine: (id: string) => request<QuarantineInfo>(`/api/v1/alerts/${id}/quarantine`),
   /** Ask CORE to release the quarantined message (the person has confirmed it is safe). */
+  checkQuarantine: (id: string) => request<QuarantineInfo>(`/api/v1/alerts/${id}/check-quarantine`, { method: 'POST' }),
   releaseQuarantine: (id: string) => request<QuarantineInfo>(`/api/v1/alerts/${id}/release-quarantine`, { method: 'POST', body: JSON.stringify({ confirm: true }) }),
 
   /** Link a ticket to the alert by hand, for one CORE could not match. Returns every ticket now linked. */

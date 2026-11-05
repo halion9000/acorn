@@ -519,7 +519,7 @@ class ClaimRequest(BaseModel):
 
 class ClaimedAction(BaseModel):
     id: uuid.UUID
-    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user", "bec_search", "create_ticket", "release_quarantine", "ticket_note"]
+    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user", "bec_search", "create_ticket", "release_quarantine", "ticket_note", "quarantine_check"]
     incident_uid: str
     params: dict[str, Any]
 

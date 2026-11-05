@@ -21,6 +21,7 @@ ACTION = "release_quarantine"
 VENDOR = "core"
 UID_PREFIX = "quarantine-release:"
 TICKET_NOTE_ACTION = "ticket_note"
+CHECK_ACTION = "quarantine_check"
 # Who a release is credited to when Microsoft 365 shows it released and A.C.O.R.N did not do it.
 ELSEWHERE = "someone else"
 

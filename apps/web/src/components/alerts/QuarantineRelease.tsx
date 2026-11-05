@@ -13,6 +13,28 @@ import { alertsApi, type QuarantineInfo } from '@/lib/api';
 
 const POLL_MS = 5000;
 
+const MARKS: Record<string, { word: string; tone: string }> = {
+  OK: { word: 'ok', tone: 'text-green-300' },
+  '-': { word: 'info', tone: 'text-gray-400' },
+  CHECK: { word: 'check', tone: 'text-amber-300' },
+  BAD: { word: 'bad', tone: 'text-red-300' },
+};
+
+/** CORE's check text as lines: the advice first, then each finding with its mark ("[BAD] Sender checks: ...") (pure). */
+export function checkLines(text: string): { advice: string; findings: { mark: string; word: string; tone: string; text: string }[] } {
+  const [advice = '', ...rest] = text.split('\n');
+  return {
+    advice,
+    findings: rest
+      .filter((l) => l.trim() !== '')
+      .map((l) => {
+        const m = /^\[(OK|-|CHECK|BAD)\]\s*(.*)$/.exec(l);
+        const mark = m?.[1] ?? '-';
+        return { mark, ...MARKS[mark]!, text: m ? m[2]! : l };
+      }),
+  };
+}
+
 export function releaseStateText(info: QuarantineInfo): { text: string; tone: string } {
   switch (info.state) {
     case 'pending':
@@ -34,7 +56,7 @@ export function QuarantineRelease({ alertId }: { alertId: string }) {
   const box = useRef<HTMLElement | null>(null);
   const { data, mutate } = useSWR(['alert-quarantine', alertId], () => alertsApi.quarantine(alertId), {
     revalidateOnFocus: false,
-    refreshInterval: (d) => (d && (d.state === 'pending' || d.state === 'claimed') ? POLL_MS : 0),
+    refreshInterval: (d) => (d && (d.state === 'pending' || d.state === 'claimed' || d.check_state === 'pending' || d.check_state === 'claimed') ? POLL_MS : 0),
   });
 
   useEffect(() => {
@@ -46,6 +68,15 @@ export function QuarantineRelease({ alertId }: { alertId: string }) {
   if (!data || !data.available) return null;
   const state = releaseStateText(data);
   const waiting = data.state === 'pending' || data.state === 'claimed';
+
+  const checking = data.check_state === 'pending' || data.check_state === 'claimed';
+  async function askCheck() {
+    try {
+      await mutate(await alertsApi.checkQuarantine(alertId), { revalidate: true });
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Could not ask for the check.');
+    }
+  }
 
   async function release() {
     setBusy(true);
@@ -68,6 +99,30 @@ export function QuarantineRelease({ alertId }: { alertId: string }) {
         {data.sender ? <> from <span className="font-medium">{data.sender}</span></> : null}
         {data.kind ? <span className="text-gray-400"> (held as {data.kind})</span> : null}.
       </p>
+      <div className="mt-3" data-testid="quarantine-check">
+        {data.check_state === 'done' && data.check_text ? (
+          <div className="space-y-1 text-sm">
+            <p className="font-medium text-gray-100" data-testid="check-advice">
+              {checkLines(data.check_text).advice}
+            </p>
+            <ul className="space-y-0.5">
+              {checkLines(data.check_text).findings.map((f, i) => (
+                <li key={i} className="flex gap-2 text-gray-300" data-testid="check-finding">
+                  <span className={`w-12 shrink-0 text-xs uppercase ${f.tone}`}>{f.word}</span>
+                  <span className="min-w-0 break-words">{f.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {data.check_state === 'failed' ? <p className="text-sm text-red-300">Could not check it: {data.check_text || 'CORE did not say why.'}</p> : null}
+        {checking ? <p className="text-sm text-blue-300">CORE is looking into why it was held…</p> : null}
+        {!checking && data.check_state !== undefined ? (
+          <button type="button" onClick={() => void askCheck()} className="mt-1 text-xs text-gray-400 hover:text-gray-200">
+            {data.check_state === 'none' ? 'Check why it was held' : 'Check again'}
+          </button>
+        ) : null}
+      </div>
       {state.text ? (
         <p className={`mt-2 text-sm ${state.tone}`} data-testid="release-state">
           {state.text}

@@ -319,3 +319,67 @@ def test_core_can_say_the_message_was_already_released_and_that_credits_someone_
     b = open_alert("new", {})
     noted(b, by=qr.ELSEWHERE)
     assert b.enrichment_data["quarantine_release"]["by"] == "someone else"
+
+
+def check_row(status, minutes_ago=1, message=None):
+    return row(status, minutes_ago, message)
+
+
+def test_the_look_into_why_it_was_held_follows_the_newest_request():
+    now = datetime.now(UTC)
+    assert ep.check_state_of([], now) == ("none", None, None)
+    assert ep.check_state_of([check_row("pending")], now)[:2] == ("pending", None)
+    assert ep.check_state_of([check_row("claimed")], now)[:2] == ("claimed", None)
+    text = "Looks malicious or fake: do not release it.\n[BAD] Sender checks: SPF fail"
+    assert ep.check_state_of([check_row("done", 2, text), check_row("failed", 9, "old")], now)[:2] == ("done", text), "the newest wins"
+    assert ep.check_state_of(
+        [check_row("failed", 2, "Microsoft 365 does not list this message any more."), check_row("done", 9, "old")], now
+    )[:2] == ("failed", "Microsoft 365 does not list this message any more.")
+    assert ep.check_state_of([check_row("pending", 45)], now)[0] == "failed", "a request nobody collected for too long is not still waiting"
+
+
+def check(db):
+    return asyncio.run(ep.check_quarantine(uuid.uuid4(), MagicMock(), user(), db))
+
+
+def test_asking_for_the_check_queues_one_read_only_request_for_core_and_audits_it(wired):
+    db = FakeDB(Rows([alert()]), Rows([]))
+    out = check(db)
+    (queued,) = db.added
+    assert (queued.vendor, queued.action, queued.status, queued.tenant_id) == ("core", "quarantine_check", "pending", TENANT)
+    assert queued.params == {
+        "client_id": "t1-guid",
+        "quarantine_identity": "tenant\\guid-1\\guid-2",
+    }, "only which message and which client: nothing that could release it"
+    assert out.check_state == "pending" and db.commits == 1
+    assert wired[0]["action"] == "alerts:quarantine_check_requested"
+
+
+def test_the_check_is_refused_for_an_unknown_alert_a_non_release_alert_or_one_already_waiting_and_can_be_asked_again_after_a_finished_one(
+    wired,
+):
+    for db, code in (
+        (FakeDB(Rows([])), 404),
+        (FakeDB(Rows([alert(finding={"uid": "defender:t:1"})])), 422),
+        (FakeDB(Rows([alert()]), Rows([row("pending")])), 409),
+    ):
+        with pytest.raises(HTTPException) as e:
+            check(db)
+        assert e.value.status_code == code and db.added == []
+    again = FakeDB(Rows([alert()]), Rows([row("done", 5, "Looks like a false positive")]))
+    assert check(again).check_state == "pending" and len(again.added) == 1
+
+
+def test_the_info_carries_what_the_check_found(wired):
+    found = row("done", 3, "Looks malicious or fake: do not release it.")
+    info = asyncio.run(ep.quarantine_info(uuid.uuid4(), user(), FakeDB(Rows([alert()]), Rows([]), Rows([found]))))
+    assert (info.check_state, info.check_text) == ("done", "Looks malicious or fake: do not release it.")
+    assert info.state == "none", "looking is not releasing: the release state is untouched"
+
+
+def test_the_check_route_needs_identities_respond():
+    from app.main import app
+    from route_introspect import required_permissions, walk_routes
+
+    found = {(m, p.replace("/api/v1", "", 1)): r for p, r in walk_routes(app.routes) for m in r.methods}
+    assert set(required_permissions(found[("POST", "/alerts/{alert_id}/check-quarantine")])) == {"identities:respond"}

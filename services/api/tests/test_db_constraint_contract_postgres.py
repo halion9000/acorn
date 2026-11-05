@@ -30,7 +30,7 @@ CONTRACT = [
     (
         "vendor_actions",
         "action",
-        ["approve", "reject", "resolve", scripts.SCRIPT_ACTION, ticket_rules.ACTION, quarantine_release.ACTION, quarantine_release.TICKET_NOTE_ACTION],
+        ["approve", "reject", "resolve", scripts.SCRIPT_ACTION, ticket_rules.ACTION, quarantine_release.ACTION, quarantine_release.TICKET_NOTE_ACTION, quarantine_release.CHECK_ACTION],
         "alert_vendor_actions.py (approve, reject, resolve), alert_scripts.SCRIPT_ACTION and alert_ticket_rules.ACTION",
     ),
     (

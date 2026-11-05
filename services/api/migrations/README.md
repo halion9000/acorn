@@ -50,6 +50,7 @@ Audit of every value-limiting constraint added since 080 (2026-10-23): each colu
 | `146_bec_cases.sql` | Business email compromise searches started from the Identities page |
 | `147_alert_stale.sql` | The `stale` alert status and the review of alerts nobody has touched |
 | `148_identity_merges_binary_order.sql` | Fixes the order check on `identity_merges` (see below) |
+| `151_quarantine_check_action.sql` | One more `vendor_actions.action` value, `quarantine_check` (look into why a message was quarantined, read only) |
 | `150_ticket_note_action.sql` | One more `vendor_actions.action` value, `ticket_note` (a note CORE writes on HaloPSA tickets) |
 | `149_alert_ticket_rules.sql` | `alert_ticket_rules` (open a HaloPSA ticket for an alert type) and two new `vendor_actions.action` values, `create_ticket` and `release_quarantine` |
 

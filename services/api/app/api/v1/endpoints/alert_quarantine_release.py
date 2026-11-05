@@ -20,7 +20,7 @@ from app.models.alert import Alert
 from app.models.vendor_action import VendorAction
 from app.services.alert_scope import alert_scope
 from app.services.audit import emit_audit
-from app.services.quarantine_release import ACTION, ELSEWHERE, VENDOR, quarantine_of
+from app.services.quarantine_release import ACTION, CHECK_ACTION, ELSEWHERE, VENDOR, quarantine_of
 from app.services.vendor_actions import PENDING_TTL
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -35,6 +35,10 @@ class QuarantineInfo(BaseModel):
     state: str = "none"
     message: str | None = None
     asked_at: datetime | None = None
+    # The read-only look at why it was held: none (never asked), pending, claimed, done (check_text says what CORE found) or failed.
+    check_state: str = "none"
+    check_text: str | None = None
+    check_at: datetime | None = None
 
 
 class ReleaseRequest(BaseModel):
@@ -73,7 +77,19 @@ def released_record(enrichment: Any, state: str, said: str | None, asked: dateti
     return "done", f"Already {who}{f' ({when} UTC)' if when else ''}.", asked
 
 
-async def _actions(db: Any, tid: uuid.UUID, alert_id: uuid.UUID) -> list[Any]:
+def check_state_of(rows: list[Any], now: datetime) -> tuple[str, str | None, datetime | None]:
+    """Where the look into why a message was held stands, from the newest request: waiting, running, finished (with CORE's text) or failed (with its reason). A request nobody collected for too long reads as failed (pure)."""
+    if not rows:
+        return "none", None, None
+    r = rows[0]
+    if r.status in ("pending", "claimed"):
+        if r.status == "pending" and r.created_at is not None and now - r.created_at > PENDING_TTL:
+            return "failed", "CORE did not pick the request up in time; ask again.", r.created_at
+        return r.status, None, r.created_at
+    return ("done" if r.status == "done" else "failed"), r.result_message, r.created_at
+
+
+async def _actions(db: Any, tid: uuid.UUID, alert_id: uuid.UUID, action: str = ACTION) -> list[Any]:
     return list(
         (
             await db.execute(
@@ -82,7 +98,7 @@ async def _actions(db: Any, tid: uuid.UUID, alert_id: uuid.UUID) -> list[Any]:
                     VendorAction.tenant_id == tid,
                     VendorAction.alert_id == alert_id,
                     VendorAction.vendor == VENDOR,
-                    VendorAction.action == ACTION,
+                    VendorAction.action == action,
                 )
                 .order_by(VendorAction.created_at.desc())
             )
@@ -106,6 +122,7 @@ async def quarantine_info(
             return QuarantineInfo(available=False)
         state, said, asked = state_of(await _actions(db, tid, alert_id), datetime.now(UTC))
         state, said, asked = released_record(alert.enrichment_data, state, said, asked)
+        check = check_state_of(await _actions(db, tid, alert_id, CHECK_ACTION), datetime.now(UTC))
     return QuarantineInfo(
         available=True,
         recipient=message["recipient"] or None,
@@ -114,6 +131,9 @@ async def quarantine_info(
         state=state,
         message=said,
         asked_at=asked,
+        check_state=check[0],
+        check_text=check[1],
+        check_at=check[2],
     )
 
 
@@ -184,4 +204,63 @@ async def release_quarantine(
         kind=message["kind"] or None,
         state="pending",
         asked_at=now,
+    )
+
+
+@router.post("/{alert_id}/check-quarantine", response_model=QuarantineInfo, status_code=status.HTTP_202_ACCEPTED)
+async def check_quarantine(
+    alert_id: uuid.UUID,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("identities:respond"))],
+    db: TenantDBSession,
+) -> QuarantineInfo:
+    """Ask CORE to look into why this message was quarantined (read only: its classification and headers through CIPP). Returns 202: nothing is known yet. One request at a time."""
+    now = datetime.now(UTC)
+    async with alert_scope(db, user.tenant_id, alert_id) as tid:
+        alert = (await db.execute(select(Alert).where(Alert.id == alert_id, Alert.tenant_id == tid))).scalar_one_or_none()
+        if alert is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+        message = quarantine_of(alert.raw_event)
+        if message is None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="This alert is not about a quarantined message.")
+        rows = await _actions(db, tid, alert_id, CHECK_ACTION)
+        current = check_state_of(rows, now)
+        if current[0] in ("pending", "claimed"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="A check for this message is already waiting for CORE; let it finish first."
+            )
+        db.add(
+            VendorAction(
+                id=uuid.uuid4(),
+                tenant_id=tid,
+                alert_id=alert.id,
+                vendor=VENDOR,
+                incident_uid=f"quarantine:{message['identity']}"[:200],
+                action=CHECK_ACTION,
+                params={"client_id": message["client"], "quarantine_identity": message["identity"]},
+                status="pending",
+                requested_by=user.user_id,
+                created_at=now,
+            )
+        )
+        await db.flush()
+        await emit_audit(
+            db=db,
+            tenant_id=tid,
+            actor_id=user.user_id,
+            action="alerts:quarantine_check_requested",
+            resource="alert",
+            resource_id=str(alert.id),
+            changes={"recipient": message["recipient"], "sender": message["sender"]},
+            request=request,
+        )
+        await db.commit()
+    return QuarantineInfo(
+        available=True,
+        recipient=message["recipient"] or None,
+        sender=message["sender"] or None,
+        kind=message["kind"] or None,
+        state="none",
+        check_state="pending",
+        check_at=now,
     )

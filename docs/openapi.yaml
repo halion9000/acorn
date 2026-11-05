@@ -1748,6 +1748,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alerts/{alert_id}/check-quarantine:
+    post:
+      tags:
+      - alerts
+      summary: Check Quarantine
+      description: 'Ask CORE to look into why this message was quarantined (read only:
+        its classification and headers through CIPP). Returns 202: nothing is known
+        yet. One request at a time.'
+      operationId: check_quarantine_api_v1_alerts__alert_id__check_quarantine_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuarantineInfo'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}/why:
     get:
       tags:
@@ -27883,6 +27915,7 @@ components:
           - create_ticket
           - release_quarantine
           - ticket_note
+          - quarantine_check
           title: Action
         incident_uid:
           type: string
@@ -40703,6 +40736,21 @@ components:
             format: date-time
           - type: 'null'
           title: Asked At
+        check_state:
+          type: string
+          title: Check State
+          default: none
+        check_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Check Text
+        check_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Check At
       type: object
       required:
       - available
