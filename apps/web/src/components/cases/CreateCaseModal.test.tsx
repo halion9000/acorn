@@ -61,3 +61,27 @@ describe('CreateCaseModal', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
+
+describe('case templates', () => {
+  it('fills the title, severity and a checklist from the chosen template, all still editable, and the case is created with them', async () => {
+    api.create.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<CreateCaseModal open onClose={vi.fn()} onCreated={vi.fn()} />);
+    await user.selectOptions(screen.getByLabelText(/Start from a template/), 'ransomware');
+    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('Suspected ransomware: ');
+    expect((screen.getByLabelText('Severity') as HTMLSelectElement).value).toBe('critical');
+    expect((screen.getByLabelText(/Description/) as HTMLTextAreaElement).value).toContain('- [ ] Isolate the affected devices from the network now');
+    await user.type(screen.getByLabelText('Title'), 'Acme file server');
+    await user.click(screen.getByRole('button', { name: 'Create case' }));
+    const sent = api.create.mock.calls[0]![0];
+    expect(sent.title).toBe('Suspected ransomware: Acme file server');
+    expect(sent.severity).toBe('critical');
+    expect(sent.description).toContain('Steps:');
+  });
+  it('goes back to blank fields only when the person clears them, and offers a blank case first', async () => {
+    render(<CreateCaseModal open onClose={vi.fn()} onCreated={vi.fn()} />);
+    const select = screen.getByLabelText(/Start from a template/) as HTMLSelectElement;
+    expect(select.value).toBe('');
+    expect(select.options[0]!.textContent).toBe('Blank case');
+  });
+});

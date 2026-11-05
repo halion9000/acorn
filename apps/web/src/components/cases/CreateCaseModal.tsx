@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { casesApi } from '@/lib/api';
+import { CASE_TEMPLATES, templateDescription } from './caseTemplates';
 
 const SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;
 export type CaseSeverityChoice = (typeof SEVERITIES)[number];
@@ -20,8 +21,18 @@ export function CreateCaseModal({ open, onClose, onCreated }: { open: boolean; o
   const [severity, setSeverity] = useState<CaseSeverityChoice>('medium');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
+  const [templateId, setTemplateId] = useState('');
 
   if (!open) return null;
+
+  const pickTemplate = (id: string) => {
+    setTemplateId(id);
+    const t = CASE_TEMPLATES.find((x) => x.id === id);
+    if (!t) return;
+    setTitle(t.title);
+    setSeverity(t.severity);
+    setDescription(templateDescription(t));
+  };
 
   const submit = async () => {
     if (busy) return;
@@ -35,6 +46,7 @@ export function CreateCaseModal({ open, onClose, onCreated }: { open: boolean; o
       toast.success('Case created');
       setTitle('');
       setDescription('');
+      setTemplateId('');
       onCreated();
       onClose();
     } catch (err) {
@@ -54,6 +66,19 @@ export function CreateCaseModal({ open, onClose, onCreated }: { open: boolean; o
           </button>
         </div>
         <div className="space-y-4 px-5 py-4">
+          <div>
+            <label htmlFor="case-template" className="mb-1 block text-xs font-medium text-gray-400">
+              Start from a template <span className="text-gray-600">(optional)</span>
+            </label>
+            <select id="case-template" value={templateId} onChange={(e) => pickTemplate(e.target.value)} className={field}>
+              <option value="">Blank case</option>
+              {CASE_TEMPLATES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label htmlFor="case-title" className="mb-1 block text-xs font-medium text-gray-400">
               Title
