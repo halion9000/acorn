@@ -333,3 +333,36 @@ describe('the running version line', () => {
     expect(runningLabel({ commit: null, up_seconds: 120 })).toBe('Running version unknown (started by hand, not by the update), up 2 min.');
   });
 });
+
+describe('slow database statements', () => {
+  const withSlow = (slow_queries: unknown) => ({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ overall: 'ok', down: [], services: [], database: { enforced: true, reason: 'ok', slow_queries }, generated_at: '2026-10-19T02:00:00Z' }),
+  });
+
+  it('lists the statements with their calls and times', async () => {
+    authFetch.mockResolvedValue(withSlow({ available: true, note: null, queries: [{ query: 'SELECT * FROM alerts WHERE id = $1', calls: 12, typical_seconds: 2.5, total_seconds: 30 }] }));
+    render(<PlatformHealth />);
+    const box = await screen.findByTestId('slow-queries');
+    expect(box).toHaveTextContent('SELECT * FROM alerts WHERE id = $1');
+    expect(box).toHaveTextContent('2.5');
+  });
+
+  it('says why when the database keeps no statistics, instead of looking empty', async () => {
+    authFetch.mockResolvedValue(withSlow({ available: false, note: 'The database does not keep statement statistics.', queries: [] }));
+    render(<PlatformHealth />);
+    expect(await screen.findByTestId('slow-queries')).toHaveTextContent('The database does not keep statement statistics.');
+  });
+
+  it('says nothing has run often enough yet when available but empty, and shows nothing for an older server', async () => {
+    authFetch.mockResolvedValue(withSlow({ available: true, note: null, queries: [] }));
+    const { unmount } = render(<PlatformHealth />);
+    expect(await screen.findByTestId('slow-queries')).toHaveTextContent('not run any statement often enough');
+    unmount();
+    authFetch.mockResolvedValue(withSlow(undefined));
+    render(<PlatformHealth />);
+    await waitFor(() => expect(screen.getByTestId('overall')).toBeInTheDocument());
+    expect(screen.queryByTestId('slow-queries')).not.toBeInTheDocument();
+  });
+});

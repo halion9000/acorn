@@ -914,6 +914,53 @@ async def migration_summary(db: Any) -> dict[str, Any] | None:
     }
 
 
+SLOW_QUERIES_SHOWN = 5
+SLOW_QUERY_MIN_CALLS = 5
+SLOW_QUERY_TEXT = 200
+
+
+def slow_query_rows(rows: list[Any]) -> list[dict[str, Any]]:
+    """The slowest statements as the page shows them: the statement cut short (the database already replaces the values with $1, $2), how often it ran, and its typical and total time in seconds (pure)."""
+    out = []
+    for query, calls, mean_ms, total_ms in rows:
+        out.append(
+            {
+                "query": " ".join(str(query or "").split())[:SLOW_QUERY_TEXT],
+                "calls": int(calls),
+                "typical_seconds": round(float(mean_ms) / 1000, 3),
+                "total_seconds": round(float(total_ms) / 1000, 1),
+            }
+        )
+    return out
+
+
+async def slow_queries(db: Any) -> dict[str, Any]:
+    """The statements the database spent the longest on per call, only where it keeps statistics (the pg_stat_statements extension). Where it does not, or this role may not read it, it says so: an empty list would read as "nothing is slow"."""
+    from sqlalchemy import text
+
+    try:
+        async with db.begin_nested():
+            installed = (await db.execute(text("SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'"))).first()
+            if installed is None:
+                return {
+                    "available": False,
+                    "note": "The database does not keep statement statistics (the pg_stat_statements extension is not installed), so slow queries cannot be listed.",
+                    "queries": [],
+                }
+            rows = (
+                await db.execute(
+                    text(
+                        "SELECT query, calls, mean_exec_time, total_exec_time FROM pg_stat_statements "
+                        "WHERE calls >= :calls AND query NOT ILIKE '%pg_stat_statements%' ORDER BY mean_exec_time DESC LIMIT :n"
+                    ),
+                    {"calls": SLOW_QUERY_MIN_CALLS, "n": SLOW_QUERIES_SHOWN},
+                )
+            ).all()
+    except Exception:  # noqa: BLE001 - extra detail on a health page must not take it down
+        return {"available": False, "note": "The database's statement statistics could not be read with this account.", "queries": []}
+    return {"available": True, "note": None, "queries": slow_query_rows(rows)}
+
+
 CONNECTOR_FAILING_AFTER = timedelta(hours=24)
 
 
@@ -1199,7 +1246,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
         "overall": "degraded" if down else "ok",
         "down": down,
         "services": rows,
-        "database": {**await database_row_security(db), "pool": _pool_now()},
+        "database": {**await database_row_security(db), "pool": _pool_now(), "slow_queries": await slow_queries(db)},
         "device_feeds": feeds,
         "core_feed": core_feed,
         "signins": signins,

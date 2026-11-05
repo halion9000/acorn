@@ -25,7 +25,14 @@ interface ServiceRow {
   detail: string;
 }
 
+interface SlowQueries {
+  available: boolean;
+  note: string | null;
+  queries: { query: string; calls: number; typical_seconds: number; total_seconds: number }[];
+}
+
 interface DatabaseSecurity {
+  slow_queries?: SlowQueries;
   enforced: boolean | null;
   reason: string;
   fix?: string;
@@ -158,6 +165,37 @@ export function PlatformHealth() {
               {snapshot.database.enforced === false ? 'Tenant isolation in the database is not being enforced: ' : 'Could not check tenant isolation in the database: '}
               {snapshot.database.reason}.{snapshot.database.fix ? ` To fix: ${snapshot.database.fix}.` : ''}
             </p>
+          )}
+          {snapshot.database?.slow_queries && (
+            <div data-testid="slow-queries">
+              {!snapshot.database.slow_queries.available ? (
+                <p className="text-sm text-slate-500">{snapshot.database.slow_queries.note}</p>
+              ) : snapshot.database.slow_queries.queries.length === 0 ? (
+                <p className="text-sm text-slate-500">The database has not run any statement often enough yet to list the slow ones.</p>
+              ) : (
+                <table className="w-full text-left text-xs text-slate-300">
+                  <caption className="pb-1 text-left text-sm text-slate-400">Database statements with the longest typical time (values are replaced by $1, $2)</caption>
+                  <thead>
+                    <tr className="text-slate-500">
+                      <th scope="col">Statement</th>
+                      <th scope="col">Calls</th>
+                      <th scope="col">Typical (s)</th>
+                      <th scope="col">Total (s)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {snapshot.database.slow_queries.queries.map((q) => (
+                      <tr key={q.query}>
+                        <td className="break-all font-mono">{q.query}</td>
+                        <td>{q.calls}</td>
+                        <td>{q.typical_seconds}</td>
+                        <td>{q.total_seconds}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           )}
           {snapshot.database?.pool?.peak_last_hour && snapshot.database.pool.peak_last_hour.samples > 0 && (
             <p data-testid="pool-peak" className={`text-sm ${(snapshot.database.pool.peak_last_hour.peak_percent ?? 0) >= 80 ? "text-red-300" : "text-slate-400"}`}>
