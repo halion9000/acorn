@@ -2004,6 +2004,8 @@ export const alertsApi = {
 
   /** Other alerts from the last 30 days that name the same device or user, from any tool. */
   related: (id: string) => request<{ items: RelatedAlert[]; more: number }>(`/api/v1/alerts/${id}/related`),
+  /** The facts behind one alert: the tool, the rule, how sure it was and what it names. */
+  why: (id: string) => request<{ facts: { label: string; value: string }[] }>(`/api/v1/alerts/${id}/why`),
 
   /** Link a ticket to the alert by hand, for one CORE could not match. Returns every ticket now linked. */
   addTicket: (id: string, body: { id: string; summary?: string; url?: string }) =>

@@ -4,6 +4,7 @@ import { RefreshStatusButton } from './RefreshStatusButton';
 import { RunScriptButton } from './RunScriptButton';
 import { ScriptRunsSection } from './ScriptRunsSection';
 import { AlertContext, sourceLink } from './AlertContext';
+import { WhyRaised } from './WhyRaised';
 import { AlertDescription } from './AlertDescription';
 import { useState } from 'react';
 import useSWR from 'swr';
@@ -948,6 +949,8 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
             <Section title="Description">
               <AlertDescription text={alert.description} />
             </Section>
+
+            <WhyRaised alertId={alert.id} />
 
             {alert.confidenceLabel && (
               <ConfidenceExplainability

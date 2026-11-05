@@ -5,7 +5,7 @@
  * every tool's record of the person, the alerts, and a summary of their recent sign-ins. Backed by GET /api/v1/identities. For a Microsoft 365 person, someone with the permission can also ask CORE to sign them out, block or allow their sign-in (AccountActions).
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { identitiesApi, msspApi, type IdentityPerson, type IdentityQuery, type IdentitySort } from '@/lib/api';
@@ -281,6 +281,8 @@ export function IdentitiesView() {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [clientId, setClientId] = useState('');
+  // The person a link asked for (?search=). When that search finds exactly one person, their panel opens, once.
+  const askedFor = useRef<string | null>(null);
   // A link can open the list of one client's people (?client=<id>), as Client Posture's People button does.
   useEffect(() => {
     const wanted = clientFromAddress(window.location.search);
@@ -294,6 +296,7 @@ export function IdentitiesView() {
       setSearch(asked);
       setDebounced(asked);
       setActiveOnly(false);
+      askedFor.current = asked;
     }
   }, []);
   const [tool, setTool] = useState('');
@@ -328,6 +331,11 @@ export function IdentitiesView() {
     [page, clientId, debounced, tool, alertTool, mfa, backup, signin, exposed, kind, hasAlerts, adminOnly, state, oneTool, activeOnly, sort],
   );
   const { data, error, isLoading, isValidating, mutate } = useSWR(['identities', query], () => identitiesApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
+  useEffect(() => {
+    if (askedFor.current === null || !data || debounced !== askedFor.current) return;
+    if (data.items.length === 1) setOpen(data.items[0]!.key);
+    askedFor.current = null; // whatever it found, a later search or click is the person's own
+  }, [data, debounced]);
   const { data: clients } = useSWR('mssp-children', () => msspApi.listChildren().catch(() => []), { revalidateOnFocus: false });
 
   const [exportError, setExportError] = useState<string | null>(null);

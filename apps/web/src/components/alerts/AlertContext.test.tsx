@@ -50,17 +50,18 @@ describe('AlertContext', () => {
     expect(screen.getByText('203.0.113.9')).toBeInTheDocument();
   });
 
-  it('links each user to every alert that names that person', async () => {
+  it('opens a person with an e-mail address on their Identities page, with a small link to every alert that names them', async () => {
     renderCtx(alert({ affectedUsers: ['kevin@acme.com', 'amy+it@acme.com'] }));
-    expect(screen.getByRole('link', { name: 'kevin@acme.com' })).toHaveAttribute('href', '/alerts?status=all&user=kevin%40acme.com');
-    expect(screen.getByRole('link', { name: 'amy+it@acme.com' })).toHaveAttribute('href', '/alerts?status=all&user=amy%2Bit%40acme.com');
+    expect(screen.getByRole('link', { name: 'kevin@acme.com' })).toHaveAttribute('href', '/identities?search=kevin%40acme.com');
+    expect(screen.getByRole('link', { name: 'amy+it@acme.com' })).toHaveAttribute('href', '/identities?search=amy%2Bit%40acme.com');
+    expect(screen.getByRole('link', { name: 'Alerts naming kevin@acme.com' })).toHaveAttribute('href', '/alerts?status=all&user=kevin%40acme.com');
+    expect(screen.getByRole('link', { name: 'Alerts naming amy+it@acme.com' })).toHaveAttribute('href', '/alerts?status=all&user=amy%2Bit%40acme.com');
   });
 
-  it('offers each person who has an e-mail address a link to their Identities page, and nobody else', async () => {
-    renderCtx(alert({ affectedUsers: ['kevin@acme.com', 'amy+it@acme.com', 'SYSTEM'] }));
-    expect(screen.getByRole('link', { name: 'Identity of kevin@acme.com' })).toHaveAttribute('href', '/identities?search=kevin%40acme.com');
-    expect(screen.getByRole('link', { name: 'Identity of amy+it@acme.com' })).toHaveAttribute('href', '/identities?search=amy%2Bit%40acme.com');
-    expect(screen.queryByRole('link', { name: /Identity of SYSTEM/ })).toBeNull();
+  it('sends a name with no e-mail address (SYSTEM) to the alerts that name it, since it has no identity', async () => {
+    renderCtx(alert({ affectedUsers: ['SYSTEM'] }));
+    expect(screen.getByRole('link', { name: 'SYSTEM' })).toHaveAttribute('href', '/alerts?status=all&user=SYSTEM');
+    expect(screen.queryByRole('link', { name: /Alerts naming/ })).toBeNull();
   });
 
   it('says plainly when the alert names no device or user, rather than leaving a blank', async () => {

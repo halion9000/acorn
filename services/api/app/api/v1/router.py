@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     alert_stale_review,
     alert_suppressions,
     alert_vendor_actions,
+    alert_why,
     alerts,
     api_keys,
     approvals,
@@ -130,6 +131,7 @@ api_router.include_router(alert_vendor_actions.router)
 api_router.include_router(alert_scripts.router)
 api_router.include_router(alert_related.router)
 api_router.include_router(alert_suppressions.router)
+api_router.include_router(alert_why.router)
 api_router.include_router(alert_stale_review.router)
 api_router.include_router(data_retention.router)
 api_router.include_router(client_onboarding.router)

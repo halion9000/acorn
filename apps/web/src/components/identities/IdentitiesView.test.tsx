@@ -532,6 +532,40 @@ describe('arriving from the search box', () => {
   });
 });
 
+describe('arriving from an alert for one person', () => {
+  const detailFor = () => ({ person: person(), alerts: [], signins: { last_30_days: 0, failed: 0, unusual: 0, countries: [], last_at: null } });
+  it('opens the panel of the person asked for when the search finds exactly one person, and only once', async () => {
+    window.history.replaceState({}, '', '/identities?search=amy%40acme.com');
+    api.list.mockResolvedValue(list([person()]));
+    api.detail.mockResolvedValue(detailFor());
+    try {
+      show();
+      expect(await screen.findByTestId('identity-detail')).toBeInTheDocument();
+      expect(api.detail).toHaveBeenCalledWith('c1', 'amy@acme.com');
+      await userEvent.click((await screen.findAllByTestId('identity-row'))[0]); // closing it is the person's own choice and stays closed
+      await waitFor(() => expect(screen.queryByTestId('identity-detail')).toBeNull());
+    } finally {
+      window.history.replaceState({}, '', '/');
+    }
+  });
+  it('opens nothing when the search finds several people or none', async () => {
+    window.history.replaceState({}, '', '/identities?search=amy');
+    try {
+      api.list.mockResolvedValue(list([person(), person({ key: 'c1:amy2@acme.com', email: 'amy2@acme.com' })]));
+      const { unmount } = show();
+      await screen.findAllByTestId('identity-row');
+      expect(screen.queryByTestId('identity-detail')).toBeNull();
+      unmount();
+      api.list.mockResolvedValue(list([]));
+      show();
+      await waitFor(() => expect(api.list).toHaveBeenCalled());
+      expect(screen.queryByTestId('identity-detail')).toBeNull();
+    } finally {
+      window.history.replaceState({}, '', '/');
+    }
+  });
+});
+
 describe('the extra identity tiles', () => {
   it('shows guests, failed sign-ins and possible brute force, and a guest tile filters to guests', async () => {
     api.list.mockResolvedValue(list([person()], { summary: { total: 1, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {}, guests: 3, failed_signins_24h: 42, brute_force: 2 } }));

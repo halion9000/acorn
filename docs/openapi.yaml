@@ -1601,6 +1601,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alerts/{alert_id}/why:
+    get:
+      tags:
+      - alerts
+      summary: 'Why this alert was raised: the tool, the rule, how sure it was and
+        what it names'
+      operationId: alert_why_api_v1_alerts__alert_id__why_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Why'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alert-stale:
     get:
       tags:
@@ -49504,6 +49534,30 @@ components:
       - approved_by
       - created_at
       title: WhitelistOut
+    Why:
+      properties:
+        facts:
+          items:
+            $ref: '#/components/schemas/WhyRow'
+          type: array
+          title: Facts
+      type: object
+      required:
+      - facts
+      title: Why
+    WhyRow:
+      properties:
+        label:
+          type: string
+          title: Label
+        value:
+          type: string
+          title: Value
+      type: object
+      required:
+      - label
+      - value
+      title: WhyRow
     _Param:
       properties:
         name:
