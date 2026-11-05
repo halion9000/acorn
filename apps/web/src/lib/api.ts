@@ -616,6 +616,8 @@ export interface ManagedTenantRow {
   stale_alerts?: number | null;
   /** Remote tools found on the client's devices with no allow or block decision yet. Absent from an older server, null when unreadable. */
   unreviewed_remote_tools?: number | null;
+  /** The health score over the last two weeks, oldest first. Absent from an older server, null when unreadable. */
+  health_trend?: number[] | null;
 }
 
 export interface AlertScriptRun {

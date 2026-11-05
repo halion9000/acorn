@@ -921,6 +921,8 @@ class ManagedTenantRow(BaseModel):
     unreviewed_remote_tools: int | None = None
     # Quiet alerts of this client are never set aside as stale.
     stale_exempt: bool = False
+    # The client's health score over the last two weeks, oldest first, one per snapshot that had one. None when it could not be read; a list of fewer than two points draws no trend.
+    health_trend: list[float] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -986,6 +988,28 @@ async def _connector_health(db: AsyncSession, child_ids: list[uuid.UUID]) -> dic
         enabled, bad = out.get(tenant_id, (0, 0))
         out[tenant_id] = (enabled + n, bad + (n if state in BAD_CONNECTOR_STATES else 0))
     return out
+
+
+TREND_DAYS = 14
+TREND_MAX_POINTS = 60
+
+
+async def _health_trend(db: AsyncSession, child_ids: list[uuid.UUID], now: datetime | None = None) -> dict[uuid.UUID, list[float]]:
+    """For each client: its health scores from the last ``TREND_DAYS`` days, oldest first (snapshots without a score are skipped, and only the newest ``TREND_MAX_POINTS`` are kept). Raises when the read fails."""
+    if not child_ids:
+        return {}
+    since = (now or datetime.now(UTC)) - timedelta(days=TREND_DAYS)
+    rows = (
+        await db.execute(
+            select(MSSPTenantMetrics.tenant_id, MSSPTenantMetrics.health_score)
+            .where(MSSPTenantMetrics.tenant_id.in_(child_ids), MSSPTenantMetrics.snapshot_at >= since, MSSPTenantMetrics.health_score.isnot(None))
+            .order_by(MSSPTenantMetrics.snapshot_at)
+        )
+    ).all()
+    out: dict[uuid.UUID, list[float]] = {}
+    for tenant_id, score in rows:
+        out.setdefault(tenant_id, []).append(float(score))
+    return {t: v[-TREND_MAX_POINTS:] for t, v in out.items()}
 
 
 async def _stale_counts(db: AsyncSession, child_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
@@ -1067,6 +1091,11 @@ async def list_managed_tenants(
         logging.getLogger(__name__).warning("mssp: connector health could not be read", exc_info=True)
         health = None
     try:
+        trend: dict[uuid.UUID, list[float]] | None = await _health_trend(db, [c.id for c in children])
+    except Exception:  # noqa: BLE001 - same: the list still loads, the trend is then left out
+        logging.getLogger(__name__).warning("mssp: health trend could not be read", exc_info=True)
+        trend = None
+    try:
         stale: dict[uuid.UUID, int] | None = await _stale_counts(db, [c.id for c in children])
     except Exception:  # noqa: BLE001 - same: the list still loads, the column then reads unknown
         logging.getLogger(__name__).warning("mssp: stale alert counts could not be read", exc_info=True)
@@ -1101,6 +1130,7 @@ async def list_managed_tenants(
                 stale_alerts=(stale.get(child.id, 0) if stale is not None else None),
                 unreviewed_remote_tools=(unreviewed.get(child.id, 0) if unreviewed is not None else None),
                 stale_exempt=tenant_stale_exempt(child),
+                health_trend=(trend.get(child.id, []) if trend is not None else None),
             )
         )
     return rows

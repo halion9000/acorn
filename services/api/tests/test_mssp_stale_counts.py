@@ -175,3 +175,74 @@ def test_the_list_gives_each_client_its_unreviewed_count_zero_when_none_and_unkn
     good, bad = run(body)
     assert sorted(r.unreviewed_remote_tools for r in good) == [0, 3]
     assert [r.unreviewed_remote_tools for r in bad] == [None, None]
+
+
+# ---- health trend -------------------------------------------------------------------------------------------------------------------------------------
+
+from datetime import UTC, datetime, timedelta  # noqa: E402
+
+
+def snap(tenant, days_ago, score, now):
+    return MSSPTenantMetrics(id=uuid.uuid4(), tenant_id=tenant, snapshot_at=now - timedelta(days=days_ago), health_score=score)
+
+
+def test_the_trend_is_each_clients_scores_from_the_last_two_weeks_oldest_first_without_gaps_or_old_or_other_clients():
+    now = datetime(2026, 11, 4, 12, tzinfo=UTC)
+
+    async def body(s):
+        parent = await make(s, "Parent")
+        acme, birch = await make(s, "Acme", parent.id), await make(s, "Birch", parent.id)
+        other = await make(s, "Other")
+        s.add_all(
+            [
+                snap(acme.id, 1, 90.0, now),
+                snap(acme.id, 5, 70.0, now),
+                snap(acme.id, 3, None, now),
+                snap(acme.id, 20, 10.0, now),
+                snap(birch.id, 2, 55.0, now),
+                snap(other.id, 1, 99.0, now),
+            ]
+        )
+        await s.commit()
+        got = await mssp._health_trend(s, [acme.id, birch.id], now)
+        return got[acme.id], got[birch.id], other.id in got, await mssp._health_trend(s, [], now)
+
+    acme, birch, other_in, none = run(body)
+    assert acme == [70.0, 90.0], "oldest first; the empty score and the 20-day-old one are left out"
+    assert birch == [55.0] and other_in is False and none == {}
+
+
+def test_the_list_gives_each_client_its_trend_empty_when_none_and_unknown_when_unreadable(monkeypatch):
+    async def stale(_db, _ids):
+        return {}
+
+    async def unreviewed(_db, _owner, _ids):
+        return {}
+
+    monkeypatch.setattr(mssp, "_stale_counts", stale)
+    monkeypatch.setattr(mssp, "_unreviewed_remote_tools", unreviewed)
+    fail = {"on": False}
+    real = mssp._health_trend
+
+    async def trend(db, ids, now=None):
+        if fail["on"]:
+            raise RuntimeError("metrics unreadable")
+        return await real(db, ids, now)
+
+    monkeypatch.setattr(mssp, "_health_trend", trend)
+
+    async def body(s):
+        parent = await make(s, "Parent")
+        acme = await make(s, "Acme", parent.id)
+        await make(s, "Quiet", parent.id)
+        s.add_all([snap(acme.id, 1, 80.0, datetime.now(UTC)), snap(acme.id, 2, 60.0, datetime.now(UTC))])
+        await s.commit()
+        user = SimpleNamespace(tenant_id=parent.id)
+        good = await mssp.list_managed_tenants(include_hidden=False, db=s, current_user=user)
+        fail["on"] = True
+        bad = await mssp.list_managed_tenants(include_hidden=False, db=s, current_user=user)
+        return good, bad
+
+    good, bad = run(body)
+    assert {r.name: r.health_trend for r in good} == {"Acme": [60.0, 80.0], "Quiet": []}
+    assert [r.health_trend for r in bad] == [None, None]

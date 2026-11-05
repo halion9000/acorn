@@ -19,7 +19,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
 import toast from 'react-hot-toast';
 import { orderSources } from './VendorBadge';
-import MSSPDashboardView, { figure, matchesFilter, postureHref, tenantsToCsv } from './MSSPDashboardView';
+import MSSPDashboardView, { figure, matchesFilter, postureHref, tenantsToCsv, trendPath } from './MSSPDashboardView';
 
 // The page used to render six invented tenants ("Acme Financial", "GlobalRetail Corp", ...) with invented alert counts, ARR and analyst
 // allocation to every workspace, and an "Export Report" button that only showed a toast. These tests pin that it shows real data or an honest
@@ -513,5 +513,32 @@ describe('unreviewed remote tools per client', () => {
     expect(Object.fromEntries(Object.entries(cells).map(([k, v]) => [k, v.textContent]))).toEqual({ 'Some Co': '3', 'Zero Co': '0', 'Unknown Co': '—', 'Old Server Co': '—' });
     expect(cells['Some Co']).toHaveClass('text-amber-300');
     expect(cells['Zero Co']).not.toHaveClass('text-amber-300');
+  });
+});
+
+describe('the health trend', () => {
+  it('draws a line from two points on, red when the score fell and green when it rose, and nothing otherwise', async () => {
+    overviewMock.mockResolvedValue(none);
+    tenantsMock.mockResolvedValue([
+      row({ name: 'Falling Co', health_score: 60, health_trend: [90, 75, 60] }),
+      row({ name: 'Rising Co', health_score: 90, health_trend: [60, 90] }),
+      row({ name: 'One Point Co', health_score: 80, health_trend: [80] }),
+      row({ name: 'Empty Co', health_trend: [] }),
+      row({ name: 'Unknown Co', health_trend: null }),
+      row({ name: 'Old Server Co' }),
+    ]);
+    render(<MSSPDashboardView />);
+    await screen.findByText('Falling Co');
+    const lines = Object.fromEntries(screen.getAllByTestId('client-line').map((l) => [l.querySelector('a')?.textContent, within(l).queryByTestId('health-trend')]));
+    expect(lines['Falling Co']).toHaveClass('text-red-400');
+    expect(lines['Falling Co']).toHaveAttribute('aria-label', 'Health over the last two weeks: 90 to 60');
+    expect(lines['Rising Co']).toHaveClass('text-green-400');
+    for (const none of ['One Point Co', 'Empty Co', 'Unknown Co', 'Old Server Co']) expect(lines[none]).toBeNull();
+  });
+  it('scales the path into the box with the lowest point at the bottom, and is empty for fewer than two points', () => {
+    expect(trendPath([])).toBe('');
+    expect(trendPath([5])).toBe('');
+    expect(trendPath([0, 10], 56, 16)).toBe('M0.0,15.0 L56.0,1.0');
+    expect(trendPath([7, 7], 56, 16)).toBe('M0.0,15.0 L56.0,15.0');
   });
 });

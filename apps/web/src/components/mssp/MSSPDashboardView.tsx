@@ -33,6 +33,27 @@ export function connectorHealthLabel(enabled: number | null | undefined, unhealt
   return unhealthy > 0 ? `${unhealthy} of ${enabled} failing` : `all ${enabled} ok`;
 }
 
+/** The line of a small trend chart: the points as an SVG path scaled into ``width`` by ``height`` (the lowest point at the bottom). Empty for fewer than two points. */
+export function trendPath(values: number[], width = 56, height = 16): string {
+  if (values.length < 2) return '';
+  const lo = Math.min(...values);
+  const span = Math.max(...values) - lo || 1;
+  return values.map((v, i) => `${i === 0 ? 'M' : 'L'}${((i / (values.length - 1)) * width).toFixed(1)},${(height - ((v - lo) / span) * (height - 2) - 1).toFixed(1)}`).join(' ');
+}
+
+function HealthTrend({ values }: { values: number[] | null | undefined }) {
+  const path = trendPath(values ?? []);
+  if (!path) return null;
+  const first = values![0]!;
+  const last = values![values!.length - 1]!;
+  const tone = last < first ? 'text-red-400' : last > first ? 'text-green-400' : 'text-gray-400';
+  return (
+    <svg width="56" height="16" viewBox="0 0 56 16" role="img" aria-label={`Health over the last two weeks: ${first.toFixed(0)} to ${last.toFixed(0)}`} data-testid="health-trend" className={`ml-2 inline-block align-middle ${tone}`}>
+      <path d={path} fill="none" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 export function figure(value: number | null | undefined, options: { decimals?: number; suffix?: string } = {}): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
   const text = options.decimals !== undefined ? value.toFixed(options.decimals) : String(value);
@@ -382,7 +403,10 @@ export default function MSSPDashboardView() {
                         </td>
                         <td data-testid="unreviewed-tools" className={clsx('px-2.5 py-3 text-right', (t.unreviewed_remote_tools ?? 0) > 0 ? 'font-medium text-amber-300' : 'text-gray-300')}>{figure(t.unreviewed_remote_tools)}</td>
                         <td data-testid="stale-alerts" className="px-2.5 py-3 text-right text-gray-300">{figure(t.stale_alerts)}</td>
-                        <td className="px-2.5 py-3 text-right text-gray-300">{figure(t.health_score, { decimals: 0 })}</td>
+                        <td className="px-2.5 py-3 text-right text-gray-300">
+                          {figure(t.health_score, { decimals: 0 })}
+                          <HealthTrend values={t.health_trend} />
+                        </td>
                         <td className="px-2.5 py-3 text-gray-400">{snapshotLabel(t.snapshot_at)}</td>
                         <td className="px-2.5 py-3">
                           <input

@@ -36864,6 +36864,13 @@ components:
           type: boolean
           title: Stale Exempt
           default: false
+        health_trend:
+          anyOf:
+          - items:
+              type: number
+            type: array
+          - type: 'null'
+          title: Health Trend
       type: object
       required:
       - tenant_id
