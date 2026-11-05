@@ -7,6 +7,7 @@ allow list) to release it. Releasing is a decision a person makes each time: not
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -22,6 +23,9 @@ VENDOR = "core"
 UID_PREFIX = "quarantine-release:"
 TICKET_NOTE_ACTION = "ticket_note"
 CHECK_ACTION = "quarantine_check"
+ALLOW_ACTION = "allow_sender"
+# Microsoft does not honour an allow entry for these (and an allow entry for them would be the wrong tool), so A.C.O.R.N does not offer it: release the one message instead.
+NEVER_ALLOW_KINDS = ("highconfphish", "malware")
 # Who a release is credited to when Microsoft 365 shows it released and A.C.O.R.N did not do it.
 ELSEWHERE = "someone else"
 
@@ -57,6 +61,18 @@ def quarantine_of(raw_event: Any) -> dict[str, str] | None:
         "sender": _text(ctx.get("sender"), 320),
         "kind": _text(ctx.get("quarantine_type"), 60),
     }
+
+
+def allow_refusal(message: dict[str, str] | None) -> str | None:
+    """Why this alert's sender cannot be put on the allow list from here, or None when it can: the alert must be a release alert with a real single sender address, and the message must not have been held as high-confidence phishing or malware (pure)."""
+    if message is None:
+        return "This alert is not about a quarantined message."
+    sender = (message.get("sender") or "").strip().lower()
+    if not re.fullmatch(r"[^\s@<>,;]{1,64}@[^\s@<>,;]{1,255}\.[^\s@<>,;]{2,}", sender):
+        return "The alert does not carry one sender address to allow."
+    if (message.get("kind") or "").strip().lower() in NEVER_ALLOW_KINDS:
+        return "Microsoft held this as high-confidence phishing or malware: an allow entry does not apply to those, and the sender should not be trusted. Release this one message instead, if you are sure."
+    return None
 
 
 def release_link(base_url: str, alert_id: Any) -> str | None:
@@ -110,6 +126,22 @@ async def note_quarantine_released(
     tickets = halo_ticket_ids(enrichment)
     if tickets:
         _queue_ticket_note(db, tenant_id, alert.id, tickets, release_note(by, now), now)
+    message = quarantine_of(alert.raw_event)
+    if by == ELSEWHERE and message is not None:
+        # Microsoft shows it released by someone else: look again now (read only), so the alert and its tickets say to whom and, where the audit trail knows, by whom.
+        db.add(
+            VendorAction(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                alert_id=alert.id,
+                vendor=VENDOR,
+                incident_uid=f"quarantine:{message['identity']}"[:200],
+                action=CHECK_ACTION,
+                params={"client_id": message["client"], "quarantine_identity": message["identity"], "after_release": True},
+                status="pending",
+                created_at=now,
+            )
+        )
     return True
 
 
@@ -169,7 +201,7 @@ async def queue_auto_checks(db: Any, now: datetime | None = None) -> int:
 
 def check_note(text: str) -> str:
     """The note written on a ticket: what the look into the message found (pure)."""
-    return ("A.C.O.R.N looked into why the message was quarantined (read only):\n" + text)[:1500]
+    return ("A.C.O.R.N looked into why the message was quarantined (read only):\n" + text)[:2500]
 
 
 async def store_quarantine_check(db: Any, tenant_id: Any, alert_id: Any, text: str, now: datetime) -> bool:
@@ -178,7 +210,7 @@ async def store_quarantine_check(db: Any, tenant_id: Any, alert_id: Any, text: s
     if alert is None:
         return False
     enrichment = dict(alert.enrichment_data) if isinstance(alert.enrichment_data, dict) else {}
-    record = {"text": text[:1000], "at": now.isoformat(), "ticketed": False}
+    record = {"text": text[:2000], "at": now.isoformat(), "ticketed": False}
     tickets = halo_ticket_ids(enrichment)
     if tickets:
         _queue_ticket_note(db, tenant_id, alert.id, tickets, check_note(text), now)
@@ -202,3 +234,25 @@ def _queue_ticket_note(db: Any, tenant_id: Any, alert_id: Any, tickets: list[str
             created_at=now,
         )
     )
+
+
+def allow_note(sender: str, by: str, now: datetime) -> str:
+    """The sentence written on the tickets when a sender was allowed (pure)."""
+    when = now.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    return f"{sender} was added to the tenant allow list from A.C.O.R.N by {by} at {when}. Microsoft removes the entry after 45 days with no use."
+
+
+async def note_sender_allowed(db: Any, tenant_id: Any, alert_id: Any, now: datetime, by: str, sender: str) -> bool:
+    """Record on the alert that its sender was allowed (who, when, which address) and write it on the alert's HaloPSA tickets. Once. Returns whether anything was recorded. The caller owns the transaction."""
+    alert = (await db.execute(select(Alert).where(Alert.id == alert_id, Alert.tenant_id == tenant_id))).scalar_one_or_none()
+    if alert is None:
+        return False
+    enrichment = dict(alert.enrichment_data) if isinstance(alert.enrichment_data, dict) else {}
+    if enrichment.get("sender_allowed"):
+        return False
+    enrichment["sender_allowed"] = {"sender": sender[:320], "at": now.isoformat(), "by": by[:200]}
+    alert.enrichment_data = enrichment  # a new dict, so the JSONB column is seen as changed
+    tickets = halo_ticket_ids(enrichment)
+    if tickets:
+        _queue_ticket_note(db, tenant_id, alert.id, tickets, allow_note(sender, by, now), now)
+    return True

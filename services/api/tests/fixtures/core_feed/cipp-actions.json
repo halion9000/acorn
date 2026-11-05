@@ -52,6 +52,12 @@
         "summary": "Release one quarantined message to the people it was sent to (the sender is not allow-listed)"
       },
       {
+        "action": "allow_sender",
+        "risk": "medium",
+        "reversible": true,
+        "summary": "Allow one sender address (Microsoft removes the entry after 45 days with no use)"
+      },
+      {
         "action": "contain_user",
         "risk": "high",
         "reversible": false,

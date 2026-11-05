@@ -3,8 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
-const api = vi.hoisted(() => ({ quarantine: vi.fn(), releaseQuarantine: vi.fn(), checkQuarantine: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/lib/api', () => ({ alertsApi: { quarantine: api.quarantine, releaseQuarantine: api.releaseQuarantine, checkQuarantine: api.checkQuarantine } }));
+const api = vi.hoisted(() => ({ quarantine: vi.fn(), releaseQuarantine: vi.fn(), checkQuarantine: vi.fn(), allowSender: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/api', () => ({ alertsApi: { quarantine: api.quarantine, releaseQuarantine: api.releaseQuarantine, checkQuarantine: api.checkQuarantine, allowSender: api.allowSender } }));
 vi.mock('react-hot-toast', () => ({ default: api.toast }));
 
 import { QuarantineRelease, checkLines, releaseStateText } from './QuarantineRelease';
@@ -21,6 +21,7 @@ beforeEach(() => {
   api.quarantine.mockReset();
   api.releaseQuarantine.mockReset();
   api.checkQuarantine.mockReset();
+  api.allowSender.mockReset();
   api.toast.success.mockReset();
   api.toast.error.mockReset();
 });
@@ -152,5 +153,78 @@ describe('checking why it was held', () => {
     show();
     await user.click(await screen.findByRole('button', { name: 'Check why it was held' }));
     await waitFor(() => expect(api.toast.error).toHaveBeenCalledWith('A check for this message is already waiting for CORE'));
+  });
+});
+
+describe('allowing the sender', () => {
+  const allowable = (over: Record<string, unknown> = {}) => info({ allow_state: 'none', allow_possible: true, allow_sender: 'billing@vendor.example', ...over });
+
+  it('asks first, says what it does, and sends nothing until confirmed', async () => {
+    api.quarantine.mockResolvedValue(allowable());
+    api.allowSender.mockResolvedValue(allowable({ allow_state: 'pending' }));
+    const user = userEvent.setup();
+    show();
+    await user.click(await screen.findByRole('button', { name: 'Allow this sender… (removed after 45 days unused)' }));
+    expect(api.allowSender).not.toHaveBeenCalled();
+    expect(screen.getByText(/billing@vendor.example/)).toBeInTheDocument();
+    expect(screen.getByText(/Microsoft removes the entry after 45 days/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(api.allowSender).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Allow this sender… (removed after 45 days unused)' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm allow sender' }));
+    await waitFor(() => expect(api.allowSender).toHaveBeenCalledWith('a1', false));
+  });
+
+  it('after a check that said the message looks malicious, needs an extra deliberate tick before it will ask', async () => {
+    api.quarantine.mockResolvedValue(allowable({ check_state: 'done', check_text: 'Looks malicious or fake: do not release it.\n[BAD] Sender checks: x' }));
+    api.allowSender.mockResolvedValue(allowable({ allow_state: 'pending' }));
+    const user = userEvent.setup();
+    show();
+    await user.click(await screen.findByRole('button', { name: 'Allow this sender… (removed after 45 days unused)' }));
+    const confirm = screen.getByRole('button', { name: 'Confirm allow sender' });
+    expect(confirm).toBeDisabled();
+    await user.click(screen.getByLabelText(/I still want to allow this sender/));
+    expect(confirm).toBeEnabled();
+    await user.click(confirm);
+    await waitFor(() => expect(api.allowSender).toHaveBeenCalledWith('a1', true));
+  });
+
+  it('shows nothing to click when it is not offered, and says why (high-confidence phishing or malware)', async () => {
+    api.quarantine.mockResolvedValue(allowable({ allow_possible: false, allow_blocked: 'Microsoft held this as high-confidence phishing or malware: an allow entry does not apply to those.' }));
+    show();
+    expect(await screen.findByText(/high-confidence phishing or malware/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Allow this sender/ })).toBeNull();
+  });
+
+  it('shows a finished allow with no button, a waiting one as waiting, and a failed one with the reason and a way to try again', async () => {
+    api.quarantine.mockResolvedValue(allowable({ allow_state: 'done', allow_message: 'billing@vendor.example is on the allow list (added by hal). Microsoft removes the entry after 45 days with no use.' }));
+    const a = show();
+    expect(await screen.findByText(/is on the allow list \(added by hal\)/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Allow this sender/ })).toBeNull();
+    a.unmount();
+    api.quarantine.mockResolvedValue(allowable({ allow_state: 'claimed' }));
+    const b = show();
+    expect(await screen.findByText('Allow requested: waiting for CORE…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Allow this sender/ })).toBeNull();
+    b.unmount();
+    api.quarantine.mockResolvedValue(allowable({ allow_state: 'failed', allow_message: 'Refused by CORE: already 5 actions for this client in the last hour' }));
+    show();
+    expect(await screen.findByText(/Not allowed: Refused by CORE: already 5 actions/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try allowing the sender again…' })).toBeInTheDocument();
+  });
+
+  it('says what the server refused, and offers nothing from a server that does not know about it', async () => {
+    api.quarantine.mockResolvedValue(info());
+    const a = show();
+    await screen.findByTestId('quarantine-release');
+    expect(screen.queryByTestId('allow-sender')).toBeNull();
+    a.unmount();
+    api.quarantine.mockResolvedValue(allowable());
+    api.allowSender.mockRejectedValueOnce(new Error('An allow request for this sender is already waiting for CORE'));
+    const user = userEvent.setup();
+    show();
+    await user.click(await screen.findByRole('button', { name: 'Allow this sender… (removed after 45 days unused)' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm allow sender' }));
+    await waitFor(() => expect(api.toast.error).toHaveBeenCalledWith('An allow request for this sender is already waiting for CORE'));
   });
 });

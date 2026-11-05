@@ -20,7 +20,7 @@ from app.models.alert import Alert
 from app.models.vendor_action import VendorAction
 from app.services.alert_scope import alert_scope
 from app.services.audit import emit_audit
-from app.services.quarantine_release import ACTION, CHECK_ACTION, ELSEWHERE, VENDOR, quarantine_of
+from app.services.quarantine_release import ACTION, ALLOW_ACTION, CHECK_ACTION, ELSEWHERE, VENDOR, allow_refusal, quarantine_of
 from app.services.vendor_actions import PENDING_TTL
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -39,6 +39,12 @@ class QuarantineInfo(BaseModel):
     check_state: str = "none"
     check_text: str | None = None
     check_at: datetime | None = None
+    # Allowing the sender: whether it can be offered (and if not, why), and where a request stands (none, pending, claimed, done, failed) with CORE's words.
+    allow_possible: bool = False
+    allow_blocked: str | None = None
+    allow_state: str = "none"
+    allow_message: str | None = None
+    allow_sender: str | None = None
 
 
 class ReleaseRequest(BaseModel):
@@ -71,6 +77,18 @@ def released_record(enrichment: Any, state: str, said: str | None, asked: dateti
     if by == ELSEWHERE:
         return "done", f"Already released by someone else in Microsoft 365{stamp}.", asked
     return "done", f"Released from A.C.O.R.N{f' by {by}' if by and by != 'A.C.O.R.N' else ''}{stamp}.", asked
+
+
+def allow_state_of(rows: list[Any], enrichment: Any, now: datetime) -> tuple[str, str | None, datetime | None]:
+    """Where allowing the sender stands: done when the alert records it (or an action finished), waiting, failed with CORE's reason, or none (pure)."""
+    rec = enrichment.get("sender_allowed") if isinstance(enrichment, dict) else None
+    if isinstance(rec, dict):
+        return (
+            "done",
+            f"{rec.get('sender', 'The sender')} is on the allow list (added by {rec.get('by', 'A.C.O.R.N')}). Microsoft removes the entry after 45 days with no use.",
+            None,
+        )
+    return check_state_of(rows, now)
 
 
 def check_state_of(rows: list[Any], now: datetime) -> tuple[str, str | None, datetime | None]:
@@ -119,7 +137,16 @@ async def quarantine_info(
         state, said, asked = state_of(await _actions(db, tid, alert_id), datetime.now(UTC))
         state, said, asked = released_record(alert.enrichment_data, state, said, asked)
         check = check_state_of(await _actions(db, tid, alert_id, CHECK_ACTION), datetime.now(UTC))
+        allow_state, allow_said, _ = allow_state_of(
+            await _actions(db, tid, alert_id, ALLOW_ACTION), alert.enrichment_data, datetime.now(UTC)
+        )
+        blocked = allow_refusal(message)
     return QuarantineInfo(
+        allow_possible=blocked is None,
+        allow_blocked=blocked,
+        allow_state=allow_state,
+        allow_message=allow_said,
+        allow_sender=message["sender"] or None,
         available=True,
         recipient=message["recipient"] or None,
         sender=message["sender"] or None,
@@ -259,4 +286,93 @@ async def check_quarantine(
         state="none",
         check_state="pending",
         check_at=now,
+    )
+
+
+class AllowRequest(BaseModel):
+    confirm: bool = False
+    # Needed when the check said the message looks malicious or fake: allowing that sender is then a decision to make on purpose.
+    confirm_risky: bool = False
+
+
+@router.post("/{alert_id}/allow-sender", response_model=QuarantineInfo, status_code=status.HTTP_202_ACCEPTED)
+async def allow_sender(
+    alert_id: uuid.UUID,
+    body: AllowRequest,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("identities:respond"))],
+    db: TenantDBSession,
+) -> QuarantineInfo:
+    """Ask CORE to put this message's sender on the tenant allow list (Microsoft removes the entry after 45 days with no use). One address, never a domain, never without an expiry. Returns 202: nothing has happened yet.
+    Needs ``confirm: true`` (and ``confirm_risky: true`` when the check said the message looks malicious). Refused for a message held as high-confidence phishing or malware."""
+    if not body.confirm:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Confirm that this sender should be allowed.")
+    now = datetime.now(UTC)
+    async with alert_scope(db, user.tenant_id, alert_id) as tid:
+        alert = (await db.execute(select(Alert).where(Alert.id == alert_id, Alert.tenant_id == tid))).scalar_one_or_none()
+        if alert is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+        message = quarantine_of(alert.raw_event)
+        refusal = allow_refusal(message)
+        if refusal is not None or message is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=refusal or "This alert is not about a quarantined message."
+            )
+        check = alert.enrichment_data.get("quarantine_check") if isinstance(alert.enrichment_data, dict) else None
+        looks_bad = isinstance(check, dict) and str(check.get("text") or "").startswith("Looks malicious")
+        if looks_bad and not body.confirm_risky:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="The check says this message looks malicious or fake. Confirm that you want to allow this sender anyway.",
+            )
+        state, _said, _at = allow_state_of(await _actions(db, tid, alert_id, ALLOW_ACTION), alert.enrichment_data, now)
+        if state == "done":
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This sender was already allowed.")
+        if state in ("pending", "claimed"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An allow request for this sender is already waiting for CORE; let it finish first.",
+            )
+        sender = message["sender"].strip().lower()
+        row = VendorAction(
+            id=uuid.uuid4(),
+            tenant_id=tid,
+            alert_id=alert.id,
+            vendor=VENDOR,
+            incident_uid=f"allow:{sender}"[:200],
+            action=ALLOW_ACTION,
+            params={
+                "client_id": message["client"],
+                "sender_address": sender,
+                "requested_by_name": (getattr(user, "email", None) or "")[:200],
+            },
+            status="pending",
+            requested_by=user.user_id,
+            created_at=now,
+        )
+        db.add(row)
+        await db.flush()
+        await emit_audit(
+            db=db,
+            tenant_id=tid,
+            actor_id=user.user_id,
+            action="alerts:sender_allow_requested",
+            resource="alert",
+            resource_id=str(alert.id),
+            changes={
+                "vendor_action_id": str(row.id),
+                "sender": sender,
+                "message_kind": message["kind"],
+                "after_a_malicious_check": bool(looks_bad),
+            },
+            request=request,
+        )
+        await db.commit()
+    return QuarantineInfo(
+        available=True,
+        recipient=message["recipient"] or None,
+        sender=message["sender"] or None,
+        kind=message["kind"] or None,
+        allow_state="pending",
+        allow_sender=sender,
     )

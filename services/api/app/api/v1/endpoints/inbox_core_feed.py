@@ -39,7 +39,7 @@ from app.services.core_feed_cases import close_finished_cases, open_cases_for_ne
 from app.services.core_feed_sla import record_closure_events
 from app.services.iocs_from_alerts import sync_children_throttled as sync_iocs_throttled
 from app.services.mssp_snapshots import snapshot_children_throttled
-from app.services.quarantine_release import ELSEWHERE, UID_PREFIX, note_quarantine_released, store_quarantine_check
+from app.services.quarantine_release import ELSEWHERE, UID_PREFIX, note_quarantine_released, note_sender_allowed, store_quarantine_check
 from app.services.vendor_actions import CLAIMED_TTL, PENDING_TTL
 
 logger = logging.getLogger(__name__)
@@ -519,7 +519,7 @@ class ClaimRequest(BaseModel):
 
 class ClaimedAction(BaseModel):
     id: uuid.UUID
-    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user", "bec_search", "create_ticket", "release_quarantine", "ticket_note", "quarantine_check"]
+    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user", "bec_search", "create_ticket", "release_quarantine", "ticket_note", "quarantine_check", "allow_sender"]
     incident_uid: str
     params: dict[str, Any]
 
@@ -611,7 +611,7 @@ async def claim_core_feed_actions(tenant_token: str, body: ClaimRequest, db: DBS
 
 class ActionResult(BaseModel):
     status: Literal["done", "failed"]
-    message: str | None = Field(default=None, max_length=1000)
+    message: str | None = Field(default=None, max_length=2000)
     # For a create_ticket action that worked: the number HaloPSA gave the new ticket (digits). It is linked to the alert.
     ticket_id: str | None = Field(default=None, pattern=r"^[0-9]{1,12}$")
     # For a release_quarantine action: CORE looked first and the message had already been released by someone else, so it sent nothing.
@@ -642,6 +642,8 @@ async def report_core_feed_action_result(
                 )
             ).first()
             if row is not None:
+                if body.status == "done" and row.action == "allow_sender" and row.alert_id is not None:
+                    await note_sender_allowed(db, tid, row.alert_id, now, by=str((row.params or {}).get("requested_by_name") or "A.C.O.R.N")[:200], sender=str((row.params or {}).get("sender_address") or "")[:320])
                 if body.status == "done" and row.action == "quarantine_check" and row.alert_id is not None and body.message:
                     await store_quarantine_check(db, tid, row.alert_id, body.message, now)
                 if body.status == "done" and row.action == "release_quarantine" and row.alert_id is not None:

@@ -82,8 +82,10 @@ export function CreateCaseModal({ open, onClose, alert }: CreateCaseModalProps) 
             mitre: alert.mitreAttack?.map((m) => m.techniqueId).filter(Boolean),
         });
         goToCase(created);
-      } catch {
-        toast.error('Could not create the case. Please try again.');
+      } catch (err) {
+        // Say what the server said when it said something readable ("One or more alerts were not found."), not just that it failed.
+        const why = err instanceof Error && /\s/.test(err.message) ? err.message : '';
+        toast.error(why ? `Could not create the case: ${why}` : 'Could not create the case. Please try again.');
       } finally {
         setSubmitting(false);
       }

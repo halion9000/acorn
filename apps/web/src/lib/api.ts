@@ -1912,6 +1912,12 @@ export interface QuarantineInfo {
   check_state?: 'none' | 'pending' | 'claimed' | 'done' | 'failed';
   check_text?: string | null;
   check_at?: string | null;
+  /** Allowing the sender: whether it can be offered (and if not, why) and where a request stands. Absent from an older server. */
+  allow_possible?: boolean;
+  allow_blocked?: string | null;
+  allow_state?: 'none' | 'pending' | 'claimed' | 'done' | 'failed';
+  allow_message?: string | null;
+  allow_sender?: string | null;
 }
 
 /** A rule that opens a HaloPSA ticket for every alert of one type. */
@@ -2046,6 +2052,7 @@ export const alertsApi = {
   /** Whether this alert is about a quarantined message that can be released from here, and where a release stands. */
   quarantine: (id: string) => request<QuarantineInfo>(`/api/v1/alerts/${id}/quarantine`),
   /** Ask CORE to release the quarantined message (the person has confirmed it is safe). */
+  allowSender: (id: string, risky = false) => request<QuarantineInfo>(`/api/v1/alerts/${id}/allow-sender`, { method: 'POST', body: JSON.stringify({ confirm: true, confirm_risky: risky }) }),
   checkQuarantine: (id: string) => request<QuarantineInfo>(`/api/v1/alerts/${id}/check-quarantine`, { method: 'POST' }),
   releaseQuarantine: (id: string) => request<QuarantineInfo>(`/api/v1/alerts/${id}/release-quarantine`, { method: 'POST', body: JSON.stringify({ confirm: true }) }),
 

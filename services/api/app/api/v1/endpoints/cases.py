@@ -50,7 +50,7 @@ from sqlalchemy import text
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.core.internal_auth import internal_service_headers
 from app.core.logging import safe_log_value
-from app.db.rls_scope import cross_tenant_reads
+from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.services.case_devices import build_case_devices
 from app.services.case_fanout import (
     FanoutResult,
@@ -587,14 +587,15 @@ async def case_counts(
     )
 
 
-async def _require_owned_alerts(db: Any, tenant_id: uuid.UUID, alert_ids: list[uuid.UUID]) -> None:
-    """Every alert a case names must belong to the caller's tenant.
+async def _require_owned_alerts(db: Any, tenant_id: uuid.UUID, alert_ids: list[uuid.UUID]) -> dict[str, uuid.UUID]:
+    """Every alert a case names must belong to the caller's tenant, or to one of the caller's own client tenants (an MSSP parent works the alerts of its clients: they are stored under the client).
+    Returns which tenant holds each alert, so the link back from the alert can be written as that tenant.
 
     The CASE was always scoped to the caller's tenant but the alerts it points at were not: POST /cases/{id}/alerts was fixed to check them, POST /cases never was, so a tenant could create a case citing another tenant's alert id (HTTP 201, stored in alert_ids).
     Foreign and nonexistent ids get the same 404, so this cannot be used to probe which alert ids exist elsewhere."""
     ids = [str(a) for a in alert_ids]
     if not ids:
-        return
+        return {}
     owned = (
         await db.execute(
             text("SELECT id FROM alerts WHERE id = ANY(CAST(:ids AS UUID[])) AND tenant_id = :tenant_id").bindparams(
@@ -602,11 +603,38 @@ async def _require_owned_alerts(db: Any, tenant_id: uuid.UUID, alert_ids: list[u
             )
         )
     ).fetchall()
-    if {str(r[0]) for r in owned} != set(ids):
+    holders: dict[str, uuid.UUID] = {str(r[0]): tenant_id for r in owned}
+    missing = set(ids) - set(holders)
+    if missing:
+        clients = [
+            r[0]
+            for r in (
+                await db.execute(text("SELECT id FROM tenants WHERE parent_tenant_id = :tenant_id").bindparams(tenant_id=tenant_id))
+            ).fetchall()
+        ]
+        for client in clients:
+            if not missing:
+                break
+            # Ask as the client itself (row-level security shows a tenant only its own rows); a foreign or nonexistent id is simply not found.
+            async with acting_as_tenant(db, client):
+                found = (
+                    await db.execute(
+                        text("SELECT id FROM alerts WHERE id = ANY(CAST(:ids AS UUID[])) AND tenant_id = :tenant_id").bindparams(
+                            ids=sorted(missing), tenant_id=client
+                        )
+                    )
+                ).fetchall()
+            for r in found:
+                holders[str(r[0])] = client
+                missing.discard(str(r[0]))
+    if missing:
         raise HTTPException(status_code=404, detail="One or more alerts were not found.")
+    return holders
 
 
-async def _link_alerts_to_case(db: Any, tenant_id: uuid.UUID, case_id: uuid.UUID, alert_ids: list[uuid.UUID]) -> None:
+async def _link_alerts_to_case(
+    db: Any, tenant_id: uuid.UUID, case_id: uuid.UUID, alert_ids: list[uuid.UUID], holders: dict[str, uuid.UUID] | None = None
+) -> None:
     """Record the link on the ALERT as well (alerts.case_id), in the same transaction as the case write.
 
     The link was kept only on the case (aisoc_cases.alert_ids), so alerts.case_id stayed NULL for every live alert (only the demo seed set it) and four readers of it were silently inert: the alert queue's case_id, the SLA metrics' case count, the narrative projection and the rail's case pivot.
@@ -614,11 +642,15 @@ async def _link_alerts_to_case(db: Any, tenant_id: uuid.UUID, case_id: uuid.UUID
     ids = [str(a) for a in alert_ids]
     if not ids:
         return
-    await db.execute(
-        text(
-            "UPDATE alerts SET case_id = :case_id WHERE id = ANY(CAST(:ids AS UUID[])) AND tenant_id = :tenant_id AND case_id IS NULL"
-        ).bindparams(case_id=case_id, ids=ids, tenant_id=tenant_id)
-    )
+    holders = holders or {}
+    update = "UPDATE alerts SET case_id = :case_id WHERE id = ANY(CAST(:ids AS UUID[])) AND tenant_id = :tenant_id AND case_id IS NULL"
+    mine = [i for i in ids if holders.get(i, tenant_id) == tenant_id]
+    if mine:
+        await db.execute(text(update).bindparams(case_id=case_id, ids=mine, tenant_id=tenant_id))
+    for client in {holders[i] for i in ids if holders.get(i, tenant_id) != tenant_id}:
+        # An alert held by one of the caller's clients is linked as that client, and only that client's own rows can change.
+        async with acting_as_tenant(db, client):
+            await db.execute(text(update).bindparams(case_id=case_id, ids=[i for i in ids if holders.get(i) == client], tenant_id=client))
 
 
 @router.post("", response_model=CaseResponse, status_code=status.HTTP_201_CREATED, summary="Create case")
@@ -627,7 +659,7 @@ async def create_case(
 ) -> CaseResponse:
     import json as _json
 
-    await _require_owned_alerts(db, user.tenant_id, body.alert_ids)
+    holders = await _require_owned_alerts(db, user.tenant_id, body.alert_ids)
     case_id = uuid.uuid4()
     now = datetime.now(UTC)
     # Note: PostgreSQL ``::type`` casts inside text() confuse SQLAlchemy's
@@ -663,7 +695,7 @@ async def create_case(
         row = (await db.execute(q)).fetchone()
         if row is None:
             raise HTTPException(status_code=503, detail="Database error: INSERT returned no row")
-        await _link_alerts_to_case(db, user.tenant_id, case_id, body.alert_ids)
+        await _link_alerts_to_case(db, user.tenant_id, case_id, body.alert_ids, holders)
         await db.commit()
     except Exception as exc:
         await db.rollback()
@@ -888,7 +920,7 @@ async def add_alerts(
 ) -> CaseResponse:
     cid = await _resolve_case_id(case_id, db, user.tenant_id)
     ids_str = [str(a) for a in body.alert_ids]
-    await _require_owned_alerts(db, user.tenant_id, body.alert_ids)
+    holders = await _require_owned_alerts(db, user.tenant_id, body.alert_ids)
     q = text("""
         UPDATE aisoc_cases
         SET alert_ids = array(SELECT DISTINCT unnest(alert_ids || CAST(:new_ids AS UUID[]))),
@@ -900,7 +932,7 @@ async def add_alerts(
         row = (await db.execute(q)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Case not found.")
-        await _link_alerts_to_case(db, user.tenant_id, cid, body.alert_ids)
+        await _link_alerts_to_case(db, user.tenant_id, cid, body.alert_ids, holders)
         await db.commit()
         return _row_to_case(row)
     except HTTPException:

@@ -222,6 +222,7 @@ def open_alert(status="new", enrichment=None):
         status=status,
         resolved_at=None,
         updated_at=None,
+        raw_event={},
         enrichment_data=enrichment if enrichment is not None else {"keep": 1},
     )
 
@@ -393,3 +394,148 @@ def test_a_release_made_from_here_reads_as_released_and_only_one_made_elsewhere_
     other = {"quarantine_release": {"released_at": "2026-11-05T18:16:00+00:00", "by": "someone else"}}
     assert ep.released_record(other, "none", None, None)[1] == "Already released by someone else in Microsoft 365 (2026-11-05 18:16 UTC)."
     assert "Already" not in ep.released_record(mine, "none", None, None)[1]
+
+
+# ---- allowing the sender ------------------------------------------------------------------------------------------------------------------------------------
+
+
+def msg(**over):
+    base = {"identity": "i", "client": "c", "recipient": "kim@acme.com", "sender": "billing@vendor.example", "kind": "Spam"}
+    base.update(over)
+    return base
+
+
+def test_a_sender_can_be_allowed_when_there_is_one_real_address_and_the_message_was_not_held_as_high_confidence_phishing_or_malware():
+    assert qr.allow_refusal(msg()) is None
+    for kind in ("Spam", "Bulk", "Phish", "TransportRule", "", "unknown"):
+        assert qr.allow_refusal(msg(kind=kind)) is None, kind
+    for kind in ("HighConfPhish", "highconfphish", "Malware", " MALWARE "):
+        assert "high-confidence phishing or malware" in qr.allow_refusal(msg(kind=kind)), kind
+
+
+def test_a_missing_or_odd_sender_cannot_be_allowed_and_a_non_release_alert_cannot_either():
+    assert qr.allow_refusal(None) == "This alert is not about a quarantined message."
+    for sender in (
+        "",
+        "   ",
+        "vendor.example",
+        "@vendor.example",
+        "a@b.example, c@d.example",
+        "a@b.example;c@d.example",
+        "not an address",
+        "a@b",
+    ):
+        assert qr.allow_refusal(msg(sender=sender)) == "The alert does not carry one sender address to allow.", sender
+
+
+def allow(db, confirm=True, risky=False):
+    return asyncio.run(ep.allow_sender(uuid.uuid4(), ep.AllowRequest(confirm=confirm, confirm_risky=risky), MagicMock(), user(), db))
+
+
+def spam_alert(enrichment=None, kind="Spam"):
+    a = alert(enrichment=enrichment)
+    a.raw_event["unmapped"]["context"]["quarantine_type"] = kind
+    a.raw_event["unmapped"]["context"]["sender"] = "Billing@Vendor.example"
+    return a
+
+
+def test_a_confirmed_request_queues_one_allow_for_core_naming_the_one_sender_and_audits_it(wired):
+    db = FakeDB(Rows([spam_alert()]), Rows([]))
+    out = allow(db)
+    (queued,) = db.added
+    assert (queued.vendor, queued.action, queued.status, queued.tenant_id) == ("core", "allow_sender", "pending", TENANT)
+    assert queued.params == {"client_id": "t1-guid", "sender_address": "billing@vendor.example", "requested_by_name": "hal@goliveoak.com"}
+    assert out.allow_state == "pending" and db.commits == 1
+    assert wired[0]["action"] == "alerts:sender_allow_requested" and wired[0]["changes"]["sender"] == "billing@vendor.example"
+    assert wired[0]["changes"]["after_a_malicious_check"] is False
+
+
+def test_nothing_is_queued_without_confirmation_for_high_confidence_phishing_for_a_waiting_request_or_one_already_done(wired):
+    cases = [
+        (FakeDB(Rows([spam_alert()]), Rows([])), {"confirm": False}, 422),
+        (FakeDB(Rows([spam_alert(kind="HighConfPhish")]), Rows([])), {}, 422),
+        (FakeDB(Rows([spam_alert(kind="Malware")]), Rows([])), {}, 422),
+        (FakeDB(Rows([alert(finding={"uid": "defender:t:1"})]), Rows([])), {}, 422),
+        (FakeDB(Rows([spam_alert()]), Rows([row("pending")])), {}, 409),
+        (FakeDB(Rows([spam_alert({"sender_allowed": {"sender": "billing@vendor.example", "by": "hal", "at": "x"}})]), Rows([])), {}, 409),
+        (FakeDB(Rows([])), {}, 404),
+    ]
+    for db, kwargs, code in cases:
+        with pytest.raises(HTTPException) as e:
+            allow(db, **kwargs)
+        assert e.value.status_code == code
+        assert db.added == [] and db.commits == 0 and wired == []
+
+
+def test_when_the_check_said_the_message_looks_malicious_allowing_the_sender_needs_a_second_deliberate_confirmation(wired):
+    bad = {"quarantine_check": {"text": "Looks malicious or fake: do not release it.\n[BAD] x: y", "at": "t", "ticketed": False}}
+    with pytest.raises(HTTPException) as e:
+        allow(FakeDB(Rows([spam_alert(bad)]), Rows([])))
+    assert e.value.status_code == 422 and "looks malicious" in e.value.detail
+    db = FakeDB(Rows([spam_alert(bad)]), Rows([]))
+    allow(db, risky=True)
+    assert (
+        len(db.added) == 1 and wired[-1]["changes"]["after_a_malicious_check"] is True
+    ), "it goes through only when asked for on purpose, and the audit says so"
+    fine = {"quarantine_check": {"text": "Looks like a false positive: sender checks passed.", "at": "t", "ticketed": False}}
+    ok = FakeDB(Rows([spam_alert(fine)]), Rows([]))
+    allow(ok)
+    assert len(ok.added) == 1
+
+
+def test_the_allow_state_reads_done_from_the_alert_record_otherwise_from_the_newest_request():
+    now = datetime.now(UTC)
+    rec = {"sender_allowed": {"sender": "billing@vendor.example", "by": "hal@goliveoak.com", "at": "t"}}
+    state, said, _ = ep.allow_state_of([], rec, now)
+    assert (
+        state == "done"
+        and "billing@vendor.example is on the allow list (added by hal@goliveoak.com)" in said
+        and "45 days with no use" in said
+    )
+    assert ep.allow_state_of([row("failed", 1, "Refused by CORE: rate cap")], {}, now)[:2] == ("failed", "Refused by CORE: rate cap")
+    assert ep.allow_state_of([], {}, now)[0] == "none"
+
+
+def test_the_info_says_whether_allowing_can_be_offered_and_why_not(wired):
+    ok = asyncio.run(ep.quarantine_info(uuid.uuid4(), user(), FakeDB(Rows([spam_alert()]), Rows([]), Rows([]), Rows([]))))
+    assert (ok.allow_possible, ok.allow_blocked, ok.allow_sender) == (True, None, "Billing@Vendor.example")
+    blocked = asyncio.run(
+        ep.quarantine_info(uuid.uuid4(), user(), FakeDB(Rows([spam_alert(kind="HighConfPhish")]), Rows([]), Rows([]), Rows([])))
+    )
+    assert blocked.allow_possible is False and "high-confidence phishing or malware" in blocked.allow_blocked
+
+
+def test_a_finished_allow_is_recorded_once_with_who_and_written_on_the_tickets():
+    a = open_alert("new", {"tickets": [{"system": "halopsa", "id": "555"}]})
+    db = FakeDB(Rows([a]))
+    assert asyncio.run(qr.note_sender_allowed(db, TENANT, a.id, NOW, by="hal@goliveoak.com", sender="billing@vendor.example")) is True
+    assert a.enrichment_data["sender_allowed"] == {"sender": "billing@vendor.example", "at": NOW.isoformat(), "by": "hal@goliveoak.com"}
+    (note,) = db.added
+    assert (note.action, note.params["ticket_ids"]) == ("ticket_note", ["555"])
+    assert (
+        "billing@vendor.example was added to the tenant allow list from A.C.O.R.N by hal@goliveoak.com" in note.params["note"]
+        and "45 days with no use" in note.params["note"]
+    )
+    again = FakeDB(Rows([a]))
+    assert asyncio.run(qr.note_sender_allowed(again, TENANT, a.id, NOW, by="x", sender="y@z.example")) is False and again.added == []
+    assert asyncio.run(qr.note_sender_allowed(FakeDB(Rows([])), TENANT, uuid.uuid4(), NOW, by="x", sender="y@z.example")) is False
+
+
+def test_the_allow_route_needs_identities_respond():
+    from app.main import app
+    from route_introspect import required_permissions, walk_routes
+
+    found = {(m, p.replace("/api/v1", "", 1)): r for p, r in walk_routes(app.routes) for m in r.methods}
+    assert set(required_permissions(found[("POST", "/alerts/{alert_id}/allow-sender")])) == {"identities:respond"}
+
+
+def test_a_release_seen_elsewhere_also_asks_core_to_look_again_once_so_who_released_it_is_filled_in():
+    a = NS(id=uuid.uuid4(), status="new", resolved_at=None, updated_at=None, enrichment_data={}, raw_event=raw())
+    db = FakeDB(Rows([a]))
+    assert asyncio.run(qr.note_quarantine_released(db, TENANT, a.id, NOW, by=qr.ELSEWHERE, resolve_any_open=False)) is True
+    (look,) = (x for x in db.added if x.action == "quarantine_check")
+    assert look.params == {"client_id": "t1-guid", "quarantine_identity": "tenant\\guid-1\\guid-2", "after_release": True}
+    mine = NS(id=uuid.uuid4(), status="new", resolved_at=None, updated_at=None, enrichment_data={}, raw_event=raw())
+    own = FakeDB(Rows([mine]))
+    asyncio.run(qr.note_quarantine_released(own, TENANT, mine.id, NOW, by="hal@goliveoak.com"))
+    assert not [x for x in own.added if x.action == "quarantine_check"], "a release from here is already known in full: nothing to look up"

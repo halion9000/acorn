@@ -426,8 +426,8 @@ async def test_add_alerts_refuses_a_foreign_alert_and_never_updates_the_case() -
     with pytest.raises(HTTPException) as exc:
         await add_alerts(case_id=str(uuid.uuid4()), body=AddAlertsRequest(alert_ids=[foreign]), db=db, user=user)
     assert exc.value.status_code == 404
-    assert len(db.executed) == 1, "the case must not be updated when an alert is not the caller's"
-    assert "from alerts" in _executed_sql(db, 0) and "update" not in _executed_sql(db, 0)
+    assert len(db.executed) == 2, "the ownership check, then the look for the caller's client tenants; the case must not be updated when an alert is not the caller's"
+    assert "from alerts" in _executed_sql(db, 0) and all("update" not in _executed_sql(db, n) for n in (0, 1))
     db.commit.assert_not_called()
 
 
@@ -438,7 +438,7 @@ async def test_add_alerts_refuses_the_whole_request_if_any_one_alert_is_not_the_
     db = _mk_db([[(mine,)]])  # only one of the two is owned
     with pytest.raises(HTTPException) as exc:
         await add_alerts(case_id=str(uuid.uuid4()), body=AddAlertsRequest(alert_ids=[mine, theirs]), db=db, user=user)
-    assert exc.value.status_code == 404 and len(db.executed) == 1
+    assert exc.value.status_code == 404 and len(db.executed) == 2 and all("update" not in _executed_sql(db, n) for n in (0, 1))
 
 
 @pytest.mark.asyncio
@@ -719,7 +719,7 @@ async def test_create_case_with_a_foreign_or_nonexistent_alert_is_404_and_nothin
     with pytest.raises(HTTPException) as exc:
         await create_case(body=CreateCaseRequest(title="citing someone else", alert_ids=[a]), db=db, user=user)
     assert exc.value.status_code == 404 and exc.value.detail == "One or more alerts were not found."
-    assert len(db.executed) == 1 and "insert into" not in _norm(db.executed[0][0])
+    assert len(db.executed) == 2 and all("insert into" not in _norm(sql) for sql, _ in db.executed)
     db.commit.assert_not_awaited()
 
 
@@ -950,3 +950,51 @@ class TestMigration065:
 
     def test_it_reads_the_case_side_link(self) -> None:
         assert "unnest(alert_ids)" in self.norm() and "FROM aisoc_cases" in self.norm()
+
+
+# ---- an MSSP parent works its clients' alerts: they are stored under the client, and a case from one must work ----
+
+
+@pytest.mark.asyncio
+async def test_an_alert_held_by_a_client_tenant_can_be_cited_and_is_linked_as_that_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    import contextlib
+
+    from app.api.v1.endpoints import cases as cases_mod
+
+    scopes: list[uuid.UUID] = []
+
+    @contextlib.asynccontextmanager
+    async def fake_acting(_db: Any, tid: uuid.UUID):
+        scopes.append(tid)
+        yield
+
+    monkeypatch.setattr(cases_mod, "acting_as_tenant", fake_acting)
+    user = _user()
+    client, a = uuid.uuid4(), uuid.uuid4()
+    # not the parent's own; the parent has one client; as that client the alert is found; then the insert, the link as the client
+    db = _mk_db([[], [(client,)], [(a,)], _case_row(alert_ids=[a])])
+    out = await create_case(body=CreateCaseRequest(title="from a client's alert", alert_ids=[a]), db=db, user=user)
+    assert out.alert_ids == [a]
+    db.commit.assert_awaited_once()
+    assert scopes == [client, client], "looked for as the client, then linked as the client"
+    link_sql, link_params = db.executed[-1]
+    assert "update alerts set case_id" in _norm(link_sql) and link_params["tenant_id"] == client and link_params["ids"] == [str(a)]
+    assert db.executed[3][1]["tenant_id"] == user.tenant_id, "the case itself still belongs to the caller"
+
+
+@pytest.mark.asyncio
+async def test_an_alert_that_is_in_no_client_either_is_still_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    import contextlib
+
+    from app.api.v1.endpoints import cases as cases_mod
+
+    @contextlib.asynccontextmanager
+    async def fake_acting(_db: Any, _tid: uuid.UUID):
+        yield
+
+    monkeypatch.setattr(cases_mod, "acting_as_tenant", fake_acting)
+    db = _mk_db([[], [(uuid.uuid4(),)], []])
+    with pytest.raises(HTTPException) as exc:
+        await create_case(body=CreateCaseRequest(title="nobody's alert", alert_ids=[uuid.uuid4()]), db=db, user=_user())
+    assert exc.value.status_code == 404 and exc.value.detail == "One or more alerts were not found."
+    assert all("insert into" not in _norm(sql) for sql, _ in db.executed)

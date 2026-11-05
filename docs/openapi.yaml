@@ -1780,6 +1780,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alerts/{alert_id}/allow-sender:
+    post:
+      tags:
+      - alerts
+      summary: Allow Sender
+      description: 'Ask CORE to put this message''s sender on the tenant allow list
+        (Microsoft removes the entry after 45 days with no use). One address, never
+        a domain, never without an expiry. Returns 202: nothing has happened yet.
+
+        Needs ``confirm: true`` (and ``confirm_risky: true`` when the check said the
+        message looks malicious). Refused for a message held as high-confidence phishing
+        or malware.'
+      operationId: allow_sender_api_v1_alerts__alert_id__allow_sender_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AllowRequest'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuarantineInfo'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}/why:
     get:
       tags:
@@ -23662,7 +23704,7 @@ components:
         message:
           anyOf:
           - type: string
-            maxLength: 1000
+            maxLength: 2000
           - type: 'null'
           title: Message
         ticket_id:
@@ -25006,6 +25048,18 @@ components:
       required:
       - access
       title: AllAccessRequest
+    AllowRequest:
+      properties:
+        confirm:
+          type: boolean
+          title: Confirm
+          default: false
+        confirm_risky:
+          type: boolean
+          title: Confirm Risky
+          default: false
+      type: object
+      title: AllowRequest
     AnswerIn:
       properties:
         section:
@@ -27916,6 +27970,7 @@ components:
           - release_quarantine
           - ticket_note
           - quarantine_check
+          - allow_sender
           title: Action
         incident_uid:
           type: string
@@ -40751,6 +40806,29 @@ components:
             format: date-time
           - type: 'null'
           title: Check At
+        allow_possible:
+          type: boolean
+          title: Allow Possible
+          default: false
+        allow_blocked:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Allow Blocked
+        allow_state:
+          type: string
+          title: Allow State
+          default: none
+        allow_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Allow Message
+        allow_sender:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Allow Sender
       type: object
       required:
       - available

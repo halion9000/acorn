@@ -62,6 +62,13 @@ describe('CreateCaseModal', () => {
     expect(api.create).not.toHaveBeenCalled();
   });
 
+  it('says what the server said when it gave a readable reason', async () => {
+    api.create.mockRejectedValue(new Error('One or more alerts were not found.'));
+    show();
+    await userEvent.click(screen.getByRole('button', { name: 'Create case' }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Could not create the case: One or more alerts were not found.'));
+  });
+
   it('says so when the case could not be created, and stays open', async () => {
     api.create.mockRejectedValue(new Error('500'));
     const onClose = show();
