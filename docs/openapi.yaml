@@ -41736,6 +41736,14 @@ components:
         alerts_raised:
           type: integer
           title: Alerts Raised
+        alerts_closed:
+          type: integer
+          title: Alerts Closed
+          default: 0
+        alerts_reopened:
+          type: integer
+          title: Alerts Reopened
+          default: 0
       type: object
       required:
       - stored

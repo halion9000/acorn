@@ -25,7 +25,8 @@ from app.models.remote_tool import ALL_CLIENTS, CustomRemoteTool, DeviceRemoteTo
 from app.models.tenant import Tenant
 from app.services import remote_tools as rt
 from app.services.audit import emit_audit
-from app.services.identity_detections import alert_values, save_findings  # noqa: F401  (save_findings: see _raise_alerts)
+from app.services.identity_detections import alert_id, alert_values, save_findings  # noqa: F401  (save_findings: see _raise_alerts)
+from app.services.quarantine_release import _queue_ticket_note, halo_ticket_ids
 
 logger = logging.getLogger("aisoc.remote_tools")
 
@@ -307,6 +308,60 @@ async def _raise_alerts(
     return made
 
 
+GONE_MARK = "remote_tool_gone"
+
+
+def gone_note(title: str, scanned: datetime) -> str:
+    """What is written on the alert's tickets when the finding is no longer there (pure)."""
+    return f"No longer found: {title}. The device scan of {scanned.astimezone(UTC):%Y-%m-%d %H:%M UTC} no longer lists it, so A.C.O.R.N closed this alert."
+
+
+def back_note(title: str, scanned: datetime) -> str:
+    """What is written on the alert's tickets when a finding that had gone is found again (pure)."""
+    return f"Found again: {title}. The device scan of {scanned.astimezone(UTC):%Y-%m-%d %H:%M UTC} lists it again, so A.C.O.R.N reopened this alert."
+
+
+async def reconcile_alerts(db: Any, owner: uuid.UUID, target: uuid.UUID, sightings: list[Any], rules: dict[tuple[str, uuid.UUID | None], str], now: datetime, trusted: dict[str, list[str]] | None = None) -> tuple[int, int]:
+    """Close the open alerts this page raised for one client whose finding is no longer true (the tool is gone, allowed now, or the server is now yours), and reopen one that had gone and is back.
+    Only an alert nobody has started on is closed (a person's own decision is left alone), and only one this function closed is ever reopened. Each change is written on the alert's HaloPSA tickets, so a ticket made from
+    the alert says the same. Call only after a scan that looked at devices: an empty or failed scan proves nothing. Returns (closed, reopened). The caller owns the transaction."""
+    if trusted is None:
+        trusted = rt.trusted_instances(getattr(await db.get(Tenant, owner), "settings", None))
+    current = {
+        alert_id(tid, f)
+        for tid, f in [*rt.blocked_findings(sightings, rules, now), *rt.foreign_findings(sightings, trusted, now)]
+        if tid == target
+    }
+    Alert = _alert_model()  # noqa: N806
+    closed = reopened = 0
+    async with _in_tenant(db, owner, target):
+        mine = (
+            await db.execute(select(Alert).where(Alert.tenant_id == target, Alert.raw_event["source"].astext == "aisoc-remote-tools"))
+        ).scalars().all()
+        for alert in mine:
+            enrichment = dict(alert.enrichment_data) if isinstance(alert.enrichment_data, dict) else {}
+            tickets = halo_ticket_ids(enrichment)
+            if alert.id not in current and alert.status in ("new", "triaging"):
+                enrichment[GONE_MARK] = now.isoformat()
+                alert.enrichment_data = enrichment  # a new dict, so the JSONB column is seen as changed
+                alert.status = "resolved"
+                alert.resolved_at = now
+                alert.updated_at = now
+                if tickets:
+                    _queue_ticket_note(db, target, alert.id, tickets, gone_note(alert.title, now), now)
+                closed += 1
+            elif alert.id in current and alert.status == "resolved" and enrichment.get(GONE_MARK):
+                enrichment.pop(GONE_MARK, None)
+                alert.enrichment_data = enrichment
+                alert.status = "new"
+                alert.resolved_at = None
+                alert.updated_at = now
+                if tickets:
+                    _queue_ticket_note(db, target, alert.id, tickets, back_note(alert.title, now), now)
+                reopened += 1
+    return closed, reopened
+
+
 @router.put("/tools/{tool_key}/verdict", response_model=VerdictOut, summary="Allow, block or leave unreviewed a tool, for every client or for one")
 async def set_verdict(
     tool_key: str,
@@ -541,6 +596,8 @@ class ReportOut(BaseModel):
     unknown_tools: int
     unmapped: bool
     alerts_raised: int
+    alerts_closed: int = 0
+    alerts_reopened: int = 0
 
 
 async def apply_report(db: Any, owner: uuid.UUID, report: RemoteToolsReport, now: datetime | None = None) -> ReportOut:
@@ -593,7 +650,13 @@ async def apply_report(db: Any, owner: uuid.UUID, report: RemoteToolsReport, now
     rules = await _rules(db, owner)
     sightings = await _sightings(db, [target])
     raised = await _raise_alerts(db, owner, sightings, rules, now)
-    return ReportOut(stored=stored, removed=removed, unknown_tools=unknown, unmapped=False, alerts_raised=raised)
+    closed = reopened = 0
+    if report.devices_scanned > 0:
+        try:
+            closed, reopened = await reconcile_alerts(db, owner, target, sightings, rules, now)
+        except Exception:  # noqa: BLE001 - tidying old alerts must never lose the scan itself
+            logger.warning("remote tool alert reconcile failed", exc_info=True)
+    return ReportOut(stored=stored, removed=removed, unknown_tools=unknown, unmapped=False, alerts_raised=raised, alerts_closed=closed, alerts_reopened=reopened)
 
 
 @ingest_router.post("/core-feed/{tenant_token}/remote-tools", response_model=ReportOut)

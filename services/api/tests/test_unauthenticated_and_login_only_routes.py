@@ -89,6 +89,10 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's vendor client list: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only add or rename that tenant's own client-mapping rows",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/canary-tunnel",
+    ): "CORE's Cloudflare canary card sends its tunnel token: authenticated by the core-feed token in the path, checked in the handler (401 without it); the token is checked, kept for the update script and never echoed",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/directory-audits",
     ): "CORE's directory audit entries (CIPP): authenticated by the core-feed token in the path, checked in the handler (401 without it); can only add entries under that feed's own mapped client tenants",
     (
