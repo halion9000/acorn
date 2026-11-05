@@ -36822,6 +36822,11 @@ components:
           - type: integer
           - type: 'null'
           title: Stale Alerts
+        unreviewed_remote_tools:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Unreviewed Remote Tools
       type: object
       required:
       - tenant_id

@@ -917,6 +917,8 @@ class ManagedTenantRow(BaseModel):
     connectors_unhealthy: int | None = None
     # Alerts set aside as stale (never deleted) right now. None when they could not be read: never read that as "0".
     stale_alerts: int | None = None
+    # Remote management tools found on this client's devices that nobody has allowed or blocked yet. None when they could not be read.
+    unreviewed_remote_tools: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1001,6 +1003,16 @@ async def _stale_counts(db: AsyncSession, child_ids: list[uuid.UUID]) -> dict[uu
     return {tenant_id: int(n) for tenant_id, n in rows}
 
 
+async def _unreviewed_remote_tools(db: AsyncSession, owner: uuid.UUID, child_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    """For each client: remote tools found there that have no verdict yet. Raises when the read fails; the caller decides what to show then."""
+    if not child_ids:
+        return {}
+    from app.api.v1.endpoints import remote_tools as rtep
+
+    await rtep._load_custom(db, owner)
+    return rtep.unreviewed_tools_by_client(await rtep._sightings(db, child_ids), await rtep._rules(db, owner))
+
+
 def _mean(values: list[float]) -> float | None:
     return round(sum(values) / len(values), 1) if values else None
 
@@ -1057,6 +1069,11 @@ async def list_managed_tenants(
     except Exception:  # noqa: BLE001 - same: the list still loads, the column then reads unknown
         logging.getLogger(__name__).warning("mssp: stale alert counts could not be read", exc_info=True)
         stale = None
+    try:
+        unreviewed: dict[uuid.UUID, int] | None = await _unreviewed_remote_tools(db, current_user.tenant_id, [c.id for c in children])
+    except Exception:  # noqa: BLE001 - same: the list still loads, the column then reads unknown
+        logging.getLogger(__name__).warning("mssp: unreviewed remote tools could not be read", exc_info=True)
+        unreviewed = None
     rows: list[ManagedTenantRow] = []
     for child in children:
         snap = snaps.get(child.id)
@@ -1080,6 +1097,7 @@ async def list_managed_tenants(
                 connectors_enabled=enabled,
                 connectors_unhealthy=bad,
                 stale_alerts=(stale.get(child.id, 0) if stale is not None else None),
+                unreviewed_remote_tools=(unreviewed.get(child.id, 0) if unreviewed is not None else None),
             )
         )
     return rows

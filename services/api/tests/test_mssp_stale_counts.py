@@ -117,3 +117,61 @@ def test_a_failed_read_gives_unknown_not_zero_and_the_list_still_loads(monkeypat
 
     rows = run(body)
     assert [(r.name, r.stale_alerts) for r in rows] == [("Acme", None)]
+
+
+# ---- remote tools nobody has reviewed ------------------------------------------------------------------------------------------------------------------
+
+from app.api.v1.endpoints import remote_tools as rtep  # noqa: E402
+
+
+def seen(tenant, key):
+    return SimpleNamespace(tenant_id=tenant, tool_key=key)
+
+
+def test_unreviewed_tools_are_counted_once_per_tool_per_client_and_a_rule_for_the_client_or_everyone_settles_it():
+    a, b, c = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    sightings = [
+        seen(a, "anydesk"),
+        seen(a, "anydesk"),
+        seen(a, "teamviewer"),
+        seen(b, "anydesk"),
+        seen(b, "teamviewer"),
+        seen(c, "anydesk"),
+        seen(a, "not_in_the_catalog"),
+    ]
+    rules = {("teamviewer", None): "allowed", ("anydesk", b): "blocked"}
+    assert rtep.unreviewed_tools_by_client(sightings, rules) == {
+        a: 1,
+        c: 1,
+    }, "two installs of one tool are one tool; allowed for everyone and blocked for b are both reviewed; unknown tools are ignored"
+    assert rtep.unreviewed_tools_by_client([], {}) == {}
+
+
+def test_the_list_gives_each_client_its_unreviewed_count_zero_when_none_and_unknown_when_unreadable(monkeypatch):
+    async def stale(_db, _ids):
+        return {}
+
+    monkeypatch.setattr(mssp, "_stale_counts", stale)
+    fail = {"on": False}
+
+    async def counts(_db, _owner, ids):
+        if fail["on"]:
+            raise RuntimeError("remote tool tables unreadable")
+        return {ids[0]: 3}
+
+    monkeypatch.setattr(mssp, "_unreviewed_remote_tools", counts)
+
+    async def body(s):
+        parent = await make(s, "Parent")
+        await make(s, "Acme", parent.id)
+        await make(s, "Birch", parent.id)
+        await s.commit()
+        user = SimpleNamespace(tenant_id=parent.id)
+        good = await mssp.list_managed_tenants(include_hidden=False, db=s, current_user=user)
+        fail["on"] = True
+        bad = await mssp.list_managed_tenants(include_hidden=False, db=s, current_user=user)
+        return good, bad
+
+    good, bad = run(body)
+    assert sorted(r.unreviewed_remote_tools for r in good) == [0, 3]
+    assert [r.unreviewed_remote_tools for r in bad] == [None, None]

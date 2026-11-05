@@ -100,9 +100,9 @@ describe('real tenants', () => {
 
     const table = await screen.findByRole('table');
     const reportingRow = within(table).getByText('Reporting Co').closest('tr') as HTMLElement;
-    expect(within(reportingRow).getAllByRole('cell').map((c) => c.textContent).slice(2, 11)).toEqual(['12', '2', '4', '30', '1', '3', '—', '—', '80']); // the dashes are the connector health and the stale alerts: this older row carries no reading of either
+    expect(within(reportingRow).getAllByRole('cell').map((c) => c.textContent).slice(2, 12)).toEqual(['12', '2', '4', '30', '1', '3', '—', '—', '—', '80']); // the dashes are the connector health, the unreviewed tools and the stale alerts: this older row carries no reading of either
     const quietRow = within(table).getByText('Quiet Co').closest('tr') as HTMLElement;
-    expect(within(quietRow).getAllByRole('cell').map((c) => c.textContent).slice(1)).toEqual(['—', '—', '—', '—', '—', '—', '—', '—', '—', '—', 'No data yet', '', 'Hide']); // the empty cell is the automated-playbooks checkbox
+    expect(within(quietRow).getAllByRole('cell').map((c) => c.textContent).slice(1)).toEqual(['—', '—', '—', '—', '—', '—', '—', '—', '—', '—', '—', 'No data yet', '', 'Hide']); // the empty cell is the automated-playbooks checkbox
   });
 
   it('shows a real zero as 0 and an unreported figure as a dash: they are not the same thing', async () => {
@@ -388,13 +388,13 @@ describe('the Integrations column layout', () => {
 });
 
 describe('the tenant table fits the window', () => {
-  it('uses the narrow cell padding on every cell of its 14 columns, so the page does not need sideways scrolling', async () => {
+  it('uses the narrow cell padding on every cell of its 15 columns, so the page does not need sideways scrolling', async () => {
     overviewMock.mockResolvedValue({ ...none, total_tenants: 1 });
     tenantsMock.mockResolvedValue([row({ name: 'One', sources: ['halopsa'] })]);
     render(<MSSPDashboardView />);
     const table = await screen.findByRole('table');
     const cells = [...table.querySelectorAll('th, td')];
-    expect(cells).toHaveLength(28);
+    expect(cells).toHaveLength(30);
     expect(cells.filter((c) => !c.className.includes('px-2.5'))).toEqual([]);
   });
 });
@@ -468,5 +468,18 @@ describe('stale alerts per client', () => {
     await screen.findByText('Many Co');
     const cells = Object.fromEntries(screen.getAllByTestId('client-line').map((l) => [l.querySelector('a')?.textContent, within(l).getByTestId('stale-alerts').textContent]));
     expect(cells).toEqual({ 'Many Co': '12', 'Zero Co': '0', 'Unknown Co': '—', 'Old Server Co': '—' });
+  });
+});
+
+describe('unreviewed remote tools per client', () => {
+  it('shows the count, amber when there are some, and a dash when unknown or not sent', async () => {
+    overviewMock.mockResolvedValue(none);
+    tenantsMock.mockResolvedValue([row({ name: 'Some Co', unreviewed_remote_tools: 3 }), row({ name: 'Zero Co', unreviewed_remote_tools: 0 }), row({ name: 'Unknown Co', unreviewed_remote_tools: null }), row({ name: 'Old Server Co' })]);
+    render(<MSSPDashboardView />);
+    await screen.findByText('Some Co');
+    const cells = Object.fromEntries(screen.getAllByTestId('client-line').map((l) => [l.querySelector('a')?.textContent, within(l).getByTestId('unreviewed-tools')]));
+    expect(Object.fromEntries(Object.entries(cells).map(([k, v]) => [k, v.textContent]))).toEqual({ 'Some Co': '3', 'Zero Co': '0', 'Unknown Co': '—', 'Old Server Co': '—' });
+    expect(cells['Some Co']).toHaveClass('text-amber-300');
+    expect(cells['Zero Co']).not.toHaveClass('text-amber-300');
   });
 });

@@ -612,6 +612,8 @@ export interface ManagedTenantRow {
   connectors_unhealthy?: number | null;
   /** Alerts set aside as stale right now. Absent from an older server, null when they could not be read. */
   stale_alerts?: number | null;
+  /** Remote tools found on the client's devices with no allow or block decision yet. Absent from an older server, null when unreadable. */
+  unreviewed_remote_tools?: number | null;
 }
 
 export interface AlertScriptRun {

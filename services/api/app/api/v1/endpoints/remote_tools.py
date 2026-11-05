@@ -156,6 +156,15 @@ async def inventory(current_user: Annotated[AuthUser, Depends(require_permission
     return build_inventory(sightings, rules, scans, rt.trusted_instances(getattr(owner_tenant, "settings", None)))
 
 
+def unreviewed_tools_by_client(sightings: list[Any], rules: dict[tuple[str, uuid.UUID | None], str]) -> dict[uuid.UUID, int]:
+    """For each client: how many different tools found on its devices nobody has allowed or blocked yet (pure). Clients with none are absent."""
+    seen: dict[uuid.UUID, set[str]] = {}
+    for s in sightings:
+        if rt.tool_by_key(s.tool_key) is not None and rt.effective_verdict(s.tool_key, s.tenant_id, rules) == "unreviewed":
+            seen.setdefault(s.tenant_id, set()).add(s.tool_key)
+    return {client: len(keys) for client, keys in seen.items()}
+
+
 class CatalogEntry(BaseModel):
     key: str
     name: str

@@ -321,6 +321,7 @@ export default function MSSPDashboardView() {
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">SLA Breaches</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Connectors</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Connectors switched on for this client, and how many of them report a problem right now">Connector health</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Remote management tools found on this client's devices that nobody has allowed or blocked yet">Unreviewed tools</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Alerts nobody touched for a while that were set aside for review (never deleted). They are not in the open count.">Stale alerts</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Health</th>
                       <th scope="col" className="px-2.5 py-3 font-medium">Last Snapshot</th>
@@ -364,6 +365,7 @@ export default function MSSPDashboardView() {
                         <td data-testid="connector-health" className={clsx('px-2.5 py-3 text-right', (t.connectors_unhealthy ?? 0) > 0 ? 'font-medium text-red-400' : 'text-gray-300')}>
                           {connectorHealthLabel(t.connectors_enabled, t.connectors_unhealthy)}
                         </td>
+                        <td data-testid="unreviewed-tools" className={clsx('px-2.5 py-3 text-right', (t.unreviewed_remote_tools ?? 0) > 0 ? 'font-medium text-amber-300' : 'text-gray-300')}>{figure(t.unreviewed_remote_tools)}</td>
                         <td data-testid="stale-alerts" className="px-2.5 py-3 text-right text-gray-300">{figure(t.stale_alerts)}</td>
                         <td className="px-2.5 py-3 text-right text-gray-300">{figure(t.health_score, { decimals: 0 })}</td>
                         <td className="px-2.5 py-3 text-gray-400">{snapshotLabel(t.snapshot_at)}</td>
