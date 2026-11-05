@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    abuse,
     agents,
     airgap,
     alert_explain,
@@ -132,6 +133,7 @@ api_router.include_router(alert_scripts.router)
 api_router.include_router(alert_related.router)
 api_router.include_router(alert_suppressions.router)
 api_router.include_router(alert_why.router)
+api_router.include_router(abuse.router)
 api_router.include_router(alert_stale_review.router)
 api_router.include_router(data_retention.router)
 api_router.include_router(client_onboarding.router)

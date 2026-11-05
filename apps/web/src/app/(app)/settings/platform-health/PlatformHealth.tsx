@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
+import { LoginAbusePanel } from "./LoginAbusePanel";
 import { agoMinutes } from "@/lib/ago";
 
 /** A restarted CORE takes about this long to finish its first round and report; a quiet spell shorter than the grace period is shown as a note, not a warning. */
@@ -160,6 +161,7 @@ export function PlatformHealth() {
           <p className={snapshot.overall === "ok" ? "text-emerald-700" : "text-red-700"} data-testid="overall">
             {snapshot.overall === "ok" ? "Every service is answering." : `Not answering: ${snapshot.down.join(", ")}`}
           </p>
+          <LoginAbusePanel />
           {snapshot.database && snapshot.database.enforced !== true && (
             <p role="note" data-testid="row-security" className="rounded border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm text-yellow-200">
               {snapshot.database.enforced === false ? 'Tenant isolation in the database is not being enforced: ' : 'Could not check tenant isolation in the database: '}

@@ -1631,6 +1631,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/abuse/logins:
+    get:
+      tags:
+      - abuse
+      summary: 'Failed sign-ins in the lock window: how many, from how many places,
+        and what is locked (no typed address is named)'
+      operationId: login_abuse_api_v1_abuse_logins_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginAbuse'
+      security:
+      - HTTPBearer: []
   /api/v1/alert-stale:
     get:
       tags:
@@ -26952,6 +26968,19 @@ components:
       - items
       - total
       title: BundleListResponse
+    BusyClient:
+      properties:
+        client:
+          type: string
+          title: Client
+        failures:
+          type: integer
+          title: Failures
+      type: object
+      required:
+      - client
+      - failures
+      title: BusyClient
     ByokSavings:
       properties:
         is_byok_active:
@@ -36505,6 +36534,41 @@ components:
         only signal we expose — same convention the OAuth credential view
 
         uses (``has_secret``).'
+    LoginAbuse:
+      properties:
+        window_minutes:
+          type: integer
+          title: Window Minutes
+        failures:
+          type: integer
+          title: Failures
+        addresses_tried:
+          type: integer
+          title: Addresses Tried
+        clients:
+          type: integer
+          title: Clients
+        locked_addresses:
+          type: integer
+          title: Locked Addresses
+        locked_clients:
+          type: integer
+          title: Locked Clients
+        busiest_clients:
+          items:
+            $ref: '#/components/schemas/BusyClient'
+          type: array
+          title: Busiest Clients
+      type: object
+      required:
+      - window_minutes
+      - failures
+      - addresses_tried
+      - clients
+      - locked_addresses
+      - locked_clients
+      - busiest_clients
+      title: LoginAbuse
     LoginRequest:
       properties:
         account_name:
