@@ -38404,6 +38404,12 @@ components:
         suggest_hide:
           type: boolean
           title: Suggest Hide
+        sample_alert_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Sample Alert Id
       type: object
       required:
       - name

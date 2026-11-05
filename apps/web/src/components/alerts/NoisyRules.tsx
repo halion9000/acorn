@@ -2,18 +2,58 @@
 
 /**
  * The ten rules that raised the most alerts lately, with how many are still open and how many were closed as false positives. A rule that is mostly false positives is marked "worth hiding": a suggestion
- * only, the Hide button on an alert does the hiding. Alerts already hidden or set aside as stale are not counted.
+ * only until someone presses Hide… on the row and confirms (every client, 30 days, audited); the Hide button on an alert hides one client or one device. Alerts already hidden or set aside as stale are not counted.
  */
 
 import Link from 'next/link';
 import { useState } from 'react';
 import useSWR from 'swr';
-import { alertsApi } from '@/lib/api';
+import toast from 'react-hot-toast';
+import { alertsApi, type NoisyRule } from '@/lib/api';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
+
+/** The hide-for-all-clients button of a rule worth hiding. It asks first: it hides the rule for every client for 30 days and hides the open alerts of it now. */
+function HideRule({ rule, onHidden }: { rule: NoisyRule; onHidden: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!rule.sample_alert_id) return null;
+  const alertId = rule.sample_alert_id;
+  async function hide() {
+    setBusy(true);
+    try {
+      const out = await alertsApi.hideType({ alertId, scope: 'all', days: 30 });
+      toast.success(`Hidden for 30 days for every client${typeof out.hidden_alerts === 'number' ? ` (${out.hidden_alerts} open alert${out.hidden_alerts === 1 ? '' : 's'} hidden now)` : ''}.`);
+      setAsking(false);
+      onHidden();
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Could not hide that.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!asking) {
+    return (
+      <button type="button" onClick={() => setAsking(true)} className="ml-2 text-xs text-gray-400 hover:text-gray-200" aria-label={`Hide ${rule.name}`}>
+        Hide…
+      </button>
+    );
+  }
+  return (
+    <span className="ml-2 inline-flex items-center gap-2 text-xs text-gray-300">
+      Hide for every client for 30 days?
+      <button type="button" disabled={busy} onClick={() => void hide()} className="rounded border border-amber-500/40 px-2 py-0.5 text-amber-300 hover:bg-amber-500/10 disabled:opacity-50" aria-label={`Confirm hide ${rule.name}`}>
+        {busy ? 'Hiding…' : 'Hide it'}
+      </button>
+      <button type="button" disabled={busy} onClick={() => setAsking(false)} className="text-gray-500 hover:text-gray-300">
+        Cancel
+      </button>
+    </span>
+  );
+}
 
 export function NoisyRules() {
   const [days, setDays] = useState(30);
-  const { data, error, isLoading } = useSWR(['noisy-rules', days], () => alertsApi.noisyRules(days), { revalidateOnFocus: false });
+  const { data, error, isLoading, mutate } = useSWR(['noisy-rules', days], () => alertsApi.noisyRules(days), { revalidateOnFocus: false });
   return (
     <section className="rounded-lg border border-gray-800 bg-gray-900/40 p-4" data-testid="noisy-rules">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -57,7 +97,9 @@ export function NoisyRules() {
                   <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-gray-200">
                     {r.false_positives} <span className="text-gray-500">({Math.round(r.false_positive_rate * 100)}%)</span>
                   </td>
-                  <td className="whitespace-nowrap px-2 py-1.5">{r.suggest_hide ? <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">Worth hiding</span> : null}</td>
+                  <td className="whitespace-nowrap px-2 py-1.5">{r.suggest_hide ? <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">Worth hiding</span> : null}
+                    {r.suggest_hide ? <HideRule rule={r} onHidden={() => void mutate()} /> : null}
+                  </td>
                 </tr>
               ))}
             </tbody>

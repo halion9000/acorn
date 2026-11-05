@@ -13,7 +13,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import String, cast, func, or_, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.models.alert import Alert
@@ -22,21 +22,22 @@ from app.models.tenant import Tenant
 from app.services.alert_scope import alert_scope
 from app.services.alert_suppression import (
     MAX_DAYS,
+    MAX_WINDOW_HOURS,
     SUGGEST_AFTER,
     SUGGEST_WINDOW_DAYS,
-    _type_filter,
-    should_suggest_hiding,
-    MAX_WINDOW_HOURS,
-    WINDOW_SIGNATURE,
     SUPPRESSED,
+    WINDOW_SIGNATURE,
+    _type_filter,
     apply_rule,
     expiry_from_days,
     host_keys,
     is_active,
     release_rule,
+    should_suggest_hiding,
     signature_of,
     source_of,
 )
+from app.services.audit import emit_audit
 from app.services.device_identity import hostname_key
 
 router = APIRouter(prefix="/alert-suppressions", tags=["alerts"])
@@ -134,6 +135,15 @@ async def hide_alert_type(body: SuppressionIn, user: AuthUser, db: DBSession) ->
     db.add(rule)
     await db.flush()
     hidden = await apply_rule(db, rule, user.tenant_id)
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="alert_suppression:hide_type",
+        resource="alert_suppression",
+        resource_id=str(rule.id),
+        changes={"title": title[:200], "scope": body.scope, "days": body.days, "hidden_alerts": hidden},
+    )
     await db.commit()
     names = {
         r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()
@@ -214,7 +224,9 @@ async def hide_suggestion(alert_id: uuid.UUID, user: AuthUser, db: DBSession) ->
                 .select_from(Alert)
                 .where(
                     Alert.tenant_id == tid,
-                    or_(Alert.status == "false_positive", Alert.disposition == "false_positive"),  # a single close sets the status, a bulk close also the verdict
+                    or_(
+                        Alert.status == "false_positive", Alert.disposition == "false_positive"
+                    ),  # a single close sets the status, a bulk close also the verdict
                     Alert.resolved_at >= now - timedelta(days=SUGGEST_WINDOW_DAYS),
                     _type_filter(SimpleNamespace(signature=signature)),
                 )
@@ -245,16 +257,19 @@ class NoisyRule(BaseModel):
     false_positives: int
     false_positive_rate: float
     suggest_hide: bool
+    # One alert of this rule, so "hide this rule" can name something real. Only given when hiding is suggested.
+    sample_alert_id: uuid.UUID | None = None
 
 
 NOISY_MIN_TOTAL = 10  # fewer alerts than this is not noise, whatever share was false
 NOISY_SUGGEST_RATE = 0.5
 
 
-def noisy_row(name: str, source: str | None, total: int, open_: int, false_positives: int) -> NoisyRule:
+def noisy_row(name: str, source: str | None, total: int, open_: int, false_positives: int, sample: str | None = None) -> NoisyRule:
     """One rule's line: how many alerts it raised, how many are still open, how many were closed as false positives, and whether hiding it is worth suggesting (at least ``SUGGEST_AFTER`` false positives,
     half or more of what it raised, and enough alerts to call it a pattern). It suggests; it hides nothing."""
     rate = round(false_positives / total, 3) if total else 0.0
+    suggest = total >= NOISY_MIN_TOTAL and false_positives >= SUGGEST_AFTER and rate >= NOISY_SUGGEST_RATE
     return NoisyRule(
         name=name,
         source=source,
@@ -262,7 +277,8 @@ def noisy_row(name: str, source: str | None, total: int, open_: int, false_posit
         open=open_,
         false_positives=false_positives,
         false_positive_rate=rate,
-        suggest_hide=total >= NOISY_MIN_TOTAL and false_positives >= SUGGEST_AFTER and rate >= NOISY_SUGGEST_RATE,
+        suggest_hide=suggest,
+        sample_alert_id=uuid.UUID(sample) if suggest and sample else None,
     )
 
 
@@ -282,7 +298,7 @@ async def noisy_rules(
     """The rules that raised the most alerts in the last ``days`` (for one client, or all), most first. Alerts hidden by a rule or set aside as stale are not counted: they are already dealt with."""
     from app.api.v1.endpoints.devices import _scope  # noqa: PLC0415
     from app.db.rls_scope import cross_tenant_reads  # noqa: PLC0415
-    from app.services.alert_status import FINISHED_ALERT_STATUSES, SUPPRESSED, STALE  # noqa: PLC0415
+    from app.services.alert_status import FINISHED_ALERT_STATUSES, STALE, SUPPRESSED  # noqa: PLC0415
 
     scope, _ = await _scope(db, user.tenant_id, client_id)
     since = datetime.now(UTC) - timedelta(days=days)
@@ -297,6 +313,7 @@ async def noisy_rules(
                     func.count(),
                     func.count().filter(Alert.status.notin_(FINISHED_ALERT_STATUSES)),
                     func.count().filter(is_fp),
+                    func.max(cast(Alert.id, String)),
                 )
                 .where(Alert.tenant_id.in_(scope), Alert.created_at >= since, Alert.status.notin_((SUPPRESSED, STALE)))
                 .group_by(name)
@@ -304,7 +321,7 @@ async def noisy_rules(
                 .limit(limit)
             )
         ).all()
-    return [noisy_row(str(r[0])[:200], r[1], int(r[2]), int(r[3]), int(r[4])) for r in rows]
+    return [noisy_row(str(r[0])[:200], r[1], int(r[2]), int(r[3]), int(r[4]), r[5]) for r in rows]
 
 
 @router.get("", response_model=list[SuppressionOut], dependencies=[Depends(require_permission("alerts:read"))])

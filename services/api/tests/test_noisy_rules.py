@@ -16,6 +16,13 @@ def test_a_rule_with_many_alerts_mostly_false_positives_is_worth_suggesting_to_h
     assert (r.total, r.open, r.false_positives, r.false_positive_rate, r.suggest_hide) == (40, 5, 30, 0.75, True)
 
 
+def test_only_a_rule_worth_hiding_carries_a_sample_alert_to_hide_it_by():
+    sample = uuid.uuid4()
+    assert ep.noisy_row("Disk space low", "ninjaone", 40, 5, 30, str(sample)).sample_alert_id == sample
+    assert ep.noisy_row("Impossible travel", None, 12, 12, 0, str(uuid.uuid4())).sample_alert_id is None
+    assert ep.noisy_row("Disk space low", "ninjaone", 40, 5, 30).sample_alert_id is None
+
+
 def test_a_few_alerts_or_few_false_positives_or_a_low_share_is_not_noise():
     assert ep.noisy_row("x", None, 9, 0, 9).suggest_hide is False  # too few to call a pattern
     assert ep.noisy_row("x", None, 40, 0, 2).suggest_hide is False  # under three false positives
@@ -46,10 +53,13 @@ def wired(monkeypatch):
 
 
 def test_the_report_lists_the_rules_in_the_order_the_query_gives_with_each_line_worked_out(wired):
-    db = Db([("Disk space low", "ninjaone", 40, 5, 30), ("Impossible travel", "aisoc-checks", 12, 12, 0)])
+    db = Db(
+        [("Disk space low", "ninjaone", 40, 5, 30, str(uuid.uuid4())), ("Impossible travel", "aisoc-checks", 12, 12, 0, str(uuid.uuid4()))]
+    )
     out = asyncio.run(ep.noisy_rules(NS(tenant_id=uuid.uuid4()), db, None, 30, 10))
     assert [r.name for r in out] == ["Disk space low", "Impossible travel"]
     assert out[0].suggest_hide is True and out[1].suggest_hide is False
+    assert out[0].sample_alert_id is not None and out[1].sample_alert_id is None, "the sample comes through the query, only for the one worth hiding"
 
 
 def test_the_query_counts_only_alerts_still_in_play_names_a_rule_by_its_rule_or_title_and_only_reads(wired):

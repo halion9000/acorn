@@ -1883,6 +1883,8 @@ export interface NoisyRule {
   false_positives: number;
   false_positive_rate: number;
   suggest_hide: boolean;
+  /** One alert of this rule, given only when hiding is suggested: what "hide this rule" is asked about. Absent from an older server. */
+  sample_alert_id?: string | null;
 }
 
 export interface StaleSummary {

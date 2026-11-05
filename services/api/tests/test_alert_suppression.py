@@ -165,6 +165,9 @@ def an_alert(**over):
     return SimpleNamespace(**base)
 
 
+AUDITS: list[dict] = []
+
+
 @pytest.fixture
 def wired(monkeypatch):
     applied = []
@@ -179,6 +182,12 @@ def wired(monkeypatch):
     monkeypatch.setattr(scope, "find_alert_tenant", find)
     monkeypatch.setattr(scope, "acting_as_tenant", lambda db, tid: __import__("contextlib").nullcontext())
     monkeypatch.setattr(ep, "apply_rule", fake_apply)
+    AUDITS.clear()
+
+    async def fake_audit(**kw):
+        AUDITS.append(kw)
+
+    monkeypatch.setattr(ep, "emit_audit", fake_audit)
     return applied
 
 
@@ -200,6 +209,15 @@ def test_hiding_for_the_client_stores_the_type_the_tool_and_the_client_and_hides
     assert rule_row.expires_at is not None and (rule_row.expires_at - datetime.now(UTC)) > timedelta(days=29)
     assert out.hidden_alerts == 3 and out.indefinite is False and out.active is True
     assert db.commits == 1 and wired == [rule_row]
+
+
+def test_hiding_an_alert_type_is_written_to_the_audit_log_with_who_what_how_long_and_how_many_it_hid(wired):
+    db = FakeDB(an_alert())
+    hide(db, scope="all", days=7)
+    (entry,) = AUDITS
+    assert entry["action"] == "alert_suppression:hide_type" and entry["tenant_id"] == OWNER and entry["actor_id"] is not None
+    assert entry["changes"] == {"title": "Process: 'x' does not exist", "scope": "all", "days": 7, "hidden_alerts": 3}
+    assert db.commits == 1
 
 
 def test_hiding_for_all_clients_is_not_tied_to_the_alerts_client_and_can_be_indefinite(wired):

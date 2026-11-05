@@ -28,7 +28,7 @@ describe('the alert row age badge', () => {
     const { unmount } = render(<AlertRow alert={alert({ createdAt: old })} selected={false} onSelect={() => {}} />);
     expect(screen.getByTestId('alert-open-days')).toHaveTextContent('10d open');
     unmount();
-    const young = render(<AlertRow alert={alert()} selected={false} onSelect={() => {}} />);
+    const young = render(<AlertRow alert={alert({ createdAt: new Date(Date.now() - 86_400_000).toISOString() })} selected={false} onSelect={() => {}} />); // a day old by the real clock, which is what the row reads
     expect(screen.queryByTestId('alert-open-days')).toBeNull();
     young.unmount();
     render(<AlertRow alert={alert({ createdAt: old, status: 'resolved' })} selected={false} onSelect={() => {}} />);
