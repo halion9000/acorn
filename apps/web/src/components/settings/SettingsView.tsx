@@ -274,26 +274,46 @@ export const MORE_SETTINGS: { href: string; label: string; description: string }
   { href: '/settings/triage', label: 'Auto-close', description: 'How sure AI triage must be to close an alert itself' },
   { href: '/settings/cipp-actions', label: 'CIPP actions', description: 'What CORE can do to client Microsoft 365 tenants through CIPP, whether it is switched on, and what it has been asked to do' },
   { href: '/settings/guide', label: 'ACORN Setup Guide', description: 'How to set up and use A.C.O.R.N, page by page (the former User guide)' },
+  { href: '/settings/business-context', label: 'Business context rules', description: "Rules that adjust an alert's importance for a client before it is triaged" },
   { href: '/settings/tickets', label: 'Tickets', description: 'The HaloPSA status a resolved incident moves its ticket to' },
 ];
 
-function MoreSettings() {
-  return (
-    <div className="mt-3 rounded-xl border border-gray-800 bg-gray-900/40 p-2" data-testid="more-settings">
-      <p className="px-3 py-1 text-xs font-medium uppercase tracking-wider text-gray-500">More settings</p>
-      <ul className="space-y-1">
-        {MORE_SETTINGS.map((m) => (
-          <li key={m.href}>
-            <Link href={m.href} className="flex flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-800/50 hover:text-gray-100">
-              <span className="font-medium">{m.label}</span>
-              <span className="text-xs text-gray-500">{m.description}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <SeededDetections />
-    </div>
-  );
+/**
+ * How the settings are grouped on the left. Every tab and every page in MORE_SETTINGS belongs to exactly one group (a test enforces it, so a new setting cannot be left out), shown in this order.
+ * A tab is named by its id, a separate page by its address.
+ */
+export const SETTINGS_GROUPS: { title: string; items: string[] }[] = [
+  { title: 'Your account', items: ['profile', 'appearance', 'notifications', 'api-keys'] },
+  { title: 'People & access', items: ['workspace', 'tenant-access', '/settings/rbac', '/settings/audit'] },
+  { title: 'Clients', items: ['/settings/client-mapping', '/settings/client-cleanup', '/settings/onboarding', '/settings/business-context'] },
+  { title: 'Tools & integrations', items: ['/settings/connectors', '/settings/cipp-actions', '/settings/tickets'] },
+  { title: 'Detection & AI', items: ['autonomy', '/settings/triage', 'deployment', '/settings/costs'] },
+  { title: 'Platform', items: ['/settings/platform-health', 'software-update', 'azure-spend', 'alert-email', '/settings/retention'] },
+  { title: 'Help', items: ['/settings/guide', 'about'] },
+];
+
+export type SettingsEntry = { kind: 'tab'; id: TabId; label: string; description: string } | { kind: 'link'; href: string; label: string; description: string };
+
+/** The groups a person sees: each group's entries in order, only the tabs they may use, and no group left empty (pure). Anything not placed in a group is added at the end under "More", never dropped. */
+export function groupedSettings(visibleTabs: { id: TabId; label: string; description: string }[]): { title: string; entries: SettingsEntry[] }[] {
+  const tabs = new Map(visibleTabs.map((t) => [t.id as string, t]));
+  const links = new Map(MORE_SETTINGS.map((m) => [m.href, m]));
+  const placed = new Set<string>();
+  const groups = SETTINGS_GROUPS.map((g) => ({
+    title: g.title,
+    entries: g.items.flatMap((key): SettingsEntry[] => {
+      placed.add(key);
+      const t = tabs.get(key);
+      if (t) return [{ kind: 'tab', id: t.id, label: t.label, description: t.description }];
+      const l = links.get(key);
+      return l ? [{ kind: 'link', href: l.href, label: l.label, description: l.description }] : [];
+    }),
+  }));
+  const rest: SettingsEntry[] = [
+    ...visibleTabs.filter((t) => !placed.has(t.id)).map((t): SettingsEntry => ({ kind: 'tab', id: t.id, label: t.label, description: t.description })),
+    ...MORE_SETTINGS.filter((m) => !placed.has(m.href)).map((m): SettingsEntry => ({ kind: 'link', href: m.href, label: m.label, description: m.description })),
+  ];
+  return [...groups, { title: 'More', entries: rest }].filter((g) => g.entries.length > 0);
 }
 
 export function SettingsView() {
@@ -324,31 +344,38 @@ export function SettingsView() {
           aria-label="Settings sections"
           className="lg:sticky lg:top-4 lg:w-64 lg:shrink-0"
         >
-          <ul className="space-y-1 rounded-xl border border-gray-800 bg-gray-900/40 p-2">
-            {visibleTabs.map((t) => {
-              const active = tab === t.id;
-              return (
-                <li key={t.id}>
-                  <button
-                    type="button"
-                    onClick={() => setTab(t.id)}
-                    className={clsx(
-                      'flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
-                      active
-                        ? 'bg-gray-800/80 text-gray-50 ring-1 ring-blue-500/40'
-                        : 'text-gray-300 hover:bg-gray-800/50 hover:text-gray-100',
-                    )}
-                  >
-                    <span className="font-medium">{t.label}</span>
-                    <span className="text-xs text-gray-500">
-                      {t.description}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <MoreSettings />
+          <div className="space-y-3 rounded-xl border border-gray-800 bg-gray-900/40 p-2" data-testid="settings-groups">
+            {groupedSettings(visibleTabs).map((g) => (
+              <section key={g.title} aria-label={g.title}>
+                <p className="px-3 py-1 text-xs font-medium uppercase tracking-wider text-gray-500">{g.title}</p>
+                <ul className="space-y-1">
+                  {g.entries.map((e) => (
+                    <li key={e.kind === 'tab' ? e.id : e.href}>
+                      {e.kind === 'tab' ? (
+                        <button
+                          type="button"
+                          onClick={() => setTab(e.id)}
+                          className={clsx(
+                            'flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                            tab === e.id ? 'bg-gray-800/80 text-gray-50 ring-1 ring-blue-500/40' : 'text-gray-300 hover:bg-gray-800/50 hover:text-gray-100',
+                          )}
+                        >
+                          <span className="font-medium">{e.label}</span>
+                          <span className="text-xs text-gray-500">{e.description}</span>
+                        </button>
+                      ) : (
+                        <Link href={e.href} className="flex flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-800/50 hover:text-gray-100">
+                          <span className="font-medium">{e.label}</span>
+                          <span className="text-xs text-gray-500">{e.description}</span>
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+            <SeededDetections />
+          </div>
         </nav>
 
         {/* ── Panel ── */}
