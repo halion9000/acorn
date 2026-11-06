@@ -9,7 +9,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import useSWR from 'swr';
-import { alertsApi, type Alert, type LinkedTicket, type RelatedAlert } from '@/lib/api';
+import { alertsApi, ticketRulesApi, type Alert, type LinkedTicket, type RelatedAlert, type TicketStatus } from '@/lib/api';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { safeTicketUrl } from './LinkedTicketsSection';
 
@@ -23,6 +23,38 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 const none = (text: string) => <span className="text-gray-500">{text}</span>;
+
+/** What a ticket rule did, or did not do, for this alert: only said when it has something to say (never when the alert already has its ticket or no rule is involved). */
+export function ticketStatusLine(s: TicketStatus | undefined): { text: string; tone: string } | null {
+  if (!s) return null;
+  switch (s.state) {
+    case 'waiting':
+      return { text: s.message || 'A ticket is being opened for this alert.', tone: 'text-blue-300' };
+    case 'failed':
+      return { text: `Ticket rule: no ticket was opened. ${s.message || 'CORE did not say why.'}`, tone: 'text-red-300' };
+    case 'done':
+      return s.message ? { text: `Ticket rule: ${s.message}`, tone: 'text-green-300' } : null;
+    case 'rule_will_open':
+      return { text: s.message || 'A ticket rule covers this alert; its ticket is requested within a few minutes.', tone: 'text-gray-400' };
+    case 'older_than_rule':
+      return { text: s.message || 'A ticket rule covers this type, but this alert was raised before it was made.', tone: 'text-amber-300' };
+    default:
+      return null;
+  }
+}
+
+function TicketRuleStatus({ alertId }: { alertId: string }) {
+  const { data } = useSWR(['alerts', alertId, 'ticket-status'] as const, () => ticketRulesApi.statusFor(alertId), {
+    shouldRetryOnError: false,
+    refreshInterval: (d) => (d?.state === 'waiting' || d?.state === 'rule_will_open' ? 10_000 : 0),
+  });
+  const line = ticketStatusLine(data);
+  return line ? (
+    <p className={`mt-1 text-xs ${line.tone}`} data-testid="ticket-rule-status">
+      {line.text}
+    </p>
+  ) : null;
+}
 
 export function TicketRows({ tickets, onRemove }: { tickets: LinkedTicket[]; onRemove?: (id: string) => void }) {
   if (tickets.length === 0) return none('No HaloPSA ticket matched');
@@ -239,6 +271,7 @@ export function AlertContext({ alert }: { alert: Alert }) {
         <Row label="HaloPSA ticket">
           <div>
             <TicketRows tickets={data?.tickets ?? []} onRemove={(id) => void remove(id)} />
+            <TicketRuleStatus alertId={alert.id} />
             <AddTicket alertId={alert.id} onAdded={() => void mutate()} />
           </div>
         </Row>

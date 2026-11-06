@@ -412,3 +412,83 @@ async def test_the_script_runs_of_an_alert_and_the_one_at_a_time_rule_for_script
     assert [r.script_name for r in runs] == [
         "Clean temp files"
     ], "only the script run: the ticket, the release, the note and the check are not scripts"
+
+
+# ---- catching up the alerts of the type that were already open when the rule was made ----
+
+
+async def test_a_catch_up_also_covers_older_open_alerts_of_the_type_but_not_ones_with_tickets_finished_or_of_another_type(world):
+    await off(world)
+    rule = make_rule(world, "client", created_minutes_ago=1)  # made a minute ago: every alert of the type is older than it
+    await world.flush()
+    assert await svc.queue_for_rule(world, rule, NOW, source_alert_id=world.info["ids"]["old_source"]) == 1, "without a catch-up only the alert it was made from"
+    await world.commit()
+    await off(world)
+    await world.execute(text("delete from vendor_actions where tenant_id = :c"), {"c": world.info["client"]})
+    await world.commit()
+    n = await svc.queue_for_rule(world, rule, NOW, source_alert_id=world.info["ids"]["old_source"], catch_up=True)
+    await world.commit()
+    got = await queued(world)
+    assert set(got) == {"new_a", "new_b", "old_source", "old_other"}
+    assert n == 4
+    assert not {"has_halo_ticket", "has_manual_ticket", "resolved", "other_title", "other_tool", "other_client"} & set(got)
+
+
+async def test_a_catch_up_is_capped_and_the_alert_the_rule_was_made_from_is_never_the_one_left_out(world, monkeypatch):
+    await off(world)
+    monkeypatch.setattr(svc, "CATCH_UP_MAX", 2)
+    rule = make_rule(world, "client", created_minutes_ago=1)
+    await world.flush()
+    n = await svc.queue_for_rule(world, rule, NOW, source_alert_id=world.info["ids"]["old_other"], catch_up=True)
+    await world.commit()
+    got = await queued(world)
+    assert n == 2 and "old_other" in got, "the oldest alert of the type was the source: it comes first, then the newest"
+
+
+async def test_the_sweep_after_a_catch_up_asks_for_nothing_it_already_asked_for(world):
+    await off(world)
+    rule = make_rule(world, "client", created_minutes_ago=1)
+    await world.flush()
+    assert await svc.queue_for_rule(world, rule, NOW, source_alert_id=world.info["ids"]["old_source"], catch_up=True) == 4
+    await world.commit()
+    assert await svc.queue_for_rule(world, rule, NOW) == 0
+
+
+# ---- what the alert page says about its ticket ----
+
+
+async def status_of(world, key):
+    from app.api.v1.deps import CurrentUser
+    from app.api.v1.endpoints import alert_ticket_rules as ep
+
+    await off(world)
+    user = CurrentUser(user_id=uuid.uuid4(), tenant_id=world.info["owner"], role="admin", email="hal@example.com")
+    return await ep.ticket_status_for_alert(world.info["ids"][key], user, world)
+
+
+async def test_the_status_says_none_when_no_rule_covers_the_alert(world):
+    assert (await status_of(world, "new_a")).state == "none"
+
+
+async def test_the_status_tells_a_rule_that_will_open_one_from_a_rule_that_came_too_late(world):
+    make_rule(world, "client", created_minutes_ago=60)
+    await world.flush()
+    assert (await status_of(world, "new_a")).state == "rule_will_open"
+    assert (await status_of(world, "old_source")).state == "older_than_rule", "raised before the rule was made"
+    out = await status_of(world, "old_source")
+    assert out.rule_title == TITLE and "before the rule was made" in out.message
+    assert (await status_of(world, "other_title")).state == "none"
+
+
+async def test_the_status_follows_the_request_from_waiting_to_failed_with_cores_reason_and_a_ticket_wins_over_all(world):
+    rule = make_rule(world, "client")
+    await world.flush()
+    await svc.queue_for_rule(world, rule, NOW)
+    await world.commit()
+    assert (await status_of(world, "new_a")).state == "waiting"
+    await off(world)
+    await world.execute(text("update vendor_actions set status = 'failed', result_message = 'No HaloPSA client is linked' where alert_id = :a"), {"a": world.info["ids"]["new_a"]})
+    await world.commit()
+    out = await status_of(world, "new_a")
+    assert out.state == "failed" and out.message == "No HaloPSA client is linked"
+    assert (await status_of(world, "has_halo_ticket")).state == "has_ticket"

@@ -4,7 +4,8 @@ A rule says "every alert of this type (for this client, or for all) gets a ticke
 ``create_ticket`` action for CORE (the ``vendor_actions`` queue, vendor ``core``), CORE opens the ticket and reports its number, and the number is linked to the alert.
 
 Safeguards, because this acts on its own:
- - a rule covers only alerts raised AFTER it was made, plus the one it was made from, so making a rule never floods Halo with old alerts;
+ - a rule covers only alerts raised AFTER it was made, plus the one it was made from, so making a rule never floods Halo with old alerts; the person making it may also ask for a one-time catch-up of the
+   alerts of that type already open, at most ``CATCH_UP_MAX``, newest first;
  - an alert gets at most ONE ticket request, ever (any earlier request for it, whatever happened to it, stops another), so a failure never turns into a loop;
  - an alert that already has a ticket (found by CORE, or entered by hand) gets none;
  - hidden, set aside, resolved or closed alerts get none;
@@ -33,6 +34,7 @@ from app.services.quarantine_release import _queue_ticket_note, check_note, quar
 ACTION = "create_ticket"
 VENDOR = "core"
 MAX_PER_RULE_PASS = 50
+CATCH_UP_MAX = 25  # when a rule is made, at most this many tickets for alerts of its type that were already open (the newest first)
 TITLE_MAX = 200
 DETAILS_MAX = 3000
 
@@ -79,13 +81,17 @@ def rule_covers(
     created_at: datetime | None,
     source_alert_id: Any = None,
     alert_id: Any = None,
+    catch_up: bool = False,
 ) -> bool:
-    """Whether a rule covers an alert: the same type and tool, in the place the rule covers, and raised after the rule was made (or it is the alert the rule was made from) (pure)."""
+    """Whether a rule covers an alert: the same type and tool, in the place the rule covers, and raised after the rule was made (or it is the alert the rule was made from) (pure).
+    ``catch_up`` leaves out the "raised after" part: is the alert of the type this rule is for, whenever it was raised."""
     if type_key(signature_of(rule_id, title)) != type_key(rule.signature) or (rule.source or None) != (source or None):
         return False
     if rule.scope == "client" and rule.client_tenant_id != tenant_id:
         return False
     if source_alert_id is not None and alert_id == source_alert_id:
+        return True
+    if catch_up:
         return True
     if created_at is None:
         return False
@@ -129,24 +135,26 @@ async def tenants_of(db: Any, rule: Any) -> list[uuid.UUID]:
     return [rule.tenant_id, *kids]
 
 
-async def queue_for_rule(db: Any, rule: Any, now: datetime | None = None, source_alert_id: uuid.UUID | None = None) -> int:
+async def queue_for_rule(db: Any, rule: Any, now: datetime | None = None, source_alert_id: uuid.UUID | None = None, catch_up: bool = False) -> int:
     """Queue a ticket request for each alert the rule covers that has no ticket and no earlier request. Returns how many were queued. The caller owns the transaction.
+    ``catch_up`` (used once, when the rule is made, if the person asked for it) also covers alerts of the type that were already open, the newest ``CATCH_UP_MAX`` of them.
 
     Each client's alerts are read as that client (``_acting``); the owner's own are read as the session already is."""
     now = now or datetime.now(UTC)
     queued = 0
     tenants = await tenants_of(db, rule)
     halo = await _halo_clients(db, rule.tenant_id, tenants)
+    cap = CATCH_UP_MAX if catch_up else MAX_PER_RULE_PASS
     for tid in tenants:
-        if queued >= MAX_PER_RULE_PASS:
+        if queued >= cap:
             break
         async with _acting(db, tid, rule.tenant_id):
             rows = (
                 (
                     await db.execute(
                         select(Alert)
-                        .where(Alert.tenant_id == tid, Alert.status.notin_(FINISHED_ALERT_STATUSES), Alert.created_at >= rule.created_at)
-                        .order_by(Alert.created_at)
+                        .where(Alert.tenant_id == tid, Alert.status.notin_(FINISHED_ALERT_STATUSES), *([] if catch_up else [Alert.created_at >= rule.created_at]))
+                        .order_by(Alert.created_at.desc() if catch_up else Alert.created_at)
                         .limit(500)
                     )
                 )
@@ -179,9 +187,12 @@ async def queue_for_rule(db: Any, rule: Any, now: datetime | None = None, source
                     created_at=a.created_at,
                     source_alert_id=source_alert_id,
                     alert_id=a.id,
+                    catch_up=catch_up,
                 )
                 and not has_ticket(a.enrichment_data)
             ]
+            if source_alert_id is not None:
+                candidates.sort(key=lambda a: a.id != source_alert_id)  # the alert the rule was made from always comes first, so a cap never cuts it
             if not candidates:
                 continue
             already = set(
@@ -201,7 +212,7 @@ async def queue_for_rule(db: Any, rule: Any, now: datetime | None = None, source
             for a in candidates:
                 if a.id in already:
                     continue
-                if queued >= MAX_PER_RULE_PASS:
+                if queued >= cap:
                     break
                 db.add(
                     VendorAction(

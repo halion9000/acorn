@@ -8,11 +8,12 @@ const vendorActions = vi.hoisted(() => vi.fn());
 const related = vi.hoisted(() => vi.fn());
 const addTicket = vi.hoisted(() => vi.fn());
 const removeTicket = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/api', () => ({ alertsApi: { vendorActions, addTicket, removeTicket, related } }));
+const statusFor = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/api', () => ({ alertsApi: { vendorActions, addTicket, removeTicket, related }, ticketRulesApi: { statusFor } }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: toast }));
 
-import { AlertContext, alertContextOf, sourceLink, toolLinks } from './AlertContext';
+import { AlertContext, alertContextOf, sourceLink, ticketStatusLine, toolLinks } from './AlertContext';
 
 const alert = (over: Partial<Alert> = {}): Alert =>
   ({ id: 'a1', title: 't', description: 'd', severity: 'high', status: 'new', source: 'huntress', tenantId: 't1', riskScore: 5, createdAt: '2026-10-18T00:00:00Z', ...over }) as Alert;
@@ -26,6 +27,7 @@ const renderCtx = (a: Alert) =>
 
 beforeEach(() => {
   vendorActions.mockReset().mockResolvedValue({ supported: false, actions: [], tickets: [] });
+  statusFor.mockReset().mockResolvedValue({ state: 'none' });
   related.mockReset().mockResolvedValue({ items: [], more: 0 });
   addTicket.mockReset().mockResolvedValue({ tickets: [] });
   removeTicket.mockReset().mockResolvedValue({ tickets: [] });
@@ -186,5 +188,31 @@ describe('other alerts about the same device or user', () => {
     renderCtx(alert({ affectedHosts: ['PC-1'] }));
     await waitFor(() => expect(related).toHaveBeenCalled());
     expect(screen.queryByTestId('related-alerts')).not.toBeInTheDocument();
+  });
+});
+
+describe('what a ticket rule did for the alert', () => {
+  it('says nothing when there is nothing to say, and says what happened otherwise', () => {
+    for (const state of ['none', 'has_ticket'] as const) expect(ticketStatusLine({ state })).toBeNull();
+    expect(ticketStatusLine(undefined)).toBeNull();
+    expect(ticketStatusLine({ state: 'failed', message: 'No HaloPSA client is linked' })?.text).toBe('Ticket rule: no ticket was opened. No HaloPSA client is linked');
+    expect(ticketStatusLine({ state: 'failed' })?.text).toMatch(/CORE did not say why/);
+    expect(ticketStatusLine({ state: 'waiting' })?.text).toMatch(/being opened/);
+    expect(ticketStatusLine({ state: 'older_than_rule', message: 'raised before the rule was made' })).toEqual({ text: 'raised before the rule was made', tone: 'text-amber-300' });
+    expect(ticketStatusLine({ state: 'done' })).toBeNull();
+    expect(ticketStatusLine({ state: 'done', message: 'Opened HaloPSA ticket 9.' })?.text).toBe('Ticket rule: Opened HaloPSA ticket 9.');
+  });
+
+  it('shows the line on the alert page next to the ticket row', async () => {
+    statusFor.mockResolvedValue({ state: 'failed', message: 'No HaloPSA client is linked' });
+    renderCtx(alert());
+    expect(await screen.findByTestId('ticket-rule-status')).toHaveTextContent('Ticket rule: no ticket was opened. No HaloPSA client is linked');
+    expect(statusFor).toHaveBeenCalledWith('a1');
+  });
+
+  it('shows no line for an alert no rule is involved with', async () => {
+    renderCtx(alert());
+    await waitFor(() => expect(statusFor).toHaveBeenCalled());
+    expect(screen.queryByTestId('ticket-rule-status')).toBeNull();
   });
 });

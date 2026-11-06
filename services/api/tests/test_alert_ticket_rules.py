@@ -129,7 +129,10 @@ class FakeDB:
 
 @pytest.fixture
 def wired(monkeypatch):
-    audits, queued = [], []
+    class Queued(list):
+        catch_ups: list = []
+
+    audits, queued = [], Queued()
 
     @contextlib.asynccontextmanager
     async def scope(_db, _own, _alert_id):
@@ -138,13 +141,17 @@ def wired(monkeypatch):
     async def fake_audit(**kw):
         audits.append(kw)
 
-    async def fake_queue(_db, r, now, source_alert_id=None):
+    async def fake_queue(_db, r, now, source_alert_id=None, catch_up=False):
         queued.append((r, source_alert_id))
+        fake_queue.catch_ups.append(catch_up)
         return 1
+
+    fake_queue.catch_ups = []
 
     monkeypatch.setattr(ep, "alert_scope", scope)
     monkeypatch.setattr(ep, "emit_audit", fake_audit)
     monkeypatch.setattr(ep, "queue_for_rule", fake_queue)
+    queued.catch_ups = fake_queue.catch_ups  # type: ignore[attr-defined]
     return audits, queued
 
 
@@ -281,3 +288,12 @@ def test_a_rule_made_from_one_message_or_device_covers_the_others_of_that_type_b
     assert not covers("A user reported a phishing message")
     assert not covers('A user asked to release a quarantined message: "x"', source="huntress"), "the tool still has to match"
     assert not covers('A user asked to release a quarantined message: "x"', when=t0 - timedelta(minutes=5)), "and only alerts raised after the rule was made"
+
+
+def test_a_rule_asks_for_the_catch_up_unless_the_person_turns_it_off(wired):
+    audits, queued = wired
+    alert = NS(rule_id=None, rule_name=None, title=TITLE, raw_event={"source": "cipp"}, connector_type=None)
+    for body, expected in ((ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="all"), True), (ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="all", catch_up=False), False)):
+        db = FakeDB(Rows([alert]), Rows([]), Rows([]), Rows([]))
+        asyncio.run(ep.make_ticket_rule(body, MagicMock(), user(), db))
+        assert queued.catch_ups[-1] is expected and audits[-1]["changes"]["catch_up"] is expected

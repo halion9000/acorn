@@ -13,16 +13,18 @@ import { ticketRulesApi } from '@/lib/api';
 export function TicketRuleButton({ alertId, clientName }: { alertId: string; clientName?: string | null }) {
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<'client' | 'all'>('client');
+  const [catchUp, setCatchUp] = useState(true);
   const [busy, setBusy] = useState(false);
   const [made, setMade] = useState(false);
 
   async function make() {
     setBusy(true);
     try {
-      const rule = await ticketRulesApi.make(alertId, scope);
+      const rule = await ticketRulesApi.make(alertId, scope, catchUp);
       setMade(true);
       setOpen(false);
-      toast.success(rule.queued_now ? 'Rule made. A ticket for this alert is being opened.' : 'Rule made. New alerts of this type will get a ticket.');
+      const n = rule.queued_now ?? 0;
+      toast.success(n > 1 ? `Rule made. ${n} tickets are being opened (this alert and the others of its type that were open).` : n === 1 ? 'Rule made. A ticket for this alert is being opened.' : 'Rule made. New alerts of this type will get a ticket.');
     } catch (err) {
       toast.error(err instanceof Error && err.message ? err.message : 'Could not make the rule.');
     } finally {
@@ -53,6 +55,10 @@ export function TicketRuleButton({ alertId, clientName }: { alertId: string; cli
             <label className="flex items-center gap-2">
               <input type="radio" name="ticket-rule-scope" checked={scope === 'all'} onChange={() => setScope('all')} />
               <span>for every client</span>
+            </label>
+            <label className="flex items-start gap-2 border-t border-gray-800 pt-3">
+              <input type="checkbox" className="mt-1" checked={catchUp} onChange={(e) => setCatchUp(e.target.checked)} />
+              <span>Also open tickets, once, for the alerts of this type that are already open and have none (up to 25, newest first). Without this, only this alert and new ones get a ticket.</span>
             </label>
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" disabled={busy} onClick={() => setOpen(false)} className="rounded-lg px-4 py-2 text-gray-300 hover:bg-gray-800">

@@ -1681,6 +1681,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-ticket-rules/alert/{alert_id}/status:
+    get:
+      tags:
+      - alerts
+      summary: Ticket Status For Alert
+      description: 'Why an alert has, or has not got, a ticket from a ticket rule:
+        waiting for CORE, opened, failed (with CORE''s reason), covered but older
+        than the rule, or not covered. Read only.'
+      operationId: ticket_status_for_alert_api_v1_alert_ticket_rules_alert__alert_id__status_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketStatusOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}/quarantine:
     get:
       tags:
@@ -47416,6 +47448,10 @@ components:
           - client
           - all
           title: Scope
+        catch_up:
+          type: boolean
+          title: Catch Up
+          default: true
       type: object
       required:
       - alert_id
@@ -47486,6 +47522,33 @@ components:
       title: TicketSettings
       description: '``close_status`` is the status in force; ``is_default`` says it
         is the platform''s, not this organization''s own choice.'
+    TicketStatusOut:
+      properties:
+        state:
+          type: string
+          enum:
+          - has_ticket
+          - waiting
+          - done
+          - failed
+          - rule_will_open
+          - older_than_rule
+          - none
+          title: State
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        rule_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Rule Title
+      type: object
+      required:
+      - state
+      title: TicketStatusOut
     TicketsItem:
       properties:
         uid:
