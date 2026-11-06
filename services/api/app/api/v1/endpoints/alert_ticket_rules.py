@@ -80,7 +80,8 @@ async def make_ticket_rule(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
         signature = signature_of(alert.rule_id, alert.title)
         source = source_of(alert.raw_event, alert.connector_type)
-        title = (alert.title or "")[:500]
+        # What the list shows: the alert TYPE's name when the tool gave one ("ScreenConnect for another server"), not one device's title.
+        title = ((alert.rule_name if alert.rule_id and alert.rule_name else alert.title) or "")[:500]
     count = len(
         (
             await db.execute(

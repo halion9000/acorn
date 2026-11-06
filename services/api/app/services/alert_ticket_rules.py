@@ -13,6 +13,7 @@ Safeguards, because this acts on its own:
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -41,6 +42,22 @@ def _release_url(alert: Any) -> str | None:
     return release_link(settings.CONSOLE_PUBLIC_BASE_URL, alert.id) if quarantine_of(alert.raw_event) is not None else None
 
 
+_QUOTED = re.compile(r'"[^"]*"|“[^”]*”')
+_PARENS = re.compile(r"\([^)]*\)")
+_FOUND_ON = re.compile(r"\s+found on\s+.*$", re.IGNORECASE)
+
+
+def type_key(signature: str) -> str:
+    """What makes two alerts the same TYPE for a ticket rule (pure). An alert with a rule id is its rule id. An alert with none is its title, minus the parts that change from one alert to the next: text in quotes (a message
+    subject), text in brackets (a server id) and "found on <device>". So a rule made from "...released a quarantined message: "Re: Block 2027"" covers every such message, not only that one subject, and one made from
+    "ScreenConnect for another server (514f...) found on D68HM3L3" covers every device. A title with nothing left after that stays exact."""
+    if not signature.startswith("title:"):
+        return signature
+    title = signature[len("title:") :]
+    stripped = " ".join(_FOUND_ON.sub("", _PARENS.sub(" ", _QUOTED.sub(" ", title))).split()).strip(" :-").lower()
+    return f"type:{stripped}" if stripped else signature
+
+
 def has_ticket(enrichment: Any) -> bool:
     """Whether the alert already has a HaloPSA ticket: one CORE matched (``tickets``) or one a person entered (``manual_tickets``). Anything not shaped like a ticket does not count (pure)."""
     if not isinstance(enrichment, dict):
@@ -64,7 +81,7 @@ def rule_covers(
     alert_id: Any = None,
 ) -> bool:
     """Whether a rule covers an alert: the same type and tool, in the place the rule covers, and raised after the rule was made (or it is the alert the rule was made from) (pure)."""
-    if signature_of(rule_id, title) != rule.signature or (rule.source or None) != (source or None):
+    if type_key(signature_of(rule_id, title)) != type_key(rule.signature) or (rule.source or None) != (source or None):
         return False
     if rule.scope == "client" and rule.client_tenant_id != tenant_id:
         return False

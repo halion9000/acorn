@@ -153,14 +153,14 @@ def user():
 
 
 def make(db, scope="client"):
-    alert = NS(rule_id=None, title=TITLE, raw_event={"source": "cipp"}, connector_type=None)
+    alert = NS(rule_id=None, rule_name=None, title=TITLE, raw_event={"source": "cipp"}, connector_type=None)
     body = ep.TicketRuleIn(alert_id=uuid.uuid4(), scope=scope)
     return asyncio.run(ep.make_ticket_rule(body, MagicMock(), user(), db)), alert
 
 
 def test_making_a_rule_from_an_alert_stores_its_type_tool_and_place_queues_the_source_alert_and_audits(wired):
     audits, queued = wired
-    alert = NS(rule_id=None, title=TITLE, raw_event={"source": "cipp"}, connector_type=None)
+    alert = NS(rule_id=None, rule_name=None, title=TITLE, raw_event={"source": "cipp"}, connector_type=None)
     db = FakeDB(Rows([alert]), Rows([]), Rows([]), Rows([]))
     body = ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="client")
     out = asyncio.run(ep.make_ticket_rule(body, MagicMock(), user(), db))
@@ -179,14 +179,25 @@ def test_making_a_rule_from_an_alert_stores_its_type_tool_and_place_queues_the_s
 
 
 def test_a_rule_for_all_clients_is_not_tied_to_the_alerts_client(wired):
-    alert = NS(rule_id="r-1", title="t", raw_event={}, connector_type="cipp")
+    alert = NS(rule_id="r-1", rule_name=None, title="t", raw_event={}, connector_type="cipp")
     db = FakeDB(Rows([alert]), Rows([]), Rows([]), Rows([]))
     asyncio.run(ep.make_ticket_rule(ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="all"), MagicMock(), user(), db))
     assert db.added[0].client_tenant_id is None and db.added[0].signature == "rule:r-1" and db.added[0].source == "cipp"
 
 
+def test_a_rule_made_from_an_alert_with_a_rule_id_is_listed_under_the_types_name_not_one_devices_title(wired):
+    alert = NS(rule_id="aisoc-remote-foreign", rule_name="ScreenConnect for another server", title="ScreenConnect for another server (514f25df7bb0852b) found on D68HM3L3", raw_event={"source": "aisoc-remote-tools"}, connector_type=None)
+    db = FakeDB(Rows([alert]), Rows([]), Rows([]), Rows([]))
+    asyncio.run(ep.make_ticket_rule(ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="all"), MagicMock(), user(), db))
+    assert db.added[0].title == "ScreenConnect for another server" and db.added[0].signature == "rule:aisoc-remote-foreign"
+    plain = NS(rule_id=None, rule_name="ignored without a rule id", title=TITLE, raw_event={"source": "cipp"}, connector_type=None)
+    db2 = FakeDB(Rows([plain]), Rows([]), Rows([]), Rows([]))
+    asyncio.run(ep.make_ticket_rule(ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="all"), MagicMock(), user(), db2))
+    assert db2.added[0].title == TITLE[:500]
+
+
 def test_an_unknown_alert_a_duplicate_rule_and_too_many_rules_are_refused_and_nothing_is_saved(wired):
-    alert = NS(rule_id=None, title=TITLE, raw_event={"source": "cipp"}, connector_type=None)
+    alert = NS(rule_id=None, rule_name=None, title=TITLE, raw_event={"source": "cipp"}, connector_type=None)
     body = ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="client")
     for db, code in (
         (FakeDB(Rows([])), 404),
@@ -234,3 +245,39 @@ def test_the_routes_need_the_right_permissions():
     assert set(required_permissions(found[("POST", "/alert-ticket-rules")])) == {"connectors:write"}
     assert set(required_permissions(found[("DELETE", "/alert-ticket-rules/{rule_id}")])) == {"connectors:write"}
     assert set(required_permissions(found[("GET", "/alert-ticket-rules")])) == {"alerts:read"}
+
+
+# ---- a rule is for the alert TYPE, not for the one device or message it was made from ----
+
+
+def test_type_key_ignores_the_parts_of_a_title_that_change_from_one_alert_to_the_next():
+    from app.services.alert_ticket_rules import type_key
+
+    same_quarantine = [
+        'title:A user asked to release a quarantined message: "Re: Block 2027 – Updated Pricing"',
+        "title:A user asked to release a quarantined message: “Invoice 88”",
+        'title:A user asked to release a quarantined message: "x"',
+    ]
+    assert len({type_key(t) for t in same_quarantine}) == 1
+    same_sc = ["title:ScreenConnect for another server (514f25df7bb0852b) found on D68HM3L3", "title:ScreenConnect for another server (344e459ab554378d) found on Mac.localdomain"]
+    assert len({type_key(t) for t in same_sc}) == 1
+    assert type_key(same_sc[0]) != type_key(same_quarantine[0])
+    assert type_key("title:Possible initial access from an emerging threat") == "type:possible initial access from an emerging threat"
+    assert type_key("rule:aisoc-remote-foreign") == "rule:aisoc-remote-foreign", "an alert with a rule id is that rule id, untouched"
+    assert type_key('title:"only quoted"') == 'title:"only quoted"', "nothing left after stripping: stay exact"
+
+
+def test_a_rule_made_from_one_message_or_device_covers_the_others_of_that_type_but_not_other_types():
+    from app.services.alert_ticket_rules import rule_covers
+
+    t0 = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+    tenant = uuid.uuid4()
+    rule = NS(signature='title:A user asked to release a quarantined message: "Re: Block 2027"', source="cipp", scope="all", client_tenant_id=None, created_at=t0)
+
+    def covers(title, source="cipp", when=t0 + timedelta(minutes=5)):
+        return rule_covers(rule, tenant_id=tenant, rule_id=None, title=title, source=source, created_at=when)
+
+    assert covers('A user asked to release a quarantined message: "A different subject"')
+    assert not covers("A user reported a phishing message")
+    assert not covers('A user asked to release a quarantined message: "x"', source="huntress"), "the tool still has to match"
+    assert not covers('A user asked to release a quarantined message: "x"', when=t0 - timedelta(minutes=5)), "and only alerts raised after the rule was made"
