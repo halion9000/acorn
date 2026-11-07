@@ -24,7 +24,7 @@ from app.services.alert_scope import alert_scope
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.alert_suppression import signature_of, source_of
 from app.services.alert_ticket_rules import ACTION as TICKET_ACTION
-from app.services.alert_ticket_rules import has_ticket, queue_for_rule, rule_covers
+from app.services.alert_ticket_rules import has_ticket, queue_for_rule, retry_ticket, rule_covers
 from app.services.audit import emit_audit
 
 router = APIRouter(prefix="/alert-ticket-rules", tags=["alerts"])
@@ -238,3 +238,32 @@ async def ticket_status_for_alert(
                 message="A ticket rule covers this type of alert, but this alert was raised before the rule was made, so it got no ticket.",
             )
     return TicketStatusOut(state="none")
+
+
+@router.post("/alert/{alert_id}/retry", response_model=TicketStatusOut, status_code=status.HTTP_202_ACCEPTED)
+async def retry_ticket_for_alert(
+    alert_id: uuid.UUID,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("connectors:write"))],
+    db: TenantDBSession,
+) -> TicketStatusOut:
+    """Ask CORE once more for this alert's ticket after its request failed (for example once the cause is fixed). Only when the newest request failed and the alert still has no ticket; one new request, never more."""
+    now = datetime.now(UTC)
+    async with alert_scope(db, user.tenant_id, alert_id) as tid:
+        alert = (await db.execute(select(Alert).where(Alert.id == alert_id, Alert.tenant_id == tid))).scalar_one_or_none()
+        if alert is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+        if not await retry_ticket(db, user.tenant_id, tid, alert, now):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nothing to retry: the alert has a ticket, or its last request did not fail.")
+        await emit_audit(
+            db=db,
+            tenant_id=tid,
+            actor_id=user.user_id,
+            action="alert_ticket_rule:retried",
+            resource="alert",
+            resource_id=str(alert_id),
+            changes={},
+            request=request,
+        )
+        await db.commit()
+    return TicketStatusOut(state="waiting", message="A ticket is being opened for this alert (CORE collects the request within about a minute).")

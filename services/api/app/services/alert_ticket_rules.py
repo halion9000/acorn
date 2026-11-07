@@ -195,20 +195,18 @@ async def queue_for_rule(db: Any, rule: Any, now: datetime | None = None, source
                 candidates.sort(key=lambda a: a.id != source_alert_id)  # the alert the rule was made from always comes first, so a cap never cuts it
             if not candidates:
                 continue
-            already = set(
-                (
-                    await db.execute(
-                        select(VendorAction.alert_id).where(
-                            VendorAction.tenant_id == tid,
-                            VendorAction.vendor == VENDOR,
-                            VendorAction.action == ACTION,
-                            VendorAction.alert_id.in_([a.id for a in candidates]),
-                        )
+            # An earlier request stops another (so a failure never turns into a loop); only the one-time catch-up, which a person asked for just now, tries again for a request that FAILED.
+            earlier = (
+                await db.execute(
+                    select(VendorAction.alert_id, VendorAction.status).where(
+                        VendorAction.tenant_id == tid,
+                        VendorAction.vendor == VENDOR,
+                        VendorAction.action == ACTION,
+                        VendorAction.alert_id.in_([a.id for a in candidates]),
                     )
                 )
-                .scalars()
-                .all()
-            )
+            ).all()
+            already = {alert for alert, state in earlier if not (catch_up and state == "failed")}  # a waiting or finished request still stands, whatever else the alert has
             for a in candidates:
                 if a.id in already:
                     continue
@@ -269,3 +267,35 @@ async def sweep_ticket_rules(db: Any, now: datetime | None = None) -> int:
     for rule in rules:
         total += await queue_for_rule(db, rule, now)
     return total
+
+
+async def retry_ticket(db: Any, owner: uuid.UUID, tenant_id: uuid.UUID, alert: Any, now: datetime | None = None) -> bool:
+    """Ask CORE once more for the ticket of an alert whose last request failed (a person pressed Try again). Returns False when it should not: the alert already has a ticket, or its newest request is waiting, done
+    or absent. The caller owns the transaction."""
+    now = now or datetime.now(UTC)
+    if has_ticket(alert.enrichment_data):
+        return False
+    rows = (
+        await db.execute(
+            select(VendorAction.status)
+            .where(VendorAction.tenant_id == tenant_id, VendorAction.alert_id == alert.id, VendorAction.vendor == VENDOR, VendorAction.action == ACTION)
+            .order_by(VendorAction.created_at.desc())
+        )
+    ).scalars().all()
+    if not rows or rows[0] != "failed" or any(state in ("pending", "claimed", "done") for state in rows):
+        return False
+    halo = await _halo_clients(db, owner, [tenant_id])
+    db.add(
+        VendorAction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            alert_id=alert.id,
+            vendor=VENDOR,
+            incident_uid=f"ticket-rule:{alert.id}"[:200],
+            action=ACTION,
+            params=ticket_params(alert, halo.get(tenant_id), str(alert.title or ""), _release_url(alert)),
+            status="pending",
+            created_at=now,
+        )
+    )
+    return True

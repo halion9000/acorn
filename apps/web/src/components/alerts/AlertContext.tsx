@@ -44,14 +44,34 @@ export function ticketStatusLine(s: TicketStatus | undefined): { text: string; t
 }
 
 function TicketRuleStatus({ alertId }: { alertId: string }) {
-  const { data } = useSWR(['alerts', alertId, 'ticket-status'] as const, () => ticketRulesApi.statusFor(alertId), {
+  const [busy, setBusy] = useState(false);
+  const { data, mutate } = useSWR(['alerts', alertId, 'ticket-status'] as const, () => ticketRulesApi.statusFor(alertId), {
     shouldRetryOnError: false,
     refreshInterval: (d) => (d?.state === 'waiting' || d?.state === 'rule_will_open' ? 10_000 : 0),
   });
   const line = ticketStatusLine(data);
+  async function retry() {
+    setBusy(true);
+    try {
+      await mutate(await ticketRulesApi.retry(alertId), { revalidate: false });
+      toast.success('Asked CORE for the ticket again.');
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Could not ask again.');
+    } finally {
+      setBusy(false);
+    }
+  }
   return line ? (
     <p className={`mt-1 text-xs ${line.tone}`} data-testid="ticket-rule-status">
       {line.text}
+      {data?.state === 'failed' ? (
+        <>
+          {' '}
+          <button type="button" disabled={busy} onClick={() => void retry()} className="text-blue-400 hover:text-blue-300 disabled:opacity-50">
+            {busy ? 'Asking…' : 'Try again'}
+          </button>
+        </>
+      ) : null}
     </p>
   ) : null;
 }

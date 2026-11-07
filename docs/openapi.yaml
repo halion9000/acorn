@@ -1713,6 +1713,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-ticket-rules/alert/{alert_id}/retry:
+    post:
+      tags:
+      - alerts
+      summary: Retry Ticket For Alert
+      description: Ask CORE once more for this alert's ticket after its request failed
+        (for example once the cause is fixed). Only when the newest request failed
+        and the alert still has no ticket; one new request, never more.
+      operationId: retry_ticket_for_alert_api_v1_alert_ticket_rules_alert__alert_id__retry_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketStatusOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}/quarantine:
     get:
       tags:

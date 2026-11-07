@@ -492,3 +492,61 @@ async def test_the_status_follows_the_request_from_waiting_to_failed_with_cores_
     out = await status_of(world, "new_a")
     assert out.state == "failed" and out.message == "No HaloPSA client is linked"
     assert (await status_of(world, "has_halo_ticket")).state == "has_ticket"
+
+
+# ---- trying again after a request failed ----
+
+
+async def fail_requests(world, *keys):
+    await off(world)
+    for key in keys:
+        await world.execute(
+            text("update vendor_actions set status = 'failed', result_message = 'Ticket Type not set' where alert_id = :a"), {"a": world.info["ids"][key]}
+        )
+    await world.commit()
+
+
+async def test_a_catch_up_tries_again_for_a_failed_request_but_the_ordinary_sweep_never_does(world):
+    await off(world)
+    rule = make_rule(world, "client")
+    await world.flush()
+    assert await svc.queue_for_rule(world, rule, NOW) == 2
+    await world.commit()
+    await fail_requests(world, "new_a")
+    assert await svc.queue_for_rule(world, rule, NOW) == 0, "the sweep: one request per alert, ever"
+    await world.commit()
+    assert await svc.queue_for_rule(world, rule, NOW, catch_up=True) == 3, "the one that failed, and the two older open alerts that never had a request; not the one still waiting"
+    await world.commit()
+    await off(world)
+    rows = (await world.execute(text("select status from vendor_actions where alert_id = :a order by created_at"), {"a": world.info["ids"]["new_a"]})).scalars().all()
+    assert sorted(rows) == ["failed", "pending"]
+    waiting = (await world.execute(text("select count(*) from vendor_actions where alert_id = :a"), {"a": world.info["ids"]["new_b"]})).scalar_one()
+    assert waiting == 1, "the alert whose request was still waiting got no second one"
+    assert await svc.queue_for_rule(world, rule, NOW, catch_up=True) == 0, "and a second catch-up while those wait asks for nothing more"
+
+
+async def test_try_again_asks_once_after_a_failure_and_never_when_waiting_done_absent_or_ticketed(world):
+    from app.models.alert import Alert
+
+    rule = make_rule(world, "client")
+    await world.flush()
+    await svc.queue_for_rule(world, rule, NOW)
+    await world.commit()
+    owner, client = world.info["owner"], world.info["client"]
+
+    async def retry(key):
+        await off(world)
+        alert = await world.get(Alert, world.info["ids"][key])
+        return await svc.retry_ticket(world, owner, client, alert, NOW)
+
+    assert await retry("new_a") is False, "its request is still waiting"
+    await fail_requests(world, "new_a")
+    assert await retry("new_a") is True
+    await world.commit()
+    assert await retry("new_a") is False, "the new request is waiting: never a second one"
+    assert await retry("new_b") is False, "another alert whose request has not failed"
+    assert await retry("has_halo_ticket") is False, "an alert with a ticket"
+    assert await retry("resolved") is False, "an alert that was never asked for has nothing to retry"
+    await off(world)
+    row = (await world.execute(text("select params, status from vendor_actions where alert_id = :a and status = 'pending'"), {"a": world.info["ids"]["new_a"]})).one()
+    assert row.params["halo_client_id"] == "77" and row.params["summary"] == TITLE[:200]

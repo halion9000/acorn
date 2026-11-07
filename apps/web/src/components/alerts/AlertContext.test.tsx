@@ -9,7 +9,8 @@ const related = vi.hoisted(() => vi.fn());
 const addTicket = vi.hoisted(() => vi.fn());
 const removeTicket = vi.hoisted(() => vi.fn());
 const statusFor = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/api', () => ({ alertsApi: { vendorActions, addTicket, removeTicket, related }, ticketRulesApi: { statusFor } }));
+const retry = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/api', () => ({ alertsApi: { vendorActions, addTicket, removeTicket, related }, ticketRulesApi: { statusFor, retry } }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: toast }));
 
@@ -28,6 +29,7 @@ const renderCtx = (a: Alert) =>
 beforeEach(() => {
   vendorActions.mockReset().mockResolvedValue({ supported: false, actions: [], tickets: [] });
   statusFor.mockReset().mockResolvedValue({ state: 'none' });
+  retry.mockReset().mockResolvedValue({ state: 'waiting', message: 'A ticket is being opened for this alert (CORE collects the request within about a minute).' });
   related.mockReset().mockResolvedValue({ items: [], more: 0 });
   addTicket.mockReset().mockResolvedValue({ tickets: [] });
   removeTicket.mockReset().mockResolvedValue({ tickets: [] });
@@ -214,5 +216,23 @@ describe('what a ticket rule did for the alert', () => {
     renderCtx(alert());
     await waitFor(() => expect(statusFor).toHaveBeenCalled());
     expect(screen.queryByTestId('ticket-rule-status')).toBeNull();
+  });
+
+  it('offers Try again only on a failure, asks once, and then shows the ticket as being opened', async () => {
+    statusFor.mockResolvedValue({ state: 'failed', message: 'Ticket Type not set' });
+    renderCtx(alert());
+    const button = await screen.findByRole('button', { name: 'Try again' });
+    await userEvent.click(button);
+    await waitFor(() => expect(retry).toHaveBeenCalledWith('a1'));
+    expect(await screen.findByText(/A ticket is being opened for this alert/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(toast.success).toHaveBeenCalledWith('Asked CORE for the ticket again.');
+  });
+
+  it('has no Try again when nothing failed', async () => {
+    statusFor.mockResolvedValue({ state: 'waiting', message: 'A ticket is being opened for this alert.' });
+    renderCtx(alert());
+    await screen.findByTestId('ticket-rule-status');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 });
