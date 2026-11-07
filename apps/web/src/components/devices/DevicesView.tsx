@@ -522,6 +522,11 @@ export default function DevicesView() {
 
       <UnmappedDevices />
 
+      {clientId && (
+        <Link href={`/devices/environment?client=${encodeURIComponent(clientId)}`} className="inline-block text-sm text-blue-400 hover:text-blue-300">
+          See this client&apos;s environment and network wiring
+        </Link>
+      )}
       <DuplicateDevices clientId={clientId || undefined} onChanged={() => void load()} />
 
       {error && (

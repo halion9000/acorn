@@ -1162,6 +1162,39 @@ export const inventoryApi = {
 };
 
 
+export interface EnvLink {
+  name: string;
+  port: string | null;
+  remote_port: string | null;
+  speed: string | null;
+}
+export interface EnvDevice {
+  id: string;
+  hostname: string;
+  kind: string;
+  role: string | null;
+  online: boolean | null;
+  tools: string[];
+  links: EnvLink[];
+  missing: string[];
+}
+export interface ClientEnvironment {
+  client_id: string;
+  client_name: string | null;
+  counts: Record<string, number>;
+  tools: Record<string, number>;
+  gaps: Record<string, number>;
+  has_auvik: boolean;
+  has_links: boolean;
+  truncated: boolean;
+  devices: EnvDevice[];
+}
+
+export const environmentApi = {
+  /** One client's devices by kind, which tools cover them, and (from Auvik) what each network device is plugged into. */
+  get: (clientId: string) => request<ClientEnvironment>(`/api/v1/client-environment/${encodeURIComponent(clientId)}`),
+};
+
 export const devicesApi = {
   /** Merges from the last two weeks that can still be undone. */
   async merges(): Promise<MergeEntry[]> {

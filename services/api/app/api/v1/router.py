@@ -47,6 +47,7 @@ from app.api.v1.endpoints import (
     detection_proposals,
     detection_rules,
     detection_vendor,
+    client_environment,
     devices,
     dmarc,
     easm,
@@ -244,6 +245,7 @@ api_router.include_router(saved_views.router)
 
 # Wave 3 — operational maturity
 api_router.include_router(assets.router)
+api_router.include_router(client_environment.router)
 api_router.include_router(devices.router)
 api_router.include_router(devices.ingest_router)
 api_router.include_router(remote_tools.router)
