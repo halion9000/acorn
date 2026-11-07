@@ -7,6 +7,7 @@ import { AlertContext, sourceLink } from './AlertContext';
 import { WhyRaised } from './WhyRaised';
 import { QuarantineRelease } from './QuarantineRelease';
 import { TicketRuleButton } from './TicketRuleButton';
+import { ScriptRuleButton } from './ScriptRuleButton';
 import { AlertDescription } from './AlertDescription';
 import { useState } from 'react';
 import useSWR from 'swr';
@@ -893,6 +894,7 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
             Hide alert type
           </button>
           <TicketRuleButton alertId={alertId} clientName={alert.clientName} />
+          <ScriptRuleButton alertId={alertId} clientName={alert.clientName} />
           <button
             type="button"
             onClick={() => setCreateCaseOpen(true)}

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { TicketRules } from "./TicketRules";
+import { ScriptRules } from "./ScriptRules";
+import { ToolInstalls } from "./ToolInstalls";
 import { TicketSettings } from "./TicketSettings";
 
 export const metadata: Metadata = {
@@ -12,6 +14,8 @@ export default function TicketSettingsPage() {
     <>
       <TicketSettings />
       <TicketRules />
+      <ScriptRules />
+      <ToolInstalls />
     </>
   );
 }

@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     alert_explain,
     alert_quarantine_release,
     alert_related,
+    alert_script_rules,
     alert_scripts,
     alert_stale_review,
     alert_suppressions,
@@ -66,6 +67,7 @@ from app.api.v1.endpoints import (
     identity_actions,
     identity_bec,
     identity_graph,
+    identity_halo_user,
     identity_merges,
     identity_timeline,
     inbox,
@@ -122,6 +124,7 @@ from app.api.v1.endpoints import (
     tenant_triage_settings,
     tenants,
     threat_intel,
+    tool_deploy_rules,
     translation,
     vcio_proposals,
     waitlist,
@@ -136,6 +139,8 @@ api_router.include_router(alert_vendor_actions.router)
 api_router.include_router(alert_scripts.router)
 api_router.include_router(alert_account.router)
 api_router.include_router(alert_related.router)
+api_router.include_router(alert_script_rules.router)
+api_router.include_router(tool_deploy_rules.router)
 api_router.include_router(alert_suppressions.router)
 api_router.include_router(alert_ticket_rules.router)
 api_router.include_router(alert_quarantine_release.router)
@@ -250,6 +255,7 @@ api_router.include_router(identities.router)
 api_router.include_router(identities.ingest_router)
 api_router.include_router(identity_actions.router)
 api_router.include_router(identity_bec.router)
+api_router.include_router(identity_halo_user.router)
 api_router.include_router(identity_merges.router)
 api_router.include_router(identity.router)
 api_router.include_router(cipp_actions.ingest_router)

@@ -1397,6 +1397,203 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-script-rules:
+    get:
+      tags:
+      - alerts
+      summary: List Script Rules
+      description: The active script rules, newest first.
+      operationId: list_script_rules_api_v1_alert_script_rules_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ScriptRuleOut'
+                type: array
+                title: Response List Script Rules Api V1 Alert Script Rules Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - alerts
+      summary: Make Script Rule
+      description: 'Make a rule from an alert: from now on every alert of its type
+        (for its client, or for all clients) on a Windows or Mac machine runs the
+        matching script; this alert runs it now.'
+      operationId: make_script_rule_api_v1_alert_script_rules_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScriptRuleIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScriptRuleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/alert-script-rules/{rule_id}:
+    delete:
+      tags:
+      - alerts
+      summary: Turn Off Script Rule
+      description: Turn a rule off. Requests already queued or run stay; no new ones
+        are made for the type.
+      operationId: turn_off_script_rule_api_v1_alert_script_rules__rule_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: rule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Rule Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScriptRuleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-script-rules/tools:
+    get:
+      tags:
+      - alerts
+      summary: Tools A Rule May Require
+      description: The tools a rule may require a client to already use.
+      operationId: tools_a_rule_may_require_api_v1_alert_script_rules_tools_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+                title: Response Tools A Rule May Require Api V1 Alert Script Rules
+                  Tools Get
+      security:
+      - HTTPBearer: []
+  /api/v1/tool-deploy-rules/scripts:
+    get:
+      tags:
+      - devices
+      summary: The scripts CORE has switched on, to choose from
+      operationId: scripts_to_choose_api_v1_tool_deploy_rules_scripts_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ScriptOption'
+                type: array
+                title: Response Scripts To Choose Api V1 Tool Deploy Rules Scripts
+                  Get
+      security:
+      - HTTPBearer: []
+  /api/v1/tool-deploy-rules:
+    get:
+      tags:
+      - devices
+      summary: List Deploy Rules
+      description: The active automatic installs, newest first.
+      operationId: list_deploy_rules_api_v1_tool_deploy_rules_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/DeployRuleOut'
+                type: array
+                title: Response List Deploy Rules Api V1 Tool Deploy Rules Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - devices
+      summary: Make Deploy Rule
+      description: 'Make a rule: from now on, where the tool is missing on a Windows
+        or Mac machine of the client (or every client), run the matching install script.
+        Nothing runs until CORE collects the request.'
+      operationId: make_deploy_rule_api_v1_tool_deploy_rules_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeployRuleIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeployRuleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/tool-deploy-rules/{rule_id}:
+    delete:
+      tags:
+      - devices
+      summary: Turn Off Deploy Rule
+      description: Turn a rule off. Requests already queued or run stay; no new ones
+        are made.
+      operationId: turn_off_deploy_rule_api_v1_tool_deploy_rules__rule_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: rule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Rule Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeployRuleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alert-suppressions:
     post:
       tags:
@@ -12441,6 +12638,76 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CaseDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/identities/halo-user:
+    post:
+      tags:
+      - identities
+      summary: Request Halo User
+      description: 'Queue the creation of one HaloPSA user for CORE. Returns 202:
+        nothing has happened in HaloPSA yet.'
+      operationId: request_halo_user_api_v1_identities_halo_user_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HaloUserBody'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HaloUserItem'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - identities
+      summary: Recent Halo User Requests
+      description: What was asked for this person in the last week and how each went
+        (read only).
+      operationId: recent_halo_user_requests_api_v1_identities_halo_user_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: email
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 320
+          title: Email
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HaloUserItem'
+                title: Response Recent Halo User Requests Api V1 Identities Halo User
+                  Get
         '422':
           description: Validation Error
           content:
@@ -28141,6 +28408,7 @@ components:
           - ticket_note
           - quarantine_check
           - allow_sender
+          - create_halo_user
           title: Action
         incident_uid:
           type: string
@@ -30962,6 +31230,98 @@ components:
       title: Delivery
       description: What became of the mail, in the order a person cares about it.
         Every message counts in exactly one of these.
+    DeployRuleIn:
+      properties:
+        tool:
+          type: string
+          enum:
+          - huntress
+          - fieldeffect
+          - screenconnect
+          title: Tool
+        scope:
+          type: string
+          enum:
+          - client
+          - all
+          title: Scope
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        windows_script_id:
+          anyOf:
+          - type: integer
+            maximum: 2000000000.0
+            minimum: 1.0
+          - type: 'null'
+          title: Windows Script Id
+        mac_script_id:
+          anyOf:
+          - type: integer
+            maximum: 2000000000.0
+            minimum: 1.0
+          - type: 'null'
+          title: Mac Script Id
+      type: object
+      required:
+      - tool
+      - scope
+      title: DeployRuleIn
+    DeployRuleOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        tool:
+          type: string
+          title: Tool
+        tool_name:
+          type: string
+          title: Tool Name
+        scope:
+          type: string
+          title: Scope
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        windows_script:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Windows Script
+        mac_script:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mac Script
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        active:
+          type: boolean
+          title: Active
+      type: object
+      required:
+      - id
+      - tool
+      - tool_name
+      - scope
+      - created_at
+      - active
+      title: DeployRuleOut
     DeploymentConfig:
       properties:
         mode:
@@ -34431,6 +34791,65 @@ components:
           title: Detail
       type: object
       title: HTTPValidationError
+    HaloUserBody:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        email:
+          type: string
+          maxLength: 320
+          title: Email
+        name:
+          type: string
+          maxLength: 200
+          title: Name
+          default: ''
+        confirm:
+          type: boolean
+          title: Confirm
+          description: True only when the person pressed Yes in the confirmation window.
+          default: false
+      type: object
+      required:
+      - client_id
+      - email
+      title: HaloUserBody
+    HaloUserItem:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        email:
+          type: string
+          title: Email
+        status:
+          type: string
+          title: Status
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+      type: object
+      required:
+      - id
+      - email
+      - status
+      - created_at
+      title: HaloUserItem
     HandoffItemOut:
       properties:
         id:
@@ -44351,6 +44770,110 @@ components:
       - scripts
       - tickets
       title: ScriptOptions
+    ScriptRuleIn:
+      properties:
+        alert_id:
+          type: string
+          format: uuid
+          title: Alert Id
+        scope:
+          type: string
+          enum:
+          - client
+          - all
+          title: Scope
+        windows_script_id:
+          anyOf:
+          - type: integer
+            maximum: 2000000000.0
+            minimum: 1.0
+          - type: 'null'
+          title: Windows Script Id
+        mac_script_id:
+          anyOf:
+          - type: integer
+            maximum: 2000000000.0
+            minimum: 1.0
+          - type: 'null'
+          title: Mac Script Id
+        requires_tool:
+          anyOf:
+          - type: string
+            enum:
+            - screenconnect
+            - huntress
+            - fieldeffect
+            - ninjaone
+            - addigy
+          - type: 'null'
+          title: Requires Tool
+      type: object
+      required:
+      - alert_id
+      - scope
+      title: ScriptRuleIn
+    ScriptRuleOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        scope:
+          type: string
+          title: Scope
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source
+        title:
+          type: string
+          title: Title
+        windows_script:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Windows Script
+        mac_script:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mac Script
+        requires_tool:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requires Tool
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        active:
+          type: boolean
+          title: Active
+        queued_now:
+          type: integer
+          title: Queued Now
+          default: 0
+      type: object
+      required:
+      - id
+      - scope
+      - title
+      - created_at
+      - active
+      title: ScriptRuleOut
     ScriptRun:
       properties:
         id:

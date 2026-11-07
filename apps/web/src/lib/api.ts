@@ -962,7 +962,21 @@ export const identitiesApi = {
   /** Ask CORE to sign a person out everywhere, block their sign-in, or allow it. Returns at once: the answer comes back through accountActions. */
   requestAccountAction: (body: { client_id: string; email: string; action: AccountActionKind; confirm: boolean }) =>
     request<AccountActionItem>('/api/v1/identities/actions', { method: 'POST', body: JSON.stringify(body) }),
+  /** What was asked for this person in the last week about adding them to HaloPSA, and how each went. */
+  haloUserRequests: (clientId: string, email: string) => request<HaloUserRequest[]>('/api/v1/identities/halo-user', { params: { client_id: clientId, email } }),
+  /** Ask CORE to create a HaloPSA user for a person who has a cloud account and none there. Returns at once: the answer comes back through haloUserRequests. */
+  requestHaloUser: (body: { client_id: string; email: string; name?: string; confirm: boolean }) =>
+    request<HaloUserRequest>('/api/v1/identities/halo-user', { method: 'POST', body: JSON.stringify(body) }),
 };
+
+export interface HaloUserRequest {
+  id: string;
+  email: string;
+  status: 'pending' | 'running' | 'done' | 'failed';
+  message?: string | null;
+  created_at: string;
+  finished_at?: string | null;
+}
 
 export interface BecCaseItem {
   id: string;
@@ -1969,6 +1983,58 @@ export const ticketRulesApi = {
   retry: (alertId: string) => request<TicketStatus>(`/api/v1/alert-ticket-rules/alert/${encodeURIComponent(alertId)}/retry`, { method: 'POST' }),
   list: () => request<TicketRule[]>('/api/v1/alert-ticket-rules'),
   turnOff: (id: string) => request<TicketRule>(`/api/v1/alert-ticket-rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
+export interface ScriptRule {
+  id: string;
+  scope: string;
+  client_id?: string | null;
+  client_name?: string | null;
+  source?: string | null;
+  title: string;
+  windows_script?: string | null;
+  mac_script?: string | null;
+  requires_tool?: string | null;
+  created_at: string;
+  active: boolean;
+  queued_now?: number;
+}
+
+export const scriptRulesApi = {
+  /** Make a rule from an alert: its type, for its client or every client, with a Windows script, a Mac script or both, optionally only for a client that already uses a tool. This alert runs it now. */
+  make: (body: { alert_id: string; scope: 'client' | 'all'; windows_script_id?: number; mac_script_id?: number; requires_tool?: string }) =>
+    request<ScriptRule>('/api/v1/alert-script-rules', { method: 'POST', body: JSON.stringify(body) }),
+  list: () => request<ScriptRule[]>('/api/v1/alert-script-rules'),
+  turnOff: (id: string) => request<ScriptRule>(`/api/v1/alert-script-rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
+export interface ToolInstallRule {
+  id: string;
+  tool: string;
+  tool_name: string;
+  scope: string;
+  client_id?: string | null;
+  client_name?: string | null;
+  windows_script?: string | null;
+  mac_script?: string | null;
+  created_at: string;
+  active: boolean;
+}
+
+export interface ToolInstallScript {
+  id: number;
+  name: string;
+  one_click: boolean;
+}
+
+export const toolInstallsApi = {
+  /** The scripts CORE has switched on, to choose from. */
+  scripts: () => request<ToolInstallScript[]>('/api/v1/tool-deploy-rules/scripts'),
+  list: () => request<ToolInstallRule[]>('/api/v1/tool-deploy-rules'),
+  /** Make a rule: where the tool is missing on a Windows or Mac machine of a client that uses it, run the install script for that system. */
+  make: (body: { tool: 'huntress' | 'fieldeffect' | 'screenconnect'; scope: 'client' | 'all'; client_id?: string; windows_script_id?: number; mac_script_id?: number }) =>
+    request<ToolInstallRule>('/api/v1/tool-deploy-rules', { method: 'POST', body: JSON.stringify(body) }),
+  turnOff: (id: string) => request<ToolInstallRule>(`/api/v1/tool-deploy-rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
 
 export const alertsApi = {

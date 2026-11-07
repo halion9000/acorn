@@ -13,6 +13,7 @@ import typing
 
 import pytest
 from app.api.v1.endpoints import alert_scripts as scripts
+from app.api.v1.endpoints import identity_halo_user as halo_user
 from app.api.v1.endpoints.inbox_core_feed import SourceReport
 from app.services import alert_ticket_rules as ticket_rules
 from app.services import quarantine_release
@@ -30,7 +31,7 @@ CONTRACT = [
     (
         "vendor_actions",
         "action",
-        ["approve", "reject", "resolve", scripts.SCRIPT_ACTION, ticket_rules.ACTION, quarantine_release.ACTION, quarantine_release.TICKET_NOTE_ACTION, quarantine_release.CHECK_ACTION, quarantine_release.ALLOW_ACTION],
+        ["approve", "reject", "resolve", scripts.SCRIPT_ACTION, ticket_rules.ACTION, quarantine_release.ACTION, quarantine_release.TICKET_NOTE_ACTION, quarantine_release.CHECK_ACTION, quarantine_release.ALLOW_ACTION, halo_user.ACTION],
         "alert_vendor_actions.py (approve, reject, resolve), alert_scripts.SCRIPT_ACTION and alert_ticket_rules.ACTION",
     ),
     (

@@ -15,6 +15,7 @@ import { safeDistance } from '@/lib/safe-date';
 import { daysAgo } from '@/lib/ago';
 import { clientFromAddress } from '@/components/mssp/ClientPicker';
 import { AccountActions } from './AccountActions';
+import { AddToHalo } from './AddToHalo';
 import { MergePanel } from './MergePanel';
 import { PossibleDuplicates } from './PossibleDuplicates';
 import { BecSearch } from './BecSearch';
@@ -136,6 +137,9 @@ function Detail({ person }: { person: IdentityPerson }) {
         </div>
         <div className="mt-3">
           <BecSearch clientId={person.client_id} email={data.person.email} knownTo={data.person.sources.map((s) => s.vendor)} />
+        </div>
+        <div className="mt-3">
+          <AddToHalo clientId={person.client_id} email={data.person.email} name={data.person.display_name} haloCheck={data.person.halo_check} />
         </div>
         <div className="mt-3">
           <AccountActions clientId={person.client_id} email={data.person.email} knownTo={data.person.sources.map((s) => s.vendor)} />

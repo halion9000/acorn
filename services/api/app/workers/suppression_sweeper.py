@@ -12,10 +12,12 @@ from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.db.rls_sessions import mark_platform
 from app.services import worker_heartbeat
+from app.services.alert_script_rules import sweep_script_rules
 from app.services.alert_stale import exempt_severities, exempt_tenant_ids, sweep_stale
 from app.services.alert_suppression import sweep
 from app.services.alert_ticket_rules import sweep_ticket_rules
 from app.services.quarantine_release import queue_auto_checks
+from app.services.tool_deploy_rules import sweep_deploy_rules
 
 logger = structlog.get_logger()
 
@@ -39,10 +41,14 @@ async def run_suppression_sweeper(
                 if done["hidden"] or done["expired"]:
                     logger.info("alert_suppression.sweep", **done)
                 queued = await sweep_ticket_rules(session)
+                scripted = await sweep_script_rules(session)
+                scripted += await sweep_deploy_rules(session)
                 checks = await queue_auto_checks(session)
                 await session.commit()
                 if queued:
                     logger.info("alert_ticket_rules.queued", queued=queued)
+                if scripted:
+                    logger.info("alert_script_rules.queued", queued=scripted)
                 if checks:
                     logger.info("quarantine_checks.queued", queued=checks)
             if since_stale >= STALE_EVERY_SECONDS:

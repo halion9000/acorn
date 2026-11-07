@@ -552,6 +552,7 @@ class ClaimedAction(BaseModel):
         "ticket_note",
         "quarantine_check",
         "allow_sender",
+        "create_halo_user",
     ]
     incident_uid: str
     params: dict[str, Any]
