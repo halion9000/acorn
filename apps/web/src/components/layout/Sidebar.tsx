@@ -459,23 +459,23 @@ export function Sidebar() {
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 h-16 border-b border-surface-border">
+      <div className="flex items-center gap-2.5 px-4 h-16 border-b border-surface-border overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-acorn.png" alt="" aria-hidden="true" width={32} height={32} className="flex-shrink-0 w-8 h-8 object-contain" />
-        <div>
+        <div className="min-w-0">
           <span className="text-brand-400 font-bold text-base tracking-tight">A.C.</span>
           <span className="text-brand-400 font-bold text-base tracking-tight">O.R.N</span>
-          <p className="text-[10px] leading-tight text-fg-subtle -mt-0.5 max-w-[9.5rem]">Automated Cyber Operations &amp; Response Network</p>
+          <p className="text-[10px] leading-tight text-fg-subtle -mt-0.5 max-w-[7rem]">Automated Cyber Operations &amp; Response Network</p>
         </div>
         {/* Live indicator — decorative, status conveyed by the green dot label */}
-          <div className="ml-auto flex items-center gap-1" aria-hidden="true">
+          <div className="ml-auto flex flex-shrink-0 items-center gap-1" aria-hidden="true">
             <div className="w-1.5 h-1.5 rounded-full bg-green-400 pulse-dot" />
             <span className="text-xs text-fg-subtle">Live</span>
           </div>
       </div>
 
       {/* Nav */}
-      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto py-4 px-3 space-y-5">
+      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-5">
         {sections.map((section, si) => (
           <div key={si}>
             {section.title && (
