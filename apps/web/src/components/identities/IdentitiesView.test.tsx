@@ -607,4 +607,18 @@ describe('the extra identity tiles', () => {
     expect(screen.getByRole('columnheader', { name: /Open alerts/ })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Halo tickets (60 d)' })).toHaveAttribute('title', expect.stringContaining('last 60 days'));
   });
+
+  it('has tiles for cloud accounts HaloPSA does not know, or knows as gone, that filter the list and show their counts', async () => {
+    api.list.mockResolvedValue(list([person()], { summary: { total: 1, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, cloud_not_in_halo: 3, halo_inactive_cloud_enabled: 2, tools: {} } }));
+    show();
+    await screen.findAllByTestId('identity-row');
+    expect(screen.getByRole('button', { name: /Cloud account, not in Halo/ })).toHaveTextContent('3');
+    expect(screen.getByRole('button', { name: /Gone in Halo, still enabled/ })).toHaveTextContent('2');
+    await userEvent.click(screen.getByRole('button', { name: /Cloud account, not in Halo/ }));
+    await waitFor(() => expect(lastQuery().haloCheck).toBe('cloud_not_in_halo'));
+    await userEvent.click(screen.getByRole('button', { name: /Gone in Halo, still enabled/ }));
+    await waitFor(() => expect(lastQuery().haloCheck).toBe('halo_inactive_cloud_enabled'));
+    await userEvent.click(screen.getByRole('button', { name: /Gone in Halo, still enabled/ }));
+    await waitFor(() => expect(lastQuery().haloCheck).toBeUndefined());
+  });
 });

@@ -663,3 +663,56 @@ def test_a_directory_row_not_refreshed_for_days_is_gone_like_any_other_tools_row
     old = directory(A, "gail@acme.com")
     old.refreshed_at = NOW - timedelta(days=ip.STALE_DAYS + 1)
     assert ip.build_people(NAMES, [], [old], NOW) == []
+
+
+# ---- cloud accounts against the client's HaloPSA users ----
+
+
+def _halo(tenant, email, enabled=True):
+    return src(tenant, "halopsa", email, enabled=enabled)
+
+
+def _checks(users, sources, names=None):
+    people = ip.build_people(names or NAMES, users, sources, NOW)
+    return {p.email: p.halo_check for p in people}
+
+
+def test_an_enabled_cloud_account_no_halo_user_matches_is_flagged_but_only_where_halo_users_are_known():
+    users = [ms(A, "ann@acme.com"), ms(A, "stranger@acme.com"), ms(B, "bo@beta.com")]
+    got = _checks(users, [_halo(A, "ann@acme.com")])
+    assert got["ann@acme.com"] is None
+    assert got["stranger@acme.com"] == "cloud_not_in_halo"
+    assert got["bo@beta.com"] is None, "Beta has no HaloPSA users here at all: nothing can be called missing"
+
+
+def test_a_person_halo_marks_inactive_whose_cloud_account_is_enabled_is_flagged_and_a_disabled_account_is_not():
+    users = [ms(A, "gone@acme.com"), ms(A, "off@acme.com", enabled=False), ms(A, "ann@acme.com")]
+    got = _checks(users, [_halo(A, "gone@acme.com", enabled=False), _halo(A, "off@acme.com", enabled=False), _halo(A, "ann@acme.com")])
+    assert got["gone@acme.com"] == "halo_inactive_cloud_enabled"
+    assert got["off@acme.com"] is None, "already disabled in the cloud: nothing left to do"
+    assert got["ann@acme.com"] is None
+
+
+def test_guests_shared_mailboxes_and_a_halo_user_with_no_cloud_account_are_never_flagged():
+    users = [ms(A, "ann@acme.com"), ms(A, "ext@partner.com", user_type="Guest")]
+    shared = src(A, "threatmate", "info@acme.com", kind="shared", details={"directory": "microsoft"})
+    got = _checks(users, [_halo(A, "ann@acme.com"), _halo(A, "only-halo@acme.com"), shared])
+    assert got["ext@partner.com"] is None
+    assert got["info@acme.com"] is None
+    assert got["only-halo@acme.com"] is None, "known to Halo only: that is the other direction, shown by the tools column"
+
+
+def test_a_google_directory_account_counts_as_cloud_and_an_alias_match_counts_as_halo():
+    google = src(A, "threatmate", "gina@acme.com", details={"directory": "google"})
+    got = _checks([ms(A, "ann@acme.com")], [_halo(A, "ann@acme.com"), google])
+    assert got["gina@acme.com"] == "cloud_not_in_halo"
+
+
+def test_the_summary_counts_them_and_the_filter_keeps_only_those():
+    users = [ms(A, "ann@acme.com"), ms(A, "stranger@acme.com"), ms(A, "gone@acme.com")]
+    people = ip.build_people(NAMES, users, [_halo(A, "ann@acme.com"), _halo(A, "gone@acme.com", enabled=False)], NOW)
+    summary = ep.summarize(people)
+    assert (summary.cloud_not_in_halo, summary.halo_inactive_cloud_enabled) == (1, 1)
+    assert [p.email for p in ip.filter_people(people, halo_check="cloud_not_in_halo")] == ["stranger@acme.com"]
+    assert [p.email for p in ip.filter_people(people, halo_check="halo_inactive_cloud_enabled")] == ["gone@acme.com"]
+    assert len(ip.filter_people(people)) == 3

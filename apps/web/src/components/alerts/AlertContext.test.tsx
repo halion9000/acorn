@@ -14,7 +14,7 @@ vi.mock('@/lib/api', () => ({ alertsApi: { vendorActions, addTicket, removeTicke
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: toast }));
 
-import { AlertContext, alertContextOf, sourceLink, ticketStatusLine, toolLinks } from './AlertContext';
+import { AlertContext, alertContextOf, closedTicketNote, sourceLink, ticketStatusLine, toolLinks } from './AlertContext';
 
 const alert = (over: Partial<Alert> = {}): Alert =>
   ({ id: 'a1', title: 't', description: 'd', severity: 'high', status: 'new', source: 'huntress', tenantId: 't1', riskScore: 5, createdAt: '2026-10-18T00:00:00Z', ...over }) as Alert;
@@ -234,5 +234,26 @@ describe('what a ticket rule did for the alert', () => {
     renderCtx(alert());
     await screen.findByTestId('ticket-rule-status');
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+});
+
+describe('a ticket that is closed while its alert is not', () => {
+  const t = (id: string, status?: string) => ({ id, status });
+
+  it('says so only when every ticket reads as closed and the alert is still open', () => {
+    expect(closedTicketNote([t('555', 'Closed')], 'new')).toBe('Ticket #555 is closed in HaloPSA, but this alert is still open. Check whether the problem is really gone, then close the alert (closing a ticket does not close it).');
+    expect(closedTicketNote([t('1', 'Resolved'), t('2', 'closed')], 'investigating')).toMatch(/^Its 2 tickets are closed/);
+    expect(closedTicketNote([t('1', 'Closed'), t('2', 'Tech Updated')], 'new')).toBeNull();
+    expect(closedTicketNote([t('1', 'Closed'), t('2')], 'new')).toBeNull();
+    expect(closedTicketNote([t('1', 'Closed')], 'resolved')).toBeNull();
+    expect(closedTicketNote([t('1', 'Closed')], 'false_positive')).toBeNull();
+    expect(closedTicketNote([], 'new')).toBeNull();
+    expect(closedTicketNote([t('1', 'Reclosed soon')], 'new')).toBeNull();
+  });
+
+  it('shows on the alert page', async () => {
+    vendorActions.mockResolvedValue({ supported: false, actions: [], tickets: [{ system: 'halopsa', id: '4521', summary: 's', status: 'Closed' }] });
+    renderCtx(alert({ status: 'new' }));
+    expect(await screen.findByTestId('ticket-closed-note')).toHaveTextContent('Ticket #4521 is closed in HaloPSA');
   });
 });

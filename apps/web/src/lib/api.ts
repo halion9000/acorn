@@ -811,6 +811,8 @@ export interface IdentityPerson {
   /** HaloPSA tickets about this person and when the newest was opened. Absent from an older API. */
   tickets?: number;
   last_ticket_at?: string | null;
+  /** Against the client's HaloPSA users: an enabled cloud account none matches, or one Halo marks as gone. Absent from an older server. */
+  halo_check?: 'cloud_not_in_halo' | 'halo_inactive_cloud_enabled' | null;
   /** The newest BEC search for this person (or any of their addresses). Absent when none was run, or from an older API. */
   bec?: { status: 'pending' | 'running' | 'done' | 'failed'; level?: string | null; at: string } | null;
   /** Open alerts by the tool that raised them. Absent from an older API. */
@@ -835,7 +837,7 @@ export interface IdentityDuplicate {
 }
 
 export interface IdentityList {
-  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; active?: number; failed_signins_24h?: number; brute_force?: number };
+  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; cloud_not_in_halo?: number; halo_inactive_cloud_enabled?: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; active?: number; failed_signins_24h?: number; brute_force?: number };
   items: IdentityPerson[];
   total: number;
   page: number;
@@ -865,6 +867,8 @@ export interface IdentityQuery {
   mfa?: string;
   kind?: string;
   hasAlerts?: boolean;
+  /** Only people whose cloud account needs a look against HaloPSA. */
+  haloCheck?: 'cloud_not_in_halo' | 'halo_inactive_cloud_enabled';
   alertSource?: string;
   backup?: string;
   /** failed: a failed sign-in in the last 24 hours; brute_force: ten or more. */
@@ -893,6 +897,7 @@ export const identitiesApi = {
         mfa: q.mfa,
         kind: q.kind,
         has_alerts: q.hasAlerts ? 'true' : undefined,
+        halo_check: q.haloCheck,
         alert_source: q.alertSource,
         backup: q.backup,
         exposed: q.exposed,
@@ -916,6 +921,7 @@ export const identitiesApi = {
     set('kind', q.kind);
     set('alert_source', q.alertSource);
     set('backup', q.backup);
+    set('halo_check', q.haloCheck);
     set('exposed', q.exposed);
     set('signin', q.signin);
     set('sort', q.sort);

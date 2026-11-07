@@ -149,6 +149,8 @@ class Person:
     # The other addresses of the same human, folded into this person (see identity_merge), and why each was.
     aliases: list[str] = field(default_factory=list)
     alias_reasons: dict[str, str] = field(default_factory=dict)
+    # How the person compares with the client's HaloPSA users (see halo_checks): "cloud_not_in_halo", "halo_inactive_cloud_enabled", or None.
+    halo_check: str | None = None
 
     @property
     def key(self) -> str:
@@ -257,7 +259,33 @@ def build_people(
         p.sources.sort(key=lambda r: (r.vendor != MICROSOFT, r.vendor, r.external_id))
         p.backups = backup_infos(p.sources, now)
         p.exposure = exposure_of([row for address in p.addresses for row in exposure_rows.get(f"{p.tenant_id}:{address}", [])])
+    halo_checks(out)
     return out
+
+
+HALO = "halopsa"
+HALO_CHECKS = ("cloud_not_in_halo", "halo_inactive_cloud_enabled")
+
+
+def halo_checks(people: list[Person]) -> None:
+    """Compare each person's cloud account (Microsoft 365, or a directory ThreatMate reads) with the client's HaloPSA users, and set ``halo_check`` on the ones that need a look. Only judged for a client whose HaloPSA users
+    we hold at all (otherwise every account would read as missing), and only for ordinary users: a guest, a shared mailbox or another kind of account is not expected to be a Halo user.
+    - cloud_not_in_halo: an enabled cloud account that no HaloPSA user matches (by the person's address or one of their aliases).
+    - halo_inactive_cloud_enabled: HaloPSA marks the person inactive (left, or never to return) but the cloud account is still enabled.
+    It only points: nothing is changed, and an unmatched account may well be a service or shared account nobody has labelled (pure)."""
+    with_halo = {p.tenant_id for p in people if any(s.vendor == HALO for s in p.sources)}
+    for p in people:
+        p.halo_check = None
+        if p.tenant_id not in with_halo or p.kind != "user":
+            continue
+        cloud = [s for s in p.sources if s.vendor == MICROSOFT or (s.details or {}).get("directory")]
+        if not cloud or p.enabled is False or not any(s.enabled is not False for s in cloud):
+            continue
+        halo = [s for s in p.sources if s.vendor == HALO]
+        if not halo:
+            p.halo_check = "cloud_not_in_halo"
+        elif all(s.enabled is False for s in halo):
+            p.halo_check = "halo_inactive_cloud_enabled"
 
 
 # The managed detection and response tools: none lists its people to us, but each says who a threat is about. A person one of them raised an alert about is a person that tool is watching.
@@ -349,6 +377,7 @@ def filter_people(
     backup: str | None = None,
     exposed: str | None = None,
     active: bool = False,
+    halo_check: str | None = None,
 ) -> list[Person]:
     """The people a page asked for: every filter given must hold. ``only_in`` keeps people known to just that one tool."""
     rows = people
@@ -367,6 +396,8 @@ def filter_people(
         rows = [p for p in rows if p.vendors == [only_in]]
     if has_alerts:
         rows = [p for p in rows if p.open_alerts > 0]
+    if halo_check:
+        rows = [p for p in rows if p.halo_check == halo_check]
     if backup == "ok":
         rows = [p for p in rows if p.backups and all(b.status == "ok" for b in p.backups)]
     elif backup == "problem":

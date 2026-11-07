@@ -11788,6 +11788,19 @@ paths:
           type: boolean
           default: false
           title: Has Alerts
+      - name: halo_check
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(cloud_not_in_halo|halo_inactive_cloud_enabled)$
+          - type: 'null'
+          description: Only people whose cloud account needs a look against the client's
+            HaloPSA users.
+          title: Halo Check
+        description: Only people whose cloud account needs a look against the client's
+          HaloPSA users.
       - name: backup
         in: query
         required: false
@@ -11962,6 +11975,19 @@ paths:
           type: boolean
           default: false
           title: Has Alerts
+      - name: halo_check
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(cloud_not_in_halo|halo_inactive_cloud_enabled)$
+          - type: 'null'
+          description: Only people whose cloud account needs a look against the client's
+            HaloPSA users.
+          title: Halo Check
+        description: Only people whose cloud account needs a look against the client's
+          HaloPSA users.
       - name: backup
         in: query
         required: false
@@ -39872,6 +39898,11 @@ components:
           anyOf:
           - $ref: '#/components/schemas/ExposureOut'
           - type: 'null'
+        halo_check:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Halo Check
         tickets:
           type: integer
           title: Tickets
@@ -50829,6 +50860,14 @@ components:
         in_one_tool:
           type: integer
           title: In One Tool
+        cloud_not_in_halo:
+          type: integer
+          title: Cloud Not In Halo
+          default: 0
+        halo_inactive_cloud_enabled:
+          type: integer
+          title: Halo Inactive Cloud Enabled
+          default: 0
         tools:
           additionalProperties:
             type: integer

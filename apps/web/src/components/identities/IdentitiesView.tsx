@@ -308,6 +308,7 @@ export function IdentitiesView() {
   const [exposed, setExposed] = useState('');
   const [kind, setKind] = useState('');
   const [hasAlerts, setHasAlerts] = useState(false);
+  const [haloCheck, setHaloCheck] = useState<'cloud_not_in_halo' | 'halo_inactive_cloud_enabled' | ''>('');
   const [adminOnly, setAdminOnly] = useState(false);
   // Which accounts to list by their state: all of them, only the ones still enabled, or only the disabled ones.
   const [state, setState] = useState<'' | 'enabled' | 'disabled'>('');
@@ -327,8 +328,8 @@ export function IdentitiesView() {
   }, [search]);
 
   const query: IdentityQuery = useMemo(
-    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, alertSource: alertTool || undefined, backup: backup || undefined, signin: signin || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', active: activeOnly, onlyIn: oneTool && tool ? tool : undefined, sort }),
-    [page, clientId, debounced, tool, alertTool, mfa, backup, signin, exposed, kind, hasAlerts, adminOnly, state, oneTool, activeOnly, sort],
+    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, haloCheck: haloCheck || undefined, alertSource: alertTool || undefined, backup: backup || undefined, signin: signin || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', active: activeOnly, onlyIn: oneTool && tool ? tool : undefined, sort }),
+    [page, clientId, debounced, tool, alertTool, mfa, backup, signin, exposed, kind, hasAlerts, haloCheck, adminOnly, state, oneTool, activeOnly, sort],
   );
   const { data, error, isLoading, isValidating, mutate } = useSWR(['identities', query], () => identitiesApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
   useEffect(() => {
@@ -393,6 +394,8 @@ export function IdentitiesView() {
         {tile('Backup problems', summary?.backup_problems, backup === 'problem', () => setBackup(backup === 'problem' ? '' : 'problem'), true)}
         {tile('Exposed in a breach', summary?.exposed, exposed === 'any', () => setExposed(exposed === 'any' ? '' : 'any'), true)}
         {tile('Password or stealer log', summary?.exposed_serious, exposed === 'serious', () => setExposed(exposed === 'serious' ? '' : 'serious'), true)}
+        {tile('Cloud account, not in Halo', summary?.cloud_not_in_halo, haloCheck === 'cloud_not_in_halo', () => setHaloCheck(haloCheck === 'cloud_not_in_halo' ? '' : 'cloud_not_in_halo'), true)}
+        {tile('Gone in Halo, still enabled', summary?.halo_inactive_cloud_enabled, haloCheck === 'halo_inactive_cloud_enabled', () => setHaloCheck(haloCheck === 'halo_inactive_cloud_enabled' ? '' : 'halo_inactive_cloud_enabled'), true)}
         {tile('Administrators', summary?.admins, adminOnly, () => setAdminOnly((v) => !v))}
         {tile('Disabled accounts', summary?.disabled, disabledOnly, () => reset(() => setState(state === 'disabled' ? '' : 'disabled')))}
         {tile('In only one tool', summary?.in_one_tool, oneTool, () => setOneTool((v) => !v))}

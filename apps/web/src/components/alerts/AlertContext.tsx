@@ -24,6 +24,20 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 const none = (text: string) => <span className="text-gray-500">{text}</span>;
 
+const FINISHED_ALERT = new Set(['resolved', 'closed', 'false_positive']);
+const CLOSED_TICKET = /^(closed|resolved|completed|cancel+ed|done)\b/i;
+
+/**
+ * A line for the alert page when every HaloPSA ticket on it reads as closed (by the status text HaloPSA gave) but the alert itself is still open. A closed ticket does not mean the problem is gone, so this
+ * only points it out: nothing is closed for you. Said for nothing when there are no tickets, when any ticket is still open, when a status is unknown, or when the alert is already finished (pure).
+ */
+export function closedTicketNote(tickets: Pick<LinkedTicket, 'id' | 'status'>[], alertStatus: string | undefined): string | null {
+  if (tickets.length === 0 || FINISHED_ALERT.has(String(alertStatus ?? '').toLowerCase())) return null;
+  if (!tickets.every((t) => typeof t.status === 'string' && CLOSED_TICKET.test(t.status.trim()))) return null;
+  const which = tickets.length === 1 ? `Ticket #${tickets[0]!.id} is` : `Its ${tickets.length} tickets are`;
+  return `${which} closed in HaloPSA, but this alert is still open. Check whether the problem is really gone, then close the alert (closing a ticket does not close it).`;
+}
+
 /** What a ticket rule did, or did not do, for this alert: only said when it has something to say (never when the alert already has its ticket or no rule is involved). */
 export function ticketStatusLine(s: TicketStatus | undefined): { text: string; tone: string } | null {
   if (!s) return null;
@@ -291,6 +305,11 @@ export function AlertContext({ alert }: { alert: Alert }) {
         <Row label="HaloPSA ticket">
           <div>
             <TicketRows tickets={data?.tickets ?? []} onRemove={(id) => void remove(id)} />
+            {closedTicketNote(data?.tickets ?? [], alert.status) ? (
+              <p className="mt-1 text-xs text-amber-300" data-testid="ticket-closed-note">
+                {closedTicketNote(data?.tickets ?? [], alert.status)}
+              </p>
+            ) : null}
             <TicketRuleStatus alertId={alert.id} />
             <AddTicket alertId={alert.id} onAdded={() => void mutate()} />
           </div>

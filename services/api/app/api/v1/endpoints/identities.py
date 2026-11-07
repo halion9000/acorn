@@ -107,6 +107,8 @@ class PersonOut(BaseModel):
     alerts_by_source: dict[str, int] = Field(default_factory=dict)
     backups: list[BackupOut] = Field(default_factory=list)
     exposure: ExposureOut | None = None
+    # Against the client's HaloPSA users: "cloud_not_in_halo" (an enabled cloud account no Halo user matches) or "halo_inactive_cloud_enabled" (Halo says they are gone, the cloud account is on). Null otherwise.
+    halo_check: str | None = None
     # HaloPSA tickets about this person in the window CORE reads, and when the newest was opened (the list page only; the person's own panel lists the tickets).
     tickets: int = 0
     last_ticket_at: datetime | None = None
@@ -124,6 +126,9 @@ class IdentitySummary(BaseModel):
     disabled: int
     # People known to only one tool (so no other tool has them): the ones to look at when a tool is missing someone.
     in_one_tool: int
+    # Cloud accounts that need a look against HaloPSA (see Person.halo_check).
+    cloud_not_in_halo: int = 0
+    halo_inactive_cloud_enabled: int = 0
     tools: dict[str, int] = Field(default_factory=dict)
     # How many people have an open alert from each tool, so the page can offer them as a filter.
     alert_sources: dict[str, int] = Field(default_factory=dict)
@@ -171,6 +176,7 @@ def _out(p: Person, with_sources: bool = False) -> PersonOut:
         open_alerts=p.open_alerts,
         top_severity=p.top_severity,
         alerts_by_source=p.alerts_by_source,
+        halo_check=p.halo_check,
         backups=[BackupOut(vendor=b.vendor, status=b.status, detail=b.detail) for b in p.backups],
         exposure=ExposureOut(
             count=p.exposure.count,
@@ -289,6 +295,8 @@ def summarize(people: list[Person]) -> IdentitySummary:
         admins=sum(1 for p in people if p.admin),
         disabled=sum(1 for p in people if p.enabled is False),
         in_one_tool=sum(1 for p in people if len(p.vendors) == 1),
+        cloud_not_in_halo=sum(1 for p in people if p.halo_check == "cloud_not_in_halo"),
+        halo_inactive_cloud_enabled=sum(1 for p in people if p.halo_check == "halo_inactive_cloud_enabled"),
         tools=dict(sorted(tools.items())),
         alert_sources=dict(sorted(alert_sources.items())),
         backup_problems=sum(1 for p in people if p.enabled is not False and any(b.status != "ok" for b in p.backups)),
@@ -314,6 +322,7 @@ async def list_identities(
         default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$", description="Only people known to this one tool and no other."
     ),
     has_alerts: bool = Query(default=False),
+    halo_check: str | None = Query(default=None, pattern="^(cloud_not_in_halo|halo_inactive_cloud_enabled)$", description="Only people whose cloud account needs a look against the client's HaloPSA users."),
     backup: str | None = Query(
         default=None,
         pattern="^(ok|problem|none)$",
@@ -358,6 +367,7 @@ async def list_identities(
             source=source,
             only_in=only_in,
             has_alerts=has_alerts,
+            halo_check=halo_check,
             alert_source=alert_source,
             backup=backup,
             exposed=exposed,
@@ -421,6 +431,7 @@ async def export_identities(
     source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
     only_in: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
     has_alerts: bool = Query(default=False),
+    halo_check: str | None = Query(default=None, pattern="^(cloud_not_in_halo|halo_inactive_cloud_enabled)$", description="Only people whose cloud account needs a look against the client's HaloPSA users."),
     backup: str | None = Query(default=None, pattern="^(ok|problem|none)$"),
     alert_source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
     exposed: str | None = Query(default=None, pattern="^(any|serious)$"),
@@ -447,6 +458,7 @@ async def export_identities(
             source=source,
             only_in=only_in,
             has_alerts=has_alerts,
+            halo_check=halo_check,
             alert_source=alert_source,
             backup=backup,
             exposed=exposed,
