@@ -29,7 +29,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 /** What a client's connector health reads as: a count of the failing ones, "all ok", "none", or a dash when it could not be read (never "0 failing" for that). */
 export function connectorHealthLabel(enabled: number | null | undefined, unhealthy: number | null | undefined): string {
   if (enabled === null || enabled === undefined || unhealthy === null || unhealthy === undefined) return '—';
-  if (enabled === 0) return 'none';
+  if (enabled === 0) return 'none here';
   return unhealthy > 0 ? `${unhealthy} of ${enabled} failing` : `all ${enabled} ok`;
 }
 
@@ -347,7 +347,7 @@ export default function MSSPDashboardView() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-800/60 text-left text-gray-400">
-                      <th scope="col" className="px-2.5 py-3 font-medium">Tenant</th>
+                      <th scope="col" className="sticky left-0 z-10 bg-gray-900 px-2.5 py-3 font-medium">Tenant</th>
                       <th scope="col" className="px-2.5 py-3 font-medium">Integrations</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Open Alerts</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Critical</th>
@@ -355,12 +355,12 @@ export default function MSSPDashboardView() {
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">MTTR (min)</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">SLA Breaches</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Connectors</th>
-                      <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Connectors switched on for this client, and how many of them report a problem right now">Connector health</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Connectors switched on for this client itself, and how many of them report a problem right now. Tools that CORE feeds in are kept under your own organization, so a client can read 'none here' while its tools are working.">Connector health</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Open alerts that will pass their response target within half an hour (late ones are in the SLA breaches column)">Due soon</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Remote management tools found on this client's devices that nobody has allowed or blocked yet">Unreviewed tools</th>
-                      <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Alerts nobody touched for a while that were set aside for review (never deleted). They are not in the open count.">Stale alerts</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Alerts nobody touched for 30 days that were set aside for review (never deleted). Only new or triaging alerts of medium severity or lower, in no case, and not for a client set to keep alerts open. High and critical alerts are never set aside, so zero is normal. They are not in the open count.">Stale alerts</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Health</th>
-                      <th scope="col" className="px-2.5 py-3 font-medium">Last Snapshot</th>
+                      <th scope="col" className="hidden px-2.5 py-3 font-medium xl:table-cell">Last Snapshot</th>
                       <th scope="col" className="px-2.5 py-3 font-medium" title="Tick a client to keep its quiet alerts open: they are never set aside as stale">Keep alerts open</th>
                       <th scope="col" className="px-2.5 py-3 font-medium" title="Which clients automated playbooks may run for. Playbooks do not start by themselves yet; this records the choice.">Automated playbooks</th>
                       <th scope="col" className="px-2.5 py-3 font-medium"><span className="sr-only">Actions</span></th>
@@ -378,7 +378,7 @@ export default function MSSPDashboardView() {
                         }}
                         className="cursor-pointer border-b border-gray-800/40 hover:bg-gray-800/30 transition-colors"
                       >
-                        <td className={clsx('px-2.5 py-3 font-medium', t.hidden ? 'text-gray-500' : 'text-white')}>
+                        <td className={clsx('sticky left-0 z-10 bg-gray-900 px-2.5 py-3 font-medium', t.hidden ? 'text-gray-500' : 'text-white')}>
                           <Link href={postureHref(t.tenant_id)} className="hover:text-sky-300 hover:underline" title="Open this client's posture">
                             {t.name}
                           </Link>
@@ -409,7 +409,7 @@ export default function MSSPDashboardView() {
                           {figure(t.health_score, { decimals: 0 })}
                           <HealthTrend values={t.health_trend} />
                         </td>
-                        <td className="px-2.5 py-3 text-gray-400">{snapshotLabel(t.snapshot_at)}</td>
+                        <td className="hidden px-2.5 py-3 text-gray-400 xl:table-cell">{snapshotLabel(t.snapshot_at)}</td>
                         <td className="px-2.5 py-3">
                           <input
                             type="checkbox"

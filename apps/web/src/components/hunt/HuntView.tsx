@@ -1029,6 +1029,9 @@ export function HuntView() {
                     ? 'The translator parsed your question (see editor) but found no events. Try a wider time range.'
                     : 'Either the data is clean, or the query is too tight.'}
                 </p>
+                <p className="mt-3 max-w-md text-center text-xs text-slate-500" data-testid="hunt-syntax-hint">
+                  This search looks through alerts: their titles, descriptions, hosts, users, addresses and tags. Use plain words, a quoted phrase, or field:value (severity, status, source, host, user, ip, tag, title, client; a leading minus excludes). It does not run KQL or Splunk-style queries, and raw event data is not searchable here.
+                </p>
               </div>
             ) : (
               <ul className="divide-y divide-slate-800/60">

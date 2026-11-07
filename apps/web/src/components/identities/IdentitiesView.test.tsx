@@ -599,4 +599,12 @@ describe('the extra identity tiles', () => {
     render(<IdentitiesView />);
     expect(await screen.findByTestId('failed-signins')).toHaveTextContent('—');
   });
+
+  it('names the alert and ticket columns for what they count', async () => {
+    api.list.mockResolvedValue(list([person()], { summary: { total: 1, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {} } }));
+    render(<IdentitiesView />);
+    await screen.findByTestId('failed-signins');
+    expect(screen.getByRole('columnheader', { name: /Open alerts/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Halo tickets (60 d)' })).toHaveAttribute('title', expect.stringContaining('last 60 days'));
+  });
 });

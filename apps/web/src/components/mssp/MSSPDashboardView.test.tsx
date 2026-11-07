@@ -479,7 +479,7 @@ describe('connector health per client', () => {
     expect(cells['Failing Co']).toHaveClass('text-red-400');
     expect(cells['Fine Co']).toHaveTextContent('all 3 ok');
     expect(cells['Fine Co']).not.toHaveClass('text-red-400');
-    expect(cells['Empty Co']).toHaveTextContent('none');
+    expect(cells['Empty Co']).toHaveTextContent('none here');
     expect(cells['Unknown Co']).toHaveTextContent('—');
   });
 
@@ -553,5 +553,16 @@ describe('alerts due soon per client', () => {
     expect(Object.fromEntries(Object.entries(cells).map(([k, v]) => [k, v.textContent]))).toEqual({ 'Some Co': '3', 'Zero Co': '0', 'Unknown Co': '—', 'Old Server Co': '—' });
     expect(cells['Some Co']).toHaveClass('text-amber-300');
     expect(cells['Zero Co']).not.toHaveClass('text-amber-300');
+  });
+
+  it('keeps the tenant name in view while scrolling sideways, and explains the two columns that read as empty', async () => {
+    overviewMock.mockResolvedValue(none);
+    tenantsMock.mockResolvedValue([row({ name: 'Wide Co' })]);
+    render(<MSSPDashboardView />);
+    await screen.findByText('Wide Co');
+    expect(screen.getByRole('columnheader', { name: 'Tenant' })).toHaveClass('sticky', 'left-0');
+    expect(within(screen.getByTestId('client-line')).getByRole('link', { name: 'Wide Co' }).closest('td')).toHaveClass('sticky', 'left-0');
+    expect(screen.getByRole('columnheader', { name: 'Stale alerts' })).toHaveAttribute('title', expect.stringContaining('High and critical alerts are never set aside'));
+    expect(screen.getByRole('columnheader', { name: 'Connector health' })).toHaveAttribute('title', expect.stringContaining('CORE feeds in'));
   });
 });

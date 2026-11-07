@@ -111,6 +111,7 @@ describe('a search that works', () => {
     expect(await screen.findByText('No matches in the selected window')).toBeInTheDocument();
     expect(screen.queryByText(/backend unreachable/i)).not.toBeInTheDocument();
     expect(screen.getByText('Either the data is clean, or the query is too tight.')).toBeInTheDocument();
+    expect(screen.getByTestId('hunt-syntax-hint')).toHaveTextContent(/It does not run KQL or Splunk-style queries/);
   });
 });
 

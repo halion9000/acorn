@@ -540,8 +540,8 @@ export function IdentitiesView() {
                 <th scope="col" className="px-3 py-2">Multi-Factor</th>
                 <th scope="col" className="px-3 py-2">Backup</th>
                 <SortHeader col="exposure" label="Breaches" sort={sort} onSort={(s) => reset(() => setSort(s))} />
-                <SortHeader col="alerts" label="Alerts" sort={sort} onSort={(s) => reset(() => setSort(s))} />
-                <th scope="col" className="px-3 py-2">Tickets</th>
+                <SortHeader col="alerts" label="Open alerts" sort={sort} onSort={(s) => reset(() => setSort(s))} />
+                <th scope="col" className="px-3 py-2" title="HaloPSA tickets from the last 60 days that name this person">Halo tickets (60 d)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
