@@ -479,7 +479,7 @@ describe('connector health per client', () => {
     expect(cells['Failing Co']).toHaveClass('text-red-400');
     expect(cells['Fine Co']).toHaveTextContent('all 3 ok');
     expect(cells['Fine Co']).not.toHaveClass('text-red-400');
-    expect(cells['Empty Co']).toHaveTextContent('none here');
+    expect(cells['Empty Co']).toHaveTextContent('none');
     expect(cells['Unknown Co']).toHaveTextContent('—');
   });
 
@@ -563,6 +563,6 @@ describe('alerts due soon per client', () => {
     expect(screen.getByRole('columnheader', { name: 'Tenant' })).toHaveClass('sticky', 'left-0');
     expect(within(screen.getByTestId('client-line')).getByRole('link', { name: 'Wide Co' }).closest('td')).toHaveClass('sticky', 'left-0');
     expect(screen.getByRole('columnheader', { name: 'Stale alerts' })).toHaveAttribute('title', expect.stringContaining('High and critical alerts are never set aside'));
-    expect(screen.getByRole('columnheader', { name: 'Connector health' })).toHaveAttribute('title', expect.stringContaining('CORE feeds in'));
+    expect(screen.getByRole('columnheader', { name: 'Connector health' })).toHaveAttribute('title', expect.stringContaining('tools CORE feeds in that have this client mapped'));
   });
 });

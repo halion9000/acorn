@@ -28,15 +28,16 @@ pytestmark = [
 ]
 
 
-def connector(tenant_id, health, enabled=True):
+def connector(tenant_id, health, enabled=True, kind="cipp", config=None):
     return Connector(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
         name=uuid.uuid4().hex[:8],
-        connector_type="cipp",
+        connector_type=kind,
         category="identity",
         is_enabled=enabled,
         health_status=health,
+        connector_config=config or {},
     )
 
 
@@ -72,14 +73,26 @@ async def world():
                     connector(ids["birch"], "unknown"),
                     connector(ids["birch"], "healthy"),
                     connector(ids["theirs"], "unhealthy"),
+                    # Tools CORE feeds into the owner's own organization: they belong to no client themselves, and count for each client the tool has a client mapped to.
+                    connector(ids["owner"], "healthy", kind="core_feed", config={"vendor": "huntress"}),
+                    connector(ids["owner"], "unhealthy", kind="core_feed", config={"vendor": "ninjaone"}),
+                    connector(ids["owner"], "unhealthy", enabled=False, kind="core_feed", config={"vendor": "blumira"}),
                 ]
             )
             await db.commit()
+        async with owner.begin() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            for vendor, client in (("huntress", "acme"), ("ninjaone", "acme"), ("ninjaone", "birch"), ("huntress", "quiet"), ("blumira", "quiet"), ("halopsa", "quiet")):
+                await conn.execute(
+                    text("insert into client_aliases (id, tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored) values (gen_random_uuid(), :o, :v, :c, :n, :n, :k, false)"),
+                    {"o": ids["owner"], "v": vendor, "c": f"{vendor}-{client}-{tag}", "n": f"{vendor}-{client}-{tag}-name", "k": ids[client]},
+                )
         yield ids, tag
     finally:
         async with owner.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
             everyone = [str(x) for x in ids.values()]
+            await conn.execute(text("delete from client_aliases where tenant_id = any(cast(:t as uuid[]))"), {"t": everyone})
             await conn.execute(text("delete from connectors where tenant_id = any(cast(:t as uuid[]))"), {"t": everyone})
             await conn.execute(
                 text("delete from tenants where id = any(cast(:t as uuid[])) and parent_tenant_id is not null"), {"t": everyone}
@@ -103,10 +116,10 @@ async def test_each_client_gets_its_enabled_and_failing_counts_and_nothing_of_an
     rows = await list_as(ids["owner"])
     got = {r.name.removesuffix(f"-{tag}"): (r.connectors_enabled, r.connectors_unhealthy) for r in rows if r.name.endswith(f"-{tag}")}
     assert got == {
-        "acme": (4, 2),
-        "birch": (2, 0),
-        "quiet": (0, 0),
-    }, "a switched-off connector is not counted, a client with none is 0 and 0, and the other organization's client is not listed"
+        "acme": (6, 3),  # its own 4 (2 failing) plus Huntress (fine) and NinjaOne (failing), fed by CORE
+        "birch": (3, 1),  # its own 2 plus NinjaOne (failing)
+        "quiet": (1, 0),  # nothing of its own; Huntress is fed and fine; Blumira is switched off and HaloPSA is not a feed
+    }, "a switched-off connector is not counted, a tool CORE does not feed is not counted, and the other organization's client is not listed"
 
 
 async def test_the_other_organization_sees_only_its_own_client_and_its_numbers(world):

@@ -29,7 +29,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 /** What a client's connector health reads as: a count of the failing ones, "all ok", "none", or a dash when it could not be read (never "0 failing" for that). */
 export function connectorHealthLabel(enabled: number | null | undefined, unhealthy: number | null | undefined): string {
   if (enabled === null || enabled === undefined || unhealthy === null || unhealthy === undefined) return '—';
-  if (enabled === 0) return 'none here';
+  if (enabled === 0) return 'none';
   return unhealthy > 0 ? `${unhealthy} of ${enabled} failing` : `all ${enabled} ok`;
 }
 
@@ -355,7 +355,7 @@ export default function MSSPDashboardView() {
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">MTTR (min)</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">SLA Breaches</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Connectors</th>
-                      <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Connectors switched on for this client itself, and how many of them report a problem right now. Tools that CORE feeds in are kept under your own organization, so a client can read 'none here' while its tools are working.">Connector health</th>
+                      <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Connectors switched on for this client, plus the tools CORE feeds in that have this client mapped, and how many of them report a problem right now.">Connector health</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Open alerts that will pass their response target within half an hour (late ones are in the SLA breaches column)">Due soon</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Remote management tools found on this client's devices that nobody has allowed or blocked yet">Unreviewed tools</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right" title="Alerts nobody touched for 30 days that were set aside for review (never deleted). Only new or triaging alerts of medium severity or lower, in no case, and not for a client set to keep alerts open. High and critical alerts are never set aside, so zero is normal. They are not in the open count.">Stale alerts</th>

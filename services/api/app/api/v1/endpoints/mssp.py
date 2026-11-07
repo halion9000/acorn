@@ -992,6 +992,40 @@ async def _connector_health(db: AsyncSession, child_ids: list[uuid.UUID]) -> dic
     return out
 
 
+async def _core_fed_health(db: AsyncSession, owner_id: uuid.UUID) -> dict[str, bool]:
+    """The tools CORE feeds into your own organization (enabled ones): tool name to whether it currently reports a problem. Raises when the read fails; the caller decides what to show then."""
+    from app.db.rls_scope import cross_tenant_reads
+    from app.models.connector import Connector
+
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(Connector.connector_config["vendor"].astext, Connector.health_status).where(
+                    Connector.tenant_id == owner_id, Connector.connector_type == "core_feed", Connector.is_enabled.is_(True)
+                )
+            )
+        ).all()
+    out: dict[str, bool] = {}
+    for vendor, state in rows:
+        if vendor:
+            out[vendor] = out.get(vendor, False) or state in BAD_CONNECTOR_STATES
+    return out
+
+
+def with_core_fed(
+    health: dict[uuid.UUID, tuple[int, int]], sources: dict[uuid.UUID, set[str]], fed: dict[str, bool]
+) -> dict[uuid.UUID, tuple[int, int]]:
+    """Add the tools CORE feeds in to each client's connector health: a tool counts for a client it is mapped to (``sources``: client to the tools with a client of that name there). The connectors saved under a client
+    itself are kept as they were. Tools that CORE does not feed (a PSA, say) are not counted (pure)."""
+    out = dict(health)
+    for child_id, tools in sources.items():
+        for tool in sorted(tools):
+            if tool in fed:
+                enabled, bad = out.get(child_id, (0, 0))
+                out[child_id] = (enabled + 1, bad + (1 if fed[tool] else 0))
+    return out
+
+
 SLA_SOON = timedelta(minutes=30)
 
 
@@ -1136,6 +1170,7 @@ async def list_managed_tenants(
             sources.setdefault(child_id, set()).add(vendor)
     try:
         health: dict[uuid.UUID, tuple[int, int]] | None = await _connector_health(db, [c.id for c in children])
+        health = with_core_fed(health, sources, await _core_fed_health(db, current_user.tenant_id))
     except Exception:  # noqa: BLE001 - the list must still load; the counts then read "unknown", not zero
         logging.getLogger(__name__).warning("mssp: connector health could not be read", exc_info=True)
         health = None
