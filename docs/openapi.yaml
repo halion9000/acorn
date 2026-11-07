@@ -10815,6 +10815,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-environment/{client_id}:
+    get:
+      tags:
+      - devices
+      summary: One client's devices, tool coverage and (from Auvik) network cabling
+      operationId: client_environment_api_v1_client_environment__client_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvironmentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/devices/settings:
     get:
       tags:
@@ -33149,6 +33178,124 @@ components:
       - expires_on
       - days_left
       title: EntryRow
+    EnvDevice:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        hostname:
+          type: string
+          title: Hostname
+        kind:
+          type: string
+          title: Kind
+        role:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Role
+        online:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Online
+        tools:
+          items:
+            type: string
+          type: array
+          title: Tools
+        links:
+          items:
+            $ref: '#/components/schemas/EnvLink'
+          type: array
+          title: Links
+        missing:
+          items:
+            type: string
+          type: array
+          title: Missing
+      type: object
+      required:
+      - id
+      - hostname
+      - kind
+      title: EnvDevice
+    EnvLink:
+      properties:
+        name:
+          type: string
+          title: Name
+        port:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Port
+        remote_port:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Remote Port
+        speed:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Speed
+      type: object
+      required:
+      - name
+      title: EnvLink
+    EnvironmentOut:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        counts:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Counts
+        tools:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Tools
+        gaps:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Gaps
+        has_auvik:
+          type: boolean
+          title: Has Auvik
+        has_links:
+          type: boolean
+          title: Has Links
+        truncated:
+          type: boolean
+          title: Truncated
+          default: false
+        devices:
+          items:
+            $ref: '#/components/schemas/EnvDevice'
+          type: array
+          title: Devices
+      type: object
+      required:
+      - client_id
+      - counts
+      - tools
+      - gaps
+      - has_auvik
+      - has_links
+      - devices
+      title: EnvironmentOut
     EvalAttachRequest:
       properties:
         eval_report:
