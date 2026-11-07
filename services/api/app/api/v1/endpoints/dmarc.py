@@ -128,12 +128,17 @@ class SetupLine(BaseModel):
     # The record that asks receivers for TLS reports (TLS-RPT, RFC 8460). Unlike DMARC it needs no authorisation record in the shared mailbox's zone.
     tls_rpt_name: str = ""
     tls_rpt_value: str = ""
+    # What public DNS shows right now: True when the client's _dmarc record names this alias in rua, False when it does not (or no record is seen yet), None when it was not checked (a domain with no mail, or
+    # too many lines). The same for the authorisation record in YOUR zone. DNS can lag a change, so False reads "not seen yet", never "wrong".
+    rua_published: bool | None = None
+    authorization_published: bool | None = None
 
 
 class Setup(BaseModel):
     mailbox: str | None
     mailbox_domain: str | None
     lines: list[SetupLine]
+    checked_at: str | None = None  # when public DNS was last asked about these records
 
 
 def alias_names(clients: dict[Any, Tenant]) -> dict[Any, str]:
@@ -157,6 +162,49 @@ _MX_CACHE: dict[str, tuple[float, bool]] = {}
 def get_resolver() -> Resolver:
     """The DNS resolver the mail-record check uses (replaced in tests)."""
     return DohResolver()
+
+
+_PUBLISHED_CACHE: dict[tuple[str, str], tuple[float, bool | None]] = {}
+_PUBLISHED_TTL_SECONDS = 300
+MAX_PUBLICATION_CHECKS = 300
+
+
+def rua_names_alias(records: list[str], alias: str) -> bool:
+    """Does one of these TXT records at _dmarc.<domain> say v=DMARC1 and send aggregate reports to ``alias`` (pure)?"""
+    want = f"mailto:{alias}".lower()
+    return any(r.strip().lower().startswith("v=dmarc1") and want in r.lower().replace(" ", "") for r in records)
+
+
+def is_authorization(records: list[str]) -> bool:
+    """Is one of these TXT records the report-authorisation record (v=DMARC1) (pure)?"""
+    return any(r.strip().lower().startswith("v=dmarc1") for r in records)
+
+
+async def check_publication(lines: list[SetupLine], resolver: Resolver, now: float | None = None) -> None:
+    """Fill in ``rua_published`` and ``authorization_published`` from public DNS, for lines whose domain has mail. An empty answer is asked again once; a lookup that raises leaves the answer unknown.
+    Answers are kept for five minutes so the page stays quick. At most MAX_PUBLICATION_CHECKS lines are asked about."""
+    stamp = time.monotonic() if now is None else now
+    gate = asyncio.Semaphore(10)
+
+    async def ask(name: str, kind: str, ok) -> bool | None:
+        cached = _PUBLISHED_CACHE.get((name, kind))
+        if cached and stamp - cached[0] < _PUBLISHED_TTL_SECONDS:
+            return cached[1]
+        async with gate:
+            try:
+                found = ok(await resolver.txt(name))
+                if not found:
+                    found = ok(await resolver.txt(name))
+            except Exception:  # noqa: BLE001  # a failed lookup is "unknown", never "not published"
+                return None
+        _PUBLISHED_CACHE[(name, kind)] = (stamp, found)
+        return found
+
+    async def one(line: SetupLine) -> None:
+        line.rua_published = await ask(f"_dmarc.{line.domain}", f"rua:{line.alias}", lambda records: rua_names_alias(records, line.alias))
+        line.authorization_published = await ask(line.authorization_record_name, "authorization", is_authorization)
+
+    await asyncio.gather(*(one(ln) for ln in [x for x in lines if x.has_mx][:MAX_PUBLICATION_CHECKS]))
 
 
 async def mail_domains(domains: list[str], resolver: Resolver, now: float | None = None) -> dict[str, bool]:
@@ -890,4 +938,5 @@ async def setup(
         has_mail = await mail_domains([ln.domain for ln in lines], resolver)
         for ln in lines:
             ln.has_mx = has_mail.get(ln.domain, True)
-    return Setup(mailbox=mailbox, mailbox_domain=mailbox_domain, lines=lines)
+        await check_publication(lines, resolver)
+    return Setup(mailbox=mailbox, mailbox_domain=mailbox_domain, lines=lines, checked_at=datetime.now(UTC).isoformat() if lines else None)

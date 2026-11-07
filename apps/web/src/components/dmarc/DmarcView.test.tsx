@@ -137,6 +137,22 @@ describe('DMARC results', () => {
 });
 
 describe('DMARC setup', () => {
+  it('says for each record whether public DNS shows it yet, and "not checked" when the server did not say', async () => {
+    const base = setup.lines[0]!;
+    const line = (over: object) => ({ ...base, ...over });
+    setup = { ...setup, lines: [line({ rua_published: true, authorization_published: false })] };
+    const a = render(view());
+    await userEvent.click(await screen.findByRole('tab', { name: 'Setup' }));
+    expect(await screen.findByTestId('rua-status')).toHaveTextContent('_dmarc.acmedental.com: Published');
+    expect(screen.getByTestId('authorization-status')).toHaveTextContent('Not seen in DNS yet');
+    a.unmount();
+    setup = { ...setup, lines: [line({ rua_published: null })] };
+    render(view());
+    await userEvent.click(await screen.findByRole('tab', { name: 'Setup' }));
+    expect(await screen.findByTestId('rua-status')).toHaveTextContent('Not checked');
+    expect(screen.getByTestId('authorization-status')).toHaveTextContent('Not checked');
+  });
+
   it('keeps the page no wider than the window: long record lines wrap and the page can shrink so a table scrolls inside its own box', async () => {
     render(view());
     await userEvent.click(await screen.findByRole('tab', { name: 'Setup' }));

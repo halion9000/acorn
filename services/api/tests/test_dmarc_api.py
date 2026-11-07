@@ -24,8 +24,15 @@ NOW = datetime.now(UTC)
 class FakeResolver:
     """MX answers by domain; a domain not listed has none. `calls` counts the lookups made."""
 
-    def __init__(self, mx=None, flaky=None, broken=()):
+    def __init__(self, mx=None, flaky=None, broken=(), txt=None, txt_broken=()):
         self.mx_by_domain, self.flaky, self.broken, self.calls = mx or {}, dict(flaky or {}), set(broken), []
+        self.txt_by_name, self.txt_broken = txt or {}, set(txt_broken)
+
+    async def txt(self, name):
+        self.calls.append(f"txt:{name}")
+        if name in self.txt_broken:
+            raise RuntimeError("DNS is down")
+        return list(self.txt_by_name.get(name, []))
 
     async def mx(self, name):
         self.calls.append(name)
@@ -40,6 +47,7 @@ class FakeResolver:
 @pytest.fixture(autouse=True)
 def settings_and_rls(monkeypatch):
     ep._MX_CACHE.clear()
+    ep._PUBLISHED_CACHE.clear()
     @contextlib.asynccontextmanager
     async def plain(_db):
         yield
@@ -819,3 +827,64 @@ def test_the_card_carries_the_mta_sts_result_and_its_advice_with_the_real_mail_s
     card = run(body)
     assert card.mta_sts.state == "ok" and card.mta_sts.mode == "enforce" and card.mta_sts.uncovered_mx == ["mx.acme.com"]
     assert any("mx.acme.com" in line and "refuse to deliver" in line for line in card.advice)
+
+
+# ---- is what the Setup tab asks you to publish actually published? ----
+
+ALIAS = "acme-dental.dmarc@goliveoak.com"
+AUTH_NAME = "acmedental.com._report._dmarc.goliveoak.com"
+
+
+def test_the_two_records_are_recognised_whatever_the_spacing_and_case():
+    assert ep.rua_names_alias([f"v=DMARC1; p=none; rua=mailto:{ALIAS}"], ALIAS)
+    assert ep.rua_names_alias([f"v=DMARC1;p=none;RUA=MAILTO:{ALIAS.upper()}"], ALIAS)
+    assert ep.rua_names_alias(["v=DMARC1; p=none", f"v=DMARC1; rua=mailto:x@y.example,mailto:{ALIAS}"], ALIAS), "one of several addresses"
+    assert not ep.rua_names_alias(["v=DMARC1; p=none; rua=mailto:someone@else.example"], ALIAS)
+    assert not ep.rua_names_alias([f"v=spf1 -all rua=mailto:{ALIAS}"], ALIAS), "it has to be a DMARC record"
+    assert not ep.rua_names_alias([], ALIAS)
+    assert ep.is_authorization(["v=DMARC1"]) and ep.is_authorization([" v=dmarc1 "])
+    assert not ep.is_authorization([]) and not ep.is_authorization(["v=spf1 -all"])
+
+
+def _setup_with(resolver):
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        acme = await tenant(s, "Acme Dental", owner.id)
+        s.add(IdentityMfaUser(tenant_id=acme.id, source="m365", user_id="u1", upn="a@acmedental.com", snapshot_id=uuid.uuid4()))
+        await s.commit()
+        return await ep.setup(caller(owner), s, resolver)
+
+    return run(body)
+
+
+def test_the_setup_says_which_records_are_published_and_when_it_looked():
+    both = FakeResolver({"acmedental.com": ["mx"]}, txt={"_dmarc.acmedental.com": [f"v=DMARC1; p=none; rua=mailto:{ALIAS}"], AUTH_NAME: ["v=DMARC1"]})
+    out = _setup_with(both)
+    (line,) = out.lines
+    assert (line.rua_published, line.authorization_published) == (True, True) and out.checked_at
+    ep._PUBLISHED_CACHE.clear()
+    none = _setup_with(FakeResolver({"acmedental.com": ["mx"]}))
+    assert (none.lines[0].rua_published, none.lines[0].authorization_published) == (False, False), "nothing seen in DNS yet"
+    ep._PUBLISHED_CACHE.clear()
+    wrong = _setup_with(FakeResolver({"acmedental.com": ["mx"]}, txt={"_dmarc.acmedental.com": ["v=DMARC1; p=none; rua=mailto:other@else.example"], AUTH_NAME: ["v=DMARC1"]}))
+    assert (wrong.lines[0].rua_published, wrong.lines[0].authorization_published) == (False, True), "a record that names someone else's address does not count"
+
+
+def test_a_failed_lookup_is_unknown_not_unpublished_and_an_empty_answer_is_asked_twice():
+    out = _setup_with(FakeResolver({"acmedental.com": ["mx"]}, txt_broken={"_dmarc.acmedental.com", AUTH_NAME}))
+    assert (out.lines[0].rua_published, out.lines[0].authorization_published) == (None, None)
+    ep._PUBLISHED_CACHE.clear()
+    resolver = FakeResolver({"acmedental.com": ["mx"]})
+    _setup_with(resolver)
+    assert resolver.calls.count("txt:_dmarc.acmedental.com") == 2, "an empty answer is asked again once before it is called missing"
+
+
+def test_a_domain_with_no_mail_is_not_looked_up_and_answers_are_kept_for_a_few_minutes():
+    out = _setup_with(FakeResolver({}))
+    assert (out.lines[0].has_mx, out.lines[0].rua_published, out.lines[0].authorization_published) == (False, None, None)
+    ep._PUBLISHED_CACHE.clear()
+    resolver = FakeResolver({"acmedental.com": ["mx"]}, txt={"_dmarc.acmedental.com": [f"v=DMARC1; rua=mailto:{ALIAS}"], AUTH_NAME: ["v=DMARC1"]})
+    _setup_with(resolver)
+    first = len(resolver.calls)
+    _setup_with(resolver)
+    assert len([c for c in resolver.calls[first:] if c.startswith("txt:")]) == 0, "the second page load used the kept answers"

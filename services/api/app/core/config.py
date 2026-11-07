@@ -516,7 +516,7 @@ class Settings(BaseSettings):
     # match the eTLD+1 of the PWA origin (no scheme, no port). RP_NAME is
     # what the OS prompt shows the user.
     PASSKEY_RP_ID: str = "localhost"
-    PASSKEY_RP_NAME: str = "AiSOC"
+    PASSKEY_RP_NAME: str = "A.C.O.R.N"
     PASSKEY_RP_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:3001",

@@ -302,24 +302,24 @@ def render_approval_email(
     target = action.get("target") or "unknown"
     rationale = (action.get("rationale") or "(no rationale provided)").strip()
 
-    subject = f"[AiSOC] Approval needed: {action_type} on {target} — case {case_number}"
+    subject = f"[A.C.O.R.N] Approval needed: {action_type} on {target} — case {case_number}"
 
     text_body = (
-        f"AiSOC approval request\n\n"
+        f"A.C.O.R.N approval request\n\n"
         f"Case:     {case_number}\n"
         f"Action:   {action_type}\n"
         f"Target:   {target}\n"
         f"Rationale: {rationale}\n\n"
         f"Approve: {approve_url}\n"
         f"Deny:    {reject_url}\n\n"
-        f"Open case in AiSOC: {web_base_url.rstrip('/')}/cases/{case.get('id') or ''}\n\n"
+        f"Open case in A.C.O.R.N: {web_base_url.rstrip('/')}/cases/{case.get('id') or ''}\n\n"
         f"This link expires in 60 minutes. Replies to this email are not monitored.\n"
     )
 
     # The case, action and rationale are an agent's own words about an alert: shown as text, never as markup (a rationale holding a link would be a second "Approve" button).
     esc = html.escape
     html_body = (
-        f"<p><strong>AiSOC approval request</strong></p>"
+        f"<p><strong>A.C.O.R.N approval request</strong></p>"
         f"<table style='border-collapse:collapse'>"
         f"<tr><td><strong>Case</strong></td><td>{esc(str(case_number))}</td></tr>"
         f"<tr><td><strong>Action</strong></td><td><code>{esc(str(action_type))}</code></td></tr>"

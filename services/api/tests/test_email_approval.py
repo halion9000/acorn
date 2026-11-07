@@ -203,3 +203,16 @@ async def test_mailgun_without_its_settings_refuses_before_any_request(monkeypat
     with pytest.raises(ea.EmailApprovalError, match="not configured"):
         await ea.MailgunClient(client=client).send(to=["x@y.test"], subject="s", html="h", text="t")
     await client.aclose()
+
+
+def test_the_approval_email_says_a_c_o_r_n_not_the_old_name():
+    subject, text, html = ea.render_approval_email(
+        case={"case_number": "C-1", "id": "x"},
+        action={"action_type": "disable_user", "target": "a@b.example", "rationale": "because"},
+        approve_url="https://acorn.example/a",
+        reject_url="https://acorn.example/r",
+        web_base_url="https://acorn.example",
+    )
+    assert subject.startswith("[A.C.O.R.N] Approval needed")
+    assert "A.C.O.R.N approval request" in text and "A.C.O.R.N approval request" in html
+    assert "AiSOC" not in subject + text + html

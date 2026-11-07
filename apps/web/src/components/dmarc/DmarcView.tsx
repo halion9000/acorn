@@ -149,11 +149,23 @@ export interface SetupLine {
   authorization_record_value: string;
   /** False when the domain has no mail records, so it cannot receive or send mail. Absent from an older server: treated as having mail. */
   has_mx?: boolean;
+  /** What public DNS shows now: true when the client's _dmarc record names this alias, false when not seen yet, null/absent when not checked or the lookup failed. */
+  rua_published?: boolean | null;
+  authorization_published?: boolean | null;
 }
 export interface DmarcSetup {
   mailbox: string | null;
   mailbox_domain: string | null;
   lines: SetupLine[];
+  /** When public DNS was last asked about these records. */
+  checked_at?: string | null;
+}
+
+/** The line under a record you are asked to publish: seen in public DNS, not seen yet (DNS can lag a change by a while), or not checked. */
+export function publishedLabel(published: boolean | null | undefined): { text: string; tone: string } {
+  if (published === true) return { text: 'Published', tone: 'text-emerald-300' };
+  if (published === false) return { text: 'Not seen in DNS yet', tone: 'text-amber-300' };
+  return { text: 'Not checked', tone: 'text-gray-500' };
 }
 
 const fetcher = async <T,>(url: string): Promise<T> => {
@@ -1026,11 +1038,17 @@ function Setup() {
                       </td>
                       <td className="px-3 py-2">
                         <span className="break-all font-mono text-gray-200">{ruaOf(l)}</span> <Copy text={ruaOf(l)} label={`Copy the DMARC record value for ${l.domain}`} />
+                        <div className={`mt-1 text-[11px] ${publishedLabel(l.rua_published).tone}`} data-testid="rua-status">
+                          _dmarc.{l.domain}: {publishedLabel(l.rua_published).text}
+                        </div>
                       </td>
                       <td className="px-3 py-2">
                         <div className="break-all font-mono text-gray-200">{l.authorization_record_name}</div>
                         <div className="break-all font-mono text-gray-400">{l.authorization_record_value}</div>{' '}
                         <Copy text={`${l.authorization_record_name}\tTXT\t${l.authorization_record_value}`} label={`Copy the DNS record for ${l.domain}`} />
+                        <div className={`mt-1 text-[11px] ${publishedLabel(l.authorization_published).tone}`} data-testid="authorization-status">
+                          {publishedLabel(l.authorization_published).text}
+                        </div>
                       </td>
                     </tr>
                   );

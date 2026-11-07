@@ -44991,6 +44991,11 @@ components:
             $ref: '#/components/schemas/SetupLine'
           type: array
           title: Lines
+        checked_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Checked At
       type: object
       required:
       - mailbox
@@ -45032,6 +45037,16 @@ components:
           type: string
           title: Tls Rpt Value
           default: ''
+        rua_published:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Rua Published
+        authorization_published:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Authorization Published
       type: object
       required:
       - client_id
