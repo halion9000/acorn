@@ -3,6 +3,8 @@
 A rule says "every alert of this type (for this client, or for all) gets a ticket". A.C.O.R.N opens nothing itself and holds no HaloPSA key: for each matching alert that has no ticket yet it queues a
 ``create_ticket`` action for CORE (the ``vendor_actions`` queue, vendor ``core``), CORE opens the ticket and reports its number, and the number is linked to the alert.
 
+A rule also opens a case for each alert it covers that has none (``insert_case_for_alert``), so a ticket and a case always go together; cases are not opened for alerts no rule covers.
+
 Safeguards, because this acts on its own:
  - a rule covers only alerts raised AFTER it was made, plus the one it was made from, so making a rule never floods Halo with old alerts; the person making it may also ask for a one-time catch-up of the
    alerts of that type already open, at most ``CATCH_UP_MAX``, newest first;
@@ -29,6 +31,7 @@ from app.models.tenant import Tenant
 from app.models.vendor_action import VendorAction
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.alert_suppression import _acting, signature_of, source_of
+from app.services.core_feed_cases import insert_case_for_alert
 from app.services.quarantine_release import _queue_ticket_note, check_note, quarantine_of, release_link
 
 ACTION = "create_ticket"
@@ -142,6 +145,7 @@ async def queue_for_rule(db: Any, rule: Any, now: datetime | None = None, source
     Each client's alerts are read as that client (``_acting``); the owner's own are read as the session already is."""
     now = now or datetime.now(UTC)
     queued = 0
+    cases = 0
     tenants = await tenants_of(db, rule)
     halo = await _halo_clients(db, rule.tenant_id, tenants)
     cap = CATCH_UP_MAX if catch_up else MAX_PER_RULE_PASS
@@ -175,7 +179,7 @@ async def queue_for_rule(db: Any, rule: Any, now: datetime | None = None, source
                 )
                 if src is not None and all(r.id != src.id for r in rows):
                     rows = [*rows, src]
-            candidates = [
+            covered = [
                 a
                 for a in rows
                 if rule_covers(
@@ -189,8 +193,26 @@ async def queue_for_rule(db: Any, rule: Any, now: datetime | None = None, source
                     alert_id=a.id,
                     catch_up=catch_up,
                 )
-                and not has_ticket(a.enrichment_data)
             ]
+            if source_alert_id is not None:
+                covered.sort(key=lambda a: a.id != source_alert_id)
+            # A rule makes a case for each alert it covers that has none (a ticket and a case always go together), whether or not the alert already has a ticket.
+            for a in covered:
+                if a.case_id is None and cases < cap:
+                    a.case_id = await insert_case_for_alert(
+                        db,
+                        tid,
+                        alert_id=a.id,
+                        title=a.title,
+                        description=a.description,
+                        severity=a.severity,
+                        techniques=a.mitre_techniques,
+                        tags={"source": "ticket-rule", "rule": rule.title, "auto": True},
+                        now=now,
+                        fallback_description=f"Opened automatically by the ticket rule \"{rule.title}\".",
+                    )
+                    cases += 1
+            candidates = [a for a in covered if not has_ticket(a.enrichment_data)]
             if source_alert_id is not None:
                 candidates.sort(key=lambda a: a.id != source_alert_id)  # the alert the rule was made from always comes first, so a cap never cuts it
             if not candidates:

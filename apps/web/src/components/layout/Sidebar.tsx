@@ -460,11 +460,8 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 h-16 border-b border-surface-border">
-        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-brand-600/20 border border-brand-600/30 flex items-center justify-center">
-          <span className="text-brand-400">
-            <ShieldIcon />
-          </span>
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-acorn.png" alt="" aria-hidden="true" width={32} height={32} className="flex-shrink-0 w-8 h-8 object-contain" />
         <div>
           <span className="text-brand-400 font-bold text-base tracking-tight">A.C.</span>
           <span className="text-brand-400 font-bold text-base tracking-tight">O.R.N</span>

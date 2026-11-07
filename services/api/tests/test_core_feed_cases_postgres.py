@@ -91,7 +91,8 @@ async def _run(world):
     return opened
 
 
-async def test_opens_one_linked_case_per_new_alert_of_any_severity_and_only_once(world):
+async def test_opens_one_linked_case_per_new_alert_of_any_severity_and_only_once(world, monkeypatch):
+    monkeypatch.setenv("AISOC_AUTO_CASES", "true")
     assert (
         await _run(world) == 4
     )  # the critical and low alerts in the client tenant, and the high and the Field Effect medium ones in the workspace

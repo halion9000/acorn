@@ -140,7 +140,10 @@ export function FimDashboard() {
         </h1>
         <p className="text-sm text-gray-500">
           Real-time osquery <code className="font-mono">file_events</code>{' '}
-          telemetry for your fleet.
+          telemetry for your fleet.{' '}
+          <span title="osquery's file watching works on Linux and macOS only; Windows machines are not covered yet.">
+            Covers Linux and macOS machines only; Windows is not covered.
+          </span>
         </p>
       </div>
 

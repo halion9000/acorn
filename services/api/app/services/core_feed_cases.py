@@ -1,8 +1,8 @@
-"""Open a case for each new alert CORE forwards (any severity, from every tool it feeds), so the Cases, Team Analytics and SLA pages have something to show.
+"""Open a case for each new alert CORE forwards (any severity, from every tool it feeds). OFF by default now: cases are made by ticket rules (``alert_ticket_rules``); set ``AISOC_AUTO_CASES=true`` to bring this back.
 
 CORE only pushes alerts; nothing opened cases from them, so those pages stayed empty. Each run looks at the workspace and its client tenants for recent
 alerts from CORE's tools that no case holds yet, and opens one case per alert, linked both ways (the same shape ``POST /cases`` writes).
-A kill switch (``AISOC_AUTO_CASES=false``), a 24-hour look-back and a per-run cap keep a first run from opening a case for every old alert.
+An opt-in switch (``AISOC_AUTO_CASES=true``), a 24-hour look-back and a per-run cap keep a first run from opening a case for every old alert.
 
 The other half: ``close_finished_cases`` closes a case AiSOC opened itself once every alert in it is closed (resolved, closed or a false positive) and nobody has taken it. Cases a person opened, and
 cases somebody is assigned to, are never closed this way; nothing is pushed to a PSA ticket (that stays a person's decision). A kill switch (``AISOC_AUTO_CLOSE_CASES=false``) turns it off.
@@ -42,7 +42,49 @@ def auto_close_enabled() -> bool:
 
 
 def enabled() -> bool:
-    return os.getenv("AISOC_AUTO_CASES", "true").strip().lower() not in {"0", "false", "no", "off"}
+    """Off unless ``AISOC_AUTO_CASES`` is set to a true value: a case is made for an alert by a ticket rule (see ``alert_ticket_rules``), not for every alert CORE forwards."""
+    return os.getenv("AISOC_AUTO_CASES", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+async def insert_case_for_alert(
+    db: Any,
+    tenant_id: uuid.UUID,
+    *,
+    alert_id: uuid.UUID,
+    title: str | None,
+    description: str | None,
+    severity: str,
+    techniques: Any,
+    tags: dict[str, Any],
+    now: datetime,
+    fallback_description: str,
+) -> uuid.UUID:
+    """Write one system-opened case for an alert and link it both ways (the same shape ``POST /cases`` writes). ``db`` is already in the tenant's scope; the caller commits."""
+    case_id = uuid.uuid4()
+    await db.execute(
+        text(
+            "INSERT INTO aisoc_cases (id, tenant_id, title, description, severity, status, mitre_techniques, alert_ids, compliance_frameworks, tags, "
+            "opened_at, created_at, updated_at, created_by) VALUES (:id, :t, :title, :description, :sev, 'new', CAST(:mitre AS JSONB), "
+            "CAST(:alert_ids AS UUID[]), CAST(:frameworks AS TEXT[]), CAST(:tags AS JSONB), :now, :now, :now, 'system')"
+        ),
+        {
+            "id": case_id,
+            "t": tenant_id,
+            "title": (title or "Alert from CORE")[:500],
+            "description": (description or fallback_description)[:4000],
+            "sev": severity,
+            "mitre": json.dumps(techniques if isinstance(techniques, list) else []),
+            "alert_ids": [str(alert_id)],
+            "frameworks": [],
+            "tags": json.dumps(tags),
+            "now": now,
+        },
+    )
+    await db.execute(
+        text("UPDATE alerts SET case_id = :c WHERE id = :a AND tenant_id = :t AND case_id IS NULL"),
+        {"c": case_id, "a": alert_id, "t": tenant_id},
+    )
+    return case_id
 
 
 async def open_cases_in_scope(db: Any, tenant_id: uuid.UUID, now: datetime, limit: int) -> int:
@@ -59,30 +101,17 @@ async def open_cases_in_scope(db: Any, tenant_id: uuid.UUID, now: datetime, limi
     ).all()
     opened = 0
     for alert in rows:
-        case_id = uuid.uuid4()
-        techniques = alert.mitre_techniques if isinstance(alert.mitre_techniques, list) else []
-        await db.execute(
-            text(
-                "INSERT INTO aisoc_cases (id, tenant_id, title, description, severity, status, mitre_techniques, alert_ids, compliance_frameworks, tags, "
-                "opened_at, created_at, updated_at, created_by) VALUES (:id, :t, :title, :description, :sev, 'new', CAST(:mitre AS JSONB), "
-                "CAST(:alert_ids AS UUID[]), CAST(:frameworks AS TEXT[]), CAST(:tags AS JSONB), :now, :now, :now, 'system')"
-            ),
-            {
-                "id": case_id,
-                "t": tenant_id,
-                "title": (alert.title or "Alert from CORE")[:500],
-                "description": (alert.description or f"Opened automatically for a {alert.severity} alert from {alert.vendor}.")[:4000],
-                "sev": alert.severity,
-                "mitre": json.dumps(techniques),
-                "alert_ids": [str(alert.id)],
-                "frameworks": [],
-                "tags": json.dumps({"source": "core-feed", "vendor": alert.vendor, "auto": True}),
-                "now": now,
-            },
-        )
-        await db.execute(
-            text("UPDATE alerts SET case_id = :c WHERE id = :a AND tenant_id = :t AND case_id IS NULL"),
-            {"c": case_id, "a": alert.id, "t": tenant_id},
+        await insert_case_for_alert(
+            db,
+            tenant_id,
+            alert_id=alert.id,
+            title=alert.title,
+            description=alert.description,
+            severity=alert.severity,
+            techniques=alert.mitre_techniques,
+            tags={"source": "core-feed", "vendor": alert.vendor, "auto": True},
+            now=now,
+            fallback_description=f"Opened automatically for a {alert.severity} alert from {alert.vendor}.",
         )
         opened += 1
     return opened

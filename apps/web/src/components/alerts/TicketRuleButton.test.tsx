@@ -61,7 +61,7 @@ describe('the catch-up choice', () => {
     const user = userEvent.setup();
     const a = render(<TicketRuleButton alertId="a1" />);
     await user.click(screen.getByRole('button', { name: 'Auto-ticket' }));
-    expect(screen.getByLabelText(/Also open tickets, once, for the alerts of this type that are already open/)).toBeChecked();
+    expect(screen.getByLabelText(/Also open tickets and cases, once, for the alerts of this type that are already open/)).toBeChecked();
     await user.click(screen.getByRole('button', { name: 'Make the rule' }));
     await waitFor(() => expect(api.make).toHaveBeenCalledWith('a1', 'client', true));
     expect(api.toast.success).toHaveBeenCalledWith('Rule made. 7 tickets are being opened (this alert and the others of its type that were open).');
@@ -69,7 +69,7 @@ describe('the catch-up choice', () => {
     api.make.mockClear();
     render(<TicketRuleButton alertId="a2" />);
     await user.click(screen.getByRole('button', { name: 'Auto-ticket' }));
-    await user.click(screen.getByLabelText(/Also open tickets, once/));
+    await user.click(screen.getByLabelText(/Also open tickets and cases, once/));
     await user.click(screen.getByRole('button', { name: 'Make the rule' }));
     await waitFor(() => expect(api.make).toHaveBeenCalledWith('a2', 'client', false));
   });

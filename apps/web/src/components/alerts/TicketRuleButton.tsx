@@ -37,7 +37,7 @@ export function TicketRuleButton({ alertId, clientName }: { alertId: string; cli
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title="Open a HaloPSA ticket automatically for every alert of this type"
+        title="Open a HaloPSA ticket and a case automatically for every alert of this type"
         className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 text-sm px-3 py-1.5 rounded-lg transition-colors"
         data-testid="ticket-rule-open"
       >
@@ -47,7 +47,7 @@ export function TicketRuleButton({ alertId, clientName }: { alertId: string; cli
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Open a ticket for alerts like this" onClick={() => !busy && setOpen(false)}>
           <div className="w-full max-w-md space-y-3 rounded-xl border border-gray-800 bg-gray-900 p-5 text-sm text-gray-300 shadow-2xl" onClick={(e) => e.stopPropagation()} data-testid="ticket-rule-form">
             <h2 className="text-base font-semibold text-white">Open a ticket for alerts like this</h2>
-            <p>From now on, open a HaloPSA ticket for every new alert of this type that has none. CORE opens it, and the ticket number is linked here. Make or turn off rules under Settings, Tickets.</p>
+            <p>From now on, open a HaloPSA ticket and a case for every new alert of this type that has none. CORE opens the ticket and its number is linked here; the case appears under Cases. Make or turn off rules under Settings, Tickets.</p>
             <label className="flex items-center gap-2">
               <input type="radio" name="ticket-rule-scope" checked={scope === 'client'} onChange={() => setScope('client')} />
               <span>for {clientName ? clientName : 'this client'} only</span>
@@ -58,7 +58,7 @@ export function TicketRuleButton({ alertId, clientName }: { alertId: string; cli
             </label>
             <label className="flex items-start gap-2 border-t border-gray-800 pt-3">
               <input type="checkbox" className="mt-1" checked={catchUp} onChange={(e) => setCatchUp(e.target.checked)} />
-              <span>Also open tickets, once, for the alerts of this type that are already open and have none (up to 25, newest first). Without this, only this alert and new ones get a ticket.</span>
+              <span>Also open tickets and cases, once, for the alerts of this type that are already open and have none (up to 25, newest first). Without this, only this alert and new ones get them.</span>
             </label>
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" disabled={busy} onClick={() => setOpen(false)} className="rounded-lg px-4 py-2 text-gray-300 hover:bg-gray-800">

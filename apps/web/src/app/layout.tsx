@@ -70,8 +70,8 @@ export const metadata: Metadata = {
     // Edge) all support this. We intentionally do not advertise /favicon.ico
     // because we don't ship a binary .ico file; declaring one only produces
     // 404s in the browser network tab.
-    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
-    apple: [{ url: '/icons/icon-192.svg', type: 'image/svg+xml' }],
+    icon: [{ url: '/favicon.png', type: 'image/png' }],
+    apple: [{ url: '/icons/apple-touch-icon.png', type: 'image/png' }],
   },
   appleWebApp: {
     capable: true,
@@ -95,7 +95,7 @@ const jsonLd = {
       '@type': 'Organization',
       name: 'A.C.O.R.N',
       url: siteUrl,
-      logo: `${siteUrl}/favicon.svg`,
+      logo: `${siteUrl}/logo-acorn.png`,
       description:
         'Community-driven, MIT-licensed AI security operations platform with a public demo and self-host path.',
       sameAs: [
