@@ -23,6 +23,7 @@ export function ToolInstalls() {
   const [tool, setTool] = useState<"huntress" | "fieldeffect" | "screenconnect">("huntress");
   const [windows, setWindows] = useState("");
   const [mac, setMac] = useState("");
+  const [viaAddigy, setViaAddigy] = useState(false);
   const [clients, setClients] = useState<ChildTenant[]>([]);
   const [clientId, setClientId] = useState(""); // "" = every client
 
@@ -53,9 +54,10 @@ export function ToolInstalls() {
   async function make() {
     setBusy("new");
     try {
-      await toolInstallsApi.make({ tool, ...(clientId ? { scope: "client" as const, client_id: clientId } : { scope: "all" as const }), windows_script_id: windows ? Number(windows) : undefined, mac_script_id: mac ? Number(mac) : undefined });
+      await toolInstallsApi.make({ tool, ...(viaAddigy && tool === "huntress" ? { via_addigy: true } : {}), ...(clientId ? { scope: "client" as const, client_id: clientId } : { scope: "all" as const }), windows_script_id: windows ? Number(windows) : undefined, mac_script_id: mac ? Number(mac) : undefined });
       setWindows("");
       setMac("");
+      setViaAddigy(false);
       await load();
       toast.success("Automatic install made. It looks for gaps every few minutes.");
     } catch (err) {
@@ -96,7 +98,7 @@ export function ToolInstalls() {
             <span className="min-w-0">
               <span className="block text-gray-100">{r.tool_name}</span>
               <span className="block text-xs text-gray-400">
-                Windows: {r.windows_script ?? "none"} · Mac: {r.mac_script ?? "none"}
+                Windows: {r.windows_script ?? "none"} · Mac: {r.mac_script ?? "none"}{r.via_addigy ? " · Addigy: yes" : ""}
               </span>
               <span className="text-xs text-gray-500">
                 {r.scope === "all" ? "every client" : r.client_name ?? "one client"} · since {r.created_at.slice(0, 10)}
@@ -155,8 +157,16 @@ export function ToolInstalls() {
           </select>
           {mac ? <span className="text-xs text-gray-500">This script {approval(mac)}.</span> : null}
         </label>
+        {tool === "huntress" ? (
+          <label className="flex items-start gap-2 text-xs text-gray-300">
+            <input type="checkbox" checked={viaAddigy} onChange={(e) => setViaAddigy(e.target.checked)} aria-label="Also push through Addigy" className="mt-0.5" />
+            <span>
+              Also push through Addigy, for Macs only Addigy manages. CORE first checks that the Mac&apos;s Addigy policy (and its parents) installs Huntress; if it does not, nothing is pushed and the reason is recorded. The push re-runs the policy deployment on that Mac.
+            </span>
+          </label>
+        ) : null}
         {scripts.length === 0 ? <p className="text-xs text-amber-300">CORE has not switched any script on, so there is nothing to choose. Switch the install scripts on in CORE first.</p> : null}
-        <button type="button" disabled={busy === "new" || (!windows && !mac)} onClick={() => void make()} className="rounded bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-500 disabled:opacity-50">
+        <button type="button" disabled={busy === "new" || (!windows && !mac && !(viaAddigy && tool === "huntress"))} onClick={() => void make()} className="rounded bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-500 disabled:opacity-50">
           {busy === "new" ? "Adding…" : "Add"}
         </button>
       </div>

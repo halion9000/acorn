@@ -1177,6 +1177,7 @@ export interface EnvDevice {
   tools: string[];
   links: EnvLink[];
   missing: string[];
+  pushable: string[];
 }
 export interface ClientEnvironment {
   client_id: string;
@@ -1193,6 +1194,9 @@ export interface ClientEnvironment {
 export const environmentApi = {
   /** One client's devices by kind, which tools cover them, and (from Auvik) what each network device is plugged into. */
   get: (clientId: string) => request<ClientEnvironment>(`/api/v1/client-environment/${encodeURIComponent(clientId)}`),
+  /** Ask CORE to push a tool to one Mac through Addigy; CORE checks the Mac's Addigy policy installs it first. */
+  push: (clientId: string, deviceId: string, tool: 'huntress') =>
+    request<{ queued: boolean; message: string }>(`/api/v1/client-environment/${encodeURIComponent(clientId)}/push`, { method: 'POST', body: JSON.stringify({ device_id: deviceId, tool }) }),
 };
 
 export const devicesApi = {
@@ -2050,6 +2054,7 @@ export interface ToolInstallRule {
   client_name?: string | null;
   windows_script?: string | null;
   mac_script?: string | null;
+  via_addigy?: boolean;
   created_at: string;
   active: boolean;
 }
@@ -2065,7 +2070,7 @@ export const toolInstallsApi = {
   scripts: () => request<ToolInstallScript[]>('/api/v1/tool-deploy-rules/scripts'),
   list: () => request<ToolInstallRule[]>('/api/v1/tool-deploy-rules'),
   /** Make a rule: where the tool is missing on a Windows or Mac machine of a client that uses it, run the install script for that system. */
-  make: (body: { tool: 'huntress' | 'fieldeffect' | 'screenconnect'; scope: 'client' | 'all'; client_id?: string; windows_script_id?: number; mac_script_id?: number }) =>
+  make: (body: { tool: 'huntress' | 'fieldeffect' | 'screenconnect'; scope: 'client' | 'all'; client_id?: string; windows_script_id?: number; mac_script_id?: number; via_addigy?: boolean }) =>
     request<ToolInstallRule>('/api/v1/tool-deploy-rules', { method: 'POST', body: JSON.stringify(body) }),
   turnOff: (id: string) => request<ToolInstallRule>(`/api/v1/tool-deploy-rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };

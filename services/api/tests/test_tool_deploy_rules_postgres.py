@@ -21,6 +21,7 @@ pytestmark = [
 ]
 
 NOW = datetime.now(UTC)
+AGENT = "aaaaaaaa-1111-2222-3333-444444444444"
 SCRIPTS = {
     201: SimpleNamespace(id=201, name="Install Huntress (Windows)", one_click=False),
     202: SimpleNamespace(id=202, name="Install Huntress (Mac)", one_click=False),
@@ -52,6 +53,8 @@ async def world():
             )
             for v in vendors:
                 details = {"last_contact": (last_contact or NOW - timedelta(hours=1)).isoformat()} if v == "ninjaone" else {}
+                if v == "addigy":
+                    details = {"url": f"https://app.addigy.com/devices/{AGENT}"}
                 await s.execute(
                     text(
                         "insert into device_sources (id, tenant_id, device_id, vendor, external_id, name, details) values (gen_random_uuid(), :t, :d, :v, :e, :h, cast(:det as jsonb))"
@@ -83,7 +86,7 @@ async def world():
     await engine.dispose()
 
 
-def make_rule(db, windows=201, mac=202, scope="all", tool="huntress"):
+def make_rule(db, windows=201, mac=202, scope="all", tool="huntress", via_addigy=False):
     rule = ToolDeployRule(
         id=uuid.uuid4(),
         tenant_id=db.info["owner"],
@@ -92,6 +95,7 @@ def make_rule(db, windows=201, mac=202, scope="all", tool="huntress"):
         client_tenant_id=db.info["uses"] if scope == "client" else None,
         windows_script_id=windows,
         mac_script_id=mac,
+        via_addigy=via_addigy,
         created_at=NOW,
     )
     db.add(rule)
@@ -160,3 +164,34 @@ async def test_the_per_pass_cap_limits_how_many_machines_one_rule_asks_for(world
     assert await svc.queue_for_rule(world, rule, SCRIPTS, NOW) == 1
     await world.commit()
     assert await svc.queue_for_rule(world, rule, SCRIPTS, NOW + timedelta(minutes=5)) == 1, "the next pass takes the next one"
+
+
+async def addigy_requests(db):
+    await off(db)
+    rows = (
+        await db.execute(
+            text("select params, tenant_id from vendor_actions where action = 'addigy_push' and tenant_id in (:a, :b, :c, :d)"),
+            {"a": db.info["owner"], "b": db.info["uses"], "c": db.info["lacks"], "d": db.info["excluded"]},
+        )
+    ).all()
+    return {r[0]["device"]: r[0] for r in rows}
+
+
+async def test_an_addigy_only_mac_gets_a_push_request_with_its_agent_id_only_when_the_rule_says_so_and_only_once(world):
+    await off(world)
+    plain = make_rule(world)
+    await world.flush()
+    await svc.queue_for_rule(world, plain, SCRIPTS, NOW)
+    await world.commit()
+    assert await addigy_requests(world) == {}, "a rule without via_addigy never asks Addigy"
+    await off(world)
+    rule = make_rule(world, windows=None, mac=None, via_addigy=True, tool="huntress")
+    rule.scope, rule.client_tenant_id = "client", world.info["uses"]
+    await world.flush()
+    assert await svc.queue_for_rule(world, rule, SCRIPTS, NOW) == 1
+    await world.commit()
+    got = await addigy_requests(world)
+    assert set(got) == {"MAC-ADDIGY"}, "not the Windows or Ninja machines, not the Mac Ninja manages, not another client"
+    assert got["MAC-ADDIGY"]["agent_id"] == AGENT and got["MAC-ADDIGY"]["tool"] == "huntress" and got["MAC-ADDIGY"]["deploy_rule_id"] == str(rule.id)
+    assert await svc.queue_for_rule(world, rule, SCRIPTS, NOW + timedelta(hours=3)) == 0, "asked once, not every pass"
+    assert await svc.queue_for_rule(world, rule, SCRIPTS, NOW + timedelta(days=15)) == 1, "after two weeks it asks again"

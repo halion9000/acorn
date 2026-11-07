@@ -10844,6 +10844,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-environment/{client_id}/push:
+    post:
+      tags:
+      - devices
+      summary: Push a tool to one Mac through Addigy
+      description: Ask CORE to push the tool to one Mac now. CORE first checks that
+        the Mac's Addigy policy installs it and only then re-runs the policy deployment
+        on that Mac; the result is recorded on the request.
+      operationId: push_tool_api_v1_client_environment__client_id__push_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/devices/settings:
     get:
       tags:
@@ -28438,6 +28476,7 @@ components:
           - quarantine_check
           - allow_sender
           - create_halo_user
+          - addigy_push
           title: Action
         incident_uid:
           type: string
@@ -31294,6 +31333,10 @@ components:
             minimum: 1.0
           - type: 'null'
           title: Mac Script Id
+        via_addigy:
+          type: boolean
+          title: Via Addigy
+          default: false
       type: object
       required:
       - tool
@@ -31335,6 +31378,10 @@ components:
           - type: string
           - type: 'null'
           title: Mac Script
+        via_addigy:
+          type: boolean
+          title: Via Addigy
+          default: false
         created_at:
           type: string
           format: date-time
@@ -33215,6 +33262,11 @@ components:
             type: string
           type: array
           title: Missing
+        pushable:
+          items:
+            type: string
+          type: array
+          title: Pushable
       type: object
       required:
       - id
@@ -41569,6 +41621,34 @@ components:
       - view_count
       - created_at
       title: PublishedSummary
+    PushIn:
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        tool:
+          type: string
+          const: huntress
+          title: Tool
+      type: object
+      required:
+      - device_id
+      - tool
+      title: PushIn
+    PushOut:
+      properties:
+        queued:
+          type: boolean
+          title: Queued
+        message:
+          type: string
+          title: Message
+      type: object
+      required:
+      - queued
+      - message
+      title: PushOut
     QuarantineInfo:
       properties:
         available:

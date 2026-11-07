@@ -11,6 +11,7 @@ const dev = (name: string, role: string | null, kind: string, links: { name: str
   tools: ['auvik'],
   links: links.map((l) => ({ name: l.name, port: l.port ?? null, remote_port: l.remote_port ?? null, speed: null })),
   missing: [],
+  pushable: [],
 });
 
 describe('tierOf', () => {

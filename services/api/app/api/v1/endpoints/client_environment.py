@@ -7,14 +7,21 @@ A client with no Auvik has the devices and the coverage but no cabling, and the 
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from datetime import UTC, datetime
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.devices import DeviceOut, _load_cached, _master_of, _scope, is_missing_from, long_offline
 from app.models.tenant import Tenant
+from app.models.vendor_action import VendorAction
+from app.services.alert_script_rules import RUNNER_TOOL
+from app.services.alert_suppression import _acting
+from app.services.audit import emit_audit
+from app.services.tool_deploy_rules import ACTION_ADDIGY, ADDIGY_TOOLS, VENDOR, addigy_agent_id
 
 router = APIRouter(prefix="/client-environment", tags=["devices"])
 
@@ -40,6 +47,7 @@ class EnvDevice(BaseModel):
     tools: list[str] = Field(default_factory=list)
     links: list[EnvLink] = Field(default_factory=list)
     missing: list[str] = Field(default_factory=list)  # tools a computer should have and does not
+    pushable: list[str] = Field(default_factory=list)  # tools that can be pushed to it through Addigy now
 
 
 class EnvironmentOut(BaseModel):
@@ -84,6 +92,15 @@ def _role_of(d: DeviceOut) -> str | None:
     return None
 
 
+def pushable_of(d: DeviceOut, missing: list[str]) -> list[str]:
+    """Tools that can be pushed to this machine through Addigy: a Mac only Addigy manages (NinjaOne does not, so CORE has no other way in), with its Addigy device id known, that lacks the tool."""
+    from app.api.v1.endpoints.devices import os_family
+
+    if d.kind != "computer" or os_family(d) != "mac" or addigy_agent_id(d) is None or RUNNER_TOOL in {s.vendor for s in d.sources}:
+        return []
+    return [t for t in missing if t in ADDIGY_TOOLS]
+
+
 def build_environment(client_id: uuid.UUID, client_name: str | None, devices: list[DeviceOut]) -> EnvironmentOut:
     """The environment of one client from its (already loaded, not hidden) devices. Network devices come first, then computers, so a cap drops the least informative rows."""
     counted = [d for d in devices if d.hidden_since is None]
@@ -108,6 +125,7 @@ def build_environment(client_id: uuid.UUID, client_name: str | None, devices: li
                 tools=sorted({s.vendor for s in d.sources}),
                 links=_links_of(d),
                 missing=missing,
+                pushable=pushable_of(d, missing),
             )
         )
     order = {"network": 0, "computer": 1, "camera": 2, "other": 3}
@@ -134,3 +152,78 @@ async def client_environment(
     master = _master_of(await db.get(Tenant, owner))
     loaded = await _load_cached(db, owner, scope, clients, master)
     return build_environment(client_id, clients.get(client_id), loaded)
+
+
+class PushIn(BaseModel):
+    device_id: uuid.UUID
+    tool: Literal["huntress"]
+
+
+class PushOut(BaseModel):
+    queued: bool
+    message: str
+
+
+@router.post("/{client_id}/push", response_model=PushOut, status_code=status.HTTP_201_CREATED, summary="Push a tool to one Mac through Addigy")
+async def push_tool(
+    client_id: uuid.UUID,
+    body: PushIn,
+    request: Request,
+    current_user: Annotated[AuthUser, Depends(require_permission("connectors:write"))],
+    db: DBSession,
+) -> PushOut:
+    """Ask CORE to push the tool to one Mac now. CORE first checks that the Mac's Addigy policy installs it and only then re-runs the policy deployment on that Mac; the result is recorded on the request."""
+    owner = current_user.tenant_id
+    scope, clients = await _scope(db, owner, client_id)
+    master = _master_of(await db.get(Tenant, owner))
+    loaded = await _load_cached(db, owner, scope, clients, master)
+    device = next((d for d in loaded if d.id == body.device_id and d.tenant_id == client_id), None)
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such device for this client")
+    missing = [t for t in COVERAGE_TOOLS if device.kind == "computer" and not long_offline(device) and is_missing_from(device, t)]
+    if body.tool not in pushable_of(device, missing):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="That tool cannot be pushed to this machine through Addigy: it must be a Mac only Addigy manages, missing the tool, with a known Addigy device.",
+        )
+    agent = addigy_agent_id(device)
+    async with _acting(db, client_id, owner):
+        waiting = (
+            await db.execute(
+                select(VendorAction.id).where(
+                    VendorAction.tenant_id == client_id,
+                    VendorAction.vendor == VENDOR,
+                    VendorAction.action == ACTION_ADDIGY,
+                    VendorAction.status.in_(("pending", "claimed")),
+                    VendorAction.incident_uid == f"push:{body.tool}:{device.hostname}"[:200],
+                )
+            )
+        ).first()
+        if waiting is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A push to this machine is already waiting for CORE.")
+        action = VendorAction(
+            id=uuid.uuid4(),
+            tenant_id=client_id,
+            alert_id=None,
+            vendor=VENDOR,
+            incident_uid=f"push:{body.tool}:{device.hostname}"[:200],
+            action=ACTION_ADDIGY,
+            params={"tool": body.tool, "agent_id": agent, "device": device.hostname[:255]},
+            status="pending",
+            requested_by=current_user.user_id,
+            created_at=datetime.now(UTC),
+        )
+        db.add(action)
+        await db.flush()
+    await emit_audit(
+        db=db,
+        tenant_id=owner,
+        actor_id=current_user.user_id,
+        action="addigy_push:requested",
+        resource="device",
+        resource_id=str(device.id),
+        changes={"tool": body.tool, "device": device.hostname, "client_id": str(client_id)},
+        request=request,
+    )
+    await db.commit()
+    return PushOut(queued=True, message=f"Asked CORE to push {body.tool.capitalize()} to {device.hostname}. It checks the Mac's Addigy policy first.")

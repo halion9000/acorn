@@ -13,6 +13,7 @@ long, not one hidden), plus:
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -26,6 +27,10 @@ from app.services.alert_suppression import _acting
 from app.services.alert_ticket_rules import _halo_clients, tenants_of
 
 ACTION = "run_script"
+ACTION_ADDIGY = "addigy_push"
+# Only Huntress can be pushed through Addigy (CORE knows which Addigy software and script that means).
+ADDIGY_TOOLS = {"huntress"}
+_ADDIGY_URL = re.compile(r"/devices/([0-9a-fA-F-]{36})$")
 VENDOR = "core"
 MAX_PER_RULE_PASS = 10
 RE_ASK_AFTER = timedelta(days=14)
@@ -49,6 +54,34 @@ def pick_devices(devices: list[Any], tool: str) -> list[tuple[Any, str]]:
     return sorted(out, key=lambda pair: pair[0].hostname.lower())
 
 
+def addigy_agent_id(d: Any) -> str | None:
+    """The Addigy device id of a machine, from the device page address CORE stores with its Addigy record."""
+    for s in d.sources:
+        if s.vendor == "addigy":
+            m = _ADDIGY_URL.search(str((s.details or {}).get("url") or ""))
+            if m:
+                return m.group(1).lower()
+    return None
+
+
+def pick_addigy_devices(devices: list[Any], tool: str) -> list[tuple[Any, str]]:
+    """Macs that only Addigy manages (NinjaOne does not, so CORE cannot run a script on them) and that lack the tool, as (device, Addigy device id). Pure.
+    Same footprint rule as ``pick_devices``: the client must already have the tool somewhere. Whether the Mac's Addigy policy installs it is checked by CORE before anything runs."""
+    from app.api.v1.endpoints.devices import is_missing_from, long_offline, os_family
+
+    if tool not in ADDIGY_TOOLS or not any(s.vendor == tool for d in devices for s in d.sources):
+        return []
+    out: list[tuple[Any, str]] = []
+    for d in devices:
+        if d.hidden_since is not None or long_offline(d) or not is_missing_from(d, tool) or os_family(d) != "mac":
+            continue
+        vendors = {s.vendor for s in d.sources}
+        agent = addigy_agent_id(d)
+        if "addigy" in vendors and RUNNER_TOOL not in vendors and agent:
+            out.append((d, agent))
+    return sorted(out, key=lambda pair: pair[0].hostname.lower())
+
+
 async def queue_for_rule(db: Any, rule: ToolDeployRule, scripts: dict[int, Any], now: datetime | None = None) -> int:
     """Ask for the install on every machine in the rule's gap that has not been asked for lately. Returns how many requests were queued. The caller owns the transaction."""
     from app.api.v1.endpoints.devices import _load
@@ -65,7 +98,8 @@ async def queue_for_rule(db: Any, rule: ToolDeployRule, scripts: dict[int, Any],
     label = TOOL_NAMES.get(rule.tool, rule.tool)
     for tid in tids:
         wanted = pick_devices(by_tenant.get(tid, []), rule.tool)
-        if not wanted or queued >= MAX_PER_RULE_PASS:
+        via_addigy = pick_addigy_devices(by_tenant.get(tid, []), rule.tool) if getattr(rule, "via_addigy", False) else []
+        if (not wanted and not via_addigy) or queued >= MAX_PER_RULE_PASS:
             continue
         async with _acting(db, tid, rule.tenant_id):
             asked = {
@@ -75,7 +109,7 @@ async def queue_for_rule(db: Any, rule: ToolDeployRule, scripts: dict[int, Any],
                         select(VendorAction.params).where(
                             VendorAction.tenant_id == tid,
                             VendorAction.vendor == VENDOR,
-                            VendorAction.action == ACTION,
+                            VendorAction.action.in_((ACTION, ACTION_ADDIGY)),
                             VendorAction.created_at > now - RE_ASK_AFTER,
                         )
                     )
@@ -112,6 +146,26 @@ async def queue_for_rule(db: Any, rule: ToolDeployRule, scripts: dict[int, Any],
                             "deploy_rule_id": str(rule.id),
                             "create_ticket": ticket,
                         },
+                        status="pending",
+                        requested_by=rule.created_by,
+                        created_at=now,
+                    )
+                )
+                queued += 1
+            for d, agent in via_addigy:
+                if queued >= MAX_PER_RULE_PASS:
+                    break
+                if d.hostname.lower() in asked:
+                    continue
+                db.add(
+                    VendorAction(
+                        id=uuid.uuid4(),
+                        tenant_id=tid,
+                        alert_id=None,
+                        vendor=VENDOR,
+                        incident_uid=f"deploy:{rule.tool}:{d.hostname}"[:200],
+                        action=ACTION_ADDIGY,
+                        params={"tool": rule.tool, "agent_id": agent, "device": d.hostname[:255], "deploy_rule_id": str(rule.id)},
                         status="pending",
                         requested_by=rule.created_by,
                         created_at=now,

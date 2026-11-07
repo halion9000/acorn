@@ -21,7 +21,7 @@ from app.models.tenant import Tenant
 from app.models.tool_deploy_rule import ToolDeployRule
 from app.services.alert_script_rules import published
 from app.services.audit import emit_audit
-from app.services.tool_deploy_rules import TOOL_NAMES
+from app.services.tool_deploy_rules import ADDIGY_TOOLS, TOOL_NAMES
 
 router = APIRouter(prefix="/tool-deploy-rules", tags=["devices"])
 
@@ -34,6 +34,8 @@ class DeployRuleIn(BaseModel):
     client_id: uuid.UUID | None = None
     windows_script_id: int | None = Field(default=None, ge=1, le=2_000_000_000)
     mac_script_id: int | None = Field(default=None, ge=1, le=2_000_000_000)
+    # Also push through Addigy for Macs only Addigy manages (Huntress only): CORE first checks the Mac's Addigy policy installs the tool.
+    via_addigy: bool = False
 
 
 class DeployRuleOut(BaseModel):
@@ -45,6 +47,7 @@ class DeployRuleOut(BaseModel):
     client_name: str | None = None
     windows_script: str | None = None
     mac_script: str | None = None
+    via_addigy: bool = False
     created_at: datetime
     active: bool
 
@@ -65,6 +68,7 @@ def _out(rule: ToolDeployRule, names: dict[uuid.UUID, str], scripts: dict) -> De
         client_name=names.get(rule.client_tenant_id) if rule.client_tenant_id else None,
         windows_script=name_of(rule.windows_script_id),
         mac_script=name_of(rule.mac_script_id),
+        via_addigy=bool(rule.via_addigy),
         created_at=rule.created_at,
         active=rule.revoked_at is None,
     )
@@ -90,8 +94,10 @@ async def make_deploy_rule(
     db: DBSession,
 ) -> DeployRuleOut:
     """Make a rule: from now on, where the tool is missing on a Windows or Mac machine of the client (or every client), run the matching install script. Nothing runs until CORE collects the request."""
-    if body.windows_script_id is None and body.mac_script_id is None:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Choose a Windows script, a Mac script, or both.")
+    if body.via_addigy and body.tool not in ADDIGY_TOOLS:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only Huntress can be pushed through Addigy.")
+    if body.windows_script_id is None and body.mac_script_id is None and not body.via_addigy:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Choose a Windows script, a Mac script, Addigy, or a combination.")
     if body.scope == "client" and body.client_id is None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Choose the client this rule is for.")
     scripts = await published(db, current_user.tenant_id)
@@ -140,6 +146,7 @@ async def make_deploy_rule(
         client_tenant_id=client_id,
         windows_script_id=body.windows_script_id,
         mac_script_id=body.mac_script_id,
+        via_addigy=body.via_addigy,
         created_by=current_user.user_id,
         created_at=datetime.now(UTC),
     )
@@ -158,6 +165,7 @@ async def make_deploy_rule(
             "client_id": str(client_id) if client_id else None,
             "windows_script": body.windows_script_id,
             "mac_script": body.mac_script_id,
+            "via_addigy": body.via_addigy,
         },
         request=request,
     )

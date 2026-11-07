@@ -127,6 +127,7 @@ def test_turning_a_rule_off_sets_the_time_audits_it_and_refuses_a_missing_or_alr
         client_tenant_id=None,
         windows_script_id=201,
         mac_script_id=None,
+        via_addigy=False,
         created_at=datetime.now(UTC),
         revoked_at=None,
     )
@@ -137,3 +138,13 @@ def test_turning_a_rule_off_sets_the_time_audits_it_and_refuses_a_missing_or_alr
         with pytest.raises(HTTPException) as e:
             asyncio.run(ep.turn_off_deploy_rule(rule.id, MagicMock(), user(), FakeDB(found)))
         assert e.value.status_code == 404
+
+
+def test_a_rule_can_be_addigy_only_but_only_for_huntress(wired):
+    db = FakeDB(Rows([]), Rows([]))
+    out = run(body(windows_script_id=None, mac_script_id=None, via_addigy=True), db)
+    assert db.added[0].via_addigy is True and out.via_addigy is True and wired[0]["changes"]["via_addigy"] is True
+    for b in (body(tool="fieldeffect", via_addigy=True, windows_script_id=None, mac_script_id=None), body(tool="screenconnect", via_addigy=True)):
+        with pytest.raises(HTTPException) as e:
+            run(b, FakeDB())
+        assert e.value.status_code == 422

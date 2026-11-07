@@ -54,6 +54,7 @@ Audit of every value-limiting constraint added since 080 (2026-10-23): each colu
 | `154_halo_user_action.sql` | One more `vendor_actions.action` value, `create_halo_user` (add a person to HaloPSA as a user) |
 | `155_alert_script_rules.sql` | `alert_script_rules`: run a script automatically for an alert type, choosing the script by the machine's operating system |
 | `156_tool_deploy_rules.sql` | `tool_deploy_rules`: install a tool (Huntress, Field Effect, ScreenConnect) automatically on machines that should have it and do not |
+| `157_addigy_push.sql` | the `addigy_push` action (re-run the Addigy policy deployment on a Mac whose policy includes the tool) and `tool_deploy_rules.via_addigy` |
 | `153_inventory_write_permission.sql` | `inventory:write` added to the permissions catalog (implied by `mssp:manage`), so a custom role can manage inventory on its own |
 | `151_quarantine_check_action.sql` | One more `vendor_actions.action` value, `quarantine_check` (look into why a message was quarantined, read only) |
 | `150_ticket_note_action.sql` | One more `vendor_actions.action` value, `ticket_note` (a note CORE writes on HaloPSA tickets) |

@@ -64,6 +64,19 @@ describe("ToolInstalls", () => {
     await waitFor(() => expect(api.make).toHaveBeenCalledWith({ tool: "huntress", scope: "client", client_id: "c1", windows_script_id: 201, mac_script_id: undefined }));
   });
 
+  it("can make a Huntress rule that pushes through Addigy with no script chosen, and offers that for no other tool", async () => {
+    const user = userEvent.setup();
+    render(<ToolInstalls />);
+    const add = await screen.findByRole("button", { name: "Add" });
+    expect(add).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: "Also push through Addigy" }));
+    expect(add).toBeEnabled();
+    await user.click(add);
+    await waitFor(() => expect(api.make).toHaveBeenCalledWith({ tool: "huntress", via_addigy: true, scope: "all", windows_script_id: undefined, mac_script_id: undefined }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Tool to install" }), "fieldeffect");
+    expect(screen.queryByRole("checkbox", { name: "Also push through Addigy" })).not.toBeInTheDocument();
+  });
+
   it("shows the refusal, and turns a rule off and removes it", async () => {
     api.list.mockResolvedValue([rule()]);
     api.make.mockRejectedValueOnce(new Error("There is already an automatic install of this tool for that place."));

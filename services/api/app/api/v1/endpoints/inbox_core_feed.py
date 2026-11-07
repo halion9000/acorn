@@ -553,6 +553,7 @@ class ClaimedAction(BaseModel):
         "quarantine_check",
         "allow_sender",
         "create_halo_user",
+        "addigy_push",
     ]
     incident_uid: str
     params: dict[str, Any]

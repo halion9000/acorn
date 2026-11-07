@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { environmentApi, msspApi, type ChildTenant, type ClientEnvironment } from '@/lib/api';
 import { buildMap, type Tier } from './networkMap';
 
@@ -86,6 +87,8 @@ export default function ClientEnvironmentView() {
   const [env, setEnv] = useState<ClientEnvironment | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pushing, setPushing] = useState<string | null>(null);
+  const [pushed, setPushed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     msspApi
@@ -115,6 +118,19 @@ export default function ClientEnvironmentView() {
       live = false;
     };
   }, [clientId]);
+
+  async function push(deviceId: string, hostname: string) {
+    setPushing(deviceId);
+    try {
+      const out = await environmentApi.push(clientId, deviceId, 'huntress');
+      setPushed((p) => new Set(p).add(deviceId));
+      toast.success(out.message || `Asked CORE to push Huntress to ${hostname}.`);
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Could not ask CORE to push it.');
+    } finally {
+      setPushing(null);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-6" data-testid="client-environment">
@@ -214,6 +230,17 @@ export default function ClientEnvironmentView() {
                         </ul>
                       )}
                       {d.missing.length > 0 && <div className="text-xs text-amber-300">Missing: {d.missing.map(toolName).join(', ')}</div>}
+                      {d.pushable.includes('huntress') && (
+                        <button
+                          type="button"
+                          disabled={pushing === d.id || pushed.has(d.id)}
+                          onClick={() => void push(d.id, d.hostname)}
+                          className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800 disabled:opacity-50"
+                          aria-label={`Push Huntress to ${d.hostname} through Addigy`}
+                        >
+                          {pushed.has(d.id) ? 'Asked CORE' : pushing === d.id ? 'Asking…' : 'Push Huntress through Addigy'}
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
