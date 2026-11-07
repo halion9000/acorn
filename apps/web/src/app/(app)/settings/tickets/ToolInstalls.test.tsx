@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const api = vi.hoisted(() => ({ list: vi.fn(), scripts: vi.fn(), make: vi.fn(), turnOff: vi.fn(), toast: { error: vi.fn(), success: vi.fn() } }));
-vi.mock("@/lib/api", () => ({ toolInstallsApi: { list: api.list, scripts: api.scripts, make: api.make, turnOff: api.turnOff } }));
+const api = vi.hoisted(() => ({ list: vi.fn(), scripts: vi.fn(), make: vi.fn(), turnOff: vi.fn(), children: vi.fn(), toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("@/lib/api", () => ({ toolInstallsApi: { list: api.list, scripts: api.scripts, make: api.make, turnOff: api.turnOff }, msspApi: { listChildren: api.children } }));
 vi.mock("react-hot-toast", () => ({ default: api.toast }));
 
 import { ToolInstalls } from "./ToolInstalls";
@@ -19,6 +19,7 @@ beforeEach(() => {
   api.scripts.mockReset().mockResolvedValue(scripts);
   api.make.mockReset().mockResolvedValue(rule());
   api.turnOff.mockReset().mockResolvedValue({});
+  api.children.mockReset().mockResolvedValue([{ id: "c1", name: "Acme", mssp_role: "client" }]);
   api.toast.error.mockReset();
   api.toast.success.mockReset();
 });
@@ -52,6 +53,15 @@ describe("ToolInstalls", () => {
     await user.click(add);
     await waitFor(() => expect(api.make).toHaveBeenCalledWith({ tool: "fieldeffect", scope: "all", windows_script_id: 201, mac_script_id: 202 }));
     expect(api.toast.success).toHaveBeenCalled();
+  });
+
+  it("makes a rule for one chosen client, and for every client when none is chosen", async () => {
+    const user = userEvent.setup();
+    render(<ToolInstalls />);
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Install script for Windows" }), "201");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Client for the install" }), "c1");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(api.make).toHaveBeenCalledWith({ tool: "huntress", scope: "client", client_id: "c1", windows_script_id: 201, mac_script_id: undefined }));
   });
 
   it("shows the refusal, and turns a rule off and removes it", async () => {

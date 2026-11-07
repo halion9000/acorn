@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
-import { toolInstallsApi, type ToolInstallRule, type ToolInstallScript } from "@/lib/api";
+import { msspApi, toolInstallsApi, type ChildTenant, type ToolInstallRule, type ToolInstallScript } from "@/lib/api";
 
 const TOOLS: { value: "huntress" | "fieldeffect" | "screenconnect"; label: string }[] = [
   { value: "huntress", label: "Huntress" },
@@ -23,6 +23,15 @@ export function ToolInstalls() {
   const [tool, setTool] = useState<"huntress" | "fieldeffect" | "screenconnect">("huntress");
   const [windows, setWindows] = useState("");
   const [mac, setMac] = useState("");
+  const [clients, setClients] = useState<ChildTenant[]>([]);
+  const [clientId, setClientId] = useState(""); // "" = every client
+
+  useEffect(() => {
+    msspApi
+      .listChildren()
+      .then(setClients)
+      .catch(() => setClients([])); // no clients to pick: the rule can still cover every client
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -44,7 +53,7 @@ export function ToolInstalls() {
   async function make() {
     setBusy("new");
     try {
-      await toolInstallsApi.make({ tool, scope: "all", windows_script_id: windows ? Number(windows) : undefined, mac_script_id: mac ? Number(mac) : undefined });
+      await toolInstallsApi.make({ tool, ...(clientId ? { scope: "client" as const, client_id: clientId } : { scope: "all" as const }), windows_script_id: windows ? Number(windows) : undefined, mac_script_id: mac ? Number(mac) : undefined });
       setWindows("");
       setMac("");
       await load();
@@ -100,7 +109,18 @@ export function ToolInstalls() {
         ))}
       </ul>
       <div className="space-y-2 rounded border border-gray-800 p-3 text-sm" data-testid="tool-install-form">
-        <h3 className="font-medium text-gray-200">Add an automatic install (every client)</h3>
+        <h3 className="font-medium text-gray-200">Add an automatic install</h3>
+        <label className="block">
+          <span className="mb-1 block text-xs text-gray-400">Client</span>
+          <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full rounded border border-gray-700 bg-gray-950 px-2 py-1.5" aria-label="Client for the install">
+            <option value="">Every client</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="block">
           <span className="mb-1 block text-xs text-gray-400">Tool</span>
           <select value={tool} onChange={(e) => setTool(e.target.value as typeof tool)} className="w-full rounded border border-gray-700 bg-gray-950 px-2 py-1.5" aria-label="Tool to install">
