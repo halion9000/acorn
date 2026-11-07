@@ -58,7 +58,7 @@ AiSOC has **702** operations in **100** areas. This is a MAP, not a list of tool
 - **inbox**: 3 reads, 36 changes; protection: `connectors:read`, `connectors:write`; 34 with no sign-in required; e.g. Claim core feed actions; Report core feed action result
 - **insider-threat**: 4 reads, 4 changes; protection: `alerts:read`, `alerts:write`; e.g. List indicators; Create indicator
 - **insights**: 1 reads, 0 changes; protection: `alerts:read`; e.g. SOC Insights dashboard aggregate (T3.1)
-- **inventory**: 3 reads, 9 changes; protection: `alerts:read`, `mssp:manage`; e.g. The stock held for clients, filtered, with who has each item; Add an item to the stock
+- **inventory**: 3 reads, 9 changes; protection: `alerts:read`, `inventory:write`; e.g. The stock held for clients, filtered, with who has each item; Add an item to the stock
 - **investigations**: 10 reads, 1 changes; protection: `cases:read`, `cases:work`; e.g. List runs; Aggregate costs
 - **kb**: 2 reads, 3 changes; protection: `alerts:read`, `settings:write`; e.g. List KB documents; Remove KB document
 - **lake**: 1 reads, 1 changes; protection: `lake:query`, `lake:read_schema`; e.g. Get lake schema; Execute lake sql

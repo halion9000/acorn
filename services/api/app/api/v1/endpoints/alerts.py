@@ -1372,6 +1372,8 @@ async def update_alert(
             updates["status"] = request.status
             if request.status in ("resolved", "false_positive", "closed"):
                 updates["resolved_at"] = datetime.now(UTC)
+            elif alert.resolved_at is not None:
+                updates["resolved_at"] = None  # reopened: it is not resolved any more, and a stale time would count it in MTTR
         if request.priority is not None:
             updates["priority"] = request.priority
         if request.tags is not None:

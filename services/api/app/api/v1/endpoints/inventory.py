@@ -3,7 +3,7 @@
 Replaces the SharePoint inventory lists. Every item belongs to a tenant: the client's own when it is held for that client, Live Oak's own when it is not (so a client portal can later show a client only its own items, with the row-level
 security that already separates everything else). ``kind`` is ``stock`` (the LO inventory and the per-client lists) or ``nuc`` (listed by site, with its own columns).
 
-Reading needs ``alerts:read``; adding, changing, checking in and out, and importing need ``mssp:manage``.
+Reading needs ``alerts:read``; adding, changing, checking in and out, syncing and importing need ``inventory:write`` (held through ``mssp:manage``, or granted on its own to a custom role).
 """
 
 from __future__ import annotations
@@ -428,7 +428,7 @@ def _event(
 
 
 @router.post("", response_model=ItemOut, status_code=201, summary="Add an item to the stock")
-async def create_item(body: ItemIn, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> ItemOut:
+async def create_item(body: ItemIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession) -> ItemOut:
     owner = user.tenant_id
     names = await _tenants(db, owner)
     if body.client_id is not None and body.client_id != owner and body.client_id not in names:
@@ -447,7 +447,7 @@ async def create_item(body: ItemIn, user: Annotated[AuthUser, Depends(require_pe
 
 @router.patch("/{item_id}", response_model=ItemOut, summary="Change an item, or move it to another client")
 async def update_item(
-    item_id: uuid.UUID, body: ItemPatch, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+    item_id: uuid.UUID, body: ItemPatch, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession
 ) -> ItemOut:
     owner = user.tenant_id
     item, names = await _find(db, user, item_id)
@@ -480,7 +480,7 @@ class DeletedOut(BaseModel):
 
 
 @router.delete("/{item_id}", response_model=DeletedOut, summary="Delete an item from the stock for good (its history goes with it)")
-async def delete_item(item_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> DeletedOut:
+async def delete_item(item_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession) -> DeletedOut:
     """Remove an item and its history. Refused for an item that is checked out (check it in first, so nothing is lost track of) and for one a tool keeps in step (a NinjaOne device
     would come back at the next sync: mark it Retired instead). The deletion is written to the audit log with what the item was, since its own history goes with it."""
     owner = user.tenant_id
@@ -536,7 +536,7 @@ class BulkOut(BaseModel):
 
 
 @router.post("/bulk", response_model=BulkOut, summary="Change many items at once: the client they belong to, a category, a site, tags")
-async def bulk_update(body: BulkIn, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> BulkOut:
+async def bulk_update(body: BulkIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession) -> BulkOut:
     owner = user.tenant_id
     names = await _tenants(db, owner)
     target = owner if body.move_to_own else body.client_id
@@ -610,14 +610,14 @@ async def _move(item_id: uuid.UUID, body: MoveIn, user: AuthUser, db: Any, to: s
 
 @router.post("/{item_id}/check-out", response_model=ItemOut, summary="Check an item out to a person or a site")
 async def check_out(
-    item_id: uuid.UUID, body: MoveIn, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+    item_id: uuid.UUID, body: MoveIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession
 ) -> ItemOut:
     return await _move(item_id, body, user, db, "checked_out")
 
 
 @router.post("/{item_id}/check-in", response_model=ItemOut, summary="Check an item back in")
 async def check_in(
-    item_id: uuid.UUID, body: MoveIn, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+    item_id: uuid.UUID, body: MoveIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession
 ) -> ItemOut:
     return await _move(item_id, body, user, db, "checked_in")
 
@@ -786,7 +786,7 @@ async def sync_devices(db: Any, owner: uuid.UUID, names: dict[uuid.UUID, str], a
     summary="Add the Windows computers, Macs, iPads and iPhones NinjaOne and Addigy report, as checked out",
 )
 async def sync_devices_endpoint(
-    body: SyncIn, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+    body: SyncIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession
 ) -> SyncOut:
     names = await _tenants(db, user.tenant_id)
     return await sync_devices(db, user.tenant_id, names, user.email, body.dry_run)
@@ -895,7 +895,7 @@ async def sync_nucs(db: Any, owner: uuid.UUID, names: dict[uuid.UUID, str], acto
     "/sync-nucs", response_model=NucSyncOut, summary="Add the NinjaOne devices with NUC in the name to the NUC list when they are missing"
 )
 async def sync_nucs_endpoint(
-    body: SyncIn, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession
+    body: SyncIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession
 ) -> NucSyncOut:
     names = await _tenants(db, user.tenant_id)
     return await sync_nucs(db, user.tenant_id, names, user.email, body.dry_run)
@@ -935,7 +935,7 @@ class ImportOut(BaseModel):
 @router.post(
     "/import", response_model=ImportOut, summary="Import an exported SharePoint list; a dry run first says where each customer would go"
 )
-async def import_items(body: ImportIn, user: Annotated[AuthUser, Depends(require_permission("mssp:manage"))], db: DBSession) -> ImportOut:
+async def import_items(body: ImportIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession) -> ImportOut:
     owner = user.tenant_id
     names = await _tenants(db, owner)
     if body.default_client_id is not None and body.default_client_id != owner and body.default_client_id not in names:

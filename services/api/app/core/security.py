@@ -326,6 +326,7 @@ _UNGRANTED_PERMISSIONS = frozenset(
         "billing:view",
         "identities:respond",
         "identities:bec",
+        "inventory:write",
     }
 )  # hunts:read: held through lake:query (IMPLIED_BY below) or granted on its own  # noqa: E501
 
@@ -384,6 +385,7 @@ IMPLIED_BY: dict[str, tuple[str, ...]] = {
     "connectors:view": ("connectors:read",),
     "cases:work": ("cases:write",),
     "billing:view": ("alerts:read",),
+    "inventory:write": ("mssp:manage",),  # whoever could manage the MSSP console could always change inventory; a custom role can be given inventory:write on its own
 }  # noqa: E501
 
 

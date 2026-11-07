@@ -656,3 +656,32 @@ async def test_list_alerts_without_a_device_does_not_look_at_affected_hosts() ->
     db = _mk_db([[], 0, []])
     await list_alerts(current_user=_user(), db=db, **_LIST_ALERTS_DEFAULTS)
     assert all("CAST(alerts.affected_hosts" not in re.sub(r"\s+", " ", sql) for sql, _ in db.executed)
+
+
+# ---- a reopened alert is not resolved any more ----
+
+
+def _written(db: Any) -> dict[str, Any]:
+    updates = [params for sql, params in db.executed if re.sub(r"\s+", " ", sql).lower().startswith("update alerts")]
+    assert updates, "no UPDATE ran"
+    return updates[-1]
+
+
+@pytest.mark.asyncio
+async def test_reopening_a_resolved_alert_clears_its_resolved_time_and_closing_sets_it() -> None:
+    """Otherwise a reopened alert keeps the old time and is counted in MTTR as if it were still closed."""
+    user = _user()
+    closed_at = datetime(2026, 1, 1, tzinfo=UTC)
+    alert = _alert(user.tenant_id, status="resolved", resolved_at=closed_at)
+    db = _mk_db([alert, alert, None])
+    await update_alert(alert_id=alert.id, request=AlertUpdateRequest(status="investigating"), current_user=user, db=db)
+    assert _written(db)["resolved_at"] is None
+
+    still_open = _alert(user.tenant_id, status="new", resolved_at=None)
+    db2 = _mk_db([still_open, still_open, None])
+    await update_alert(alert_id=still_open.id, request=AlertUpdateRequest(status="triaging"), current_user=user, db=db2)
+    assert "resolved_at" not in _written(db2) or _written(db2)["resolved_at"] is None, "an alert that was never closed has nothing to clear"
+
+    db3 = _mk_db([still_open, still_open, None])
+    await update_alert(alert_id=still_open.id, request=AlertUpdateRequest(status="resolved"), current_user=user, db=db3)
+    assert _written(db3)["resolved_at"] is not None

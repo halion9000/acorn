@@ -60,3 +60,16 @@ def test_nobody_below_platform_admin_gets_platform_powers_from_this():
     for role in ("tenant_admin", "soc_lead", "soc_analyst", "threat_hunter", "viewer"):
         for permission in PLATFORM_PERMISSIONS | DELIBERATELY_UNGRANTED:
             assert not has_permission(role, permission), (role, permission)
+
+
+def test_inventory_write_is_held_through_mssp_manage_and_can_be_granted_on_its_own():
+    from app.core.security import permission_in
+
+    assert permission_in(["mssp:manage"], "inventory:write"), "the tenant admin could always change inventory"
+    assert has_permission("tenant_admin", "inventory:write")
+    assert permission_in(["inventory:write"], "inventory:write")
+    assert not permission_in(["inventory:write"], "mssp:manage"), "a custom role with only inventory:write does not get the MSSP console"
+    assert not permission_in(["mssp:read"], "inventory:write")
+    assert "inventory:write" in known_permissions()
+    for role in ("soc_analyst", "viewer", "threat_hunter"):
+        assert not has_permission(role, "inventory:write"), role

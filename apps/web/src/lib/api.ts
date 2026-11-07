@@ -4242,6 +4242,8 @@ export interface AgentInvestigation {
   actions?: Array<{ type: string; target: string; status: string }>;
   startedAt: string;
   completedAt?: string;
+  /** Why a failed run failed, in words fit to show (the run's own error text stays in the server log). */
+  error?: string | null;
 }
 
 export const agentsApi = {

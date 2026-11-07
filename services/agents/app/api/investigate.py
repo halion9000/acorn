@@ -177,9 +177,13 @@ async def _run_and_store(run_id: str, case_id: str, req: InvestigateRequest) -> 
 
             elif event.get("type") == "done":
                 state_data = event.get("state", {})
+                # A node that raised is turned into a failed state that still ends in a "done" event: say so, instead of showing a green "completed" with nothing in it.
+                failed = str(state_data.get("status", "")).lower() in ("failed", "error")
+                if failed:
+                    logger.error("investigation_failed", run_id=run_id, error=str(state_data.get("error") or "")[:500])
                 _runs[run_id].update(
                     {
-                        "status": "completed",
+                        "status": "failed" if failed else "completed",
                         "report_md": state_data.get("report_md", ""),
                         "report_html": state_data.get("report_html", ""),
                         "audit_log": audit_log,
@@ -187,17 +191,17 @@ async def _run_and_store(run_id: str, case_id: str, req: InvestigateRequest) -> 
                         "forensic": state_data.get("forensic", {}),
                         "responder": state_data.get("responder", {}),
                         "completed_at": datetime.utcnow().isoformat(),
-                        "error": None,
+                        "error": (state_data.get("error") or "The investigation stopped before it finished.") if failed else None,
                     }
                 )
                 await _emit_event(
                     run_id,
                     req.tenant_id,
                     {
-                        "kind": "completed",
+                        "kind": "error" if failed else "completed",
                         "agent": "orchestrator",
-                        "summary": "Investigation completed",
-                        "data": {"status": "completed"},
+                        "summary": (state_data.get("error") or "Investigation failed") if failed else "Investigation completed",
+                        "data": {"status": "failed" if failed else "completed"},
                     },
                 )
 
@@ -410,6 +414,9 @@ class _LegacyInvestigateRequest(BaseModel):
     alertId: str
 
 
+FAILED_INVESTIGATION_MESSAGE = "The investigation stopped with an error before it finished. Run it again; if it keeps failing, ask an administrator to check the agents service log for this run."
+
+
 class _AgentInvestigationResponse(BaseModel):
     """Shape expected by the frontend's AgentInvestigation interface."""
 
@@ -420,6 +427,7 @@ class _AgentInvestigationResponse(BaseModel):
     findings: str | None = None
     recommendations: list[str] | None = None
     completedAt: str | None = None
+    error: str | None = None  # why a failed run failed
 
 
 @router.post("/agents/investigate", response_model=_AgentInvestigationResponse)
@@ -517,4 +525,6 @@ async def get_agent_investigation(run_id: str, request: Request):
         findings=findings,
         recommendations=recommendations,
         completedAt=completed_at,
+        # Generic on purpose: the run's own error text can carry internal hosts and paths, so it stays in the log.
+        error=FAILED_INVESTIGATION_MESSAGE if fe_status == "failed" else None,
     )

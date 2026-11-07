@@ -110,6 +110,10 @@ async def test_closing_in_the_vendor_writes_detected_and_resolved_once_and_the_s
     assert await _close(world, ["huntress:1", "huntress:3"]) == (1, 2)  # the one still "new"; the analyst's alert is left alone
     mine = world["alerts"]["closed_in_vendor"]
     assert [(r[0], r[1], r[2]) for r in await _events(world)] == [(mine, "detected", "high"), (mine, "resolved", "high")]
+    async with world["owner"].connect() as conn:
+        await conn.execute(text("select set_config('app.rls_fail_closed', 'off', false)"))
+        stamped = (await conn.execute(text("select resolved_at is not null from alerts where id = :a"), {"a": mine})).scalar_one()
+    assert stamped, "a vendor-closed alert has a resolved time, so it is counted in MTTR"
 
     assert await _close(world, ["huntress:1"]) == (0, 0)  # already closed: nothing new, no duplicates
     assert len(await _events(world)) == 2

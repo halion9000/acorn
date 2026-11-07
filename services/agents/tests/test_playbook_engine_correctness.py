@@ -403,3 +403,35 @@ class TestEngineConditionGate:
 
         assert called["hit"] is True
         assert run.step_results[0]["status"] == StepStatus.SUCCESS
+
+
+class TestASkippedStepIsNotASuccess:
+    """A step the engine has no handler for did nothing: it must read as skipped, not success."""
+
+    @pytest.mark.asyncio
+    async def test_a_step_with_no_handler_is_skipped_on_a_real_run(self, patch_handlers) -> None:
+        patch_handlers({})
+        pb = _make_playbook([PlaybookStep(id="s1", name="disable the account", type=StepType.DISABLE_USER)])
+        run = await PlaybookEngine().run(pb, trigger_context={})
+        assert run.step_results[0]["status"] == StepStatus.SKIPPED
+        assert run.step_results[0]["result"]["skipped"] is True
+
+    @pytest.mark.asyncio
+    async def test_a_handler_that_found_nothing_to_act_on_is_skipped_but_one_that_acted_is_a_success(self, patch_handlers) -> None:
+        async def nothing(step: PlaybookStep, ctx: dict, http: Any) -> dict:
+            return {"skipped": True, "reason": "no case_id"}
+
+        async def acted(step: PlaybookStep, ctx: dict, http: Any) -> dict:
+            return {"ok": True}
+
+        patch_handlers({StepType.NOTIFY: nothing, StepType.ENRICH: acted})
+        pb = _make_playbook([PlaybookStep(id="s1", name="tell", type=StepType.NOTIFY), PlaybookStep(id="s2", name="look", type=StepType.ENRICH)])
+        run = await PlaybookEngine().run(pb, trigger_context={})
+        assert [r["status"] for r in run.step_results] == [StepStatus.SKIPPED, StepStatus.SUCCESS]
+
+    @pytest.mark.asyncio
+    async def test_a_dry_run_still_reports_every_step_as_it_did(self, patch_handlers) -> None:
+        patch_handlers({})
+        pb = _make_playbook([PlaybookStep(id="s1", name="disable the account", type=StepType.DISABLE_USER)])
+        run = await PlaybookEngine().run(pb, trigger_context={}, dry_run=True)
+        assert run.step_results[0]["status"] == StepStatus.SUCCESS

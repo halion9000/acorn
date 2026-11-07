@@ -273,7 +273,7 @@ function LedgerEvidenceChain({ runId }: { runId: string }) {
 
 // ─── AI Investigation Panel ───────────────────────────────────────────────────
 
-function AIInvestigation({ alertId }: { alertId: string }) {
+export function AIInvestigation({ alertId }: { alertId: string }) {
   const [investigation, setInvestigation] = useState<AgentInvestigation | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -375,6 +375,12 @@ function AIInvestigation({ alertId }: { alertId: string }) {
           Re-investigate
         </button>
       </div>
+
+      {investigation.status === 'failed' && (
+        <p className="text-xs text-red-300" data-testid="investigation-error">
+          {investigation.error || 'The investigation failed.'}
+        </p>
+      )}
 
       {/* Findings */}
       {investigation.findings && (

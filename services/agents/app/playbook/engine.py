@@ -629,6 +629,9 @@ class PlaybookEngine:
                             result = {"error": str(exc), "_elapsed_ms": round(elapsed * 1000)}
                             break
 
+                if step_status == StepStatus.SUCCESS and not dry_run and result.get("skipped") is True:
+                    # Nothing was done (no handler for this kind of step, or nothing to act on): say so, rather than report SUCCESS for a step that did not run.
+                    step_status = StepStatus.SKIPPED
                 pr.step_results.append({"step_id": step.id, "name": step.name, "status": step_status, "result": result})
                 # Merge result into context for downstream steps. The namespaced
                 # key ``_step_<id>`` always reflects this step's full result.

@@ -386,6 +386,7 @@ async def apply_closed(db: Any, tenant_id: Any, report: ClosedReport, now: datet
             )
             .values(
                 status="resolved",
+                resolved_at=now,  # without it a vendor-closed alert drops out of every MTTR figure that measures created_at to resolved_at
                 updated_at=now,
                 enrichment_data=Alert.enrichment_data.op("||")(literal(note, type_=JSONB)),
                 tags=Alert.tags.op("||")(literal([f"closed-in-{report.vendor}"], type_=JSONB)),

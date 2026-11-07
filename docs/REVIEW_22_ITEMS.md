@@ -1,0 +1,42 @@
+# Review of the 22 operational items (2026-11-06)
+
+Method: each item was traced through the actual code of both repos by read-only investigators; no production system was queried. "Verified" means read in code; "inferred" means reasoned from code but not observed live. Nothing here claims a feature works in production unless it says so. This replaces no earlier doc; it is the working list for the fixes that follow.
+
+Status key: DONE (fixed, tested, deployed), TODO (small, planned), BIGGER (needs a design or a decision), NOT A BUG (working as designed).
+
+| # | Item | Finding | Kind | Size | Status |
+|---|------|---------|------|------|--------|
+| 12.1 | What opens a case | Five paths insert cases. The only automatic ones: `core_feed_cases.open_cases_in_scope` (every CORE check-in; alerts from huntress, petra, blumira, ninjaone, fieldeffect, threatmate, addigy, status new, last 24 h, all severities, cap 50, one case per alert) and, off by default, fusion RBA (`AISOC_RBA_OPEN_CASE`). Detection rules, ingestion and AI triage open none. No configurable policy; only env kill switches. The comment in `inbox_core_feed.py` still says "high/critical" but the code takes all severities. | missing feature (policy) | M | BIGGER |
+| 12.2 | Halo ticket closed | Nothing acts on it. CORE reads the ticket's status text and A.C.O.R.N stores it on the alert and shows it. No Halo webhook. | missing feature | S (flag it) / M (act on it) | TODO |
+| 12.3 | Start AI Investigation | `_run_and_store` (`services/agents/app/api/investigate.py`) hardcodes `completed` even when the run failed; the response has no error field; recommendations are never filled; runs are held in memory (lost on restart). | bug | S | TODO |
+| 12.4 | Automatic correlation | Identity detections over CIPP sign-ins/directory data, UEBA scoring, fusion correlator, related alerts by exact host/user all exist. Nothing automatically pulls Microsoft 365 sign-ins/MFA/risk when an alert from another tool names a user; the BEC search is manual only. | missing feature | M | BIGGER |
+| 12.5 | ScreenConnect unauthorized clients | Alerts exist (foreign-instance rule), now auto-close when gone, rules open tickets (ticket type Service Request), Refresh rescans. Not built: running the cleanup script from the alert with approval, verification, status "Tech Updated". Needs a decision on how the existing approved script is invoked. | feature | L | BIGGER |
+| 12.6 | MTTR | Three different calculations (dashboard, SOC Insights, SLA page). Vendor-closed alerts never get `resolved_at` so they drop out of dashboard MTTR; a manual reopen leaves the old `resolved_at`; stale/bulk closes count as resolved; the dashboard "MTTD" is really time to first action. | bug + design | S / M | TODO |
+| 12.7 | Connector Health "None" | The query counts enabled connector rows under each client tenant. CORE-fed connectors live under the parent tenant, so clients have none: "none" means zero rows, not a read failure. | design gap | S-M | TODO |
+| 12.8 | Stale Alerts zero | Defined as status `stale` set by a sweeper for new/triaging alerts quiet 30 days, no case, not critical/high, tenant not exempt. Auto-cases and high severities make zero plausible. | NOT A BUG | S (tooltip) | TODO (tooltip) |
+| 12.9 | Dashboard horizontal scroll | 17 columns in one table. | layout | S | TODO |
+| 12.10 | Rewst | No Rewst code in either repo (only a prompt-only skill and an IT Glue folder name). | missing feature | M-L | BIGGER |
+| 12.11 | Auvik network maps | Auvik connector exists in CORE (tenants, devices, interfaces; "not verified against a live Auvik"). No topology or map. | missing feature | L | BIGGER |
+| 12.12 | Branding | Generic shield icon in the sidebar and sign-in; no real logo asset; old "AiSOC" artwork in `public/` and "AiSOC" in emails, HTML reports, passkey prompt, tool pages. Needs the real logo file from Hal. | bug (drift) | S-M | PARTLY (strings), logo NEEDS HAL |
+| 12.13 | M365/Google vs Halo users | All the data is already held (Halo users with inactive flag, M365 via CIPP, Google via ThreatMate). Not derived: "in cloud, not in Halo" and "inactive in Halo, enabled in cloud". | missing feature | S-M | TODO |
+| 12.14 | Threat hunting | Works as designed: `/hunt/search` runs SQL ILIKE over the alerts table (own and client tenants). No KQL/SPL, no raw telemetry (CORE forwards only alerts). "Broken" is most likely KQL-style queries matching nothing. The hypotheses API runs only ES|QL when an Elasticsearch is configured. | design / UX | S (hint) | TODO (hint) |
+| 12.15 | DMARC | Setup tab shows the rua value and the report-authorization TXT with copy buttons; no check that they are actually published. | missing feature | S-M | TODO |
+| 12.16 | Inventory permissions | Writes need `mssp:manage`, which is not in the `permissions` catalog table, so a custom role cannot be given it from the role editor. | bug | S | TODO |
+| 12.17 | Client Docs | A searchable copy of IT Glue documents/assets (secrets redacted) used by Copilot search; Client Review does not read it. Keep. | NOT A BUG | - | none |
+| 12.18 | Playbooks | Only manual dry-run from the UI plus a worker that records "would have run" for ticked clients. Nine step types have handlers; block_ip, isolate_host, create_ticket are hardcoded simulations; unsupported steps are skipped but reported SUCCESS; no approval step. None executes in production. | missing feature + misleading status | S (honest status) / L | TODO (status) |
+| 12.19 | FIM | osquery packs, ingest forwarder, four detection rules and a UI exist, but nothing writes the `fim_event` table, so the FIM dashboard is always empty. Linux/macOS only. | partly scaffolded | S-M | TODO |
+| 12.20 | Client Review mapping | Readiness checklist, tech stack and M365 are mostly automatic; the 145-question assessment is only about 13 automatic, the rest manual (especially Google Workspace). | working as designed | S per question | none |
+| 12.21 | Settings styling | A shared helper exists but only some panels use it; headings and gray/slate palettes vary by hand. | consolidation | S-M | BIGGER (many files) |
+| 12.22 | Missing Huntress agent remediation | Not built. Needs NinjaOne/Addigy install commands (Addigy script API unverified) and a coverage policy. | feature | L | BIGGER |
+
+## What was NOT verified
+
+Nothing was run against production Halo, CIPP, Exchange, Huntress, NinjaOne, Auvik or Rewst. Live data shapes noted as unverified in the source remain unverified. The user's exact Identities label complaint and the exact hunting query that "broke" are inferred.
+
+## Order of work
+
+1. Honest numbers and statuses: MTTR bugs, investigation status, playbook skipped-step status.
+2. Permissions: inventory.
+3. Small UI: dashboard layout and labels, hunting hint, Identities headers.
+4. Data that exists but is not shown: FIM events, Halo vs cloud users, DMARC publication check, Halo ticket closed flag.
+5. Everything marked BIGGER waits for a decision from Hal.
