@@ -1828,6 +1828,21 @@ export interface RelatedAlert {
   matched: 'device' | 'user' | 'device and user';
 }
 
+export interface AccountPerson {
+  user: string;
+  found: boolean;
+  account?: { enabled: boolean; admin: boolean; licensed: boolean; mfa_registered: boolean; methods?: string | null; conditional_access: boolean; per_user_mfa?: string | null } | null;
+  signins: number;
+  failed: number;
+  without_mfa: number;
+  risky: number;
+  countries: [string, number][];
+  apps: [string, number][];
+  last_success?: string | null;
+  recent: { at: string; country?: string | null; city?: string | null; app?: string | null; ip?: string | null; success: boolean; mfa?: boolean | null; risk?: string | null }[];
+  note?: string | null;
+}
+
 export interface LinkedTicket {
   id: string;
   system: 'halopsa';
@@ -2063,6 +2078,8 @@ export const alertsApi = {
 
   /** Other alerts from the last 30 days that name the same device or user, from any tool. */
   related: (id: string) => request<{ items: RelatedAlert[]; more: number }>(`/api/v1/alerts/${id}/related`),
+  /** What Microsoft 365 knows about the people the alert names: their last 7 days of sign-ins and account facts. */
+  account: (id: string) => request<{ window_days: number; people: AccountPerson[] }>(`/api/v1/alerts/${id}/account`),
   /** The facts behind one alert: the tool, the rule, how sure it was and what it names. */
   why: (id: string) => request<{ facts: { label: string; value: string }[] }>(`/api/v1/alerts/${id}/why`),
   /** Whether this alert is about a quarantined message that can be released from here, and where a release stands. */

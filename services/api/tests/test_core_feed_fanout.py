@@ -94,7 +94,7 @@ async def test_a_closed_report_is_bounded_and_only_resolving_tenants_get_sla_eve
     db = Db(holders=[HOLDER_A, HOLDER_B])
     closed = [cf.ClosedItem(uid=f"ninjaone:{i}", state="cleared") for i in range(500)]
     out = await cf.report_core_feed_closed("tok", cf.ClosedReport(vendor="ninjaone", closed=closed), db)
-    assert out.resolved == 10  # 5 chunks of 100 ids, one row each, in each of the two tenants
+    assert out.resolved == 20  # 5 chunks of 100 ids in each of the two tenants, two statements per chunk that can resolve (the mock counts one row for each)
     assert set(db.updated_in) == {HOLDER_A, HOLDER_B}
     assert db.total < 150, f"{db.total} statements for 500 ids across 241 tenants"
     assert {c.args[1] for c in _env.await_args_list} == {HOLDER_A, HOLDER_B}, "SLA events only where something was resolved"

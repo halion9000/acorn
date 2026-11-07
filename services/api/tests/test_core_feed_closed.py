@@ -39,7 +39,7 @@ def test_a_report_rejects_ids_and_vendors_that_could_be_abused():
 
 @pytest.mark.asyncio
 async def test_only_new_alerts_in_this_tenant_for_this_vendor_are_resolved():
-    db = _db([2])
+    db = _db([2, 0, 0])
     rep = ClosedReport(
         vendor="huntress", closed=[ClosedItem(uid="huntress:1", state="resolved"), ClosedItem(uid="petra:9"), ClosedItem(uid="huntress:2")]
     )
@@ -64,16 +64,16 @@ async def test_nothing_to_do_makes_no_database_call():
 
 @pytest.mark.asyncio
 async def test_many_ids_are_applied_in_chunks_and_counted():
-    db = _db([100, 100, 30])
+    db = _db([100, 0, 0, 100, 0, 0, 30, 0, 0])
     rep = ClosedReport(vendor="huntress", closed=[ClosedItem(uid=f"huntress:{i}") for i in range(230)])
     assert await apply_closed(db, TENANT, rep) == 230
-    assert len(db.executed) == 3
+    assert len(db.executed) == 9, "per chunk: resolve, note the closure, resolve the ones whose tickets are closed"
 
 
 @pytest.mark.asyncio
 async def test_huntress_escalations_and_signals_are_closed_too_but_another_vendors_uids_are_not():
     """ITDR escalations (``huntress-escalation:9``) and signals (``huntress-signal:3``) are Huntress's own: when Huntress closes one, the alert resolves. Only the ``huntress:`` form used to be accepted, so they never did."""
-    db = _db([3])
+    db = _db([3, 0, 0])
     report = ClosedReport(
         vendor="huntress",
         closed=[

@@ -107,6 +107,7 @@ class TestTheImplication:
             "connectors:view": ("connectors:read",),
             "cases:work": ("cases:write",),
             "billing:view": ("alerts:read",),
+            "inventory:write": ("mssp:manage",),
         }
 
     def test_no_implied_permission_is_a_platform_permission_and_nothing_implies_a_platform_permission(self):

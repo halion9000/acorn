@@ -10,11 +10,12 @@ const addTicket = vi.hoisted(() => vi.fn());
 const removeTicket = vi.hoisted(() => vi.fn());
 const statusFor = vi.hoisted(() => vi.fn());
 const retry = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/api', () => ({ alertsApi: { vendorActions, addTicket, removeTicket, related }, ticketRulesApi: { statusFor, retry } }));
+const account = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/api', () => ({ alertsApi: { vendorActions, addTicket, removeTicket, related, account }, ticketRulesApi: { statusFor, retry } }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: toast }));
 
-import { AlertContext, alertContextOf, closedTicketNote, sourceLink, ticketStatusLine, toolLinks } from './AlertContext';
+import { AccountSection, AlertContext, accountLine, alertContextOf, closedTicketNote, sourceLink, ticketStatusLine, toolLinks } from './AlertContext';
 
 const alert = (over: Partial<Alert> = {}): Alert =>
   ({ id: 'a1', title: 't', description: 'd', severity: 'high', status: 'new', source: 'huntress', tenantId: 't1', riskScore: 5, createdAt: '2026-10-18T00:00:00Z', ...over }) as Alert;
@@ -31,6 +32,7 @@ beforeEach(() => {
   statusFor.mockReset().mockResolvedValue({ state: 'none' });
   retry.mockReset().mockResolvedValue({ state: 'waiting', message: 'A ticket is being opened for this alert (CORE collects the request within about a minute).' });
   related.mockReset().mockResolvedValue({ items: [], more: 0 });
+  account.mockReset().mockResolvedValue({ window_days: 7, people: [] });
   addTicket.mockReset().mockResolvedValue({ tickets: [] });
   removeTicket.mockReset().mockResolvedValue({ tickets: [] });
   toast.success.mockReset();
@@ -241,7 +243,8 @@ describe('a ticket that is closed while its alert is not', () => {
   const t = (id: string, status?: string) => ({ id, status });
 
   it('says so only when every ticket reads as closed and the alert is still open', () => {
-    expect(closedTicketNote([t('555', 'Closed')], 'new')).toBe('Ticket #555 is closed in HaloPSA, but this alert is still open. Check whether the problem is really gone, then close the alert (closing a ticket does not close it).');
+    expect(closedTicketNote([t('555', 'Closed')], 'new')).toBe('Ticket #555 is closed in HaloPSA, but the alert is still open in the source tool. It closes by itself once the source tool closes it; if the problem is really gone, check the source tool or close the alert yourself.');
+    expect(closedTicketNote([t('555', 'Closed')], 'new', 'Huntress')).toMatch(/still open in Huntress\. It closes by itself once Huntress closes it/);
     expect(closedTicketNote([t('1', 'Resolved'), t('2', 'closed')], 'investigating')).toMatch(/^Its 2 tickets are closed/);
     expect(closedTicketNote([t('1', 'Closed'), t('2', 'Tech Updated')], 'new')).toBeNull();
     expect(closedTicketNote([t('1', 'Closed'), t('2')], 'new')).toBeNull();
@@ -255,5 +258,29 @@ describe('a ticket that is closed while its alert is not', () => {
     vendorActions.mockResolvedValue({ supported: false, actions: [], tickets: [{ system: 'halopsa', id: '4521', summary: 's', status: 'Closed' }] });
     renderCtx(alert({ status: 'new' }));
     expect(await screen.findByTestId('ticket-closed-note')).toHaveTextContent('Ticket #4521 is closed in HaloPSA');
+  });
+});
+
+
+describe('the Microsoft 365 account of the person an alert names', () => {
+  const person = (over: Record<string, unknown> = {}) => ({
+    user: 'alice@corp.com', found: true, account: { enabled: true, admin: true, licensed: true, mfa_registered: true, methods: 'Authenticator', conditional_access: false }, signins: 4, failed: 1, without_mfa: 1, risky: 0,
+    countries: [['US', 3], ['RU', 1]] as [string, number][], apps: [], recent: [{ at: '2026-11-07T10:00:00Z', country: 'RU', city: 'Moscow', app: 'Outlook', success: false }], ...over,
+  });
+
+  it('says what the sign-ins show, and that nothing was found for an unknown address', () => {
+    expect(accountLine(person() as never)).toBe('4 sign-ins · 1 failed · 1 without a second factor · from US (3), RU (1)');
+    expect(accountLine({ ...person(), signins: 1, failed: 0, without_mfa: 0, countries: [] } as never)).toBe('1 sign-in');
+    expect(accountLine({ user: 'x@y.z', found: false, signins: 0, failed: 0, without_mfa: 0, risky: 0, countries: [], apps: [], recent: [], note: 'No Microsoft 365 account or recent sign-in found for this address.' })).toMatch(/No Microsoft 365 account/);
+  });
+
+  it('shows the person with their account facts and recent sign-ins, and nothing when no one is named', () => {
+    const { container, rerender } = render(<AccountSection items={[person() as never]} />);
+    expect(screen.getByTestId('account-context').textContent).toContain('alice@corp.com');
+    expect(screen.getByTestId('account-context').textContent).toContain('admin');
+    expect(screen.getByTestId('account-context').textContent).toContain('registered (Authenticator)');
+    expect(screen.getByTestId('account-context').textContent).toContain('Moscow, RU');
+    rerender(<AccountSection items={[]} />);
+    expect(container.textContent).toBe('');
   });
 });

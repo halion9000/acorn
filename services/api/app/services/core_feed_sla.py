@@ -28,7 +28,7 @@ async def record_closure_events(db: Any, tenant_id: uuid.UUID, vendor: str, now:
             "SELECT gen_random_uuid(), a.tenant_id, a.id, a.severity, ev.kind, "
             "CASE ev.kind WHEN 'detected' THEN a.created_at ELSE CAST(:now AS TIMESTAMPTZ) END, CAST(:meta AS JSONB) "
             "FROM alerts a CROSS JOIN (VALUES ('detected'), ('resolved')) AS ev(kind) "
-            "WHERE a.tenant_id = :t AND a.enrichment_data->'closed_in_vendor'->>'vendor' = :vendor AND a.enrichment_data->'closed_in_vendor'->>'at' = :at "
+            "WHERE a.tenant_id = :t AND a.status = 'resolved' AND a.enrichment_data->'closed_in_vendor'->>'vendor' = :vendor AND a.enrichment_data->'closed_in_vendor'->>'at' = :at "
             "AND NOT EXISTS (SELECT 1 FROM alert_sla_events e WHERE e.tenant_id = a.tenant_id AND e.alert_id = a.id AND e.event_type = ev.kind)"
         ),
         {

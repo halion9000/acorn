@@ -116,8 +116,8 @@ async def test_each_client_gets_its_enabled_and_failing_counts_and_nothing_of_an
     rows = await list_as(ids["owner"])
     got = {r.name.removesuffix(f"-{tag}"): (r.connectors_enabled, r.connectors_unhealthy) for r in rows if r.name.endswith(f"-{tag}")}
     assert got == {
-        "acme": (6, 3),  # its own 4 (2 failing) plus Huntress (fine) and NinjaOne (failing), fed by CORE
-        "birch": (3, 1),  # its own 2 plus NinjaOne (failing)
+        "acme": (6, 2),  # its own 4 (2 failing) plus Huntress and NinjaOne, fed by CORE (counted, never failing)
+        "birch": (3, 0),  # its own 2 plus NinjaOne
         "quiet": (1, 0),  # nothing of its own; Huntress is fed and fine; Blumira is switched off and HaloPSA is not a feed
     }, "a switched-off connector is not counted, a tool CORE does not feed is not counted, and the other organization's client is not listed"
 

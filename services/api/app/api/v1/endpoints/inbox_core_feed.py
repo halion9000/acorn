@@ -32,6 +32,8 @@ from app.models.connector import Connector
 from app.models.tenant import Tenant
 from app.models.vendor_action import VendorAction
 from app.services import core_approvals
+from app.services.alert_settle import closed_in_tool, has_open_ticket, tickets_all_closed
+from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.alert_ticket_rules import link_created_ticket
 from app.services.client_mapping import IncomingClient, upsert_clients
 from app.services.connector_run_log import record_if_changed
@@ -348,7 +350,11 @@ def closed_prefixes(vendor: str) -> tuple[str, ...]:
 
 async def note_released_elsewhere(db: Any, tenant_id: Any, uids: list[str], now: datetime) -> int:
     """For quarantine-release alerts whose message Microsoft 365 now shows as released (by someone else): record it on the alert and queue the ticket note. Safe to run again. Returns how many alerts were noted."""
-    ids = (await db.execute(select(Alert.id).where(Alert.tenant_id == tenant_id, Alert.raw_event["finding"]["uid"].astext.in_(uids)))).scalars().all()
+    ids = (
+        (await db.execute(select(Alert.id).where(Alert.tenant_id == tenant_id, Alert.raw_event["finding"]["uid"].astext.in_(uids))))
+        .scalars()
+        .all()
+    )
     noted = 0
     for alert_id in ids:
         if await note_quarantine_released(db, tenant_id, alert_id, now, by=ELSEWHERE, resolve_any_open=False):
@@ -377,20 +383,32 @@ async def apply_closed(db: Any, tenant_id: Any, report: ClosedReport, now: datet
                 "states": sorted({str(by_uid[u]) for u in chunk if by_uid[u]}),
             }
         }
+        in_chunk = (Alert.tenant_id == tenant_id, Alert.raw_event["finding"]["uid"].astext.in_(chunk))
+        tag = literal([f"closed-in-{report.vendor}"], type_=JSONB)
+        # Closed in the tool, nobody has acted on it, and no ticket of it is still open: resolved. (An alert with no ticket at all has none open.)
         result = await db.execute(
             update(Alert)
-            .where(
-                Alert.tenant_id == tenant_id,
-                Alert.status == "new",
-                Alert.raw_event["finding"]["uid"].astext.in_(chunk),
-            )
+            .where(*in_chunk, Alert.status == "new", ~has_open_ticket())
             .values(
                 status="resolved",
                 resolved_at=now,  # without it a vendor-closed alert drops out of every MTTR figure that measures created_at to resolved_at
                 updated_at=now,
                 enrichment_data=Alert.enrichment_data.op("||")(literal(note, type_=JSONB)),
-                tags=Alert.tags.op("||")(literal([f"closed-in-{report.vendor}"], type_=JSONB)),
+                tags=Alert.tags.op("||")(tag),
             )
+        )
+        changed += result.rowcount or 0
+        # The rest that are still open: remember the tool closed them (the alert page says so, and the last ticket to close can then close the alert) ...
+        await db.execute(
+            update(Alert)
+            .where(*in_chunk, Alert.status.notin_(FINISHED_ALERT_STATUSES))
+            .values(enrichment_data=Alert.enrichment_data.op("||")(literal(note, type_=JSONB)))
+        )
+        # ... and close the ones, whatever stage they are at, whose tickets are all closed too.
+        result = await db.execute(
+            update(Alert)
+            .where(*in_chunk, Alert.status.notin_(FINISHED_ALERT_STATUSES), tickets_all_closed())
+            .values(status="resolved", resolved_at=now, updated_at=now, tags=Alert.tags.op("||")(tag))
         )
         changed += result.rowcount or 0
     released = [u for u in uids if u.startswith(UID_PREFIX) and str(by_uid[u]).lower() == "released"]
@@ -520,7 +538,21 @@ class ClaimRequest(BaseModel):
 
 class ClaimedAction(BaseModel):
     id: uuid.UUID
-    action: Literal["approve", "reject", "resolve", "run_script", "revoke_sessions", "disable_user", "enable_user", "bec_search", "create_ticket", "release_quarantine", "ticket_note", "quarantine_check", "allow_sender"]
+    action: Literal[
+        "approve",
+        "reject",
+        "resolve",
+        "run_script",
+        "revoke_sessions",
+        "disable_user",
+        "enable_user",
+        "bec_search",
+        "create_ticket",
+        "release_quarantine",
+        "ticket_note",
+        "quarantine_check",
+        "allow_sender",
+    ]
     incident_uid: str
     params: dict[str, Any]
 
@@ -644,7 +676,14 @@ async def report_core_feed_action_result(
             ).first()
             if row is not None:
                 if body.status == "done" and row.action == "allow_sender" and row.alert_id is not None:
-                    await note_sender_allowed(db, tid, row.alert_id, now, by=str((row.params or {}).get("requested_by_name") or "A.C.O.R.N")[:200], sender=str((row.params or {}).get("sender_address") or "")[:320])
+                    await note_sender_allowed(
+                        db,
+                        tid,
+                        row.alert_id,
+                        now,
+                        by=str((row.params or {}).get("requested_by_name") or "A.C.O.R.N")[:200],
+                        sender=str((row.params or {}).get("sender_address") or "")[:320],
+                    )
                 if body.status == "done" and row.action == "quarantine_check" and row.alert_id is not None and body.message:
                     await store_quarantine_check(db, tid, row.alert_id, body.message, now)
                 if body.status == "done" and row.action == "release_quarantine" and row.alert_id is not None:
@@ -746,7 +785,9 @@ async def report_bec_result(tenant_token: str, case_id: uuid.UUID, body: BecResu
             from app.services.identity_detections import save_findings  # noqa: PLC0415
 
             try:
-                finding = finding_for_case(case_ref=row.case_ref, case_id=str(row.id), email=row.email, summary=body.summary or {}, report=body.report, now=now)
+                finding = finding_for_case(
+                    case_ref=row.case_ref, case_id=str(row.id), email=row.email, summary=body.summary or {}, report=body.report, now=now
+                )
                 if finding is not None:
                     await save_findings(db, tid, [finding], now)
             except Exception:  # noqa: BLE001
@@ -850,16 +891,36 @@ async def apply_tickets(db: Any, tenant_id: Any, report: TicketsReport) -> int:
     # A vendor's alert ids are "huntress:<id>" for an incident report but also "huntress-escalation:<id>" and "huntress-signal:<id>" for the other kinds of alert from the same tool.
     prefixes = (f"{report.vendor}:", f"{report.vendor}-")
     updated = 0
+    uids: list[str] = []
     for item in report.items:
         if not item.uid.startswith(prefixes):
             continue
         value = {"tickets": [t.model_dump(exclude_none=True) for t in item.tickets]}
+        same = (Alert.tenant_id == tenant_id, Alert.raw_event["finding"]["uid"].astext == item.uid)
         result = await db.execute(
-            update(Alert)
-            .where(Alert.tenant_id == tenant_id, Alert.raw_event["finding"]["uid"].astext == item.uid)
-            .values(enrichment_data=Alert.enrichment_data.op("||")(literal(value, type_=JSONB)))
+            update(Alert).where(*same).values(enrichment_data=Alert.enrichment_data.op("||")(literal(value, type_=JSONB)))
         )
         updated += result.rowcount or 0
+        uids.append(item.uid)
+    if uids:
+        # The last ticket closing closes an alert its tool has already closed (one statement for the whole report, not one per incident).
+        now = datetime.now(UTC)
+        await db.execute(
+            update(Alert)
+            .where(
+                Alert.tenant_id == tenant_id,
+                Alert.raw_event["finding"]["uid"].astext.in_(uids),
+                Alert.status.notin_(FINISHED_ALERT_STATUSES),
+                closed_in_tool(),
+                tickets_all_closed(),
+            )
+            .values(
+                status="resolved",
+                resolved_at=now,
+                updated_at=now,
+                tags=Alert.tags.op("||")(literal([f"closed-in-{report.vendor}"], type_=JSONB)),
+            )
+        )
     return updated
 
 

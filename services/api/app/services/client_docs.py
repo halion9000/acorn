@@ -117,10 +117,10 @@ def search_terms(message: str) -> list[str]:
     return seen[:MAX_TERMS]
 
 
-def tsquery_text(terms: list[str]) -> str | None:
-    """``a | b | c``: a document matches on any word, and the ranking puts the ones with most of them first. None when there is nothing to look up."""
+def tsquery_text(terms: list[str], every_word: bool = False) -> str | None:
+    """``a | b | c``: a document matches on any word, and the ranking puts the ones with most of them first. With ``every_word``, ``a & b & c``: only a document that has them all. None when there is nothing to look up."""
     clean = [t for t in terms if _TERM.fullmatch(t)]
-    return " | ".join(clean) if clean else None
+    return (" & " if every_word else " | ").join(clean) if clean else None
 
 
 def _name_key(name: str) -> str:
@@ -161,30 +161,36 @@ class Hit:
 
 async def search_documents(db: Any, tenant_ids: list[uuid.UUID], query: str, limit: int = 8) -> list[Hit]:
     """The best matches for a question among these clients' documents. The caller supplies a session that may read all of ``tenant_ids``."""
-    tsq = tsquery_text(search_terms(query))
-    if tsq is None or not tenant_ids:
+    terms = search_terms(query)
+    if tsquery_text(terms) is None or not tenant_ids:
         return []
-    q = func.to_tsquery("english", tsq)
-    search = column("search")
-    rows = (
-        await db.execute(
-            select(
-                ClientDocument.tenant_id,
-                ClientDocument.kind,
-                ClientDocument.title,
-                ClientDocument.folder,
-                ClientDocument.url,
-                case(
-                    (ClientDocument.kind == TICKET_KIND, func.left(ClientDocument.body, TICKET_SNIPPET_CHARS)),
-                    else_=func.ts_headline("english", ClientDocument.body, q, SNIPPET_OPTIONS),
-                ).label("snippet"),
-                func.ts_rank(search, q).label("rank"),
+    # A search for "365 login" must find documents about both words, not every printer sheet that mentions "365": try the words together first, and only when nothing has them all fall back to any word.
+    modes = [True, False] if len(terms) > 1 else [False]
+    rows: list[Any] = []
+    for every_word in modes:
+        q = func.to_tsquery("english", tsquery_text(terms, every_word))
+        search = column("search")
+        rows = (
+            await db.execute(
+                select(
+                    ClientDocument.tenant_id,
+                    ClientDocument.kind,
+                    ClientDocument.title,
+                    ClientDocument.folder,
+                    ClientDocument.url,
+                    case(
+                        (ClientDocument.kind == TICKET_KIND, func.left(ClientDocument.body, TICKET_SNIPPET_CHARS)),
+                        else_=func.ts_headline("english", ClientDocument.body, q, SNIPPET_OPTIONS),
+                    ).label("snippet"),
+                    func.ts_rank(search, q).label("rank"),
+                )
+                .where(ClientDocument.tenant_id.in_(tenant_ids), search.op("@@")(q))
+                .order_by(_automated_sql().asc(), desc("rank"), ClientDocument.title)
+                .limit(max(1, min(limit, 30)))
             )
-            .where(ClientDocument.tenant_id.in_(tenant_ids), search.op("@@")(q))
-            .order_by(_automated_sql().asc(), desc("rank"), ClientDocument.title)
-            .limit(max(1, min(limit, 30)))
-        )
-    ).all()
+        ).all()
+        if rows:
+            break
     return [
         Hit(
             r.tenant_id,

@@ -9,7 +9,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import useSWR from 'swr';
-import { alertsApi, ticketRulesApi, type Alert, type LinkedTicket, type RelatedAlert, type TicketStatus } from '@/lib/api';
+import { alertsApi, ticketRulesApi, type AccountPerson, type Alert, type LinkedTicket, type RelatedAlert, type TicketStatus } from '@/lib/api';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { safeTicketUrl } from './LinkedTicketsSection';
 
@@ -29,13 +29,13 @@ const CLOSED_TICKET = /^(closed|resolved|completed|cancel+ed|done)\b/i;
 
 /**
  * A line for the alert page when every HaloPSA ticket on it reads as closed (by the status text HaloPSA gave) but the alert itself is still open. A closed ticket does not mean the problem is gone, so this
- * only points it out: nothing is closed for you. Said for nothing when there are no tickets, when any ticket is still open, when a status is unknown, or when the alert is already finished (pure).
+ * only points it out: the alert closes by itself when its tool has closed it too (A.C.O.R.N does that), never because of the ticket alone. Said for nothing when there are no tickets, when any ticket is still open, when a status is unknown, or when the alert is already finished (pure).
  */
-export function closedTicketNote(tickets: Pick<LinkedTicket, 'id' | 'status'>[], alertStatus: string | undefined): string | null {
+export function closedTicketNote(tickets: Pick<LinkedTicket, 'id' | 'status'>[], alertStatus: string | undefined, tool = 'the source tool'): string | null {
   if (tickets.length === 0 || FINISHED_ALERT.has(String(alertStatus ?? '').toLowerCase())) return null;
   if (!tickets.every((t) => typeof t.status === 'string' && CLOSED_TICKET.test(t.status.trim()))) return null;
   const which = tickets.length === 1 ? `Ticket #${tickets[0]!.id} is` : `Its ${tickets.length} tickets are`;
-  return `${which} closed in HaloPSA, but this alert is still open. Check whether the problem is really gone, then close the alert (closing a ticket does not close it).`;
+  return `${which} closed in HaloPSA, but the alert is still open in ${tool}. It closes by itself once ${tool} closes it; if the problem is really gone, check ${tool} or close the alert yourself.`;
 }
 
 /** What a ticket rule did, or did not do, for this alert: only said when it has something to say (never when the alert already has its ticket or no rule is involved). */
@@ -124,6 +124,53 @@ export function TicketRows({ tickets, onRemove }: { tickets: LinkedTicket[]; onR
 export function alertContextOf(alert: Pick<Alert, 'clientName' | 'affectedHosts' | 'affectedUsers' | 'affectedIps' | 'device'>) {
   const hosts = alert.affectedHosts && alert.affectedHosts.length > 0 ? alert.affectedHosts : alert.device ? [alert.device] : [];
   return { company: alert.clientName ?? null, hosts, users: alert.affectedUsers ?? [], ips: alert.affectedIps ?? [] };
+}
+
+/** One line per person the alert names, from the sign-ins A.C.O.R.N already holds for them (last 7 days). Shows nothing when the alert names no e-mail address. */
+export function accountLine(p: AccountPerson): string {
+  if (!p.found) return p.note ?? 'No Microsoft 365 account found.';
+  const parts = [`${p.signins} sign-in${p.signins === 1 ? '' : 's'}`];
+  if (p.failed) parts.push(`${p.failed} failed`);
+  if (p.risky) parts.push(`${p.risky} rated risky by Microsoft`);
+  if (p.without_mfa) parts.push(`${p.without_mfa} without a second factor`);
+  if (p.countries.length) parts.push(`from ${p.countries.map(([c, n]) => `${c} (${n})`).join(', ')}`);
+  return parts.join(' · ');
+}
+
+export function AccountSection({ items }: { items: AccountPerson[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section aria-label="Microsoft 365 account" className="rounded-xl border border-gray-800/60 bg-gray-900/60 p-5" data-testid="account-context">
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">Microsoft 365 account of the person named (sign-ins, last 7 days)</h3>
+      <ul className="space-y-3 text-sm">
+        {items.map((p) => (
+          <li key={p.user}>
+            <p className="text-gray-200">
+              {p.user}
+              {p.account ? (
+                <span className="ml-2 text-xs text-gray-500">
+                  {p.account.enabled ? 'enabled' : 'disabled'}
+                  {p.account.admin ? ' · admin' : ''} · second factor {p.account.mfa_registered ? `registered${p.account.methods ? ` (${p.account.methods})` : ''}` : 'not registered'}
+                </span>
+              ) : null}
+            </p>
+            <p className={p.failed || p.risky || p.without_mfa ? 'text-amber-300' : 'text-gray-400'}>{accountLine(p)}</p>
+            {p.note && p.found ? <p className="text-xs text-gray-500">{p.note}</p> : null}
+            {p.recent.length > 0 ? (
+              <ul className="mt-1 space-y-0.5 text-xs text-gray-500">
+                {p.recent.slice(0, 5).map((r, i) => (
+                  <li key={i}>
+                    {r.at.slice(0, 16).replace('T', ' ')} · {r.success ? 'signed in' : 'failed'} · {r.app ?? 'unknown app'} · {[r.city, r.country].filter(Boolean).join(', ') || 'unknown place'}
+                    {r.risk ? ` · risk ${r.risk}` : ''}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 /** Other alerts about the same device or person: where they came from, why they match, and a link to each. Shows nothing when there are none. */
@@ -230,6 +277,7 @@ export function AlertContext({ alert }: { alert: Alert }) {
   const { company, hosts, users, ips } = alertContextOf(alert);
   const tool = toolLinks(alert);
   const related = useSWR(['alerts', alert.id, 'related'] as const, () => alertsApi.related(alert.id));
+  const account = useSWR(['alerts', alert.id, 'account'] as const, () => alertsApi.account(alert.id), { shouldRetryOnError: false });
   return (
     <>
     <section aria-label="Where and who" className="rounded-xl border border-gray-800/60 bg-gray-900/60 p-5" data-testid="alert-context">
@@ -305,9 +353,9 @@ export function AlertContext({ alert }: { alert: Alert }) {
         <Row label="HaloPSA ticket">
           <div>
             <TicketRows tickets={data?.tickets ?? []} onRemove={(id) => void remove(id)} />
-            {closedTicketNote(data?.tickets ?? [], alert.status) ? (
+            {closedTicketNote(data?.tickets ?? [], alert.status, vendorLabel(alert.source)) ? (
               <p className="mt-1 text-xs text-amber-300" data-testid="ticket-closed-note">
-                {closedTicketNote(data?.tickets ?? [], alert.status)}
+                {closedTicketNote(data?.tickets ?? [], alert.status, vendorLabel(alert.source))}
               </p>
             ) : null}
             <TicketRuleStatus alertId={alert.id} />
@@ -316,6 +364,7 @@ export function AlertContext({ alert }: { alert: Alert }) {
         </Row>
       </div>
     </section>
+    <AccountSection items={account.data?.people ?? []} />
     <RelatedAlertsList items={related.data?.items ?? []} more={related.data?.more ?? 0} />
     </>
   );

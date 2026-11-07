@@ -1015,14 +1015,15 @@ async def _core_fed_health(db: AsyncSession, owner_id: uuid.UUID) -> dict[str, b
 def with_core_fed(
     health: dict[uuid.UUID, tuple[int, int]], sources: dict[uuid.UUID, set[str]], fed: dict[str, bool]
 ) -> dict[uuid.UUID, tuple[int, int]]:
-    """Add the tools CORE feeds in to each client's connector health: a tool counts for a client it is mapped to (``sources``: client to the tools with a client of that name there). The connectors saved under a client
-    itself are kept as they were. Tools that CORE does not feed (a PSA, say) are not counted (pure)."""
+    """Add the tools CORE feeds in to each client's connector count: a tool counts for a client it is mapped to (``sources``: client to the tools with a client of that name there). They are counted as connected but never as
+    failing here: a feed's health is one shared state for all clients (one client's trouble, or a partial run, would show as a failure on every client mapped to that tool), and it is shown with the feed itself.
+    The connectors saved under a client itself are kept as they were. Tools that CORE does not feed (a PSA, say) are not counted (pure)."""
     out = dict(health)
     for child_id, tools in sources.items():
         for tool in sorted(tools):
             if tool in fed:
                 enabled, bad = out.get(child_id, (0, 0))
-                out[child_id] = (enabled + 1, bad + (1 if fed[tool] else 0))
+                out[child_id] = (enabled + 1, bad)
     return out
 
 

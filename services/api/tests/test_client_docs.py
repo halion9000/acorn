@@ -33,6 +33,7 @@ def test_a_question_becomes_its_letters_and_digits_once_each_and_nothing_that_co
 def test_the_search_matches_on_any_word_and_is_empty_when_there_are_no_words():
     assert cd.tsquery_text(["vpn", "firewall"]) == "vpn | firewall"
     assert cd.tsquery_text([]) is None
+    assert cd.tsquery_text(["365", "login"], every_word=True) == "365 & login"
     assert cd.tsquery_text(["bad term", "ok"]) == "ok", "a term that is not plain letters and digits never reaches the query"
 
 

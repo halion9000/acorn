@@ -106,7 +106,7 @@ def test_a_tickets_report_rejects_what_could_be_abused():
 
 @pytest.mark.asyncio
 async def test_tickets_are_stored_on_that_vendors_incident_only():
-    db = _db(rowcounts=[1, 1, 1])
+    db = _db(rowcounts=[1, 1, 1, 0])
     rep = cf.TicketsReport(
         vendor="huntress",
         items=[
@@ -120,8 +120,8 @@ async def test_tickets_are_stored_on_that_vendors_incident_only():
     )
     assert await cf.apply_tickets(db, OWNER, rep) == 3
     assert (
-        len(db.executed) == 3
-    )  # the incident report, the escalation and the signal; another vendor's uids (petra, a lookalike prefix) are not this vendor's
+        len(db.executed) == 4
+    )  # the incident report, the escalation and the signal (another vendor's uids, petra and a lookalike prefix, are not this vendor's), then one statement that closes alerts whose tool and tickets are both closed
     sql, params = _sql(db.executed[0])
     assert sql.lower().startswith("update alerts") and OWNER in params.values() and "huntress:7" in params.values()
     assert {"huntress-escalation:11", "huntress-signal:12"} <= {

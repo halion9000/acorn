@@ -1339,6 +1339,35 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/alerts/{alert_id}/account:
+    get:
+      tags:
+      - alerts
+      summary: Microsoft 365 sign-ins and account facts for the people an alert names
+      operationId: alert_account_api_v1_alerts__alert_id__account_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountContext'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}/related:
     get:
       tags:
@@ -23608,6 +23637,56 @@ components:
       - granted_by
       - created_at
       title: AccessGrantResponse
+    AccountContext:
+      properties:
+        window_days:
+          type: integer
+          title: Window Days
+          default: 7
+        people:
+          items:
+            $ref: '#/components/schemas/PersonContext'
+          type: array
+          title: People
+      type: object
+      required:
+      - people
+      title: AccountContext
+    AccountFacts:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+        admin:
+          type: boolean
+          title: Admin
+        licensed:
+          type: boolean
+          title: Licensed
+        mfa_registered:
+          type: boolean
+          title: Mfa Registered
+        methods:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Methods
+        conditional_access:
+          type: boolean
+          title: Conditional Access
+        per_user_mfa:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Per User Mfa
+      type: object
+      required:
+      - enabled
+      - admin
+      - licensed
+      - mfa_registered
+      - conditional_access
+      title: AccountFacts
     ActionBody:
       properties:
         client_id:
@@ -39786,6 +39865,78 @@ components:
       - description
       - category
       title: PermissionOut
+    PersonContext:
+      properties:
+        user:
+          type: string
+          title: User
+        found:
+          type: boolean
+          title: Found
+        account:
+          anyOf:
+          - $ref: '#/components/schemas/AccountFacts'
+          - type: 'null'
+        signins:
+          type: integer
+          title: Signins
+          default: 0
+        failed:
+          type: integer
+          title: Failed
+          default: 0
+        without_mfa:
+          type: integer
+          title: Without Mfa
+          default: 0
+        risky:
+          type: integer
+          title: Risky
+          default: 0
+        countries:
+          items:
+            prefixItems:
+            - type: string
+            - type: integer
+            type: array
+            maxItems: 2
+            minItems: 2
+          type: array
+          title: Countries
+          default: []
+        apps:
+          items:
+            prefixItems:
+            - type: string
+            - type: integer
+            type: array
+            maxItems: 2
+            minItems: 2
+          type: array
+          title: Apps
+          default: []
+        last_success:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Success
+        recent:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__alert_account__SigninRow'
+          type: array
+          title: Recent
+          default: []
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+      type: object
+      required:
+      - user
+      - found
+      title: PersonContext
     PersonDetail:
       properties:
         person:
@@ -39804,7 +39955,7 @@ components:
           title: Tickets
         recent_signins:
           items:
-            $ref: '#/components/schemas/SigninRow'
+            $ref: '#/components/schemas/app__api__v1__endpoints__identities__SigninRow'
           type: array
           title: Recent Signins
         changes:
@@ -45376,49 +45527,6 @@ components:
           title: Last At
       type: object
       title: SigninBrief
-    SigninRow:
-      properties:
-        at:
-          type: string
-          format: date-time
-          title: At
-        app:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: App
-        country:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Country
-        city:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: City
-        ip:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Ip
-        success:
-          type: boolean
-          title: Success
-        mfa:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Mfa
-        unusual:
-          type: boolean
-          title: Unusual
-          default: false
-      type: object
-      required:
-      - at
-      - success
-      title: SigninRow
     SigninSummary:
       properties:
         last_24h:
@@ -50317,6 +50425,50 @@ components:
       required:
       - id
       title: _Remediation
+    app__api__v1__endpoints__alert_account__SigninRow:
+      properties:
+        at:
+          type: string
+          format: date-time
+          title: At
+        country:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Country
+        city:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: City
+        app:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: App
+        ip:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ip
+        success:
+          type: boolean
+          title: Success
+        mfa:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Mfa
+        risk:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Risk
+      type: object
+      required:
+      - at
+      - success
+      title: SigninRow
     app__api__v1__endpoints__alert_vendor_actions__TicketsResponse:
       properties:
         tickets:
@@ -50915,6 +51067,49 @@ components:
       - disabled
       - in_one_tool
       title: IdentitySummary
+    app__api__v1__endpoints__identities__SigninRow:
+      properties:
+        at:
+          type: string
+          format: date-time
+          title: At
+        app:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: App
+        country:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Country
+        city:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: City
+        ip:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ip
+        success:
+          type: boolean
+          title: Success
+        mfa:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Mfa
+        unusual:
+          type: boolean
+          title: Unusual
+          default: false
+      type: object
+      required:
+      - at
+      - success
+      title: SigninRow
     app__api__v1__endpoints__identity__IdentitySummary:
       properties:
         audits_last_24h:
