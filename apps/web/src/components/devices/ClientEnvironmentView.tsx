@@ -8,6 +8,56 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { environmentApi, msspApi, type ChildTenant, type ClientEnvironment } from '@/lib/api';
+import { buildMap, type Tier } from './networkMap';
+
+const TIER_FILL: Record<Tier, string> = { 0: '#b45309', 1: '#1d4ed8', 2: '#0f766e', 3: '#4b5563' };
+const TIER_NAME: Record<Tier, string> = { 0: 'Firewall / router', 1: 'Switch', 2: 'Access point', 3: 'Other device' };
+
+/** The client's network drawn from Auvik's links. Hover a line for the ports at each end. */
+function NetworkMapDrawing({ devices }: { devices: ClientEnvironment['devices'] }) {
+  const map = buildMap(devices);
+  if (map.nodes.length === 0) return null;
+  const at = new Map(map.nodes.map((n) => [n.id, n]));
+  return (
+    <section aria-label="Network map" className="rounded border border-gray-800 p-3" data-testid="network-map">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-medium text-gray-200">Network map</h2>
+        <div className="flex flex-wrap gap-3 text-[11px] text-gray-400">
+          {([0, 1, 2, 3] as Tier[]).map((t) => (
+            <span key={t} className="inline-flex items-center gap-1">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: TIER_FILL[t] }} />
+              {TIER_NAME[t]}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <svg viewBox={`0 0 ${map.width} ${map.height}`} style={{ minWidth: Math.min(map.width, 900), width: '100%' }} role="img" aria-label="How this client's network devices are connected">
+          {map.edges.map((e, i) => {
+            const a = at.get(e.from);
+            const b = at.get(e.to);
+            if (!a || !b) return null;
+            return (
+              <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#6b7280" strokeWidth={1.5}>
+                <title>{`${at.get(e.from)?.label} ↔ ${at.get(e.to)?.label}: ${e.label}${e.speed ? ` · ${e.speed}` : ''}`}</title>
+              </line>
+            );
+          })}
+          {map.nodes.map((n) => (
+            <g key={n.id} data-testid="map-node" opacity={n.online === false ? 0.45 : 1}>
+              <rect x={n.x - 56} y={n.y - 16} width={112} height={32} rx={6} fill={TIER_FILL[n.tier]} stroke="#111827" />
+              <text x={n.x} y={n.y + 4} textAnchor="middle" fontSize={11} fill="#f9fafb">
+                {n.label.length > 16 ? `${n.label.slice(0, 15)}…` : n.label}
+              </text>
+              <title>{`${n.label}${n.role ? ` (${n.role})` : ''}${n.online === false ? ' · offline' : ''}`}</title>
+            </g>
+          ))}
+        </svg>
+      </div>
+      {map.hidden > 0 && <p className="mt-2 text-xs text-gray-500">{map.hidden} more linked devices are in the lists below, not in the drawing.</p>}
+    </section>
+  );
+}
 
 const KINDS: { key: string; label: string }[] = [
   { key: 'network', label: 'Network devices' },
@@ -131,7 +181,8 @@ export default function ClientEnvironmentView() {
 
           {!env.has_auvik && <p className="text-xs text-gray-500">Auvik has not reported this client, so there is no network wiring to show.</p>}
           {env.has_auvik && !env.has_links && <p className="text-xs text-gray-500">Auvik reports this client but has not named what any device is plugged into.</p>}
-          {env.truncated && <p className="text-xs text-amber-300">This client has more devices than are shown here.</p>}
+          {env.has_links && <NetworkMapDrawing devices={env.devices} />}
+          {env.truncated &&<p className="text-xs text-amber-300">This client has more devices than are shown here.</p>}
 
           {KINDS.map((k) => {
             const rows = env.devices.filter((d) => d.kind === k.key);

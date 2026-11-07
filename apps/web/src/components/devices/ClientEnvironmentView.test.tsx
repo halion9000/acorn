@@ -40,6 +40,20 @@ describe('ClientEnvironmentView', () => {
     expect(screen.getByText('Missing: Huntress')).toBeInTheDocument();
   });
 
+  it('draws the network as a map with a box per linked device when links name devices it knows', async () => {
+    api.get.mockResolvedValueOnce(
+      env({
+        devices: [
+          { id: 'd1', hostname: 'fw-1', kind: 'network', role: 'firewall', online: true, tools: ['auvik'], links: [{ name: 'sw-1', port: 'LAN', remote_port: 'Gi1', speed: null }], missing: [] },
+          { id: 'd2', hostname: 'sw-1', kind: 'network', role: 'switch', online: false, tools: ['auvik'], links: [{ name: 'fw-1', port: 'Gi1', remote_port: 'LAN', speed: null }], missing: [] },
+        ],
+      }),
+    );
+    render(<ClientEnvironmentView />);
+    expect(await screen.findByTestId('network-map')).toBeInTheDocument();
+    expect(screen.getAllByTestId('map-node')).toHaveLength(2);
+  });
+
   it('says there is no wiring to show when Auvik has not reported the client, or has reported no links', async () => {
     api.get.mockResolvedValueOnce(env({ has_auvik: false, has_links: false }));
     const a = render(<ClientEnvironmentView />);
