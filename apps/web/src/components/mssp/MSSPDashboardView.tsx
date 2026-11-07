@@ -247,7 +247,7 @@ export default function MSSPDashboardView() {
   };
 
   return (
-    <div className="space-y-8 p-6 max-w-7xl mx-auto">
+    <div className="space-y-8 p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">MSSP Executive Dashboard</h1>
