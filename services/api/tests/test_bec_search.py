@@ -75,7 +75,9 @@ def test_a_confirmed_start_records_the_case_and_queues_it_for_core_with_the_ids_
     db = Db([[]])  # no search already running
     item = start(db)
     assert item.status == "pending" and item.email == "pat@acme.com" and item.case_ref.startswith("BEC-")
-    case, action = db.added
+    case, action, ticket = db.added
+    assert (ticket.action, ticket.vendor, ticket.alert_id, ticket.incident_uid) == ("create_ticket", "core", None, f"bec-ticket:{case.id}"), "a person's search also asks CORE to open a HaloPSA ticket"
+    assert case.aisoc_case_id is not None, "and opens a case"
     assert (case.tenant_id, case.requested_by, case.status) == (CLIENT, USER.user_id, "pending")
     assert (action.vendor, action.action, action.status, action.alert_id) == ("core", "bec_search", "pending", None)
     assert action.params["client_id"] == "cipp-cust-1" and action.params["user_id"] == "entra-guid-1" and action.params["user"] == "pat@acme.com"

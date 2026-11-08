@@ -10,7 +10,7 @@ vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => fetchMock
 vi.mock('@/lib/api', () => ({ alertsApi: { list: (...a: unknown[]) => listMock(...a) } }));
 vi.mock('next/link', () => ({ default: ({ children, href, onClick, ...rest }: { children: React.ReactNode; href: string; onClick?: () => void; 'data-testid'?: string }) => <a href={href} onClick={onClick} data-testid={rest['data-testid']}>{children}</a> }));
 
-import { NotificationsBell, approvalsLine, billingLinesOff, needsAttention } from './NotificationsBell';
+import { NotificationsBell, approvalsLine, becFinishedLine, billingLinesOff, needsAttention } from './NotificationsBell';
 
 const alert = (id: string, severity: string, createdAt: string, clientName?: string) => ({ id, title: `Alert ${id}`, severity, createdAt, clientName }) as unknown as Alert;
 const wrap = () => render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}><NotificationsBell /></SWRConfig>);
@@ -144,5 +144,42 @@ describe('CORE approvals in the bell', () => {
     wrap();
     expect(await screen.findByTestId('bell-dot')).toBeTruthy();
     expect(screen.queryByTestId('bell-dot-approvals')).toBeNull();
+  });
+});
+
+describe('finished BEC searches in the bell', () => {
+  it('words a finished search from the rating CIPP gave, and a failed one as not finished, and never says clean', () => {
+    expect(becFinishedLine({ id: '1', client_name: 'Acme', email: 'p@x.com', status: 'done', level: 'High', ticket_id: '4242' })).toEqual({
+      title: 'BEC search for p@x.com finished',
+      detail: 'CIPP rates it High · Acme · ticket 4242',
+    });
+    expect(becFinishedLine({ id: '2', client_name: '', email: 'p@x.com', status: 'done', level: null }).detail).toBe('CIPP gave no rating');
+    expect(becFinishedLine({ id: '3', client_name: 'Acme', email: 'p@x.com', status: 'failed' }).title).toBe('BEC search for p@x.com did not finish');
+  });
+
+  it('shows a blue dot and a row for a finished search, and the dot goes once the bell has been opened', async () => {
+    window.localStorage.clear();
+    listMock.mockResolvedValue({ alerts: [], total: 0 });
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).includes('bec/finished')
+        ? { ok: true, status: 200, json: async () => ({ items: [{ id: 'b1', client_name: 'Acme', email: 'p@x.com', status: 'done', level: 'High', ticket_id: null }] }) }
+        : { ok: false, status: 403, json: async () => ({}) },
+    );
+    const user = userEvent.setup();
+    wrap();
+    expect(await screen.findByTestId('bell-dot-bec')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Open notifications' }));
+    expect(await screen.findByText('BEC search for p@x.com finished')).toBeTruthy();
+    expect(screen.queryByTestId('bell-dot-bec')).toBeNull();
+  });
+
+  it('shows nothing about BEC when the reader may not see it', async () => {
+    window.localStorage.clear();
+    listMock.mockResolvedValue({ alerts: [], total: 0 });
+    const user = userEvent.setup();
+    wrap();
+    await user.click(screen.getByRole('button', { name: 'Open notifications' }));
+    expect(screen.queryByTestId('bell-bec')).toBeNull();
+    expect(screen.queryByTestId('bell-dot-bec')).toBeNull();
   });
 });

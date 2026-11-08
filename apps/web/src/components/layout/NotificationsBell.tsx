@@ -46,6 +46,43 @@ export function approvalsLine(items: CoreApproval[]): { title: string; detail: s
   };
 }
 
+/** One BEC search that finished (or failed) in the last day. */
+export interface BecFinished {
+  id: string;
+  client_name: string;
+  email: string;
+  status: 'done' | 'failed';
+  level?: string | null;
+  ticket_id?: string | null;
+}
+
+/** How a finished search reads in the bell: CIPP's own rating when it gave one, or plainly that it did not finish. Never says "clean". */
+export function becFinishedLine(b: BecFinished): { title: string; detail: string } {
+  const where = b.client_name ? ` · ${b.client_name}` : '';
+  const ticket = b.ticket_id ? ` · ticket ${b.ticket_id}` : '';
+  if (b.status === 'failed') return { title: `BEC search for ${b.email} did not finish`, detail: `Start it again from Identities${where}${ticket}` };
+  return { title: `BEC search for ${b.email} finished`, detail: `${b.level ? `CIPP rates it ${b.level}` : 'CIPP gave no rating'}${where}${ticket}` };
+}
+
+const BEC_SEEN_KEY = 'bell-bec-seen';
+
+function readSeen(): string[] {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(BEC_SEEN_KEY) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSeen(ids: string[]): void {
+  try {
+    window.localStorage.setItem(BEC_SEEN_KEY, JSON.stringify(ids.slice(-50)));
+  } catch {
+    /* private window or blocked storage: the dot simply shows again */
+  }
+}
+
 export function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -85,6 +122,29 @@ export function NotificationsBell() {
     { refreshInterval: 120_000, shouldRetryOnError: false },
   );
 
+  // BEC searches that finished in the last day, so a person who started one need not watch it. A person without the BEC permission or a failed read gets no such line.
+  const { data: becDone } = useSWR(
+    'topbar-bec-finished',
+    async () => {
+      const res = await authFetch('/api/v1/identities/bec/finished');
+      if (!res.ok) return null;
+      const body = (await res.json()) as { items?: BecFinished[] };
+      return Array.isArray(body.items) ? body.items : [];
+    },
+    { refreshInterval: 60_000, shouldRetryOnError: false },
+  );
+  const [seen, setSeen] = useState<string[]>([]);
+  useEffect(() => setSeen(readSeen()), []);
+  const becItems = becDone ?? [];
+  const becUnseen = becItems.filter((b) => !seen.includes(b.id)).length;
+  useEffect(() => {
+    // Opening the bell is reading it: the dot goes, the rows stay until they are a day old.
+    if (!open || becItems.length === 0) return;
+    const all = Array.from(new Set([...readSeen(), ...becItems.map((b) => b.id)]));
+    writeSeen(all);
+    setSeen(all);
+  }, [open, becItems.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -120,6 +180,8 @@ export function NotificationsBell() {
         </svg>
         {criticalCount > 0 ? (
           <span aria-hidden data-testid="bell-dot" className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-surface-raised" />
+        ) : becUnseen > 0 ? (
+          <span aria-hidden data-testid="bell-dot-bec" className="absolute top-1 right-1 w-2 h-2 bg-blue-400 rounded-full ring-2 ring-surface-raised" />
         ) : approvals ? (
           <span aria-hidden data-testid="bell-dot-approvals" className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full ring-2 ring-surface-raised" />
         ) : billingLines > 0 ? (
@@ -148,6 +210,21 @@ export function NotificationsBell() {
                   </Link>
                 </li>
               ))}
+            </ul>
+          ) : null}
+          {becItems.length > 0 ? (
+            <ul data-testid="bell-bec" className="divide-y divide-gray-800/60 border-t border-gray-800">
+              {becItems.map((b) => {
+                const line = becFinishedLine(b);
+                return (
+                  <li key={b.id}>
+                    <Link href="/identities" onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-gray-800/50">
+                      <p className="text-sm text-blue-300 truncate">{line.title}</p>
+                      <p className="text-xs text-gray-500">{line.detail}</p>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
           {approvals ? (

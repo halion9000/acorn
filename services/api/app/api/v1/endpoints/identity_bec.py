@@ -21,7 +21,9 @@ from app.api.v1.endpoints.identities import _people
 from app.api.v1.endpoints.identity_actions import cipp_customer, clean_email
 from app.models.bec_case import BecCase
 from app.models.vendor_action import VendorAction
+from app.db.rls_scope import cross_tenant_reads
 from app.services.audit import emit_audit
+from app.services.bec_followup import open_followup
 
 router = APIRouter(prefix="/identities/bec", tags=["identities"])
 
@@ -168,6 +170,8 @@ async def start_bec_search(
             now=now,
         )
         await db.flush()
+        # A person who started a search should not have to watch it: it also gets a case and a HaloPSA ticket, both written to when it finishes (never raises).
+        await open_followup(db, owner_id=owner, client_id=body.client_id, bec=case, requested_by_name=getattr(user, "email", None), now=now)
         await emit_audit(
             db=db,
             tenant_id=body.client_id,
@@ -214,6 +218,60 @@ async def recent_bec_searches(
         )
     now = datetime.now(UTC)
     return CaseList(items=[item_of(r, now) for r in rows])  # type: ignore[misc]
+
+
+class FinishedItem(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    client_name: str
+    email: str
+    status: Literal["done", "failed"]
+    level: str | None = None
+    finished_at: datetime
+    ticket_id: str | None = None
+
+
+class FinishedList(BaseModel):
+    items: list[FinishedItem]
+
+
+FINISHED_HOURS = 24
+
+
+@router.get("/finished", response_model=FinishedList)
+async def finished_bec_searches(user: Annotated[AuthUser, Depends(require_permission("identities:bec"))], db: DBSession) -> FinishedList:
+    """For the notification bell: searches that finished (or failed) in the last day across the clients this person can see, newest first, without their reports."""
+    owner = user.tenant_id
+    scope, names = await _scope(db, owner, None)
+    since = datetime.now(UTC) - timedelta(hours=FINISHED_HOURS)
+    async with cross_tenant_reads(db):
+        rows = (
+            (
+                await db.execute(
+                    select(BecCase)
+                    .where(BecCase.tenant_id.in_(scope), BecCase.status.in_(("done", "failed")), BecCase.finished_at.isnot(None), BecCase.finished_at > since)
+                    .order_by(BecCase.finished_at.desc())
+                    .limit(10)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    return FinishedList(
+        items=[
+            FinishedItem(
+                id=r.id,
+                client_id=r.tenant_id,
+                client_name=names.get(r.tenant_id, ""),
+                email=r.email,
+                status=r.status,  # type: ignore[arg-type]
+                level=(str((r.summary or {}).get("level") or "").strip() or None),
+                finished_at=r.finished_at,  # type: ignore[arg-type]
+                ticket_id=r.ticket_id,
+            )
+            for r in rows
+        ]
+    )
 
 
 @router.get("/{case_id}", response_model=CaseDetail)

@@ -12674,6 +12674,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/identities/bec/finished:
+    get:
+      tags:
+      - identities
+      summary: Finished Bec Searches
+      description: 'For the notification bell: searches that finished (or failed)
+        in the last day across the clients this person can see, newest first, without
+        their reports.'
+      operationId: finished_bec_searches_api_v1_identities_bec_finished_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinishedList'
+      security:
+      - HTTPBearer: []
   /api/v1/identities/bec/{case_id}:
     get:
       tags:
@@ -34263,6 +34281,62 @@ components:
       - credential
       - challenge
       title: FinishRequest
+    FinishedItem:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        email:
+          type: string
+          title: Email
+        status:
+          type: string
+          enum:
+          - done
+          - failed
+          title: Status
+        level:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Level
+        finished_at:
+          type: string
+          format: date-time
+          title: Finished At
+        ticket_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ticket Id
+      type: object
+      required:
+      - id
+      - client_id
+      - client_name
+      - email
+      - status
+      - finished_at
+      title: FinishedItem
+    FinishedList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/FinishedItem'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: FinishedList
     FleetAcceptance:
       properties:
         client_id:

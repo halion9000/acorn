@@ -673,7 +673,7 @@ async def report_core_feed_action_result(
                     update(VendorAction)
                     .where(VendorAction.id == action_id, VendorAction.tenant_id == tid, VendorAction.status == "claimed")
                     .values(status=body.status, result_message=body.message, finished_at=now)
-                    .returning(VendorAction.alert_id, VendorAction.action, VendorAction.params)
+                    .returning(VendorAction.alert_id, VendorAction.action, VendorAction.params, VendorAction.incident_uid)
                 )
             ).first()
             if row is not None:
@@ -693,6 +693,11 @@ async def report_core_feed_action_result(
                     await note_quarantine_released(db, tid, row.alert_id, now, by=by)
                 if body.status == "done" and row.action == "create_ticket" and body.ticket_id and row.alert_id is not None:
                     await link_created_ticket(db, tid, row.alert_id, body.ticket_id, now)
+                if body.status == "done" and row.action == "create_ticket" and body.ticket_id and row.alert_id is None:
+                    # A ticket opened for a BEC search (it has no alert): note its number on the search and its case.
+                    from app.services.bec_followup import on_ticket_created  # noqa: PLC0415
+
+                    await on_ticket_created(db, tid, row.incident_uid, body.ticket_id, now)
                 if body.status == "done" and row.action == "resolve":
                     # The vendor accepted the resolution: mirror it now rather than waiting for the next closed-incident sweep. Same narrow rule as ``apply_closed``: never override an analyst's decision.
                     await db.execute(
@@ -794,6 +799,10 @@ async def report_bec_result(tenant_token: str, case_id: uuid.UUID, body: BecResu
                     await save_findings(db, tid, [finding], now)
             except Exception:  # noqa: BLE001
                 logger.warning("bec result: the alert could not be made for case=%s", row.id, exc_info=True)
+        # The case and the ticket opened when the search was started get the result (the ticket only once its number is known).
+        from app.services.bec_followup import on_result  # noqa: PLC0415
+
+        await on_result(db, row, now)
         await db.commit()
     return BecAck(recorded=True)
 

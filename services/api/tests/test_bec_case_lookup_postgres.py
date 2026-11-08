@@ -130,3 +130,110 @@ async def test_a_low_rating_and_a_failed_search_raise_no_alert(world):
     ids, cases = world
     await call(feed.report_bec_result, cases["acme"], feed.BecResult(status="done", report={"Score": {"Value": 1, "Level": "Low"}}, summary={"score": 1, "level": "Low"}))
     assert await alerts_of(ids["acme"]) == []
+
+
+# ---- the case and ticket a person's search opens (migration 158) -------------------------------------------------------------------------------------------
+
+
+async def owner_rows(sql, **params):
+    owner = create_async_engine(PG_URL, poolclass=NullPool)
+    try:
+        async with owner.connect() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            return (await conn.execute(text(sql), params)).all()
+    finally:
+        await owner.dispose()
+
+
+async def owner_exec(sql, **params):
+    owner = create_async_engine(PG_URL, poolclass=NullPool)
+    try:
+        async with owner.begin() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            await conn.execute(text(sql), params)
+    finally:
+        await owner.dispose()
+
+
+@pytest.fixture
+async def with_case_and_ticket(world):
+    """The acme search already has the case and the claimed ticket request that starting it opens."""
+    ids, cases = world
+    case_row, action = uuid.uuid4(), uuid.uuid4()
+    await owner_exec(
+        "insert into aisoc_cases (id, tenant_id, title, description, severity, status, mitre_techniques, alert_ids, compliance_frameworks, tags, opened_at, created_at, updated_at, created_by) "
+        "values (:c, :t, 'BEC search: p@x.com', 'Started.', 'medium', 'new', '[]', '{}', '{}', '{}', now(), now(), now(), 'system')",
+        c=case_row,
+        t=ids["acme"],
+    )
+    await owner_exec("update bec_cases set aisoc_case_id = :c where id = :b", c=case_row, b=cases["acme"])
+    await owner_exec(
+        "insert into vendor_actions (id, tenant_id, vendor, incident_uid, action, params, status, created_at) values (:a, :t, 'core', :u, 'create_ticket', '{}', 'claimed', now())",
+        a=action,
+        t=ids["acme"],
+        u=f"bec-ticket:{cases['acme']}",
+    )
+    try:
+        yield ids, cases, case_row, action
+    finally:
+        await owner_exec("delete from vendor_actions where tenant_id = :t", t=ids["acme"])
+        await owner_exec("delete from aisoc_cases where tenant_id = :t", t=ids["acme"])
+        await owner_exec("delete from alerts where tenant_id = :t", t=ids["acme"])
+
+
+async def notes_for(tenant_id):
+    return await owner_rows("select params from vendor_actions where tenant_id = :t and action = 'ticket_note'", t=tenant_id)
+
+
+async def test_the_result_then_the_ticket_number_writes_the_result_on_the_case_and_once_on_the_ticket(with_case_and_ticket):
+    ids, cases, case_row, action = with_case_and_ticket
+    report = {"Score": {"Value": 9, "Level": "High"}, "NewRules": [{"Name": "x"}]}
+    await call(feed.report_bec_result, cases["acme"], feed.BecResult(status="done", message="ok", report=report, summary={"score": 9, "level": "High"}))
+    (case,) = await owner_rows("select description, severity from aisoc_cases where id = :c", c=case_row)
+    assert "CIPP rates it High" in case[0] and case[1] == "high"
+    assert await notes_for(ids["acme"]) == [], "there is no ticket number yet, so nothing can be written on a ticket"
+    await call(feed.report_core_feed_action_result, action, feed.ActionResult(status="done", message="Opened", ticket_id="4242"))
+    (note,) = await notes_for(ids["acme"])
+    assert note[0]["ticket_ids"] == ["4242"] and "CIPP rates it High" in note[0]["note"]
+    (bec,) = await owner_rows("select ticket_id, ticket_note_queued from bec_cases where id = :b", b=cases["acme"])
+    assert tuple(bec) == ("4242", True)
+    (tags,) = await owner_rows("select tags from aisoc_cases where id = :c", c=case_row)
+    assert tags[0]["ticket"] == "4242"
+
+
+async def test_the_ticket_number_then_the_result_writes_the_note_when_the_search_finishes(with_case_and_ticket):
+    ids, cases, case_row, action = with_case_and_ticket
+    await call(feed.report_core_feed_action_result, action, feed.ActionResult(status="done", message="Opened", ticket_id="5151"))
+    assert await notes_for(ids["acme"]) == [], "the search is still running"
+    await call(feed.report_bec_result, cases["acme"], feed.BecResult(status="failed", message="CIPP timed out"))
+    (note,) = await notes_for(ids["acme"])
+    assert note[0]["ticket_ids"] == ["5151"] and "did not finish" in note[0]["note"]
+    (case,) = await owner_rows("select severity from aisoc_cases where id = :c", c=case_row)
+    assert case[0] == "medium", "a failed search never raises the case"
+
+
+async def test_the_bell_list_shows_only_this_organizations_recent_finished_searches(world):
+    from datetime import UTC, datetime, timedelta
+
+    from app.api.v1.endpoints import identity_bec as ep
+
+    ids, cases = world
+    await owner_exec("update bec_cases set status = 'done', finished_at = :f, summary = '{\"level\": \"High\"}' where id = :b", f=datetime.now(UTC), b=cases["acme"])
+    await owner_exec("update bec_cases set status = 'done', finished_at = :f where id = :b", f=datetime.now(UTC), b=cases["stranger"])
+    engine = create_async_engine(APP_URL, poolclass=NullPool)
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as db:
+            from types import SimpleNamespace as NS
+
+            out = await ep.finished_bec_searches(NS(tenant_id=ids["parent"], user_id=uuid.uuid4()), db)
+    finally:
+        await engine.dispose()
+    assert [(i.id, i.level, i.status) for i in out.items] == [(cases["acme"], "High", "done")], "the other organization's search is not listed"
+    await owner_exec("update bec_cases set finished_at = :f where id = :b", f=datetime.now(UTC) - timedelta(hours=30), b=cases["acme"])
+    engine = create_async_engine(APP_URL, poolclass=NullPool)
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as db:
+            out = await ep.finished_bec_searches(NS(tenant_id=ids["parent"], user_id=uuid.uuid4()), db)
+    finally:
+        await engine.dispose()
+    assert out.items == [], "a search finished more than a day ago is not a notification"
