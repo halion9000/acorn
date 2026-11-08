@@ -48,6 +48,7 @@ from app.api.v1.endpoints import (
     detection_rules,
     detection_vendor,
     client_environment,
+    client_status,
     devices,
     dmarc,
     easm,
@@ -55,6 +56,7 @@ from app.api.v1.endpoints import (
     enrichment,
     federated,
     feedback,
+    finance,
     fusion,
     global_search,
     graph,
@@ -86,6 +88,7 @@ from app.api.v1.endpoints import (
     mssp,
     mssp_clients,
     nessus,
+    nist_coverage,
     nl_detection,
     nl_query,
     oauth,
@@ -120,6 +123,7 @@ from app.api.v1.endpoints import (
     signins,
     sla,
     sso_microsoft,
+    standing_approvals,
     stix_taxii,
     tenant_provision,
     tenant_ticket_settings,
@@ -144,6 +148,11 @@ api_router.include_router(alert_account.router)
 api_router.include_router(alert_related.router)
 api_router.include_router(alert_script_rules.router)
 api_router.include_router(tool_deploy_rules.router)
+api_router.include_router(standing_approvals.router)
+api_router.include_router(client_status.router)
+api_router.include_router(client_status.public_router)
+api_router.include_router(finance.router)
+api_router.include_router(nist_coverage.router)
 api_router.include_router(alert_suppressions.router)
 api_router.include_router(alert_ticket_rules.router)
 api_router.include_router(alert_quarantine_release.router)

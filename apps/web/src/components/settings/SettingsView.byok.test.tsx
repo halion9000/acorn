@@ -50,6 +50,10 @@ const mockGetConnectors = vi.hoisted(() => vi.fn());
 const mockGetConnectorStatuses = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/api', () => ({
+  // The Profile tab now also shows the authenticator-app card and the password card, which read these; a mock that lacks them made their load fail with an unhandled error.
+  apiErrorDetail: () => null,
+  totpApi: { status: async () => ({ enabled: false, recovery_codes_left: 0 }) },
+  passwordApi: { change: async () => ({ changed: true, detail: '' }) },
   __esModule: true,
   deploymentApi: {
     getAirgapStatus: mockGetAirgapStatus,

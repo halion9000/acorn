@@ -35,6 +35,9 @@ class FakeDB:
     def add(self, row):
         self.added.append(row)
 
+    async def flush(self):
+        return None
+
     async def commit(self):
         self.committed += 1
 
@@ -47,6 +50,11 @@ class FakeDB:
 def _quiet(monkeypatch):
     async def no_notify(row, *, event):
         return None
+
+    async def no_standing(db, tenant_id, action, title):
+        return None  # these tests are about the references, not standing approvals (see test_standing_approvals*.py)
+
+    monkeypatch.setattr(approvals, "_matching_standing_approval", no_standing)
 
     monkeypatch.setattr(approvals, "_notify_realtime", no_notify)
     monkeypatch.setattr(approvals.ApprovalResponse, "model_validate", classmethod(lambda cls, row: row))

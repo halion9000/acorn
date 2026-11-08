@@ -8,6 +8,8 @@ import { Fragment, useEffect, useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
 
+import { FinancePanel } from "./FinancePanel";
+
 export interface CountRow {
   source: string;
   item: string;
@@ -870,8 +872,8 @@ export function LicenceWaste() {
 }
 
 export function Billing() {
-  const [tab, setTab] = useState<"totals" | "client" | "changes" | "reconcile" | "mapping" | "quality" | "waste">("totals");
-  const tabs: [typeof tab, string][] = [["totals", "Totals by tool"], ["client", "By client"], ["changes", "Changes"], ["reconcile", "Billed vs counted"], ["mapping", "Invoice mapping"], ["quality", "Data quality"], ["waste", "Licence waste"]];
+  const [tab, setTab] = useState<"totals" | "client" | "changes" | "reconcile" | "mapping" | "quality" | "waste" | "finance">("totals");
+  const tabs: [typeof tab, string][] = [["totals", "Totals by tool"], ["client", "By client"], ["changes", "Changes"], ["reconcile", "Billed vs counted"], ["mapping", "Invoice mapping"], ["quality", "Data quality"], ["waste", "Licence waste"], ["finance", "Margin"]];
   return (
     <div className="space-y-4 p-6">
       <div>
@@ -890,7 +892,7 @@ export function Billing() {
           </button>
         ))}
       </div>
-      {tab === "totals" ? <Totals /> : tab === "client" ? <ByClient /> : tab === "reconcile" ? <Reconcile /> : tab === "mapping" ? <Mapping /> : tab === "quality" ? <DataQuality /> : tab === "waste" ? <LicenceWaste /> : <Changes />}
+      {tab === "totals" ? <Totals /> : tab === "client" ? <ByClient /> : tab === "reconcile" ? <Reconcile /> : tab === "mapping" ? <Mapping /> : tab === "quality" ? <DataQuality /> : tab === "waste" ? <LicenceWaste /> : tab === "finance" ? <FinancePanel /> : <Changes />}
     </div>
   );
 }

@@ -39,6 +39,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
     # source of the P0.3 audit finding.
     "admin": ["*"],
     "tenant_admin": [
+        "finance:view",  # the workspace owner sees prices and margins; staff roles do not, and a custom role can be given them
+        "finance:write",
         "alerts:read",
         "alerts:write",
         "alerts:delete",

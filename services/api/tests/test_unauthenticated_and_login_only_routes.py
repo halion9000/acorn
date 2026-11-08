@@ -36,6 +36,7 @@ OWN = "acts only on the caller's own account, credential, subscription or prefer
 OWN_VIEWS = "the caller's own saved views: every handler filters on SavedView.user_id == the caller"
 
 OPEN_ROUTES: dict[tuple[str, str], str] = {
+    ("GET", "/api/v1/public/client-status/{token}"): "a client's private read-only status page: the secret in the address is the credential (only its hash is stored); an unknown, revoked, expired or unreviewed link all get the same 404; it returns counts and plain labels only",
     ("POST", "/api/v1/auth/login"): ENTRY + " (locked after repeated failures, see login_throttle)",
     ("POST", "/api/v1/auth/refresh"): ENTRY + " (refresh token)",
     ("POST", "/api/v1/passkeys/authenticate/begin"): ENTRY + " (passkey sign-in)",

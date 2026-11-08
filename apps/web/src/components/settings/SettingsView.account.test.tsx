@@ -12,6 +12,10 @@ const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/api', () => ({
+  // The Profile tab now also shows the authenticator-app card and the password card, which read these; a mock that lacks them made their load fail with an unhandled error.
+  apiErrorDetail: () => null,
+  totpApi: { status: async () => ({ enabled: false, recovery_codes_left: 0 }) },
+  passwordApi: { change: async () => ({ changed: true, detail: '' }) },
   __esModule: true,
   authApi: { currentUser: () => currentUser(), updateUserPreferences: (p: unknown) => updateUserPreferences(p) },
   tenantsApi: { details: () => details(), users: () => users() },

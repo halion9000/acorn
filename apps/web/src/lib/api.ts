@@ -6212,6 +6212,82 @@ export interface ApprovalAgreementResponse {
   rules: string;
 }
 
+export interface StandingApproval {
+  id: string;
+  action_type: string;
+  client_id: string | null;
+  note: string;
+  created_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+  state: 'active' | 'expired' | 'revoked';
+}
+
+export interface StandingApprovalList {
+  items: StandingApproval[];
+  allowed_types: string[];
+  default_days: number;
+}
+
+export interface AutoApprovedCard {
+  id: string;
+  title: string;
+  status: string;
+  decided_at: string | null;
+  standing_approval_id: string | null;
+  undo: { how?: string } | null;
+  undone_at: string | null;
+}
+
+export const standingApprovalsApi = {
+  list: () => request<StandingApprovalList>('/api/v1/standing-approvals'),
+  create: (body: { action_type: string; client_id?: string | null; days: number; note?: string }) =>
+    request<StandingApproval>('/api/v1/standing-approvals', { method: 'POST', body: JSON.stringify(body) }),
+  revoke: (id: string) => request<StandingApproval>(`/api/v1/standing-approvals/${encodeURIComponent(id)}/revoke`, { method: 'POST' }),
+  /** Approved cards, newest first; the ones a standing approval approved on its own carry standing_approval_id. */
+  recentApproved: () => request<{ items: AutoApprovedCard[] }>('/api/v1/approvals?status=approved&page_size=50'),
+  undo: (approvalId: string) => request<AutoApprovedCard>(`/api/v1/approvals/${encodeURIComponent(approvalId)}/undo`, { method: 'POST' }),
+};
+
+export interface ClientStatusLink {
+  id: string;
+  client_id: string;
+  client_name: string | null;
+  label: string;
+  created_at: string;
+  expires_at: string;
+  reviewed_at: string | null;
+  revoked_at: string | null;
+  last_opened_at: string | null;
+  state: string;
+}
+
+export interface ClientStatusLinkList {
+  links: ClientStatusLink[];
+  clients: { id: string; name: string }[];
+  default_days: number;
+}
+
+export interface ClientStatusPreview {
+  client_name: string;
+  generated_at: string | null;
+  devices: { total: number; protected: number; percent: number | null };
+  people: { total: number; protected: number; percent: number | null } | null;
+  alerts: { open: number; being_worked_on: number };
+  tools: string[];
+  copy: Record<'title' | 'intro' | 'devices' | 'people' | 'alerts_open' | 'alerts_handled' | 'tools' | 'footer', string>;
+}
+
+export const clientStatusLinksApi = {
+  list: () => request<ClientStatusLinkList>('/api/v1/client-status-links'),
+  /** The secret comes back ONCE, in `token`. */
+  create: (body: { client_id: string; label?: string; days: number }) =>
+    request<ClientStatusLink & { token: string }>('/api/v1/client-status-links', { method: 'POST', body: JSON.stringify(body) }),
+  preview: (id: string) => request<ClientStatusPreview>(`/api/v1/client-status-links/${encodeURIComponent(id)}/preview`),
+  review: (id: string) => request<ClientStatusLink>(`/api/v1/client-status-links/${encodeURIComponent(id)}/review`, { method: 'POST' }),
+  revoke: (id: string) => request<ClientStatusLink>(`/api/v1/client-status-links/${encodeURIComponent(id)}/revoke`, { method: 'POST' }),
+};
+
 export const approvalAgreementApi = {
   /** How often people agreed with each kind of action an agent asked approval for (last 90 days). */
   get: () => request<ApprovalAgreementResponse>('/api/v1/approvals/agreement'),

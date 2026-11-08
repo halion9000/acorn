@@ -17,6 +17,10 @@ vi.mock('swr', () => ({
 
 const apiKeysApi = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), revoke: vi.fn() }));
 vi.mock('@/lib/api', () => ({
+  // The Profile tab now also shows the authenticator-app card and the password card, which read these; a mock that lacks them made their load fail with an unhandled error.
+  apiErrorDetail: () => null,
+  totpApi: { status: async () => ({ enabled: false, recovery_codes_left: 0 }) },
+  passwordApi: { change: async () => ({ changed: true, detail: '' }) },
   __esModule: true,
   apiKeysApi,
   deploymentApi: { getAirgapStatus: vi.fn(), getLlmStatus: vi.fn(), getLlmCredential: vi.fn(), upsertLlmCredential: vi.fn(), deleteLlmCredential: vi.fn() },

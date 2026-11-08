@@ -12,6 +12,7 @@ import VendorBadge from "@/components/mssp/VendorBadge";
 import { vendorLabel } from "@/components/mssp/ClientMapping";
 import { vendorClientUrl } from "@/lib/vendor-links";
 import { DomainChecks } from "./DomainChecks";
+import { NistCoverage } from "./NistCoverage";
 import { ToolChecks, checkTitle, type PostureCheck } from "./ToolChecks";
 import { ClientSummary } from "./ClientSummary";
 import { SourceHealth } from "./SourceHealth";
@@ -288,6 +289,7 @@ export function ClientPosture() {
             <ToolChecks key={source} tool={source} label={TOOL_CHECK_LABELS[source] ?? source} checks={v.checks} refreshedAt={v.refreshed_at} clientId={shown.client_id} onChanged={() => setReload((n) => n + 1)} onlyProblems={onlyProblems} />
           ))}
           <DomainChecks clientId={shown.client_id} />
+          <NistCoverage clientId={shown.client_id} />
           <ClientSummary posture={shown} labelFor={labelFor} />
           <section>
             <h3 className="mb-2 text-sm uppercase text-gray-500">Alerts and cases</h3>

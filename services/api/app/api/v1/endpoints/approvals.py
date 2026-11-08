@@ -31,8 +31,11 @@ from app.core.config import settings
 from app.db.rls import TenantDBSession
 from app.models.investigation import InvestigationRun
 from app.models.responder import AgentApproval
+from app.models.standing_approval import StandingApproval
 from app.models.tenant import User
 from app.services import autonomy_agreement as agreement
+from app.services import standing_approvals
+from app.services.audit import emit_audit
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +63,9 @@ class ApprovalResponse(BaseModel):
     decided_at: datetime | None
     decision_comment: str | None
     expires_at: datetime | None
+    standing_approval_id: uuid.UUID | None = None
+    undo: dict | None = None
+    undone_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -85,6 +91,8 @@ class ApprovalCreateRequest(BaseModel):
     summary: str = Field(min_length=1)
     risk_level: Literal["low", "medium", "high", "critical"] = "medium"
     action: dict[str, Any] = Field(default_factory=dict)
+    # How to reverse the action if a person presses Undo within 24 hours (a short description the agent supplies, for example {"how": "reopen the alert"}).
+    undo: dict[str, Any] | None = None
     expires_at: datetime | None = None
 
 
@@ -240,17 +248,80 @@ async def create_approval(
         summary=body.summary,
         risk_level=body.risk_level,
         action=body.action,
+        undo=body.undo,
         expires_at=body.expires_at,
         status="pending",
     )
     db.add(row)
+    await db.flush()
+    standing = await _matching_standing_approval(db, user.tenant_id, body.action, body.title)
+    if standing is not None:
+        # A person already said "always allow this" for this kind of action: approve it now, say which decision did it, and leave an audit entry.
+        row.status = "approved"
+        row.decided_at = datetime.now(UTC)
+        row.decision_comment = f"Approved by a standing approval ({standing.action_type}, until {standing.expires_at.date().isoformat()}) made by a person."
+        row.standing_approval_id = standing.id
+        await emit_audit(
+            db=db,
+            tenant_id=user.tenant_id,
+            actor_id=standing.created_by,
+            action="approval:auto_approved",
+            resource="agent_approval",
+            resource_id=str(row.id),
+            changes={"standing_approval_id": str(standing.id), "action_type": standing.action_type, "requested_by": body.requested_by},
+        )
     await db.commit()
     await db.refresh(row)
 
     # Best-effort push notification — failure must not block the agent run.
-    await _notify_realtime(row, event="approval_request")
+    await _notify_realtime(row, event="approval_decided" if row.status == "approved" else "approval_request")
 
     return ApprovalResponse.model_validate(row)
+
+
+async def _matching_standing_approval(db: Any, tenant_id: uuid.UUID, action: dict[str, Any], title: str) -> StandingApproval | None:
+    """The first active standing approval of this tenant that covers the card, or None. Matching is the pure function in app.services.standing_approvals."""
+    now = datetime.now(UTC)
+    rows = (await db.execute(select(StandingApproval).where(StandingApproval.tenant_id == tenant_id, StandingApproval.revoked_at.is_(None), StandingApproval.expires_at > now))).scalars().all()
+    for r in rows:
+        if standing_approvals.matches({"action_type": r.action_type, "client_id": r.client_id, "expires_at": r.expires_at, "revoked_at": r.revoked_at}, action, title, now):
+            return r
+    return None
+
+
+UNDO_HOURS = 24
+
+
+# Undoing is a person's act, like deciding: a signed-in session, not an API key. Within 24 hours of the decision, once, and only for an approved action that said how it can be reversed. It marks the card
+# and tells the agents service (event ``approval_undone``) to reverse it; the reversal itself is the agent's step.
+@router.post("/{approval_id}/undo", response_model=ApprovalResponse, dependencies=[Depends(require_signed_in_session)])
+async def undo_approval(approval_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("cases:write"))], db: TenantDBSession) -> ApprovalResponse:
+    row = (await db.execute(select(AgentApproval).where(AgentApproval.id == approval_id, AgentApproval.tenant_id == user.tenant_id).with_for_update())).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found")
+    problem = undo_problem(row.status, row.undo, row.decided_at, row.undone_at, datetime.now(UTC))
+    if problem:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=problem)
+    row.undone_at = datetime.now(UTC)
+    row.undone_by_id = user.user_id
+    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="approval:undone", resource="agent_approval", resource_id=str(row.id), changes={"undo": row.undo})
+    await db.commit()
+    await db.refresh(row)
+    await _notify_realtime(row, event="approval_undone")
+    return ApprovalResponse.model_validate(row)
+
+
+def undo_problem(status_: str, undo: dict | None, decided_at: datetime | None, undone_at: datetime | None, now: datetime) -> str | None:
+    """Why Undo is not possible right now, or None when it is (pure)."""
+    if undone_at is not None:
+        return "This action was already undone."
+    if status_ != "approved":
+        return "Only an approved action can be undone."
+    if not undo:
+        return "This action did not say how it can be reversed, so it cannot be undone from here."
+    if decided_at is None or now - decided_at > timedelta(hours=UNDO_HOURS):
+        return f"Undo is only possible within {UNDO_HOURS} hours of the approval."
+    return None
 
 
 # DECIDING an approval is a person's act: it is the human sign-off for a destructive agent action (isolate a host, disable a user, a

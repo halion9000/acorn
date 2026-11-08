@@ -64,6 +64,8 @@ import { AzureSpendPanel } from './AzureSpendPanel';
 import { TenantAccessPanel } from './TenantAccessPanel';
 import { AutonomyPolicyPanel } from '@/components/settings/AutonomyPolicy';
 import { AutonomyAgreement } from '@/components/settings/AutonomyAgreement';
+import { StandingApprovals } from '@/components/settings/StandingApprovals';
+import { ClientStatusLinks } from '@/components/settings/ClientStatusLinks';
 import { useTheme, type ThemePreference } from '@/components/theme/ThemeProvider';
 import { authFetch } from '@/lib/auth-session';
 import { AvatarError, avatarFromFile, avatarOf } from '@/lib/avatar';
@@ -393,10 +395,16 @@ export function SettingsView() {
               className="rounded-xl border border-gray-800 bg-gray-900/40"
             >
               {tab === 'profile' && <ProfilePanel />}
-              {tab === 'workspace' && <WorkspacePanel canAdd={capabilities.includes('manage_users')} />}
+              {tab === 'workspace' && (
+                <>
+                  <WorkspacePanel canAdd={capabilities.includes('manage_users')} />
+                  <ClientStatusLinks />
+                </>
+              )}
               {tab === 'autonomy' && (
                 <>
                   <AutonomyAgreement />
+                  <StandingApprovals />
                   <AutonomyPolicyPanel />
                 </>
               )}
