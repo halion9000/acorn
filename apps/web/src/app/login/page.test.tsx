@@ -202,3 +202,50 @@ describe('a refused sign-in says why in the server\'s own words', () => {
     expect(await screen.findByText(/API 403/)).toBeInTheDocument();
   });
 });
+
+describe('an account with an authenticator app', () => {
+  beforeEach(() => {
+    login.mockReset();
+    replace.mockReset();
+    isAuthenticated.mockReturnValue(false);
+  });
+
+  const typeNamePassword = async () => {
+    await userEvent.type(screen.getByLabelText(/account name/i), 'hal');
+    await userEvent.type(document.querySelector('input[type="password"]') as HTMLInputElement, 'a-long-enough-password');
+    await userEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
+  };
+
+  it('asks for the code after the password was right, then signs in with it', async () => {
+    login.mockRejectedValueOnce(new ApiError('API 428', 428, JSON.stringify({ detail: 'Enter the 6-digit code from your authenticator app (or a recovery code).' })));
+    login.mockResolvedValueOnce({});
+    render(<LoginPage />);
+    await typeNamePassword();
+    const codeBox = await screen.findByLabelText('Authenticator code');
+    expect(screen.queryByText(/API 428/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^sign in$/i })).toBeDisabled();
+    await userEvent.type(codeBox, '123456');
+    await userEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
+    await waitFor(() => expect(login).toHaveBeenLastCalledWith('hal', 'a-long-enough-password', '123456'));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+  });
+
+  it('says the code is wrong, not the password, when the server refuses the code', async () => {
+    login.mockRejectedValueOnce(new ApiError('API 428', 428, ''));
+    login.mockRejectedValueOnce(new ApiError('API 401', 401, JSON.stringify({ detail: 'That code is not right.' })));
+    render(<LoginPage />);
+    await typeNamePassword();
+    await userEvent.type(await screen.findByLabelText('Authenticator code'), '000000');
+    await userEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
+    expect(await screen.findByText(/That code is not right/)).toBeInTheDocument();
+    expect(screen.queryByText(/account name or password incorrect/i)).not.toBeInTheDocument();
+  });
+
+  it('shows no code box for an account that does not need one', async () => {
+    login.mockResolvedValue({});
+    render(<LoginPage />);
+    await typeNamePassword();
+    await waitFor(() => expect(login).toHaveBeenCalledWith('hal', 'a-long-enough-password'));
+    expect(screen.queryByLabelText('Authenticator code')).not.toBeInTheDocument();
+  });
+});

@@ -24,6 +24,7 @@ vi.mock('@/lib/api', () => ({
   tenantsApi: { details: () => details(), users: () => users(), createUser: (b: unknown) => createUser(b), rename: (n: string) => rename(n) },
   apiErrorDetail: (e: unknown) => apiErrorDetail(e),
   passkeyApi: { list: async () => ({ items: [] }) },
+  totpApi: { status: async () => ({ enabled: false, recovery_codes_left: 0 }) },
   ApiError: class ApiError extends Error {
     status: number;
     constructor(message: string, status = 500) {

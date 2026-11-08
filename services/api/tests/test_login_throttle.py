@@ -25,6 +25,7 @@ from app.core.security import get_password_hash
 from app.db.database import Base
 from app.models.login_failure import LoginFailure
 from app.models.tenant import ApiKey, Tenant, User
+from app.models.user_totp import UserTotp
 from app.scripts import login_lockout
 from app.services import login_throttle
 from fastapi import FastAPI
@@ -53,7 +54,7 @@ def _email_sign_in_is_on_for_these_tests(monkeypatch):
 def world(tmp_path):
     path = tmp_path / "throttle.db"
     sync = create_engine(f"sqlite:///{path}")
-    Base.metadata.create_all(sync, tables=[Tenant.__table__, User.__table__, ApiKey.__table__, LoginFailure.__table__])
+    Base.metadata.create_all(sync, tables=[Tenant.__table__, User.__table__, ApiKey.__table__, LoginFailure.__table__, UserTotp.__table__])
     t = Tenant(id=uuid.uuid4(), name="T", slug="t-" + uuid.uuid4().hex[:6])
 
     def user(email, active=True):

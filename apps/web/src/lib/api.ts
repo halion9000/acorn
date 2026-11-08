@@ -312,10 +312,10 @@ export const authApi = {
    * + mobile.
    */
   /** Sign in with an ACCOUNT NAME (or, while the server allows it, the old email). */
-  async login(accountName: string, password: string): Promise<LoginResult> {
+  async login(accountName: string, password: string, totpCode?: string): Promise<LoginResult> {
     const tokens = await request<TokenResponse>('/api/v1/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ account_name: accountName, password }),
+      body: JSON.stringify({ account_name: accountName, password, ...(totpCode ? { totp_code: totpCode } : {}) }),
     });
     // Stash the access token now so the `me` request flows through the
     // standard `Authorization: Bearer …` path in `request()`.
@@ -7240,3 +7240,17 @@ export const searchApi = {
   },
 };
 
+/** The authenticator-app code a password sign-in asks for (set up under Settings > Profile). */
+export interface TotpStatus {
+  enabled: boolean;
+  recovery_codes_left: number;
+}
+
+export const totpApi = {
+  status: () => request<TotpStatus>('/api/v1/auth/totp'),
+  /** Start setting one up: the secret to type in (or the address a QR code would hold). Nothing changes about signing in until `confirm`. */
+  enrol: () => request<{ secret: string; otpauth_uri: string }>('/api/v1/auth/totp/enrol', { method: 'POST' }),
+  /** The person typed a code from the app: it is then on, and the recovery codes come back ONCE. */
+  confirm: (code: string) => request<{ recovery_codes: string[]; note: string }>('/api/v1/auth/totp/confirm', { method: 'POST', body: JSON.stringify({ code }) }),
+  disable: (password: string, code: string) => request<{ ok: boolean }>('/api/v1/auth/totp/disable', { method: 'POST', body: JSON.stringify({ password, code }) }),
+};

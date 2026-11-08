@@ -92,6 +92,7 @@ from app.api.v1.endpoints import (
     oncall,
     osquery_fim,
     passkeys,
+    totp,
     phishing,
     platform_alert_email,
     platform_azure_spend,
@@ -134,6 +135,7 @@ from app.api.v1.endpoints import (
 api_router = APIRouter(prefix="/api/v1")
 
 api_router.include_router(auth.router)
+api_router.include_router(totp.router)
 api_router.include_router(api_keys.router)
 api_router.include_router(alerts.router)
 api_router.include_router(alert_vendor_actions.router)

@@ -229,6 +229,90 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/auth/totp:
+    get:
+      tags:
+      - auth
+      summary: Totp Status
+      operationId: totp_status_api_v1_auth_totp_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TotpStatus'
+      security:
+      - HTTPBearer: []
+  /api/v1/auth/totp/enrol:
+    post:
+      tags:
+      - auth
+      summary: Enrol
+      operationId: enrol_api_v1_auth_totp_enrol_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrolOut'
+      security:
+      - HTTPBearer: []
+  /api/v1/auth/totp/confirm:
+    post:
+      tags:
+      - auth
+      summary: Confirm
+      operationId: confirm_api_v1_auth_totp_confirm_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/auth/totp/disable:
+    post:
+      tags:
+      - auth
+      summary: Disable
+      operationId: disable_api_v1_auth_totp_disable_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisableIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Done'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/api-keys:
     get:
       tags:
@@ -29078,6 +29162,17 @@ components:
       - summary_markdown
       title: ClosedSummary
       description: Response body for POST /close.
+    CodeIn:
+      properties:
+        code:
+          type: string
+          maxLength: 32
+          minLength: 1
+          title: Code
+      type: object
+      required:
+      - code
+      title: CodeIn
     CollectEvidenceRequest:
       properties:
         framework:
@@ -29502,6 +29597,22 @@ components:
       - action
       - result
       title: ConfirmActionResponse
+    ConfirmOut:
+      properties:
+        recovery_codes:
+          items:
+            type: string
+          type: array
+          title: Recovery Codes
+        note:
+          type: string
+          title: Note
+          default: Keep these somewhere safe. Each works once if you lose your phone.
+            They are not shown again.
+      type: object
+      required:
+      - recovery_codes
+      title: ConfirmOut
     ConnectorHealthSummary:
       properties:
         total:
@@ -32340,6 +32451,24 @@ components:
       required:
       - accepted
       title: DirectoryAuditsResponse
+    DisableIn:
+      properties:
+        password:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Password
+        code:
+          type: string
+          maxLength: 32
+          minLength: 1
+          title: Code
+          description: A current code from the app, or an unused recovery code.
+      type: object
+      required:
+      - password
+      - code
+      title: DisableIn
     DisagreementRow:
       properties:
         client_id:
@@ -32669,6 +32798,14 @@ components:
       - dmarc
       - dkim
       title: DomainWithWeb
+    Done:
+      properties:
+        ok:
+          type: boolean
+          title: Ok
+          default: true
+      type: object
+      title: Done
     DriftEntry:
       properties:
         ruleId:
@@ -33116,6 +33253,19 @@ components:
       - override_note
       - parameter_overrides
       title: EffectiveRuleOut
+    EnrolOut:
+      properties:
+        secret:
+          type: string
+          title: Secret
+        otpauth_uri:
+          type: string
+          title: Otpauth Uri
+      type: object
+      required:
+      - secret
+      - otpauth_uri
+      title: EnrolOut
     EntitiesReport:
       properties:
         vendor:
@@ -37776,6 +37926,12 @@ components:
         password:
           type: string
           title: Password
+        totp_code:
+          anyOf:
+          - type: string
+            maxLength: 32
+          - type: 'null'
+          title: Totp Code
       type: object
       required:
       - account_name
@@ -49029,6 +49185,19 @@ components:
       - clients
       - total
       title: TotalRow
+    TotpStatus:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+        recovery_codes_left:
+          type: integer
+          title: Recovery Codes Left
+          default: 0
+      type: object
+      required:
+      - enabled
+      title: TotpStatus
     TranslateRequest:
       properties:
         source_format:

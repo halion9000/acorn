@@ -40,7 +40,7 @@ from app.core.token_revocation import (
 )
 from app.core.trusted_proxy import resolve_client_ip
 from app.models.tenant import User
-from app.services import login_throttle
+from app.services import login_throttle, totp_store
 from app.services.user_lookup import find_user_by_login
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,8 @@ class LoginRequest(BaseModel):
 
     identifier: str = Field(min_length=1, max_length=320, validation_alias=AliasChoices("account_name", "username", "email", "identifier"))
     password: str
+    # The six-digit code from the person's authenticator app, or one of their recovery codes. Only needed when they have set one up (app.services.totp_store); otherwise ignored.
+    totp_code: str | None = Field(default=None, max_length=32)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -178,11 +180,23 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    await login_throttle.clear_failures(db, request.identifier)  # this name starts again (the client address's count stays)
-
     # With Microsoft sign-in on, only administrators may still use a password (a way back in if Microsoft or its setup breaks). Said only AFTER the password is right, so it reveals nothing about who has an account.
     if not password_login_allowed(user.role):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in with Microsoft.")
+
+    # A second factor, for anyone who has set up an authenticator app. Asked only AFTER the password is right (so it reveals nothing about who has an account), and a wrong code is counted like a wrong password.
+    if await totp_store.is_enabled(db, user.id, user.tenant_id):
+        if not request.totp_code or not request.totp_code.strip():
+            raise HTTPException(
+                status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+                detail="Enter the 6-digit code from your authenticator app (or a recovery code).",
+            )
+        if await totp_store.check_code(db, user.id, user.tenant_id, request.totp_code) is None:
+            await login_throttle.record_failure(db, request.identifier, client_ip)
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="That code is not right.", headers={"WWW-Authenticate": "Bearer"})
+
+    # Only now, with the password AND any second factor right, does this name start again (the client address's count stays). Clearing it after the password alone would let someone who knows the password guess codes for ever.
+    await login_throttle.clear_failures(db, request.identifier)
 
     # Update last login
     await db.execute(update(User).where(User.id == user.id).values(last_login=datetime.now(UTC)))

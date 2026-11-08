@@ -55,6 +55,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field, PanelHeader, inputClass } from './panel-parts';
 import { AlertEmailPanel } from './AlertEmailPanel';
 import { PasskeysCard } from './PasskeysCard';
+import { TotpCard } from './TotpCard';
 import { keyHealth } from './apiKeyHealth';
 import { MemberEditor } from './MemberEditor';
 import { SoftwareUpdatePanel } from './SoftwareUpdatePanel';
@@ -634,6 +635,8 @@ function ProfilePanel() {
         </div>
 
         <PasskeysCard />
+
+        <TotpCard />
 
         <div className="rounded-lg border border-gray-800 bg-gray-950/40 p-4 text-xs text-gray-500">
           Your display name, job title and timezone are saved to your user account and follow you across devices when you sign in.

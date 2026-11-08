@@ -54,6 +54,7 @@ Audit of every value-limiting constraint added since 080 (2026-10-23): each colu
 | `154_halo_user_action.sql` | One more `vendor_actions.action` value, `create_halo_user` (add a person to HaloPSA as a user) |
 | `155_alert_script_rules.sql` | `alert_script_rules`: run a script automatically for an alert type, choosing the script by the machine's operating system |
 | `156_tool_deploy_rules.sql` | `tool_deploy_rules`: install a tool (Huntress, Field Effect, ScreenConnect) automatically on machines that should have it and do not |
+| `159_user_totp.sql` | `user_totp`: authenticator-app (TOTP) setup per person, secret encrypted, single-use recovery codes stored as hashes (A13) |
 | `158_bec_followup.sql` | `bec_cases.aisoc_case_id`, `ticket_id`, `ticket_note_queued`: a BEC search started by a person opens a case and a HaloPSA ticket and writes the result on both |
 | `157_addigy_push.sql` | the `addigy_push` action (re-run the Addigy policy deployment on a Mac whose policy includes the tool) and `tool_deploy_rules.via_addigy` |
 | `153_inventory_write_permission.sql` | `inventory:write` added to the permissions catalog (implied by `mssp:manage`), so a custom role can manage inventory on its own |

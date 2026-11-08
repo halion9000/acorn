@@ -63,6 +63,9 @@ function LoginInner() {
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  // Set when the server says this account has an authenticator app: the password was right, a code is now needed.
+  const [needCode, setNeedCode] = useState(false);
+  const [code, setCode] = useState('');
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -138,7 +141,8 @@ function LoginInner() {
     setError(null);
 
     try {
-      await authApi.login(identifier.trim(), password);
+      if (needCode) await authApi.login(identifier.trim(), password, code.trim());
+      else await authApi.login(identifier.trim(), password);
       setPhase('success');
       router.replace(next);
     } catch (err) {
@@ -149,6 +153,13 @@ function LoginInner() {
       // Map the common 401 to something a human understands.
       if (locked) {
         setError(locked);
+      } else if ((err as { status?: unknown } | null)?.status === 428) {
+        // The password was right and this account has an authenticator app: ask for the code (not an error).
+        setNeedCode(true);
+        setError(null);
+        setPhase('idle');
+      } else if (needCode && (err as { status?: unknown } | null)?.status === 401 && /code/i.test(apiErrorDetail(err) ?? '')) {
+        setError('That code is not right. Try the next one from your app, or use a recovery code.');
       } else if (/401|incorrect/i.test(message)) {
         setError('Account name or password incorrect.');
       } else {
@@ -244,9 +255,28 @@ function LoginInner() {
               />
             </label>
 
+            {needCode ? (
+              <label className="block">
+                <span className="block text-xs uppercase tracking-wider text-zinc-500 mb-2">Authenticator code</span>
+                <input
+                  type="text"
+                  inputMode="text"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  placeholder="6-digit code or a recovery code"
+                  aria-label="Authenticator code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  disabled={phase === 'pending'}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 disabled:opacity-60"
+                />
+                <span className="block text-xs text-zinc-500 mt-2">Open your authenticator app and type the code for A.C.O.R.N. Lost your phone? Use one of your recovery codes.</span>
+              </label>
+            ) : null}
+
             <button
               type="submit"
-              disabled={phase === 'pending' || !identifier || !password}
+              disabled={phase === 'pending' || !identifier || !password || (needCode && !code.trim())}
               className="w-full bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 text-white font-medium rounded-xl py-3 px-4 transition flex items-center justify-center gap-2 disabled:bg-zinc-800 disabled:text-zinc-500"
             >
               {phase === 'pending' ? (
