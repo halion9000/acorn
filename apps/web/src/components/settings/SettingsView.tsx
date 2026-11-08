@@ -62,6 +62,7 @@ import { SoftwareUpdatePanel } from './SoftwareUpdatePanel';
 import { AzureSpendPanel } from './AzureSpendPanel';
 import { TenantAccessPanel } from './TenantAccessPanel';
 import { AutonomyPolicyPanel } from '@/components/settings/AutonomyPolicy';
+import { AutonomyAgreement } from '@/components/settings/AutonomyAgreement';
 import { useTheme, type ThemePreference } from '@/components/theme/ThemeProvider';
 import { authFetch } from '@/lib/auth-session';
 import { AvatarError, avatarFromFile, avatarOf } from '@/lib/avatar';
@@ -392,7 +393,12 @@ export function SettingsView() {
             >
               {tab === 'profile' && <ProfilePanel />}
               {tab === 'workspace' && <WorkspacePanel canAdd={capabilities.includes('manage_users')} />}
-              {tab === 'autonomy' && <AutonomyPolicyPanel />}
+              {tab === 'autonomy' && (
+                <>
+                  <AutonomyAgreement />
+                  <AutonomyPolicyPanel />
+                </>
+              )}
               {tab === 'api-keys' && <ApiKeysPanel />}
               {tab === 'tenant-access' && <TenantAccessPanel canGrantAll={capabilities.includes('platform_admin')} />}
               {tab === 'alert-email' && <AlertEmailPanel />}

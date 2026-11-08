@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 import httpx
@@ -32,6 +32,7 @@ from app.db.rls import TenantDBSession
 from app.models.investigation import InvestigationRun
 from app.models.responder import AgentApproval
 from app.models.tenant import User
+from app.services import autonomy_agreement as agreement
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +140,44 @@ async def list_approvals(
         page=page,
         page_size=page_size,
         pages=max(1, (int(total) + page_size - 1) // page_size),
+    )
+
+
+class AgreementRowResponse(BaseModel):
+    action: str
+    proposed: int
+    approved: int
+    denied: int
+    expired: int
+    pending: int
+    decided: int
+    agreement: float | None
+    suggestion: str
+
+
+class AgreementResponse(BaseModel):
+    window_days: int
+    rows: list[AgreementRowResponse]
+    rules: str
+
+
+@router.get("/agreement", response_model=AgreementResponse, dependencies=[Depends(require_permission("settings:read"))])
+async def approval_agreement(user: AuthUser, db: TenantDBSession) -> AgreementResponse:
+    """For each kind of action an agent asked approval for in the last 90 days: how many, how many a person approved, denied or let expire, and the agreement share, with a suggestion (promote, keep, demote, too few).
+
+    Only reports; it never changes an autonomy setting. See ``app.services.autonomy_agreement`` for the rules.
+    """
+    since = datetime.now(UTC) - timedelta(days=agreement.WINDOW_DAYS)
+    stmt = select(AgentApproval.action, AgentApproval.title, AgentApproval.status, AgentApproval.created_at).where(AgentApproval.tenant_id == user.tenant_id, AgentApproval.created_at >= since)
+    rows = [{"action": a, "title": t, "status": st, "created_at": c} for a, t, st, c in (await db.execute(stmt)).all()]
+    out = agreement.summarize(rows, datetime.now(UTC))
+    return AgreementResponse(
+        window_days=agreement.WINDOW_DAYS,
+        rows=[AgreementRowResponse(**vars(r)) for r in out],
+        rules=(
+            f"Decided = approved + denied + expired (an expired card counts against). Agreement = approved / decided. Promotion is suggested at {agreement.PROMOTE_MIN_DECIDED}+ decided and "
+            f"{int(agreement.PROMOTE_AT * 100)}%+ agreement; demotion under {int(agreement.DEMOTE_BELOW * 100)}% with {agreement.DEMOTE_MIN_DECIDED}+ decided. Nothing changes by itself."
+        ),
     )
 
 

@@ -6193,6 +6193,30 @@ export interface AutonomyThresholdUpdateResponse {
   updated_by: string;
 }
 
+export interface ApprovalAgreementRow {
+  action: string;
+  proposed: number;
+  approved: number;
+  denied: number;
+  expired: number;
+  pending: number;
+  decided: number;
+  /** approved / decided, or null while nothing is decided. */
+  agreement: number | null;
+  suggestion: 'promote' | 'keep' | 'demote' | 'too few';
+}
+
+export interface ApprovalAgreementResponse {
+  window_days: number;
+  rows: ApprovalAgreementRow[];
+  rules: string;
+}
+
+export const approvalAgreementApi = {
+  /** How often people agreed with each kind of action an agent asked approval for (last 90 days). */
+  get: () => request<ApprovalAgreementResponse>('/api/v1/approvals/agreement'),
+};
+
 export const autonomyPolicyApi = {
   /** Effective policy (defaults + DB overrides) for the calling tenant. */
   list: () => request<AutonomyPolicyResponse>('/api/v1/autonomy-policy'),
