@@ -56,6 +56,7 @@ import { Field, PanelHeader, inputClass } from './panel-parts';
 import { AlertEmailPanel } from './AlertEmailPanel';
 import { PasskeysCard } from './PasskeysCard';
 import { TotpCard } from './TotpCard';
+import { ChangePasswordCard } from './ChangePasswordCard';
 import { keyHealth } from './apiKeyHealth';
 import { MemberEditor } from './MemberEditor';
 import { SoftwareUpdatePanel } from './SoftwareUpdatePanel';
@@ -642,6 +643,7 @@ function ProfilePanel() {
 
         <PasskeysCard />
 
+        <ChangePasswordCard />
         <TotpCard />
 
         <div className="rounded-lg border border-gray-800 bg-gray-950/40 p-4 text-xs text-gray-500">

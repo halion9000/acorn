@@ -7283,6 +7283,12 @@ export interface TotpStatus {
   recovery_codes_left: number;
 }
 
+export const passwordApi = {
+  /** Change your own password. The current one must be right; every session of yours ends, this one included. */
+  change: (current_password: string, new_password: string) =>
+    request<{ changed: boolean; detail: string }>('/api/v1/auth/password', { method: 'POST', body: JSON.stringify({ current_password, new_password }) }),
+};
+
 export const totpApi = {
   status: () => request<TotpStatus>('/api/v1/auth/totp'),
   /** Start setting one up: the secret to type in (or the address a QR code would hold). Nothing changes about signing in until `confirm`. */
