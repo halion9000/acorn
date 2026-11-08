@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { FrameworkIndex } from '@/components/compliance/FrameworkIndex';
+import { GovernancePanel } from '@/components/compliance/GovernancePanel';
 
 export const metadata: Metadata = {
   title: 'Compliance',
@@ -45,5 +46,12 @@ const FRAMEWORKS = [
 ];
 
 export default function CompliancePage() {
-  return <FrameworkIndex frameworks={FRAMEWORKS} />;
+  return (
+    <>
+      <FrameworkIndex frameworks={FRAMEWORKS} />
+      <div className="px-6 pb-8">
+        <GovernancePanel />
+      </div>
+    </>
+  );
 }

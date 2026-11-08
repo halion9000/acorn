@@ -293,6 +293,20 @@ CIPP tenants appear under Client mapping like every other tool; data for an unma
 
 **Known gaps:** UEBA only scores what CORE feeds it; Okta and Google Workspace sign-ins are not collected; Slack approvals carry no verified approver; SAML and OIDC are off until configured; community plugin install is not available; alerts are never purged unless retention is set; the database role is a superuser, so row-level security is not enforced by default; the embedding model for ATT&CK semantic search is not set up; Petra and Huntress SIEM cannot be actioned or read through any API.
 
+### November 2026 additions (new)
+
+All of these were tested against test data and a scratch database and deployed, but **not yet used by a person on the live stack**.
+
+- **Settings > Autonomy: how often people agree with the agents.** For each kind of action an agent asked approval for in the last 90 days: how many were approved, denied or let expire, the agreement share, and a suggestion (could act more on its own, keep, ask a person more often). It only reports; a person still sets every level.
+- **Settings > Autonomy: standing approvals and undo.** "Always allow this kind of action, for one client or all, until a date", so the same card is not approved every week. Only reversible kinds can be chosen (add tag, comment, assign case, create case, close alert, ticket). A card that a standing approval approved says so, and is audited. If the agent said how to reverse it, an **Undo** button shows for 24 hours.
+- **Settings > Workspace > Client status pages.** Make a private link for a client (the secret is shown once), **Preview** exactly what the client will see, press **Approve wording** (the link does nothing until you do), and **Revoke** when needed. The page shows protection percentages, the number of open alerts and the protections in place; never raw alerts, names, devices or tickets.
+- **Licences & Counts > Margin.** Type what each invoice line sells for and costs per unit; the page then estimates revenue, cost and margin per client from what each client is billed for, lowest margin first, and lists the lines that are billed but not priced yet. Needs the **finance** permission (the workspace owner role has it; give it to a custom role to share it).
+- **Client Posture > NIST CSF 2.0.** Each control, how the client stands today and the checks behind it. A control no check applies to says "No automated evidence": it is never called met by default, and a control is met only when every check behind it is met.
+- **Compliance > Review calendar and policies.** Things that must be looked at again on a schedule (policies, vendor reviews, evidence renewals) with an owner and a due date, soonest first; press **Reviewed** and the next date is today plus the interval. A policy keeps numbered versions of its text that are only ever added.
+- **Settings > Profile > Password.** Change your own password: it needs the current one, and signs you out everywhere.
+
+---
+
 ## 15. When something looks wrong
 
 | Symptom | Look at |
