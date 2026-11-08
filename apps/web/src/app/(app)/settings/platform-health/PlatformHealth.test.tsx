@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PlatformHealth, agoLabel, migrationsLabel, runningLabel, workerLabel } from './PlatformHealth';
+import { PlatformHealth, agoLabel, migrationsLabel, rateLimitLabel, runningLabel, workerLabel } from './PlatformHealth';
 
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
@@ -364,5 +364,20 @@ describe('slow database statements', () => {
     render(<PlatformHealth />);
     await waitFor(() => expect(screen.getByTestId('overall')).toBeInTheDocument());
     expect(screen.queryByTestId('slow-queries')).not.toBeInTheDocument();
+  });
+});
+
+describe('rateLimitLabel', () => {
+  it('says plainly that log mode refuses nothing and how many requests it would have refused', () => {
+    expect(rateLimitLabel({ mode: 'log', per_minute: 300, checked: 900, over_limit: 0, callers_over_limit: 0 })).toBe(
+      'Request limit: logging only (300 a minute per caller); nothing is refused. Since the API started, no caller went over.',
+    );
+    expect(rateLimitLabel({ mode: 'log', per_minute: 300, checked: 900, over_limit: 1, callers_over_limit: 1 })).toContain('1 request from 1 caller went over');
+    expect(rateLimitLabel({ mode: 'log', per_minute: 300, checked: 900, over_limit: 40, callers_over_limit: 3 })).toContain('40 requests from 3 callers went over');
+  });
+
+  it('says when the limit is enforced and when it is off', () => {
+    expect(rateLimitLabel({ mode: 'enforce', per_minute: 100, checked: 5, over_limit: 0, callers_over_limit: 0 })).toContain('enforced');
+    expect(rateLimitLabel({ mode: 'off', per_minute: 100, checked: 0, over_limit: 0, callers_over_limit: 0 })).toBe('Request limit: off.');
   });
 });

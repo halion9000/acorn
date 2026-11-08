@@ -21,6 +21,7 @@ from app.api.v1.router import api_router
 from app.auth.oidc import router as oidc_router
 from app.auth.saml import router as saml_router
 from app.core.airgap import airgap_status
+from app.core.api_rate_limit import RateLimitMiddleware
 from app.core.config import enforce_secure_defaults, is_dev_env, settings
 from app.core.cors import build_cors_kwargs
 from app.core.db_errors import register_db_error_handlers
@@ -642,6 +643,8 @@ def create_application() -> FastAPI:
     app.add_middleware(AuditMiddleware)
     app.add_middleware(DemoModeMiddleware)
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+    # A limit on how fast one caller may use the API: log-only by default (AISOC_RATE_LIMIT_MODE=enforce turns it on). Inside CORS so a refusal still carries CORS headers.
+    app.add_middleware(RateLimitMiddleware)
     # CORS allow-list is resolved from AISOC_CORS_ORIGINS / CORS_ORIGINS via
     # the shared helper; settings.CORS_ORIGINS is the Pydantic-parsed fallback
     # for when neither env var is set (e.g. local pytest). The helper also

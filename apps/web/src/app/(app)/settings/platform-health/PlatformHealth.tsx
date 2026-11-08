@@ -79,6 +79,23 @@ interface WorkerRow {
   status: "ok" | "failing" | "waiting" | "late";
 }
 
+export interface RateLimitTally {
+  mode: 'off' | 'log' | 'enforce';
+  per_minute: number;
+  checked: number;
+  over_limit: number;
+  callers_over_limit: number;
+}
+
+/** What the API-wide request limit has done since the API started, in plain words: in log mode it says how many requests it WOULD have refused, so the limit can be judged before it is switched on. */
+export function rateLimitLabel(r: RateLimitTally): string {
+  if (r.mode === 'off') return 'Request limit: off.';
+  const over = r.over_limit === 0 ? 'no caller went over' : `${r.over_limit.toLocaleString()} request${r.over_limit === 1 ? '' : 's'} from ${r.callers_over_limit} caller${r.callers_over_limit === 1 ? '' : 's'} went over`;
+  return r.mode === 'log'
+    ? `Request limit: logging only (${r.per_minute} a minute per caller); nothing is refused. Since the API started, ${over}.`
+    : `Request limit: ${r.per_minute} a minute per caller, enforced. Since the API started, ${over}.`;
+}
+
 /** "Running version abc1234, up 2 h": which commit the API is, and for how long. Says plainly when it does not know the commit. */
 export function runningLabel(v: { commit: string | null; up_seconds: number }): string {
   const s = v.up_seconds;
@@ -123,7 +140,7 @@ interface Snapshot {
   database?: DatabaseSecurity;
   feed_routes?: { since_minutes_ago: number; routes: FeedRoute[] };
   migrations?: { applied: number; newest: string | null; applied_at: string | null } | null;
-  runtime?: { version?: { commit: string | null; up_seconds: number }; loop?: { samples: number; max_seconds?: number; typical_seconds?: number; window_seconds: number }; slow_routes?: SlowRoute[]; workers?: WorkerRow[] };
+  runtime?: { version?: { commit: string | null; up_seconds: number }; loop?: { samples: number; max_seconds?: number; typical_seconds?: number; window_seconds: number }; slow_routes?: SlowRoute[]; workers?: WorkerRow[]; rate_limit?: RateLimitTally };
   generated_at: string;
 }
 
@@ -221,6 +238,11 @@ export function PlatformHealth() {
           {snapshot.runtime?.version && (
             <p data-testid="running-version" className="text-sm text-gray-400">
               {runningLabel(snapshot.runtime.version)}
+            </p>
+          )}
+          {snapshot.runtime?.rate_limit && (
+            <p data-testid="rate-limit" className="text-sm text-gray-400">
+              {rateLimitLabel(snapshot.runtime.rate_limit)}
             </p>
           )}
           {snapshot.runtime?.loop && snapshot.runtime.loop.samples > 0 && (
