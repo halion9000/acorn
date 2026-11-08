@@ -45,7 +45,7 @@ BOARDS: dict[str, tuple[str, tuple[str, ...]]] = {
             "liongard_datto_bcdr",
         ),
     ),
-    "network": ("Network", ("meraki_wan", "meraki_dual_wan", "meraki_licence", "meraki_admin_2fa")),
+    "network": ("Network", ("meraki_wan", "meraki_dual_wan", "meraki_devices_offline", "meraki_licence", "meraki_admin_2fa")),
     "admins": (
         "Administrator accounts",
         (
