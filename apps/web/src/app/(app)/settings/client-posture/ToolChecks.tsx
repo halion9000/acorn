@@ -69,6 +69,7 @@ const TITLE: Record<string, string> = {
   cipp_unused_licences: 'Unused licences',
   cipp_partner_relationship: 'Partner relationship (GDAP)',
   meraki_devices_offline: 'Meraki devices offline',
+  meraki_open_wifi: 'Open or WEP Wi-Fi',
   dnsfilter_agents_silent: 'DNSFilter roaming agents silent',
   cipp_tenant_readable: 'CIPP can read the tenant',
   ninjaone_unsupported_os: 'Windows support status',
