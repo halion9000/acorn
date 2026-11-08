@@ -1,6 +1,6 @@
 # Local Development Runbook
 
-This runbook walks you from a freshly cloned repository to a running AiSOC stack on your laptop, and describes how to develop and debug each service in isolation.
+This runbook walks you from a freshly cloned repository to a running A.C.O.R.N stack on your laptop, and describes how to develop and debug each service in isolation.
 
 ---
 
@@ -25,7 +25,7 @@ Memory budget: the full stack uses **~6 GB RAM** with all services running. If y
 
 ```bash
 git clone https://github.com/beenuar/AiSOC.git
-cd AiSOC
+cd A.C.O.R.N
 cp .env.example .env
 ```
 

@@ -1,6 +1,6 @@
-# AiSOC System Design
+# A.C.O.R.N System Design
 
-This document describes the end-to-end architecture of the AiSOC platform after the v2 enterprise upgrade. It covers data flow, the new knowledge graph, the detection rule engine, the threat intelligence pipeline, and the ML-augmented alert fusion pipeline.
+This document describes the end-to-end architecture of the A.C.O.R.N platform after the v2 enterprise upgrade. It covers data flow, the new knowledge graph, the detection rule engine, the threat intelligence pipeline, and the ML-augmented alert fusion pipeline.
 
 ---
 
@@ -341,21 +341,21 @@ A scoped, tenant-isolated query surface over the OpenSearch `events-*` indices. 
 
 ### 12.4 Case Fan-out and Bidirectional ITSM (WS8)
 
-AiSOC is the **source of truth** for case state. ITSM systems (Jira, ServiceNow) are projections — analysts working in their familiar ticket UI still see correct context, but the canonical state lives in AiSOC.
+A.C.O.R.N is the **source of truth** for case state. ITSM systems (Jira, ServiceNow) are projections — analysts working in their familiar ticket UI still see correct context, but the canonical state lives in A.C.O.R.N.
 
-**Outbound (AiSOC → ITSM):** When a case is created or its status changes, `services/api/app/services/case_fanout.py` looks up every connector instance the tenant has enabled with `Capability.PUSH_CASE` (or `PUSH_STATUS`) and projects the change. Successes write a row to `case_external_refs (case_id, connector_id, external_system, external_id, external_url, external_status, last_synced_at)` so subsequent updates target the correct external record. Failures are logged but never block the AiSOC case write — the canonical state is already durable.
+**Outbound (A.C.O.R.N → ITSM):** When a case is created or its status changes, `services/api/app/services/case_fanout.py` looks up every connector instance the tenant has enabled with `Capability.PUSH_CASE` (or `PUSH_STATUS`) and projects the change. Successes write a row to `case_external_refs (case_id, connector_id, external_system, external_id, external_url, external_status, last_synced_at)` so subsequent updates target the correct external record. Failures are logged but never block the A.C.O.R.N case write — the canonical state is already durable.
 
-**Inbound (ITSM → AiSOC):** A public-facing webhook at `POST /v1/inbox/itsm` accepts Jira and ServiceNow status-change payloads. The endpoint:
+**Inbound (ITSM → A.C.O.R.N):** A public-facing webhook at `POST /v1/inbox/itsm` accepts Jira and ServiceNow status-change payloads. The endpoint:
 
 1. Verifies the per-tenant HMAC (`X-AiSOC-Signature`).
 2. Parses the vendor-specific payload (`issue.key` + `issue.fields.status.name` for Jira; `sys_id` + `state` for ServiceNow).
-3. Maps the vendor status into the AiSOC enum via `_JIRA_INBOUND_STATUS` / `_SNOW_INBOUND_STATUS`.
-4. Looks up the matching `case_external_refs` row to find the AiSOC `case_id`.
-5. Idempotently applies the status change to the AiSOC case (no-op if the case is already in that state).
+3. Maps the vendor status into the A.C.O.R.N enum via `_JIRA_INBOUND_STATUS` / `_SNOW_INBOUND_STATUS`.
+4. Looks up the matching `case_external_refs` row to find the A.C.O.R.N `case_id`.
+5. Idempotently applies the status change to the A.C.O.R.N case (no-op if the case is already in that state).
 
-The mapping is intentionally lossy in one direction: vendor-specific fields (Jira priority, ServiceNow assignment_group, etc.) are **not** synced back into AiSOC. The contract is "case status converges, ITSM-specific metadata stays in ITSM."
+The mapping is intentionally lossy in one direction: vendor-specific fields (Jira priority, ServiceNow assignment_group, etc.) are **not** synced back into A.C.O.R.N. The contract is "case status converges, ITSM-specific metadata stays in ITSM."
 
-→ [ITSM as a projection of AiSOC (full architecture doc)](../../apps/docs/docs/architecture/itsm-as-source-of-truth.md)
+→ [ITSM as a projection of A.C.O.R.N (full architecture doc)](../../apps/docs/docs/architecture/itsm-as-source-of-truth.md)
 
 ### 12.5 Test Coverage
 
@@ -381,21 +381,21 @@ Connectors are also the unit of distribution. Every connector ships a marketplac
 
 ## 13. v2.2 Additions (Endpoint Telemetry, ChatOps, Responder PWA, MCP, One-Click Install)
 
-The v2.2 increment is scoped to first-mile ergonomics — getting events into AiSOC from every realistic source, getting analysts out of the console for routine approvals, and getting the entire stack onto a freshly-imaged laptop in one command.
+The v2.2 increment is scoped to first-mile ergonomics — getting events into A.C.O.R.N from every realistic source, getting analysts out of the console for routine approvals, and getting the entire stack onto a freshly-imaged laptop in one command.
 
 ### 13.1 Endpoint Telemetry (osquery TLS server + extensions)
 
-`services/osquery-tls` is a Go TLS server that implements the four osquery endpoints — `/enroll`, `/config`, `/distributed/read`, `/distributed/write`, `/log` — so that any host running osquery can be enrolled into AiSOC with a single enrol secret. Result rows are normalised into OCSF and shipped to `services/ingest`'s `/v1/ingest/batch` endpoint, sharing the same KEV correlator and ATT&CK tagger described in §1.
+`services/osquery-tls` is a Go TLS server that implements the four osquery endpoints — `/enroll`, `/config`, `/distributed/read`, `/distributed/write`, `/log` — so that any host running osquery can be enrolled into A.C.O.R.N with a single enrol secret. Result rows are normalised into OCSF and shipped to `services/ingest`'s `/v1/ingest/batch` endpoint, sharing the same KEV correlator and ATT&CK tagger described in §1.
 
 `services/osquery-extensions` registers custom virtual tables and decorators that the standard osquery distribution doesn't ship — for example, AiSOC-specific process-lineage and EDR-correlated host metadata — and is loaded out-of-band by agents managed by `osquery-tls`. The split (server vs extensions) keeps the TLS server's surface area minimal and lets the extensions iterate without touching the enrol path.
 
-This makes AiSOC self-sufficient for endpoint telemetry: a tenant who doesn't own a CrowdStrike or SentinelOne licence can still get host events into the platform without standing up a separate fleet manager.
+This makes A.C.O.R.N self-sufficient for endpoint telemetry: a tenant who doesn't own a CrowdStrike or SentinelOne licence can still get host events into the platform without standing up a separate fleet manager.
 
 ### 13.2 ChatOps (`services/slack-bot`)
 
 A first-class Slack surface that closes the loop on the action-gating layer described in §8. When `services/actions` requires approval for a high-blast-radius action, the slack-bot posts an interactive message into the configured channel; an authorised approver clicks the button; Slack posts back to the bot, which verifies the request with an HMAC-signed Slack signature and forwards the approval to the actions service. The bot also exposes a `/aisoc` slash command for ad-hoc queries (case lookup, ledger snippet, IOC reputation).
 
-Crucially, **AiSOC remains the source of truth** — Slack is a projection. If the bot is offline, approvals fall back to the web console with no state divergence.
+Crucially, **A.C.O.R.N remains the source of truth** — Slack is a projection. If the bot is offline, approvals fall back to the web console with no state divergence.
 
 ### 13.3 Responder PWA
 
@@ -403,11 +403,11 @@ A route group inside `apps/web` (Next.js 14) registers as an installable PWA tar
 
 ### 13.4 Model Context Protocol Server (`services/mcp`)
 
-A TypeScript stdio MCP server that exposes 11 AiSOC tools (case search, alert detail, IOC pivot, ledger query, detection-as-code lookup, …) to IDE-side AI agents — Claude Code, Cursor, Continue, Cody. This makes AiSOC a first-class context source for any analyst writing detections, runbooks, or post-mortems in their editor. The MCP server is read-only by default; write tools require an explicit per-tool capability token.
+A TypeScript stdio MCP server that exposes 11 A.C.O.R.N tools (case search, alert detail, IOC pivot, ledger query, detection-as-code lookup, …) to IDE-side AI agents — Claude Code, Cursor, Continue, Cody. This makes A.C.O.R.N a first-class context source for any analyst writing detections, runbooks, or post-mortems in their editor. The MCP server is read-only by default; write tools require an explicit per-tool capability token.
 
 ### 13.5 Investigation Ledger and Ambient Copilot
 
-Every prompt, tool invocation, and agent step inside `services/agents` is persisted into the **investigation ledger** — a per-case, append-only log that is replayable end-to-end. The ledger is the substrate for the Ambient Copilot in `apps/web`: a sidebar that shows what the agent is doing right now, why it picked the next tool, and what the analyst can do to redirect it. Combined with the LangGraph DAG in §7, this gives AiSOC a debugging surface for AI-driven investigations that mirrors the kind of structured logging analysts already expect from deterministic systems.
+Every prompt, tool invocation, and agent step inside `services/agents` is persisted into the **investigation ledger** — a per-case, append-only log that is replayable end-to-end. The ledger is the substrate for the Ambient Copilot in `apps/web`: a sidebar that shows what the agent is doing right now, why it picked the next tool, and what the analyst can do to redirect it. Combined with the LangGraph DAG in §7, this gives A.C.O.R.N a debugging surface for AI-driven investigations that mirrors the kind of structured logging analysts already expect from deterministic systems.
 
 ### 13.6 One-Click Install Pipeline
 

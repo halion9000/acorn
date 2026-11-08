@@ -1,4 +1,4 @@
-"""Sign-in events: CORE posts the sign-ins it read through CIPP; AiSOC stores each once and has the UEBA service score it. Each batch is also run through the identity rules (app/services/identity_detections.py), which raise alerts for a sign-in from a country the client rarely sees and for impossible travel.
+"""Sign-in events: CORE posts the sign-ins it read through CIPP; A.C.O.R.N stores each once and has the UEBA service score it. Each batch is also run through the identity rules (app/services/identity_detections.py), which raise alerts for a sign-in from a country the client rarely sees and for impossible travel.
 
 ``POST /api/v1/inbox/core-feed/{token}/signins`` (authenticated by the secret in the path, like the other core-feed endpoints). A sign-in is placed under the client its vendor client id
 (the CIPP customer id) is mapped to; one whose client is not mapped yet is counted and skipped, and arrives again after the mapping.

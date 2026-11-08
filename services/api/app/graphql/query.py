@@ -1,4 +1,4 @@
-"""Strawberry GraphQL root Query type for AiSOC.
+"""Strawberry GraphQL root Query type for A.C.O.R.N.
 
 All resolvers authenticate via the same ``get_current_user`` dependency
 used by the REST layer, and use the shared SQLAlchemy ``AsyncSession``.

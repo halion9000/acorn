@@ -1,5 +1,5 @@
 """
-AiSOC Plugin Manager
+A.C.O.R.N Plugin Manager
 Discovers, validates, loads, and dispatches calls to installed plugins.
 
 Plugin layout expected on disk (two manifest formats accepted):
@@ -34,7 +34,7 @@ OCI image support (oras pull):
   Pass an OCI reference to install_from_oci() — the manager pulls the image
   layer via the ORAS CLI (must be installed) and extracts it into PLUGINS_DIR.
 
-MIT License — AiSOC (open-source AI Security Operations Center)
+MIT License — A.C.O.R.N (open-source AI Security Operations Center)
 """
 
 from __future__ import annotations

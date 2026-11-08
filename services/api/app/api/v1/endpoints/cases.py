@@ -443,7 +443,7 @@ async def list_cases(
         where_clauses = ["tenant_id = :tenant_id"]
     col = "c." if scope == "all" else ""
     statuses = [s.strip() for s in (status_filter if isinstance(status_filter, str) else "").split(",") if s.strip()]
-    # "Auto-closed" is a closed case AiSOC closed itself (``tags.auto_closed``); "closed" is the ones a person closed. Neither is a status of its own in the database.
+    # "Auto-closed" is a closed case A.C.O.R.N closed itself (``tags.auto_closed``); "closed" is the ones a person closed. Neither is a status of its own in the database.
     auto = f"coalesce({col}tags->>'auto_closed', '') = 'true'"
     if len(statuses) == 1 and statuses[0] == "auto_closed":
         where_clauses.append(f"{col}status = 'closed' AND {auto}")
@@ -513,7 +513,7 @@ class CaseCounts(BaseModel):
     open: int
     in_progress: int
     resolved: int
-    # Closed by a person; the ones AiSOC closed itself are counted in ``auto_closed``.
+    # Closed by a person; the ones A.C.O.R.N closed itself are counted in ``auto_closed``.
     closed: int
     auto_closed: int = 0
     # Cases still to be worked (not resolved or closed) that nobody owns.
@@ -721,7 +721,7 @@ async def create_case(
             await db.commit()
             response.fanout_results = results
         except Exception:
-            # Persistence of external refs failed but the AiSOC case
+            # Persistence of external refs failed but the A.C.O.R.N case
             # itself is fine; surface the partial result and move on.
             logger.exception("cases.create.fanout_persistence_failed case=%s", row.id)
             await db.rollback()

@@ -22,7 +22,8 @@
         "security_defaults": false,
         "methods": [
           "authenticatorApp"
-        ]
+        ],
+        "password_never_expires": null
       },
       {
         "id": "u2",
@@ -39,7 +40,8 @@
         "security_defaults": false,
         "methods": [
           "authenticatorApp"
-        ]
+        ],
+        "password_never_expires": null
       }
     ]
   }

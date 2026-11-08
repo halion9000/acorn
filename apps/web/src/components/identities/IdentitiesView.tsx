@@ -309,6 +309,8 @@ export function IdentitiesView() {
   const [backup, setBackup] = useState('');
   // Only people with a failed sign-in in the last 24 hours ('failed') or ten or more ('brute_force'): what the two sign-in tiles count.
   const [signin, setSignin] = useState<'' | 'failed' | 'brute_force'>('');
+  // Only working accounts whose password is set never to expire (the tile's list).
+  const [pwNever, setPwNever] = useState(false);
   const [exposed, setExposed] = useState('');
   const [kind, setKind] = useState('');
   const [hasAlerts, setHasAlerts] = useState(false);
@@ -332,8 +334,8 @@ export function IdentitiesView() {
   }, [search]);
 
   const query: IdentityQuery = useMemo(
-    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, haloCheck: haloCheck || undefined, alertSource: alertTool || undefined, backup: backup || undefined, signin: signin || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', active: activeOnly, onlyIn: oneTool && tool ? tool : undefined, sort }),
-    [page, clientId, debounced, tool, alertTool, mfa, backup, signin, exposed, kind, hasAlerts, haloCheck, adminOnly, state, oneTool, activeOnly, sort],
+    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, haloCheck: haloCheck || undefined, alertSource: alertTool || undefined, backup: backup || undefined, signin: signin || undefined, passwordNeverExpires: pwNever || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', active: activeOnly, onlyIn: oneTool && tool ? tool : undefined, sort }),
+    [page, clientId, debounced, tool, alertTool, mfa, backup, signin, pwNever, exposed, kind, hasAlerts, haloCheck, adminOnly, state, oneTool, activeOnly, sort],
   );
   const { data, error, isLoading, isValidating, mutate } = useSWR(['identities', query], () => identitiesApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
   useEffect(() => {
@@ -425,6 +427,20 @@ export function IdentitiesView() {
         >
           <div className="text-xs text-gray-400">Possible brute force</div>
           <div className={`text-2xl font-semibold ${summary?.brute_force ? 'text-red-300' : 'text-gray-100'}`}>{summary?.brute_force ?? '—'}</div>
+        </button>
+        <button
+          type="button"
+          data-testid="password-never-expires"
+          aria-pressed={pwNever}
+          onClick={() => reset(() => setPwNever((v) => !v))}
+          title="Working accounts whose Microsoft 365 password is set never to expire, from CIPP. People CIPP could not say it for are not counted. Press to list them."
+          className={`rounded-lg border p-3 text-left ${pwNever ? 'border-blue-500 bg-blue-500/10' : 'border-gray-800 bg-gray-900/60'}`}
+        >
+          <div className="text-xs text-gray-400">Password never expires</div>
+          <div className="text-2xl font-semibold text-gray-100">{summary?.password_policy_known ? summary.password_never_expires : '—'}</div>
+          {summary?.password_policy_known !== undefined && summary.total > summary.password_policy_known ? (
+            <div className="text-[11px] text-gray-500" data-testid="password-unknown">{summary.total - summary.password_policy_known} unknown</div>
+          ) : null}
         </button>
       </div>
       {oneTool && !tool && <p className="text-xs text-amber-300">Pick a tool below to see the people only that tool knows.</p>}

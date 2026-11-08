@@ -308,8 +308,8 @@ class TestTheEmailText:
             pending_more=0,
             min_severity="medium",
         )
-        assert subject == "[AiSOC] 3 alerts, highest CRITICAL: Ransomware"
-        assert compose.build_message([line()], pending_more=0, min_severity="high")[0].startswith("[AiSOC] 1 alert, highest HIGH")
+        assert subject == "[A.C.O.R.N] 3 alerts, highest CRITICAL: Ransomware"
+        assert compose.build_message([line()], pending_more=0, min_severity="high")[0].startswith("[A.C.O.R.N] 1 alert, highest HIGH")
         assert len(compose.build_message([line(title="x" * 5000)], pending_more=0, min_severity="high")[0]) <= 150
 
     def test_the_most_severe_alert_comes_first_and_older_before_newer_within_a_severity(self):

@@ -1,4 +1,4 @@
-# AiSOC Roadmap (Now / Next / Later) — 2026-05-12
+# A.C.O.R.N Roadmap (Now / Next / Later) — 2026-05-12
 
 > **Source of truth for active prioritization.** See
 > [`README.md`](./README.md) for how this doc relates to `/ROADMAP.md` and

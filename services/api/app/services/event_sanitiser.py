@@ -49,7 +49,7 @@ submission — analysts still want the visibility on the *other* events —
 but a deliberately oversized batch (caller is misconfigured or hostile)
 gets a clean 4xx instead of crashing the worker.
 
-AiSOC — open-source AI Security Operations Center (MIT License)
+A.C.O.R.N — open-source AI Security Operations Center (MIT License)
 Author: Beenu Arora <beenu@cyble.com>
 """
 

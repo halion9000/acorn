@@ -1,4 +1,4 @@
-# AiSOC Reality Report
+# A.C.O.R.N Reality Report
 
 Phase 0 of the world-class program (`AISOC_CURSOR_PROMPT_V2.md`). This document classifies every headline claim in `README.md` against the code that is supposed to back it. It changes no code.
 
@@ -15,7 +15,7 @@ Phase 0 of the world-class program (`AISOC_CURSOR_PROMPT_V2.md`). This document 
 
 ## Claim-by-claim classification
 
-### "What AiSOC is" — the three differentiators (`README.md` L59-65)
+### "What A.C.O.R.N is" — the three differentiators (`README.md` L59-65)
 
 | Claim | Code path | Status | Test evidence | Gated in CI? |
 |---|---|---|---|---|
@@ -36,7 +36,7 @@ Phase 0 of the world-class program (`AISOC_CURSOR_PROMPT_V2.md`). This document 
 | Hunt-as-Code + NL `/hunt` workbench | `services/api/app/api/v1/endpoints/saved_hunts.py`; `apps/web/src/app/(app)/hunt/` | functional-untested | `hunt_corpus` eval suite | Yes (corpus coverage) |
 | Public weekly benchmark scoreboard — same harness, weekly against `main` | `.github/workflows/wet-eval.yml`; `apps/docs/docs/benchmark-scoreboard.mdx` | functional-untested (OVERCLAIM) | wet-eval no-ops without `WET_EVAL_OPENAI_KEY`; live-agent tables are unfilled placeholders | Effectively No for live-agent numbers |
 
-### "How AiSOC compares" table (`README.md` L71-81)
+### "How A.C.O.R.N compares" table (`README.md` L71-81)
 
 | Claim | Reality | Status |
 |---|---|---|
@@ -77,7 +77,7 @@ Phase 0 of the world-class program (`AISOC_CURSOR_PROMPT_V2.md`). This document 
 
 ## Internal inconsistencies found (fix in Phase 2 / Phase 12)
 
-- **License disagreement.** `README.md` L229 and `LICENSE` say MIT; `.github/LICENSES.md` L3 says "AiSOC ships under Apache-2.0" and marks native detections Apache-2.0.
+- **License disagreement.** `README.md` L229 and `LICENSE` say MIT; `.github/LICENSES.md` L3 says "A.C.O.R.N ships under Apache-2.0" and marks native detections Apache-2.0.
 - **Referenced-but-missing CI guard.** `docs/decisions/0002-compliance-claims.md` asserts a CI check at `scripts/audit_compliance_claims.py` exists and fails the build on unqualified framework names. That script does not exist and no workflow references it.
 - **Stale internal reference.** `AGENTS.md` and `packages/aisoc-sandbox/src/aisoc_sandbox/investigation.py` reference `services/.../llm_safety.py`; the real file is `services/agents/app/investigator/prompt_sanitizer.py`.
 - **AGENTS.md eval claim is wrong.** It states only `mitre_accuracy` measures the live agent; per the code, `mitre_accuracy` is an offline keyword extractor and no PR-gated suite runs the live agent.

@@ -1,4 +1,4 @@
-"""Load AiSOC's shipped first-party detection rules (``detections/**/*.yaml``) into the ``detection_rules`` table as built-in rules.
+"""Load A.C.O.R.N's shipped first-party detection rules (``detections/**/*.yaml``) into the ``detection_rules`` table as built-in rules.
 
 Why this exists: the repository ships ~870 curated detection rules as YAML, and the live detection engine (services/fusion) runs them from its own bundled
 ruleset, but nothing ever put them in the database, so ``GET /api/v1/rules``, the console and anything built on them (Cipher's ``aisoc_list_rules``) saw an
@@ -218,7 +218,7 @@ async def main() -> None:
     async with AsyncSessionLocal() as session:
         tenants = await list_tenant_ids(session)
     if not tenants:
-        print(json.dumps({"ok": False, "error": "no tenants exist yet (run AiSOC's setup step first)"}))
+        print(json.dumps({"ok": False, "error": "no tenants exist yet (run A.C.O.R.N's setup step first)"}))
         sys.exit(1)
 
     total = LoadReport(skipped=len(skipped), skipped_files=skipped)

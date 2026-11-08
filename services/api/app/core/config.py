@@ -1,6 +1,6 @@
 """
-AiSOC API Configuration
-AiSOC — open-source AI Security Operations Center
+A.C.O.R.N API Configuration
+A.C.O.R.N — open-source AI Security Operations Center
 MIT License
 """
 
@@ -134,7 +134,7 @@ class Settings(BaseSettings):
     )
 
     # App
-    APP_NAME: str = "AiSOC API"
+    APP_NAME: str = "A.C.O.R.N API"
     APP_VERSION: str = "0.1.0"
     ENV: str = "development"
     ENVIRONMENT: str = "development"  # alias for ENV
@@ -485,7 +485,7 @@ class Settings(BaseSettings):
     REALTIME_INTERNAL_TOKEN: str = ""
 
     # SAML/OIDC session token signing secret. Consumed by ``app/auth/saml.py``
-    # and ``app/auth/oidc.py`` to mint AiSOC session JWTs after an external
+    # and ``app/auth/oidc.py`` to mint A.C.O.R.N session JWTs after an external
     # identity provider returns a successful authn response. We surface this
     # as a real Settings field (not just ``os.getenv``) so that
     # ``warn_if_insecure_defaults`` can be exercised deterministically in
@@ -562,7 +562,7 @@ class Settings(BaseSettings):
     AISOC_DISABLE_QDRANT: bool = False
 
     # ------------------------------------------------------------------
-    # v6 capability flags (AiSOC v6 capability roadmap).
+    # v6 capability flags (A.C.O.R.N v6 capability roadmap).
     # Every capability ships behind a flag so operators can stage rollout.
     # All default to True in development; production deployments can pin
     # individual flags via env vars (e.g. ``AISOC_FEATURE_RBA=false``).

@@ -46,7 +46,7 @@ Status as of this file: **Done** = built, tested, pushed. **Ready** = safe to bu
 
 ## CORE / Cipher
 35. Device sources: Huntress, Blumira, ThreatMate — Done
-36. Drift check (AiSOC build behind GitHub) — Done
+36. Drift check (A.C.O.R.N build behind GitHub) — Done
 37. Scrubbed rolling log — Done
 38. Cipher knowledge: devices, alert context, health — Done (aisoc-09-devices-and-alert-context)
 39. Cipher tool for related alerts — Ready
@@ -58,7 +58,7 @@ Status as of this file: **Done** = built, tested, pushed. **Ready** = safe to bu
 43. Database role that is not superuser (so row-level security is enforced)
 44. OS credential store for connector secrets
 45. Embedding model route for ATT&CK search
-46. Slack user to AiSOC user mapping (then require a verified approver)
+46. Slack user to A.C.O.R.N user mapping (then require a verified approver)
 47. UEBA source (Entra/Okta/M365 sign-in logs)
 48. Petra actions via Microsoft Graph (Petra's API has none)
 49. One real test of the Halo private note and status change on a reversible ticket
@@ -103,7 +103,7 @@ All **Ready** unless marked; none has been started. Where a vendor API is involv
 78. Group alerts by device on the list - Ready
 79. Keyboard shortcuts for next/previous alert - Ready
 80. Remember the last filter on the alert list - Ready
-81. Show the vendor's own severity next to AiSOC's - Ready
+81. Show the vendor's own severity next to A.C.O.R.N's - Ready
 82. Add a note without changing status - Ready
 83. Assign an alert to a person - Ready
 84. Due-date reminders for assigned alerts - Ready
@@ -172,8 +172,8 @@ All **Ready** unless marked; none has been started. Where a vendor API is involv
 141. Cipher skill: onboarding checklist for a new client - Ready
 142. Cipher skill: offboarding checklist - Ready
 143. CORE: notify when the feed has been silent 15 minutes - Ready
-144. CORE: show the AiSOC drift line on the main screen - Ready
-145. CORE: one-click open of the AiSOC console for a device - Ready
+144. CORE: show the A.C.O.R.N drift line on the main screen - Ready
+145. CORE: one-click open of the A.C.O.R.N console for a device - Ready
 146. CORE: sync-now button per vendor - Ready
 147. CORE: show which vendors have API keys expiring - Ready
 148. CORE: backup of its settings file - Ready

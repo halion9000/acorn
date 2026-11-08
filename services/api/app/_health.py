@@ -1,5 +1,5 @@
 """
-Phase 2.6 — shared liveness + readiness probes for AiSOC FastAPI
+Phase 2.6 — shared liveness + readiness probes for A.C.O.R.N FastAPI
 services.
 
 The "liveness vs readiness" distinction is the single most-missed

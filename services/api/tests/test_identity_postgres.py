@@ -290,3 +290,25 @@ async def test_top_changes_are_the_highest_scores_of_the_window_with_their_clien
     assert [t.actor for t in top] == ["eve@x.com", "admin@x.com"], "highest first; the 30-day-old one is outside the window"
     assert top[0].client_id == world["mapped"] and top[0].client_name.startswith("mapped-")
     assert len(await run(world["msp"], lambda db: ep.top_changes(User(), db, days=7, limit=1))) == 1
+
+
+async def test_the_password_never_expires_flag_is_stored_as_yes_no_or_unknown_and_a_new_snapshot_can_change_it(world):
+    snap = uuid.uuid4()
+    await run(
+        world["msp"],
+        lambda db: ep.apply_mfa_users(
+            db,
+            world["msp"],
+            snapshot(snap, [mfa("1", "yes@x.com", password_never_expires=True), mfa("2", "no@x.com", password_never_expires=False), mfa("3", "unknown@x.com")]),
+            NOW,
+        ),
+    )
+    flags = {}
+    for uid in ("1", "2", "3"):
+        flags[uid] = await scalar("select password_never_expires from identity_mfa_users where user_id = :u and tenant_id = :t", u=uid, t=world["mapped"])
+    assert flags == {"1": True, "2": False, "3": None}, "unknown stays unknown: it is never stored as 'expires'"
+    await run(
+        world["msp"],
+        lambda db: ep.apply_mfa_users(db, world["msp"], snapshot(uuid.uuid4(), [mfa("1", "yes@x.com", password_never_expires=False)]), NOW),
+    )
+    assert await scalar("select password_never_expires from identity_mfa_users where user_id = '1' and tenant_id = :t", t=world["mapped"]) is False

@@ -36,6 +36,7 @@ from app.services.identity_people import (
     attach_alerts,
     build_people,
     filter_people,
+    never_expires,
     is_active,
     normalize_email,
     sort_people,
@@ -100,6 +101,8 @@ class PersonOut(BaseModel):
     licensed: bool | None = None
     mfa: str
     mfa_methods: str | None = None
+    # Password set never to expire (true / false), or null when CIPP's user list could not say.
+    password_never_expires: bool | None = None
     tools: list[str]
     sources: list[SourceOut] = Field(default_factory=list)
     open_alerts: int = 0
@@ -144,6 +147,9 @@ class IdentitySummary(BaseModel):
     # Failed password sign-ins in the last 24 hours across the people in scope, and the people with BRUTE_FORCE_FAILURES or more of them. Steps that only ask for more proof (MFA prompts) are not failures.
     failed_signins_24h: int = 0
     brute_force: int = 0
+    # Working accounts whose password is set never to expire, and how many accounts CIPP could say it for (the rest are unknown, not "expires").
+    password_never_expires: int = 0
+    password_policy_known: int = 0
 
 
 class IdentityList(BaseModel):
@@ -168,6 +174,7 @@ def _out(p: Person, with_sources: bool = False) -> PersonOut:
         licensed=p.licensed,
         mfa=p.mfa,
         mfa_methods=p.mfa_methods,
+        password_never_expires=p.password_never_expires,
         tools=p.vendors,
         aliases=[AliasOut(email=a, reason=p.alias_reasons.get(a, "merged")) for a in p.aliases],
         sources=[SourceOut(vendor=s.vendor, external_id=s.external_id, enabled=s.enabled, details=s.details) for s in p.sources]
@@ -303,6 +310,8 @@ def summarize(people: list[Person]) -> IdentitySummary:
         exposed=sum(1 for p in people if p.exposure is not None),
         guests=sum(1 for p in people if p.kind == "guest"),
         active=sum(1 for p in people if is_active(p)),
+        password_never_expires=sum(1 for p in people if never_expires(p)),
+        password_policy_known=sum(1 for p in people if p.password_never_expires is not None),
         exposed_serious=sum(
             1 for p in people if p.exposure is not None and (p.exposure.password or p.exposure.stealer_log or p.exposure.malware)
         ),
@@ -342,6 +351,7 @@ async def list_identities(
     enabled: bool = Query(default=False, description="Only accounts that are not disabled."),
     active: bool = Query(default=False, description="Only active identities: a licensed account, not a guest, not disabled."),
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
+    password_never_expires: bool = Query(default=False, description="Only working accounts whose password is set never to expire (the tile's list)."),
     signin: str | None = Query(
         default=None,
         pattern="^(failed|brute_force)$",
@@ -377,6 +387,7 @@ async def list_identities(
             enabled=enabled,
             active=active,
             kind=kind,
+            password_never_expires=password_never_expires,
         ),
         sort,
     )
@@ -442,6 +453,7 @@ async def export_identities(
     active: bool = Query(default=False, description="Only active identities: a licensed account, not a guest, not disabled."),
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
     signin: str | None = Query(default=None, pattern="^(failed|brute_force)$"),
+    password_never_expires: bool = Query(default=False, description="Only working accounts whose password is set never to expire."),
     sort: str = Query(default="alerts"),
 ) -> Response:
     if sort not in SORTS:
@@ -468,6 +480,7 @@ async def export_identities(
             enabled=enabled,
             active=active,
             kind=kind,
+            password_never_expires=password_never_expires,
         ),
         sort,
     )

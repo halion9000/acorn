@@ -1,4 +1,4 @@
-"""Vendor action ORM model: an action an analyst asked for in AiSOC that CORE carries out at the vendor (migration 084)."""
+"""Vendor action ORM model: an action an analyst asked for in A.C.O.R.N that CORE carries out at the vendor (migration 084)."""
 
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 """
-OpenTelemetry bootstrap for AiSOC API service.
+OpenTelemetry bootstrap for A.C.O.R.N API service.
 
 Instruments:
   - FastAPI   (HTTP spans — method, route, status)

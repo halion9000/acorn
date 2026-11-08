@@ -43,7 +43,7 @@ def test_the_description_says_the_question_the_evidence_and_where_it_came_from()
     assert d.evidence == "2 administrator(s) have no Multi-Factor."
     assert (
         d.description
-        == "Question for mfa_admins? 2 administrator(s) have no Multi-Factor. Suggested by AiSOC from the connected tools on 2026-10-22."
+        == "Question for mfa_admins? 2 administrator(s) have no Multi-Factor. Suggested by A.C.O.R.N from the connected tools on 2026-10-22."
     )
 
 

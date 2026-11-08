@@ -190,8 +190,8 @@ async def send_test_email(
     try:
         await mailer.send(
             recipients,
-            "[AiSOC] Test email: alert email is working",
-            f"This is a test of AiSOC's alert email, requested by {who} at {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}.\n\nIf you can read this, the Microsoft Graph setup works. No action is needed.\n",
+            "[A.C.O.R.N] Test email: alert email is working",
+            f"This is a test of A.C.O.R.N's alert email, requested by {who} at {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}.\n\nIf you can read this, the Microsoft Graph setup works. No action is needed.\n",
         )
     except MailError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=scrub(str(exc), (mailer.client_secret,))) from None

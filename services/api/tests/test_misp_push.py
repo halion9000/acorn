@@ -313,7 +313,7 @@ class TestStixIndicatorToMispEvent:
     def test_indicator_event_falls_back_to_id_when_no_name(self) -> None:
         event = stix_indicator_to_misp_event({"id": "indicator--zzz", "pattern": "[ipv4-addr:value = '10.0.0.1']"})
         assert event is not None
-        assert event["Event"]["info"] == "AiSOC indicator indicator--zzz"
+        assert event["Event"]["info"] == "A.C.O.R.N indicator indicator--zzz"
 
 
 class TestStixBundleToMispEvent:

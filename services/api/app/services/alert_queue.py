@@ -1,6 +1,6 @@
 """Investigation queue workbench backend.
 
-This module powers the ``/queue`` workbench in the AiSOC console — a
+This module powers the ``/queue`` workbench in the A.C.O.R.N console — a
 fixed-priority list of alerts an analyst should be working *right
 now*. The ordering rule is deliberately opinionated and mirrors what
 shift-leads on a live SOC floor would draw on the whiteboard:
@@ -23,7 +23,7 @@ re-tuned. The expression we generate is plain SQL ``CASE`` on
 severity, so PostgreSQL can index-walk over ``alerts.first_seen``
 and apply the offset cheaply.
 
-AiSOC — open-source AI Security Operations Center (MIT License)
+A.C.O.R.N — open-source AI Security Operations Center (MIT License)
 Author: Beenu Arora <beenu@cyble.com>
 """
 

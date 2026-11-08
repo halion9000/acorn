@@ -1,1 +1,1 @@
-# AiSOC API application package
+# A.C.O.R.N API application package

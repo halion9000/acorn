@@ -1,6 +1,6 @@
 # Migration Guide: v3 → v4
 
-This guide covers the breaking changes and upgrade path from AiSOC v3 to v4.
+This guide covers the breaking changes and upgrade path from A.C.O.R.N v3 to v4.
 Read it before running `docker compose pull` or deploying to production.
 
 ---

@@ -1,4 +1,4 @@
-"""Hunt search over the alerts AiSOC already holds: POST /hunt/search.
+"""Hunt search over the alerts A.C.O.R.N already holds: POST /hunt/search.
 
 This used to be served by the agents service, which has no event store and answered every search with a 501. The only real telemetry here is the
 alerts CORE forwards, so the search runs over those: the caller's own tenant and its client tenants. It is not KQL/Lucene/SPL. It understands plain

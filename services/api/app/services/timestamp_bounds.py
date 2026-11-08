@@ -38,7 +38,7 @@ can widen ``MIN_AGE`` without redeploying:
 * ``AISOC_SUBMIT_MAX_TIMESTAMP_AGE_DAYS``  — default 90
 * ``AISOC_SUBMIT_MAX_FUTURE_SECONDS``      — default 300
 
-AiSOC — open-source AI Security Operations Center (MIT License)
+A.C.O.R.N — open-source AI Security Operations Center (MIT License)
 Author: Beenu Arora <beenu@cyble.com>
 """
 

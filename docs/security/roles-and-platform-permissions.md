@@ -1,6 +1,6 @@
 # Roles and platform permissions
 
-AiSOC separates what a person may do **inside their own tenant** from what acts on **the whole platform** (every tenant).
+A.C.O.R.N separates what a person may do **inside their own tenant** from what acts on **the whole platform** (every tenant).
 
 ## The roles
 

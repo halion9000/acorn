@@ -1,5 +1,5 @@
 """
-OIDC (OpenID Connect) Relying Party implementation for AiSOC.
+OIDC (OpenID Connect) Relying Party implementation for A.C.O.R.N.
 
 Flow:
   1. GET  /auth/oidc/login          → redirect to provider authorization URL
@@ -268,7 +268,7 @@ async def oidc_userinfo(request: Request) -> JSONResponse:
     """Proxy userinfo from upstream OIDC provider using the stored access token.
 
     Requires `Authorization: Bearer <aisoc_jwt>` header — the JWT sub is
-    used to look up the upstream token (stub: returns claims from AiSOC JWT).
+    used to look up the upstream token (stub: returns claims from A.C.O.R.N JWT).
     """
     auth_header = request.headers.get("authorization", "")
     if not auth_header.lower().startswith("bearer "):

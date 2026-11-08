@@ -1,7 +1,7 @@
 """Run one of CORE's NinjaOne scripts on the machine an alert is about, from the alert page.
 
-AiSOC runs nothing and holds no NinjaOne or HaloPSA key. These routes only QUEUE a request (a ``vendor_actions`` row for the vendor ``core``, the same queue Approve / Resolve use). CORE
-collects it within about 15 seconds, finds the machine, runs the script, waits for the output, adds it as a private note on the HaloPSA ticket and as a comment on the AiSOC case, and reports
+A.C.O.R.N runs nothing and holds no NinjaOne or HaloPSA key. These routes only QUEUE a request (a ``vendor_actions`` row for the vendor ``core``, the same queue Approve / Resolve use). CORE
+collects it within about 15 seconds, finds the machine, runs the script, waits for the output, adds it as a private note on the HaloPSA ticket and as a comment on the A.C.O.R.N case, and reports
 back. CORE decides whether to ask its owner first: a script switched to "run at once" there starts straight away, any other waits for an approval card in CORE.
 
 Permission: ``connectors:write`` to ask (it reaches a live machine), ``alerts:read`` to see the options. Every request is audited.

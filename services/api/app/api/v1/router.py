@@ -396,9 +396,9 @@ api_router.include_router(inbox.router)
 # Bidirectional ITSM webhook receiver (Workstream 8 of AI Stack plan).
 # /inbox/itsm/{tenant_token}/{connector_instance_id} accepts inbound
 # Jira / ServiceNow webhooks, resolves the external ticket back to its
-# AiSOC case via case_external_refs, and mirrors the status onto
+# A.C.O.R.N case via case_external_refs, and mirrors the status onto
 # aisoc_cases. This is the *inbound* counterpart to case_fanout (which
-# handles outbound AiSOC → ITSM projection) and is what makes the
+# handles outbound A.C.O.R.N → ITSM projection) and is what makes the
 # operator's existing ITSM the source of truth for case status.
 api_router.include_router(inbox_itsm.router)
 api_router.include_router(inbox_core_feed.router)

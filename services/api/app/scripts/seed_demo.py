@@ -1605,11 +1605,11 @@ async def _ensure_tenant(session) -> Tenant:
         return tenant
     tenant = Tenant(
         id=DEMO_TENANT_ID,
-        name="AiSOC Demo Tenant",
+        name="A.C.O.R.N Demo Tenant",
         slug="demo",
         plan="enterprise",
         is_active=True,
-        settings={"demo": True, "branding": "AiSOC"},
+        settings={"demo": True, "branding": "A.C.O.R.N"},
         limits={"alerts_per_day": 1_000_000},
     )
     session.add(tenant)
@@ -3165,7 +3165,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="python -m app.scripts.seed_demo",
         description=(
-            "Seed the AiSOC demo dataset. With no flags this populates the full "
+            "Seed the A.C.O.R.N demo dataset. With no flags this populates the full "
             "BOTS-shaped catalogue (15 INC-RT-* + 28 randomized). With "
             "--demo-quick it populates exactly four deterministic DEMO-* "
             "incidents for the `pnpm aisoc:demo --quick` / screencast path."

@@ -802,6 +802,8 @@ export interface IdentityPerson {
   licensed: boolean | null;
   mfa: 'covered' | 'registered_not_required' | 'none' | 'unknown' | string;
   mfa_methods: string | null;
+  /** Password set never to expire (true / false), or null when CIPP's user list could not say. */
+  password_never_expires?: boolean | null;
   tools: string[];
   sources: { vendor: string; external_id: string; enabled: boolean | null; details: Record<string, unknown> }[];
   open_alerts: number;
@@ -837,7 +839,7 @@ export interface IdentityDuplicate {
 }
 
 export interface IdentityList {
-  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; cloud_not_in_halo?: number; halo_inactive_cloud_enabled?: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; active?: number; failed_signins_24h?: number; brute_force?: number };
+  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; cloud_not_in_halo?: number; halo_inactive_cloud_enabled?: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; active?: number; failed_signins_24h?: number; brute_force?: number; password_never_expires?: number; password_policy_known?: number };
   items: IdentityPerson[];
   total: number;
   page: number;
@@ -873,6 +875,8 @@ export interface IdentityQuery {
   backup?: string;
   /** failed: a failed sign-in in the last 24 hours; brute_force: ten or more. */
   signin?: string;
+  /** Only working accounts whose password is set never to expire. */
+  passwordNeverExpires?: boolean;
   exposed?: string;
   admin?: boolean;
   disabled?: boolean;
@@ -906,6 +910,7 @@ export const identitiesApi = {
         enabled: q.enabled ? 'true' : undefined,
         active: q.active ? 'true' : undefined,
         signin: q.signin,
+        password_never_expires: q.passwordNeverExpires ? 'true' : undefined,
         sort: q.sort,
       } as unknown as Record<string, string>,
     }),
@@ -926,6 +931,7 @@ export const identitiesApi = {
     set('signin', q.signin);
     set('sort', q.sort);
     if (q.hasAlerts) p.set('has_alerts', 'true');
+    if (q.passwordNeverExpires) p.set('password_never_expires', 'true');
     if (q.admin) p.set('admin', 'true');
     if (q.disabled) p.set('disabled', 'true');
     if (q.enabled) p.set('enabled', 'true');

@@ -341,7 +341,7 @@ async def provision_from_waitlist(
     provisioned_at = datetime.now(UTC)
     tenant_settings = {
         "managed": True,
-        "branding": "AiSOC",
+        "branding": "A.C.O.R.N",
         "aisoc_credential_key_fingerprint": key_fingerprint,
         # NOTE: the *plaintext* key is intentionally NOT persisted in
         # the JSONB. The connectors-service reads it from

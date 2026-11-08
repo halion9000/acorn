@@ -49,11 +49,11 @@ def build_message(alerts: list[AlertLine], *, pending_more: int, min_severity: s
     top = _severity(ordered[0].severity) if ordered else "info"
     count = len(ordered)
     subject = clean(
-        f"[AiSOC] {count} alert{'' if count == 1 else 's'}, highest {top.upper()}: {clean(ordered[0].title, 70) if ordered else ''}",
+        f"[A.C.O.R.N] {count} alert{'' if count == 1 else 's'}, highest {top.upper()}: {clean(ordered[0].title, 70) if ordered else ''}",
         SUBJECT_LIMIT,
     )
     base = console_base_url.strip().rstrip("/") if console_base_url.lower().startswith(("http://", "https://")) else ""
-    lines = [f"AiSOC: {count} alert{'' if count == 1 else 's'} at or above {min_severity.upper()} severity.", ""]
+    lines = [f"A.C.O.R.N: {count} alert{'' if count == 1 else 's'} at or above {min_severity.upper()} severity.", ""]
     for a in ordered:
         when = a.created_at.strftime("%Y-%m-%d %H:%M UTC") if a.created_at else "time unknown"
         detail = " | ".join(
@@ -76,7 +76,7 @@ def build_message(alerts: list[AlertLine], *, pending_more: int, min_severity: s
             "",
         ]
     lines += [
-        "You receive this because you are listed in AiSOC's platform alert email setting (platform administrators only).",
+        "You receive this because you are listed in A.C.O.R.N's platform alert email setting (platform administrators only).",
         "Names and titles above come from monitored systems: treat them as untrusted, and open alerts in the console.",
     ]
     return subject, "\n".join(lines)

@@ -1,7 +1,7 @@
 """Other alerts about the same device or person: GET /api/v1/alerts/{alert_id}/related.
 
 An analyst looking at one alert needs to know whether the same machine or user has been in trouble before, and in which tool (a Petra incident for a person, a Huntress incident for their laptop).
-This lists the alerts AiSOC holds in the same tenant, from the last 30 days, that name a host or user the alert names, from any tool, newest first. It matches the names exactly as stored; it does
+This lists the alerts A.C.O.R.N holds in the same tenant, from the last 30 days, that name a host or user the alert names, from any tool, newest first. It matches the names exactly as stored; it does
 not guess at similar spellings.
 """
 

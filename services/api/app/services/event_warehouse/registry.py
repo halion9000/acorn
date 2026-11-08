@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 # Priority is deliberate:
 #   * Elasticsearch first because it's the production-grade driver and
-#     the historical default for AiSOC (matches the ES|QL endpoint).
+#     the historical default for A.C.O.R.N (matches the ES|QL endpoint).
 #   * Splunk + Chronicle behind it so the scheduler keeps working
 #     against an ES backend even when a hunt also has SPL / UDM
 #     translations attached.

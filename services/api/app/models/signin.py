@@ -110,6 +110,8 @@ class IdentityMfaUser(Base):
     ca_enforced: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     security_defaults: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     methods: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    # True when the password is set never to expire, False when it is not, None when CIPP's user list could not say (migration 160).
+    password_never_expires: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     snapshot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     refreshed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
 
@@ -242,7 +244,7 @@ class BillingItemMap(Base):
 
 
 class ClientVcioProposal(Base):
-    """Something AiSOC suggests adding to a client's vCIO Toolbox, and what a person decided about it (migration 096)."""
+    """Something A.C.O.R.N suggests adding to a client's vCIO Toolbox, and what a person decided about it (migration 096)."""
 
     __tablename__ = "client_vcio_proposals"
 

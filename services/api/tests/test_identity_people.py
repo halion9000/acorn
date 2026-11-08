@@ -716,3 +716,33 @@ def test_the_summary_counts_them_and_the_filter_keeps_only_those():
     assert [p.email for p in ip.filter_people(people, halo_check="cloud_not_in_halo")] == ["stranger@acme.com"]
     assert [p.email for p in ip.filter_people(people, halo_check="halo_inactive_cloud_enabled")] == ["gone@acme.com"]
     assert len(ip.filter_people(people)) == 3
+
+
+# ---- password set never to expire (migration 160) ---------------------------------------------------------------------------------------------------------
+
+
+def test_the_never_expires_tile_counts_working_own_accounts_with_a_known_yes_and_never_counts_unknown():
+    from types import SimpleNamespace as NS
+
+    from app.api.v1.endpoints.identities import summarize
+    from app.services.identity_people import Person, filter_people, never_expires
+
+    tid = uuid.uuid4()
+
+    def person(email, flag, enabled=True, kind="user"):
+        return Person(tenant_id=tid, email=email, enabled=enabled, kind=kind, password_never_expires=flag)
+
+    people = [
+        person("yes@x.com", True),
+        person("no@x.com", False),
+        person("unknown@x.com", None),
+        person("disabled@x.com", True, enabled=False),
+        person("guest@x.com", True, kind="guest"),
+    ]
+    assert [p.email for p in people if never_expires(p)] == ["yes@x.com"]
+    s = summarize(people)
+    assert s.password_never_expires == 1, "only the working, own, known-yes account"
+    assert s.password_policy_known == 4, "everyone CIPP could say it for, so the page can say how many are unknown"
+    assert [p.email for p in filter_people(people, password_never_expires=True)] == ["yes@x.com"]
+    assert len(filter_people(people)) == 5
+    _ = NS  # (kept so the helper above reads like the other tests)

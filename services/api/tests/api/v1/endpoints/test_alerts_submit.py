@@ -466,7 +466,7 @@ class TestSynthesiseAlertFromEvents:
             override_severity=None,
             override_tags=None,
         )
-        assert alert.title == "AiSOC submitted alert"
+        assert alert.title == "A.C.O.R.N submitted alert"
         assert alert.severity == "medium"
         # No connector_type → not an identity event
         assert alert.category is None

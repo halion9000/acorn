@@ -1,7 +1,7 @@
 """The numbers behind a client review and cyber-insurance readiness: tool coverage across a client's machines, and a plain checklist of the questions insurers and QBRs ask, each answered
-from data AiSOC already holds (met, partly met, not met, or unknown when AiSOC has nothing to say). Pure functions over simple values, so every rule is testable without a database.
+from data A.C.O.R.N already holds (met, partly met, not met, or unknown when A.C.O.R.N has nothing to say). Pure functions over simple values, so every rule is testable without a database.
 
-Nothing here is a certification: it reports what the connected tools show, and says "unknown" for what AiSOC does not collect (backups, e-mail filtering, training, a written incident plan).
+Nothing here is a certification: it reports what the connected tools show, and says "unknown" for what A.C.O.R.N does not collect (backups, e-mail filtering, training, a written incident plan).
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ class ToolCoverage(BaseModel):
     of: int
     percent: float | None
     # Whether this client exists in the tool at all: True when the tool reports some of its machines or the client is mapped to one of its organizations, False when the tool maps clients and this one is not
-    # among them ("not currently enrolled"), None when AiSOC cannot tell (the tool has no client mapping).
+    # among them ("not currently enrolled"), None when A.C.O.R.N cannot tell (the tool has no client mapping).
     enrolled: bool | None = None
     # The client does not use this tool (chosen on its posture page), so it is not a gap.
     excluded: bool = False
@@ -109,7 +109,7 @@ def device_facts(
 class ReadinessItem(BaseModel):
     key: str
     question: str
-    # met, partly, not_met, or unknown (AiSOC has no data to say either way).
+    # met, partly, not_met, or unknown (A.C.O.R.N has no data to say either way).
     status: str
     evidence: str
     # A person's typed answer or note (see review_overrides). ``manual``: the status or answer was typed, replacing what A.C.O.R.N worked out, which is kept in ``auto_*``.
@@ -307,7 +307,7 @@ def readiness(
         ("email_filtering", "Is e-mail filtered for phishing and malware?"),
         ("ir_plan", "Is there a written incident response plan?"),
     ):
-        add(key, question, "unknown", "AiSOC does not collect this yet; answer it from the client's own records.")
+        add(key, question, "unknown", "A.C.O.R.N does not collect this yet; answer it from the client's own records.")
 
     backups = backup_readiness(devices or [])
     if backups is None:
@@ -315,7 +315,7 @@ def readiness(
             "backups",
             "Are backups tested and kept offline?",
             "unknown",
-            "AiSOC does not collect this yet; answer it from the client's own records.",
+            "A.C.O.R.N does not collect this yet; answer it from the client's own records.",
         )
     else:
         add("backups", "Are backups tested and kept offline?", backups[0], backups[1])

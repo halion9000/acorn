@@ -21,6 +21,7 @@ from app.core.security import get_password_hash
 from app.db.database import Base
 from app.models.login_failure import LoginFailure
 from app.models.tenant import ApiKey, Tenant, User
+from app.models.user_totp import UserTotp
 from app.services.user_lookup import find_user_by_email
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
@@ -49,7 +50,7 @@ def world(tmp_path):
     """Tenant A holds a lower-case account, a LEGACY mixed-case account and an inactive one; tenant B holds a legacy mixed-case account."""
     path = tmp_path / "case.db"
     sync = create_engine(f"sqlite:///{path}")
-    Base.metadata.create_all(sync, tables=[Tenant.__table__, User.__table__, ApiKey.__table__, LoginFailure.__table__])
+    Base.metadata.create_all(sync, tables=[Tenant.__table__, User.__table__, ApiKey.__table__, LoginFailure.__table__, UserTotp.__table__])
     ta, tb = (Tenant(id=uuid.uuid4(), name=n, slug=n.lower() + "-" + uuid.uuid4().hex[:6]) for n in ("A", "B"))
     base = datetime(2026, 1, 1, tzinfo=UTC)
 

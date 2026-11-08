@@ -16,6 +16,7 @@ from app.models.login_failure import LoginFailure
 from app.models.rbac import Permission, Role, RolePermission, UserRole
 from app.models.responder import PasskeyCredential
 from app.models.tenant import ApiKey, Tenant, User
+from app.models.user_totp import UserTotp
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
@@ -24,7 +25,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 PW = "correct horse battery staple"
-TABLES = [m.__table__ for m in (Tenant, User, ApiKey, LoginFailure, Role, Permission, RolePermission, UserRole, PasskeyCredential)]
+TABLES = [m.__table__ for m in (Tenant, User, ApiKey, LoginFailure, UserTotp, Role, Permission, RolePermission, UserRole, PasskeyCredential)]
 
 
 def make_user(tenant, name, role):

@@ -14,7 +14,7 @@ from typing import Any
 
 SUPPORTED_VENDOR = "huntress"
 ACTIONS = ("approve", "reject", "resolve")
-# Vendors whose incident can only be RESOLVED from AiSOC (no remediation plan to approve first). Blumira: POST .../findings/{id}/resolve with a ``resolution`` code;
+# Vendors whose incident can only be RESOLVED from A.C.O.R.N (no remediation plan to approve first). Blumira: POST .../findings/{id}/resolve with a ``resolution`` code;
 # Field Effect: POST /v1/aros/{id}/transition to status Closed / resolution Resolved. Both bodies are from the vendors' own API docs.
 RESOLVE_ONLY_VENDORS = ("blumira", "fieldeffect")
 BLUMIRA_RESOLUTIONS = {10: "Valid", 20: "False Positive", 30: "No Action Needed", 40: "Risk Accepted"}
@@ -64,7 +64,7 @@ def alert_incident_uid(raw_event: Any) -> str | None:
 
 
 def alert_vendor_and_uid(raw_event: Any) -> tuple[str, str] | None:
-    """(vendor, finding uid) of an alert AiSOC can act on: a Huntress incident, or a Blumira finding / Field Effect ARO (resolve only). None for anything else."""
+    """(vendor, finding uid) of an alert A.C.O.R.N can act on: a Huntress incident, or a Blumira finding / Field Effect ARO (resolve only). None for anything else."""
     huntress = alert_incident_uid(raw_event)
     if huntress is not None:
         return SUPPORTED_VENDOR, huntress
@@ -114,7 +114,7 @@ def vendor_account_id(raw_event: Any) -> str | None:
 
 
 def problem_with_resolve_only(vendor: str, action: str, resolution: int | None, alert_status: str) -> str | None:
-    """Why a Blumira / Field Effect alert cannot be resolved from AiSOC right now, or None."""
+    """Why a Blumira / Field Effect alert cannot be resolved from A.C.O.R.N right now, or None."""
     if action != "resolve":
         return f"Only resolving is supported for {vendor}; there is no remediation plan to approve or reject."
     if alert_status == "resolved":
@@ -132,7 +132,7 @@ def _remediations(vendor_state: Any) -> list[dict[str, Any]]:
 def problem_with_request(action: str, vendor_state: Any) -> str | None:
     """Why this action cannot be requested right now, or None if it can.
 
-    ``vendor_state`` is what CORE last reported for the incident (``status`` and ``remediations``). With nothing reported yet we refuse: AiSOC would be acting blind.
+    ``vendor_state`` is what CORE last reported for the incident (``status`` and ``remediations``). With nothing reported yet we refuse: A.C.O.R.N would be acting blind.
     """
     if action not in ACTIONS:
         return f"Unknown action {action!r}."

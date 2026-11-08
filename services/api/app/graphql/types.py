@@ -1,4 +1,4 @@
-"""Strawberry GraphQL type definitions for AiSOC.
+"""Strawberry GraphQL type definitions for A.C.O.R.N.
 
 These mirror the Pydantic response schemas used in the REST API so that
 callers get the same field names/types regardless of protocol.

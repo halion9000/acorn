@@ -19,7 +19,7 @@ VALID SCOPES
   reports:read reports:write
   *            (all permissions — admin only)
 
-MIT License — AiSOC (open-source AI Security Operations Center)
+MIT License — A.C.O.R.N (open-source AI Security Operations Center)
 """
 
 from __future__ import annotations

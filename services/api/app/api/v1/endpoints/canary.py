@@ -1,7 +1,7 @@
 """The honeytoken tripwire: GET /api/v1/canary/{token_id}.
 
 A honeytoken of type url (or a file that carries a beacon link) contains a link to this route with the token's own id in it. Anyone who opens the link, whoever they are, reaches here WITHOUT signing
-in (a visitor who found a planted link has no AiSOC account); we record the visit with the honeytokens service, which marks the token triggered and raises the alert, and answer with a one pixel image.
+in (a visitor who found a planted link has no A.C.O.R.N account); we record the visit with the honeytokens service, which marks the token triggered and raises the alert, and answer with a one pixel image.
 
 Why this is safe to leave open:
   * The answer is identical for a real token, an unknown id and junk, so the route cannot be used to find out which tokens exist.
@@ -10,7 +10,7 @@ Why this is safe to leave open:
   * It is rate limited per token and overall, so it cannot be used to flood the honeytokens service or its database. Past a limit the visit is dropped quietly (the first visits already fired the alert).
   * Failing to reach the honeytokens service, or to write the alert, never changes the answer or raises an error to the visitor.
 
-Two things happen on a visit to a real token: the honeytokens service records the trigger (so the token shows as triggered, with the visitor's address and browser), and AiSOC raises an ALERT in the
+Two things happen on a visit to a real token: the honeytokens service records the trigger (so the token shows as triggered, with the visitor's address and browser), and A.C.O.R.N raises an ALERT in the
 token's own tenant (high severity, tagged honeytoken) so it reaches the queue analysts work. One alert per token per hour: later visits in that hour are in the trigger history, not new alerts.
 """
 

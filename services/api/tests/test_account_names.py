@@ -23,6 +23,7 @@ from app.core.security import decode_token, get_password_hash, hash_api_key
 from app.db.database import Base
 from app.models.login_failure import LoginFailure
 from app.models.tenant import ApiKey, Tenant, User
+from app.models.user_totp import UserTotp
 from app.services import account_names as svc
 from app.services.user_lookup import find_user_by_account_name, find_user_by_login
 from fastapi import FastAPI, HTTPException
@@ -45,7 +46,7 @@ def world(tmp_path):
     """Tenant A: 'alice' (with an email), 'nomail' (NO email), 'dormant' (inactive). Tenant B: 'bob' (with an email)."""
     path = tmp_path / "names.db"
     sync = create_engine(f"sqlite:///{path}")
-    Base.metadata.create_all(sync, tables=[Tenant.__table__, User.__table__, ApiKey.__table__, LoginFailure.__table__])
+    Base.metadata.create_all(sync, tables=[Tenant.__table__, User.__table__, ApiKey.__table__, LoginFailure.__table__, UserTotp.__table__])
     with sync.begin() as c:
         c.execute(text("CREATE UNIQUE INDEX ux_users_account_name_lower ON users (lower(account_name))"))  # as migration 071 does
     ta, tb = (Tenant(id=uuid.uuid4(), name=n, slug=n.lower() + "-" + uuid.uuid4().hex[:6]) for n in ("A", "B"))

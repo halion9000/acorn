@@ -108,7 +108,7 @@ def test_opsgenie_priority_mapping():
 def test_email_payload_subject_and_recipients():
     payload = build_email_payload(_ALERT, ["soc@corp.com"])
     assert payload["to"] == ["soc@corp.com"]
-    assert "[AiSOC][CRITICAL]" in payload["subject"]
+    assert "[A.C.O.R.N][CRITICAL]" in payload["subject"]
 
 
 def test_soar_handoff_schema():

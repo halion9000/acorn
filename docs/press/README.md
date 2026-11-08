@@ -1,6 +1,6 @@
-# AiSOC press kit
+# A.C.O.R.N press kit
 
-Everything a writer, conference organizer, or partner needs to represent AiSOC
+Everything a writer, conference organizer, or partner needs to represent A.C.O.R.N
 accurately. Please keep quotes and stats consistent with the
 [benchmark page](../../apps/docs/docs/benchmark.md).
 
@@ -8,13 +8,13 @@ accurately. Please keep quotes and stats consistent with the
 
 **One sentence:**
 
-> AiSOC is an open-source, self-hostable AI security operations center whose
+> A.C.O.R.N is an open-source, self-hostable AI security operations center whose
 > agent decisions are logged step-by-step and replayable, gated by a public
 > eval harness, and MIT-licensed.
 
 **One paragraph:**
 
-> AiSOC is an open-source (MIT) AI SOC that ingests security events, correlates
+> A.C.O.R.N is an open-source (MIT) AI SOC that ingests security events, correlates
 > them, runs AI-driven investigation, and surfaces the result in a SOC console.
 > Unlike closed-source AI SOC products, the agent and the substrate are open:
 > every prompt, tool call, piece of evidence, and rationale is stored in an
@@ -45,7 +45,7 @@ all sides; on dark backgrounds use the mark as-is.
 
 ## Naming
 
-- Product name is **AiSOC** (capital A-i-S-O-C). Not "AISOC", not "Aisoc".
+- Product name is **A.C.O.R.N** (capital A-i-S-O-C). Not "AISOC", not "Aisoc".
 - Not affiliated with, and not to be compared by name to, any specific
   commercial vendor in our materials.
 

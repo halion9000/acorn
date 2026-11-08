@@ -41,7 +41,7 @@ from app.db.database import Base
 
 
 class SavedView(Base):
-    """Per-user filter+column preset for an AiSOC list page."""
+    """Per-user filter+column preset for an A.C.O.R.N list page."""
 
     __tablename__ = "saved_views"
 

@@ -370,7 +370,7 @@ async def create_bundle(
 async def list_taxii_collections() -> TAXIICollectionListResponse:
     """List TAXII 2.1 collections. No TAXII collection is served yet (there is no per-collection objects endpoint), so there are none to list.
 
-    It used to list three that did not exist ("AiSOC Threat Feed", "Community IOCs", "MITRE ATT&CK Mapping"), which a TAXII client would try to read and fail.
+    It used to list three that did not exist ("A.C.O.R.N Threat Feed", "Community IOCs", "MITRE ATT&CK Mapping"), which a TAXII client would try to read and fail.
     """
     return TAXIICollectionListResponse(items=[], total=0)
 

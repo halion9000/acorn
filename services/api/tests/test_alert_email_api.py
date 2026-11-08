@@ -20,6 +20,7 @@ from app.models.alert_email import AlertEmailLog, PlatformAlertEmailSettings
 from app.models.login_failure import LoginFailure
 from app.models.rbac import Permission, Role, RolePermission, UserRole
 from app.models.tenant import ApiKey, Tenant, User
+from app.models.user_totp import UserTotp
 from app.scripts import alert_email as cli
 from app.services.alert_email.graph import MailError
 from fastapi import FastAPI
@@ -65,6 +66,7 @@ def world(tmp_path, monkeypatch):
                 User.__table__,
                 ApiKey.__table__,
                 LoginFailure.__table__,
+                UserTotp.__table__,
                 PlatformAlertEmailSettings.__table__,
                 AlertEmailLog.__table__,
                 Role.__table__,

@@ -285,7 +285,7 @@ class AlertSubmitRequest(BaseModel):
     tags: list[str] | None = None
 
 
-# Map vendor-native severity strings to the canonical AiSOC severity ladder.
+# Map vendor-native severity strings to the canonical A.C.O.R.N severity ladder.
 # Keep this in sync with the five-tier ladder documented in AGENTS.md
 # (info | low | medium | high | critical).
 _SEVERITY_MAP = {
@@ -388,7 +388,7 @@ def _synthesise_alert_from_events(
     first = events[0] if events else {}
 
     # Title
-    title = override_title or first.get("displayMessage") or first.get("eventType") or first.get("name") or "AiSOC submitted alert"
+    title = override_title or first.get("displayMessage") or first.get("eventType") or first.get("name") or "A.C.O.R.N submitted alert"
 
     # Severity: pick the highest in the batch unless overridden
     severities = [_normalize_severity(e.get("severity")) for e in events]

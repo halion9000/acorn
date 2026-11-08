@@ -1,6 +1,6 @@
-"""Approve or reject a Huntress remediation plan, or resolve the incident, from the alert in AiSOC.
+"""Approve or reject a Huntress remediation plan, or resolve the incident, from the alert in A.C.O.R.N.
 
-AiSOC holds no vendor key. These routes only QUEUE the request (a ``vendor_actions`` row, migration 084) after checking it makes sense for the incident's last reported state;
+A.C.O.R.N holds no vendor key. These routes only QUEUE the request (a ``vendor_actions`` row, migration 084) after checking it makes sense for the incident's last reported state;
 CORE collects it on its next sync (``inbox_core_feed.py``), makes the call at Huntress and reports back. The alert page shows the progress.
 
 Permission: ``connectors:write`` to ask for an action (these change a live security tool), ``alerts:read`` to see them. Every request is audited.

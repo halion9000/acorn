@@ -61,7 +61,7 @@ def build_signup_message(
     truncated_motivation = motivation if len(motivation) <= 500 else motivation[:497] + "..."
 
     return {
-        "text": f"New AiSOC managed waitlist signup: {company} ({email})",
+        "text": f"New A.C.O.R.N managed waitlist signup: {company} ({email})",
         "blocks": [
             {
                 "type": "header",

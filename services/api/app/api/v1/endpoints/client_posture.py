@@ -1,4 +1,4 @@
-"""One client's security posture on a single page: devices, second-factor coverage, open alerts and cases. Read-only; every number comes from data AiSOC already holds.
+"""One client's security posture on a single page: devices, second-factor coverage, open alerts and cases. Read-only; every number comes from data A.C.O.R.N already holds.
 
 ``GET /api/v1/client-posture/{client_id}``. The same figures are on the Devices, Multi-factor status, Alerts and Cases pages; this puts them side by side for a client review.
 """

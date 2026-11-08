@@ -1,4 +1,4 @@
-"""Client alias ORM model: links one vendor's name for a customer to one AiSOC tenant (migration 083)."""
+"""Client alias ORM model: links one vendor's name for a customer to one A.C.O.R.N tenant (migration 083)."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ class ClientAlias(Base):
 
 
 class ClientDeviceHint(Base):
-    """A machine name seen for a tool's client that is not mapped yet (migration 092): evidence for suggesting which AiSOC client it belongs to."""
+    """A machine name seen for a tool's client that is not mapped yet (migration 092): evidence for suggesting which A.C.O.R.N client it belongs to."""
 
     __tablename__ = "client_device_hints"
 

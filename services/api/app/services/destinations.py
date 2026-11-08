@@ -31,11 +31,11 @@ class DispatchResult:
 def build_opsgenie_payload(alert: dict[str, Any]) -> dict[str, Any]:
     sev = str(alert.get("severity", "medium")).lower()
     return {
-        "message": alert.get("title", "AiSOC alert"),
+        "message": alert.get("title", "A.C.O.R.N alert"),
         "alias": f"aisoc-{alert.get('id', '')}",
         "description": alert.get("description", ""),
         "priority": _OPSGENIE_PRIORITY.get(sev, "P3"),
-        "source": "AiSOC",
+        "source": "A.C.O.R.N",
         "tags": ["aisoc", sev, str(alert.get("source", "unknown"))],
         "details": {"alert_id": str(alert.get("id", "")), "severity": sev},
     }
@@ -43,10 +43,10 @@ def build_opsgenie_payload(alert: dict[str, Any]) -> dict[str, Any]:
 
 def build_email_payload(alert: dict[str, Any], recipients: list[str]) -> dict[str, Any]:
     sev = str(alert.get("severity", "medium")).upper()
-    title = alert.get("title", "AiSOC alert")
+    title = alert.get("title", "A.C.O.R.N alert")
     return {
         "to": list(recipients),
-        "subject": f"[AiSOC][{sev}] {title}",
+        "subject": f"[A.C.O.R.N][{sev}] {title}",
         "body": (
             f"Severity: {sev}\n"
             f"Source: {alert.get('source', 'unknown')}\n"

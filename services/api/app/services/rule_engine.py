@@ -1,7 +1,7 @@
 """
 Detection rule execution engine.
 Supports: Sigma (pySigma), YARA, KQL (simulated), EQL (simulated).
-AiSOC — open-source AI Security Operations Center (MIT License)
+A.C.O.R.N — open-source AI Security Operations Center (MIT License)
 """
 
 from __future__ import annotations

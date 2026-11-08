@@ -1,4 +1,4 @@
-"""AiSOC Core API - FastAPI Application Entry Point."""
+"""A.C.O.R.N Core API - FastAPI Application Entry Point."""
 
 import asyncio
 import hmac
@@ -297,7 +297,7 @@ REQUEST_LATENCY = Histogram(
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler for startup and shutdown tasks."""
     configure_logging()
-    logger.info("AiSOC API starting up", version=settings.VERSION, environment=settings.ENVIRONMENT)
+    logger.info("A.C.O.R.N API starting up", version=settings.VERSION, environment=settings.ENVIRONMENT)
 
     # Surface insecure defaults (placeholder SECRET_KEY, missing METRICS_TOKEN
     # outside dev, plugin trust mode disabled outside dev) at the top of the
@@ -525,7 +525,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # without sending us new ones.
     app.state.mark_not_ready()
 
-    logger.info("AiSOC API shutting down")
+    logger.info("A.C.O.R.N API shutting down")
     if oauth_refresh_task is not None and not oauth_refresh_task.done():
         oauth_refresh_task.cancel()
         try:
@@ -611,8 +611,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_application() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
-        title="AiSOC Platform API",
-        description=("AiSOC — open-source AI Security Operations Center. Autonomous threat detection, investigation, and response."),
+        title="A.C.O.R.N Platform API",
+        description=("A.C.O.R.N — open-source AI Security Operations Center. Autonomous threat detection, investigation, and response."),
         version=settings.VERSION,
         # Docs are exposed in every non-production environment. We use the
         # ``is_production`` predicate (the inverse of the dev set) so any

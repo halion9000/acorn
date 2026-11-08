@@ -264,6 +264,8 @@ class MfaUserIn(BaseModel):
     ca_enforced: bool = False
     security_defaults: bool = False
     methods: list[str] = Field(default_factory=list, max_length=8)
+    # True / False when CIPP's user list said, None when it could not (never guessed).
+    password_never_expires: bool | None = None
 
 
 class MfaUsersReport(BaseModel):
@@ -335,6 +337,7 @@ async def apply_mfa_users(db: Any, owner: uuid.UUID, report: MfaUsersReport, now
                         "ca_enforced": u.ca_enforced,
                         "security_defaults": u.security_defaults,
                         "methods": ", ".join(u.methods)[:400] or None,
+                        "password_never_expires": u.password_never_expires,
                         "snapshot_id": report.snapshot_id,
                         "refreshed_at": now,
                     }

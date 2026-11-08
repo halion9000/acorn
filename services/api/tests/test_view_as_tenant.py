@@ -23,6 +23,7 @@ from app.db.database import Base
 from app.models.login_failure import LoginFailure
 from app.models.rbac import Role, UserRole
 from app.models.tenant import ApiKey, Tenant, User
+from app.models.user_totp import UserTotp
 from app.models.tenant_access import AllTenantAccessGrant, TenantAccessGrant
 from app.services import view_as
 from app.services.view_as import ERROR_HEADER, VIEW_AS_HEADER, VIEWING_HEADER
@@ -67,6 +68,7 @@ def world(tmp_path, monkeypatch):
                 User.__table__,
                 ApiKey.__table__,
                 LoginFailure.__table__,
+                UserTotp.__table__,
                 TenantAccessGrant.__table__,
                 AllTenantAccessGrant.__table__,
                 Role.__table__,

@@ -151,6 +151,8 @@ class Person:
     alias_reasons: dict[str, str] = field(default_factory=dict)
     # How the person compares with the client's HaloPSA users (see halo_checks): "cloud_not_in_halo", "halo_inactive_cloud_enabled", or None.
     halo_check: str | None = None
+    # Microsoft 365 password set never to expire: True / False, or None when CIPP's user list could not say.
+    password_never_expires: bool | None = None
 
     @property
     def key(self) -> str:
@@ -222,6 +224,7 @@ def build_people(
         p.licensed = bool(u.licensed)
         p.mfa = mfa_state(u, known[u.tenant_id])
         p.mfa_methods = u.methods or None
+        p.password_never_expires = getattr(u, "password_never_expires", None)
         p.sources.append(
             SourceRef(
                 vendor=MICROSOFT,
@@ -361,6 +364,11 @@ def is_active(p: Person) -> bool:
     return p.licensed is True and p.kind != "guest" and p.enabled is not False
 
 
+def never_expires(p: "Person") -> bool:
+    """Whether the tile counts this person: a working (not disabled) account of the organization's own (not a guest) whose password CIPP says never expires. Unknown is never counted (pure)."""
+    return p.password_never_expires is True and p.enabled is not False and p.kind != "guest"
+
+
 def filter_people(
     people: list[Person],
     *,
@@ -378,6 +386,7 @@ def filter_people(
     exposed: str | None = None,
     active: bool = False,
     halo_check: str | None = None,
+    password_never_expires: bool = False,
 ) -> list[Person]:
     """The people a page asked for: every filter given must hold. ``only_in`` keeps people known to just that one tool."""
     rows = people
@@ -414,6 +423,8 @@ def filter_people(
     if mfa:
         # "No multi-factor" leaves out disabled accounts, as the tile does: a blocked account cannot be signed in to, with or without a second factor.
         rows = [p for p in rows if p.mfa == mfa and not (mfa == "none" and p.enabled is False)]
+    if password_never_expires:
+        rows = [p for p in rows if never_expires(p)]
     if admin:
         rows = [p for p in rows if p.admin]
     if disabled:

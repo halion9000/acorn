@@ -1,6 +1,6 @@
 """
-Neo4j driver singleton for AiSOC graph layer.
-AiSOC — open-source AI Security Operations Center (MIT License)
+Neo4j driver singleton for A.C.O.R.N graph layer.
+A.C.O.R.N — open-source AI Security Operations Center (MIT License)
 """
 
 from __future__ import annotations

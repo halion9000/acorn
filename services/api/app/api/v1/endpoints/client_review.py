@@ -1,5 +1,5 @@
 """A client review on one page: tool coverage, Multi-Factor, Microsoft Secure Score, the last 30 days of alerts and cases, and a cyber-insurance readiness checklist. Read-only; every number comes
-from data AiSOC already holds, and what it does not hold is reported as unknown rather than guessed.
+from data A.C.O.R.N already holds, and what it does not hold is reported as unknown rather than guessed.
 
 ``GET /api/v1/client-review/{client_id}``. For a quarterly business review or a cyber-insurance questionnaire; the checklist answers are evidence from the connected tools, not a certification.
 ``POST /api/v1/inbox/core-feed/{token}/vcio-reviews``: CORE's daily summary of a client's vCIO Toolbox recommendations and risks (authenticated by the secret in the path, like the other core-feed routes).

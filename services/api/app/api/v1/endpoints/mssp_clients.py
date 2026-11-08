@@ -1,4 +1,4 @@
-"""MSSP console: add a client, and map each vendor's client to one AiSOC tenant.
+"""MSSP console: add a client, and map each vendor's client to one A.C.O.R.N tenant.
 
 ``POST /mssp/clients/new`` creates a fresh child tenant (nothing is claimed from anyone else, so ``mssp:manage`` is enough; ``mssp:onboard`` stays for claiming an existing tenant).
 The ``/mssp/clients`` routes list the clients CORE forwarded from each vendor (Petra, Halo, Huntress, ...), with suggested matches, and let a person map, create-and-map, ignore or unmap each one.

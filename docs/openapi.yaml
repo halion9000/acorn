@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
-  title: AiSOC Platform API
-  description: AiSOC — open-source AI Security Operations Center. Autonomous threat
+  title: A.C.O.R.N Platform API
+  description: A.C.O.R.N — open-source AI Security Operations Center. Autonomous threat
     detection, investigation, and response.
   version: 0.1.0
 paths:
@@ -9840,8 +9840,8 @@ paths:
         \ — per-day buckets so the UI can plot a trend line.\n* **by_model** — spend,\
         \ tokens, runs, and average latency per model\n  with the imputed public-list\
         \ cost for context.\n* **top_cases** — the most expensive ``case_id`` values,\
-        \ the closest\n  proxy AiSOC has for \"top-cost playbook runs\" since each\
-        \ playbook\n  run lives under a case (no separate ``playbook_runs`` table).\n\
+        \ the closest\n  proxy A.C.O.R.N has for \"top-cost playbook runs\" since\
+        \ each playbook\n  run lives under a case (no separate ``playbook_runs`` table).\n\
         * **action_counts** — ``audit_log`` action distribution so operators\n  can\
         \ see how much SOC activity their LLM spend is buying.\n* **byok_savings**\
         \ — imputed delta between recorded cost and public\n  list pricing. ``is_byok_active``\
@@ -12267,6 +12267,17 @@ paths:
             pattern: ^(user|guest|shared|other)$
           - type: 'null'
           title: Kind
+      - name: password_never_expires
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Only working accounts whose password is set never to expire
+            (the tile's list).
+          default: false
+          title: Password Never Expires
+        description: Only working accounts whose password is set never to expire (the
+          tile's list).
       - name: signin
         in: query
         required: false
@@ -12453,6 +12464,15 @@ paths:
             pattern: ^(failed|brute_force)$
           - type: 'null'
           title: Signin
+      - name: password_never_expires
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Only working accounts whose password is set never to expire.
+          default: false
+          title: Password Never Expires
+        description: Only working accounts whose password is set never to expire.
       - name: sort
         in: query
         required: false
@@ -16429,7 +16449,7 @@ paths:
     get:
       tags:
       - posture
-      summary: What AiSOC suggests adding to this client's vCIO Toolbox
+      summary: What A.C.O.R.N suggests adding to this client's vCIO Toolbox
       operationId: list_proposals_api_v1_client_review__client_id__vcio_proposals_get
       security:
       - HTTPBearer: []
@@ -22242,7 +22262,7 @@ paths:
         (there is no per-collection objects endpoint), so there are none to list.
 
 
-        It used to list three that did not exist ("AiSOC Threat Feed", "Community
+        It used to list three that did not exist ("A.C.O.R.N Threat Feed", "Community
         IOCs", "MITRE ATT&CK Mapping"), which a TAXII client would try to read and
         fail.'
       operationId: list_taxii_collections_api_v1_threatintel_stix_taxii_collections_get
@@ -22959,8 +22979,8 @@ paths:
     post:
       tags:
       - inbox-itsm
-      summary: Inbound ITSM webhook (Jira / ServiceNow → AiSOC case)
-      description: 'Receive a Jira / ServiceNow webhook and mirror status onto AiSOC.
+      summary: Inbound ITSM webhook (Jira / ServiceNow → A.C.O.R.N case)
+      description: 'Receive a Jira / ServiceNow webhook and mirror status onto A.C.O.R.N.
 
 
         Public-facing — the only authenticator is the ``tenant_token`` in the
@@ -23311,8 +23331,8 @@ paths:
       tags:
       - inbox-core-feed
       summary: Report Core Feed Scripts
-      description: CORE tells AiSOC which NinjaOne scripts its owner switched on,
-        so an alert can offer them. The whole list replaces the last one (a script
+      description: CORE tells A.C.O.R.N which NinjaOne scripts its owner switched
+        on, so an alert can offer them. The whole list replaces the last one (a script
         switched off disappears).
       operationId: report_core_feed_scripts_api_v1_inbox_core_feed__tenant_token__scripts_post
       parameters:
@@ -23347,7 +23367,7 @@ paths:
       - inbox-core-feed
       summary: Report Core Feed Clients
       description: CORE sends the list of clients one vendor has (Petra tenants, Halo
-        clients, ...), so each can be mapped to an AiSOC tenant on the MSSP page.
+        clients, ...), so each can be mapped to an A.C.O.R.N tenant on the MSSP page.
       operationId: report_core_feed_clients_api_v1_inbox_core_feed__tenant_token__clients_post
       parameters:
       - name: tenant_token
@@ -23900,7 +23920,7 @@ paths:
 
         Requires `Authorization: Bearer <aisoc_jwt>` header — the JWT sub is
 
-        used to look up the upstream token (stub: returns claims from AiSOC JWT).'
+        used to look up the upstream token (stub: returns claims from A.C.O.R.N JWT).'
       operationId: oidc_userinfo_auth_oidc_userinfo_get
       responses:
         '200':
@@ -38741,6 +38761,11 @@ components:
           type: array
           maxItems: 8
           title: Methods
+        password_never_expires:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Password Never Expires
       type: object
       required:
       - id
@@ -40868,6 +40893,11 @@ components:
           - type: string
           - type: 'null'
           title: Mfa Methods
+        password_never_expires:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Password Never Expires
         tools:
           items:
             type: string
@@ -45167,7 +45197,7 @@ components:
         one_click:
           type: boolean
           title: One Click
-          description: Whether CORE runs it at once when asked from AiSOC (otherwise
+          description: Whether CORE runs it at once when asked from A.C.O.R.N (otherwise
             CORE asks its owner first).
           default: false
       type: object
@@ -46656,7 +46686,7 @@ components:
           maximum: 1000000.0
           minimum: 0.0
           title: Sent
-          description: Records AiSOC accepted in this run.
+          description: Records A.C.O.R.N accepted in this run.
           default: 0
         message:
           anyOf:
@@ -49143,7 +49173,7 @@ components:
       description: 'The most expensive cases over the window.
 
 
-        Top-cost playbooks ≈ top-cost cases in the AiSOC data model: a
+        Top-cost playbooks ≈ top-cost cases in the A.C.O.R.N data model: a
 
         case is the unit of work an analyst (or playbook) drives, and
 
@@ -49676,7 +49706,7 @@ components:
       title: UnmappedClient
       description: A tool's client that devices belong to but that is not mapped to
         a client here (``name`` is None when the tool's client list has not reached
-        AiSOC yet).
+        A.C.O.R.N yet).
     UnmappedGroup:
       properties:
         vendor:
@@ -52058,6 +52088,14 @@ components:
         brute_force:
           type: integer
           title: Brute Force
+          default: 0
+        password_never_expires:
+          type: integer
+          title: Password Never Expires
+          default: 0
+        password_policy_known:
+          type: integer
+          title: Password Policy Known
           default: 0
       type: object
       required:

@@ -1,4 +1,4 @@
-"""Suggest which AiSOC tenant a vendor's client belongs to, from the names alone.
+"""Suggest which A.C.O.R.N tenant a vendor's client belongs to, from the names alone.
 
 The same customer is spelled differently in every tool ("Acme Dental, LLC", "Acme Dental", "ACME DENTAL INC."). This module is pure (no database): it normalizes names and
 ranks candidate tenants. It only SUGGESTS; a person confirms, and a choice a person made is never replaced by a suggestion.
@@ -134,7 +134,7 @@ def duplicate_groups(candidates: list[Candidate]) -> list[list[Candidate]]:
 
 @dataclass(frozen=True)
 class DeviceOverlap:
-    """How many of a tool client's machine names are also machines under one AiSOC client."""
+    """How many of a tool client's machine names are also machines under one A.C.O.R.N client."""
 
     tenant_id: str
     shared: int

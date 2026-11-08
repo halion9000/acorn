@@ -57,8 +57,8 @@ async def run(action: str, *, recipients: str | None = None, min_severity: str |
             try:
                 await mailer.send(
                     to,
-                    "[AiSOC] Test email: alert email is working",
-                    "This is a test of AiSOC's alert email, requested from the command line. If you can read this, the Microsoft Graph setup works.\n",
+                    "[A.C.O.R.N] Test email: alert email is working",
+                    "This is a test of A.C.O.R.N's alert email, requested from the command line. If you can read this, the Microsoft Graph setup works.\n",
                 )
             except MailError as exc:
                 raise AlertEmailCliError(scrub(str(exc), (mailer.client_secret,))) from None

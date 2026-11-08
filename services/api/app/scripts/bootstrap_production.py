@@ -1,4 +1,4 @@
-"""Production bootstrap for a self-hosted AiSOC (idempotent).
+"""Production bootstrap for a self-hosted A.C.O.R.N (idempotent).
 
 Run inside the api container once the database is up:
 
@@ -24,7 +24,7 @@ What it does, in order (every step is safe to repeat):
 
 The last line of output is machine-readable:
     AISOC_BOOTSTRAP_RESULT {"ok": true, ...}
-The raw API key appears there once and is never stored by AiSOC (only its hash).
+The raw API key appears there once and is never stored by A.C.O.R.N (only its hash).
 """
 
 from __future__ import annotations
@@ -140,7 +140,7 @@ async def _verify_orm_tables(session) -> None:
 async def _ensure_key(session, name: str, scopes: list[str], owner_id, rotate: bool) -> tuple[str | None, str]:
     """Keep an active key named `name`, or issue one. Returns (raw key or None, status).
 
-    The raw key is returned ONLY when issued now (it is shown once; AiSOC stores
+    The raw key is returned ONLY when issued now (it is shown once; A.C.O.R.N stores
     its hash). With rotate=True any active key of that name is revoked first.
     """
     from datetime import UTC, datetime  # noqa: PLC0415

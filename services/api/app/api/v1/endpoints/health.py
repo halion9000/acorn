@@ -242,7 +242,7 @@ FEED_SLOW_AFTER = timedelta(minutes=5)
 
 
 async def _feed_stage(db, tenant_id, *, now: datetime) -> PipelineStage:
-    """Is CORE still reporting its tools to AiSOC? Green when it reported in the last five minutes, yellow up to the silence limit (fifteen minutes), red beyond it, unknown when CORE was never
+    """Is CORE still reporting its tools to A.C.O.R.N? Green when it reported in the last five minutes, yellow up to the silence limit (fifteen minutes), red beyond it, unknown when CORE was never
     connected here. This is what alerts and devices from the tools actually travel on, so it is the stage that tells a person whether the data is arriving."""
     feed = await core_feed_status(db, tenant_id, now)
     if feed is None:
@@ -298,7 +298,7 @@ async def _normalize_stage(
 ) -> PipelineStage:
     """Build the ``normalize`` row from event_time → created_at lag.
 
-    The "normalize" step in the AiSOC pipeline is the transition from
+    The "normalize" step in the A.C.O.R.N pipeline is the transition from
     raw event JSON (carrying a vendor-side ``event_time``) to a fully
     structured ``Alert`` row in Postgres. The p95 lag between the two
     is the most honest single-number proxy for normalization latency.
@@ -723,7 +723,7 @@ CORE_FEED_SILENT_AFTER = timedelta(minutes=15)
 
 
 def core_feed_row(last_report: datetime | None, sources: int, now: datetime) -> dict[str, Any]:
-    """Is CORE still reporting to AiSOC? CORE reports every run, including runs that found nothing new, so a long silence means CORE is closed, asleep or cannot reach AiSOC, and nothing from
+    """Is CORE still reporting to A.C.O.R.N? CORE reports every run, including runs that found nothing new, so a long silence means CORE is closed, asleep or cannot reach A.C.O.R.N, and nothing from
     Huntress, Petra, NinjaOne and the rest is arriving. ``silent`` is true after fifteen minutes (or when it has never reported)."""
     if last_report is None:
         return {"sources": sources, "last_report": None, "minutes_ago": None, "silent": True}
@@ -783,7 +783,7 @@ DEVICE_SYNC_STALLED_AFTER = timedelta(hours=3)
 
 
 def device_feed_row(vendor: str, devices: int, newest: datetime | None, now: datetime) -> dict[str, Any]:
-    """One tool's device feed: how many devices it holds in AiSOC, when it last synced, and whether it looks stalled (nothing for three hours, when CORE syncs hourly)."""
+    """One tool's device feed: how many devices it holds in A.C.O.R.N, when it last synced, and whether it looks stalled (nothing for three hours, when CORE syncs hourly)."""
     if newest is None:
         return {"vendor": vendor, "devices": devices, "last_synced": None, "minutes_ago": None, "stalled": True}
     if newest.tzinfo is None:

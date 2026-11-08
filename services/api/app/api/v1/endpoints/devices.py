@@ -1249,7 +1249,7 @@ class DevicesReport(BaseModel):
 
 
 class UnmappedClient(BaseModel):
-    """A tool's client that devices belong to but that is not mapped to a client here (``name`` is None when the tool's client list has not reached AiSOC yet)."""
+    """A tool's client that devices belong to but that is not mapped to a client here (``name`` is None when the tool's client list has not reached A.C.O.R.N yet)."""
 
     vendor_client_id: str
     name: str | None = None

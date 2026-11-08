@@ -12,6 +12,7 @@ from app.core.security import get_password_hash
 from app.db.database import Base
 from app.models.login_failure import LoginFailure
 from app.models.tenant import ApiKey, Tenant, User
+from app.models.user_totp import UserTotp
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -27,7 +28,7 @@ NEW = "a brand new long passphrase"
 def world(tmp_path):
     path = tmp_path / "pw.db"
     sync = create_engine(f"sqlite:///{path}")
-    Base.metadata.create_all(sync, tables=[Tenant.__table__, User.__table__, ApiKey.__table__, LoginFailure.__table__])
+    Base.metadata.create_all(sync, tables=[Tenant.__table__, User.__table__, ApiKey.__table__, LoginFailure.__table__, UserTotp.__table__])
     tenant = Tenant(id=uuid.uuid4(), name="T", slug="t-" + uuid.uuid4().hex[:6])
     other = Tenant(id=uuid.uuid4(), name="U", slug="u-" + uuid.uuid4().hex[:6])
     admin = User(

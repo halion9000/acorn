@@ -1,7 +1,7 @@
-"""Make sure the default tenant has a push-inbox token that CORE can use to forward its connector data into AiSOC.
+"""Make sure the default tenant has a push-inbox token that CORE can use to forward its connector data into A.C.O.R.N.
 
-CORE (the HUD) already holds the vendor credentials (Huntress, DNSFilter, ...) and knows how to call those APIs. Rather than copying every credential into AiSOC and
-re-implementing every vendor client, CORE polls its own connectors and posts what it finds to AiSOC's generic JSON push inbox (``POST /v1/inbox/{token}``,
+CORE (the HUD) already holds the vendor credentials (Huntress, DNSFilter, ...) and knows how to call those APIs. Rather than copying every credential into A.C.O.R.N and
+re-implementing every vendor client, CORE polls its own connectors and posts what it finds to A.C.O.R.N's generic JSON push inbox (``POST /v1/inbox/{token}``,
 template ``generic-json``). This script creates that one token.
 
     python -m app.scripts.ensure_core_feed_token
@@ -10,7 +10,7 @@ Idempotent: if an active token with the label below already exists it is returne
 
     AISOC_CORE_FEED_RESULT {"ok": true, "token": "aitnb_...", "created": false}
 
-The token is a credential (it is the only thing that authenticates a push). It is printed here for CORE to store in AiSOC's ``.env`` and is never logged.
+The token is a credential (it is the only thing that authenticates a push). It is printed here for CORE to store in A.C.O.R.N's ``.env`` and is never logged.
 """
 
 from __future__ import annotations

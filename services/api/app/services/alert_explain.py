@@ -718,7 +718,7 @@ async def _call_llm_for_summary(
         {
             "role": "system",
             "content": (
-                "You are AiSOC's alert explainer. Given one security alert, the "
+                "You are A.C.O.R.N's alert explainer. Given one security alert, the "
                 "detection rule that fired (when known), a list of MITRE ATT&CK "
                 "techniques pulled from the local corpus, and the historical "
                 "false-positive rate for similar alerts, write a tight 3-5 "

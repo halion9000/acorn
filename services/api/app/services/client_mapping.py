@@ -1,4 +1,4 @@
-"""Which AiSOC tenant a vendor's client belongs to: the database side of client mapping.
+"""Which A.C.O.R.N tenant a vendor's client belongs to: the database side of client mapping.
 
 ``client_matching`` ranks names (pure). This module reads and writes the ``client_aliases`` rows around it: CORE pushes each vendor's client list, a person maps, ignores or creates a tenant for each,
 and the Unmapped list is whatever has no tenant yet and has not been ignored.

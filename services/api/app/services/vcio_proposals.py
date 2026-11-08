@@ -1,4 +1,4 @@
-"""What AiSOC suggests adding to a client's vCIO Toolbox, worked out from the same checks the client review shows.
+"""What A.C.O.R.N suggests adding to a client's vCIO Toolbox, worked out from the same checks the client review shows.
 
 A check that is "not met" or "partly" becomes a suggested recommendation (a title, a plain description with the evidence, a priority). A person approves or rejects each one; CORE creates an approved one at
 vCIO Toolbox. This module only decides what to suggest and keeps the rows in step with the checks; it never contacts vCIO Toolbox.
@@ -50,7 +50,7 @@ TITLES = {
 
 
 def drafts_from_readiness(readiness: Readiness, now: datetime | None = None) -> list[Draft]:
-    """One draft for each check that is not met or partly met and has a recommendation to suggest. Unknown checks are never suggested: AiSOC cannot say they are failing."""
+    """One draft for each check that is not met or partly met and has a recommendation to suggest. Unknown checks are never suggested: A.C.O.R.N cannot say they are failing."""
     stamp = (now or datetime.now(UTC)).date().isoformat()
     out: list[Draft] = []
     for item in readiness.items:
@@ -61,7 +61,7 @@ def drafts_from_readiness(readiness: Readiness, now: datetime | None = None) -> 
             Draft(
                 key=item.key,
                 name=title,
-                description=f"{item.question} {item.evidence} Suggested by AiSOC from the connected tools on {stamp}.",
+                description=f"{item.question} {item.evidence} Suggested by A.C.O.R.N from the connected tools on {stamp}.",
                 priority="High" if item.status == "not_met" else "Medium",
                 evidence=item.evidence,
             )

@@ -2,7 +2,7 @@
 
 The SLA page computes time-to-resolve from ``alert_sla_events`` rows, but nothing wrote them for CORE's alerts, so it had no data. When CORE reports an
 incident closed in the vendor's portal, ``apply_closed`` resolves the alert and stamps ``enrichment_data.closed_in_vendor``; this adds the two events the
-page needs for exactly those alerts: ``detected`` (when AiSOC received the alert) and ``resolved`` (when the closure was reported). Nothing is invented:
+page needs for exactly those alerts: ``detected`` (when A.C.O.R.N received the alert) and ``resolved`` (when the closure was reported). Nothing is invented:
 there is no ``acknowledged`` event because nobody acknowledged anything, so time-to-detect stays empty for these alerts. Safe to repeat: an alert
 that already has an event of a type does not get a second one.
 """

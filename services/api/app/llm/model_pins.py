@@ -40,7 +40,7 @@ class ModelPin:
 # (`aisoc-<role>`), not a concrete model — the LiteLLM gateway
 # (`infra/litellm/config.yaml`) owns the alias → real-model mapping and any
 # model-level fallback, so each AiSOC-side chain only needs its `deterministic`
-# floor. One role per AiSOC LLM workload named in #478.
+# floor. One role per A.C.O.R.N LLM workload named in #478.
 #
 # Escape hatch for deployments not running the gateway: override any primary via
 # env (`AISOC_MODEL_PIN_<ROLE>`, e.g. `AISOC_MODEL_PIN_TRIAGE=gpt-4o-mini`) to

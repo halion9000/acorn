@@ -4,7 +4,7 @@ CORE only pushes alerts; nothing opened cases from them, so those pages stayed e
 alerts from CORE's tools that no case holds yet, and opens one case per alert, linked both ways (the same shape ``POST /cases`` writes).
 An opt-in switch (``AISOC_AUTO_CASES=true``), a 24-hour look-back and a per-run cap keep a first run from opening a case for every old alert.
 
-The other half: ``close_finished_cases`` closes a case AiSOC opened itself once every alert in it is closed (resolved, closed or a false positive) and nobody has taken it. Cases a person opened, and
+The other half: ``close_finished_cases`` closes a case A.C.O.R.N opened itself once every alert in it is closed (resolved, closed or a false positive) and nobody has taken it. Cases a person opened, and
 cases somebody is assigned to, are never closed this way; nothing is pushed to a PSA ticket (that stays a person's decision). A kill switch (``AISOC_AUTO_CLOSE_CASES=false``) turns it off.
 """
 

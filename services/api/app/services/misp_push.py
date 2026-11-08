@@ -1,7 +1,7 @@
 """
 MISP push service.
 
-Stage 3 #20 (AiSOC v1.0 buyer-value plan).
+Stage 3 #20 (A.C.O.R.N v1.0 buyer-value plan).
 
 This module mirrors STIX 2.1 indicators and bundles created via
 ``/threatintel/stix/...`` into a downstream MISP instance. It is split
@@ -206,7 +206,7 @@ def stix_bundle_to_misp_event(
             indicator_names.append(str(obj["name"]))
 
     event_info = (
-        info or ("AiSOC bundle " + bundle.get("id", "") + (" — " + "; ".join(indicator_names[:3]) if indicator_names else "")).strip()
+        info or ("A.C.O.R.N bundle " + bundle.get("id", "") + (" — " + "; ".join(indicator_names[:3]) if indicator_names else "")).strip()
     )
 
     return {
@@ -242,7 +242,7 @@ def stix_indicator_to_misp_event(
         return None
     return {
         "Event": {
-            "info": indicator.get("name") or f"AiSOC indicator {indicator.get('id', '')}",
+            "info": indicator.get("name") or f"A.C.O.R.N indicator {indicator.get('id', '')}",
             "distribution": distribution_level,
             "threat_level_id": threat_level_id,
             "analysis": analysis_id,

@@ -1,6 +1,6 @@
 """The capability reference: generated from the live routes, never edited by hand, and honest about what it knows.
 
-It exists so an agent (Cipher) can say what AiSOC can do even where it has no tool, instead of guessing. What it must never do is overstate
+It exists so an agent (Cipher) can say what A.C.O.R.N can do even where it has no tool, instead of guessing. What it must never do is overstate
 protection: writing 'login only' for a route that is public, or checked inside its handler, is worse than saying nothing (it did exactly
 that on its
 first run, which is how a tenant admin being able to list every tenant came to light).

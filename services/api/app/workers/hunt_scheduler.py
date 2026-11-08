@@ -280,7 +280,7 @@ async def _propose_detection_from_hunt(db: AsyncSession, hunt: SavedHunt, hit_co
         f"  Auto-proposed from scheduled hunt '{hunt.name}' ({hit_count} hit(s)).\n"
         f"  Original NL query: {hunt.nl_query or '(none)'}\n"
         f"  Source language: {lang}\n"
-        f"author: AiSOC Hunt Scheduler\n"
+        f"author: A.C.O.R.N Hunt Scheduler\n"
         f"date: {datetime.now(UTC).strftime('%Y/%m/%d')}\n"
         f"tags:\n"
         f"  - attack.hunt-finding\n"

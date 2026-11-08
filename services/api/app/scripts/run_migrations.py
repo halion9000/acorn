@@ -272,7 +272,7 @@ async def main() -> None:
     # this write so the wrapper also skips seeding.
     _SENTINEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     _SENTINEL_PATH.write_text(
-        "AiSOC run_migrations.py completed — DB reachable, seed_demo may proceed.\n",
+        "A.C.O.R.N run_migrations.py completed — DB reachable, seed_demo may proceed.\n",
         encoding="utf-8",
     )
 

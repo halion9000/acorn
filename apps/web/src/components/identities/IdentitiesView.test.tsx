@@ -594,6 +594,23 @@ describe('the extra identity tiles', () => {
     await waitFor(() => expect(screen.getByTestId('failed-signins')).toHaveAttribute('aria-pressed', 'true')); // the menu and the tile are one setting
   });
 
+  it('the password-never-expires tile shows the count and how many are unknown, lists those people when pressed, and shows a dash when nobody could be checked', async () => {
+    api.list.mockResolvedValue(list([person()], { summary: { total: 10, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {}, password_never_expires: 3, password_policy_known: 8 } }));
+    const { unmount } = show();
+    await waitFor(() => expect(screen.getByTestId('password-never-expires')).toHaveTextContent('3'));
+    expect(screen.getByTestId('password-unknown')).toHaveTextContent('2 unknown');
+    await userEvent.click(screen.getByTestId('password-never-expires'));
+    await waitFor(() => expect(lastQuery()).toEqual(expect.objectContaining({ passwordNeverExpires: true, page: 1 })));
+    expect(screen.getByTestId('password-never-expires')).toHaveAttribute('aria-pressed', 'true');
+    unmount();
+  });
+
+  it('shows a dash, not a zero, for the password tile when CIPP could not say for anyone', async () => {
+    api.list.mockResolvedValue(list([person()], { summary: { total: 7, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {}, password_never_expires: 0, password_policy_known: 0 } }));
+    show();
+    await waitFor(() => expect(screen.getByTestId('password-never-expires').querySelector('.text-2xl')?.textContent).toBe('—'));
+  });
+
   it('shows a dash when the server does not send them, and no alarm colour at zero', async () => {
     api.list.mockResolvedValue(list([person()], { summary: { total: 1, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {} } }));
     render(<IdentitiesView />);

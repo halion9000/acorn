@@ -65,7 +65,7 @@ class SourceReport(BaseModel):
     # "devices" for a tool that only supplies devices (DNSFilter, ScreenConnect...): its card shows how many devices the last sync read instead of an event count that would stay 0.
     kind: Literal["alerts", "devices"] = "alerts"
     fetched: int = Field(default=0, ge=0, le=1_000_000)
-    sent: int = Field(default=0, ge=0, le=1_000_000, description="Records AiSOC accepted in this run.")
+    sent: int = Field(default=0, ge=0, le=1_000_000, description="Records A.C.O.R.N accepted in this run.")
     message: str | None = Field(
         default=None,
         max_length=300,
@@ -250,7 +250,7 @@ async def report_core_feed_status(tenant_token: str, body: StatusReport, db: DBS
     except Exception:
         logger.exception("core_feed.auto_cases_failed")
         await db.rollback()
-    # Close the cases AiSOC opened itself once every alert in them is closed and nobody has taken them. Also best effort.
+    # Close the cases A.C.O.R.N opened itself once every alert in them is closed and nobody has taken them. Also best effort.
     try:
         if await close_finished_cases(db, tenant_id):
             await db.commit()
@@ -449,8 +449,8 @@ async def report_core_feed_closed(tenant_token: str, body: ClosedReport, db: DBS
 
 
 # --- Incident state and vendor actions -------------------------------------------------------------------------------------------------------------------------
-# CORE reports each OPEN incident's current state (status, remediation plan, the ticket the vendor opened in the PSA) so AiSOC can show it; an analyst's approve /
-# reject / resolve is queued as a ``vendor_actions`` row (``alert_vendor_actions.py``), CORE collects it here, carries it out at the vendor (CORE holds the key; AiSOC never does)
+# CORE reports each OPEN incident's current state (status, remediation plan, the ticket the vendor opened in the PSA) so A.C.O.R.N can show it; an analyst's approve /
+# reject / resolve is queued as a ``vendor_actions`` row (``alert_vendor_actions.py``), CORE collects it here, carries it out at the vendor (CORE holds the key; A.C.O.R.N never does)
 # and reports the outcome. Same path-token authentication as the routes above.
 
 
@@ -811,7 +811,7 @@ class ScriptItem(BaseModel):
     id: int = Field(ge=1, le=2_000_000_000)
     name: str = Field(min_length=1, max_length=200)
     one_click: bool = Field(
-        default=False, description="Whether CORE runs it at once when asked from AiSOC (otherwise CORE asks its owner first)."
+        default=False, description="Whether CORE runs it at once when asked from A.C.O.R.N (otherwise CORE asks its owner first)."
     )
 
 
@@ -825,7 +825,7 @@ class ScriptsResponse(BaseModel):
 
 @router.post("/core-feed/{tenant_token}/scripts", response_model=ScriptsResponse)
 async def report_core_feed_scripts(tenant_token: str, body: ScriptsReport, db: DBSession) -> ScriptsResponse:
-    """CORE tells AiSOC which NinjaOne scripts its owner switched on, so an alert can offer them. The whole list replaces the last one (a script switched off disappears)."""
+    """CORE tells A.C.O.R.N which NinjaOne scripts its owner switched on, so an alert can offer them. The whole list replaces the last one (a script switched off disappears)."""
     tenant_id = await _verify_core_feed_token(db, tenant_token)
     await adopt_tenant(db, tenant_id)
     scripts = [s.model_dump() for s in body.scripts]
@@ -864,7 +864,7 @@ class ClientsResponse(BaseModel):
 
 @router.post("/core-feed/{tenant_token}/clients", response_model=ClientsResponse)
 async def report_core_feed_clients(tenant_token: str, body: ClientsReport, db: DBSession) -> ClientsResponse:
-    """CORE sends the list of clients one vendor has (Petra tenants, Halo clients, ...), so each can be mapped to an AiSOC tenant on the MSSP page."""
+    """CORE sends the list of clients one vendor has (Petra tenants, Halo clients, ...), so each can be mapped to an A.C.O.R.N tenant on the MSSP page."""
     tenant_id = await _verify_core_feed_token(db, tenant_token)
     await adopt_tenant(db, tenant_id)
     created, linked = await upsert_clients(

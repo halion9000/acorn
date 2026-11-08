@@ -1,4 +1,4 @@
-"""Credentials for the API's own calls to other AiSOC services.
+"""Credentials for the API's own calls to other A.C.O.R.N services.
 
 The agents service requires authentication in production (see its
 app/core/service_auth.py). When the API proxies a request it has ALREADY

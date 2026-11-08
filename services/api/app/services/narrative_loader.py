@@ -36,7 +36,7 @@ the same ``NarrativeInputs`` returns the same byte-for-byte string. The
 caller (the alerts endpoint) safely persists the result on the row so we
 only pay the build cost once per alert.
 
-AiSOC — open-source AI Security Operations Center (MIT License)
+A.C.O.R.N — open-source AI Security Operations Center (MIT License)
 Author: Beenu Arora <beenu@cyble.com>
 """
 

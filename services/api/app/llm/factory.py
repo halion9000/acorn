@@ -54,7 +54,7 @@ def llm_override(*, api_key: str | None = None, base_url: str | None = None, mod
 
 
 def resolve_model_alias(role: str) -> str:
-    """Return the logical model alias AiSOC sends for a task ``role``.
+    """Return the logical model alias A.C.O.R.N sends for a task ``role``.
 
     ``aisoc-<role>`` by default; ``AISOC_MODEL_PIN_<ROLE>`` overrides it with a
     concrete provider model for deployments that bypass the gateway.
@@ -66,7 +66,7 @@ def resolve_base_url() -> str | None:
     """OpenAI-compatible base URL for live calls, or ``None`` for the client default.
 
     Honours an explicit ``OPENAI_BASE_URL`` / ``LLM_BASE_URL`` — what an operator
-    sets to point AiSOC at the LiteLLM gateway. ``None`` means "use the client's
+    sets to point A.C.O.R.N at the LiteLLM gateway. ``None`` means "use the client's
     provider default" (the direct-to-provider path). We intentionally do **not**
     auto-adopt the compose-provided ``LLM_GATEWAY_URL`` here: routing through the
     gateway is an explicit choice so the bearer token (the gateway master key vs.

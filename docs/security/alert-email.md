@@ -1,6 +1,6 @@
 # Emailing alerts to platform administrators
 
-An **optional** feature: new alerts at or above a severity are emailed to a short list of **platform administrators** (the people who run AiSOC, not a tenant's own users), sent through Microsoft Graph from one shared mailbox. It is **off by default** and does nothing until three things are all true: the worker is enabled in the deployment, the Microsoft credentials are set, and a platform administrator has switched the setting on with at least one recipient.
+An **optional** feature: new alerts at or above a severity are emailed to a short list of **platform administrators** (the people who run A.C.O.R.N, not a tenant's own users), sent through Microsoft Graph from one shared mailbox. It is **off by default** and does nothing until three things are all true: the worker is enabled in the deployment, the Microsoft credentials are set, and a platform administrator has switched the setting on with at least one recipient.
 
 > **What has and has not been verified.** Everything here was tested against a mock Graph and, end to end, against a stand-in Graph server over real HTTP on real Postgres, with the restricted database role. It has **not** been run against a real Microsoft 365 tenant. The setup steps for Entra and Exchange below are from general knowledge of Microsoft Graph and should be checked against Microsoft's current documentation; use **"send a test email"** (below) as the first real check.
 

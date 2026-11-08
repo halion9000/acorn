@@ -1,4 +1,4 @@
-"""Shared CORS configuration helper for AiSOC FastAPI services.
+"""Shared CORS configuration helper for A.C.O.R.N FastAPI services.
 
 Goal: every FastAPI service in this repo lands at the same, safe CORS posture
 without each ``main.py`` re-implementing the parsing + production guard.
@@ -57,7 +57,7 @@ DEFAULT_CORS_ORIGINS: tuple[str, ...] = (
 
 # Used when ``allow_credentials`` is True. The CORS spec refuses the response
 # if either of these is ``*`` while credentials are enabled, so we enumerate
-# the values the AiSOC frontends actually need. Services that don't carry
+# the values the A.C.O.R.N frontends actually need. Services that don't carry
 # cookies/Authorization headers can still pass ``allow_methods=["*"]``.
 DEFAULT_ALLOW_METHODS: tuple[str, ...] = (
     "GET",

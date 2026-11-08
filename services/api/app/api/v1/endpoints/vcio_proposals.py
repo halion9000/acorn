@@ -1,4 +1,4 @@
-"""What AiSOC suggests adding to a client's vCIO Toolbox, a person's decision on each, and the hand-off to CORE.
+"""What A.C.O.R.N suggests adding to a client's vCIO Toolbox, a person's decision on each, and the hand-off to CORE.
 
 ``GET  /client-review/{client_id}/vcio-proposals``                      the suggestions and their states.
 ``POST /client-review/{client_id}/vcio-proposals/refresh``              work the suggestions out again from the client review's checks.
@@ -6,7 +6,7 @@
 ``POST /inbox/core-feed/{token}/vcio-proposals/approved``               CORE collects what was approved (authenticated by the secret in the path, like the other core-feed routes).
 ``POST /inbox/core-feed/{token}/vcio-proposals/{id}/result``            CORE says whether vCIO Toolbox took it.
 
-Nothing is sent to vCIO Toolbox by AiSOC itself, and nothing is sent until a person has approved it.
+Nothing is sent to vCIO Toolbox by A.C.O.R.N itself, and nothing is sent until a person has approved it.
 """
 
 from __future__ import annotations
@@ -113,7 +113,7 @@ async def _rows(db: Any, owner: uuid.UUID, client_id: uuid.UUID) -> list[ClientV
         )
 
 
-@router.get("/{client_id}/vcio-proposals", response_model=ProposalsOut, summary="What AiSOC suggests adding to this client's vCIO Toolbox")
+@router.get("/{client_id}/vcio-proposals", response_model=ProposalsOut, summary="What A.C.O.R.N suggests adding to this client's vCIO Toolbox")
 async def list_proposals(
     client_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
 ) -> ProposalsOut:

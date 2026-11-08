@@ -1,6 +1,6 @@
 """Which HaloPSA ticket status a resolved incident moves its ticket to: GET / PUT / DELETE /api/v1/tenant-settings/tickets.
 
-When an analyst resolves a security incident from AiSOC, CORE (which holds the HaloPSA credentials) leaves a note on the incident's ticket and moves the ticket to this status. The platform default
+When an analyst resolves a security incident from A.C.O.R.N, CORE (which holds the HaloPSA credentials) leaves a note on the incident's ticket and moves the ticket to this status. The platform default
 is "Tech Updated"; an organization may choose another status by name (it must exist in its HaloPSA, which CORE checks when it makes the change). Stored in ``tenants.settings.ticket_close_status``;
 setting it merges one key and leaves the rest of the tenant's settings alone.
 """

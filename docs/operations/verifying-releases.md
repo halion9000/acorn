@@ -1,6 +1,6 @@
-# Verifying AiSOC Releases
+# Verifying A.C.O.R.N Releases
 
-You run AiSOC images next to your crown jewels, so you should verify what you download. This page documents how to check release integrity today and what stronger attestations are landing.
+You run A.C.O.R.N images next to your crown jewels, so you should verify what you download. This page documents how to check release integrity today and what stronger attestations are landing.
 
 ## Available today
 
