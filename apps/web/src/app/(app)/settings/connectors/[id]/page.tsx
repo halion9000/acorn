@@ -89,7 +89,7 @@ export default function ConnectorDetailPage() {
       <div className="rounded-xl border border-white/10 bg-white/5 p-8">
         <div className="mb-6 flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">{connector.name}</h1>
+            <h1 className="text-xl font-semibold text-gray-100">{connector.name}</h1>
             {connector.description && (
               <p className="mt-2 text-gray-400">{connector.description}</p>
             )}

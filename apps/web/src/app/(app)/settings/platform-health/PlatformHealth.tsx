@@ -150,7 +150,7 @@ export function PlatformHealth() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6">
-      <h1 className="text-xl font-semibold">Platform health</h1>
+      <h1 className="text-xl font-semibold text-gray-100">Platform health</h1>
       {error && (
         <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           {error}

@@ -243,7 +243,7 @@ export function SigninScores() {
   return (
     <div className="space-y-4 p-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-100">Sign-in scores</h1>
+        <h1 className="text-xl font-semibold text-gray-100">Sign-in scores</h1>
         <p className="mt-1 text-sm text-slate-400">
           The sign-ins the behaviour service flagged as unusual for that person, across clients (it keeps a score only for the ones it flags). Higher is more unusual. Nothing alerts on these yet; this is for judging them first.
         </p>

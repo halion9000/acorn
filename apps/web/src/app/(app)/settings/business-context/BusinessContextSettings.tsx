@@ -159,7 +159,7 @@ export function BusinessContextSettings() {
     <div className="flex h-full flex-col gap-4 p-6">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">
+          <h1 className="text-xl font-semibold text-gray-100">
             Business Context Rules
           </h1>
           <p className="max-w-2xl text-sm text-slate-400">

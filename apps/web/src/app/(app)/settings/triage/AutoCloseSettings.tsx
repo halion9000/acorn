@@ -71,7 +71,7 @@ export function AutoCloseSettings() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-6">
-      <h1 className="text-xl font-semibold">Auto-close</h1>
+      <h1 className="text-xl font-semibold text-gray-100">Auto-close</h1>
       <p className="text-sm text-gray-400">
         AI triage closes an alert on its own only when it judges it benign or a false positive <em>and</em> its confidence is at or above this number. A true positive or an alert needing review always goes to a person. A higher number closes fewer alerts
         on its own.

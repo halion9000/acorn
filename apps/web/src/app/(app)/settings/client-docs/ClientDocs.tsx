@@ -118,7 +118,7 @@ export function ClientDocs() {
   return (
     <div className="space-y-4 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Client documentation</h1>
+        <h1 className="text-xl font-semibold text-gray-100">Client documentation</h1>
         <p className="mt-1 max-w-prose text-sm text-slate-400">
           What IT Glue says about each client: documents, runbooks, configurations, locations and password entries. Search by a word, a question, or a client&apos;s name. Password entries show a link, never the password.
         </p>

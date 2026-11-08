@@ -121,7 +121,7 @@ export function CippActions() {
   return (
     <div className="space-y-5 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">CIPP actions</h1>
+        <h1 className="text-xl font-semibold text-gray-100">CIPP actions</h1>
         <p className="mt-1 max-w-prose text-sm text-slate-400">
           What CORE can do to client Microsoft 365 tenants through CIPP, and what it has been asked to do. Read only: the rules are CORE&apos;s saved settings, and nothing here can change one or run an action.
         </p>

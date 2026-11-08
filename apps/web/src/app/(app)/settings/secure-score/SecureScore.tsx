@@ -176,7 +176,7 @@ export function SecureScore() {
   return (
     <div className="space-y-4 p-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-100">Microsoft Secure Score</h1>
+        <h1 className="text-xl font-semibold text-gray-100">Microsoft Secure Score</h1>
         <p className="mt-1 text-sm text-slate-400">
           How well each client&apos;s Microsoft 365 is set up against Microsoft&apos;s own security checklist, read through CIPP once a day. Open a client to see the controls that would add the most points. Read-only: nothing here
           changes a tenant.

@@ -330,7 +330,7 @@ export function SettingsView() {
   return (
     <div className="space-y-5">
       <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold text-gray-100">Settings</h1>
+        <h1 className="text-xl font-semibold text-gray-100">Settings</h1>
         <p className="max-w-2xl text-sm text-gray-500">
           Configure your account, the workspace, and the data that feeds
           the SOC. Most preferences sync across devices; appearance and

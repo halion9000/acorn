@@ -201,7 +201,7 @@ export function ClientPosture() {
     <div className="space-y-4 p-6">
       <div className="flex items-end justify-between gap-4 print:hidden">
         <div>
-          <h1 className="text-xl font-semibold text-slate-100">Client posture</h1>
+          <h1 className="text-xl font-semibold text-gray-100">Client posture</h1>
           <p className="mt-1 text-sm text-slate-400">One client&apos;s devices, Multi-Factor coverage, open alerts and cases on a page you can print for a review.</p>
         </div>
         {shown && (

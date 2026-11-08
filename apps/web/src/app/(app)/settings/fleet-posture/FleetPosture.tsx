@@ -716,7 +716,7 @@ export function FleetPosture() {
     <div className="space-y-4 p-6">
       <div>
         <div className="flex items-start justify-between gap-4">
-          <h1 className="text-xl font-semibold text-slate-100">Fleet posture</h1>
+          <h1 className="text-xl font-semibold text-gray-100">Fleet posture</h1>
           <button type="button" onClick={() => window.print()} className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 print:hidden">
             Print
           </button>

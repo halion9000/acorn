@@ -86,7 +86,7 @@ export function ClientCleanup() {
   return (
     <div className="space-y-4 p-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-100">Client cleanup</h1>
+        <h1 className="text-xl font-semibold text-gray-100">Client cleanup</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-400">
           Clients with nothing in them: no devices, no alerts, no cases and no tool client mapped to them. Archiving hides a client and renames it &quot;(archived)&quot;; nothing is deleted, and Show hidden brings it back.
         </p>

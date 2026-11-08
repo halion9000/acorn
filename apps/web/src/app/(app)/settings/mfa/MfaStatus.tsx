@@ -218,7 +218,7 @@ export function MfaStatus() {
   return (
     <div className="space-y-4 p-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-100">Multi-factor status</h1>
+        <h1 className="text-xl font-semibold text-gray-100">Multi-factor status</h1>
         <p className="mt-1 text-sm text-slate-400">
           Who has Multi-Factor sign-in, per client, read through CIPP once a day. Counts cover enabled, licensed member accounts (shared mailboxes, guests and disabled accounts are left out).
         </p>

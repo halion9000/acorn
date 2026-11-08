@@ -68,7 +68,7 @@ export function TicketSettings() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-6">
-      <h1 className="text-xl font-semibold">Tickets</h1>
+      <h1 className="text-xl font-semibold text-gray-100">Tickets</h1>
       <p className="text-sm text-gray-400">
         When you resolve a Huntress incident from an alert, CORE adds a private note to the HaloPSA ticket Huntress opened and moves the ticket to the status below. Approving or rejecting a remediation only adds a note.
       </p>
