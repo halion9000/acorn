@@ -4,7 +4,7 @@ import json
 import logging
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
@@ -17,6 +17,7 @@ from app.db.rls import TenantDBSession
 from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.models.alert import Alert
 from app.models.tenant import Tenant, User
+from app.services import alert_outcomes
 from app.services.alert_queue import (
     AlertAlreadyClaimedError,
     AlertNotFoundError,
@@ -1070,6 +1071,26 @@ async def get_alert_queue(
         period=period,
         page=page,
         page_size=page_size,
+    )
+
+
+@router.get("/{alert_id}/earlier-outcomes")
+async def earlier_outcomes(alert_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> dict[str, Any]:
+    """What usually happened to earlier alerts of the same kind (same client, same exact title, last 180 days): how they ended, how often a ticket was made, the median time. Counts only, and "too few" under three."""
+    async with alert_scope(db, current_user.tenant_id, alert_id) as tid:
+        this = (await db.execute(select(Alert.title).where(Alert.id == alert_id, Alert.tenant_id == tid))).first()
+        if this is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+        since = datetime.now(UTC) - timedelta(days=alert_outcomes.WINDOW_DAYS)
+        found = (
+            await db.execute(
+                select(Alert.status, Alert.disposition, has_ticket_expr().label("has_ticket"), Alert.created_at, Alert.resolved_at, Alert.stale_at)
+                .where(Alert.tenant_id == tid, Alert.title == this[0], Alert.id != alert_id, Alert.created_at >= since)
+                .limit(2000)
+            )
+        ).all()
+    return alert_outcomes.summarize(
+        [{"status": r[0], "disposition": r[1], "has_ticket": bool(r[2]), "created_at": r[3], "resolved_at": r[4], "stale_at": r[5]} for r in found]
     )
 
 

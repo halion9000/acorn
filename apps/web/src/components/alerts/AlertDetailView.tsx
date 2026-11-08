@@ -32,6 +32,7 @@ import { ExplainDrawer } from '@/components/alerts/ExplainDrawer';
 import { CreateCaseModal } from '@/components/alerts/CreateCaseModal';
 import { HideAlertTypeModal } from '@/components/alerts/HideAlertTypeModal';
 import { HideSuggestionBanner } from '@/components/alerts/HideSuggestionBanner';
+import { EarlierOutcomes } from '@/components/alerts/EarlierOutcomes';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -964,6 +965,8 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
             </Section>
 
             <WhyRaised alertId={alert.id} />
+
+            <EarlierOutcomes alertId={alert.id} />
 
 
             {alert.confidenceLabel && (

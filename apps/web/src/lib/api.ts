@@ -2114,6 +2114,8 @@ export const alertsApi = {
     }),
   /** Whether to suggest hiding this alert's type (only counts; hides nothing). */
   hideSuggestion: (alertId: string) => request<HideSuggestion>('/api/v1/alert-suppressions/suggestion', { params: { alert_id: alertId } }),
+  /** What usually happened to earlier alerts of the same kind for this client: counts only. */
+  earlierOutcomes: (alertId: string) => request<EarlierOutcomes>(`/api/v1/alerts/${encodeURIComponent(alertId)}/earlier-outcomes`),
   /** Stop hiding an alert type: its alerts come back as they were. */
   liftSuppression: (id: string) => request<AlertSuppression>(`/api/v1/alert-suppressions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   /** Enter one alert by hand (the same endpoint `aisoc submit` uses). */
@@ -6287,6 +6289,18 @@ export const clientStatusLinksApi = {
   review: (id: string) => request<ClientStatusLink>(`/api/v1/client-status-links/${encodeURIComponent(id)}/review`, { method: 'POST' }),
   revoke: (id: string) => request<ClientStatusLink>(`/api/v1/client-status-links/${encodeURIComponent(id)}/revoke`, { method: 'POST' }),
 };
+
+export interface EarlierOutcomes {
+  total: number;
+  enough: boolean;
+  window_days: number;
+  still_open?: number;
+  by_status?: Record<string, number>;
+  by_disposition?: Record<string, number>;
+  with_ticket?: number;
+  median_hours_to_finish?: number | null;
+  timed?: number;
+}
 
 export const approvalAgreementApi = {
   /** How often people agreed with each kind of action an agent asked approval for (last 90 days). */
