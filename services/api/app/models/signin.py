@@ -112,6 +112,9 @@ class IdentityMfaUser(Base):
     methods: Mapped[str | None] = mapped_column(String(400), nullable=True)
     # True when the password is set never to expire, False when it is not, None when CIPP's user list could not say (migration 160).
     password_never_expires: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # 'active' / 'inactive' / 'never', or None when the client's sign-in data is not available (migration 161).
+    signin_state: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    days_since_signin: Mapped[int | None] = mapped_column(Integer, nullable=True)
     snapshot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     refreshed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
 

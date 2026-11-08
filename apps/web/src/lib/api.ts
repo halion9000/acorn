@@ -804,6 +804,9 @@ export interface IdentityPerson {
   mfa_methods: string | null;
   /** Password set never to expire (true / false), or null when CIPP's user list could not say. */
   password_never_expires?: boolean | null;
+  /** active / inactive (90+ days) / never, or null when the client's sign-in data is not available. */
+  signin_state?: 'active' | 'inactive' | 'never' | null;
+  days_since_signin?: number | null;
   tools: string[];
   sources: { vendor: string; external_id: string; enabled: boolean | null; details: Record<string, unknown> }[];
   open_alerts: number;
@@ -839,7 +842,7 @@ export interface IdentityDuplicate {
 }
 
 export interface IdentityList {
-  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; cloud_not_in_halo?: number; halo_inactive_cloud_enabled?: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; active?: number; failed_signins_24h?: number; brute_force?: number; password_never_expires?: number; password_policy_known?: number };
+  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; cloud_not_in_halo?: number; halo_inactive_cloud_enabled?: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; active?: number; failed_signins_24h?: number; brute_force?: number; password_never_expires?: number; password_policy_known?: number; inactive_90?: number; never_signed_in?: number; signin_state_known?: number };
   items: IdentityPerson[];
   total: number;
   page: number;
@@ -877,6 +880,8 @@ export interface IdentityQuery {
   signin?: string;
   /** Only working accounts whose password is set never to expire. */
   passwordNeverExpires?: boolean;
+  /** inactive: working accounts with no sign-in for 90+ days; never: none on record. */
+  inactivity?: 'inactive' | 'never';
   exposed?: string;
   admin?: boolean;
   disabled?: boolean;
@@ -911,6 +916,7 @@ export const identitiesApi = {
         active: q.active ? 'true' : undefined,
         signin: q.signin,
         password_never_expires: q.passwordNeverExpires ? 'true' : undefined,
+        inactivity: q.inactivity,
         sort: q.sort,
       } as unknown as Record<string, string>,
     }),
@@ -932,6 +938,7 @@ export const identitiesApi = {
     set('sort', q.sort);
     if (q.hasAlerts) p.set('has_alerts', 'true');
     if (q.passwordNeverExpires) p.set('password_never_expires', 'true');
+    set('inactivity', q.inactivity);
     if (q.admin) p.set('admin', 'true');
     if (q.disabled) p.set('disabled', 'true');
     if (q.enabled) p.set('enabled', 'true');

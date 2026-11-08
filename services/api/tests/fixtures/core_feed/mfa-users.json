@@ -23,7 +23,9 @@
         "methods": [
           "authenticatorApp"
         ],
-        "password_never_expires": null
+        "password_never_expires": null,
+        "signin_state": null,
+        "days_since_signin": null
       },
       {
         "id": "u2",
@@ -41,7 +43,9 @@
         "methods": [
           "authenticatorApp"
         ],
-        "password_never_expires": null
+        "password_never_expires": null,
+        "signin_state": null,
+        "days_since_signin": null
       }
     ]
   }

@@ -12278,6 +12278,19 @@ paths:
           title: Password Never Expires
         description: Only working accounts whose password is set never to expire (the
           tile's list).
+      - name: inactivity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(inactive|never)$
+          - type: 'null'
+          description: 'inactive: working accounts with no sign-in for 90+ days; never:
+            no sign-in on record (the two tiles'' lists). Unknown is never listed.'
+          title: Inactivity
+        description: 'inactive: working accounts with no sign-in for 90+ days; never:
+          no sign-in on record (the two tiles'' lists). Unknown is never listed.'
       - name: signin
         in: query
         required: false
@@ -12473,6 +12486,15 @@ paths:
           default: false
           title: Password Never Expires
         description: Only working accounts whose password is set never to expire.
+      - name: inactivity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(inactive|never)$
+          - type: 'null'
+          title: Inactivity
       - name: sort
         in: query
         required: false
@@ -38766,6 +38788,19 @@ components:
           - type: boolean
           - type: 'null'
           title: Password Never Expires
+        signin_state:
+          anyOf:
+          - type: string
+            pattern: ^(active|inactive|never)$
+          - type: 'null'
+          title: Signin State
+        days_since_signin:
+          anyOf:
+          - type: integer
+            maximum: 100000.0
+            minimum: 0.0
+          - type: 'null'
+          title: Days Since Signin
       type: object
       required:
       - id
@@ -40898,6 +40933,16 @@ components:
           - type: boolean
           - type: 'null'
           title: Password Never Expires
+        signin_state:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Signin State
+        days_since_signin:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Days Since Signin
         tools:
           items:
             type: string
@@ -52096,6 +52141,18 @@ components:
         password_policy_known:
           type: integer
           title: Password Policy Known
+          default: 0
+        inactive_90:
+          type: integer
+          title: Inactive 90
+          default: 0
+        never_signed_in:
+          type: integer
+          title: Never Signed In
+          default: 0
+        signin_state_known:
+          type: integer
+          title: Signin State Known
           default: 0
       type: object
       required:

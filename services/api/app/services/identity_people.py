@@ -153,6 +153,9 @@ class Person:
     halo_check: str | None = None
     # Microsoft 365 password set never to expire: True / False, or None when CIPP's user list could not say.
     password_never_expires: bool | None = None
+    # "active" / "inactive" (90+ days) / "never", or None when the client's sign-in data is not available.
+    signin_state: str | None = None
+    days_since_signin: int | None = None
 
     @property
     def key(self) -> str:
@@ -225,6 +228,8 @@ def build_people(
         p.mfa = mfa_state(u, known[u.tenant_id])
         p.mfa_methods = u.methods or None
         p.password_never_expires = getattr(u, "password_never_expires", None)
+        p.signin_state = getattr(u, "signin_state", None)
+        p.days_since_signin = getattr(u, "days_since_signin", None)
         p.sources.append(
             SourceRef(
                 vendor=MICROSOFT,
@@ -369,6 +374,11 @@ def never_expires(p: "Person") -> bool:
     return p.password_never_expires is True and p.enabled is not False and p.kind != "guest"
 
 
+def counts_as(p: "Person", state: str) -> bool:
+    """Whether the inactive or never-signed-in tile counts this person: a working (not disabled), own (not guest) account whose sign-in state is known to be ``state`` ("inactive" or "never"). Unknown is never counted (pure)."""
+    return p.signin_state == state and p.enabled is not False and p.kind != "guest"
+
+
 def filter_people(
     people: list[Person],
     *,
@@ -387,6 +397,7 @@ def filter_people(
     active: bool = False,
     halo_check: str | None = None,
     password_never_expires: bool = False,
+    inactivity: str | None = None,
 ) -> list[Person]:
     """The people a page asked for: every filter given must hold. ``only_in`` keeps people known to just that one tool."""
     rows = people
@@ -425,6 +436,8 @@ def filter_people(
         rows = [p for p in rows if p.mfa == mfa and not (mfa == "none" and p.enabled is False)]
     if password_never_expires:
         rows = [p for p in rows if never_expires(p)]
+    if inactivity:
+        rows = [p for p in rows if counts_as(p, inactivity)]
     if admin:
         rows = [p for p in rows if p.admin]
     if disabled:

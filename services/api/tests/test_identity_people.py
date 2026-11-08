@@ -746,3 +746,32 @@ def test_the_never_expires_tile_counts_working_own_accounts_with_a_known_yes_and
     assert [p.email for p in filter_people(people, password_never_expires=True)] == ["yes@x.com"]
     assert len(filter_people(people)) == 5
     _ = NS  # (kept so the helper above reads like the other tests)
+
+
+# ---- last sign-in state (migration 161) -------------------------------------------------------------------------------------------------------------------
+
+
+def test_the_inactive_and_never_tiles_count_working_own_accounts_with_a_known_state_and_never_count_unknown():
+    from app.api.v1.endpoints.identities import summarize
+    from app.services.identity_people import Person, counts_as, filter_people
+
+    tid = uuid.uuid4()
+
+    def person(email, state, enabled=True, kind="user"):
+        return Person(tenant_id=tid, email=email, enabled=enabled, kind=kind, signin_state=state)
+
+    people = [
+        person("old@x.com", "inactive"),
+        person("never@x.com", "never"),
+        person("active@x.com", "active"),
+        person("unknown@x.com", None),
+        person("disabled-old@x.com", "inactive", enabled=False),
+        person("guest-never@x.com", "never", kind="guest"),
+    ]
+    assert [p.email for p in people if counts_as(p, "inactive")] == ["old@x.com"]
+    assert [p.email for p in people if counts_as(p, "never")] == ["never@x.com"]
+    s = summarize(people)
+    assert (s.inactive_90, s.never_signed_in) == (1, 1)
+    assert s.signin_state_known == 5, "everyone the client's sign-in data covered; the rest are unknown, not active"
+    assert [p.email for p in filter_people(people, inactivity="inactive")] == ["old@x.com"]
+    assert [p.email for p in filter_people(people, inactivity="never")] == ["never@x.com"]

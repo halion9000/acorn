@@ -312,3 +312,36 @@ async def test_the_password_never_expires_flag_is_stored_as_yes_no_or_unknown_an
         lambda db: ep.apply_mfa_users(db, world["msp"], snapshot(uuid.uuid4(), [mfa("1", "yes@x.com", password_never_expires=False)]), NOW),
     )
     assert await scalar("select password_never_expires from identity_mfa_users where user_id = '1' and tenant_id = :t", t=world["mapped"]) is False
+
+
+async def test_the_sign_in_state_is_stored_as_active_inactive_never_or_unknown(world):
+    snap = uuid.uuid4()
+    await run(
+        world["msp"],
+        lambda db: ep.apply_mfa_users(
+            db,
+            world["msp"],
+            snapshot(
+                snap,
+                [
+                    mfa("1", "old@x.com", signin_state="inactive", days_since_signin=160),
+                    mfa("2", "never@x.com", signin_state="never"),
+                    mfa("3", "active@x.com", signin_state="active"),
+                    mfa("4", "unknown@x.com"),
+                ],
+            ),
+            NOW,
+        ),
+    )
+    got = {}
+    for uid in ("1", "2", "3", "4"):
+        got[uid] = (
+            await scalar("select signin_state from identity_mfa_users where user_id = :u and tenant_id = :t", u=uid, t=world["mapped"]),
+            await scalar("select days_since_signin from identity_mfa_users where user_id = :u and tenant_id = :t", u=uid, t=world["mapped"]),
+        )
+    assert got == {"1": ("inactive", 160), "2": ("never", None), "3": ("active", None), "4": (None, None)}, "unknown stays unknown"
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        mfa("5", "bad@x.com", signin_state="banana")

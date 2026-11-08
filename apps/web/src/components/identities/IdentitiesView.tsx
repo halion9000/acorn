@@ -311,6 +311,8 @@ export function IdentitiesView() {
   const [signin, setSignin] = useState<'' | 'failed' | 'brute_force'>('');
   // Only working accounts whose password is set never to expire (the tile's list).
   const [pwNever, setPwNever] = useState(false);
+  // Working accounts with no sign-in for 90+ days ('inactive') or none on record ('never'): what the two sign-in-state tiles count.
+  const [inactivity, setInactivity] = useState<'' | 'inactive' | 'never'>('');
   const [exposed, setExposed] = useState('');
   const [kind, setKind] = useState('');
   const [hasAlerts, setHasAlerts] = useState(false);
@@ -334,8 +336,8 @@ export function IdentitiesView() {
   }, [search]);
 
   const query: IdentityQuery = useMemo(
-    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, haloCheck: haloCheck || undefined, alertSource: alertTool || undefined, backup: backup || undefined, signin: signin || undefined, passwordNeverExpires: pwNever || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', active: activeOnly, onlyIn: oneTool && tool ? tool : undefined, sort }),
-    [page, clientId, debounced, tool, alertTool, mfa, backup, signin, pwNever, exposed, kind, hasAlerts, haloCheck, adminOnly, state, oneTool, activeOnly, sort],
+    () => ({ page, pageSize: 50, clientId: clientId || undefined, search: debounced || undefined, source: tool || undefined, mfa: mfa || undefined, kind: kind || undefined, hasAlerts, haloCheck: haloCheck || undefined, alertSource: alertTool || undefined, backup: backup || undefined, signin: signin || undefined, passwordNeverExpires: pwNever || undefined, inactivity: inactivity || undefined, exposed: exposed || undefined, admin: adminOnly, disabled: disabledOnly, enabled: state === 'enabled', active: activeOnly, onlyIn: oneTool && tool ? tool : undefined, sort }),
+    [page, clientId, debounced, tool, alertTool, mfa, backup, signin, pwNever, inactivity, exposed, kind, hasAlerts, haloCheck, adminOnly, state, oneTool, activeOnly, sort],
   );
   const { data, error, isLoading, isValidating, mutate } = useSWR(['identities', query], () => identitiesApi.list(query), { revalidateOnFocus: false, keepPreviousData: true });
   useEffect(() => {
@@ -442,6 +444,25 @@ export function IdentitiesView() {
             <div className="text-[11px] text-gray-500" data-testid="password-unknown">{summary.total - summary.password_policy_known} unknown</div>
           ) : null}
         </button>
+        {(
+          [
+            ['inactive', 'Inactive 90+ days', 'inactive-90', 'Working accounts with no sign-in for 90 days or more, from CIPP. Needs the client\'s sign-in data (Entra ID P1); where CIPP has none the people are unknown and not counted. Press to list them.', summary?.inactive_90],
+            ['never', 'Never signed in', 'never-signed-in', 'Working accounts more than 14 days old with no sign-in on record, from CIPP. Where the client\'s sign-in data is not available the people are unknown and not counted. Press to list them.', summary?.never_signed_in],
+          ] as const
+        ).map(([key, label, testId, hint, count]) => (
+          <button
+            key={key}
+            type="button"
+            data-testid={testId}
+            aria-pressed={inactivity === key}
+            onClick={() => reset(() => setInactivity(inactivity === key ? '' : key))}
+            title={hint}
+            className={`rounded-lg border p-3 text-left ${inactivity === key ? 'border-blue-500 bg-blue-500/10' : 'border-gray-800 bg-gray-900/60'}`}
+          >
+            <div className="text-xs text-gray-400">{label}</div>
+            <div className="text-2xl font-semibold text-gray-100">{summary?.signin_state_known ? count : '—'}</div>
+          </button>
+        ))}
       </div>
       {oneTool && !tool && <p className="text-xs text-amber-300">Pick a tool below to see the people only that tool knows.</p>}
 

@@ -611,6 +611,26 @@ describe('the extra identity tiles', () => {
     await waitFor(() => expect(screen.getByTestId('password-never-expires').querySelector('.text-2xl')?.textContent).toBe('—'));
   });
 
+  it('the inactive and never-signed-in tiles show their counts, list those people when pressed, and show a dash when the client sign-in data is not available', async () => {
+    api.list.mockResolvedValue(list([person()], { summary: { total: 10, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {}, inactive_90: 4, never_signed_in: 2, signin_state_known: 9 } }));
+    const { unmount } = show();
+    await waitFor(() => expect(screen.getByTestId('inactive-90')).toHaveTextContent('4'));
+    expect(screen.getByTestId('never-signed-in')).toHaveTextContent('2');
+    await userEvent.click(screen.getByTestId('inactive-90'));
+    await waitFor(() => expect(lastQuery()).toEqual(expect.objectContaining({ inactivity: 'inactive', page: 1 })));
+    await userEvent.click(screen.getByTestId('never-signed-in'));
+    await waitFor(() => expect(lastQuery().inactivity).toBe('never'));
+    expect(screen.getByTestId('inactive-90')).toHaveAttribute('aria-pressed', 'false');
+    unmount();
+  });
+
+  it('shows a dash, not zero, for those two tiles when nobody could be judged', async () => {
+    api.list.mockResolvedValue(list([person()], { summary: { total: 7, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {}, inactive_90: 0, never_signed_in: 0, signin_state_known: 0 } }));
+    show();
+    await waitFor(() => expect(screen.getByTestId('never-signed-in').querySelector('.text-2xl')?.textContent).toBe('—'));
+    expect(screen.getByTestId('inactive-90').querySelector('.text-2xl')?.textContent).toBe('—');
+  });
+
   it('shows a dash when the server does not send them, and no alarm colour at zero', async () => {
     api.list.mockResolvedValue(list([person()], { summary: { total: 1, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {} } }));
     render(<IdentitiesView />);

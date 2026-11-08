@@ -266,6 +266,9 @@ class MfaUserIn(BaseModel):
     methods: list[str] = Field(default_factory=list, max_length=8)
     # True / False when CIPP's user list said, None when it could not (never guessed).
     password_never_expires: bool | None = None
+    # "active" / "inactive" / "never" from CIPP's inactive-accounts report, or None when the client's sign-in data is not available (never guessed).
+    signin_state: str | None = Field(default=None, pattern="^(active|inactive|never)$")
+    days_since_signin: int | None = Field(default=None, ge=0, le=100000)
 
 
 class MfaUsersReport(BaseModel):
@@ -338,6 +341,8 @@ async def apply_mfa_users(db: Any, owner: uuid.UUID, report: MfaUsersReport, now
                         "security_defaults": u.security_defaults,
                         "methods": ", ".join(u.methods)[:400] or None,
                         "password_never_expires": u.password_never_expires,
+                        "signin_state": u.signin_state,
+                        "days_since_signin": u.days_since_signin,
                         "snapshot_id": report.snapshot_id,
                         "refreshed_at": now,
                     }

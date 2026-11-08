@@ -36,6 +36,7 @@ from app.services.identity_people import (
     attach_alerts,
     build_people,
     filter_people,
+    counts_as,
     never_expires,
     is_active,
     normalize_email,
@@ -103,6 +104,9 @@ class PersonOut(BaseModel):
     mfa_methods: str | None = None
     # Password set never to expire (true / false), or null when CIPP's user list could not say.
     password_never_expires: bool | None = None
+    # Last sign-in: active / inactive (90+ days) / never, or null when the client's sign-in data is not available.
+    signin_state: str | None = None
+    days_since_signin: int | None = None
     tools: list[str]
     sources: list[SourceOut] = Field(default_factory=list)
     open_alerts: int = 0
@@ -150,6 +154,10 @@ class IdentitySummary(BaseModel):
     # Working accounts whose password is set never to expire, and how many accounts CIPP could say it for (the rest are unknown, not "expires").
     password_never_expires: int = 0
     password_policy_known: int = 0
+    # Working own accounts with no sign-in for 90+ days, and ones with none on record; and how many accounts the client's sign-in data covered (the rest are unknown, not "active").
+    inactive_90: int = 0
+    never_signed_in: int = 0
+    signin_state_known: int = 0
 
 
 class IdentityList(BaseModel):
@@ -175,6 +183,8 @@ def _out(p: Person, with_sources: bool = False) -> PersonOut:
         mfa=p.mfa,
         mfa_methods=p.mfa_methods,
         password_never_expires=p.password_never_expires,
+        signin_state=p.signin_state,
+        days_since_signin=p.days_since_signin,
         tools=p.vendors,
         aliases=[AliasOut(email=a, reason=p.alias_reasons.get(a, "merged")) for a in p.aliases],
         sources=[SourceOut(vendor=s.vendor, external_id=s.external_id, enabled=s.enabled, details=s.details) for s in p.sources]
@@ -312,6 +322,9 @@ def summarize(people: list[Person]) -> IdentitySummary:
         active=sum(1 for p in people if is_active(p)),
         password_never_expires=sum(1 for p in people if never_expires(p)),
         password_policy_known=sum(1 for p in people if p.password_never_expires is not None),
+        inactive_90=sum(1 for p in people if counts_as(p, "inactive")),
+        never_signed_in=sum(1 for p in people if counts_as(p, "never")),
+        signin_state_known=sum(1 for p in people if p.signin_state is not None),
         exposed_serious=sum(
             1 for p in people if p.exposure is not None and (p.exposure.password or p.exposure.stealer_log or p.exposure.malware)
         ),
@@ -352,6 +365,7 @@ async def list_identities(
     active: bool = Query(default=False, description="Only active identities: a licensed account, not a guest, not disabled."),
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
     password_never_expires: bool = Query(default=False, description="Only working accounts whose password is set never to expire (the tile's list)."),
+    inactivity: str | None = Query(default=None, pattern="^(inactive|never)$", description="inactive: working accounts with no sign-in for 90+ days; never: no sign-in on record (the two tiles' lists). Unknown is never listed."),
     signin: str | None = Query(
         default=None,
         pattern="^(failed|brute_force)$",
@@ -388,6 +402,7 @@ async def list_identities(
             active=active,
             kind=kind,
             password_never_expires=password_never_expires,
+            inactivity=inactivity,
         ),
         sort,
     )
@@ -454,6 +469,7 @@ async def export_identities(
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
     signin: str | None = Query(default=None, pattern="^(failed|brute_force)$"),
     password_never_expires: bool = Query(default=False, description="Only working accounts whose password is set never to expire."),
+    inactivity: str | None = Query(default=None, pattern="^(inactive|never)$"),
     sort: str = Query(default="alerts"),
 ) -> Response:
     if sort not in SORTS:
@@ -481,6 +497,7 @@ async def export_identities(
             active=active,
             kind=kind,
             password_never_expires=password_never_expires,
+            inactivity=inactivity,
         ),
         sort,
     )
