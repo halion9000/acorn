@@ -275,6 +275,30 @@ HALO = "halopsa"
 HALO_CHECKS = ("cloud_not_in_halo", "halo_inactive_cloud_enabled")
 
 
+# Addresses that belong to a thing or a team, not a person: nobody is added to HaloPSA as a user for these. Matched on the part before the @, split into words at . _ - + (whole words only, so
+# "scanlon" is not "scan"), plus a few fragments that are distinctive enough to match inside a word ("xmdreports", "gshake-admin", "itadmin").
+ROLE_WORDS = frozenset(
+    "info information scan scans scanner scopier support helpdesk help sales billing accounting accounts payable receivable payroll hr service services backup alerts alert notifications notification noreply "
+    "donotreply postmaster webmaster office contact mail team front reception security orders order marketing store shop test testing it admin admins administrator scanning printer print copier copy fax "
+    "ricoh xerox konica kyocera canon epson brother lexmark".split()
+)
+ROLE_FRAGMENTS = ("copier", "report", "admin", "noreply", "no-reply", "donotreply")
+
+
+def looks_like_role_account(emails: list[str], display_name: str | None = None) -> bool:
+    """True for a shared or function address (info@, scan@, a copier, a reports sender, an admin account), judged by the address and, when the display name is a single such word, by that (pure)."""
+    for email in emails:
+        local = email.split("@", 1)[0].lower()
+        words = [w for w in re.split(r"[._\-+]+", local) if w]
+        if any(w in ROLE_WORDS for w in words) or any(f in local for f in ROLE_FRAGMENTS):
+            return True
+    if display_name:
+        name_words = [w for w in re.split(r"[^a-z]+", display_name.lower()) if w]
+        if len(name_words) <= 2 and any(w in ROLE_WORDS or any(f in w for f in ROLE_FRAGMENTS) for w in name_words):
+            return True
+    return False
+
+
 def halo_checks(people: list[Person]) -> None:
     """Compare each person's cloud account (Microsoft 365, or a directory ThreatMate reads) with the client's HaloPSA users, and set ``halo_check`` on the ones that need a look. Only judged for a client whose HaloPSA users
     we hold at all (otherwise every account would read as missing), and only for ordinary users: a guest, a shared mailbox or another kind of account is not expected to be a Halo user.
@@ -291,7 +315,9 @@ def halo_checks(people: list[Person]) -> None:
             continue
         halo = [s for s in p.sources if s.vendor == HALO]
         if not halo:
-            p.halo_check = "cloud_not_in_halo"
+            # A function address (info@, scan@, a copier, an admin account) is not someone to add to Halo, so it is not listed as missing.
+            if not looks_like_role_account(list(p.addresses) or [p.email], p.display_name):
+                p.halo_check = "cloud_not_in_halo"
         elif all(s.enabled is False for s in halo):
             p.halo_check = "halo_inactive_cloud_enabled"
 
