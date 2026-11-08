@@ -8,8 +8,10 @@ Connect-AzAccount -Identity | Out-Null
 $rg = 'rg-liveoak-ops'
 $diskName = 'liveoak-acorn-vm_OsDisk_1_4d99608d48144d1284c65b0bd3594d0b'
 $keep = 4
-$disk = Get-AzDisk -ResourceGroupName $rg -DiskName $diskName
-$cfg = New-AzSnapshotConfig -SourceUri $disk.Id -Location $disk.Location -CreateOption Copy -Incremental -Tag @{ purpose = 'acorn-weekly' }
+# The role cannot READ disks (only snapshots, and start the copy of a disk), so the disk is named by its id instead of being looked up.
+$sub = (Get-AzContext).Subscription.Id
+$diskId = "/subscriptions/$sub/resourceGroups/$rg/providers/Microsoft.Compute/disks/$diskName"
+$cfg = New-AzSnapshotConfig -SourceUri $diskId -Location 'centralus' -CreateOption Copy -Incremental -Tag @{ purpose = 'acorn-weekly' }
 $name = 'acorn-os-' + (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmm')
 New-AzSnapshot -ResourceGroupName $rg -SnapshotName $name -Snapshot $cfg | Out-Null
 Write-Output "Created snapshot $name"
