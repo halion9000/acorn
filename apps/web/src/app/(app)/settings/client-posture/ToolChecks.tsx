@@ -67,6 +67,8 @@ const TITLE: Record<string, string> = {
   cipp_inactive_accounts: 'Unused accounts',
   cipp_subscriptions: 'Microsoft 365 subscriptions',
   cipp_unused_licences: 'Unused licences',
+  cipp_partner_relationship: 'Partner relationship (GDAP)',
+  cipp_tenant_readable: 'CIPP can read the tenant',
   ninjaone_unsupported_os: 'Windows support status',
   ninjaone_huntress_service: 'Huntress service running',
   ninjaone_antivirus: 'Antivirus',

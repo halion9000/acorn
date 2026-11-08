@@ -18,6 +18,7 @@ BOARDS: dict[str, tuple[str, tuple[str, ...]]] = {
             "itglue_certificate_expiry",
             "liongard_iis_certificates",
             "cipp_subscriptions",
+            "cipp_partner_relationship",
             "meraki_licence",
             "halopsa_agreement",
             "slide_appliance",
