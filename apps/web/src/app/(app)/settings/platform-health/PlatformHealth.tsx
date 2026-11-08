@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
+import { RetentionPreview } from "./RetentionPreview";
 import { LoginAbusePanel } from "./LoginAbusePanel";
 import { CredentialReminders } from "./CredentialReminders";
 import { agoMinutes } from "@/lib/ago";
@@ -396,6 +397,7 @@ export function PlatformHealth() {
           </table>
         </>
       )}
+      <RetentionPreview />
     </div>
   );
 }
