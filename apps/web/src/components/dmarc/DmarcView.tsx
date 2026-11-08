@@ -8,6 +8,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 
 import { authFetch } from '@/lib/auth-session';
+import CountryMap from './CountryMap';
 
 export interface DmarcStatus {
   configured: boolean;
@@ -610,6 +611,7 @@ function Countries({ days }: { days: number }) {
   return (
     <section aria-label="Where mail was sent from" className="space-y-2">
       <h3 className="text-sm font-medium text-gray-200">Where it was sent from</h3>
+      <CountryMap countries={data.countries} nameOf={countryName} />
       <ul className="space-y-1">
         {data.countries.slice(0, 15).map((c) => (
           <li key={c.code} data-testid="country-row" className="flex items-center gap-3 text-sm">
