@@ -25060,6 +25060,10 @@ components:
         mttr:
           type: number
           title: Mttr
+        mttr_p90:
+          type: number
+          title: Mttr P90
+          default: 0.0
       type: object
       required:
       - total
@@ -44015,6 +44019,10 @@ components:
         mttr_hours:
           type: number
           title: Mttr Hours
+        mttr_p90_hours:
+          type: number
+          title: Mttr P90 Hours
+          default: 0.0
         mttc_hours:
           type: number
           title: Mttc Hours

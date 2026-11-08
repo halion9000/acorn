@@ -16,6 +16,7 @@ from typing import Any
 
 from sqlalchemy import and_, func, select
 
+from app.services.mttr import summarize_pairs
 from app.db.rls_scope import acting_as_tenant
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
@@ -63,12 +64,13 @@ async def compute_child_metrics(db: Any, child_id: uuid.UUID, mapped_tools: int,
     )
     resolved = (
         await db.execute(
-            select(Alert.created_at, Alert.resolved_at).where(
+            select(Alert.created_at, Alert.resolved_at, Alert.stale_at).where(
                 and_(Alert.tenant_id == child_id, Alert.resolved_at.isnot(None), Alert.created_at >= now - MTTR_WINDOW)
             )
         )
     ).all()
-    minutes = [(r.resolved_at - r.created_at).total_seconds() / 60 for r in resolved if r.resolved_at and r.created_at]
+    # The one MTTR definition (services/mttr.py): the median, stale sweeps left out.
+    response = summarize_pairs((r.created_at, r.resolved_at, r.stale_at) for r in resolved)
     open_cases = await case_metrics.count_with_status(db, child_id, OPEN_CASES)
     case_rows = await case_metrics.digest_rows(db, child_id, now - MTTR_WINDOW)
     breaches = sum(1 for r in case_rows if r.sla_breached)
@@ -76,13 +78,13 @@ async def compute_child_metrics(db: Any, child_id: uuid.UUID, mapped_tools: int,
         "open_alerts": int(open_alerts or 0),
         "critical_alerts": int(critical or 0),
         "open_cases": open_cases,
-        "mttr_minutes": round(sum(minutes) / len(minutes), 1) if minutes else None,
+        "mttr_minutes": round(response.median_hours * 60, 1) if response.n else None,
         "sla_breaches": breaches,
         "connector_count": mapped_tools,
         "health_score": health_score(int(critical or 0), int(high or 0), breaches, mapped_tools),
         "raw_data": {
             "open_alerts": "alerts not resolved/closed/false-positive",
-            "mttr_minutes": f"mean created-to-resolved of alerts resolved in the last {MTTR_WINDOW.days} days",
+            "mttr_minutes": f"median created-to-resolved of alerts a person resolved in the last {MTTR_WINDOW.days} days (alerts swept as stale are not counted)",
             "sla_breaches": f"cases from the last {MTTR_WINDOW.days} days past their SLA due time",
             "connector_count": "tools with a client mapped to this tenant",
             "health_score": (

@@ -503,7 +503,7 @@ export function SLADashboard() {
             { label: 'SLA Breaches', value: metrics.overall.total_breaches },
             { label: 'Breach Rate', value: `${metrics.overall.breach_rate}%` },
             {
-              label: 'Avg MTTR',
+              label: 'MTTR (median)',
               value: fmtMinutes(metrics.overall.mttr_avg),
             },
           ].map(({ label, value }) => (

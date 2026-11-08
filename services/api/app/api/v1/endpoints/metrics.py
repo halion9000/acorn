@@ -2,7 +2,7 @@
 
 Tier 1.4 (SOC metrics dashboard) — exposes:
   * MTTD (mean time to detect): alert.created_at → alert.first_seen_at
-  * MTTR (mean time to respond): alert.created_at → alert.resolved_at
+  * MTTR (time to respond, the median; see services/mttr.py): alert.created_at → alert.resolved_at
   * MTTC (mean time to contain): alert.created_at → alert.resolved_at for
     alerts with disposition='true_positive' (proxy for confirmed-contained)
   * False-positive rate (FPR): disposition='false_positive' / total resolved
@@ -29,6 +29,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import and_, func, select, text
 
+from app.services.mttr import window as mttr_window
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.core.config import settings
 from app.db.rls_scope import cross_tenant_reads
@@ -57,6 +58,7 @@ class AlertMetrics(BaseModel):
     low: int
     resolvedToday: int
     mttr: float
+    mttr_p90: float = 0.0
 
 
 class CaseMetrics(BaseModel):
@@ -280,16 +282,8 @@ async def _get_dashboard_metrics_impl(
         )
     )
 
-    # MTTR for the dashboard tile: average resolved-alert duration over last 7d
-    mttr_dashboard_q = await db.scalar(
-        select(func.avg(func.extract("epoch", Alert.resolved_at - Alert.created_at) / 3600)).where(
-            and_(
-                Alert.tenant_id.in_(tenant_ids),
-                Alert.resolved_at.isnot(None),
-                Alert.created_at >= week_start,
-            )
-        )
-    )
+    # MTTR for the dashboard tile: the one definition (services/mttr.py), median of the alerts created in the last 7 days that a person resolved.
+    mttr_dashboard = await mttr_window(db, tenant_ids, week_start)
 
     alert_metrics = AlertMetrics(
         total=total_q or 0,
@@ -300,7 +294,8 @@ async def _get_dashboard_metrics_impl(
         medium=medium_q or 0,
         low=low_q or 0,
         resolvedToday=resolved_today_q or 0,
-        mttr=round(float(mttr_dashboard_q or 0.0), 2),
+        mttr=mttr_dashboard.median_hours,
+        mttr_p90=mttr_dashboard.p90_hours,
     )
 
     # ── Case counts ───────────────────────────────────────────────────────────
@@ -419,6 +414,7 @@ async def _get_dashboard_metrics_impl(
 class SOCKpis(BaseModel):
     mttd_hours: float
     mttr_hours: float
+    mttr_p90_hours: float = 0.0
     mttc_hours: float
     false_positive_rate: float
     escalation_rate: float
@@ -495,17 +491,9 @@ async def _get_soc_metrics_impl(
     mttd_hours = float(mttd_q or 0.0)
 
     # ── MTTR ──────────────────────────────────────────────────────────────────
-    # Mean time from alert creation to resolved_at, for any resolved alert.
-    mttr_q = await db.scalar(
-        select(func.avg(func.extract("epoch", Alert.resolved_at - Alert.created_at) / 3600)).where(
-            and_(
-                Alert.tenant_id.in_(tenant_ids),
-                Alert.resolved_at.isnot(None),
-                Alert.created_at >= week_start,
-            )
-        )
-    )
-    mttr_hours = float(mttr_q or 0.0)
+    # The one definition (services/mttr.py): median hours from creation to a person resolving it, stale sweeps left out.
+    mttr_summary = await mttr_window(db, tenant_ids, week_start)
+    mttr_hours = mttr_summary.median_hours
 
     # ── MTTC (Mean Time to Contain) ───────────────────────────────────────────
     # For confirmed true-positive alerts only — proxy for "incident contained".
@@ -606,6 +594,7 @@ async def _get_soc_metrics_impl(
     kpis = SOCKpis(
         mttd_hours=round(mttd_hours, 2),
         mttr_hours=round(mttr_hours, 2),
+        mttr_p90_hours=mttr_summary.p90_hours,
         mttc_hours=round(mttc_hours, 2),
         false_positive_rate=round(fpr, 4),
         escalation_rate=round(escalation_rate, 4),

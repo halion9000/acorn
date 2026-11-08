@@ -10,7 +10,7 @@ hop:
     * **MTTA** — mean time-to-acknowledge (alert.created_at →
       alert.first_seen_at), captured for the current window and the
       previous window so the UI can render a delta.
-    * **MTTR** — mean time-to-resolve (alert.created_at →
+    * **MTTR** — median time-to-resolve (services/mttr.py) (alert.created_at →
       alert.resolved_at).
     * **FP rate** — false-positive disposition over dispositioned
       alerts.
@@ -64,6 +64,7 @@ from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.tenant import Tenant
 from app.services import case_metrics, insight_tiles
+from app.services.mttr import window as mttr_window
 from app.services.timeutil import as_utc
 
 logger = logging.getLogger(__name__)
@@ -504,20 +505,26 @@ async def _scope_totals_per_tenant(
         else:
             async with acting_as_tenant(db, tid):
                 parts.append(await _tenant_parts(db, tid, start, now, prev_start))
-    return _merge_parts(parts)
+    merged = _merge_parts(parts)
+    # A median cannot be merged from per-tenant figures, so the reference path takes MTTR over the whole scope at once, with the same definition.
+    async with cross_tenant_reads(db):
+        for tag, (a, b) in (("", (start, now)), ("prev_", (prev_start, start))):
+            m = await mttr_window(db, list(scope_ids), a, b)
+            merged[tag + "mttr"], merged[tag + "mttr_n"] = m.median_hours, m.n
+    return merged
 
 
 async def _alert_window(db, ids: list[uuid.UUID], start: datetime, end: datetime) -> dict:
     """What the alerts created in [start, end) say, for all these tenants at once."""
     hours = lambda col: func.avg(func.extract("epoch", col - Alert.created_at) / 3600)  # noqa: E731
+    # MTTR is the one definition in services/mttr.py (median, a person's resolution, stale sweeps left out), not a mean.
+    responded = await mttr_window(db, ids, start, end)
     row = (
         await db.execute(
             select(
                 func.count(),
                 hours(Alert.first_seen_at),
                 func.count(Alert.first_seen_at),
-                hours(Alert.resolved_at),
-                func.count(Alert.resolved_at),
                 func.count(Alert.disposition),
                 func.count().filter(Alert.disposition == "false_positive"),
             ).where(Alert.tenant_id.in_(ids), Alert.created_at >= start, Alert.created_at < end)
@@ -527,10 +534,10 @@ async def _alert_window(db, ids: list[uuid.UUID], start: datetime, end: datetime
         "alerts": int(row[0]),
         "mtta": round(float(row[1] or 0.0), 2),
         "mtta_n": int(row[2]),
-        "mttr": round(float(row[3] or 0.0), 2),
-        "mttr_n": int(row[4]),
-        "dispositioned": int(row[5]),
-        "fp": int(row[6]),
+        "mttr": responded.median_hours,
+        "mttr_n": responded.n,
+        "dispositioned": int(row[3]),
+        "fp": int(row[4]),
     }
 
 
@@ -756,7 +763,7 @@ async def _build_soc_insights(user: AuthUser, db: DBSession, window: str, client
             delta_pct=_change(mttr_hours, prev_mttr) if mttr_has else None,
             sparkline=InsightSparkline(points=alert_spark),
             has_data=mttr_has,
-            detail=f"Average time from an alert arriving to it being finished, over {total['mttr_n']} alerts"
+            detail=f"Median time from an alert arriving to a person finishing it (alerts swept as stale are not counted), over {total['mttr_n']} alerts"
             if mttr_has
             else "No alert from this window has been finished yet",
         ),

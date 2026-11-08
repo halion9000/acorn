@@ -202,6 +202,7 @@ def test_an_empty_window_is_all_zeros_not_a_division_error(monkeypatch):
         "breach_rate": 0.0,
         "mttd_avg": None,
         "mttr_avg": None,
+        "mttr_p90": None,
         "mttc_avg": None,
     }
 
@@ -269,3 +270,11 @@ class TestRecordEvent:
         with pytest.raises(ValidationError):
             new_event(event_type="e" * 33)
         assert new_event(metadata={"note": "ok"}).metadata == {"note": "ok"}
+
+
+def test_the_sla_page_mttr_is_the_median_with_the_90th_percentile_beside_it():
+    from app.services.sla import median_minutes, p90_minutes
+
+    assert median_minutes([10, 20, 30, 5000]) == 25.0, "one alert that sat for days does not drag the typical figure"
+    assert p90_minutes([10, 20, 30, 5000]) > 3000
+    assert median_minutes([]) is None and p90_minutes([]) is None

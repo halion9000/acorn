@@ -377,3 +377,18 @@ def test_render_digest_html_escapes_user_data() -> None:
     # Raw script tag must not appear; escaped form must.
     assert "<script>alert" not in html
     assert "&lt;script&gt;alert" in html
+
+
+def test_mttr_in_the_digest_is_the_median_and_leaves_out_alerts_swept_as_stale():
+    from dataclasses import replace
+
+    from app.services.executive_digest import _compute_mtt
+
+    base = _alert()
+    t0 = base.created_at
+
+    def row(hours, stale=False):
+        return replace(base, created_at=t0, resolved_at=t0 + timedelta(hours=hours), stale_at=t0 if stale else None)
+
+    got = _compute_mtt([row(1), row(2), row(3), row(500), row(400, stale=True)])
+    assert got.mttr_hours == 2.5, "the median of 1, 2, 3 and 500; the stale sweep is not counted"

@@ -92,7 +92,7 @@ export function kpiCards(overview: MsspOverview) {
     { label: 'Critical alerts', value: figure(overview.total_critical_alerts), href: '/alerts?status=open&severity=critical' },
     { label: 'Open cases', value: figure(overview.total_open_cases), href: '/cases?scope=all' },
     { label: 'SLA breaches', value: figure(overview.sla_breach_count), href: '/sla' },
-    { label: 'Avg MTTR', value: figure(overview.avg_mttr_minutes, { decimals: 0, suffix: ' min' }), href: '/sla' },
+    { label: 'Avg MTTR', value: figure(overview.avg_mttr_minutes, { decimals: 0, suffix: ' min' }), hint: 'the median of each client, averaged', href: '/sla' },
   ];
 }
 

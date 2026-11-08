@@ -36,6 +36,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.mttr import summarize
 from app.models.alert import Alert
 from app.models.remediation import RemediationGateLog
 from app.services import case_metrics
@@ -159,6 +160,8 @@ class AlertRow:
     event_time: datetime
     # The tool that raised it as the alert itself says (``raw_event.source``); the connector type is often a generic ingest name instead.
     source: str | None = None
+    # Set when the alert was swept as stale: it is not a response, so MTTR leaves it out (services/mttr.py).
+    stale_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -229,6 +232,12 @@ def _mean_hours(deltas: list[timedelta]) -> float | None:
     return round(seconds / len(deltas) / 3600, 2)
 
 
+def _median_hours(deltas: list[timedelta]) -> float | None:
+    """MTTR as decided: the median, not the mean (services/mttr.py)."""
+    summary = summarize(d.total_seconds() / 3600 for d in deltas)
+    return summary.median_hours if summary.n else None
+
+
 def _compute_mtt(rows: list[AlertRow]) -> MttSummary:
     """MTTD/MTTR/MTTC over a window."""
     detect: list[timedelta] = []
@@ -239,13 +248,14 @@ def _compute_mtt(rows: list[AlertRow]) -> MttSummary:
         if r.first_seen_at and r.first_seen_at >= r.created_at:
             detect.append(r.first_seen_at - r.created_at)
         if r.resolved_at and r.resolved_at >= r.created_at:
-            respond.append(r.resolved_at - r.created_at)
+            if r.stale_at is None:
+                respond.append(r.resolved_at - r.created_at)
             if r.disposition == "true_positive":
                 contain.append(r.resolved_at - r.created_at)
 
     return MttSummary(
         mttd_hours=_mean_hours(detect),
-        mttr_hours=_mean_hours(respond),
+        mttr_hours=_median_hours(respond),
         mttc_hours=_mean_hours(contain),
     )
 
@@ -520,6 +530,7 @@ async def _fetch_alerts(
             Alert.status,
             Alert.created_at,
             Alert.resolved_at,
+            Alert.stale_at,
             Alert.first_seen_at,
             Alert.disposition,
             Alert.mitre_tactics,
@@ -551,6 +562,7 @@ async def _fetch_alerts(
                 source=r.tool,
                 ai_score=float(r.ai_score) if r.ai_score is not None else None,
                 event_time=r.event_time or r.created_at,
+                stale_at=getattr(r, "stale_at", None),
             )
         )
     return rows

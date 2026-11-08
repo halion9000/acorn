@@ -15,6 +15,7 @@ from sqlalchemy import Text, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
+from app.services.mttr import percentile
 from app.core.config import get_settings
 from app.models.alert import Alert
 from app.models.sla import AlertSLAEvent, TenantSLAConfig
@@ -141,6 +142,15 @@ async def _fetch_alert_events(
         key = str(ev.alert_id)
         grouped.setdefault(key, []).append(ev)
     return grouped
+
+
+def median_minutes(values: list[int]) -> float | None:
+    """MTTR as decided: the median of the response times in minutes (the key stays ``mttr_avg`` so nothing reading it breaks; it is now a median). None when there are none."""
+    return round(percentile(sorted(float(v) for v in values), 0.5), 1) if values else None
+
+
+def p90_minutes(values: list[int]) -> float | None:
+    return round(percentile(sorted(float(v) for v in values), 0.9), 1) if values else None
 
 
 def _compute_durations(
@@ -278,7 +288,7 @@ async def compute_sla_metrics(
             return round(sum(vals) / len(vals), 1) if vals else None
 
         mttd_avg = avg(mttd_vals)
-        mttr_avg = avg(mttr_vals)
+        mttr_avg = median_minutes(mttr_vals)  # the one MTTR definition (services/mttr.py): the median
         mttc_avg = avg(mttc_vals)
 
         # Breaches: any metric exceeding its target
@@ -298,6 +308,7 @@ async def compute_sla_metrics(
             "breach_rate": round(breaches / len(items) * 100, 1) if items else 0.0,
             "mttd_avg": mttd_avg,
             "mttr_avg": mttr_avg,
+            "mttr_p90": p90_minutes(mttr_vals),
             "mttc_avg": mttc_avg,
             "mttd_target": targets.get("mttd_target"),
             "mttr_target": targets.get("mttr_target"),
@@ -317,7 +328,8 @@ async def compute_sla_metrics(
         "total_breaches": total_breaches,
         "breach_rate": round(total_breaches / total_alerts * 100, 1) if total_alerts else 0.0,
         "mttd_avg": round(sum(all_mttd) / len(all_mttd), 1) if all_mttd else None,
-        "mttr_avg": round(sum(all_mttr) / len(all_mttr), 1) if all_mttr else None,
+        "mttr_avg": median_minutes(all_mttr),
+        "mttr_p90": p90_minutes(all_mttr),
         "mttc_avg": round(sum(all_mttc) / len(all_mttc), 1) if all_mttc else None,
     }
 
