@@ -87,7 +87,7 @@ export function ClientCleanup() {
     <div className="space-y-4 p-6">
       <div>
         <h1 className="text-xl font-semibold text-gray-100">Client cleanup</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-400">
+        <p className="mt-1 max-w-2xl text-sm text-gray-400">
           Clients with nothing in them: no devices, no alerts, no cases and no tool client mapped to them. Archiving hides a client and renames it &quot;(archived)&quot;; nothing is deleted, and Show hidden brings it back.
         </p>
       </div>
@@ -96,49 +96,49 @@ export function ClientCleanup() {
           {error}
         </p>
       )}
-      {report === null && !error && <p className="text-sm text-slate-500">Loading...</p>}
+      {report === null && !error && <p className="text-sm text-gray-500">Loading...</p>}
       {report !== null && (
-        <p data-testid="checked" className="text-sm text-slate-300">
+        <p data-testid="checked" className="text-sm text-gray-300">
           {report.checked} clients checked, {report.empty.length} empty.
         </p>
       )}
       {report !== null && report.empty.length === 0 && (
-        <p data-testid="none" className="text-sm text-slate-400">
+        <p data-testid="none" className="text-sm text-gray-400">
           Every client has something in it.
         </p>
       )}
       {suspects !== null && suspects.length > 0 && (
         <section className="space-y-2" data-testid="suspect-mappings">
-          <h2 className="text-sm font-semibold text-slate-200">Mappings to double-check</h2>
-          <p className="max-w-2xl text-sm text-slate-400">
+          <h2 className="text-sm font-semibold text-gray-200">Mappings to double-check</h2>
+          <p className="max-w-2xl text-sm text-gray-400">
             A tool&apos;s client mapped to a client whose name looks unrelated, with no machine in common. Most are fine (a trading name); a wrong one sends a client&apos;s alerts and counts to the wrong place. Fix it on the
             MSSP page.
           </p>
-          <ul className="divide-y divide-slate-800 rounded border border-slate-800">
+          <ul className="divide-y divide-gray-800 rounded border border-gray-800">
             {suspects.map((m) => (
-              <li key={m.alias_id} className="px-4 py-2 text-sm text-slate-300" data-testid="suspect-mapping">
-                {m.vendor}: <span className="text-slate-100">{m.vendor_client_name}</span> is mapped to <span className="text-slate-100">{m.client_name}</span>
+              <li key={m.alias_id} className="px-4 py-2 text-sm text-gray-300" data-testid="suspect-mapping">
+                {m.vendor}: <span className="text-gray-100">{m.vendor_client_name}</span> is mapped to <span className="text-gray-100">{m.client_name}</span>
               </li>
             ))}
           </ul>
         </section>
       )}
       {report !== null && report.empty.length > 0 && (
-        <ul className="divide-y divide-slate-800 rounded border border-slate-800">
+        <ul className="divide-y divide-gray-800 rounded border border-gray-800">
           {report.empty.map((c) => (
             <li key={c.id} className="flex items-center justify-between gap-4 px-4 py-3" data-testid="empty-client">
-              <span className="text-slate-200">{c.name}</span>
+              <span className="text-gray-200">{c.name}</span>
               {confirming === c.id ? (
                 <span className="flex items-center gap-2 text-sm">
                   <button type="button" disabled={busy === c.id} onClick={() => void archive(c)} className="rounded border border-red-500/50 bg-red-500/10 px-2 py-1 text-red-300 disabled:opacity-50">
                     {busy === c.id ? "Archiving..." : `Archive ${c.name}`}
                   </button>
-                  <button type="button" onClick={() => setConfirming(null)} className="text-slate-400 hover:text-slate-200">
+                  <button type="button" onClick={() => setConfirming(null)} className="text-gray-400 hover:text-gray-200">
                     Cancel
                   </button>
                 </span>
               ) : (
-                <button type="button" onClick={() => setConfirming(c.id)} className="rounded border border-slate-600 px-2 py-1 text-sm text-slate-200 hover:bg-slate-800">
+                <button type="button" onClick={() => setConfirming(c.id)} className="rounded border border-gray-600 px-2 py-1 text-sm text-gray-200 hover:bg-gray-800">
                   Archive
                 </button>
               )}

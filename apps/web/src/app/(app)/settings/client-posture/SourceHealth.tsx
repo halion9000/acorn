@@ -69,12 +69,12 @@ export function SourceHealth() {
   const sorted = sortRuns(runs);
   const bad = sorted.filter((r) => r.health !== 'ok').length;
   return (
-    <details className="rounded border border-slate-800 p-3 text-sm print:hidden" data-testid="source-health" open={bad > 0}>
-      <summary className="cursor-pointer text-slate-300">
+    <details className="rounded border border-gray-800 p-3 text-sm print:hidden" data-testid="source-health" open={bad > 0}>
+      <summary className="cursor-pointer text-gray-300">
         Data sources: {bad === 0 ? 'every sweep is reaching A.C.O.R.N' : `${bad} of ${runs.length} need a look`}
       </summary>
       <table className="mt-2 w-full text-left text-xs">
-        <thead className="text-slate-500">
+        <thead className="text-gray-500">
           <tr>
             <th className="pr-3">Tool</th>
             <th className="pr-3">Last pass</th>
@@ -87,7 +87,7 @@ export function SourceHealth() {
           {sorted.map((r) => {
             const h = HEALTH[r.health] ?? HEALTH.partly;
             return (
-              <tr key={r.source} data-testid={`sweep-${r.source}`} className="border-t border-slate-800 text-slate-300">
+              <tr key={r.source} data-testid={`sweep-${r.source}`} className="border-t border-gray-800 text-gray-300">
                 <td className="py-1 pr-3">{TOOL_CHECK_LABELS[r.source] ?? r.title}</td>
                 <td className="pr-3">{new Date(r.ran_at).toLocaleString()}</td>
                 <td className="pr-3">
@@ -97,7 +97,7 @@ export function SourceHealth() {
                 <td className={h.className}>
                   {h.text}
                   {r.first_error ? (
-                    <span className="ml-1 text-slate-500">
+                    <span className="ml-1 text-gray-500">
                       ({failureKind(r.first_error) ? `${failureKind(r.first_error)}: ` : ""}
                       {r.first_error})
                     </span>

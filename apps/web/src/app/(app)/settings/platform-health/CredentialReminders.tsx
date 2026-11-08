@@ -74,18 +74,18 @@ export function CredentialReminders() {
   }
 
   return (
-    <section data-testid="credential-reminders" className="space-y-2 text-sm text-slate-300">
-      <h3 className="text-sm font-medium text-slate-200">Credential reminders</h3>
-      <p className="text-xs text-slate-500">A name and the day it stops working. Never type the credential itself. A date within 30 days shows as a warning at the top of this page.</p>
-      {rows.length === 0 ? <p className="text-xs text-slate-500">Nothing is being tracked yet.</p> : null}
+    <section data-testid="credential-reminders" className="space-y-2 text-sm text-gray-300">
+      <h3 className="text-sm font-medium text-gray-200">Credential reminders</h3>
+      <p className="text-xs text-gray-500">A name and the day it stops working. Never type the credential itself. A date within 30 days shows as a warning at the top of this page.</p>
+      {rows.length === 0 ? <p className="text-xs text-gray-500">Nothing is being tracked yet.</p> : null}
       <ul className="space-y-1">
         {rows.map((r) => (
           <li key={r.name} className="flex flex-wrap items-center gap-2" data-testid="reminder-row">
-            <span className="text-slate-200">{r.name}</span>
-            <span className="text-xs text-slate-400">
+            <span className="text-gray-200">{r.name}</span>
+            <span className="text-xs text-gray-400">
               {r.expires_on} {daysLeftText(r.days_left) ? `(${daysLeftText(r.days_left)})` : ""}
             </span>
-            <button type="button" disabled={busy} onClick={() => void save(rows.filter((x) => x.name !== r.name))} className="text-xs text-slate-500 hover:text-red-300" aria-label={`Stop tracking ${r.name}`}>
+            <button type="button" disabled={busy} onClick={() => void save(rows.filter((x) => x.name !== r.name))} className="text-xs text-gray-500 hover:text-red-300" aria-label={`Stop tracking ${r.name}`}>
               Remove
             </button>
           </li>
@@ -98,15 +98,15 @@ export function CredentialReminders() {
           if (name.trim() && date) void save([...rows, { name: name.trim(), expires_on: date }]);
         }}
       >
-        <label className="text-xs text-slate-400">
+        <label className="text-xs text-gray-400">
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Microsoft sign-in secret" className="ml-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100" />
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Microsoft sign-in secret" className="ml-1 rounded border border-gray-700 bg-gray-950 px-2 py-1 text-sm text-gray-100" />
         </label>
-        <label className="text-xs text-slate-400">
+        <label className="text-xs text-gray-400">
           Expires
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="ml-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100" />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="ml-1 rounded border border-gray-700 bg-gray-950 px-2 py-1 text-sm text-gray-100" />
         </label>
-        <button type="submit" disabled={busy || !name.trim() || !date} className="rounded border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-40">
+        <button type="submit" disabled={busy || !name.trim() || !date} className="rounded border border-gray-600 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800 disabled:opacity-40">
           Add reminder
         </button>
       </form>

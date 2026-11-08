@@ -93,7 +93,7 @@ export function LinkedTools({ tools }: { tools: NonNullable<Posture["tools"]> })
   if (tools.length === 0) return null;
   return (
     <section aria-label="Tools this client is linked to" className="print:hidden">
-      <h3 className="mb-2 text-sm uppercase text-slate-500">Linked tools</h3>
+      <h3 className="mb-2 text-sm uppercase text-gray-500">Linked tools</h3>
       <ul className="flex flex-wrap gap-2">
         {tools.map((t) => {
           const url = vendorClientUrl(t.vendor, t.vendor_client_id, t.product);
@@ -108,11 +108,11 @@ export function LinkedTools({ tools }: { tools: NonNullable<Posture["tools"]> })
           return (
             <li key={`${t.vendor}:${t.vendor_client_id}`}>
               {url ? (
-                <a href={url} target="_blank" rel="noopener noreferrer" title={`Open ${detail} in ${label}`} className="flex items-center gap-2 rounded border border-slate-700 px-2 py-1 text-sm text-slate-200 hover:border-sky-500/60 hover:bg-slate-800/60">
+                <a href={url} target="_blank" rel="noopener noreferrer" title={`Open ${detail} in ${label}`} className="flex items-center gap-2 rounded border border-gray-700 px-2 py-1 text-sm text-gray-200 hover:border-sky-500/60 hover:bg-gray-800/60">
                   {chip}
                 </a>
               ) : (
-                <span title={`${detail} (no link to this tool's page yet)`} className="flex items-center gap-2 rounded border border-slate-800 px-2 py-1 text-sm text-slate-400">
+                <span title={`${detail} (no link to this tool's page yet)`} className="flex items-center gap-2 rounded border border-gray-800 px-2 py-1 text-sm text-gray-400">
                   {chip}
                 </span>
               )}
@@ -127,13 +127,13 @@ export function LinkedTools({ tools }: { tools: NonNullable<Posture["tools"]> })
 function Stat({ label, value, bad, href }: { label: string; value: string | number; bad?: boolean; href?: string }) {
   const body = (
     <>
-      <div className={`text-2xl font-semibold ${bad ? "text-red-300" : "text-slate-100"}`}>{value}</div>
-      <div className="text-xs uppercase text-slate-500">{label}</div>
+      <div className={`text-2xl font-semibold ${bad ? "text-red-300" : "text-gray-100"}`}>{value}</div>
+      <div className="text-xs uppercase text-gray-500">{label}</div>
     </>
   );
-  if (!href) return <div className="rounded border border-slate-700 p-3">{body}</div>;
+  if (!href) return <div className="rounded border border-gray-700 p-3">{body}</div>;
   return (
-    <Link href={href} aria-label={`${label}: ${value}. Open the list`} className="block rounded border border-slate-700 p-3 transition-colors hover:border-sky-500/60 hover:bg-slate-800/60 print:border-slate-300">
+    <Link href={href} aria-label={`${label}: ${value}. Open the list`} className="block rounded border border-gray-700 p-3 transition-colors hover:border-sky-500/60 hover:bg-gray-800/60 print:border-gray-300">
       {body}
     </Link>
   );
@@ -202,17 +202,17 @@ export function ClientPosture() {
       <div className="flex items-end justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-xl font-semibold text-gray-100">Client posture</h1>
-          <p className="mt-1 text-sm text-slate-400">One client&apos;s devices, Multi-Factor coverage, open alerts and cases on a page you can print for a review.</p>
+          <p className="mt-1 text-sm text-gray-400">One client&apos;s devices, Multi-Factor coverage, open alerts and cases on a page you can print for a review.</p>
         </div>
         {shown && (
-          <button type="button" onClick={() => window.print()} className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200">
+          <button type="button" onClick={() => window.print()} className="rounded border border-gray-600 px-3 py-1 text-sm text-gray-200">
             Print
           </button>
         )}
       </div>
-      <label className="flex items-center gap-2 text-sm text-slate-300 print:hidden">
+      <label className="flex items-center gap-2 text-sm text-gray-300 print:hidden">
         Client
-        <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="rounded border border-slate-700 bg-slate-900 px-2 py-1" aria-label="Client">
+        <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="rounded border border-gray-700 bg-gray-900 px-2 py-1" aria-label="Client">
           <option value="">Pick a client</option>
           {(clients ?? []).map((c) => (
             <option key={c.id} value={c.id}>
@@ -230,13 +230,13 @@ export function ClientPosture() {
       {shown && (
         <div className="space-y-5" data-testid="posture">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-slate-100">
-              {shown.client_name ?? "This organization"} <span className="text-sm font-normal text-slate-500">as of {new Date(shown.generated_at).toLocaleString()}</span>
+            <h2 className="text-lg font-semibold text-gray-100">
+              {shown.client_name ?? "This organization"} <span className="text-sm font-normal text-gray-500">as of {new Date(shown.generated_at).toLocaleString()}</span>
             </h2>
             <Link
               href={`/identities?client=${encodeURIComponent(shown.client_id)}`}
               data-testid="people-button"
-              className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 hover:border-sky-500/60 hover:bg-slate-800/60 print:hidden"
+              className="rounded border border-gray-600 px-3 py-1 text-sm text-gray-200 hover:border-sky-500/60 hover:bg-gray-800/60 print:hidden"
             >
               People in this client →
             </Link>
@@ -251,7 +251,7 @@ export function ClientPosture() {
             }}
           />
           <section>
-            <h3 className="mb-2 text-sm uppercase text-slate-500">Devices</h3>
+            <h3 className="mb-2 text-sm uppercase text-gray-500">Devices</h3>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               <Stat label="Devices" value={shown.devices.devices} href={links.devices} />
               <Stat label="Need attention" value={shown.devices.needs_attention} bad={shown.devices.needs_attention > 0} href={links.needsAttention} />
@@ -265,7 +265,7 @@ export function ClientPosture() {
             </div>
           </section>
           <section>
-            <h3 className="mb-2 text-sm uppercase text-slate-500">Multi-Factor</h3>
+            <h3 className="mb-2 text-sm uppercase text-gray-500">Multi-Factor</h3>
             {shown.identity ? (
               <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
                 <Stat label="People" value={shown.identity.people} href={links.people} />
@@ -275,12 +275,12 @@ export function ClientPosture() {
                 <Stat label="Administrators without" value={shown.identity.admins_without_mfa} bad={shown.identity.admins_without_mfa > 0} href={links.adminsWithout} />
               </div>
             ) : (
-              <p className="text-sm text-slate-400" data-testid="no-identity">
+              <p className="text-sm text-gray-400" data-testid="no-identity">
                 No Multi-Factor data yet. It arrives once CORE is connected to CIPP and this client&apos;s CIPP tenant is mapped.
               </p>
             )}
           </section>
-          <label className="flex items-center gap-2 text-sm text-slate-300 print:hidden">
+          <label className="flex items-center gap-2 text-sm text-gray-300 print:hidden">
             <input type="checkbox" checked={onlyProblems} onChange={(e) => setOnlyProblems(e.target.checked)} aria-label="Only checks that need attention" />
             Only checks that need attention
           </label>
@@ -290,7 +290,7 @@ export function ClientPosture() {
           <DomainChecks clientId={shown.client_id} />
           <ClientSummary posture={shown} labelFor={labelFor} />
           <section>
-            <h3 className="mb-2 text-sm uppercase text-slate-500">Alerts and cases</h3>
+            <h3 className="mb-2 text-sm uppercase text-gray-500">Alerts and cases</h3>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               <Stat label="Open alerts" value={shown.alerts.open} href={links.alerts} />
               <Stat label="Critical" value={shown.alerts.critical} bad={shown.alerts.critical > 0} href={links.critical} />

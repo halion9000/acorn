@@ -50,7 +50,7 @@ export interface ActionsView {
 
 export const OUTCOMES: Record<AuditEntry["result"], { label: string; className: string }> = {
   executed: { label: "Executed", className: "bg-red-500/20 text-red-200" },
-  dry_run: { label: "Dry run", className: "bg-slate-600/30 text-slate-300" },
+  dry_run: { label: "Dry run", className: "bg-gray-600/30 text-gray-300" },
   refused: { label: "Refused", className: "bg-amber-500/20 text-amber-200" },
   failed: { label: "Failed", className: "bg-red-500/20 text-red-300" },
 };
@@ -112,7 +112,7 @@ export function CippActions() {
       </p>
     );
   }
-  if (!view) return <p className="m-6 text-sm text-slate-500">Loading…</p>;
+  if (!view) return <p className="m-6 text-sm text-gray-500">Loading…</p>;
   const r = view.report;
   const names = view.client_names;
   const stale = view.received_at !== null && Date.now() - Date.parse(view.received_at) > 3 * 3_600_000;
@@ -122,21 +122,21 @@ export function CippActions() {
     <div className="space-y-5 p-6">
       <div>
         <h1 className="text-xl font-semibold text-gray-100">CIPP actions</h1>
-        <p className="mt-1 max-w-prose text-sm text-slate-400">
+        <p className="mt-1 max-w-prose text-sm text-gray-400">
           What CORE can do to client Microsoft 365 tenants through CIPP, and what it has been asked to do. Read only: the rules are CORE&apos;s saved settings, and nothing here can change one or run an action.
         </p>
       </div>
 
       {!r ? (
-        <p data-testid="no-report" className="rounded border border-slate-700 p-3 text-sm text-slate-400">
+        <p data-testid="no-report" className="rounded border border-gray-700 p-3 text-sm text-gray-400">
           CORE has not reported yet. It sends this once CIPP is connected and CORE is running.
         </p>
       ) : (
         <>
-          <p data-testid="mode" className={`rounded border p-3 text-sm ${r.live ? "border-red-500/40 bg-red-500/10 text-red-200" : "border-slate-700 bg-slate-800/40 text-slate-200"}`}>
+          <p data-testid="mode" className={`rounded border p-3 text-sm ${r.live ? "border-red-500/40 bg-red-500/10 text-red-200" : "border-gray-700 bg-gray-800/40 text-gray-200"}`}>
             {modeSentence(r)}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-gray-500">
             CORE reported {ago(view.received_at)}.
             {stale && <span data-testid="stale" className="ml-1 text-amber-300">That is a while ago: CORE may not be running, so what is shown may be out of date.</span>}
           </p>
@@ -147,8 +147,8 @@ export function CippActions() {
             </p>
           )}
 
-          <section aria-label="Rules" className="space-y-1 text-sm text-slate-300">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rules</h2>
+          <section aria-label="Rules" className="space-y-1 text-sm text-gray-300">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Rules</h2>
             <p data-testid="would">{wouldSentence(r)}</p>
             <p data-testid="opted-in">
               Opted-in clients:{" "}
@@ -160,9 +160,9 @@ export function CippActions() {
           </section>
 
           <section aria-label="Allowed actions">
-            <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Allowed actions</h2>
+            <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Allowed actions</h2>
             <table className="w-full text-left text-sm" data-testid="allowlist">
-              <thead className="text-xs text-slate-500">
+              <thead className="text-xs text-gray-500">
                 <tr>
                   <th scope="col">Action</th>
                   <th scope="col">What it does</th>
@@ -172,11 +172,11 @@ export function CippActions() {
               </thead>
               <tbody>
                 {r.actions.map((a) => (
-                  <tr key={a.action} className="border-t border-slate-800 align-top">
+                  <tr key={a.action} className="border-t border-gray-800 align-top">
                     <td className="py-1.5 pr-3 font-mono text-xs">{a.action}</td>
-                    <td className="pr-3 text-slate-300">{a.summary}</td>
+                    <td className="pr-3 text-gray-300">{a.summary}</td>
                     <td className={`pr-3 ${RISK_CLASS[a.risk]}`}>{a.risk}</td>
-                    <td className="text-slate-400">{a.reversible ? "in one step" : "no"}</td>
+                    <td className="text-gray-400">{a.reversible ? "in one step" : "no"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -185,8 +185,8 @@ export function CippActions() {
 
           <section aria-label="Recent requests">
             <div className="mb-1 flex items-center gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent requests</h2>
-              <select aria-label="Outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)} className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Recent requests</h2>
+              <select aria-label="Outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)} className="rounded border border-gray-700 bg-gray-900 px-2 py-0.5 text-xs">
                 <option value="">All outcomes</option>
                 {(Object.keys(OUTCOMES) as AuditEntry["result"][]).map((k) => (
                   <option key={k} value={k}>
@@ -196,10 +196,10 @@ export function CippActions() {
               </select>
             </div>
             {rows.length === 0 ? (
-              <p className="text-sm text-slate-500">{r.audit.length === 0 ? "CORE has not been asked to do anything yet." : "No request has that outcome."}</p>
+              <p className="text-sm text-gray-500">{r.audit.length === 0 ? "CORE has not been asked to do anything yet." : "No request has that outcome."}</p>
             ) : (
               <table className="w-full text-left text-sm" data-testid="audit">
-                <thead className="text-xs text-slate-500">
+                <thead className="text-xs text-gray-500">
                   <tr>
                     <th scope="col">When</th>
                     <th scope="col">Action</th>
@@ -212,18 +212,18 @@ export function CippActions() {
                 </thead>
                 <tbody>
                   {rows.map((e, i) => (
-                    <tr key={`${e.at}-${i}`} className="border-t border-slate-800 align-top">
-                      <td className="py-1.5 pr-3 text-xs text-slate-400" suppressHydrationWarning>
+                    <tr key={`${e.at}-${i}`} className="border-t border-gray-800 align-top">
+                      <td className="py-1.5 pr-3 text-xs text-gray-400" suppressHydrationWarning>
                         {new Date(e.at).toLocaleString()}
                       </td>
                       <td className="pr-3 font-mono text-xs">{e.action}</td>
                       <td className="pr-3">{names[e.client_id] ?? e.client_id}</td>
-                      <td className="pr-3 text-slate-300">{e.user ?? ""}</td>
-                      <td className="pr-3 text-slate-400">{[e.actor, e.reason].filter(Boolean).join(": ")}</td>
+                      <td className="pr-3 text-gray-300">{e.user ?? ""}</td>
+                      <td className="pr-3 text-gray-400">{[e.actor, e.reason].filter(Boolean).join(": ")}</td>
                       <td className="pr-3">
                         <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${OUTCOMES[e.result].className}`}>{OUTCOMES[e.result].label}</span>
                       </td>
-                      <td className="text-xs text-slate-400">{noteFor(e)}</td>
+                      <td className="text-xs text-gray-400">{noteFor(e)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -101,8 +101,8 @@ function ChangesTable({ rows }: { rows: ScoredChange[] }) {
     <div className="space-y-2">
       <ClearFilters active={t.active} shown={t.shown.length} total={rows.length} onClear={t.clear} />
       <table className="w-full text-left text-sm">
-        <thead className="text-xs text-slate-500">
-          <tr className="border-b border-slate-700">
+        <thead className="text-xs text-gray-500">
+          <tr className="border-b border-gray-700">
             {CHANGE_COLUMNS.map((c) => (
               <SortableTh key={c.key} col={c} sort={t.sort} onSort={t.toggleSort} />
             ))}
@@ -112,26 +112,26 @@ function ChangesTable({ rows }: { rows: ScoredChange[] }) {
         <tbody>
           {t.shown.length === 0 && (
             <tr>
-              <td colSpan={CHANGE_COLUMNS.length} className="px-3 py-4 text-slate-500">
+              <td colSpan={CHANGE_COLUMNS.length} className="px-3 py-4 text-gray-500">
                 Nothing matches these filters.
               </td>
             </tr>
           )}
           {t.shown.map((r, i) => (
-            <tr key={`${r.client_id}-${r.actor}-${r.occurred_at}-${i}`} className="border-b border-slate-800" data-testid="change-row">
-              <td className="px-3 py-2 font-mono text-slate-200">{r.score.toFixed(2)}</td>
-              <td className="px-3 text-slate-200">
+            <tr key={`${r.client_id}-${r.actor}-${r.occurred_at}-${i}`} className="border-b border-gray-800" data-testid="change-row">
+              <td className="px-3 py-2 font-mono text-gray-200">{r.score.toFixed(2)}</td>
+              <td className="px-3 text-gray-200">
                 {r.actor}
-                {r.actor_is_app ? <span className="ml-1 text-slate-500">(app)</span> : null}
+                {r.actor_is_app ? <span className="ml-1 text-gray-500">(app)</span> : null}
               </td>
-              <td className={`px-3 ${r.success ? "text-slate-300" : "text-red-300"}`}>
+              <td className={`px-3 ${r.success ? "text-gray-300" : "text-red-300"}`}>
                 {r.activity}
                 {r.success ? "" : " (failed)"}
               </td>
-              <td className="px-3 text-slate-400">{r.target ?? "—"}</td>
-              <td className="max-w-xs px-3 text-xs text-slate-300" data-testid="change-detail">{r.detail ?? "—"}</td>
-              <td className="px-3 text-slate-400">{r.client_name ?? "This organization"}</td>
-              <td className="px-3 text-slate-400">{new Date(r.occurred_at).toLocaleString()}</td>
+              <td className="px-3 text-gray-400">{r.target ?? "—"}</td>
+              <td className="max-w-xs px-3 text-xs text-gray-300" data-testid="change-detail">{r.detail ?? "—"}</td>
+              <td className="px-3 text-gray-400">{r.client_name ?? "This organization"}</td>
+              <td className="px-3 text-gray-400">{new Date(r.occurred_at).toLocaleString()}</td>
             </tr>
           ))}
         </tbody>
@@ -161,11 +161,11 @@ function IdentityChanges({ days }: { days: number }) {
   }, [days]);
   return (
     <section className="space-y-2" data-testid="identity-changes">
-      <h2 className="text-lg font-semibold text-slate-100">Identity changes</h2>
-      <p className="text-sm text-slate-400">Role, group, password and security-method changes in Microsoft 365 that were flagged as unusual for whoever made them. Higher is more unusual.</p>
+      <h2 className="text-lg font-semibold text-gray-100">Identity changes</h2>
+      <p className="text-sm text-gray-400">Role, group, password and security-method changes in Microsoft 365 that were flagged as unusual for whoever made them. Higher is more unusual.</p>
       {error && <p className="text-sm text-red-300">{error}</p>}
-      {rows === null && !error && <p className="text-sm text-slate-500">Loading...</p>}
-      {rows !== null && rows.length === 0 && <p className="text-sm text-slate-400">No identity changes were flagged as unusual in this period.</p>}
+      {rows === null && !error && <p className="text-sm text-gray-500">Loading...</p>}
+      {rows !== null && rows.length === 0 && <p className="text-sm text-gray-400">No identity changes were flagged as unusual in this period.</p>}
       {rows !== null && rows.length > 0 && <ChangesTable rows={rows} />}
     </section>
   );
@@ -177,8 +177,8 @@ function SigninsTable({ rows }: { rows: ScoredSignin[] }) {
     <div className="space-y-2">
       <ClearFilters active={t.active} shown={t.shown.length} total={rows.length} onClear={t.clear} />
       <table className="w-full text-left text-sm">
-        <thead className="text-xs text-slate-500">
-          <tr className="border-b border-slate-700">
+        <thead className="text-xs text-gray-500">
+          <tr className="border-b border-gray-700">
             {SIGNIN_COLUMNS.map((c) => (
               <SortableTh key={c.key} col={c} sort={t.sort} onSort={t.toggleSort} />
             ))}
@@ -188,26 +188,26 @@ function SigninsTable({ rows }: { rows: ScoredSignin[] }) {
         <tbody>
           {t.shown.length === 0 && (
             <tr>
-              <td colSpan={SIGNIN_COLUMNS.length} className="px-3 py-4 text-slate-500">
+              <td colSpan={SIGNIN_COLUMNS.length} className="px-3 py-4 text-gray-500">
                 Nothing matches these filters.
               </td>
             </tr>
           )}
           {t.shown.map((r, i) => (
-            <tr key={`${r.client_id}-${r.user}-${r.occurred_at}-${i}`} className="border-b border-slate-800" data-testid="signin-row">
-              <td className="px-3 py-2 font-mono text-slate-200">{r.score.toFixed(2)}</td>
-              <td className="px-3 text-slate-200">{r.user}</td>
-              <td className="px-3 text-slate-400">{r.client_name ?? "This organization"}</td>
-              <td className="px-3 text-slate-400">{new Date(r.occurred_at).toLocaleString()}</td>
-              <td className="px-3 text-slate-400">
+            <tr key={`${r.client_id}-${r.user}-${r.occurred_at}-${i}`} className="border-b border-gray-800" data-testid="signin-row">
+              <td className="px-3 py-2 font-mono text-gray-200">{r.score.toFixed(2)}</td>
+              <td className="px-3 text-gray-200">{r.user}</td>
+              <td className="px-3 text-gray-400">{r.client_name ?? "This organization"}</td>
+              <td className="px-3 text-gray-400">{new Date(r.occurred_at).toLocaleString()}</td>
+              <td className="px-3 text-gray-400">
                 {placeLabel(r)}
-                {r.ip_address ? <span className="ml-1 font-mono text-slate-500">{r.ip_address}</span> : null}
+                {r.ip_address ? <span className="ml-1 font-mono text-gray-500">{r.ip_address}</span> : null}
               </td>
-              <td className={`px-3 ${regionLabel(r) === "Outside US" ? "text-amber-300" : "text-slate-400"}`} data-testid="signin-region">
+              <td className={`px-3 ${regionLabel(r) === "Outside US" ? "text-amber-300" : "text-gray-400"}`} data-testid="signin-region">
                 {regionLabel(r)}
               </td>
-              <td className="px-3 text-slate-400">{r.app ?? "—"}</td>
-              <td className={`px-3 ${r.success ? "text-slate-400" : "text-red-300"}`}>
+              <td className="px-3 text-gray-400">{r.app ?? "—"}</td>
+              <td className={`px-3 ${r.success ? "text-gray-400" : "text-red-300"}`}>
                 {r.success ? "Signed in" : "Failed"}
                 {r.mfa === false ? <span className="ml-1 text-amber-300">no MFA</span> : null}
                 {r.risk && r.risk !== "none" ? <span className="ml-1 text-amber-300">risk: {r.risk}</span> : null}
@@ -244,7 +244,7 @@ export function SigninScores() {
     <div className="space-y-4 p-6">
       <div>
         <h1 className="text-xl font-semibold text-gray-100">Sign-in scores</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-gray-400">
           The sign-ins the behaviour service flagged as unusual for that person, across clients (it keeps a score only for the ones it flags). Higher is more unusual. Nothing alerts on these yet; this is for judging them first.
         </p>
       </div>
@@ -255,7 +255,7 @@ export function SigninScores() {
             type="button"
             onClick={() => setDays(d)}
             aria-pressed={days === d}
-            className={`rounded border px-2 py-1 ${days === d ? "border-sky-500 text-sky-300" : "border-slate-700 text-slate-400"}`}
+            className={`rounded border px-2 py-1 ${days === d ? "border-sky-500 text-sky-300" : "border-gray-700 text-gray-400"}`}
           >
             {d === 1 ? "Last day" : `Last ${d} days`}
           </button>
@@ -266,9 +266,9 @@ export function SigninScores() {
           {error}
         </p>
       )}
-      {rows === null && !error && <p className="text-sm text-slate-500">Loading...</p>}
+      {rows === null && !error && <p className="text-sm text-gray-500">Loading...</p>}
       {rows !== null && rows.length === 0 && (
-        <p data-testid="none" className="text-sm text-slate-400">
+        <p data-testid="none" className="text-sm text-gray-400">
           No sign-ins were flagged as unusual in this period. That is normal while the service is still learning each person&apos;s usual pattern. Sign-ins arrive hourly through CORE once CIPP is connected and its tenants are mapped to clients.
         </p>
       )}

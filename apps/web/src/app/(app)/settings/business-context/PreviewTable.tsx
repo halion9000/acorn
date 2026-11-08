@@ -18,7 +18,7 @@ interface PreviewTableProps {
 export function PreviewTable({ rows }: PreviewTableProps) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-md border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-400">
+      <div className="rounded-md border border-gray-800 bg-gray-900/50 p-4 text-sm text-gray-400">
         No preview rows yet — click <em>Preview</em> to run the current
         YAML against a synthetic alert sample.
       </div>
@@ -26,9 +26,9 @@ export function PreviewTable({ rows }: PreviewTableProps) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-slate-800">
-      <table className="min-w-full divide-y divide-slate-800 text-sm">
-        <thead className="bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+    <div className="overflow-x-auto rounded-md border border-gray-800">
+      <table className="min-w-full divide-y divide-gray-800 text-sm">
+        <thead className="bg-gray-900/80 text-xs uppercase tracking-wide text-gray-400">
           <tr>
             <th className="px-3 py-2 text-left">Alert</th>
             <th className="px-3 py-2 text-left">Matched rules</th>
@@ -38,7 +38,7 @@ export function PreviewTable({ rows }: PreviewTableProps) {
             <th className="px-3 py-2" />
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-800 bg-slate-950/30 text-slate-200">
+        <tbody className="divide-y divide-gray-800 bg-gray-950/30 text-gray-200">
           {rows.map((row) => (
             <Row key={row.alert_id} row={row} />
           ))}
@@ -67,12 +67,12 @@ function Row({ row }: { row: PreviewRow }) {
               : undefined
         }
       >
-        <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-slate-300">
+        <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-gray-300">
           {row.alert_id}
         </td>
         <td className="px-3 py-2 text-xs">
           {row.matched_rule_ids.length === 0 ? (
-            <span className="text-slate-500">none</span>
+            <span className="text-gray-500">none</span>
           ) : (
             <div className="flex flex-wrap gap-1">
               {row.matched_rule_ids.map((id) => (
@@ -92,15 +92,15 @@ function Row({ row }: { row: PreviewRow }) {
           ) : row.changed ? (
             <span className="text-emerald-300">modified</span>
           ) : (
-            <span className="text-slate-500">unchanged</span>
+            <span className="text-gray-500">unchanged</span>
           )}
         </td>
         <td className="whitespace-nowrap px-3 py-2 text-xs">
-          <span className={sevChanged ? "text-emerald-200" : "text-slate-300"}>
+          <span className={sevChanged ? "text-emerald-200" : "text-gray-300"}>
             {sevBefore} → {sevAfter}
           </span>
         </td>
-        <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-300">
+        <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-300">
           {routed}
         </td>
         <td className="whitespace-nowrap px-3 py-2 text-right">
@@ -114,7 +114,7 @@ function Row({ row }: { row: PreviewRow }) {
         </td>
       </tr>
       {open ? (
-        <tr className="bg-slate-950/60">
+        <tr className="bg-gray-950/60">
           <td colSpan={6} className="px-3 py-3">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <DiffPane title="Before" payload={row.before} />
@@ -135,11 +135,11 @@ function DiffPane({
   payload: Record<string, unknown>;
 }) {
   return (
-    <div className="rounded border border-slate-800 bg-slate-900/60">
-      <div className="border-b border-slate-800 px-2 py-1 text-[11px] uppercase tracking-wide text-slate-500">
+    <div className="rounded border border-gray-800 bg-gray-900/60">
+      <div className="border-b border-gray-800 px-2 py-1 text-[11px] uppercase tracking-wide text-gray-500">
         {title}
       </div>
-      <pre className="max-h-64 overflow-auto px-2 py-2 text-xs leading-snug text-slate-200">
+      <pre className="max-h-64 overflow-auto px-2 py-2 text-xs leading-snug text-gray-200">
         {JSON.stringify(payload, null, 2)}
       </pre>
     </div>

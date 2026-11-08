@@ -40,13 +40,13 @@ export function LoginAbusePanel() {
   if (!data) return null;
   const locked = data.locked_addresses + data.locked_clients;
   return (
-    <div data-testid="login-abuse" className="text-sm text-slate-400">
+    <div data-testid="login-abuse" className="text-sm text-gray-400">
       <p className={locked > 0 ? "text-amber-300" : undefined}>
         Failed sign-ins in the last {data.window_minutes} minutes: {data.failures} from {data.clients} place{data.clients === 1 ? "" : "s"} against {data.addresses_tried} address{data.addresses_tried === 1 ? "" : "es"}
         {locked > 0 ? `; locked now: ${data.locked_addresses} address${data.locked_addresses === 1 ? "" : "es"}, ${data.locked_clients} place${data.locked_clients === 1 ? "" : "s"}` : ""}.
       </p>
       {data.busiest_clients.length > 0 && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-gray-500">
           Busiest: {data.busiest_clients.map((c) => `${c.client} (${c.failures})`).join(", ")}
         </p>
       )}

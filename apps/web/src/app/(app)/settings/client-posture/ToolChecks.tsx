@@ -149,13 +149,13 @@ function Comments({ clientId, check }: { clientId: string; check: string }) {
     };
   }, [clientId, check]);
   if (error) return <p className="mt-1 text-xs text-red-300">{error}</p>;
-  if (!rows) return <p className="mt-1 text-xs text-slate-500">Loading comments…</p>;
-  if (rows.length === 0) return <p className="mt-1 text-xs text-slate-500">No comments yet.</p>;
+  if (!rows) return <p className="mt-1 text-xs text-gray-500">Loading comments…</p>;
+  if (rows.length === 0) return <p className="mt-1 text-xs text-gray-500">No comments yet.</p>;
   return (
-    <ul className="mt-1 space-y-1 text-xs text-slate-300" data-testid={`comments-${check}`}>
+    <ul className="mt-1 space-y-1 text-xs text-gray-300" data-testid={`comments-${check}`}>
       {rows.map((c) => (
         <li key={c.id}>
-          <span className="text-slate-500">
+          <span className="text-gray-500">
             {day(c.created_at)} {c.author}:
           </span>{' '}
           {c.body}
@@ -184,10 +184,10 @@ function History({ clientId, check }: { clientId: string; check: string }) {
     };
   }, [clientId, check]);
   if (error) return <p className="mt-1 text-xs text-red-300">{error}</p>;
-  if (!rows) return <p className="mt-1 text-xs text-slate-500">Loading history…</p>;
-  if (rows.length === 0) return <p className="mt-1 text-xs text-slate-500">No history yet: A.C.O.R.N has seen this check only once.</p>;
+  if (!rows) return <p className="mt-1 text-xs text-gray-500">Loading history…</p>;
+  if (rows.length === 0) return <p className="mt-1 text-xs text-gray-500">No history yet: A.C.O.R.N has seen this check only once.</p>;
   return (
-    <ul className="mt-1 space-y-0.5 text-xs text-slate-400" data-testid={`history-${check}`}>
+    <ul className="mt-1 space-y-0.5 text-xs text-gray-400" data-testid={`history-${check}`}>
       {rows.map((r, i) => (
         <li key={`${r.observed_at}-${i}`}>
           {day(r.observed_at)}: {r.previous_status ? `${STATUS[r.previous_status]?.text ?? r.previous_status} → ` : 'first seen as '}
@@ -299,9 +299,9 @@ export function ToolChecks({
 
   return (
     <section data-testid={`${tool}-checks`}>
-      <h3 className="mb-2 text-sm uppercase text-slate-500">
+      <h3 className="mb-2 text-sm uppercase text-gray-500">
         {label}
-        {refreshedAt ? <span className="ml-2 text-xs normal-case text-slate-600">as of {new Date(refreshedAt).toLocaleDateString()}</span> : null}
+        {refreshedAt ? <span className="ml-2 text-xs normal-case text-gray-600">as of {new Date(refreshedAt).toLocaleDateString()}</span> : null}
         {stale ? (
           <span className="ml-2 rounded border border-amber-500/40 px-1.5 py-0.5 text-[11px] normal-case text-amber-300" data-testid={`${tool}-stale`}>
             not updated for over {STALE_HOURS} hours
@@ -317,19 +317,19 @@ export function ToolChecks({
         {shown.map((c) => {
           const st = STATUS[c.status] ?? STATUS.partly;
           return (
-            <div key={c.key} className={`rounded border p-2 ${c.accepted ? 'border-slate-800 opacity-80' : 'border-slate-800'}`} data-testid={`check-${c.key}`}>
-              <div className="text-xs uppercase text-slate-500">{checkTitle(c.key)}</div>
+            <div key={c.key} className={`rounded border p-2 ${c.accepted ? 'border-gray-800 opacity-80' : 'border-gray-800'}`} data-testid={`check-${c.key}`}>
+              <div className="text-xs uppercase text-gray-500">{checkTitle(c.key)}</div>
               <span className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[11px] ${st.className}`}>{st.text}</span>
               {c.accepted ? (
                 <span className="ml-1 inline-block rounded border border-sky-500/40 px-1.5 py-0.5 text-[11px] text-sky-300" data-testid={`accepted-${c.key}`}>
                   {c.accepted.not_applicable ? 'Not applicable' : `Accepted${c.accepted.expires_at ? ` until ${day(c.accepted.expires_at)}` : ''}`}
                 </span>
               ) : null}
-              {c.since ? <span className="ml-1 text-[11px] text-slate-600">since {day(c.since)}</span> : null}
-              <div className="mt-1 text-xs text-slate-400">{c.evidence}</div>
+              {c.since ? <span className="ml-1 text-[11px] text-gray-600">since {day(c.since)}</span> : null}
+              <div className="mt-1 text-xs text-gray-400">{c.evidence}</div>
               {c.accepted ? <div className="mt-1 text-xs text-sky-200/80">Reason: {c.accepted.reason}</div> : null}
               {c.owner ? (
-                <div className={`mt-1 text-xs ${c.overdue ? "text-red-300" : "text-slate-400"}`} data-testid={`owner-${c.key}`}>
+                <div className={`mt-1 text-xs ${c.overdue ? "text-red-300" : "text-gray-400"}`} data-testid={`owner-${c.key}`}>
                   Owner: {c.owner}
                   {c.due_date ? `, due ${c.due_date}` : ""}
                   {c.overdue ? " (overdue)" : ""}
@@ -337,55 +337,55 @@ export function ToolChecks({
               ) : null}
               <div className="mt-1 flex gap-3 text-[11px] print:hidden">
                 {c.items && c.items.length > 0 ? (
-                  <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setOpenItems(openItems === c.key ? null : c.key)}>
+                  <button type="button" className="text-gray-500 underline hover:text-gray-300" onClick={() => setOpenItems(openItems === c.key ? null : c.key)}>
                     {openItems === c.key ? 'Hide the list' : `Which ones (${c.items.length})`}
                   </button>
                 ) : null}
                 {CHECK_HELP[c.key] ? (
-                  <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setOpenHelp(openHelp === c.key ? null : c.key)}>
+                  <button type="button" className="text-gray-500 underline hover:text-gray-300" onClick={() => setOpenHelp(openHelp === c.key ? null : c.key)}>
                     {openHelp === c.key ? 'Hide' : 'What this means'}
                   </button>
                 ) : null}
               </div>
               {openItems === c.key && c.items ? (
-                <ul className="mt-1 max-h-40 list-disc space-y-0.5 overflow-y-auto pl-4 text-xs text-slate-400" data-testid={`items-${c.key}`}>
+                <ul className="mt-1 max-h-40 list-disc space-y-0.5 overflow-y-auto pl-4 text-xs text-gray-400" data-testid={`items-${c.key}`}>
                   {c.items.map((i) => (
                     <li key={i}>{i}</li>
                   ))}
                 </ul>
               ) : null}
               {openHelp === c.key && CHECK_HELP[c.key] ? (
-                <div className="mt-1 space-y-0.5 text-xs text-slate-400" data-testid={`help-${c.key}`}>
+                <div className="mt-1 space-y-0.5 text-xs text-gray-400" data-testid={`help-${c.key}`}>
                   <p>{CHECK_HELP[c.key].why}</p>
-                  <p className="text-slate-300">To fix: {CHECK_HELP[c.key].fix}</p>
+                  <p className="text-gray-300">To fix: {CHECK_HELP[c.key].fix}</p>
                 </div>
               ) : null}
               {clientId ? (
                 <div className="mt-1 flex gap-3 text-[11px] print:hidden">
                   {c.status !== 'met' || c.owner ? (
-                    <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void assign(c.key, c.owner)}>
+                    <button type="button" className="text-gray-500 underline hover:text-gray-300" onClick={() => void assign(c.key, c.owner)}>
                       {c.owner ? 'Change owner' : 'Assign'}
                     </button>
                   ) : null}
-                  <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setCommentsOf(commentsOf === c.key ? null : c.key)}>
+                  <button type="button" className="text-gray-500 underline hover:text-gray-300" onClick={() => setCommentsOf(commentsOf === c.key ? null : c.key)}>
                     {commentsOf === c.key ? 'Hide comments' : `Comments${c.comments ? ` (${c.comments})` : ''}`}
                   </button>
-                  <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void addComment(c.key)}>
+                  <button type="button" className="text-gray-500 underline hover:text-gray-300" onClick={() => void addComment(c.key)}>
                     Add comment
                   </button>
-                  <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => setOpenHistory(openHistory === c.key ? null : c.key)}>
+                  <button type="button" className="text-gray-500 underline hover:text-gray-300" onClick={() => setOpenHistory(openHistory === c.key ? null : c.key)}>
                     {openHistory === c.key ? 'Hide history' : 'History'}
                   </button>
                   {c.accepted ? (
-                    <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void unaccept(c.key)}>
+                    <button type="button" className="text-gray-500 underline hover:text-gray-300" onClick={() => void unaccept(c.key)}>
                       {c.accepted.not_applicable ? 'Applies after all' : 'Stop accepting'}
                     </button>
                   ) : c.status !== 'met' ? (
                     <>
-                      <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void accept(c.key)}>
+                      <button type="button" className="text-gray-500 underline hover:text-gray-300" onClick={() => void accept(c.key)}>
                         Accept this
                       </button>
-                      <button type="button" className="text-slate-500 underline hover:text-slate-300" onClick={() => void accept(c.key, true)}>
+                      <button type="button" className="text-gray-500 underline hover:text-gray-300" onClick={() => void accept(c.key, true)}>
                         Not applicable
                       </button>
                     </>

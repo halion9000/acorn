@@ -121,7 +121,7 @@ export function RuleBuilder({ onAppend }: RuleBuilderProps) {
   };
 
   return (
-    <div className="flex flex-col gap-3 text-sm text-slate-200">
+    <div className="flex flex-col gap-3 text-sm text-gray-200">
       <Field label="Rule ID">
         <input
           type="text"
@@ -151,8 +151,8 @@ export function RuleBuilder({ onAppend }: RuleBuilderProps) {
         />
       </Field>
 
-      <fieldset className="rounded border border-slate-700 p-2">
-        <legend className="px-1 text-xs uppercase tracking-wide text-slate-500">
+      <fieldset className="rounded border border-gray-700 p-2">
+        <legend className="px-1 text-xs uppercase tracking-wide text-gray-500">
           when
         </legend>
         <div className="flex flex-col gap-2">
@@ -197,8 +197,8 @@ export function RuleBuilder({ onAppend }: RuleBuilderProps) {
         </div>
       </fieldset>
 
-      <fieldset className="rounded border border-slate-700 p-2">
-        <legend className="px-1 text-xs uppercase tracking-wide text-slate-500">
+      <fieldset className="rounded border border-gray-700 p-2">
+        <legend className="px-1 text-xs uppercase tracking-wide text-gray-500">
           then
         </legend>
         <div className="flex flex-col gap-2">
@@ -234,7 +234,7 @@ export function RuleBuilder({ onAppend }: RuleBuilderProps) {
               className={inputCls}
             />
           </Field>
-          <label className="flex items-center gap-2 text-xs text-slate-300">
+          <label className="flex items-center gap-2 text-xs text-gray-300">
             <input
               type="checkbox"
               checked={suppress}
@@ -259,7 +259,7 @@ export function RuleBuilder({ onAppend }: RuleBuilderProps) {
       >
         Append rule to editor
       </button>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-gray-500">
         The snippet is appended verbatim. Use the editor to tweak it after.
       </p>
     </div>
@@ -273,7 +273,7 @@ interface FieldProps {
 
 function Field({ label, children }: FieldProps) {
   return (
-    <label className="flex flex-col gap-1 text-xs uppercase tracking-wide text-slate-500">
+    <label className="flex flex-col gap-1 text-xs uppercase tracking-wide text-gray-500">
       <span>{label}</span>
       {children}
     </label>
@@ -281,7 +281,7 @@ function Field({ label, children }: FieldProps) {
 }
 
 const inputCls =
-  "rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100 normal-case tracking-normal focus:border-indigo-500 focus:outline-none";
+  "rounded border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100 normal-case tracking-normal focus:border-indigo-500 focus:outline-none";
 
 /**
  * Quote a YAML scalar only when needed (contains special chars or whitespace).

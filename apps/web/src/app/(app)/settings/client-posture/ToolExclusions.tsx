@@ -81,14 +81,14 @@ export function ToolExclusions({ clientId, onLoaded, onChanged }: { clientId: st
   if (!loaded && !error) return null;
   return (
     <section aria-label="Tools this client does not use" className="print:hidden" data-testid="tool-exclusions">
-      <h3 className="mb-1 text-sm uppercase text-slate-500">Tools this client does not use</h3>
-      <p className="mb-2 text-xs text-slate-500">
+      <h3 className="mb-1 text-sm uppercase text-gray-500">Tools this client does not use</h3>
+      <p className="mb-2 text-xs text-gray-500">
         A ticked tool is never reported as missing for this client: not on the Devices page, not here, not in the fleet boards or the score, and its checks raise no alerts.
       </p>
       <ul className="flex flex-wrap gap-x-4 gap-y-1">
         {choices.map((tool) => (
           <li key={tool}>
-            <label className="flex items-center gap-2 text-sm text-slate-200">
+            <label className="flex items-center gap-2 text-sm text-gray-200">
               <input type="checkbox" checked={excluded.includes(tool)} disabled={saving} onChange={(e) => void change(tool, e.target.checked)} />
               {vendorLabel(tool)}
             </label>

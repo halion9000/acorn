@@ -156,7 +156,7 @@ export function PlatformHealth() {
           {error}
         </p>
       )}
-      {!snapshot && !error && <p className="text-sm text-slate-500">Checking the services...</p>}
+      {!snapshot && !error && <p className="text-sm text-gray-500">Checking the services...</p>}
       {snapshot && (
         <>
           <p className={snapshot.overall === "ok" ? "text-emerald-700" : "text-red-700"} data-testid="overall">
@@ -173,14 +173,14 @@ export function PlatformHealth() {
           {snapshot.database?.slow_queries && (
             <div data-testid="slow-queries">
               {!snapshot.database.slow_queries.available ? (
-                <p className="text-sm text-slate-500">{snapshot.database.slow_queries.note}</p>
+                <p className="text-sm text-gray-500">{snapshot.database.slow_queries.note}</p>
               ) : snapshot.database.slow_queries.queries.length === 0 ? (
-                <p className="text-sm text-slate-500">The database has not run any statement often enough yet to list the slow ones.</p>
+                <p className="text-sm text-gray-500">The database has not run any statement often enough yet to list the slow ones.</p>
               ) : (
-                <table className="w-full text-left text-xs text-slate-300">
-                  <caption className="pb-1 text-left text-sm text-slate-400">Database statements with the longest typical time (values are replaced by $1, $2)</caption>
+                <table className="w-full text-left text-xs text-gray-300">
+                  <caption className="pb-1 text-left text-sm text-gray-400">Database statements with the longest typical time (values are replaced by $1, $2)</caption>
                   <thead>
-                    <tr className="text-slate-500">
+                    <tr className="text-gray-500">
                       <th scope="col">Statement</th>
                       <th scope="col">Calls</th>
                       <th scope="col">Typical (s)</th>
@@ -202,7 +202,7 @@ export function PlatformHealth() {
             </div>
           )}
           {snapshot.database?.pool?.peak_last_hour && snapshot.database.pool.peak_last_hour.samples > 0 && (
-            <p data-testid="pool-peak" className={`text-sm ${(snapshot.database.pool.peak_last_hour.peak_percent ?? 0) >= 80 ? "text-red-300" : "text-slate-400"}`}>
+            <p data-testid="pool-peak" className={`text-sm ${(snapshot.database.pool.peak_last_hour.peak_percent ?? 0) >= 80 ? "text-red-300" : "text-gray-400"}`}>
               Database connections: busiest in the last hour was {snapshot.database.pool.peak_last_hour.peak_percent}% ({snapshot.database.pool.peak_last_hour.peak_in_use} of {snapshot.database.pool.peak_last_hour.peak_limit}),{" "}
               {agoLabel(snapshot.database.pool.peak_last_hour.peak_minutes_ago ?? null)}.
             </p>
@@ -214,25 +214,25 @@ export function PlatformHealth() {
             </p>
           )}
           {snapshot.migrations !== undefined && (
-            <p data-testid="migrations-line" className="text-sm text-slate-400">
+            <p data-testid="migrations-line" className="text-sm text-gray-400">
               {migrationsLabel(snapshot.migrations)}
             </p>
           )}
           {snapshot.runtime?.version && (
-            <p data-testid="running-version" className="text-sm text-slate-400">
+            <p data-testid="running-version" className="text-sm text-gray-400">
               {runningLabel(snapshot.runtime.version)}
             </p>
           )}
           {snapshot.runtime?.loop && snapshot.runtime.loop.samples > 0 && (
-            <p data-testid="loop-lag" className="text-sm text-slate-400">
+            <p data-testid="loop-lag" className="text-sm text-gray-400">
               The API&apos;s wake-up delay over the last {Math.round(snapshot.runtime.loop.window_seconds / 60)} minutes: typically {snapshot.runtime.loop.typical_seconds} s, worst {snapshot.runtime.loop.max_seconds} s.
             </p>
           )}
           {(snapshot.runtime?.slow_routes ?? []).length > 0 && (
-            <table data-testid="slow-routes" className="w-full text-left text-xs text-slate-300">
-              <caption className="pb-1 text-left text-sm text-slate-400">Routes that have taken the most time since the API started</caption>
+            <table data-testid="slow-routes" className="w-full text-left text-xs text-gray-300">
+              <caption className="pb-1 text-left text-sm text-gray-400">Routes that have taken the most time since the API started</caption>
               <thead>
-                <tr className="text-slate-500">
+                <tr className="text-gray-500">
                   <th scope="col">Route</th>
                   <th scope="col">Calls</th>
                   <th scope="col">Total (s)</th>
@@ -256,10 +256,10 @@ export function PlatformHealth() {
             </table>
           )}
           {(snapshot.runtime?.workers ?? []).length > 0 && (
-            <table data-testid="workers" className="w-full text-left text-xs text-slate-300">
-              <caption className="pb-1 text-left text-sm text-slate-400">Background work since the API started (the worst is first)</caption>
+            <table data-testid="workers" className="w-full text-left text-xs text-gray-300">
+              <caption className="pb-1 text-left text-sm text-gray-400">Background work since the API started (the worst is first)</caption>
               <thead>
-                <tr className="text-slate-500">
+                <tr className="text-gray-500">
                   <th scope="col">Worker</th>
                   <th scope="col">Runs every</th>
                   <th scope="col">Last pass</th>
@@ -274,7 +274,7 @@ export function PlatformHealth() {
                     <td>{Math.round(w.interval_seconds / 60) || 1} min</td>
                     <td>{w.seconds_since_pass === null ? "none yet" : `${Math.floor(w.seconds_since_pass / 60)} min ago`}</td>
                     <td>{w.passes}</td>
-                    <td data-testid={`worker-${w.name}`} className={w.status === "ok" || w.status === "waiting" ? "text-slate-300" : w.status === "failing" ? "text-amber-300" : "text-red-300"}>
+                    <td data-testid={`worker-${w.name}`} className={w.status === "ok" || w.status === "waiting" ? "text-gray-300" : w.status === "failing" ? "text-amber-300" : "text-red-300"}>
                       {workerLabel(w)}
                     </td>
                   </tr>
@@ -283,12 +283,12 @@ export function PlatformHealth() {
             </table>
           )}
           {(snapshot.feed_routes?.routes ?? []).length > 0 && (
-            <table data-testid="feed-routes" className="w-full text-left text-xs text-slate-300">
-              <caption className="pb-1 text-left text-sm text-slate-400">
+            <table data-testid="feed-routes" className="w-full text-left text-xs text-gray-300">
+              <caption className="pb-1 text-left text-sm text-gray-400">
                 When CORE last reported on each route (since the API started {agoLabel(snapshot.feed_routes?.since_minutes_ago ?? 0)}); the quietest is first
               </caption>
               <thead>
-                <tr className="text-slate-500">
+                <tr className="text-gray-500">
                   <th scope="col">Route</th>
                   <th scope="col">Last accepted</th>
                   <th scope="col">Accepted</th>
@@ -321,7 +321,7 @@ export function PlatformHealth() {
             </ul>
           )}
           {snapshot.core_feed?.silent && isRestarting(snapshot.core_feed.minutes_ago) && (
-            <p role="note" data-testid="core-restarting" className="rounded border border-slate-600 bg-slate-800/60 p-3 text-sm text-slate-300">
+            <p role="note" data-testid="core-restarting" className="rounded border border-gray-600 bg-gray-800/60 p-3 text-sm text-gray-300">
               CORE has been quiet for {snapshot.core_feed.minutes_ago} minutes. If it was just restarted, that is normal: its first round after a start can take about {RESTART_ROUND_MINUTES} minutes. If it is still silent after{" "}
               {RESTART_GRACE_MINUTES} minutes, check that CORE is running and can reach A.C.O.R.N.
             </p>
@@ -333,7 +333,7 @@ export function PlatformHealth() {
             </p>
           )}
           {snapshot.signins && (
-            <p data-testid="signins-line" className="text-sm text-slate-300">
+            <p data-testid="signins-line" className="text-sm text-gray-300">
               Sign-ins collected through CORE: {snapshot.signins.last_24h.toLocaleString()} in the last 24 hours from {snapshot.signins.users_last_24h.toLocaleString()} people,{" "}
               {snapshot.signins.scored_last_24h.toLocaleString()} scored for unusual behaviour
               {snapshot.signins.unscored > 0 ? `, ${snapshot.signins.unscored.toLocaleString()} waiting to be scored (is the behaviour service up?)` : ""}.
@@ -341,10 +341,10 @@ export function PlatformHealth() {
           )}
           {snapshot.device_feeds && snapshot.device_feeds.length > 0 && (
             <section aria-label="Device feeds" data-testid="device-feeds">
-              <h2 className="mb-1 text-sm font-medium text-slate-300">Device feeds</h2>
+              <h2 className="mb-1 text-sm font-medium text-gray-300">Device feeds</h2>
               <ul className="space-y-1 text-sm">
                 {snapshot.device_feeds.map((f) => (
-                  <li key={f.vendor} className={f.stalled ? "text-red-300" : "text-slate-300"}>
+                  <li key={f.vendor} className={f.stalled ? "text-red-300" : "text-gray-300"}>
                     <span className="font-medium">{f.vendor}</span>: {f.devices.toLocaleString()} devices, last synced {agoLabel(f.minutes_ago)}
                     {f.stalled ? " (nothing for hours: is CORE running, and is this tool's connector working?)" : ""}
                   </li>
@@ -354,7 +354,7 @@ export function PlatformHealth() {
           )}
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b text-slate-500">
+              <tr className="border-b text-gray-500">
                 <th className="py-2">Service</th>
                 <th>Status</th>
                 <th>Answered in</th>
@@ -365,9 +365,9 @@ export function PlatformHealth() {
               {snapshot.services.map((s) => (
                 <tr key={s.service} className="border-b">
                   <td className="py-2 font-medium">{s.service}</td>
-                  <td className={s.status === "up" ? "text-emerald-700" : s.status === "off" ? "text-slate-500" : "text-red-700"}>{s.status === "off" ? "off (not switched on)" : s.status}</td>
+                  <td className={s.status === "up" ? "text-emerald-700" : s.status === "off" ? "text-gray-500" : "text-red-700"}>{s.status === "off" ? "off (not switched on)" : s.status}</td>
                   <td>{s.latency_ms} ms</td>
-                  <td className="text-slate-500">{s.detail}</td>
+                  <td className="text-gray-500">{s.detail}</td>
                 </tr>
               ))}
             </tbody>

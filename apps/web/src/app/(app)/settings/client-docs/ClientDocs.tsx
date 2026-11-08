@@ -119,7 +119,7 @@ export function ClientDocs() {
     <div className="space-y-4 p-6">
       <div>
         <h1 className="text-xl font-semibold text-gray-100">Client documentation</h1>
-        <p className="mt-1 max-w-prose text-sm text-slate-400">
+        <p className="mt-1 max-w-prose text-sm text-gray-400">
           What IT Glue says about each client: documents, runbooks, configurations, locations and password entries. Search by a word, a question, or a client&apos;s name. Password entries show a link, never the password.
         </p>
         {summaryError !== null && (
@@ -128,7 +128,7 @@ export function ClientDocs() {
           </p>
         )}
         {summary !== null && (
-          <p data-testid="docs-summary" className="mt-1 text-xs text-slate-500">
+          <p data-testid="docs-summary" className="mt-1 text-xs text-gray-500">
             {summary.length === 0
               ? "Nothing has been read from IT Glue yet. CORE reads it once a day after IT Glue is connected and each organization is mapped to a client."
               : summaryLine(summary)}
@@ -143,10 +143,10 @@ export function ClientDocs() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="onboarding guide, firewall, Microsoft admin login…"
-          className="min-w-[18rem] flex-1 rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm"
+          className="min-w-[18rem] flex-1 rounded border border-gray-600 bg-gray-900 px-3 py-2 text-sm"
         />
         {clients.length > 0 && (
-          <select aria-label="Client" value={clientId} onChange={(e) => setClientId(e.target.value)} className="rounded border border-slate-600 bg-slate-900 px-2 py-2 text-sm">
+          <select aria-label="Client" value={clientId} onChange={(e) => setClientId(e.target.value)} className="rounded border border-gray-600 bg-gray-900 px-2 py-2 text-sm">
             <option value="">All clients</option>
             {clients.map((c) => (
               <option key={c.client_id} value={c.client_id}>
@@ -168,14 +168,14 @@ export function ClientDocs() {
 
       {hits !== null && !error && (
         <section aria-label="Results" data-testid="docs-results">
-          <p className="mb-2 text-sm text-slate-400">
+          <p className="mb-2 text-sm text-gray-400">
             {hits.length === 0 ? `Nothing in the documentation matches “${asked}”. It may not be documented, or not synced for that client yet.` : `${hits.length} best match${hits.length === 1 ? "" : "es"} for “${asked}”.`}
           </p>
           <ul className="space-y-3">
             {hits.map((h, i) => (
-              <li key={`${h.client_id}-${h.url ?? h.title}-${i}`} className="rounded-lg border border-slate-700 bg-slate-900/50 p-3">
+              <li key={`${h.client_id}-${h.url ?? h.title}-${i}`} className="rounded-lg border border-gray-700 bg-gray-900/50 p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-200">{h.automated ? "Automated inventory" : (KIND_LABELS[h.kind] ?? h.kind)}</span>
+                  <span className="rounded-full bg-gray-700 px-2 py-0.5 text-xs text-gray-200">{h.automated ? "Automated inventory" : (KIND_LABELS[h.kind] ?? h.kind)}</span>
                   {isHttps(h.url) ? (
                     <a href={h.url} target="_blank" rel="noreferrer" className="font-medium text-sky-300 hover:underline">
                       {h.title}
@@ -184,14 +184,14 @@ export function ClientDocs() {
                     <span className="font-medium">{h.title}</span>
                   )}
                 </div>
-                <p className="mt-0.5 text-xs text-slate-400">
+                <p className="mt-0.5 text-xs text-gray-400">
                   {[h.client, h.folder].filter(Boolean).join(" · ")}
                 </p>
                 {h.kind === "password" && (
                   <p className="mt-1 text-xs text-amber-200">The password is masked in IT Glue. Open the link to reveal it if you have access.</p>
                 )}
                 {h.snippet && (
-                  <p className={h.automated ? "mt-1 whitespace-pre-line text-xs text-slate-500" : "mt-1 whitespace-pre-line text-sm text-slate-300"}>
+                  <p className={h.automated ? "mt-1 whitespace-pre-line text-xs text-gray-500" : "mt-1 whitespace-pre-line text-sm text-gray-300"}>
                     {h.automated && h.snippet.length > AUTOMATED_SNIPPET_CHARS ? `${h.snippet.slice(0, AUTOMATED_SNIPPET_CHARS)}…` : h.snippet}
                   </p>
                 )}

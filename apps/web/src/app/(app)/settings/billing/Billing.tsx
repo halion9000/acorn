@@ -153,13 +153,13 @@ function useJson<T>(url: string | null): { data: T | null; error: string | null 
   return { data, error };
 }
 
-const changeClass = (c: number | null | undefined): string => (c === null || c === undefined || c === 0 ? "text-slate-500" : c > 0 ? "text-emerald-300" : "text-amber-300");
+const changeClass = (c: number | null | undefined): string => (c === null || c === undefined || c === 0 ? "text-gray-500" : c > 0 ? "text-emerald-300" : "text-amber-300");
 
 function DaysSelect({ days, onChange }: { days: number; onChange: (d: number) => void }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-slate-300">
+    <label className="flex items-center gap-2 text-sm text-gray-300">
       Compare with
-      <select value={days} onChange={(e) => onChange(Number(e.target.value))} className="rounded border border-slate-700 bg-slate-900 px-2 py-1" aria-label="Days">
+      <select value={days} onChange={(e) => onChange(Number(e.target.value))} className="rounded border border-gray-700 bg-gray-900 px-2 py-1" aria-label="Days">
         <option value={7}>7 days ago</option>
         <option value={30}>30 days ago</option>
         <option value={90}>90 days ago</option>
@@ -176,17 +176,17 @@ function Totals() {
       <div className="flex items-center gap-4 print:hidden">
         <DaysSelect days={days} onChange={setDays} />
         {data && data.rows.length > 0 ? (
-          <button type="button" className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200" onClick={() => download(`license-totals-${days}d.csv`, totalsCsv(data.rows, days))}>
+          <button type="button" className="rounded border border-gray-600 px-3 py-1 text-sm text-gray-200" onClick={() => download(`license-totals-${days}d.csv`, totalsCsv(data.rows, days))}>
             Download CSV
           </button>
         ) : null}
       </div>
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-      {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
-      {data && data.rows.length === 0 && <p className="text-sm text-slate-400">No counts yet. CORE sends them once a day for each client that is mapped to a tool.</p>}
+      {!data && !error && <p className="text-sm text-gray-500">Loading…</p>}
+      {data && data.rows.length === 0 && <p className="text-sm text-gray-400">No counts yet. CORE sends them once a day for each client that is mapped to a tool.</p>}
       {data && data.rows.length > 0 && (
         <table className="w-full text-left text-sm" data-testid="billing-totals">
-          <thead className="text-xs uppercase text-slate-500">
+          <thead className="text-xs uppercase text-gray-500">
             <tr>
               <th scope="col" className="py-1 pr-3">Tool</th>
               <th scope="col" className="pr-3">Item</th>
@@ -198,7 +198,7 @@ function Totals() {
           </thead>
           <tbody>
             {data.rows.map((r) => (
-              <tr key={`${r.source}:${r.item}`} className="border-t border-slate-800 text-slate-300">
+              <tr key={`${r.source}:${r.item}`} className="border-t border-gray-800 text-gray-300">
                 <td className="py-1 pr-3">{toolName(r.source)}</td>
                 <td className="pr-3">{r.item}</td>
                 <td className="pr-3">{r.clients}</td>
@@ -236,14 +236,14 @@ export function sparkPoints(points: SeriesPoint[], width: number, height: number
 function Trend({ clientId, source, item, days }: { clientId: string; source: string; item: string; days: number }) {
   const { data, error } = useJson<{ points: SeriesPoint[]; forecast_30d?: number | null }>(`/api/v1/billing/clients/${encodeURIComponent(clientId)}/history?source=${encodeURIComponent(source)}&item=${encodeURIComponent(item)}&days=${Math.max(days, 90)}`);
   if (error) return <span role="alert" className="text-xs text-red-300">{error}</span>;
-  if (!data) return <span className="text-xs text-slate-500">Loading…</span>;
+  if (!data) return <span className="text-xs text-gray-500">Loading…</span>;
   const counts = data.points.map((p) => p.count);
   return (
     <div className="flex items-center gap-3" data-testid="billing-trend">
       <svg width={240} height={48} viewBox="0 0 240 48" role="img" aria-label={`${item} over time`}>
         <polyline fill="none" stroke="currentColor" strokeWidth={2} className="text-sky-400" points={sparkPoints(data.points, 236, 44)} transform="translate(2 2)" />
       </svg>
-      <span className="text-xs text-slate-400">
+      <span className="text-xs text-gray-400">
         {Math.min(...counts)} to {Math.max(...counts)} over {Math.max(days, 90)} days
         {data.forecast_30d != null ? `; heading for about ${data.forecast_30d} in 30 days` : ""}
       </span>
@@ -277,9 +277,9 @@ function ByClient() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-4 print:hidden">
-        <label className="flex items-center gap-2 text-sm text-slate-300">
+        <label className="flex items-center gap-2 text-sm text-gray-300">
           Client
-          <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="rounded border border-slate-700 bg-slate-900 px-2 py-1" aria-label="Client">
+          <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="rounded border border-gray-700 bg-gray-900 px-2 py-1" aria-label="Client">
             <option value="">Pick a client</option>
             {(clients ?? []).map((c) => (
               <option key={c.id} value={c.id}>
@@ -290,16 +290,16 @@ function ByClient() {
         </label>
         <DaysSelect days={days} onChange={setDays} />
         {data && data.rows.length > 0 ? (
-          <button type="button" className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200" onClick={() => download(`${name || "client"}-licenses.csv`, clientCsv(data.rows, name, days))}>
+          <button type="button" className="rounded border border-gray-600 px-3 py-1 text-sm text-gray-200" onClick={() => download(`${name || "client"}-licenses.csv`, clientCsv(data.rows, name, days))}>
             Download CSV
           </button>
         ) : null}
       </div>
       {(error || loadError) && <p role="alert" className="text-sm text-red-300">{error ?? loadError}</p>}
-      {clientId && data && data.rows.length === 0 && <p className="text-sm text-slate-400">No counts for this client yet. It needs to be mapped to a tool CORE reads.</p>}
+      {clientId && data && data.rows.length === 0 && <p className="text-sm text-gray-400">No counts for this client yet. It needs to be mapped to a tool CORE reads.</p>}
       {data && data.rows.length > 0 && (
         <table className="w-full text-left text-sm" data-testid="billing-client">
-          <thead className="text-xs uppercase text-slate-500">
+          <thead className="text-xs uppercase text-gray-500">
             <tr>
               <th scope="col" className="py-1 pr-3">Tool</th>
               <th scope="col" className="pr-3">Item</th>
@@ -315,21 +315,21 @@ function ByClient() {
               const key = `${r.source}:${r.item}`;
               return (
                 <Fragment key={key}>
-                  <tr className="border-t border-slate-800 text-slate-300">
+                  <tr className="border-t border-gray-800 text-gray-300">
                     <td className="py-1 pr-3">{toolName(r.source)}</td>
                     <td className="pr-3">{r.item}</td>
                     <td className="pr-3 font-medium">{r.count}</td>
                     <td className="pr-3">{r.available ?? "—"}</td>
                     <td className={`pr-3 ${changeClass(r.change)}`}>{changeText(r.change)}</td>
-                    <td className="pr-3 text-xs text-slate-500">{new Date(r.first_seen_at).toLocaleDateString()}</td>
+                    <td className="pr-3 text-xs text-gray-500">{new Date(r.first_seen_at).toLocaleDateString()}</td>
                     <td className="print:hidden">
-                      <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300" onClick={() => setTrendOf(trendOf === key ? null : key)}>
+                      <button type="button" className="text-xs text-gray-500 underline hover:text-gray-300" onClick={() => setTrendOf(trendOf === key ? null : key)}>
                         {trendOf === key ? "Hide trend" : "Trend"}
                       </button>
                     </td>
                   </tr>
                   {trendOf === key ? (
-                    <tr className="text-slate-300">
+                    <tr className="text-gray-300">
                       <td colSpan={7} className="pb-2">
                         <Trend clientId={clientId} source={r.source} item={r.item} days={days} />
                       </td>
@@ -414,15 +414,15 @@ function Reconcile() {
   };
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-400">Each invoice line HaloPSA bills, against the tool counts it is mapped to. Only mapped lines are compared; map more under Invoice mapping.</p>
+      <p className="text-sm text-gray-400">Each invoice line HaloPSA bills, against the tool counts it is mapped to. Only mapped lines are compared; map more under Invoice mapping.</p>
       {(error || problem) && <p role="alert" className="text-sm text-red-300">{error ?? problem}</p>}
-      {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
-      {data && data.rows.some((r) => r.note_state === "accepted") && <p className="text-xs text-slate-500" data-testid="billing-accepted-count">{data.rows.filter((r) => r.note_state === "accepted").length} difference(s) accepted with a reason; {data.rows.filter((r) => r.note_state !== "accepted").length} still to look at.</p>}
+      {!data && !error && <p className="text-sm text-gray-500">Loading…</p>}
+      {data && data.rows.some((r) => r.note_state === "accepted") && <p className="text-xs text-gray-500" data-testid="billing-accepted-count">{data.rows.filter((r) => r.note_state === "accepted").length} difference(s) accepted with a reason; {data.rows.filter((r) => r.note_state !== "accepted").length} still to look at.</p>}
       {data && data.unmapped_lines > 0 && <p className="text-xs text-amber-300">{data.unmapped_lines} billed line{data.unmapped_lines === 1 ? "" : "s"} left out because nobody has mapped {data.unmapped_lines === 1 ? "it" : "them"} yet.</p>}
       {all && all.rows.length > 0 && (
-        <label className="flex items-center gap-2 text-sm text-slate-300 print:hidden">
+        <label className="flex items-center gap-2 text-sm text-gray-300 print:hidden">
           Show lines that have disagreed for
-          <select value={minDays} onChange={(e) => setMinDays(Number(e.target.value))} aria-label="Disagreed for at least" className="rounded border border-slate-700 bg-slate-900 px-2 py-1">
+          <select value={minDays} onChange={(e) => setMinDays(Number(e.target.value))} aria-label="Disagreed for at least" className="rounded border border-gray-700 bg-gray-900 px-2 py-1">
             <option value={0}>any length of time</option>
             <option value={7}>7 days or more</option>
             <option value={14}>14 days or more</option>
@@ -430,15 +430,15 @@ function Reconcile() {
           </select>
         </label>
       )}
-      {data && data.rows.length === 0 && <p className="text-sm text-slate-400">{minDays > 0 ? "No line has disagreed that long." : "Nothing disagrees."}</p>}
+      {data && data.rows.length === 0 && <p className="text-sm text-gray-400">{minDays > 0 ? "No line has disagreed that long." : "Nothing disagrees."}</p>}
       {data && data.rows.length > 0 && (
-        <button type="button" className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 print:hidden" onClick={() => download("true-up.csv", trueUpCsv(data.rows))}>
+        <button type="button" className="rounded border border-gray-600 px-3 py-1 text-sm text-gray-200 print:hidden" onClick={() => download("true-up.csv", trueUpCsv(data.rows))}>
           Download true-up list (CSV)
         </button>
       )}
       {data && data.rows.length > 0 && (
         <table className="w-full text-left text-sm" data-testid="billing-reconcile">
-          <thead className="text-xs uppercase text-slate-500">
+          <thead className="text-xs uppercase text-gray-500">
             <tr>
               <th scope="col" className="py-1 pr-3">Client</th>
               <th scope="col" className="pr-3">Invoice line</th>
@@ -450,27 +450,27 @@ function Reconcile() {
           </thead>
           <tbody>
             {data.rows.map((r) => (
-              <tr key={`${r.client_id}:${r.invoice_item}`} className={`border-t border-slate-800 text-slate-300 ${r.note_state === "accepted" ? "opacity-60" : ""}`}>
+              <tr key={`${r.client_id}:${r.invoice_item}`} className={`border-t border-gray-800 text-gray-300 ${r.note_state === "accepted" ? "opacity-60" : ""}`}>
                 <td className="py-1 pr-3">{r.client_name}</td>
                 <td className="pr-3">
                   {r.invoice_item}
-                  <div className="text-xs text-slate-500">{r.parts.map((p) => `${toolName(p.source)} ${p.item}: ${p.count}`).join("; ")}</div>
+                  <div className="text-xs text-gray-500">{r.parts.map((p) => `${toolName(p.source)} ${p.item}: ${p.count}`).join("; ")}</div>
                 </td>
                 <td className="pr-3">{r.billed}</td>
                 <td className="pr-3">{r.counted}</td>
                 <td className={`pr-3 ${r.difference > 0 ? "text-amber-300" : "text-sky-300"}`}>
                   {differenceText(r.difference)}
-                  {disagreedText(r) ? <div className="text-xs text-slate-500" data-testid={`age-${r.client_id}-${r.invoice_item}`}>{disagreedText(r)}</div> : null}
-                  {r.note_state === "accepted" ? <div className="text-xs text-slate-400" data-testid={`note-${r.client_id}-${r.invoice_item}`}>Accepted: {r.note}</div> : null}
+                  {disagreedText(r) ? <div className="text-xs text-gray-500" data-testid={`age-${r.client_id}-${r.invoice_item}`}>{disagreedText(r)}</div> : null}
+                  {r.note_state === "accepted" ? <div className="text-xs text-gray-400" data-testid={`note-${r.client_id}-${r.invoice_item}`}>Accepted: {r.note}</div> : null}
                   {r.note_state === "stale" ? <div className="text-xs text-red-300">The note (&quot;{r.note}&quot;) was for a different difference.</div> : null}
                 </td>
                 <td className="print:hidden">
                   {r.note_state === "accepted" ? (
-                    <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300" onClick={() => void stopAccepting(r)}>
+                    <button type="button" className="text-xs text-gray-500 underline hover:text-gray-300" onClick={() => void stopAccepting(r)}>
                       Stop accepting
                     </button>
                   ) : (
-                    <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300" onClick={() => void accept(r)}>
+                    <button type="button" className="text-xs text-gray-500 underline hover:text-gray-300" onClick={() => void accept(r)}>
                       Accept
                     </button>
                   )}
@@ -547,28 +547,28 @@ function Mapping() {
   };
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-400">Say which tool counts each invoice line should equal. A suggestion is a guess from the line&apos;s name: use it only if it is right. For a line with no suggestion, pick the tool count yourself. A flat fee or a service no tool here reads can be marked &quot;No tool counts this&quot;, so it stops waiting to be mapped.</p>
-      <label className="flex items-center gap-2 text-xs text-slate-400 print:hidden">
+      <p className="text-sm text-gray-400">Say which tool counts each invoice line should equal. A suggestion is a guess from the line&apos;s name: use it only if it is right. For a line with no suggestion, pick the tool count yourself. A flat fee or a service no tool here reads can be marked &quot;No tool counts this&quot;, so it stops waiting to be mapped.</p>
+      <label className="flex items-center gap-2 text-xs text-gray-400 print:hidden">
         Find a tool count
-        <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="for example Meraki or Huntress" aria-label="Find a tool count" className="w-64 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-200" />
+        <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="for example Meraki or Huntress" aria-label="Find a tool count" className="w-64 rounded border border-gray-700 bg-gray-900 px-2 py-1 text-gray-200" />
       </label>
       {(error || problem) && <p role="alert" className="text-sm text-red-300">{error ?? problem}</p>}
-      {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
+      {!data && !error && <p className="text-sm text-gray-500">Loading…</p>}
       {data && (
         <>
           <section>
-            <h3 className="mb-1 text-sm uppercase text-slate-500">Mapped</h3>
+            <h3 className="mb-1 text-sm uppercase text-gray-500">Mapped</h3>
             {(data.mapped ?? []).length === 0 ? (
-              <p className="text-sm text-slate-400">Nothing is mapped yet.</p>
+              <p className="text-sm text-gray-400">Nothing is mapped yet.</p>
             ) : (
               <table className="w-full text-left text-sm" data-testid="mapped-lines">
                 <tbody>
                   {(data.mapped ?? []).map((m) => (
-                    <tr key={m.invoice_item} className="border-t border-slate-800 text-slate-300">
+                    <tr key={m.invoice_item} className="border-t border-gray-800 text-gray-300">
                       <td className="py-1 pr-3">{m.invoice_item}</td>
-                      <td className="pr-3 text-xs text-slate-400">{m.counted.length === 0 ? <span className="italic text-slate-500">No tool counts this</span> : m.counted.map((c) => `${toolName(c.source)} ${c.item}`).join(" + ")}</td>
+                      <td className="pr-3 text-xs text-gray-400">{m.counted.length === 0 ? <span className="italic text-gray-500">No tool counts this</span> : m.counted.map((c) => `${toolName(c.source)} ${c.item}`).join(" + ")}</td>
                       <td>
-                        <button type="button" className="text-xs text-slate-500 underline hover:text-slate-300" onClick={() => void remove(m.invoice_item)}>
+                        <button type="button" className="text-xs text-gray-500 underline hover:text-gray-300" onClick={() => void remove(m.invoice_item)}>
                           Remove
                         </button>
                       </td>
@@ -580,7 +580,7 @@ function Mapping() {
           </section>
           <section>
             <div className="mb-1 flex items-center justify-between gap-3">
-              <h3 className="text-sm uppercase text-slate-500">Billed lines still to map</h3>
+              <h3 className="text-sm uppercase text-gray-500">Billed lines still to map</h3>
               <span className="flex gap-2 print:hidden">
                 {sure.length > 0 ? (
                   <button type="button" className="rounded border border-emerald-500/50 px-2 py-0.5 text-xs text-emerald-200" onClick={() => void applyAll(sure)}>
@@ -595,15 +595,15 @@ function Mapping() {
               </span>
             </div>
             {(data.unmapped ?? []).length === 0 ? (
-              <p className="text-sm text-slate-400">Every billed line is mapped.</p>
+              <p className="text-sm text-gray-400">Every billed line is mapped.</p>
             ) : (
               <table className="w-full text-left text-sm" data-testid="unmapped-lines">
                 <tbody>
                   {(data.unmapped ?? []).map((u) => (
-                    <tr key={u.invoice_item} className="border-t border-slate-800 text-slate-300">
+                    <tr key={u.invoice_item} className="border-t border-gray-800 text-gray-300">
                       <td className="py-1 pr-3">{u.invoice_item}</td>
-                      <td className="pr-3 text-xs text-slate-500">{u.clients} clients</td>
-                      <td className="pr-3 text-xs text-slate-400">
+                      <td className="pr-3 text-xs text-gray-500">{u.clients} clients</td>
+                      <td className="pr-3 text-xs text-gray-400">
                         {u.suggestion.length > 0 ? u.suggestion.map((c) => `${toolName(c.source)} ${c.item}`).join(" + ") : "no suggestion"}
                         {u.suggestion.length > 0 && u.confidence ? <span className={`ml-2 rounded border px-1 ${u.confidence === "high" ? "border-emerald-500/40 text-emerald-300" : u.confidence === "medium" ? "border-amber-500/40 text-amber-300" : "border-red-500/40 text-red-300"}`}>{u.confidence}</span> : null}
                       </td>
@@ -617,7 +617,7 @@ function Mapping() {
                           {/* The picker is on every row: a suggestion is a guess, and when it is wrong the person must be able to choose the right count. */}
                           <select
                             aria-label={`Map ${u.invoice_item} to`}
-                            className="max-w-[16rem] rounded border border-slate-700 bg-slate-900 px-1 py-0.5 text-xs text-slate-300"
+                            className="max-w-[16rem] rounded border border-gray-700 bg-gray-900 px-1 py-0.5 text-xs text-gray-300"
                             value=""
                             onChange={(e) => {
                               if (e.target.value === NO_TOOL) return void save(u.invoice_item, []);
@@ -657,27 +657,27 @@ function Changes() {
   const { data, error } = useJson<ChangeRow[]>(`/api/v1/billing/changes?days=${days}${only ? `&source=${encodeURIComponent(only)}` : ""}`);
   return (
     <div className="space-y-3">
-      <label className="flex items-center gap-2 text-sm text-slate-300 print:hidden">
+      <label className="flex items-center gap-2 text-sm text-gray-300 print:hidden">
         Last
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="rounded border border-slate-700 bg-slate-900 px-2 py-1" aria-label="Days">
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="rounded border border-gray-700 bg-gray-900 px-2 py-1" aria-label="Days">
           <option value={7}>7 days</option>
           <option value={30}>30 days</option>
           <option value={90}>90 days</option>
         </select>
       </label>
-      <label className="flex items-center gap-2 text-sm text-slate-300 print:hidden">
+      <label className="flex items-center gap-2 text-sm text-gray-300 print:hidden">
         Show
-        <select value={only} onChange={(e) => setOnly(e.target.value)} className="rounded border border-slate-700 bg-slate-900 px-2 py-1" aria-label="Which changes">
+        <select value={only} onChange={(e) => setOnly(e.target.value)} className="rounded border border-gray-700 bg-gray-900 px-2 py-1" aria-label="Which changes">
           <option value="">Every tool</option>
           <option value="halopsa">What was billed (invoice corrections)</option>
         </select>
       </label>
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-      {!data && !error && <p className="text-sm text-slate-500">Loading…</p>}
-      {data && data.length === 0 && <p className="text-sm text-slate-400">No count changed in that time.</p>}
+      {!data && !error && <p className="text-sm text-gray-500">Loading…</p>}
+      {data && data.length === 0 && <p className="text-sm text-gray-400">No count changed in that time.</p>}
       {data && data.length > 0 && (
         <table className="w-full text-left text-sm" data-testid="billing-changes">
-          <thead className="text-xs uppercase text-slate-500">
+          <thead className="text-xs uppercase text-gray-500">
             <tr>
               <th scope="col" className="py-1 pr-3">When</th>
               <th scope="col" className="pr-3">Client</th>
@@ -688,8 +688,8 @@ function Changes() {
           </thead>
           <tbody>
             {data.map((c, i) => (
-              <tr key={`${c.client_id}:${c.source}:${c.item}:${i}`} className="border-t border-slate-800 text-slate-300">
-                <td className="py-1 pr-3 text-xs text-slate-500">{new Date(c.observed_at).toLocaleString()}</td>
+              <tr key={`${c.client_id}:${c.source}:${c.item}:${i}`} className="border-t border-gray-800 text-gray-300">
+                <td className="py-1 pr-3 text-xs text-gray-500">{new Date(c.observed_at).toLocaleString()}</td>
                 <td className="pr-3">{c.client_name}</td>
                 <td className="pr-3">{toolName(c.source)}</td>
                 <td className="pr-3">{c.item}</td>
@@ -718,13 +718,13 @@ function DataQuality() {
     <div className="space-y-6">
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-200">Tools that count different machines than NinjaOne</h2>
-        <p className="text-sm text-slate-400">A security tool whose count for a client is at least three machines and a fifth away from what NinjaOne manages. A tool with no count for the client is not listed here.</p>
-        {!quality.data && !quality.error && <p className="text-sm text-slate-500">Loading…</p>}
-        {quality.data && quality.data.rows.length === 0 && <p className="text-sm text-slate-400">No tool disagrees with NinjaOne.</p>}
+        <h2 className="text-sm font-semibold text-gray-200">Tools that count different machines than NinjaOne</h2>
+        <p className="text-sm text-gray-400">A security tool whose count for a client is at least three machines and a fifth away from what NinjaOne manages. A tool with no count for the client is not listed here.</p>
+        {!quality.data && !quality.error && <p className="text-sm text-gray-500">Loading…</p>}
+        {quality.data && quality.data.rows.length === 0 && <p className="text-sm text-gray-400">No tool disagrees with NinjaOne.</p>}
         {quality.data && quality.data.rows.length > 0 && (
           <table className="w-full text-left text-sm" data-testid="billing-disagree">
-            <thead className="text-xs uppercase text-slate-500">
+            <thead className="text-xs uppercase text-gray-500">
               <tr>
                 <th scope="col" className="py-1 pr-3">Client</th>
                 <th scope="col" className="pr-3">Tool</th>
@@ -735,7 +735,7 @@ function DataQuality() {
             </thead>
             <tbody>
               {quality.data.rows.map((r) => (
-                <tr key={`${r.client_id}:${r.tool}`} className="border-t border-slate-800 text-slate-300">
+                <tr key={`${r.client_id}:${r.tool}`} className="border-t border-gray-800 text-gray-300">
                   <td className="py-1 pr-3">{r.client_name}</td>
                   <td className="pr-3">{toolName(r.tool)}</td>
                   <td className="pr-3">{r.tool_count}</td>
@@ -749,9 +749,9 @@ function DataQuality() {
       </section>
       {quality.data && (quality.data.unbilled ?? []).length > 0 && (
         <section className="space-y-2" data-testid="billing-unbilled">
-          <h2 className="text-sm font-semibold text-slate-200">Counted but never billed</h2>
-          <p className="text-sm text-slate-400">NinjaOne manages machines for these clients, but HaloPSA has no billed line for them at all.</p>
-          <ul className="space-y-1 text-sm text-slate-300">
+          <h2 className="text-sm font-semibold text-gray-200">Counted but never billed</h2>
+          <p className="text-sm text-gray-400">NinjaOne manages machines for these clients, but HaloPSA has no billed line for them at all.</p>
+          <ul className="space-y-1 text-sm text-gray-300">
             {(quality.data.unbilled ?? []).map((u) => (
               <li key={u.client_id}>
                 {u.client_name}: {u.baseline_count} machine{u.baseline_count === 1 ? "" : "s"}
@@ -761,19 +761,19 @@ function DataQuality() {
         </section>
       )}
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-200">Tools with clients but no counts</h2>
-        <p className="text-sm text-slate-400">These tools have clients mapped to them but have never stored a count. Some count nothing by design (a detection feed); a tool that should count and is listed here needs a look.</p>
-        {quality.data && (quality.data.no_counts ?? []).length === 0 && <p className="text-sm text-slate-400">Every mapped tool has stored counts.</p>}
-        {quality.data && (quality.data.no_counts ?? []).length > 0 && <p className="text-sm text-slate-300" data-testid="billing-no-counts">{(quality.data.no_counts ?? []).map(toolName).join(', ')}</p>}
+        <h2 className="text-sm font-semibold text-gray-200">Tools with clients but no counts</h2>
+        <p className="text-sm text-gray-400">These tools have clients mapped to them but have never stored a count. Some count nothing by design (a detection feed); a tool that should count and is listed here needs a look.</p>
+        {quality.data && (quality.data.no_counts ?? []).length === 0 && <p className="text-sm text-gray-400">Every mapped tool has stored counts.</p>}
+        {quality.data && (quality.data.no_counts ?? []).length > 0 && <p className="text-sm text-gray-300" data-testid="billing-no-counts">{(quality.data.no_counts ?? []).map(toolName).join(', ')}</p>}
       </section>
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-200">Tools that stopped reporting</h2>
-        <p className="text-sm text-slate-400">No count from the tool for the client in more than two days: a stopped feed, a removed mapping or lost access.</p>
-        {!silent.data && !silent.error && <p className="text-sm text-slate-500">Loading…</p>}
-        {silent.data && silent.data.length === 0 && <p className="text-sm text-slate-400">Every tool reported in the last two days.</p>}
+        <h2 className="text-sm font-semibold text-gray-200">Tools that stopped reporting</h2>
+        <p className="text-sm text-gray-400">No count from the tool for the client in more than two days: a stopped feed, a removed mapping or lost access.</p>
+        {!silent.data && !silent.error && <p className="text-sm text-gray-500">Loading…</p>}
+        {silent.data && silent.data.length === 0 && <p className="text-sm text-gray-400">Every tool reported in the last two days.</p>}
         {silent.data && silent.data.length > 0 && (
           <table className="w-full text-left text-sm" data-testid="billing-silent">
-            <thead className="text-xs uppercase text-slate-500">
+            <thead className="text-xs uppercase text-gray-500">
               <tr>
                 <th scope="col" className="py-1 pr-3">Client</th>
                 <th scope="col" className="pr-3">Tool</th>
@@ -782,7 +782,7 @@ function DataQuality() {
             </thead>
             <tbody>
               {silent.data.map((r) => (
-                <tr key={`${r.client_id}:${r.source}`} className="border-t border-slate-800 text-slate-300">
+                <tr key={`${r.client_id}:${r.source}`} className="border-t border-gray-800 text-gray-300">
                   <td className="py-1 pr-3">{r.client_name}</td>
                   <td className="pr-3">{toolName(r.source)}</td>
                   <td className="text-amber-300">{r.days_ago} days ago</td>
@@ -825,21 +825,21 @@ export function LicenceWaste() {
     <div className="space-y-3">
       {waste.error && <p role="alert" className="text-sm text-red-300">{waste.error}</p>}
       {exportError && <p role="alert" className="text-sm text-red-300">{exportError}</p>}
-      {!waste.data && !waste.error && <p className="text-sm text-slate-500">Loading…</p>}
+      {!waste.data && !waste.error && <p className="text-sm text-gray-500">Loading…</p>}
       {waste.data && (
         <>
-          <button type="button" onClick={() => void exportCsv()} className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100 hover:bg-slate-800">
+          <button type="button" onClick={() => void exportCsv()} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100 hover:bg-gray-800">
             Export CSV
           </button>
-          <p className="text-sm text-slate-300" data-testid="waste-summary">
+          <p className="text-sm text-gray-300" data-testid="waste-summary">
             {waste.data.total_unassigned} of {waste.data.total_bought} licences are not assigned to anyone, across {waste.data.clients} client{waste.data.clients === 1 ? "" : "s"}.
           </p>
-          <p className="text-xs text-slate-500">Only licences the tool says the unassigned number for are listed: a tool that does not say is left out, not counted as zero.</p>
+          <p className="text-xs text-gray-500">Only licences the tool says the unassigned number for are listed: a tool that does not say is left out, not counted as zero.</p>
           {waste.data.rows.length === 0 ? (
-            <p className="text-sm text-slate-400">No unassigned licences found.</p>
+            <p className="text-sm text-gray-400">No unassigned licences found.</p>
           ) : (
             <table className="w-full text-left text-sm" data-testid="waste-table">
-              <thead className="text-xs uppercase text-slate-500">
+              <thead className="text-xs uppercase text-gray-500">
                 <tr>
                   <th scope="col" className="py-1 pr-3">Client</th>
                   <th scope="col" className="pr-3">Licence</th>
@@ -848,16 +848,16 @@ export function LicenceWaste() {
                   <th scope="col" className="text-right">Share</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-gray-800">
                 {waste.data.rows.map((r) => (
                   <tr key={`${r.client_id}:${r.source}:${r.item}`}>
-                    <td className="py-1 pr-3 text-slate-100">{r.client_name}</td>
-                    <td className="pr-3 text-slate-300">
+                    <td className="py-1 pr-3 text-gray-100">{r.client_name}</td>
+                    <td className="pr-3 text-gray-300">
                       {r.item} {r.stale ? <span className="text-xs text-amber-300" title="Not refreshed for over a week">(old count)</span> : null}
                     </td>
-                    <td className="pr-3 text-right tabular-nums text-slate-300">{r.bought}</td>
-                    <td className="pr-3 text-right tabular-nums text-slate-100">{r.unassigned}</td>
-                    <td className="text-right tabular-nums text-slate-400">{r.percent}%</td>
+                    <td className="pr-3 text-right tabular-nums text-gray-300">{r.bought}</td>
+                    <td className="pr-3 text-right tabular-nums text-gray-100">{r.unassigned}</td>
+                    <td className="text-right tabular-nums text-gray-400">{r.percent}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -877,15 +877,15 @@ export function Billing() {
       <div>
         <div className="flex items-start justify-between gap-4">
           <h1 className="text-xl font-semibold text-gray-100">Licences and counts</h1>
-          <button type="button" onClick={() => window.print()} className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 print:hidden">
+          <button type="button" onClick={() => window.print()} className="rounded border border-gray-600 px-3 py-1 text-sm text-gray-200 print:hidden">
             Print
           </button>
         </div>
-        <p className="mt-1 text-sm text-slate-400">What each tool counts for each client, read once a day, and every change, to check an invoice against.</p>
+        <p className="mt-1 text-sm text-gray-400">What each tool counts for each client, read once a day, and every change, to check an invoice against.</p>
       </div>
       <div role="tablist" className="flex flex-wrap gap-2 print:hidden">
         {tabs.map(([id, label]) => (
-          <button key={id} role="tab" type="button" aria-selected={tab === id} onClick={() => setTab(id)} className={`rounded border px-3 py-1 text-sm ${tab === id ? "border-sky-500/60 text-sky-200" : "border-slate-700 text-slate-300"}`}>
+          <button key={id} role="tab" type="button" aria-selected={tab === id} onClick={() => setTab(id)} className={`rounded border px-3 py-1 text-sm ${tab === id ? "border-sky-500/60 text-sky-200" : "border-gray-700 text-gray-300"}`}>
             {label}
           </button>
         ))}

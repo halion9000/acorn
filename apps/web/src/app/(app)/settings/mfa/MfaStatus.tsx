@@ -86,16 +86,16 @@ function People({ clientId, which }: { clientId: string; which: Which }) {
     };
   }, [clientId, which]);
   if (error) return <p className="text-sm text-red-300">{error}</p>;
-  if (people === null) return <p className="text-sm text-slate-500">Loading...</p>;
-  if (people.length === 0) return <p className="text-sm text-slate-500">Nobody.</p>;
+  if (people === null) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (people.length === 0) return <p className="text-sm text-gray-500">Nobody.</p>;
   // Each person is tagged with their directory only when the list holds both, so a client with one directory is not covered in tags.
   const mixed = people.some((p) => p.directory === "Google Workspace") && people.some((p) => p.directory !== "Google Workspace");
   return (
     <ul className="space-y-0.5 text-sm" data-testid={`people-${which}`}>
       {people.map((p) => (
         <li key={p.upn} className="flex items-baseline gap-2">
-          <span className="font-mono text-slate-200">{p.upn}</span>
-          {p.display_name ? <span className="text-slate-500">{p.display_name}</span> : null}
+          <span className="font-mono text-gray-200">{p.upn}</span>
+          {p.display_name ? <span className="text-gray-500">{p.display_name}</span> : null}
           {p.admin ? <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[11px] text-red-300">administrator</span> : null}
           {mixed && p.directory === "Microsoft 365" ? <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[11px] text-indigo-300">M365</span> : null}
           {p.directory === "Google Workspace" ? <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[11px] text-sky-300">Google</span> : null}
@@ -110,8 +110,8 @@ function ClientRow({ c, open, setOpen }: { c: MfaClient; open: Open; setOpen: (v
   const toggle = (which: Which) => setOpen(shown === which ? null : { id: c.client_id, which });
   return (
     <>
-      <tr className="border-b border-slate-800" data-testid="client-row">
-        <td className="py-2 text-slate-200">
+      <tr className="border-b border-gray-800" data-testid="client-row">
+        <td className="py-2 text-gray-200">
           {c.client_name ?? "This organization"}
         </td>
         <td className="whitespace-nowrap" data-testid="directory-tags">
@@ -126,8 +126,8 @@ function ClientRow({ c, open, setOpen }: { c: MfaClient; open: Open; setOpen: (v
             </span>
           ) : null}
         </td>
-        <td className="text-slate-400">{c.people}</td>
-        <td className="text-slate-300">
+        <td className="text-gray-400">{c.people}</td>
+        <td className="text-gray-300">
           {coveragePercent(c)}
           {c.registration_unknown ? (
             <span
@@ -146,7 +146,7 @@ function ClientRow({ c, open, setOpen }: { c: MfaClient; open: Open; setOpen: (v
               {c.not_required}
             </button>
           ) : (
-            <span className="text-slate-500">0</span>
+            <span className="text-gray-500">0</span>
           )}
         </td>
         <td>
@@ -155,7 +155,7 @@ function ClientRow({ c, open, setOpen }: { c: MfaClient; open: Open; setOpen: (v
               {c.without_mfa}
             </button>
           ) : (
-            <span className="text-slate-500">0</span>
+            <span className="text-gray-500">0</span>
           )}
         </td>
         <td>
@@ -164,14 +164,14 @@ function ClientRow({ c, open, setOpen }: { c: MfaClient; open: Open; setOpen: (v
               {c.admins_without_mfa}
             </button>
           ) : (
-            <span className="text-slate-500">0</span>
+            <span className="text-gray-500">0</span>
           )}
         </td>
       </tr>
       {shown && (
-        <tr className="border-b border-slate-800 bg-slate-900/40">
+        <tr className="border-b border-gray-800 bg-gray-900/40">
           <td colSpan={7} className="px-3 py-2">
-            <p className="mb-1 text-xs uppercase text-slate-500">{shown === "without" ? "No Multi-Factor" : shown === "admins" ? "Administrators with no Multi-Factor" : "Registered for Multi-Factor, but nothing requires it"}</p>
+            <p className="mb-1 text-xs uppercase text-gray-500">{shown === "without" ? "No Multi-Factor" : shown === "admins" ? "Administrators with no Multi-Factor" : "Registered for Multi-Factor, but nothing requires it"}</p>
             <People clientId={c.client_id} which={shown} />
           </td>
         </tr>
@@ -219,7 +219,7 @@ export function MfaStatus() {
     <div className="space-y-4 p-6">
       <div>
         <h1 className="text-xl font-semibold text-gray-100">Multi-factor status</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-gray-400">
           Who has Multi-Factor sign-in, per client, read through CIPP once a day. Counts cover enabled, licensed member accounts (shared mailboxes, guests and disabled accounts are left out).
         </p>
       </div>
@@ -228,15 +228,15 @@ export function MfaStatus() {
           {error}
         </p>
       )}
-      {clients === null && !error && <p className="text-sm text-slate-500">Loading...</p>}
+      {clients === null && !error && <p className="text-sm text-gray-500">Loading...</p>}
       {clients !== null && clients.length === 0 && (
-        <p data-testid="none" className="text-sm text-slate-400">
+        <p data-testid="none" className="text-sm text-gray-400">
           Nothing yet. Once CORE is connected to CIPP and the CIPP tenants are mapped to clients, each client&apos;s multi-factor status appears here after the next daily read.
         </p>
       )}
       {clients !== null && clients.length > 0 && (
         <>
-          <p data-testid="totals" className="text-sm text-slate-300">
+          <p data-testid="totals" className="text-sm text-gray-300">
             {totals.people.toLocaleString()} people across {clients.length} clients: {totals.without.toLocaleString()} with no Multi-Factor, {totals.admins.toLocaleString()} of them administrators.
           </p>
           <div className="flex flex-wrap items-center gap-4">
@@ -246,23 +246,23 @@ export function MfaStatus() {
               placeholder="Search clients"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-64 rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-500"
+              className="w-64 rounded border border-gray-700 bg-gray-900 px-3 py-1.5 text-sm text-gray-200 placeholder:text-gray-500"
             />
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-gray-300">
               <input type="checkbox" checked={adminsOnly} onChange={(e) => setAdminsOnly(e.target.checked)} data-testid="admins-only" />
               Only clients with administrators that have no Multi-Factor
             </label>
             {onlyClient && (
-              <button type="button" onClick={() => setOnlyClient(null)} className="rounded border border-slate-600 px-2 py-1 text-sm text-slate-200 hover:bg-slate-800" data-testid="show-all-clients">
+              <button type="button" onClick={() => setOnlyClient(null)} className="rounded border border-gray-600 px-2 py-1 text-sm text-gray-200 hover:bg-gray-800" data-testid="show-all-clients">
                 Showing one client: show all
               </button>
             )}
           </div>
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-700 text-slate-500">
+              <tr className="border-b border-gray-700 text-gray-500">
                 <th className="py-2" aria-sort={sort?.key === "client" ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleSort("client")} className="font-medium hover:text-slate-200" data-testid="sort-client">
+                  <button type="button" onClick={() => toggleSort("client")} className="font-medium hover:text-gray-200" data-testid="sort-client">
                     Client{arrow("client")}
                   </button>
                 </th>
@@ -270,27 +270,27 @@ export function MfaStatus() {
                   Tools
                 </th>
                 <th className="" aria-sort={sort?.key === "people" ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleSort("people")} className="font-medium hover:text-slate-200" data-testid="sort-people">
+                  <button type="button" onClick={() => toggleSort("people")} className="font-medium hover:text-gray-200" data-testid="sort-people">
                     People{arrow("people")}
                   </button>
                 </th>
                 <th className="" aria-sort={sort?.key === "covered" ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleSort("covered")} className="font-medium hover:text-slate-200" data-testid="sort-covered">
+                  <button type="button" onClick={() => toggleSort("covered")} className="font-medium hover:text-gray-200" data-testid="sort-covered">
                     Covered{arrow("covered")}
                   </button>
                 </th>
                 <th className="" aria-sort={sort?.key === "not_required" ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleSort("not_required")} className="font-medium hover:text-slate-200" data-testid="sort-not_required">
+                  <button type="button" onClick={() => toggleSort("not_required")} className="font-medium hover:text-gray-200" data-testid="sort-not_required">
                     Registered, not required{arrow("not_required")}
                   </button>
                 </th>
                 <th className="" aria-sort={sort?.key === "without" ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleSort("without")} className="font-medium hover:text-slate-200" data-testid="sort-without">
+                  <button type="button" onClick={() => toggleSort("without")} className="font-medium hover:text-gray-200" data-testid="sort-without">
                     No Multi-Factor{arrow("without")}
                   </button>
                 </th>
                 <th className="" aria-sort={sort?.key === "admins" ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleSort("admins")} className="font-medium hover:text-slate-200" data-testid="sort-admins">
+                  <button type="button" onClick={() => toggleSort("admins")} className="font-medium hover:text-gray-200" data-testid="sort-admins">
                     Administrators without{arrow("admins")}
                   </button>
                 </th>
@@ -302,7 +302,7 @@ export function MfaStatus() {
               ))}
               {shownClients.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-4 text-slate-500" data-testid="no-match">
+                  <td colSpan={7} className="py-4 text-gray-500" data-testid="no-match">
                     No client matches.
                   </td>
                 </tr>

@@ -95,7 +95,7 @@ async function getJson<T>(path: string): Promise<T> {
 
 function Trend({ history }: { history: ScorePoint[] }) {
   const path = sparklinePath(history);
-  if (!path) return <span className="text-slate-600">—</span>;
+  if (!path) return <span className="text-gray-600">—</span>;
   return (
     <svg width="96" height="24" viewBox="0 0 96 24" role="img" aria-label={`Score over the last ${history.length} days`} className="text-sky-400">
       <path d={path} fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -120,21 +120,21 @@ function Improvements({ clientId }: { clientId: string }) {
     };
   }, [clientId]);
   if (error) return <p className="text-sm text-red-300">{error}</p>;
-  if (items === null) return <p className="text-sm text-slate-500">Loading...</p>;
-  if (items.length === 0) return <p className="text-sm text-slate-500">Every control Microsoft scores is fully met.</p>;
+  if (items === null) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (items.length === 0) return <p className="text-sm text-gray-500">Every control Microsoft scores is fully met.</p>;
   return (
     <ul className="space-y-2 text-sm" data-testid="improvements">
       {items.map((i) => (
-        <li key={i.id} className="rounded border border-slate-800 p-2">
+        <li key={i.id} className="rounded border border-gray-800 p-2">
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[11px] text-sky-300">+{i.missing.toLocaleString(undefined, { maximumFractionDigits: 2 })} points</span>
-            <span className="font-medium text-slate-200">{i.title}</span>
-            {i.category ? <span className="text-xs text-slate-500">{i.category}</span> : null}
-            {i.user_impact && i.user_impact !== "Unknown" ? <span className="text-xs text-slate-500">user impact: {i.user_impact}</span> : null}
-            {i.cost && i.cost !== "Unknown" ? <span className="text-xs text-slate-500">cost: {i.cost}</span> : null}
+            <span className="font-medium text-gray-200">{i.title}</span>
+            {i.category ? <span className="text-xs text-gray-500">{i.category}</span> : null}
+            {i.user_impact && i.user_impact !== "Unknown" ? <span className="text-xs text-gray-500">user impact: {i.user_impact}</span> : null}
+            {i.cost && i.cost !== "Unknown" ? <span className="text-xs text-gray-500">cost: {i.cost}</span> : null}
           </div>
-          {i.status ? <p className="mt-1 text-xs text-slate-400">{i.status}</p> : null}
-          {i.description ? <p className="mt-1 text-xs text-slate-500">{i.description}</p> : null}
+          {i.status ? <p className="mt-1 text-xs text-gray-400">{i.status}</p> : null}
+          {i.description ? <p className="mt-1 text-xs text-gray-500">{i.description}</p> : null}
         </li>
       ))}
     </ul>
@@ -177,7 +177,7 @@ export function SecureScore() {
     <div className="space-y-4 p-6">
       <div>
         <h1 className="text-xl font-semibold text-gray-100">Microsoft Secure Score</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-gray-400">
           How well each client&apos;s Microsoft 365 is set up against Microsoft&apos;s own security checklist, read through CIPP once a day. Open a client to see the controls that would add the most points. Read-only: nothing here
           changes a tenant.
         </p>
@@ -187,15 +187,15 @@ export function SecureScore() {
           {error}
         </p>
       )}
-      {clients === null && !error && <p className="text-sm text-slate-500">Loading...</p>}
+      {clients === null && !error && <p className="text-sm text-gray-500">Loading...</p>}
       {clients !== null && clients.length === 0 && (
-        <p data-testid="none" className="text-sm text-slate-400">
+        <p data-testid="none" className="text-sm text-gray-400">
           Nothing yet. Once CORE is connected to CIPP and the CIPP tenants are mapped to clients, each client&apos;s Secure Score appears here after the next daily read.
         </p>
       )}
       {clients !== null && clients.length > 0 && (
         <>
-          <p data-testid="totals" className="text-sm text-slate-300">
+          <p data-testid="totals" className="text-sm text-gray-300">
             {clients.length} clients, {overall}% on average; {falling} {falling === 1 ? "has" : "have"} fallen in the last 30 days.
           </p>
           <div className="flex flex-wrap items-center gap-4">
@@ -205,11 +205,11 @@ export function SecureScore() {
               placeholder="Search clients"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-64 rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-500"
+              className="w-64 rounded border border-gray-700 bg-gray-900 px-3 py-1.5 text-sm text-gray-200 placeholder:text-gray-500"
             />
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-gray-300">
               Order by
-              <select aria-label="Order by" value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-200">
+              <select aria-label="Order by" value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="rounded border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-200">
                 <option value="lowest">Lowest score first</option>
                 <option value="biggest_drop">Biggest 30-day drop first</option>
                 <option value="name">Client name</option>
@@ -217,36 +217,36 @@ export function SecureScore() {
             </label>
           </div>
           <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-slate-500">
-              <tr className="border-b border-slate-700">
+            <thead className="text-xs uppercase text-gray-500">
+              <tr className="border-b border-gray-700">
                 <th className="py-2" aria-sort={column?.key === "client" ? (column.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleColumn("client")} className="uppercase hover:text-slate-200" data-testid="sort-client">
+                  <button type="button" onClick={() => toggleColumn("client")} className="uppercase hover:text-gray-200" data-testid="sort-client">
                     Client{mark("client")}
                   </button>
                 </th>
                 <th  aria-sort={column?.key === "score" ? (column.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleColumn("score")} className="uppercase hover:text-slate-200" data-testid="sort-score">
+                  <button type="button" onClick={() => toggleColumn("score")} className="uppercase hover:text-gray-200" data-testid="sort-score">
                     Score{mark("score")}
                   </button>
                 </th>
                 <th  aria-sort={column?.key === "change" ? (column.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleColumn("change")} className="uppercase hover:text-slate-200" data-testid="sort-change">
+                  <button type="button" onClick={() => toggleColumn("change")} className="uppercase hover:text-gray-200" data-testid="sort-change">
                     30 days{mark("change")}
                   </button>
                 </th>
                 <th>Trend</th>
                 <th  aria-sort={column?.key === "average" ? (column.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleColumn("average")} className="uppercase hover:text-slate-200" data-testid="sort-average">
+                  <button type="button" onClick={() => toggleColumn("average")} className="uppercase hover:text-gray-200" data-testid="sort-average">
                     Microsoft average{mark("average")}
                   </button>
                 </th>
                 <th  aria-sort={column?.key === "people" ? (column.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleColumn("people")} className="uppercase hover:text-slate-200" data-testid="sort-people">
+                  <button type="button" onClick={() => toggleColumn("people")} className="uppercase hover:text-gray-200" data-testid="sort-people">
                     People{mark("people")}
                   </button>
                 </th>
                 <th  aria-sort={column?.key === "read" ? (column.dir === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" onClick={() => toggleColumn("read")} className="uppercase hover:text-slate-200" data-testid="sort-read">
+                  <button type="button" onClick={() => toggleColumn("read")} className="uppercase hover:text-gray-200" data-testid="sort-read">
                     Read{mark("read")}
                   </button>
                 </th>
@@ -266,23 +266,23 @@ export function SecureScore() {
 
 function ScoreRow({ c, open, toggle }: { c: ScoreClient; open: boolean; toggle: () => void }) {
   const tone = c.percent >= 70 ? "bg-emerald-500" : c.percent >= 45 ? "bg-amber-500" : "bg-red-500";
-  const changeTone = c.change_30d === null || c.change_30d === 0 ? "text-slate-500" : c.change_30d > 0 ? "text-emerald-300" : "text-red-300";
+  const changeTone = c.change_30d === null || c.change_30d === 0 ? "text-gray-500" : c.change_30d > 0 ? "text-emerald-300" : "text-red-300";
   const belowAverage = c.average !== null && c.current < c.average;
   return (
     <>
-      <tr className="border-b border-slate-800" data-testid="score-row">
+      <tr className="border-b border-gray-800" data-testid="score-row">
         <td className="py-2">
-          <button type="button" onClick={toggle} aria-expanded={open} className="text-left text-slate-200 hover:underline">
+          <button type="button" onClick={toggle} aria-expanded={open} className="text-left text-gray-200 hover:underline">
             {c.client_name ?? "This organization"}
           </button>
         </td>
         <td>
           <div className="flex items-center gap-2">
-            <div className="h-2 w-24 rounded bg-slate-800" aria-hidden="true">
+            <div className="h-2 w-24 rounded bg-gray-800" aria-hidden="true">
               <div className={`h-2 rounded ${tone}`} style={{ width: `${Math.min(100, Math.max(0, c.percent))}%` }} />
             </div>
-            <span className="text-slate-200">{c.percent}%</span>
-            <span className="text-xs text-slate-500">
+            <span className="text-gray-200">{c.percent}%</span>
+            <span className="text-xs text-gray-500">
               {c.current.toLocaleString(undefined, { maximumFractionDigits: 2 })} / {c.max.toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </span>
           </div>
@@ -293,14 +293,14 @@ function ScoreRow({ c, open, toggle }: { c: ScoreClient; open: boolean; toggle: 
         <td>
           <Trend history={c.history} />
         </td>
-        <td className={belowAverage ? "text-amber-300" : "text-slate-400"}>{c.average === null ? "—" : c.average.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td>
-        <td className="text-slate-400">{c.active_users ?? "—"}{c.licensed_users !== null ? ` / ${c.licensed_users}` : ""}</td>
-        <td className="text-slate-500">{new Date(c.taken_at).toLocaleDateString()}</td>
+        <td className={belowAverage ? "text-amber-300" : "text-gray-400"}>{c.average === null ? "—" : c.average.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td>
+        <td className="text-gray-400">{c.active_users ?? "—"}{c.licensed_users !== null ? ` / ${c.licensed_users}` : ""}</td>
+        <td className="text-gray-500">{new Date(c.taken_at).toLocaleDateString()}</td>
       </tr>
       {open && (
-        <tr className="border-b border-slate-800 bg-slate-900/40">
+        <tr className="border-b border-gray-800 bg-gray-900/40">
           <td colSpan={7} className="px-3 py-3">
-            <p className="mb-2 text-xs uppercase text-slate-500">
+            <p className="mb-2 text-xs uppercase text-gray-500">
               Controls still missing points{c.points_available > 0 ? ` (the top ones add up to ${c.points_available.toLocaleString(undefined, { maximumFractionDigits: 2 })} points)` : ""}
             </p>
             <Improvements clientId={c.client_id} />

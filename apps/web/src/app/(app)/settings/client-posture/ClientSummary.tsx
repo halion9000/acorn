@@ -67,24 +67,24 @@ export function ClientSummary({ posture, labelFor }: { posture: Posture; labelFo
 
   return (
     <section className="space-y-2" data-testid="client-summary">
-      <h3 className="text-sm uppercase text-slate-500">Update for the client</h3>
+      <h3 className="text-sm uppercase text-gray-500">Update for the client</h3>
       <div className="flex flex-wrap items-center gap-2 text-sm print:hidden">
-        <label className="flex items-center gap-2 text-slate-300">
+        <label className="flex items-center gap-2 text-gray-300">
           Period
-          <select value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Update period" className="rounded border border-slate-700 bg-slate-900 px-2 py-1">
+          <select value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Update period" className="rounded border border-gray-700 bg-gray-900 px-2 py-1">
             <option value={7}>Weekly update (7 days)</option>
             <option value={90}>Quarterly review (90 days)</option>
           </select>
         </label>
-        <button type="button" className="rounded border border-slate-600 px-3 py-1 text-slate-200" onClick={() => void navigator.clipboard?.writeText(text)}>
+        <button type="button" className="rounded border border-gray-600 px-3 py-1 text-gray-200" onClick={() => void navigator.clipboard?.writeText(text)}>
           Copy
         </button>
-        <span className="text-xs text-slate-500">A draft to edit. Nothing is sent.</span>
+        <span className="text-xs text-gray-500">A draft to edit. Nothing is sent.</span>
       </div>
       {state === "loading" ? (
-        <p className="text-sm text-slate-500">Writing the draft…</p>
+        <p className="text-sm text-gray-500">Writing the draft…</p>
       ) : (
-        <textarea value={text} onChange={(e) => setText(e.target.value)} aria-label="Draft update" rows={14} className="w-full rounded border border-slate-700 bg-slate-900 p-2 font-mono text-sm text-slate-200 print:border-0 print:bg-white print:text-black" />
+        <textarea value={text} onChange={(e) => setText(e.target.value)} aria-label="Draft update" rows={14} className="w-full rounded border border-gray-700 bg-gray-900 p-2 font-mono text-sm text-gray-200 print:border-0 print:bg-white print:text-black" />
       )}
     </section>
   );

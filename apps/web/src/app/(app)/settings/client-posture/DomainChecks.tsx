@@ -35,11 +35,11 @@ const LABEL: Record<Status, { text: string; className: string }> = {
 function Check({ name, f }: { name: string; f: Finding }) {
   const l = LABEL[f.status];
   return (
-    <div className="rounded border border-slate-800 p-2" data-testid={`check-${name}`}>
-      <div className="text-xs uppercase text-slate-500">{name}</div>
+    <div className="rounded border border-gray-800 p-2" data-testid={`check-${name}`}>
+      <div className="text-xs uppercase text-gray-500">{name}</div>
       <div className={`text-sm font-medium ${l.className}`}>{l.text}</div>
-      <div className="mt-1 text-xs text-slate-400">{f.summary}</div>
-      {f.record && <code className="mt-1 block break-all text-[11px] text-slate-500">{f.record}</code>}
+      <div className="mt-1 text-xs text-gray-400">{f.summary}</div>
+      {f.record && <code className="mt-1 block break-all text-[11px] text-gray-500">{f.record}</code>}
     </div>
   );
 }
@@ -63,22 +63,22 @@ export function DomainChecks({ clientId }: { clientId: string }) {
     };
   }, [clientId]);
 
-  if (domains === null) return <p className="text-sm text-slate-500">Checking the client&apos;s domains…</p>;
+  if (domains === null) return <p className="text-sm text-gray-500">Checking the client&apos;s domains…</p>;
   return (
     <section data-testid="domain-checks">
-      <h3 className="mb-2 text-sm uppercase text-slate-500">E-mail and website checks for the client&apos;s domains</h3>
+      <h3 className="mb-2 text-sm uppercase text-gray-500">E-mail and website checks for the client&apos;s domains</h3>
       {domains.length === 0 ? (
-        <p className="text-sm text-slate-400" data-testid="no-domains">
+        <p className="text-sm text-gray-400" data-testid="no-domains">
           No domains to check yet. They come from the e-mail addresses of this client&apos;s people (the Identities page), so they appear once those are loaded.
         </p>
       ) : (
         <div className="space-y-3">
           {domains.map((d) => (
-            <div key={d.domain} className="rounded border border-slate-800 p-3">
+            <div key={d.domain} className="rounded border border-gray-800 p-3">
               <div className="mb-2 flex flex-wrap items-baseline gap-x-3">
-                <span className="font-medium text-slate-100">{d.domain}</span>
+                <span className="font-medium text-gray-100">{d.domain}</span>
                 <span className={`text-sm ${LABEL[d.status].className}`}>{LABEL[d.status].text}</span>
-                <span className="text-xs text-slate-500">{d.mail_provider ? `Mail: ${d.mail_provider}` : d.mx.length > 0 ? `Mail: ${d.mx[0]}` : "No mail server (MX) published"}</span>
+                <span className="text-xs text-gray-500">{d.mail_provider ? `Mail: ${d.mail_provider}` : d.mx.length > 0 ? `Mail: ${d.mx[0]}` : "No mail server (MX) published"}</span>
               </div>
               <div className="grid gap-2 md:grid-cols-3">
                 <Check name="SPF" f={d.spf} />
