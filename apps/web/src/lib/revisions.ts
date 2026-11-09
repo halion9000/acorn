@@ -13,9 +13,11 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-09",
-    "commits": 1,
+    "commits": 3,
     "changes": [
-      "Hunts: saved hunts show how many hits their last scheduled run returned"
+      "Hunts: saved hunts show how many hits their last scheduled run returned",
+      "Digest: 12-hour and 24-hour windows for a shift handover, with the hours in the label",
+      "Autonomy: proposal log (table, API, evidence rule)"
     ],
     "fixes": 0
   },

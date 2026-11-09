@@ -65,6 +65,7 @@ import { AzureSpendPanel } from './AzureSpendPanel';
 import { TenantAccessPanel } from './TenantAccessPanel';
 import { AutonomyPolicyPanel } from '@/components/settings/AutonomyPolicy';
 import { AutonomyAgreement } from '@/components/settings/AutonomyAgreement';
+import { AgentProposalLog } from '@/components/settings/AgentProposalLog';
 import { StandingApprovals } from '@/components/settings/StandingApprovals';
 import { ClientStatusLinks } from '@/components/settings/ClientStatusLinks';
 import { useTheme, type ThemePreference } from '@/components/theme/ThemeProvider';
@@ -427,6 +428,7 @@ export function SettingsView() {
               {tab === 'autonomy' && (
                 <>
                   <AutonomyAgreement />
+                  <AgentProposalLog />
                   <StandingApprovals />
                   <AutonomyPolicyPanel />
                 </>

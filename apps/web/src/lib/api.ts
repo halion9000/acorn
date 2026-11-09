@@ -6319,6 +6319,35 @@ export const approvalAgreementApi = {
   get: () => request<ApprovalAgreementResponse>('/api/v1/approvals/agreement'),
 };
 
+export interface AgentProposal {
+  id: string;
+  agent: string;
+  action_type: string;
+  target: string;
+  summary: string;
+  rung: 'shadow' | 'suggest' | 'ask' | 'act_tell' | 'act_quiet';
+  evidence: { label: string; url?: string }[];
+  confidence: number | null;
+  approval_id: string | null;
+  outcome: 'none' | 'accepted' | 'edited' | 'rejected' | 'expired';
+  outcome_note: string | null;
+  outcome_at: string | null;
+  created_at: string;
+}
+
+export interface AgentProposalList {
+  items: AgentProposal[];
+  summary: { total: number; by_rung: Record<string, number>; by_outcome: Record<string, number>; shadow_unreviewed: number };
+}
+
+export const agentProposalsApi = {
+  /** Every action an agent proposed or took, newest first, with the header counts. */
+  list: () => request<AgentProposalList>('/api/v1/agent-proposals?limit=50'),
+  /** A person records what they made of a proposal (a signed-in session is required). */
+  setOutcome: (id: string, outcome: 'accepted' | 'edited' | 'rejected' | 'expired', note?: string) =>
+    request<AgentProposal>(`/api/v1/agent-proposals/${id}/outcome`, { method: 'POST', body: JSON.stringify({ outcome, note: note || null }) }),
+};
+
 export const autonomyPolicyApi = {
   /** Effective policy (defaults + DB overrides) for the calling tenant. */
   list: () => request<AutonomyPolicyResponse>('/api/v1/autonomy-policy'),
