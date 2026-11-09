@@ -22,6 +22,17 @@ export interface NistCoverageData {
   totals: Record<Status, number>;
 }
 
+/** A control met for this many days or more counts as evidenced: a person can show an auditor it has held, not just that it holds today. */
+export const EVIDENCED_DAYS = 90;
+
+/** Whole days a control has been met, from the date its checks last turned met; null when that date is unknown or in the future. */
+export function daysMet(metSince: string | null, now: number = Date.now()): number | null {
+  if (!metSince) return null;
+  const t = Date.parse(metSince);
+  if (!Number.isFinite(t) || t > now) return null;
+  return Math.floor((now - t) / 86_400_000);
+}
+
 const LABEL: Record<Status, { text: string; className: string }> = {
   met: { text: "Met", className: "text-emerald-300" },
   partly: { text: "Partly", className: "text-amber-300" },
@@ -49,11 +60,12 @@ export function NistCoverage({ clientId }: { clientId: string }) {
   }, [clientId]);
   if (!data) return null;
   const t = data.totals;
+  const evidenced = data.controls.filter((c) => c.status === "met" && (daysMet(c.met_since) ?? 0) >= EVIDENCED_DAYS).length;
   return (
     <section className="rounded-lg border border-gray-800 bg-gray-900/60 p-4" data-testid="nist">
       <h3 className="text-sm font-semibold text-gray-100">NIST CSF 2.0</h3>
       <p className="mt-1 text-xs text-gray-400" data-testid="nist-totals">
-        {t.met} met · {t.partly} partly · {t.not_met} not met · {t.no_evidence} need a person to show evidence. A control is met only when every check behind it is met.
+        {t.met} met ({evidenced} for {EVIDENCED_DAYS}+ days) · {t.partly} partly · {t.not_met} not met · {t.no_evidence} need a person to show evidence. A control is met only when every check behind it is met.
       </p>
       <ul className="mt-3 divide-y divide-gray-800 text-sm">
         {data.controls.map((c) => (
@@ -64,7 +76,7 @@ export function NistCoverage({ clientId }: { clientId: string }) {
               </span>
               <span className={LABEL[c.status].className}>
                 {LABEL[c.status].text}
-                {c.status === "met" && c.met_since ? ` since ${c.met_since.slice(0, 10)}` : ""}
+                {c.status === "met" && c.met_since ? ` since ${c.met_since.slice(0, 10)}${daysMet(c.met_since) !== null ? ` (${daysMet(c.met_since)} days)` : ""}` : ""}
               </span>
             </button>
             {open === c.control_id ? (

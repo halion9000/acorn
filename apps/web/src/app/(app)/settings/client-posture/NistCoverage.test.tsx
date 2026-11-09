@@ -28,7 +28,7 @@ describe('NistCoverage', () => {
     expect(screen.getByTestId('nist-PR.AA-03')).toHaveTextContent('Not met');
     expect(screen.getByTestId('nist-PR.AA-03')).not.toHaveTextContent('since');
     expect(screen.getByTestId('nist-GV.OC-01')).toHaveTextContent('No automated evidence');
-    expect(screen.getByTestId('nist-totals')).toHaveTextContent('1 met · 0 partly · 1 not met · 1 need a person');
+    expect(screen.getByTestId('nist-totals')).toHaveTextContent(/1 met \(\d+ for 90\+ days\) · 0 partly · 1 not met · 1 need a person/);
     expect(authFetch).toHaveBeenCalledWith('/api/v1/nist-coverage/c1');
   });
 
@@ -47,5 +47,17 @@ describe('NistCoverage', () => {
     render(<NistCoverage clientId="c1" />);
     await waitFor(() => expect(authFetch).toHaveBeenCalled());
     expect(screen.queryByTestId('nist')).toBeNull();
+  });
+});
+
+describe("daysMet", () => {
+  const now = Date.parse("2026-11-08T00:00:00Z");
+  it("counts whole days since the date, and is null for no date, a bad date or a future one", async () => {
+    const { daysMet } = await import("./NistCoverage");
+    expect(daysMet("2026-08-10T00:00:00Z", now)).toBe(90);
+    expect(daysMet("2026-11-07T12:00:00Z", now)).toBe(0);
+    expect(daysMet(null, now)).toBeNull();
+    expect(daysMet("not a date", now)).toBeNull();
+    expect(daysMet("2027-01-01T00:00:00Z", now)).toBeNull();
   });
 });
