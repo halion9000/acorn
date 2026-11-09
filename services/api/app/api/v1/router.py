@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     abuse,
+    agent_proposals,
     agents,
     airgap,
     alert_account,
@@ -156,6 +157,7 @@ api_router.include_router(client_status.public_router)
 api_router.include_router(finance.router)
 api_router.include_router(nist_coverage.router)
 api_router.include_router(governance.router)
+api_router.include_router(agent_proposals.router)
 api_router.include_router(alert_notes.router)
 api_router.include_router(alert_suppressions.router)
 api_router.include_router(alert_ticket_rules.router)
