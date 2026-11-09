@@ -70,6 +70,8 @@ const TITLE: Record<string, string> = {
   cipp_partner_relationship: 'Partner relationship (GDAP)',
   cipp_risky_oauth_apps: 'Apps with broad access',
   liongard_m365_legacy_auth: 'Legacy sign-in not blocked',
+  liongard_m365_users_mfa_policy: 'Users without an MFA policy',
+  liongard_m365_weak_mfa: 'Weak second factor',
   meraki_devices_offline: 'Meraki devices offline',
   meraki_open_wifi: 'Open or WEP Wi-Fi',
   dnsfilter_agents_silent: 'DNSFilter roaming agents silent',
