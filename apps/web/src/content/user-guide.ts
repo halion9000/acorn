@@ -311,6 +311,7 @@ All of these were tested against test data and a scratch database and deployed, 
 - **Alert page > Notes, and Assignee.** Write a note on an alert (what you looked at, who you called) without changing its status, owner or priority; notes are never edited and are audited. Next to the Assignee, pick a person and press **Assign** to give just this alert to them (or take it off whoever has it).
 - **Export CSV on Alerts and Cases.** Saves the alerts or cases listed on the page as a spreadsheet file. A title that starts like a formula is saved as plain text.
 - **Platform health > What the next retention sweep would delete** (platform administrators only). A dry run that counts, per kind of data, what the next sweep would delete; it deletes nothing.
+- **Settings > Find a setting.** A search box above the settings list: type a word or two from a setting's name or description and only the matching ones stay.
 - **Settings > Profile > Password.** Change your own password: it needs the current one, and signs you out everywhere.
 
 ---

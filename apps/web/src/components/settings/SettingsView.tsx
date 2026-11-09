@@ -321,7 +321,17 @@ export function groupedSettings(visibleTabs: { id: TabId; label: string; descrip
   return [...groups, { title: 'More', entries: rest }].filter((g) => g.entries.length > 0);
 }
 
+/** The groups left when a search box has text: an entry stays when every word typed appears in its name or its description (letter case ignored); a group with nothing left is dropped. No text keeps everything (pure). */
+export function filterSettingsGroups(groups: { title: string; entries: SettingsEntry[] }[], query: string): { title: string; entries: SettingsEntry[] }[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return groups;
+  return groups
+    .map((g) => ({ title: g.title, entries: g.entries.filter((e) => words.every((w) => `${e.label} ${e.description}`.toLowerCase().includes(w))) }))
+    .filter((g) => g.entries.length > 0);
+}
+
 export function SettingsView() {
+  const [search, setSearch] = useState('');
   const [pickedTab, setTab] = useState<TabId>('profile');
   // What this person may do, from /auth/me at sign-in. Read after mount so the first paint is the same on the server and the client.
   const [capabilities, setCapabilities] = useState<string[]>([]);
@@ -350,7 +360,18 @@ export function SettingsView() {
           className="lg:sticky lg:top-4 lg:w-64 lg:shrink-0"
         >
           <div className="space-y-3 rounded-xl border border-gray-800 bg-gray-900/40 p-2" data-testid="settings-groups">
-            {groupedSettings(visibleTabs).map((g) => (
+            <input
+              type="search"
+              aria-label="Search settings"
+              placeholder="Find a setting…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-1.5 text-sm text-gray-100 placeholder:text-gray-600"
+            />
+            {search.trim() && filterSettingsGroups(groupedSettings(visibleTabs), search).length === 0 ? (
+              <p className="px-3 py-2 text-xs text-gray-500" data-testid="settings-search-empty">Nothing matches &quot;{search.trim()}&quot;.</p>
+            ) : null}
+            {filterSettingsGroups(groupedSettings(visibleTabs), search).map((g) => (
               <section key={g.title} aria-label={g.title}>
                 <p className="px-3 py-1 text-xs font-medium uppercase tracking-wider text-gray-500">{g.title}</p>
                 <ul className="space-y-1">
