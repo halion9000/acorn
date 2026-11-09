@@ -121,3 +121,26 @@ def test_no_module_in_the_api_switches_row_security_off():
 def test_the_scheduler_source_explains_why_it_does_not_bypass_rls():
     source = inspect.getsource(hunt_scheduler)
     assert "BYPASSRLS" in source and "aisoc_app" in source and "row_security" in source.split("This used to start with")[1][:40]
+
+
+@pytest.mark.asyncio
+async def test_the_sweep_stores_how_many_hits_each_hunt_returned(monkeypatch):
+    hunt = _hunt(uuid.uuid4())
+    monkeypatch.setattr(hunt_scheduler, "_is_due", lambda h, now: True)
+    seen = []
+
+    class _DB(_RecordingDB):
+        async def execute(self, statement, params=None):
+            seen.append(statement)
+            return await super().execute(statement, params)
+
+    async def runner(db, h):
+        return 7
+
+    async def callback(db, h, hits):
+        return None
+
+    await hunt_scheduler.run_once(db=_DB([hunt]), now=datetime(2026, 10, 11, tzinfo=UTC), executor=runner, hit_callback=callback)
+    updates = [s for s in seen if getattr(s, "is_update", False)]
+    assert len(updates) == 1
+    assert updates[0].compile().params["last_hit_count"] == 7

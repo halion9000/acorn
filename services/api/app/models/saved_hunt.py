@@ -32,6 +32,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -95,6 +96,9 @@ class SavedHunt(Base):
     # Re-run). Used by the scheduler to decide whether the cron interval has
     # elapsed since the previous run.
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # How many hits the latest scheduled run returned (migration 167). NULL until the hunt has run.
+    last_hit_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

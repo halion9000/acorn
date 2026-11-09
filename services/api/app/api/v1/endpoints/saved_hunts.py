@@ -150,6 +150,7 @@ class SavedHuntModel(BaseModel):
     language: HuntLanguage
     schedule: str | None = None
     last_run_at: str | None = None
+    last_hit_count: int | None = None
     created_at: str
     updated_at: str
     created_by: str | None = None
@@ -172,6 +173,7 @@ class SavedHuntModel(BaseModel):
             language=row.language,  # type: ignore[arg-type]
             schedule=row.schedule,
             last_run_at=row.last_run_at.isoformat() if row.last_run_at else None,
+            last_hit_count=row.last_hit_count,
             created_at=row.created_at.isoformat(),
             updated_at=row.updated_at.isoformat(),
             created_by=str(row.created_by) if row.created_by else None,

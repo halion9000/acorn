@@ -4770,6 +4770,8 @@ export interface SavedHunt {
   language: HuntLanguage;
   schedule: string | null;
   last_run_at: string | null;
+  /** Hits the latest scheduled run returned; null/absent until the scheduler has run it. */
+  last_hit_count?: number | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;

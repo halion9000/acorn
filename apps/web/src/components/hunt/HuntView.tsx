@@ -308,7 +308,9 @@ function SavedHuntsPanel({
             </p>
             <p className="mt-1 text-[11px] text-slate-500" suppressHydrationWarning>
               {h.last_run_at
-                ? `Last run ${safeDistance(h.last_run_at, { addSuffix: true })}`
+                ? `Last run ${safeDistance(h.last_run_at, { addSuffix: true })}${
+                    typeof h.last_hit_count === 'number' ? ` · ${h.last_hit_count} hit${h.last_hit_count === 1 ? '' : 's'}` : ''
+                  }`
                 : `Saved ${safeDistance(h.created_at, { addSuffix: true })}`}
             </p>
           </div>

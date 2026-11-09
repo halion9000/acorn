@@ -454,7 +454,7 @@ async def run_once(
                 hits = await runner(db, hunt)
                 await callback(db, hunt, hits)
                 # Stamp last_run_at so we don't re-fire on the next tick.
-                await db.execute(update(SavedHunt).where(SavedHunt.id == hunt.id).values(last_run_at=now, updated_at=now))
+                await db.execute(update(SavedHunt).where(SavedHunt.id == hunt.id).values(last_run_at=now, last_hit_count=hits, updated_at=now))
                 fired += 1
             except Exception as exc:  # pragma: no cover - defensive
                 logger.exception(

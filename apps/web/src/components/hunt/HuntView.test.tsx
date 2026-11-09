@@ -207,3 +207,19 @@ describe('running a search', () => {
     expect(search).not.toHaveBeenCalled();
   });
 });
+
+describe('saved hunt last run', () => {
+  it('shows how many hits the latest scheduled run returned, singular and plural, and nothing for a hunt never counted', async () => {
+    const base = { nl_query: 'q', translated_query: { esql: '', kql: '', spl: '', explanation: '' }, language: 'esql', schedule: '0 * * * *', created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z', created_by: null };
+    savedHunts.mockResolvedValue([
+      { ...base, id: 'a', name: 'Many', last_run_at: '2026-10-08T01:00:00Z', last_hit_count: 3 },
+      { ...base, id: 'b', name: 'One', last_run_at: '2026-10-08T01:00:00Z', last_hit_count: 1 },
+      { ...base, id: 'c', name: 'Never', last_run_at: '2026-10-08T01:00:00Z', last_hit_count: null },
+    ]);
+    renderHunt();
+    expect(await screen.findByText(/Last run .* · 3 hits/)).toBeInTheDocument();
+    expect(screen.getByText(/Last run .* · 1 hit$/)).toBeInTheDocument();
+    expect(screen.getAllByText(/^Last run /)).toHaveLength(3);
+    expect(screen.getAllByText(/ hits?$/)).toHaveLength(2);
+  });
+});
