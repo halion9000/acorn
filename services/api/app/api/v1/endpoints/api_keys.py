@@ -51,6 +51,7 @@ VALID_SCOPES: frozenset[str] = frozenset(
         "identities:respond",
         "identities:bec",
         "cases:work",
+        "proposals:log",
         "alerts:delete",
         "cases:read",
         "cases:write",

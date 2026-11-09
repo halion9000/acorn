@@ -71,7 +71,8 @@ CORE_KEY_NAME = "core-hud"
 # in-place sync below removes that from an existing key, same secret.)
 # Adding a scope here also widens the key on a deployment that already has it:
 # _ensure_key syncs an existing key's scopes in place (same secret).
-CORE_KEY_SCOPES = ["alerts:read", "alerts:triage", "cases:read", "cases:work", "connectors:view", "rules:view", "hunts:read", "intel:read"]
+# proposals:log is the one-route permission for POST /agent-proposals (the agents' proposal log); it is split out of cases:write the same way.
+CORE_KEY_SCOPES = ["alerts:read", "alerts:triage", "cases:read", "cases:work", "proposals:log", "connectors:view", "rules:view", "hunts:read", "intel:read"]
 # The agents service's own key, for background calls it makes without a user
 # behind them (attack-path, blast-radius and neighbor graphs during an
 # investigation). Those endpoints need only an authenticated caller; read-only.

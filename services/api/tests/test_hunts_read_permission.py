@@ -106,6 +106,7 @@ class TestTheImplication:
             "rules:view": ("rules:read",),
             "connectors:view": ("connectors:read",),
             "cases:work": ("cases:write",),
+            "proposals:log": ("cases:write",),
             "billing:view": ("alerts:read",),
             "inventory:write": ("mssp:manage",),
         }

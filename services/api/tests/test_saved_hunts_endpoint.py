@@ -110,6 +110,7 @@ def _saved_hunt_row(
         language=language,
         schedule=schedule,
         last_run_at=last_run_at,
+        last_hit_count=None,
         created_at=now,
         updated_at=now,
     )

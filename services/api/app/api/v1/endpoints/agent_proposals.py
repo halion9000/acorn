@@ -1,6 +1,6 @@
 """The proposal log: every action an agent proposed or took, with its rung, its evidence and what a person did with it.
 
-``POST /agent-proposals`` (``cases:write``, the permission agents already use to raise approvals) records one; a proposal with no evidence is refused (see app.services.agent_proposals).
+``POST /agent-proposals`` (``proposals:log``, a one-route permission CORE's key holds) records one; a proposal with no evidence is refused (see app.services.agent_proposals).
 ``GET /agent-proposals`` (``alerts:read``) lists them newest first with the header counts. ``POST /agent-proposals/{id}/outcome`` records what a person made of it and needs a signed-in person's session
 (an agent's token cannot mark its own proposal). Nothing here approves, resolves or grants anything.
 """
@@ -89,7 +89,7 @@ async def list_proposals(
 
 
 @router.post("", response_model=ProposalOut, status_code=status.HTTP_201_CREATED)
-async def record_proposal(body: ProposalIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("cases:write"))], db: TenantDBSession) -> ProposalOut:
+async def record_proposal(body: ProposalIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("proposals:log"))], db: TenantDBSession) -> ProposalOut:
     try:
         evidence = clean_evidence(body.evidence)
     except EvidenceError as exc:

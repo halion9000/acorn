@@ -99,6 +99,10 @@ A.C.O.R.N separates what a person may do **inside their own tenant** from what a
 * **It grants nothing else.** A principal holding only `cases:work` can use those four routes and no other route anywhere in the API (a test checks this over every route). It does not grant `cases:delete`.
 * A key can be issued with the scope `cases:work` (`POST /api-keys`); a custom role can be given the permission (migration `080` adds it to the catalog; it backfills nothing). CORE's integration key holds `cases:work` and not `cases:write`; the bootstrap updates an existing key in place (same secret) and logs `scopes-updated`, naming both the scope it adds and the one it removes.
 
+## Logging an agent proposal: `proposals:log`
+
+`POST /agent-proposals` (the proposal log: what an agent proposed or did, its level, its evidence) needs `proposals:log`, split out of `cases:write` the same way as `cases:work` (so `cases:work` stays exactly four routes). `cases:write` implies `proposals:log`, so every role that held `cases:write` can still log. A principal holding only `proposals:log` can use that one route. CORE's integration key holds it (the bootstrap adds it to an existing key in place, same secret). It is not in the custom-role catalog (no migration adds it), so a custom role cannot be given it; an API key can be issued with the scope. `POST /agent-proposals/{id}/outcome` (a person recording a verdict) needs `cases:write` and a signed-in session, like deciding an approval.
+
 ## Platform permissions
 
 These act on every tenant, so neither the `*` wildcard nor a resource wildcard such as `plugins:*` grants them. A principal holds one only if it is **named exactly**: in a role (only `platform_admin` lists them), in an API key's scopes, or in a database role.

@@ -44,6 +44,10 @@ LEFT_OPEN = {
     # Deliberate: a ticket opens the tenant's live alert and case streams, so it needs both alerts:read and cases:read (and the key holds
     # both).
     ("POST", "/realtime/ticket"): "mint a realtime stream ticket: needs alerts:read AND cases:read, deliberately",
+    # A note on an alert (alerts:triage, with claim and snooze): additive text only, it changes no status, owner or priority and is audited.
+    ("POST", "/alerts/{alert_id}/notes"): "a note on an alert: alerts:triage; additive, changes nothing about the alert, audited",
+    # The agents' proposal log (proposals:log): records what an agent proposed or did, refuses an entry with no evidence, and approves, resolves or grants nothing; only a signed-in person can record a verdict.
+    ("POST", "/agent-proposals"): "log an agent proposal: proposals:log; write-only record with required evidence, approves nothing",
 }
 # CLOSED by the cases:work split (they need cases:write, which the key no longer holds): create a case, attach alerts, notes, observables,
 # tasks, update a task, RAISE an approval, UNPUBLISH a replay.

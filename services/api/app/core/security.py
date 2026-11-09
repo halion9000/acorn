@@ -325,6 +325,7 @@ _UNGRANTED_PERMISSIONS = frozenset(
         "rules:view",
         "connectors:view",
         "cases:work",
+        "proposals:log",
         "billing:view",
         "identities:respond",
         "identities:bec",
@@ -376,6 +377,8 @@ def known_permissions() -> frozenset[str]:
 # tasks, raising and deciding approvals (the human sign-off for destructive agent actions) and publishing or unpublishing investigation
 # replays: 14 routes. Everything that held `cases:write` still works on cases exactly as
 # before; a holder of `cases:work` alone can do those four things and nothing else in the API: CORE's key holds only this one.
+# `proposals:log` (record an entry in the agent proposal log: 1 route, POST /agent-proposals) was split out of `cases:write` so CORE's key can log what its agents propose without holding the
+# 14-route `cases:write`, and without widening `cases:work` (which stays exactly four routes). Everything that held `cases:write` can still log; a holder of `proposals:log` alone can do that one thing.
 # `billing:view` (what each tool counts for each client, the changes, billed versus counted, the data quality and last-reported views: the GET routes under /billing) was
 # split out of `alerts:read`, so a role can be given the licence and count pages without the alerts, or the alerts without these pages once the owner removes the implication
 # for that role. Everything that held `alerts:read` still reads these pages exactly as before; a holder of `billing:view` alone can read them and nothing else.
@@ -386,6 +389,7 @@ IMPLIED_BY: dict[str, tuple[str, ...]] = {
     "rules:view": ("rules:read",),
     "connectors:view": ("connectors:read",),
     "cases:work": ("cases:write",),
+    "proposals:log": ("cases:write",),
     "billing:view": ("alerts:read",),
     "inventory:write": ("mssp:manage",),  # whoever could manage the MSSP console could always change inventory; a custom role can be given inventory:write on its own
 }  # noqa: E501

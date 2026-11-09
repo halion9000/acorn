@@ -42,8 +42,11 @@ STAY_ROUTES = {
     ("PATCH", "/cases/{case_id}/tasks/{task_id}"),
     ("POST", "/approvals"),
     ("POST", "/approvals/{approval_id}/decide"),
+    ("POST", "/approvals/{approval_id}/undo"),
     ("POST", "/ledger/{run_id}/publish"),
     ("DELETE", "/ledger/publish/{slug}"),
+    # A person recording what they made of an agent proposal (the proposal log, added after this permission was split).
+    ("POST", "/agent-proposals/{proposal_id}/outcome"),
 }
 
 
@@ -84,7 +87,7 @@ class TestTheImplication:
         assert {p for p in known_permissions() if permission_in(["cases:work"], p)} == {"cases:work"}
 
     def test_cases_write_grants_exactly_what_it_did_plus_cases_work_and_the_implication_is_one_way(self):
-        assert {p for p in known_permissions() if permission_in(["cases:write"], p)} == {"cases:write", "cases:work"}
+        assert {p for p in known_permissions() if permission_in(["cases:write"], p)} == {"cases:write", "cases:work", "proposals:log"}
         assert not permission_in(["cases:work"], "cases:write")
 
     def test_the_pair_is_in_the_rule_and_no_platform_permission_is_involved(self):
@@ -122,7 +125,7 @@ class TestTheRoutes:
         found = {
             (m, p) for p, r in ALL_ROUTES if "cases:write" in required_permissions(r) for m in r.methods if m not in {"HEAD", "OPTIONS"}
         }
-        assert found == STAY_ROUTES and len(found) == 10
+        assert found == STAY_ROUTES and len(found) == 12
         assert not (_satisfied_by(["cases:work"]) & STAY_ROUTES)
 
     def test_whoever_held_cases_write_still_reaches_all_fourteen_routes(self):

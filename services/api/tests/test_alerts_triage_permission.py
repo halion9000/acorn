@@ -27,7 +27,7 @@ from route_introspect import required_permissions as _required_permissions
 from route_introspect import walk_routes
 
 MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations"
-TRIAGE_ROUTES = {("POST", "/alerts/{alert_id}/claim"), ("POST", "/alerts/{alert_id}/escalate"), ("POST", "/alerts/{alert_id}/snooze")}
+TRIAGE_ROUTES = {("POST", "/alerts/{alert_id}/claim"), ("POST", "/alerts/{alert_id}/escalate"), ("POST", "/alerts/{alert_id}/snooze"), ("POST", "/alerts/{alert_id}/notes")}
 # The ones the confirmed live run showed CORE's key passing, plus the alert ones: all must stay alerts:write.
 NAMED_WRITE_ONLY = {
     ("POST", "/alerts/submit"),
