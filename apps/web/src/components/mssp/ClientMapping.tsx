@@ -34,6 +34,18 @@ export function vendorFromSearch(search: string): string | null {
 }
 
 /** One tab per tool, with how many of its clients still need mapping, so each tool can be worked through on its own. */
+/** What the toast after mapping a row says, with a button to take it back. */
+export function MappedToast({ message, onUndo }: { message: string; onUndo: () => void }) {
+  return (
+    <span className="flex items-center gap-3" data-testid="mapped-toast">
+      <span>{message}</span>
+      <button type="button" onClick={onUndo} className="rounded border border-gray-500 px-2 py-0.5 text-xs hover:bg-gray-100">
+        Undo
+      </button>
+    </span>
+  );
+}
+
 export function toolTabs(clients: VendorClient[]): { vendor: string; total: number; unmapped: number }[] {
   const tabs = new Map<string, { vendor: string; total: number; unmapped: number }>();
   for (const c of clients) {
@@ -161,11 +173,33 @@ function UnmappedRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [choice]);
 
-  const run = async (work: () => Promise<unknown>, done: string) => {
+  const run = async (work: () => Promise<unknown>, done: string, undo?: () => Promise<unknown>) => {
     setBusy(true);
     try {
       await work();
-      toast.success(done);
+      if (undo) {
+        // Taking it back unmaps the row again (it lands back in the unmapped list); the toast stays long enough to read and press.
+        toast.success(
+          (tt) => (
+            <MappedToast
+              message={done}
+              onUndo={async () => {
+                toast.dismiss(tt.id);
+                try {
+                  await undo();
+                  toast.success('Mapping undone.');
+                  onChanged();
+                } catch (err) {
+                  toast.error(err instanceof Error && err.message ? err.message : 'Could not undo that.');
+                }
+              }}
+            />
+          ),
+          { duration: 10000 },
+        );
+      } else {
+        toast.success(done);
+      }
       onChanged();
     } catch (err) {
       toast.error(err instanceof Error && err.message ? err.message : 'Could not save that.');
@@ -179,7 +213,7 @@ function UnmappedRow({
     if (choice === NEW_CLIENT) {
       return run(() => msspApi.mapClient(client.id, { newTenantName: client.vendor_client_name }), `Added ${client.vendor_client_name} as a new client`);
     }
-    return run(() => msspApi.mapClient(client.id, { childTenantId: choice }), `Mapped ${client.vendor_client_name}`);
+    return run(() => msspApi.mapClient(client.id, { childTenantId: choice }), `Mapped ${client.vendor_client_name}`, () => msspApi.unmapClient(client.id));
   };
 
   return (
