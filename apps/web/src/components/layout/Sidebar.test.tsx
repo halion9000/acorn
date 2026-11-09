@@ -25,6 +25,7 @@ vi.mock('next/link', () => ({
 }));
 
 import { Sidebar } from './Sidebar';
+import { APP_VERSION } from '@/lib/revisions';
 
 describe('Sidebar', () => {
   it('renders the A.C.O.R.N mark and the major nav sections', () => {
@@ -60,11 +61,12 @@ describe('Sidebar', () => {
     for (const h of ['/settings/client-cleanup', '/settings/platform-health']) expect(hrefs).not.toContain(h);
   });
 
-  it('renders the MIT license attribution in the footer', () => {
+  it('shows the current version in the footer as a link to the revisions page, and no license line', () => {
     render(<Sidebar />);
 
-    const license = screen.getByRole('link', { name: /MIT License/i });
-    expect(license).toHaveAttribute('href', 'https://github.com/beenuar/AiSOC');
+    const version = screen.getByRole('link', { name: new RegExp(`^v${APP_VERSION.replace('.', '\\.')}$`) });
+    expect(version).toHaveAttribute('href', '/settings/revisions');
+    expect(screen.queryByText(/MIT License/i)).toBeNull();
   });
 });
 

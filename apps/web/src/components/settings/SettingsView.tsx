@@ -57,6 +57,7 @@ import { AlertEmailPanel } from './AlertEmailPanel';
 import { PasskeysCard } from './PasskeysCard';
 import { TotpCard } from './TotpCard';
 import { ChangePasswordCard } from './ChangePasswordCard';
+import { APP_VERSION } from '@/lib/revisions';
 import { keyHealth } from './apiKeyHealth';
 import { MemberEditor } from './MemberEditor';
 import { SoftwareUpdatePanel } from './SoftwareUpdatePanel';
@@ -278,6 +279,7 @@ export const MORE_SETTINGS: { href: string; label: string; description: string }
   { href: '/settings/costs', label: 'Cost dashboard', description: 'AI spend, automation activity and savings from bringing your own key' },
   { href: '/settings/triage', label: 'Auto-close', description: 'How sure AI triage must be to close an alert itself' },
   { href: '/settings/cipp-actions', label: 'CIPP actions', description: 'What CORE can do to client Microsoft 365 tenants through CIPP, whether it is switched on, and what it has been asked to do' },
+  { href: '/settings/revisions', label: 'Revisions', description: 'Every revision of A.C.O.R.N so far, newest first, and the current version number' },
   { href: '/settings/guide', label: 'ACORN Setup Guide', description: 'How to set up and use A.C.O.R.N, page by page (the former User guide)' },
   { href: '/settings/business-context', label: 'Business context rules', description: "Rules that adjust an alert's importance for a client before it is triaged" },
   { href: '/settings/tickets', label: 'Tickets', description: 'The HaloPSA status a resolved incident moves its ticket to' },
@@ -294,7 +296,7 @@ export const SETTINGS_GROUPS: { title: string; items: string[] }[] = [
   { title: 'Tools & integrations', items: ['/settings/connectors', '/settings/cipp-actions', '/settings/tickets'] },
   { title: 'Detection & AI', items: ['autonomy', '/settings/triage', 'deployment', '/settings/costs'] },
   { title: 'Platform', items: ['/settings/platform-health', 'software-update', 'azure-spend', 'alert-email', '/settings/retention'] },
-  { title: 'Help', items: ['/settings/guide', 'about'] },
+  { title: 'Help', items: ['/settings/guide', '/settings/revisions', 'about'] },
 ];
 
 export type SettingsEntry = { kind: 'tab'; id: TabId; label: string; description: string } | { kind: 'link'; href: string; label: string; description: string };
@@ -2183,7 +2185,7 @@ function AboutPanel() {
         description="Open-source SOC platform — community-built, MIT licensed."
       />
       <div className="grid gap-4 px-6 py-5 sm:grid-cols-2">
-        <InfoTile label="Version" value="v6.0.1" />
+        <InfoTile label="Version" value={`v${APP_VERSION}`} />
         <InfoTile label="Build" value="local • dev" />
         <InfoTile label="License" value="MIT" />
         <InfoTile label="Source" value="github.com/beenuar/AiSOC" mono />

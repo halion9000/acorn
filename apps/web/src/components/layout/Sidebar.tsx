@@ -4,12 +4,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
-import packageJson from '../../../package.json';
+import { APP_VERSION } from '@/lib/revisions';
 import { LiveQueueBadge } from './LiveQueueBadge';
 import { useHiddenNav } from '@/hooks/useHiddenNav';
 import { pathIsHidden, visibleSections } from '@/lib/nav-visibility';
-
-const APP_VERSION = packageJson.version;
 
 interface NavItem {
   label: string;
@@ -526,16 +524,9 @@ export function Sidebar() {
       {/* Footer */}
       <div className="p-4 border-t border-surface-border">
         <div className="flex items-center gap-2 text-xs text-fg-subtle">
-          <span className="font-mono">v{APP_VERSION}</span>
-          <span>·</span>
-          <a
-            href="https://github.com/beenuar/AiSOC"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-fg-muted transition-colors"
-          >
-            MIT License
-          </a>
+          <Link href="/settings/revisions" className="font-mono hover:text-fg-muted transition-colors" title="See every revision">
+            v{APP_VERSION}
+          </Link>
         </div>
       </div>
     </aside>
