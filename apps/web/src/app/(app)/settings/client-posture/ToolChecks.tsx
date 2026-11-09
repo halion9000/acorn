@@ -68,6 +68,7 @@ const TITLE: Record<string, string> = {
   cipp_subscriptions: 'Microsoft 365 subscriptions',
   cipp_unused_licences: 'Unused licences',
   cipp_partner_relationship: 'Partner relationship (GDAP)',
+  cipp_risky_oauth_apps: 'Apps with broad access',
   meraki_devices_offline: 'Meraki devices offline',
   meraki_open_wifi: 'Open or WEP Wi-Fi',
   dnsfilter_agents_silent: 'DNSFilter roaming agents silent',

@@ -28,6 +28,14 @@ const SEVERITY_STYLE: Record<string, string> = {
   info: 'bg-gray-500/15 text-gray-300 border-gray-500/30',
 };
 
+/** Why a person shows each Multi-Factor state: shown on hover so the label is never a mystery. */
+export const MFA_WHY: Record<string, string> = {
+  covered: 'They have a second factor and something requires it (a Conditional Access policy, security defaults or the per-user setting).',
+  registered_not_required: "They signed up for a second factor, but the tool reports nothing that requires it of them: no Conditional Access policy that covers them (a policy that excludes them, targets only some apps or groups, or is report-only does not count), no security defaults and no per-user enforcement.",
+  none: 'No second factor is registered for them.',
+  unknown: "The client's tools do not report their second-factor status.",
+};
+
 export const MFA_LABEL: Record<string, { text: string; className: string }> = {
   covered: { text: 'Covered', className: 'text-emerald-300' },
   registered_not_required: { text: 'Signed up, not required', className: 'text-amber-300' },
@@ -632,7 +640,7 @@ export function IdentitiesView() {
                           ))}
                         </span>
                       </td>
-                      <td className={`px-3 py-2 ${mfaInfo.className}`}>{mfaInfo.text}</td>
+                      <td className={`px-3 py-2 ${mfaInfo.className}`} title={MFA_WHY[p.mfa] ?? MFA_WHY.unknown}>{mfaInfo.text}</td>
                       <td className="px-3 py-2">
                         <span className="flex flex-wrap gap-1" data-testid="backups">
                           {(p.backups ?? []).length === 0 ? (
