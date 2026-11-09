@@ -246,6 +246,7 @@ TOOL_CHECK_SOURCES = {
     "fieldeffect": "fieldeffect",
     "cipp-health": "cipp",
     "ninjaone": "ninjaone",
+    "addigy": "addigy",
     "halopsa": "halopsa",
     "meraki": "meraki",
     "slide": "slide",

@@ -189,3 +189,16 @@ def test_a_vulnerability_check_that_is_failing_when_first_seen_raises_one_standi
 def test_a_vulnerability_check_that_gets_worse_later_still_raises_its_dated_alert():
     out = specs([check("threatmate_firmware", "met")], [check("threatmate_firmware", "not_met", "3 critical")], source="threatmate")
     assert len(out) == 1 and out[0]["key"] == "threatmate_firmware" and out[0]["idempotency_key"].endswith(":not_met")
+
+
+def test_the_ninjaone_and_addigy_update_and_support_checks_are_vulnerability_checks_that_alert_when_not_met():
+    for key in ("ninjaone_patching", "ninjaone_software_patches", "ninjaone_unsupported_os", "addigy_unsupported_macos"):
+        assert key in ca.VULN_CHECK_KEYS and key in ca.WATCHED, key
+        assert ca.standing_specs([check(key, "partly")], "x") == [], "partly is not enough to alert"
+        assert [s["key"] for s in ca.standing_specs([check(key, "not_met", "3 of 10 machines")], "x")] == [key]
+
+
+def test_addigy_may_send_its_own_checks():
+    from app.services.infra_review import TOOL_CHECK_SOURCES
+
+    assert TOOL_CHECK_SOURCES.get("addigy") == "addigy"

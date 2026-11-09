@@ -25,6 +25,7 @@ BODY_METHODS = {"POST", "PUT", "PATCH"}
 
 # (METHOD, path template) -> why anonymous callers are allowed.
 PUBLIC = {
+    ("GET", "/api/v1/public/client-status/{token}"): "the client status page opened by a private link: the secret is the credential (only its hash is stored), every problem is the same 404, and it returns client-safe counts only",
     ("POST", "/api/v1/auth/login"): "sign-in",
     ("POST", "/api/v1/auth/refresh"): "token refresh (the refresh token is the credential)",
     ("GET", "/auth/oidc/login"): "SSO flow (fails closed with 501 when unconfigured)",
