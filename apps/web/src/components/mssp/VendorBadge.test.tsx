@@ -78,3 +78,11 @@ describe('the vCIO Toolbox badge', () => {
     expect(img?.getAttribute('alt')).toBe('vCIO Toolbox');
   });
 });
+
+describe("A.C.O.R.N's own sources", () => {
+  it('show the A.C.O.R.N logo, with the readable name on hover, instead of a grey letter', () => {
+    render(<VendorBadge vendor="aisoc-identity-detections" />);
+    const img = screen.getByAltText('A.C.O.R.N identity detections');
+    expect(img).toHaveAttribute('src', '/logo-acorn.png');
+  });
+});

@@ -56,10 +56,12 @@ export default function VendorBadge({ vendor, size = 'sm', struck }: { vendor: s
   const label = vendorLabel(vendor);
   const box = size === 'lg' ? 'h-10 w-10 rounded-xl' : 'h-6 w-6 rounded-md';
   const b = BADGES[vendor] ?? { text: label.charAt(0).toUpperCase(), className: 'bg-gray-600 text-white' };
-  if (LOGOS.has(vendor)) {
+  // A.C.O.R.N's own detections (aisoc-checks, aisoc-identity-detections ...) wear the A.C.O.R.N logo, not a grey letter.
+  const own = vendor === 'aisoc' || vendor.startsWith('aisoc-');
+  if (own || LOGOS.has(vendor)) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={`/vendors/${vendor}.png`} alt={label} title={label} className={`${box} shrink-0 bg-white/90 object-contain p-0.5`} />
+      <img src={own ? '/logo-acorn.png' : `/vendors/${vendor}.png`} alt={label} title={label} className={`${box} shrink-0 bg-white/90 object-contain p-0.5`} />
     );
   }
   return (
