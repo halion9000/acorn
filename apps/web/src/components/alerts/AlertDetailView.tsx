@@ -33,6 +33,8 @@ import { CreateCaseModal } from '@/components/alerts/CreateCaseModal';
 import { HideAlertTypeModal } from '@/components/alerts/HideAlertTypeModal';
 import { HideSuggestionBanner } from '@/components/alerts/HideSuggestionBanner';
 import { EarlierOutcomes } from '@/components/alerts/EarlierOutcomes';
+import { AlertNotes } from '@/components/alerts/AlertNotes';
+import { AssignAlert } from '@/components/alerts/AssignAlert';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -968,6 +970,8 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
 
             <EarlierOutcomes alertId={alert.id} />
 
+            <AlertNotes alertId={alert.id} />
+
 
             {alert.confidenceLabel && (
               <ConfidenceExplainability
@@ -982,7 +986,7 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
               <div className="space-y-3">
                 <Field label="Source" value={alert.source} />
                 <Field label="Source Ref" value={alert.sourceRef || '—'} />
-                <Field label="Assignee" value={alert.assignee || <span className="text-gray-500">Unassigned</span>} />
+                <Field label="Assignee" value={<>{alert.assignee || <span className="text-gray-500">Unassigned</span>}<AssignAlert alertId={alert.id} onDone={() => void mutate()} /></>} />
                 <Field label="Created" value={<span suppressHydrationWarning>{safeFormat(alert.createdAt, 'MMM d, yyyy HH:mm:ss')}</span>} />
                 {alert.resolvedAt && (
                   <Field label="Resolved" value={<span suppressHydrationWarning>{safeFormat(alert.resolvedAt, 'MMM d, yyyy HH:mm:ss')}</span>} />

@@ -2115,6 +2115,9 @@ export const alertsApi = {
   /** Whether to suggest hiding this alert's type (only counts; hides nothing). */
   hideSuggestion: (alertId: string) => request<HideSuggestion>('/api/v1/alert-suppressions/suggestion', { params: { alert_id: alertId } }),
   /** What usually happened to earlier alerts of the same kind for this client: counts only. */
+  /** Notes on an alert (oldest first); they change nothing about it. */
+  notes: (alertId: string) => request<AlertNote[]>(`/api/v1/alerts/${encodeURIComponent(alertId)}/notes`),
+  addNote: (alertId: string, body: string) => request<AlertNote>(`/api/v1/alerts/${encodeURIComponent(alertId)}/notes`, { method: 'POST', body: JSON.stringify({ body }) }),
   earlierOutcomes: (alertId: string) => request<EarlierOutcomes>(`/api/v1/alerts/${encodeURIComponent(alertId)}/earlier-outcomes`),
   /** Stop hiding an alert type: its alerts come back as they were. */
   liftSuppression: (id: string) => request<AlertSuppression>(`/api/v1/alert-suppressions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
@@ -6289,6 +6292,13 @@ export const clientStatusLinksApi = {
   review: (id: string) => request<ClientStatusLink>(`/api/v1/client-status-links/${encodeURIComponent(id)}/review`, { method: 'POST' }),
   revoke: (id: string) => request<ClientStatusLink>(`/api/v1/client-status-links/${encodeURIComponent(id)}/revoke`, { method: 'POST' }),
 };
+
+export interface AlertNote {
+  id: string;
+  author: string;
+  body: string;
+  created_at: string;
+}
 
 export interface EarlierOutcomes {
   total: number;

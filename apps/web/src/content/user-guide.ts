@@ -308,6 +308,9 @@ All of these were tested against test data and a scratch database and deployed, 
 - **Client Posture > NIST CSF 2.0.** Each control, how the client stands today and the checks behind it. A control no check applies to says "No automated evidence": it is never called met by default, and a control is met only when every check behind it is met.
 - **Compliance > Review calendar and policies.** Things that must be looked at again on a schedule (policies, vendor reviews, evidence renewals) with an owner and a due date, soonest first; press **Reviewed** and the next date is today plus the interval. A policy keeps numbered versions of its text that are only ever added.
 - **Alert page > What usually happens.** For an alert, how earlier alerts of the same kind (same client, same exact title, last 180 days) ended: counts by status and by how they were judged, how many had a ticket, the median time to finish. It says "too few" under three earlier alerts, and it only describes: it never closes or advises.
+- **Alert page > Notes, and Assignee.** Write a note on an alert (what you looked at, who you called) without changing its status, owner or priority; notes are never edited and are audited. Next to the Assignee, pick a person and press **Assign** to give just this alert to them (or take it off whoever has it).
+- **Export CSV on Alerts and Cases.** Saves the alerts or cases listed on the page as a spreadsheet file. A title that starts like a formula is saved as plain text.
+- **Platform health > What the next retention sweep would delete** (platform administrators only). A dry run that counts, per kind of data, what the next sweep would delete; it deletes nothing.
 - **Settings > Profile > Password.** Change your own password: it needs the current one, and signs you out everywhere.
 
 ---

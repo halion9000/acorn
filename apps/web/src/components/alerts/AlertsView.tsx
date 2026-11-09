@@ -1,5 +1,6 @@
 'use client';
 
+import { csvText, downloadCsv } from '@/lib/csv';
 import { useState, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
@@ -96,6 +97,14 @@ function SeverityBadge({ severity }: { severity: string }) {
 
 const FINISHED = new Set(['resolved', 'closed', 'false_positive', 'auto_closed']);
 export const STALE_ALERT_DAYS = 7;
+
+/** The alerts listed on the page as spreadsheet text (what the Export CSV button saves). */
+export function alertsCsvText(alerts: Alert[]): string {
+  return csvText(
+    ['Title', 'Severity', 'Status', 'Source', 'Client', 'Device', 'Users', 'Assignee', 'Created'],
+    alerts.map((a) => [a.title, a.severity, a.status, a.source, a.clientName, a.device, (a.affectedUsers ?? []).join('; '), a.assignee, a.createdAt]),
+  );
+}
 
 /** How many whole days an alert has been open when that is a week or more, otherwise null (finished alerts, young alerts and unreadable dates give null). */
 export function openDays(createdAt: string | undefined, status: string, now: number = Date.now()): number | null {
@@ -547,6 +556,17 @@ export function AlertsView() {
           <Link href="/alerts/hidden" className="text-xs text-gray-400 hover:text-gray-200 underline">
             Hidden alert types
           </Link>
+          <button
+            type="button"
+            disabled={alerts.length === 0}
+            title="Save the alerts listed on this page as a spreadsheet file"
+            onClick={() =>
+              downloadCsv('alerts.csv', alertsCsvText(alerts))
+            }
+            className="text-xs text-gray-400 hover:text-gray-200 underline disabled:opacity-40"
+          >
+            Export CSV
+          </button>
           <div
             role="tablist"
             aria-label="View mode"

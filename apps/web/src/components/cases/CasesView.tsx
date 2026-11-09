@@ -1,5 +1,6 @@
 'use client';
 
+import { csvText, downloadCsv } from '@/lib/csv';
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
@@ -45,6 +46,14 @@ const STATUS_CONFIG: Record<
 };
 
 // ─── Case Card ────────────────────────────────────────────────────────────────
+
+/** The cases listed on the page as spreadsheet text (what the Export CSV button saves). */
+export function casesCsvText(cases: Case[]): string {
+  return csvText(
+    ['Case', 'Title', 'Status', 'Severity', 'Client', 'Assignee', 'Alerts', 'Tags', 'Created'],
+    cases.map((c) => [c.caseNumber, c.title, c.status, c.severity, c.clientName, c.assignee, c.alertCount ?? c.alertIds?.length ?? 0, (c.tags ?? []).join('; '), c.createdAt]),
+  );
+}
 
 function CaseCard({ c }: { c: Case }) {
   const sev = SEVERITY_CONFIG[c.severity] ?? SEVERITY_CONFIG.medium;
@@ -376,6 +385,18 @@ export function CasesView({ initialCases }: CasesViewProps = {}) {
         )
       ) : (
         <div className="grid grid-cols-1 gap-3">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              title="Save the cases listed here as a spreadsheet file"
+              onClick={() =>
+                downloadCsv('cases.csv', casesCsvText(cases))
+              }
+              className="text-xs text-gray-400 hover:text-gray-200 underline"
+            >
+              Export CSV ({cases.length})
+            </button>
+          </div>
           {cases.map((c) => <CaseCard key={c.id} c={c} />)}
         </div>
       )}
