@@ -10,6 +10,16 @@ export interface Revision {
 
 export const REVISIONS: Revision[] = [
   {
+    "version": "1.23",
+    "weekOf": "2026-11-09",
+    "lastChange": "2026-11-09",
+    "commits": 1,
+    "changes": [
+      "Hunts: saved hunts show how many hits their last scheduled run returned"
+    ],
+    "fixes": 0
+  },
+  {
     "version": "1.22",
     "weekOf": "2026-11-02",
     "lastChange": "2026-11-08",

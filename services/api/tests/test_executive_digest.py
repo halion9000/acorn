@@ -75,6 +75,16 @@ def test_format_period_label_same_month() -> None:
     assert "2026" in label
 
 
+def test_format_period_label_for_a_shift_window_gives_the_hours() -> None:
+    from datetime import UTC, datetime
+
+    fmt = _internal_helpers["_format_period_label"]
+    assert fmt(datetime(2026, 11, 9, 0, 0, tzinfo=UTC), datetime(2026, 11, 9, 12, 0, tzinfo=UTC)) == "Nov 9, 00:00 – Nov 9, 12:00 UTC"
+    assert fmt(datetime(2026, 11, 8, 18, 30, tzinfo=UTC), datetime(2026, 11, 9, 18, 30, tzinfo=UTC)) == "Nov 8, 18:30 – Nov 9, 18:30 UTC"
+    # Longer windows keep the date-only wording.
+    assert "UTC" not in fmt(datetime(2026, 11, 1, tzinfo=UTC), datetime(2026, 11, 8, tzinfo=UTC))
+
+
 def test_severity_split_counts() -> None:
     split = _internal_helpers["_severity_split"](
         [

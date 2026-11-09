@@ -21,7 +21,10 @@ import { OrgSnapshot } from './OrgSnapshot';
 
 import { reportsApi, type ExecutiveDigest as ExecutiveDigestPayload } from '@/lib/api';
 
-const PERIOD_PRESETS: { label: string; days: number }[] = [
+// The two short windows are for a shift handover: what happened since the last person was on.
+export const PERIOD_PRESETS: { label: string; days: number }[] = [
+  { label: 'Last 12 hours (shift handover)', days: 0.5 },
+  { label: 'Last 24 hours', days: 1 },
   { label: 'Last 7 days', days: 7 },
   { label: 'Last 14 days', days: 14 },
   { label: 'Last 30 days', days: 30 },
@@ -94,7 +97,7 @@ function deltaClass(delta: number): string {
   return delta > 0 ? 'text-amber-300' : 'text-emerald-300';
 }
 
-function periodWindow(days: number): { period_start: string; period_end: string } {
+export function periodWindow(days: number): { period_start: string; period_end: string } {
   const end = new Date();
   const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
   return {

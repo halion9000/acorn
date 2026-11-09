@@ -205,6 +205,12 @@ def _format_period_label(start: datetime, end: datetime) -> str:
     the ``%-d`` directive is a glibc extension that raises ``ValueError``
     on Windows/msvcrt. The output is byte-identical on all platforms.
     """
+    if end - start <= timedelta(days=2):
+        # A shift handover window (12 or 24 hours): days alone would read "Nov 9 – 9, 2026", so say the hours (UTC).
+        def stamp(dt: datetime) -> str:
+            return f"{dt:%b} {dt.day}, {dt:%H:%M}"
+
+        return f"{stamp(start)} – {stamp(end)} UTC"
     same_year = start.year == end.year
     same_month = same_year and start.month == end.month
     if same_month:

@@ -55,6 +55,20 @@ describe('ExecutiveDigest', () => {
     expect(days(api.weeklyDigest.mock.calls[1][0])).toBe(30);
   });
 
+  it('offers a 12-hour and a 24-hour window for a shift handover, and asks the API for exactly that span', async () => {
+    api.weeklyDigest.mockResolvedValue(digest());
+    renderIt();
+    await screen.findByText('Oct 1 to Oct 7');
+    const hours = (p: { period_start: string; period_end: string }) => Math.round((Date.parse(p.period_end) - Date.parse(p.period_start)) / 3600_000);
+    expect(screen.getByRole('option', { name: /12 hours/ })).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole('combobox'), '0.5');
+    await waitFor(() => expect(api.weeklyDigest).toHaveBeenCalledTimes(2));
+    expect(hours(api.weeklyDigest.mock.calls[1][0])).toBe(12);
+    await userEvent.selectOptions(screen.getByRole('combobox'), '1');
+    await waitFor(() => expect(api.weeklyDigest).toHaveBeenCalledTimes(3));
+    expect(hours(api.weeklyDigest.mock.calls[2][0])).toBe(24);
+  });
+
   it('shows the headline and the four headline numbers', async () => {
     api.weeklyDigest.mockResolvedValue(digest());
     renderIt();
