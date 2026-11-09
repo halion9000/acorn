@@ -40,7 +40,12 @@ WATCHED: dict[str, tuple[str, str, str]] = {
 
 # The checks that are vulnerabilities in software, operating systems, firmware or exposed services. Their alerts get the category "vulnerability" so the Vulnerabilities page can list them, and a
 # failing one raises its alert once even on the first report (see ``standing_specs``). Add the key here when a new vulnerability check is built.
-VULN_CHECK_KEYS = frozenset({"threatmate_patching", "threatmate_firmware", "threatmate_end_of_life", "threatmate_pentest", "threatmate_external_exposure"})
+VULN_CHECK_KEYS = frozenset(
+    {
+        "threatmate_patching", "threatmate_firmware", "threatmate_end_of_life", "threatmate_pentest", "threatmate_external_exposure",
+        "ninjaone_patching", "ninjaone_software_patches", "ninjaone_unsupported_os",
+    }
+)
 
 WATCHED.update(
     {
@@ -49,6 +54,9 @@ WATCHED.update(
         "threatmate_end_of_life": ("Operating systems or applications at this client are past end of life", "high", "not_met"),
         "threatmate_pentest": ("ThreatMate's scans found serious vulnerabilities at this client", "high", "not_met"),
         "threatmate_external_exposure": ("Serious vulnerabilities on this client's internet-facing addresses", "high", "not_met"),
+        "ninjaone_patching": ("Windows machines at this client have critical updates waiting over 30 days", "high", "not_met"),
+        "ninjaone_software_patches": ("Windows machines at this client have critical application updates waiting over 30 days", "high", "not_met"),
+        "ninjaone_unsupported_os": ("Windows machines at this client run a version Microsoft no longer supports", "high", "not_met"),
     }
 )
 

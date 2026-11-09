@@ -13,14 +13,15 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-09",
-    "commits": 6,
+    "commits": 7,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Digest: 12-hour and 24-hour windows for a shift handover, with the hours in the label",
       "Autonomy: proposal log (table, API, evidence rule)",
       "Autonomy: proposal log on the Autonomy settings page, with Agree/Reject verdicts",
       "Autonomy: proposals:log permission for the proposal log; test fixtures brought current",
-      "Remove the Nessus pages, routes and import service"
+      "Remove the Nessus pages, routes and import service",
+      "Vulnerabilities page: vulnerability alerts from the connected tools, each linking to its alert"
     ],
     "fixes": 0
   },

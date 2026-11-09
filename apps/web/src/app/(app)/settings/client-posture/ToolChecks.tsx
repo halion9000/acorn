@@ -82,6 +82,7 @@ const TITLE: Record<string, string> = {
   ninjaone_reboot: 'Restarts',
   ninjaone_disk_space: 'System drive space',
   ninjaone_patching: 'Windows updates',
+  ninjaone_software_patches: 'Application updates',
   halopsa_agreement: 'Support agreement',
   meraki_licence: 'Meraki licence',
   meraki_admin_2fa: 'Meraki administrators',

@@ -30,6 +30,19 @@ export function toolOf(a: Alert): string {
   return tool ? vendorLabel(tool) : 'Unknown tool';
 }
 
+/** How many open findings each client has, most first (pure). The client is the alert's own tenant, which is what the page's client filter takes. */
+export function byClient(alerts: Alert[]): { id: string; name: string; count: number; worst: string }[] {
+  const out = new Map<string, { id: string; name: string; count: number; worst: string }>();
+  for (const a of alerts) {
+    const id = a.tenantId ?? '';
+    const row = out.get(id) ?? { id, name: a.clientName ?? 'This organisation', count: 0, worst: a.severity };
+    row.count += 1;
+    if ((RANK[a.severity] ?? 9) < (RANK[row.worst] ?? 9)) row.worst = a.severity;
+    out.set(id, row);
+  }
+  return [...out.values()].sort((a, b) => (RANK[a.worst] ?? 9) - (RANK[b.worst] ?? 9) || b.count - a.count || a.name.localeCompare(b.name));
+}
+
 /** Worst first, then newest first (pure). */
 export function sortFindings(alerts: Alert[]): Alert[] {
   return [...alerts].sort((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9) || (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
@@ -43,6 +56,7 @@ export function VulnerabilitiesView() {
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
   const findings = sortFindings(data?.alerts ?? []);
+  const clients = byClient(findings);
   const counts = findings.reduce<Record<string, number>>((m, a) => ({ ...m, [a.severity]: (m[a.severity] ?? 0) + 1 }), {});
 
   return (
@@ -51,10 +65,10 @@ export function VulnerabilitiesView() {
         <div>
           <h1 className="text-2xl font-bold text-white">Vulnerabilities</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-400">
-            Software, operating-system, firmware and internet-facing vulnerabilities the connected tools report for each client. Each row is an alert: open it to work it with the rest of the alerts.
+            Software, operating-system, firmware and internet-facing vulnerabilities the connected tools report for each client. It opens on all clients together; pick one to narrow it, or press a client's name below. Each row is an alert: open it to work it with the rest of the alerts.
           </p>
         </div>
-        <ClientPicker value={clientId} onChange={setClientId} label="Client" ownLabel="My organisation (internal)" />
+        <ClientPicker value={clientId} onChange={setClientId} label="Show" ownLabel="All clients" />
       </div>
 
       {error ? (
@@ -78,6 +92,21 @@ export function VulnerabilitiesView() {
                 .map((s) => `${counts[s]} ${s}`)
                 .join(' · ')}
             </p>
+            {!clientId && clients.length > 1 ? (
+              <div className="flex flex-wrap gap-2" data-testid="vulnerabilities-by-client">
+                {clients.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setClientId(c.id)}
+                    className={`rounded border px-2 py-1 text-xs ${SEVERITY_TEXT[c.worst] ?? SEVERITY_TEXT.info}`}
+                    title={`Show only ${c.name}`}
+                  >
+                    {c.name}: {c.count}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className="overflow-x-auto rounded-lg border border-gray-800">
               <table className="w-full text-left text-sm">
                 <thead className="bg-gray-900 text-xs text-gray-500">
