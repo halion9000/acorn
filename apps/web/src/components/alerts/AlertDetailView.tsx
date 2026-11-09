@@ -1,5 +1,6 @@
 'use client';
 
+import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { RefreshStatusButton } from './RefreshStatusButton';
 import { RunScriptButton } from './RunScriptButton';
 import { ScriptRunsSection } from './ScriptRunsSection';
@@ -847,7 +848,7 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
             <span className="text-xs text-gray-500">Risk Score: <span className="text-white font-bold">{alert.riskScore}</span></span>
           </div>
           <h1 className="text-lg font-semibold text-gray-100">{alert.title}</h1>
-          <p className="text-sm text-gray-500 mt-1" suppressHydrationWarning>{alert.source} · {safeFormat(alert.createdAt, 'MMM d, yyyy HH:mm:ss')}</p>
+          <p className="text-sm text-gray-500 mt-1" suppressHydrationWarning>{vendorLabel(alert.source)} · {safeFormat(alert.createdAt, 'MMM d, yyyy HH:mm:ss')}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <select
@@ -996,7 +997,7 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
 
             <Section title="Details">
               <div className="space-y-3">
-                <Field label="Source" value={alert.source} />
+                <Field label="Source" value={vendorLabel(alert.source)} />
                 <Field label="Source Ref" value={alert.sourceRef || '—'} />
                 <Field label="Assignee" value={<>{alert.assignee || <span className="text-gray-500">Unassigned</span>}<AssignAlert alertId={alert.id} onDone={() => void mutate()} /></>} />
                 <Field label="Created" value={<span suppressHydrationWarning>{safeFormat(alert.createdAt, 'MMM d, yyyy HH:mm:ss')}</span>} />
@@ -1063,7 +1064,7 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
         <Section title="Event Timeline">
           <div className="space-y-4">
             {[
-              { time: alert.createdAt, type: 'alert_created', title: 'Alert Created', desc: `Alert ingested from ${alert.source}` },
+              { time: alert.createdAt, type: 'alert_created', title: 'Alert Created', desc: `Alert ingested from ${vendorLabel(alert.source)}` },
               { time: alert.updatedAt, type: 'status_change', title: 'Status Updated', desc: `Status changed to ${alert.status}` },
             ].map((event, i) => (
               <div key={i} className="flex gap-4">

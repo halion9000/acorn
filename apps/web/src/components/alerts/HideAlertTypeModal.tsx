@@ -1,5 +1,6 @@
 'use client';
 
+import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { alertsApi, type Alert } from '@/lib/api';
@@ -71,7 +72,7 @@ export function HideAlertTypeModal({ open, onClose, alert, onHidden }: Props) {
           <h2 className="text-lg font-semibold text-gray-100">Hide this alert type</h2>
           <p className="mt-1 text-sm text-gray-400">
             Hides every alert like <span className="text-gray-200">{alert.title}</span>
-            {alert.source ? <> from {alert.source}</> : null}. Nothing is deleted: they come back as they were when this ends.
+            {alert.source ? <> from {vendorLabel(alert.source)}</> : null}. Nothing is deleted: they come back as they were when this ends.
           </p>
         </div>
 

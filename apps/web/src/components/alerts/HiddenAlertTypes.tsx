@@ -1,5 +1,6 @@
 'use client';
 
+import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
@@ -93,7 +94,7 @@ export function HiddenAlertTypes() {
             {(data ?? []).map((r) => (
               <tr key={r.id} className="border-b border-gray-800" data-testid="rule">
                 <td className="px-3 py-2 text-gray-100">{r.title || '—'}</td>
-                <td className="px-3 py-2 text-gray-300">{r.source ?? '—'}</td>
+                <td className="px-3 py-2 text-gray-300">{r.source ? vendorLabel(r.source) : '—'}</td>
                 <td className="px-3 py-2 text-gray-300">{coverage(r)}</td>
                 <td className="px-3 py-2 text-gray-400">{lasts(r)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-200">

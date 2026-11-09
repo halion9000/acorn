@@ -326,7 +326,7 @@ describe('InvestigationRail — header', () => {
     // Severity 'high' is unique — the fixture priorities are {critical, low,
     // info}, so 'high' appears exactly once (in the severity span).
     expect(screen.getByText('high')).toBeInTheDocument();
-    expect(screen.getByText('okta')).toBeInTheDocument();
+    expect(screen.getByText('Okta')).toBeInTheDocument();
     // Risk score is rounded — 87 stays 87, but the prefix is the contract.
     expect(screen.getByText(/^risk 87$/)).toBeInTheDocument();
   });

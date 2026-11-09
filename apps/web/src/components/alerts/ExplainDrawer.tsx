@@ -49,6 +49,7 @@
  * immediately closes it.
  */
 
+import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   agentsApi,
@@ -526,7 +527,7 @@ function DrawerHeader({
           {alert.title}
         </h2>
         <p className="text-xs text-gray-400 mt-0.5">
-          {alert.source} · {alert.severity} · {alert.id}
+          {vendorLabel(alert.source)} · {alert.severity} · {alert.id}
         </p>
       </div>
 

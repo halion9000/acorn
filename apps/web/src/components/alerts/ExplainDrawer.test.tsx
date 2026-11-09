@@ -183,7 +183,7 @@ describe('ExplainDrawer', () => {
     expect(
       screen.getByText(/Impossible travel/),
     ).toBeInTheDocument();
-    expect(screen.getByText(/okta · high · ALERT-WS-D1-0001/)).toBeInTheDocument();
+    expect(screen.getByText(/Okta · high · ALERT-WS-D1-0001/)).toBeInTheDocument();
 
     // The drawer trims `rawEvent` from the payload it sends to the backend.
     const callArgs = explainStreamMock.mock.calls[0][0] as {

@@ -420,7 +420,7 @@ export function AlertRow({
               <span className="text-gray-700">·</span>
             </>
           )}
-          <span className="text-xs text-gray-600">{alert.source}</span>
+          <span className="text-xs text-gray-600">{vendorLabel(alert.source)}</span>
           {toolLink && (
             // The row is itself a link, so this is not an anchor inside it: it opens the tool's own page for this alert in a new tab and leaves the row alone.
             <>

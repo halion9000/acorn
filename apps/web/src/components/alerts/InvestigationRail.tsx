@@ -32,6 +32,7 @@
  * Author: Beenu Arora <beenu@cyble.com>
  */
 
+import { vendorLabel } from '@/components/mssp/ClientMapping';
 import Link from 'next/link';
 import { useState } from 'react';
 import useSWR from 'swr';
@@ -243,7 +244,7 @@ function RailHeader({
         <span>·</span>
         <span className="capitalize">{alert.status.replace('_', ' ')}</span>
         <span>·</span>
-        <span>{alert.source}</span>
+        <span>{vendorLabel(alert.source)}</span>
         <span>·</span>
         <span suppressHydrationWarning>
           {safeDistance(alert.createdAt, { addSuffix: true })}

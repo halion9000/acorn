@@ -11,6 +11,7 @@
  * fox.beach" rather than 47 separate alert rows.
  */
 
+import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { useState } from 'react';
 import useSWR from 'swr';
 import { TenantScopePicker } from '@/components/ui/TenantScopePicker';
@@ -397,7 +398,7 @@ function EntityDetailDrawer({
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-500">
-                        {c.source && <span>{c.source}</span>}
+                        {c.source && <span>{vendorLabel(c.source)}</span>}
                         {c.source && <span className="text-gray-700">·</span>}
                         <span suppressHydrationWarning>
                           {safeDistance(c.observed_at, {
