@@ -90,7 +90,6 @@ from app.api.v1.endpoints import (
     metrics,
     mssp,
     mssp_clients,
-    nessus,
     nist_coverage,
     nl_detection,
     nl_query,
@@ -286,7 +285,6 @@ api_router.include_router(client_documents.ingest_router)
 api_router.include_router(client_documents.router)
 api_router.include_router(client_posture.router)
 api_router.include_router(dmarc.router)
-api_router.include_router(nessus.router)
 api_router.include_router(billing.router)
 api_router.include_router(billing.ingest_router)
 api_router.include_router(canary_tunnel.ingest_router)
