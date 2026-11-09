@@ -43,7 +43,7 @@ def test_the_first_report_of_a_check_and_an_unchanged_or_improving_check_raise_n
 
 
 def test_a_check_nobody_watches_raises_nothing_and_partly_only_matters_for_the_dark_web():
-    assert specs([check("threatmate_patching", "met")], [check("threatmate_patching", "not_met")]) == []
+    assert specs([check("threatmate_agents_online", "met")], [check("threatmate_agents_online", "not_met")]) == []
     assert specs([check("threatmate_google_admins", "met")], [check("threatmate_google_admins", "partly")]) == []
     dark = specs([check("threatmate_deep_dark_web", "met")], [check("threatmate_deep_dark_web", "partly", "1 open finding")], "threatmate")
     assert [a["key"] for a in dark] == ["threatmate_deep_dark_web"]
@@ -172,3 +172,20 @@ def test_liongard_losing_sight_of_a_client_raises_a_medium_alert_only_when_it_is
     assert [(a["key"], a["severity"]) for a in out] == [("liongard_inspections", "medium")]
     assert specs([check("liongard_inspections", "met")], [check("liongard_inspections", "partly", "1 of 20 inspections has failed")]) == []
 
+
+
+def test_a_vulnerability_check_that_is_failing_when_first_seen_raises_one_standing_alert_in_the_vulnerability_category():
+    new = [check("threatmate_patching", "not_met", "10 of 40 devices are patch-compliant in ThreatMate (25%)"), check("threatmate_end_of_life", "partly", "one app near end of life"), check("threatmate_google_admins", "not_met", "x")]
+    out = ca.standing_specs(new, "threatmate")
+    assert [s["key"] for s in out] == ["threatmate_patching"], "only vulnerability checks at their alerting level or worse, and not the identity check"
+    assert out[0]["idempotency_key"] == "check:threatmate:threatmate_patching:standing", "no date: raised once however long it stays failing"
+    assert "10 of 40 devices" in out[0]["description"]
+    assert ca.standing_specs(None, "threatmate") == [] and ca.standing_specs([check("threatmate_patching", "met")], "threatmate") == []
+    row = ca.build_alert(uuid.uuid4(), "threatmate", out[0], NOW)
+    assert row.category == "vulnerability" and "threatmate_patching" in row.tags
+    assert ca.build_alert(uuid.uuid4(), "threatmate-google", ca.alerts_for_changes(changes([check("threatmate_google_admins", "met")], [check("threatmate_google_admins", "not_met")], "threatmate-google"), "threatmate-google", NOW)[0], NOW).category == "posture"
+
+
+def test_a_vulnerability_check_that_gets_worse_later_still_raises_its_dated_alert():
+    out = specs([check("threatmate_firmware", "met")], [check("threatmate_firmware", "not_met", "3 critical")], source="threatmate")
+    assert len(out) == 1 and out[0]["key"] == "threatmate_firmware" and out[0]["idempotency_key"].endswith(":not_met")

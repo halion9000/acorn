@@ -310,6 +310,11 @@ const navSections: NavSection[] = [
         icon: <ShieldIcon />,
       },
       {
+        label: 'Vulnerabilities',
+        href: '/vulnerabilities',
+        icon: <ShieldIcon />,
+      },
+      {
         label: 'Client Docs',
         href: '/settings/client-docs',
         icon: <FolderIcon />,

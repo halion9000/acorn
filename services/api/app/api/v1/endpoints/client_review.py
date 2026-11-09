@@ -231,7 +231,7 @@ async def apply_m365_checks(db: Any, owner: uuid.UUID, report: M365ChecksReport,
                 db.add(ClientCheckHistory(tenant_id=tid, observed_at=now, **change))
             try:
                 async with db.begin_nested():  # an alert that cannot be raised must not lose the checks
-                    await raise_check_alerts(db, tid, source, changed, now)
+                    await raise_check_alerts(db, tid, source, changed, now, checks=new_checks)
             except Exception:  # noqa: BLE001
                 logger.warning("check alerts not raised for %s", tid, exc_info=True)
             try:

@@ -1827,6 +1827,8 @@ export interface AlertFilters {
   severity?: string;
   status?: string;
   source?: string;
+  /** Only alerts of this kind, for example vulnerability (the Vulnerabilities page). */
+  category?: string;
   assignee?: string;
   startTime?: string;
   endTime?: string;

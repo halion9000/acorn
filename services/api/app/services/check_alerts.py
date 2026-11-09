@@ -38,6 +38,21 @@ WATCHED: dict[str, tuple[str, str, str]] = {
 }
 
 
+# The checks that are vulnerabilities in software, operating systems, firmware or exposed services. Their alerts get the category "vulnerability" so the Vulnerabilities page can list them, and a
+# failing one raises its alert once even on the first report (see ``standing_specs``). Add the key here when a new vulnerability check is built.
+VULN_CHECK_KEYS = frozenset({"threatmate_patching", "threatmate_firmware", "threatmate_end_of_life", "threatmate_pentest", "threatmate_external_exposure"})
+
+WATCHED.update(
+    {
+        "threatmate_patching": ("Many machines at this client are missing patches", "high", "not_met"),
+        "threatmate_firmware": ("Serious firmware vulnerabilities at this client", "high", "not_met"),
+        "threatmate_end_of_life": ("Operating systems or applications at this client are past end of life", "high", "not_met"),
+        "threatmate_pentest": ("ThreatMate's scans found serious vulnerabilities at this client", "high", "not_met"),
+        "threatmate_external_exposure": ("Serious vulnerabilities on this client's internet-facing addresses", "high", "not_met"),
+    }
+)
+
+
 def raises_alert(key: str) -> bool:
     """Whether a worsening of this check opens an alert (so a page can offer to open it). Most checks are only shown, never alerted on."""
     return key in WATCHED
@@ -72,6 +87,34 @@ def alerts_for_changes(changes: list[dict[str, Any]], source: str, now: datetime
     return out
 
 
+def standing_specs(checks: list[dict[str, Any]] | None, source: str) -> list[dict[str, Any]]:
+    """Alert specs for vulnerability checks that are failing right now, whatever they were before (pure).
+
+    A change-only alert would never mention a vulnerability that was already there when A.C.O.R.N first saw the check, and the Vulnerabilities page would open empty. So a vulnerability check at its alerting
+    level or worse gets one alert, keyed by client, tool and check with no date, so it is raised once and not every day it stays failing. When it is fixed and breaks again, the dated alert for that change is raised
+    as usual.
+    """
+    out: list[dict[str, Any]] = []
+    for c in checks or []:
+        key = str(c.get("key") or "")
+        watched = WATCHED.get(key)
+        status = str(c.get("status") or "")
+        if key not in VULN_CHECK_KEYS or watched is None or status not in RANK or RANK[status] < RANK[watched[2]]:
+            continue
+        title, severity, _least = watched
+        evidence = str(c.get("evidence") or "").strip()
+        out.append(
+            {
+                "key": key,
+                "title": title,
+                "severity": severity,
+                "description": f"{evidence} (found when A.C.O.R.N first saw this check failing)".strip(),
+                "idempotency_key": f"check:{source}:{key}:standing"[:128],
+            }
+        )
+    return out
+
+
 def build_alert(tenant_id: uuid.UUID, source: str, spec: dict[str, Any], now: datetime) -> Alert:
     """One alert row for a spec from ``alerts_for_changes``."""
     return Alert(
@@ -81,7 +124,7 @@ def build_alert(tenant_id: uuid.UUID, source: str, spec: dict[str, Any], now: da
         severity=spec["severity"],
         status="new",
         priority=80 if spec["severity"] == "high" else 50,
-        category="posture",
+        category="vulnerability" if spec["key"] in VULN_CHECK_KEYS else "posture",
         connector_type=CONNECTOR_TYPE,
         rule_id=f"check:{spec['key']}",
         rule_name=spec["title"],
@@ -102,14 +145,14 @@ def build_alert(tenant_id: uuid.UUID, source: str, spec: dict[str, Any], now: da
     )
 
 
-async def raise_alerts(db: Any, tenant_id: uuid.UUID, source: str, changes: list[dict[str, Any]], now: datetime) -> int:
+async def raise_alerts(db: Any, tenant_id: uuid.UUID, source: str, changes: list[dict[str, Any]], now: datetime, checks: list[dict[str, Any]] | None = None) -> int:
     """Add the alerts a report's changes call for to ``db`` (the caller commits), skipping one that already exists for the same check, day and status. Returns how many were added."""
     from app.models.tenant import Tenant  # noqa: PLC0415
     from app.services.tool_exclusions import check_is_excluded, of_settings  # noqa: PLC0415
 
     if check_is_excluded(source, of_settings((await db.execute(select(Tenant.settings).where(Tenant.id == tenant_id))).scalar_one_or_none())):
         return 0  # the client does not use this tool: its checks raise nothing
-    specs = alerts_for_changes(changes, source, now)
+    specs = alerts_for_changes(changes, source, now) + standing_specs(checks, source)
     added = 0
     for spec in specs:
         exists = (
