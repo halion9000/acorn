@@ -98,6 +98,25 @@ function SeverityBadge({ severity }: { severity: string }) {
 const FINISHED = new Set(['resolved', 'closed', 'false_positive', 'auto_closed']);
 export const STALE_ALERT_DAYS = 7;
 
+export type GroupBy = 'none' | 'device' | 'person';
+
+/**
+ * The alerts of this page gathered under the device or the person they name, whichever tool raised them (so one incident seen by three tools sits together). The biggest groups come first; alerts naming nobody
+ * go last; inside a group the order is the list's. An alert that names several people sits under the first. With "none" there is one group with no heading (pure).
+ */
+export function groupAlerts(alerts: Alert[], by: GroupBy): { key: string | null; alerts: Alert[] }[] {
+  if (by === 'none') return [{ key: null, alerts }];
+  const keyOf = (a: Alert): string => (by === 'device' ? (a.device ?? a.affectedHosts?.[0] ?? '') : (a.affectedUsers?.[0] ?? '')).trim().toLowerCase();
+  const groups = new Map<string, Alert[]>();
+  for (const a of alerts) {
+    const k = keyOf(a);
+    (groups.get(k) ?? groups.set(k, []).get(k)!).push(a);
+  }
+  return [...groups.entries()]
+    .sort((x, y) => (x[0] === '' ? 1 : 0) - (y[0] === '' ? 1 : 0) || y[1].length - x[1].length || x[0].localeCompare(y[0]))
+    .map(([key, list]) => ({ key, alerts: list }));
+}
+
 /** The alerts listed on the page as spreadsheet text (what the Export CSV button saves). */
 export function alertsCsvText(alerts: Alert[]): string {
   return csvText(
@@ -788,6 +807,7 @@ export function AlertsTableGrid({
 }) {
   // Ticked rows (for linking one ticket to several alerts). Only ids still on this page count, so paging or filtering never leaves a hidden alert selected.
   const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [groupBy, setGroupBy] = useState<GroupBy>('none');
   const tickedIds = alerts.filter((a) => ticked.has(a.id)).map((a) => a.id);
   const allTicked = alerts.length > 0 && tickedIds.length === alerts.length;
   const someTicked = tickedIds.length > 0 && !allTicked;
@@ -825,7 +845,20 @@ export function AlertsTableGrid({
           disabled={alerts.length === 0}
           className="mr-3 shrink-0"
         />
-        <span className="text-xs text-gray-500 flex-1 pl-2">ALERT</span>
+        <span className="text-xs text-gray-500 flex-1 pl-2">
+          ALERT
+          <select
+            aria-label="Group this page by"
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value as GroupBy)}
+            className="ml-3 rounded border border-gray-700 bg-gray-900 px-1 py-0.5 text-xs normal-case text-gray-300"
+            title="Gather the alerts on this page under the device or the person they name, whichever tool raised them"
+          >
+            <option value="none">No grouping</option>
+            <option value="device">Group by device</option>
+            <option value="person">Group by person</option>
+          </select>
+        </span>
         <span className="text-xs text-gray-500 w-20">CONFIDENCE</span>
         <span className="text-xs text-gray-500 w-20">SEVERITY</span>
         <span className="text-xs text-gray-500 w-24">STATUS</span>
@@ -888,18 +921,27 @@ export function AlertsTableGrid({
         </div>
       ) : (
         <div>
-          {alerts.map((alert) => (
-            <div key={alert.id} className="flex items-center">
-              <input
-                type="checkbox"
-                aria-label={`Select alert ${alert.title}`}
-                checked={ticked.has(alert.id)}
-                onChange={() => toggle(alert.id)}
-                className="ml-3 shrink-0"
-              />
-              <div className="min-w-0 flex-1">
-                <AlertRow alert={alert} selected={selectedAlertId === alert.id} onSelect={onSelect} />
-              </div>
+          {groupAlerts(alerts, groupBy).map((group) => (
+            <div key={group.key ?? 'all'} data-testid={group.key === null ? undefined : 'alert-group'}>
+              {group.key !== null && (
+                <div className="border-b border-gray-800/60 bg-gray-900/80 px-4 py-1.5 text-xs text-gray-400">
+                  {groupBy === 'device' ? 'Device' : 'Person'}: <span className="text-gray-200">{group.key || (groupBy === 'device' ? 'no device named' : 'no person named')}</span> · {group.alerts.length} alert{group.alerts.length === 1 ? '' : 's'}
+                </div>
+              )}
+              {group.alerts.map((alert) => (
+                <div key={alert.id} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    aria-label={`Select alert ${alert.title}`}
+                    checked={ticked.has(alert.id)}
+                    onChange={() => toggle(alert.id)}
+                    className="ml-3 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <AlertRow alert={alert} selected={selectedAlertId === alert.id} onSelect={onSelect} />
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </div>

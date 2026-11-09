@@ -35,6 +35,7 @@ import { HideSuggestionBanner } from '@/components/alerts/HideSuggestionBanner';
 import { EarlierOutcomes } from '@/components/alerts/EarlierOutcomes';
 import { AlertNotes } from '@/components/alerts/AlertNotes';
 import { AssignAlert } from '@/components/alerts/AssignAlert';
+import BulkCloseBar, { needsCloseReason, type CloseStatus } from '@/components/alerts/BulkCloseBar';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -785,7 +786,15 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
     () => alertsApi.get(alertId),
       );
 
+  // Finishing an alert needs a reason from the list (the same one the list's bulk bar asks for); every other status change is immediate.
+  const [closingAs, setClosingAs] = useState<CloseStatus | null>(null);
+
   const handleStatusChange = async (newStatus: Alert['status']) => {
+    if (needsCloseReason(newStatus)) {
+      setClosingAs(newStatus);
+      return;
+    }
+    setClosingAs(null);
     setStatus(newStatus);
     try {
       await alertsApi.update(alertId, { status: newStatus });
@@ -808,6 +817,9 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
 
   return (
     <div className="space-y-5 max-w-6xl">
+      {closingAs && (
+        <BulkCloseBar key={closingAs} alertIds={[alertId]} defaultStatus={closingAs} onDone={() => void mutate()} onClear={() => setClosingAs(null)} />
+      )}
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-gray-500">
         <Link href="/alerts" className="hover:text-gray-300">Alerts</Link>

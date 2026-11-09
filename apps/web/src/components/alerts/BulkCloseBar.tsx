@@ -8,6 +8,11 @@ export const CLOSE_REASONS = ['Duplicate alerts', 'Handled in a ticket', 'Expect
 export const OTHER = 'Other';
 
 export type CloseStatus = 'resolved' | 'false_positive' | 'closed';
+
+/** A status that finishes an alert: choosing one needs a reason from the list, so the false-positive rate and the audit log stay accurate (pure). */
+export function needsCloseReason(status: string): status is CloseStatus {
+  return status === 'resolved' || status === 'false_positive' || status === 'closed';
+}
 const STATUS_LABEL: Record<CloseStatus, string> = { resolved: 'Resolved', false_positive: 'False positive', closed: 'Closed' };
 
 /** The reason to send: the preset, or what was typed when "Other" is chosen. Empty when there is not yet a usable reason (three characters at least). */
@@ -30,14 +35,16 @@ export default function BulkCloseBar({
   alertIds,
   onDone,
   onClear,
+  defaultStatus = 'resolved',
   close = alertsApi.bulkClose,
 }: {
   alertIds: string[];
+  defaultStatus?: CloseStatus;
   onDone: () => void;
   onClear: () => void;
   close?: (body: { alert_ids: string[]; status: CloseStatus; reason: string }) => Promise<BulkCloseResult>;
 }) {
-  const [status, setStatus] = useState<CloseStatus>('resolved');
+  const [status, setStatus] = useState<CloseStatus>(defaultStatus);
   const [preset, setPreset] = useState<string>('');
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);

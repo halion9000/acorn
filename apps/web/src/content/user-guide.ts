@@ -312,6 +312,8 @@ All of these were tested against test data and a scratch database and deployed, 
 - **Export CSV on Alerts and Cases.** Saves the alerts or cases listed on the page as a spreadsheet file. A title that starts like a formula is saved as plain text.
 - **Platform health > What the next retention sweep would delete** (platform administrators only). A dry run that counts, per kind of data, what the next sweep would delete; it deletes nothing.
 - **Settings > Find a setting.** A search box above the settings list: type a word or two from a setting's name or description and only the matching ones stay.
+- **Closing one alert needs a reason.** Choosing Resolved, False positive or Closed on an alert's page opens the same reason picker the list's bulk bar uses (a short list, or Other with your own words); the reason and the change are kept in the audit log, and a false-positive close counts in the false-positive rate.
+- **Alerts > Group by device or person.** A selector in the list header gathers the alerts on the page under the device or the person they name, whichever tool raised them, biggest group first. It groups only the page you are looking at.
 - **Settings > Profile > Password.** Change your own password: it needs the current one, and signs you out everywhere.
 
 ---
