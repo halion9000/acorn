@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 
-import { ToolChecks } from './ToolChecks';
+import { ToolChecks, targetWords } from './ToolChecks';
 
 describe('ToolChecks', () => {
   it('shows each check with a plain verdict and what ThreatMate saw', () => {
@@ -88,3 +88,24 @@ describe('ToolChecks', () => {
     expect(within(screen.getByTestId('check-itglue_certificate_expiry')).getByText('SSL certificates')).toBeInTheDocument();
   });
 });
+
+describe('the time-to-fix target', () => {
+  it('says the target in words and marks a check that is past it', () => {
+    expect([4, 24, 120, 336].map(targetWords)).toEqual(['4 hours', '1 day', '5 days', '14 days']);
+    render(
+      <ToolChecks
+        tool="ninjaone"
+        label="NinjaOne"
+        checks={[
+          { key: 'ninjaone_disk_health', status: 'not_met', evidence: '1 device has a failing disk', since: '2026-11-01T00:00:00Z', target_hours: 24, over_target: true },
+          { key: 'ninjaone_antivirus', status: 'not_met', evidence: '2 machines have no antivirus', since: '2026-11-10T00:00:00Z', target_hours: 336, over_target: false },
+          { key: 'ninjaone_patching', status: 'partly', evidence: 'x' },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId('target-ninjaone_disk_health')).toHaveTextContent('past its 1 day target');
+    expect(screen.getByTestId('target-ninjaone_antivirus')).toHaveTextContent('fix within 14 days');
+    expect(screen.queryByTestId('target-ninjaone_patching')).toBeNull();
+  });
+});
+

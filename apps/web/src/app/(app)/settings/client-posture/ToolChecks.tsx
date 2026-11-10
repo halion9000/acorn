@@ -24,6 +24,9 @@ export interface PostureCheck {
   owner?: string | null;
   due_date?: string | null;
   overdue?: boolean;
+  /** The time-to-fix target (hours) for a check that is not met, and whether it has been not met for longer than that. */
+  target_hours?: number | null;
+  over_target?: boolean;
   /** How many comments are in the thread on this check. */
   comments?: number;
 }
@@ -38,6 +41,11 @@ export interface CheckHistoryRow {
 }
 
 /** A check's plain name: its own title, or its key without the tool's prefix. */
+/** A target in hours as words: 4 hours, 24 hours becomes 1 day, 120 hours becomes 5 days (pure). */
+export function targetWords(hours: number): string {
+  return hours >= 24 && hours % 24 === 0 ? `${hours / 24} day${hours === 24 ? '' : 's'}` : `${hours} hours`;
+}
+
 export function checkTitle(key: string): string {
   return TITLE[key] ?? key.replace(/^(threatmate|liongard|itglue|fieldeffect|cipp|ninjaone|halopsa|meraki|slide|autoelevate|huntress|dnsfilter|datto)_/, '').replace(/_/g, ' ');
 }
@@ -342,6 +350,13 @@ export function ToolChecks({
                 </span>
               ) : null}
               {c.since ? <span className="ml-1 text-[11px] text-gray-600">since {day(c.since)}</span> : null}
+              {c.target_hours ? (
+                <span className={`ml-1 text-[11px] ${c.over_target ? 'text-red-300' : 'text-gray-500'}`} data-testid={`target-${c.key}`}>
+                  {c.over_target ? 'past its ' : 'fix within '}
+                  {targetWords(c.target_hours)}
+                  {c.over_target ? ' target' : ''}
+                </span>
+              ) : null}
               <div className="mt-1 text-xs text-gray-400">{c.evidence}</div>
               {c.accepted ? <div className="mt-1 text-xs text-sky-200/80">Reason: {c.accepted.reason}</div> : null}
               {c.owner ? (

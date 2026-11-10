@@ -41,6 +41,7 @@ from app.models.tenant import Tenant
 from app.services import fleet_cache, tool_exclusions
 from app.services.check_alerts import raises_alert
 from app.services.audit import emit_audit
+from app.services.fix_targets import standing
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.fleet_posture import (
     BOARDS,
@@ -122,6 +123,9 @@ class PostureCheck(BaseModel):
     owner: str | None = None
     due_date: date | None = None
     overdue: bool = False
+    # The time-to-fix target for a check that is NOT MET (hours, by how serious the check is) and whether it has been not met for longer than that. None when the check has no clock.
+    target_hours: int | None = None
+    over_target: bool = False
     # How many comments are in the thread on this check.
     comments: int = 0
 
@@ -248,6 +252,7 @@ async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, alia
                 owner=owners.get(str(c["key"]), (None, None))[0],
                 due_date=owners.get(str(c["key"]), (None, None))[1],
                 overdue=is_overdue(str(c["status"]), owners.get(str(c["key"]), (None, None))[1], datetime.now(UTC).date()),
+                **dict(zip(("target_hours", "over_target"), standing(str(c["key"]), str(c["status"]), since.get(str(c["key"])), now), strict=True)),
                 comments=comment_counts.get(str(c["key"]), 0),
             )
             for c in (row.checks or [])
