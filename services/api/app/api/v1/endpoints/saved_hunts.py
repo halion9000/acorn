@@ -388,6 +388,24 @@ async def delete_saved_hunt(
     )
 
 
+class RecordHitsRequest(BaseModel):
+    """How many hits a person's own run of the hunt found (the page runs the search itself; the scheduler stores its own count)."""
+
+    hits: int = Field(..., ge=0, le=10_000_000)
+
+
+@router.post(
+    "/{hunt_id}/hits",
+    dependencies=[Depends(require_permission("lake:query"))],
+)
+async def record_saved_hunt_hits(hunt_id: str, body: RecordHitsRequest, user: AuthUser, db: TenantDBSession) -> dict[str, int]:
+    """Store the hit count of a manual run so the saved-hunt list can show it beside "Last run"."""
+    row = await _load_owned_hunt(db, _coerce_uuid(hunt_id), user)
+    await db.execute(update(SavedHunt).where(SavedHunt.id == row.id).values(last_hit_count=body.hits))
+    await db.commit()
+    return {"last_hit_count": body.hits}
+
+
 @router.post(
     "/{hunt_id}/run",
     response_model=RunSavedHuntResponse,

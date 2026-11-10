@@ -519,6 +519,25 @@ def test_run_saved_hunt_re_translates_and_stamps(monkeypatch: pytest.MonkeyPatch
     db.commit.assert_awaited_once()
 
 
+def test_record_hits_stores_the_count_of_a_manual_run_and_refuses_a_negative_one() -> None:
+    from app.api.v1.endpoints.saved_hunts import RecordHitsRequest, record_saved_hunt_hits
+
+    user = _build_user()
+    row = _saved_hunt_row(tenant_id=user.tenant_id)
+    db = _mock_scalar_db(row)
+    out = asyncio.run(record_saved_hunt_hits(str(row.id), RecordHitsRequest(hits=7), user, db))
+    assert out == {"last_hit_count": 7}
+    db.execute.assert_awaited_once()
+    assert db.execute.await_args.args[0].compile().params["last_hit_count"] == 7
+    db.commit.assert_awaited_once()
+    with pytest.raises(ValueError):
+        RecordHitsRequest(hits=-1)
+    missing = _mock_scalar_db(None)
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(record_saved_hunt_hits(str(uuid.uuid4()), RecordHitsRequest(hits=1), user, missing))
+    assert exc.value.status_code == 404
+
+
 def test_run_saved_hunt_missing_404s() -> None:
     user = _build_user()
     db = _mock_scalar_db(None)

@@ -522,6 +522,15 @@ export function HuntView() {
   const [preset, setPreset] = useState<string>('24h');
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<HuntResponse | null>(null);
+  // The saved hunt whose Run button was pressed: when that run's results arrive, their total is stored on it.
+  const recordHitsFor = useRef<string | null>(null);
+  useEffect(() => {
+    const id = recordHitsFor.current;
+    if (!id || !results) return;
+    recordHitsFor.current = null;
+    savedHuntsApi.recordHits(id, results.total).then(() => void savedHuntsState.mutate()).catch(() => undefined); // a count that cannot be stored must not disturb the search
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results]);
   const [runError, setRunError] = useState<unknown>(null);
   const [activeSavedId, setActiveSavedId] = useState<string | null>(null);
   const [activeSavedHuntId, setActiveSavedHuntId] = useState<string | null>(null);
@@ -740,6 +749,7 @@ export function HuntView() {
       console.error('Saved hunt re-run failed', err);
       // Don't block — fall through to the executor with the snapshot.
     }
+    recordHitsFor.current = h.id; // the hit count of this run is stored when its results arrive (see the effect on results)
     void runHunt({
       languageOverride: 'esql',
       queryOverride: h.translated_query.esql || query,

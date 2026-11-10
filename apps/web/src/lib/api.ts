@@ -4818,6 +4818,10 @@ export const savedHuntsApi = {
     request<RunSavedHuntResponse>(`/api/v1/saved-hunts/${id}/run`, {
       method: 'POST',
     }),
+
+  /** Store how many hits a run of the saved hunt found, so the list can show it. */
+  recordHits: (id: string, hits: number) =>
+    request<{ last_hit_count: number }>(`/api/v1/saved-hunts/${id}/hits`, { method: 'POST', body: JSON.stringify({ hits }) }),
 };
 
 // ─── Attack Graph (Neo4j) ────────────────────────────────────────────────────

@@ -20,11 +20,13 @@ const search = vi.hoisted(() => vi.fn());
 const listSaved = vi.hoisted(() => vi.fn());
 const translate = vi.hoisted(() => vi.fn());
 const savedHunts = vi.hoisted(() => vi.fn());
+const runSaved = vi.hoisted(() => vi.fn());
+const recordHits = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/api', () => ({
   __esModule: true,
   huntApi: { search: (q: unknown) => search(q), listSaved: () => listSaved(), saveSearch: vi.fn(), deleteSaved: vi.fn() },
   nlQueryApi: { translate: (q: unknown) => translate(q) },
-  savedHuntsApi: { list: () => savedHunts(), create: vi.fn(), remove: vi.fn(), delete: vi.fn(), touch: vi.fn() },
+  savedHuntsApi: { list: () => savedHunts(), create: vi.fn(), remove: vi.fn(), delete: vi.fn(), touch: vi.fn(), run: (id: string) => runSaved(id), recordHits: (id: string, n: number) => recordHits(id, n) },
 }));
 
 import { HuntView } from './HuntView';
@@ -55,7 +57,8 @@ function renderHunt() {
 const runButton = () => screen.getByRole('button', { name: /run hunt/i });
 
 beforeEach(() => {
-  [search, listSaved, translate, savedHunts, toastError, toastFn].forEach((m) => m.mockReset());
+  [search, listSaved, translate, savedHunts, toastError, toastFn, runSaved, recordHits].forEach((m) => m.mockReset());
+  recordHits.mockResolvedValue({ last_hit_count: 0 });
   listSaved.mockResolvedValue({ searches: [] });
   savedHunts.mockResolvedValue([]);
 });
@@ -223,3 +226,17 @@ describe('saved hunt last run', () => {
     expect(screen.getAllByText(/ hits?$/)).toHaveLength(2);
   });
 });
+
+describe('a manual run of a saved hunt', () => {
+  it('stores how many hits it found, once its results arrive', async () => {
+    const base = { nl_query: 'q', translated_query: { esql: 'FROM x', kql: '', spl: '', explanation: '' }, language: 'esql', schedule: null, created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z', created_by: null, last_run_at: null };
+    savedHunts.mockResolvedValue([{ ...base, id: 'h1', name: 'My hunt' }]);
+    runSaved.mockResolvedValue({ id: 'h1', name: 'My hunt', nl_query: 'q', translated_query: base.translated_query, last_run_at: '2026-11-09T00:00:00Z' });
+    search.mockResolvedValue({ total: 7, took: 3, hits: [] });
+    renderHunt();
+    await screen.findByText('My hunt');
+    await userEvent.setup().click(screen.getByTitle('Re-run this hunt'));
+    await waitFor(() => expect(recordHits).toHaveBeenCalledWith('h1', 7));
+  });
+});
+
