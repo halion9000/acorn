@@ -290,3 +290,32 @@ async def _no_ticket_rules(_session):
 
 async def _no_auto_checks(_session):
     return 0
+
+
+def test_a_worker_that_failed_and_recovered_still_shows_the_failures_in_its_latest_passes():
+    wh.expect("dmarc", 60, now=0)
+    wh.beat("dmarc", now=60)
+    wh.beat("dmarc", error="TimeoutError", now=120)
+    wh.beat("dmarc", error="TimeoutError", now=180)
+    wh.beat("dmarc", now=240)
+    row = wh.snapshot(now=250)[0]
+    assert row["status"] == "ok", "the last pass was fine"
+    assert row["recent_failed"] == 2
+    assert row["recent"] == [
+        {"seconds_ago": 10, "ok": True, "error": None},
+        {"seconds_ago": 70, "ok": False, "error": "TimeoutError"},
+        {"seconds_ago": 130, "ok": False, "error": "TimeoutError"},
+        {"seconds_ago": 190, "ok": True, "error": None},
+    ]
+
+
+def test_only_the_latest_ten_passes_are_kept_and_a_worker_that_never_ran_has_none():
+    wh.expect("sweep", 30, now=0)
+    wh.expect("idle", 30, now=0)
+    wh.beat("sweep", error="RuntimeError", now=1)
+    for i in range(2, 14):
+        wh.beat("sweep", now=i)
+    rows = {r["name"]: r for r in wh.snapshot(now=20)}
+    assert len(rows["sweep"]["recent"]) == wh.RECENT_PASSES and rows["sweep"]["passes"] == 13
+    assert rows["sweep"]["recent_failed"] == 0, "the failure is older than the ten passes kept"
+    assert rows["idle"]["recent"] == [] and rows["idle"]["recent_failed"] == 0

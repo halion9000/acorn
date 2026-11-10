@@ -8,10 +8,12 @@ what THIS process saw since it started (a restart begins a fresh clock, and a wo
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from collections import deque
+from dataclasses import dataclass, field
 
 GRACE_FACTOR = 2.5  # a worker is late when it has not beaten for this many of its own intervals
 GRACE_FLOOR_SECONDS = 120  # ... and never sooner than this, so a slow pass is not called late
+RECENT_PASSES = 10  # how many of a worker's latest passes are remembered, so a failure that has since recovered still shows
 
 
 @dataclass
@@ -24,6 +26,7 @@ class _Worker:
     last_error: str | None = None
     passes: int = 0
     next_within: float | None = None  # this pass told us when to expect the next (a worker that backs off after failures)
+    recent: deque[tuple[float, str | None]] = field(default_factory=lambda: deque(maxlen=RECENT_PASSES))  # (when, error or None), oldest first
 
 
 _WORKERS: dict[str, _Worker] = {}
@@ -44,6 +47,7 @@ def beat(name: str, error: str | None = None, now: float | None = None, next_wit
     w.last_ok = error is None
     w.last_error = error[:80] if error else None
     w.passes += 1
+    w.recent.append((w.last_beat, w.last_error))
     w.next_within = None if next_within_seconds is None else max(w.interval, float(next_within_seconds))
 
 
@@ -57,7 +61,7 @@ def _status(w: _Worker, t: float) -> str:
 
 
 def snapshot(now: float | None = None) -> list[dict[str, object]]:
-    """Every registered worker: its name, how often it should run, seconds since its last pass, passes since start, the last error, and ok / failing / waiting / late. Worst first."""
+    """Every registered worker: its name, how often it should run, seconds since its last pass, passes since start, the last error, its latest passes, and ok / failing / waiting / late. Worst first."""
     t = time.monotonic() if now is None else now
     order = {"late": 0, "failing": 1, "waiting": 2, "ok": 3}
     rows = [
@@ -68,6 +72,9 @@ def snapshot(now: float | None = None) -> list[dict[str, object]]:
             "passes": w.passes,
             "last_error": w.last_error,
             "status": _status(w, t),
+            # The latest passes, newest first: how long ago and the error's type name when it failed. A worker that failed and recovered shows here though its status is ok again.
+            "recent": [{"seconds_ago": int(t - at), "ok": error is None, "error": error} for at, error in reversed(w.recent)],
+            "recent_failed": sum(1 for _, error in w.recent if error is not None),
         }
         for name, w in _WORKERS.items()
     ]

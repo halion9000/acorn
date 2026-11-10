@@ -85,6 +85,9 @@ interface WorkerRow {
   passes: number;
   last_error: string | null;
   status: "ok" | "failing" | "waiting" | "late";
+  /** The latest passes, newest first, and how many of them failed; absent from an older server. */
+  recent?: { seconds_ago: number; ok: boolean; error: string | null }[];
+  recent_failed?: number;
 }
 
 export interface RateLimitTally {
@@ -121,10 +124,16 @@ export function migrationsLabel(m: { applied: number; newest: string | null; app
 }
 
 /** What a worker's status reads as on the page, in plain words. */
-export function workerLabel(w: Pick<WorkerRow, "status" | "seconds_since_pass" | "last_error">): string {
+/** A worker whose last pass was fine but which failed lately: it recovered, and that is worth a look. */
+export function recoveredFromFailures(w: Pick<WorkerRow, "status" | "recent_failed">): boolean {
+  return w.status === "ok" && (w.recent_failed ?? 0) > 0;
+}
+
+export function workerLabel(w: Pick<WorkerRow, "status" | "seconds_since_pass" | "last_error" | "recent" | "recent_failed">): string {
   if (w.status === "late") return w.seconds_since_pass === null ? "never ran: something is wrong" : `quiet for ${Math.floor(w.seconds_since_pass / 60)} min: something is wrong`;
   if (w.status === "failing") return `last pass failed${w.last_error ? ` (${w.last_error})` : ""}`;
   if (w.status === "waiting") return "waiting for its first turn";
+  if (recoveredFromFailures(w)) return `running, but ${w.recent_failed} of its last ${w.recent?.length ?? w.recent_failed} passes failed`;
   return "running";
 }
 
@@ -331,7 +340,7 @@ export function PlatformHealth() {
                     <td>{Math.round(w.interval_seconds / 60) || 1} min</td>
                     <td>{w.seconds_since_pass === null ? "none yet" : `${Math.floor(w.seconds_since_pass / 60)} min ago`}</td>
                     <td>{w.passes}</td>
-                    <td data-testid={`worker-${w.name}`} className={w.status === "ok" || w.status === "waiting" ? "text-gray-300" : w.status === "failing" ? "text-amber-300" : "text-red-300"}>
+                    <td data-testid={`worker-${w.name}`} className={recoveredFromFailures(w) ? "text-amber-300" : w.status === "ok" || w.status === "waiting" ? "text-gray-300" : w.status === "failing" ? "text-amber-300" : "text-red-300"}>
                       {workerLabel(w)}
                     </td>
                   </tr>

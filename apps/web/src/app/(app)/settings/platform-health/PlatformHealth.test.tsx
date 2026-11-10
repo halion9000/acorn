@@ -293,6 +293,17 @@ describe('background workers', () => {
     expect(screen.getByTestId('worker-alert_suppression')).toHaveTextContent('running');
   });
 
+  it('says when a running worker failed some of its latest passes, in amber, and stays plain when none failed', async () => {
+    const recent = [{ seconds_ago: 10, ok: true, error: null }, { seconds_ago: 70, ok: false, error: 'TimeoutError' }, { seconds_ago: 130, ok: false, error: 'TimeoutError' }, { seconds_ago: 190, ok: true, error: null }];
+    authFetch.mockResolvedValue(withWorkers([w({ name: 'dmarc', status: 'ok', recent, recent_failed: 2 }), w({ name: 'steady', status: 'ok', recent: recent.slice(0, 1), recent_failed: 0 })]));
+    render(<PlatformHealth />);
+    await screen.findByTestId('workers');
+    expect(screen.getByTestId('worker-dmarc')).toHaveTextContent('running, but 2 of its last 4 passes failed');
+    expect(screen.getByTestId('worker-dmarc')).toHaveClass('text-amber-300');
+    expect(screen.getByTestId('worker-steady')).toHaveTextContent(/^running$/);
+    expect(screen.getByTestId('worker-steady')).toHaveClass('text-gray-300');
+  });
+
   it('says nothing when the server sends no workers, and an older server is not an error', async () => {
     authFetch.mockResolvedValue(withWorkers(undefined));
     render(<PlatformHealth />);
