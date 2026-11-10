@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PlatformHealth, agoLabel, migrationsLabel, rateLimitLabel, runningLabel, workerLabel } from './PlatformHealth';
@@ -419,5 +419,24 @@ describe('largest database tables', () => {
     render(<PlatformHealth />);
     await waitFor(() => expect(screen.getByTestId('overall')).toBeInTheDocument());
     expect(screen.queryByTestId('table-sizes')).not.toBeInTheDocument();
+  });
+});
+
+describe('the health report download', () => {
+  it('offers the download once the page has loaded, and saves what the page shows as a JSON file', async () => {
+    authFetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ overall: 'ok', down: [], services: [{ service: 'fusion', status: 'up', latency_ms: 20, detail: '' }], generated_at: '2026-11-10T22:00:00Z' }) });
+    const blobs: Blob[] = [];
+    const createObjectURL = vi.fn((b: Blob) => { blobs.push(b); return 'blob:report'; });
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const clicked: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { clicked.push(this.download); });
+    render(<PlatformHealth />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Download health report' }));
+    expect(clicked).toHaveLength(1);
+    expect(clicked[0]).toMatch(/^acorn-health-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}\.json$/);
+    const saved = JSON.parse(await blobs[0].text());
+    expect(saved.report).toBe('A.C.O.R.N platform health');
+    expect(saved.snapshot.services[0].service).toBe('fusion');
+    click.mockRestore();
   });
 });

@@ -4,6 +4,8 @@
  * Platform health: is each internal service (fusion, connectors, agents, ...) answering its own probe right now?
  * Backed by GET /api/v1/health/services. Refreshes every 15 s; a service that does not answer is shown as down, never hidden.
  */
+import { downloadText } from "@/components/devices/mapDownload";
+import { healthReport, healthReportFileName } from "@/lib/healthReport";
 import { useCallback, useEffect, useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
@@ -184,7 +186,22 @@ export function PlatformHealth() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6">
-      <h1 className="text-xl font-semibold text-gray-100">Platform health</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold text-gray-100">Platform health</h1>
+        {snapshot && (
+          <button
+            type="button"
+            onClick={() => {
+              const now = new Date();
+              downloadText(healthReportFileName(now), healthReport(snapshot, now), "application/json");
+            }}
+            className="rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-200 hover:bg-gray-800"
+            title="Save what this page shows as a file for a support ticket (no passwords, keys or tokens)"
+          >
+            Download health report
+          </button>
+        )}
+      </div>
       {error && (
         <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           {error}
