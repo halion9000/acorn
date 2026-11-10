@@ -27,3 +27,12 @@ def test_only_a_not_met_check_with_a_known_since_has_a_clock_and_it_is_overdue_p
     assert standing("x", "partly", NOW - timedelta(days=99), NOW, 5) == (None, False)
     assert standing("x", "met", NOW - timedelta(days=99), NOW, 5) == (None, False)
     assert standing("x", "not_met", None, NOW, 5) == (None, False)
+
+
+def test_the_insurance_readiness_checklist_asks_about_the_checks_built_on_2026_11_09_with_unique_keys():
+    from app.services.client_review import TOOL_ITEMS
+
+    keys = [k for _, k, _ in TOOL_ITEMS]
+    assert len(keys) == len(set(keys)) and len({q for _, _, q in TOOL_ITEMS}) == len(TOOL_ITEMS)
+    wanted = {"cipp_ca_legacy_auth", "cipp_mailbox_forwarding", "cipp_defender_vulnerabilities", "ninjaone_software_patches", "addigy_unsupported_macos", "meraki_end_of_support", "ninjaone_disk_health"}
+    assert wanted <= {c for c, _, _ in TOOL_ITEMS}
