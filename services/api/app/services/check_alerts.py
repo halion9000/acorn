@@ -43,7 +43,7 @@ WATCHED: dict[str, tuple[str, str, str]] = {
 VULN_CHECK_KEYS = frozenset(
     {
         "threatmate_patching", "threatmate_firmware", "threatmate_end_of_life", "threatmate_pentest", "threatmate_external_exposure",
-        "ninjaone_patching", "ninjaone_software_patches", "ninjaone_unsupported_os", "addigy_unsupported_macos",
+        "ninjaone_patching", "ninjaone_software_patches", "ninjaone_unsupported_os", "addigy_unsupported_macos", "cipp_defender_vulnerabilities",
     }
 )
 
@@ -58,6 +58,7 @@ WATCHED.update(
         "ninjaone_software_patches": ("Windows machines at this client have critical application updates waiting over 30 days", "high", "not_met"),
         "ninjaone_unsupported_os": ("Windows machines at this client run a version Microsoft no longer supports", "high", "not_met"),
         "addigy_unsupported_macos": ("Macs at this client run a macOS Apple no longer patches", "high", "not_met"),
+        "cipp_defender_vulnerabilities": ("Microsoft Defender finds vulnerabilities with a known exploit on this client's devices", "high", "not_met"),
     }
 )
 
