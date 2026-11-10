@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { USER_GUIDE } from '@/content/user-guide';
+import { NAV_CATALOG } from '@/components/layout/Sidebar';
 
 /**
  * The user guide is kept in two places: docs/USER_GUIDE.md (for people who read it in the repository) and src/content/user-guide.ts (what the Guide page shows).
@@ -18,6 +19,15 @@ function firstDifference(a: string, b: string): string {
   }
   return '';
 }
+
+describe('every page in the sidebar', () => {
+  it('is named in the user guide, so a new page cannot ship without a word about what it is for', () => {
+    const guide = USER_GUIDE.toLowerCase();
+    const labels = NAV_CATALOG.flatMap((s) => s.items.map((i) => i.label));
+    expect(labels.length).toBeGreaterThan(30);
+    expect(labels.filter((label) => !guide.includes(label.toLowerCase()))).toEqual([]);
+  });
+});
 
 describe('the two copies of the user guide', () => {
   it.skipIf(!existsSync(REPO_COPY))('are the same text', () => {
