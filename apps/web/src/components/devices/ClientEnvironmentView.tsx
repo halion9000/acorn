@@ -4,18 +4,20 @@
  * One client's environment: what is there (network gear, computers, cameras, other), which tools cover it, the gaps, and what each network device is plugged into (from Auvik).
  * Everything here is read from what CORE already sent; a client without Auvik shows no cabling and says so.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { environmentApi, msspApi, type ChildTenant, type ClientEnvironment } from '@/lib/api';
 import { buildMap, type Tier } from './networkMap';
+import { downloadText, mapFileName, standaloneSvg } from './mapDownload';
 
 const TIER_FILL: Record<Tier, string> = { 0: '#b45309', 1: '#1d4ed8', 2: '#0f766e', 3: '#4b5563' };
 const TIER_NAME: Record<Tier, string> = { 0: 'Firewall / router', 1: 'Switch', 2: 'Access point', 3: 'Other device' };
 
 /** The client's network drawn from Auvik's links. Hover a line for the ports at each end. */
-function NetworkMapDrawing({ devices }: { devices: ClientEnvironment['devices'] }) {
+function NetworkMapDrawing({ devices, clientName }: { devices: ClientEnvironment['devices']; clientName: string }) {
+  const drawing = useRef<SVGSVGElement>(null);
   const map = buildMap(devices);
   if (map.nodes.length === 0) return null;
   const at = new Map(map.nodes.map((n) => [n.id, n]));
@@ -23,7 +25,16 @@ function NetworkMapDrawing({ devices }: { devices: ClientEnvironment['devices'] 
     <section aria-label="Network map" className="rounded border border-gray-800 p-3" data-testid="network-map">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-medium text-gray-200">Network map</h2>
-        <div className="flex flex-wrap gap-3 text-[11px] text-gray-400">
+        <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-400">
+          <button
+            type="button"
+            onClick={() => {
+              if (drawing.current) downloadText(mapFileName(clientName, new Date()), standaloneSvg(drawing.current), 'image/svg+xml');
+            }}
+            className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800"
+          >
+            Download drawing
+          </button>
           {([0, 1, 2, 3] as Tier[]).map((t) => (
             <span key={t} className="inline-flex items-center gap-1">
               <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: TIER_FILL[t] }} />
@@ -33,7 +44,7 @@ function NetworkMapDrawing({ devices }: { devices: ClientEnvironment['devices'] 
         </div>
       </div>
       <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${map.width} ${map.height}`} style={{ minWidth: Math.min(map.width, 900), width: '100%' }} role="img" aria-label="How this client's network devices are connected">
+        <svg ref={drawing} viewBox={`0 0 ${map.width} ${map.height}`} style={{ minWidth: Math.min(map.width, 900), width: '100%' }} role="img" aria-label="How this client's network devices are connected">
           {map.edges.map((e, i) => {
             const a = at.get(e.from);
             const b = at.get(e.to);
@@ -197,7 +208,7 @@ export default function ClientEnvironmentView() {
 
           {!env.has_auvik && <p className="text-xs text-gray-500">Auvik has not reported this client, so there is no network wiring to show.</p>}
           {env.has_auvik && !env.has_links && <p className="text-xs text-gray-500">Auvik reports this client but has not named what any device is plugged into.</p>}
-          {env.has_links && <NetworkMapDrawing devices={env.devices} />}
+          {env.has_links && <NetworkMapDrawing devices={env.devices} clientName={clients.find((c) => c.id === clientId)?.name ?? ''} />}
           {env.truncated &&<p className="text-xs text-amber-300">This client has more devices than are shown here.</p>}
 
           {KINDS.map((k) => {
