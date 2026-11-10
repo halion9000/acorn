@@ -26,6 +26,7 @@ import useSWR from 'swr';
 import { clsx } from 'clsx';
 import { safeDistance, safeFormat } from '@/lib/safe-date';
 import toast from 'react-hot-toast';
+import { caseTicketNote } from './ticketNote';
 import {
   apiErrorDetail,
   casesApi,
@@ -649,6 +650,21 @@ export function CaseWorkspace({ caseId }: { caseId: string }) {
                 <span className="h-3 w-3 animate-spin rounded-full border border-indigo-500/30 border-t-indigo-400" />
               )}
               {summaryDownloading ? 'Generating…' : 'Summary'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!caseRecord) return;
+                navigator.clipboard.writeText(caseTicketNote(caseRecord)).then(
+                  () => toast.success('Copied. Paste it into the ticket.'),
+                  () => toast.error('The browser would not copy it. Use Summary instead.'),
+                );
+              }}
+              disabled={!caseRecord}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-700/70 bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:text-slate-500"
+              title="Copy this case as plain text for a ticket note"
+            >
+              Copy as ticket note
             </button>
           </div>
         </div>
