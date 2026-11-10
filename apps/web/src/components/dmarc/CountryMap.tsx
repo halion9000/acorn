@@ -34,7 +34,18 @@ export function drawable(countries: CountryCount[]): { shown: CountryCount[]; le
   return { shown, left: countries.filter((c) => c.emails > 0).length - shown.length };
 }
 
-export default function CountryMap({ countries, nameOf }: { countries: CountryCount[]; nameOf: (code: string) => string }) {
+export default function CountryMap({
+  countries,
+  nameOf,
+  selected,
+  onSelect,
+}: {
+  countries: CountryCount[];
+  nameOf: (code: string) => string;
+  /** The country picked on the page (its outline is drawn brighter), and what a click on a country does. Without `onSelect` the map is a picture only. */
+  selected?: string | null;
+  onSelect?: (code: string) => void;
+}) {
   const { shown, left } = drawable(countries);
   if (shown.length === 0) return null;
   const max = Math.max(...shown.map((c) => c.emails));
@@ -47,7 +58,18 @@ export default function CountryMap({ countries, nameOf }: { countries: CountryCo
           if (!c) return <path key={code} d={d} fill="#1f2937" stroke="#111827" strokeWidth={0.4} />;
           const { fill, opacity } = fillFor(c, max);
           return (
-            <path key={code} d={d} fill={fill} fillOpacity={opacity} stroke="#111827" strokeWidth={0.4} data-testid="map-country" data-code={code}>
+            <path
+              key={code}
+              d={d}
+              fill={fill}
+              fillOpacity={opacity}
+              stroke={selected?.toUpperCase() === code ? '#f9fafb' : '#111827'}
+              strokeWidth={selected?.toUpperCase() === code ? 1.2 : 0.4}
+              data-testid="map-country"
+              data-code={code}
+              onClick={onSelect ? () => onSelect(code) : undefined}
+              style={onSelect ? { cursor: 'pointer' } : undefined}
+            >
               <title>{`${nameOf(code)}: ${c.emails.toLocaleString()} message${c.emails === 1 ? '' : 's'}, ${c.failed > 0 ? `${c.failed.toLocaleString()} failed` : 'all pass'}`}</title>
             </path>
           );

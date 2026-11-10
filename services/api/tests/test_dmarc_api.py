@@ -457,6 +457,11 @@ def test_mail_is_grouped_by_the_country_of_the_sending_address_and_what_cannot_b
     out = run(body)
     assert [(c.code, c.emails, c.passed, c.failed) for c in out.countries] == [("US", 40, 30, 10), ("AU", 5, 5, 0)]
     assert (out.emails, out.unknown, out.not_looked_up) == (51, 6, 0)
+    # Each country names its busiest sending addresses, busiest first, with how many of their messages failed.
+    assert [(a.ip, a.emails, a.failed) for a in out.countries[0].addresses] == [("8.8.8.8", 30, 0), ("8.8.4.4", 10, 10)]
+    assert [(a.ip, a.emails, a.failed) for a in out.countries[1].addresses] == [("1.1.1.1", 5, 0)]
+    listed = {a.ip for c in out.countries for a in c.addresses}
+    assert "10.0.0.5" not in listed and "9.9.9.9" not in listed, "an address that could not be placed is in no country"
     assert len(r.calls) == 4  # the private address was not sent to anyone
 
 
@@ -888,3 +893,21 @@ def test_a_domain_with_no_mail_is_not_looked_up_and_answers_are_kept_for_a_few_m
     first = len(resolver.calls)
     _setup_with(resolver)
     assert len([c for c in resolver.calls[first:] if c.startswith("txt:")]) == 0, "the second page load used the kept answers"
+
+
+def test_a_country_lists_at_most_five_addresses_the_busiest_ones():
+    from app.services import ip_country
+
+    ip_country._CACHE.clear()
+    rows = [line_row(f"8.8.8.{i}", 10 + i) for i in range(1, 9)]
+    r = CountryResolver({f"8.8.8.{i}": "US" for i in range(1, 9)})
+
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        s.add(rep(owner.id, "goliveoak.com", sum(10 + i for i in range(1, 9)), sum(10 + i for i in range(1, 9)), rows=rows))
+        await s.commit()
+        return await ep.countries(caller(owner), s, r, days=30, domain=None, client_id=None)
+
+    (us,) = run(body).countries
+    assert [a.ip for a in us.addresses] == ["8.8.8.8", "8.8.8.7", "8.8.8.6", "8.8.8.5", "8.8.8.4"]
+    assert us.emails == sum(10 + i for i in range(1, 9)), "the country total still counts every address, not only the five listed"

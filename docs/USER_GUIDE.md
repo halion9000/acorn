@@ -328,6 +328,7 @@ All of these were tested against test data and a scratch database and deployed, 
 - **Platform health > Largest database tables, and workers that recovered.** The ten biggest tables with their size and row estimate; and a background worker whose last pass was fine but which failed some of its latest ten passes says so in amber.
 - **Settings > Update A.C.O.R.N > Earlier runs.** A list of past updates, health checks and roll backs with the time, the result and the version each ended on.
 - **Alert email > alerts waiting.** While alert email is on, its settings page says how many alerts are waiting to be sent.
+- **DMARC > Where it was sent from: click a country.** Clicking a country on the map or in the list shows the five addresses that sent the most mail from there, with how many of their messages failed. Clicking it again closes it.
 
 ---
 

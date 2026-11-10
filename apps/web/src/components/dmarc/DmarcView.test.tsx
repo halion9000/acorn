@@ -425,6 +425,37 @@ describe('DMARC countries', () => {
     expect(screen.getByTestId('country-unplaced')).toHaveTextContent('10 messages could not be placed');
   });
 
+  it('shows the addresses that sent the most from a country when it is clicked in the list or on the map, and closes on a second click', async () => {
+    countries = {
+      days: 30,
+      emails: 100,
+      countries: [
+        { code: 'US', emails: 70, passed: 60, failed: 10, addresses: [{ ip: '8.8.8.8', emails: 60, failed: 0 }, { ip: '8.8.4.4', emails: 10, failed: 10 }] },
+        { code: 'AU', emails: 20, passed: 20, failed: 0 },
+      ],
+      unknown: 0,
+      not_looked_up: 0,
+    };
+    const user = userEvent.setup();
+    render(view());
+    const rows = await screen.findAllByTestId('country-row');
+    expect(screen.queryByTestId('country-addresses')).toBeNull();
+    await user.click(within(rows[0]).getByRole('button'));
+    const box = screen.getByTestId('country-addresses');
+    expect(box).toHaveTextContent('8.8.8.8');
+    expect(box).toHaveTextContent('60 messages');
+    expect(box).toHaveTextContent('8.8.4.4');
+    expect(box).toHaveTextContent('10 failed');
+    await user.click(within(rows[0]).getByRole('button'));
+    expect(screen.queryByTestId('country-addresses')).toBeNull();
+    // The map picks the same country; an older server that sends no addresses says so instead of showing an empty box.
+    const onMap = screen.getAllByTestId('map-country').find((p) => p.getAttribute('data-code') === 'AU');
+    expect(onMap).toBeTruthy();
+    await user.click(onMap!);
+    expect(screen.getByTestId('country-addresses')).toHaveTextContent('not available from this server');
+    expect(within(screen.getAllByTestId('country-row')[1]).getByRole('button')).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('is left out when nothing could be placed or the server has no such route', async () => {
     countries = null;
     render(view());

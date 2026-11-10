@@ -74,7 +74,7 @@ export interface DmarcInsights {
 export interface DmarcCountries {
   days: number;
   emails: number;
-  countries: { code: string; emails: number; passed: number; failed: number }[];
+  countries: { code: string; emails: number; passed: number; failed: number; addresses?: { ip: string; emails: number; failed: number }[] }[];
   unknown: number;
   not_looked_up: number;
 }
@@ -605,24 +605,53 @@ export function countryName(code: string): string {
 /** Where the mail was sent from, busiest first, as bars. Says plainly how much could not be placed. Hidden when there is nothing to show or the lookup is unavailable. */
 function Countries({ days }: { days: number }) {
   const { data } = useSWR<DmarcCountries>(`/api/v1/dmarc/countries?days=${days}`, fetcher, { shouldRetryOnError: false });
+  // The country picked on the map or in the list: its busiest sending addresses are shown under its row. Picking it again closes it.
+  const [picked, setPicked] = useState<string | null>(null);
   if (!data || data.countries.length === 0) return null;
   const top = data.countries[0].emails;
   const unplaced = data.unknown + data.not_looked_up;
+  const pick = (code: string) => setPicked((now) => (now?.toUpperCase() === code.toUpperCase() ? null : code));
+  const shown = data.countries.slice(0, 15);
+  // A country picked on the map that is below the fifteen listed still gets its own row.
+  const extra = picked ? data.countries.find((c) => c.code.toUpperCase() === picked.toUpperCase() && !shown.includes(c)) : undefined;
   return (
     <section aria-label="Where mail was sent from" className="space-y-2">
       <h3 className="text-sm font-medium text-gray-200">Where it was sent from</h3>
-      <CountryMap countries={data.countries} nameOf={countryName} />
+      <p className="text-xs text-gray-500">Click a country, on the map or in the list, to see the addresses that sent the most from there.</p>
+      <CountryMap countries={data.countries} nameOf={countryName} selected={picked} onSelect={pick} />
       <ul className="space-y-1">
-        {data.countries.slice(0, 15).map((c) => (
-          <li key={c.code} data-testid="country-row" className="flex items-center gap-3 text-sm">
-            <span className="w-40 shrink-0 truncate text-gray-200">{countryName(c.code)}</span>
-            <span className="h-2 flex-1 rounded bg-gray-800">
-              <span className="block h-2 rounded bg-blue-400" style={{ width: `${Math.max(2, Math.round((c.emails / top) * 100))}%` }} />
-            </span>
-            <span className="w-20 text-right text-gray-300">{c.emails.toLocaleString()}</span>
-            <span className={`w-16 text-right ${c.failed > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>{c.failed > 0 ? `${c.failed.toLocaleString()} failed` : 'all pass'}</span>
-          </li>
-        ))}
+        {[...shown, ...(extra ? [extra] : [])].map((c) => {
+          const open = picked?.toUpperCase() === c.code.toUpperCase();
+          return (
+            <li key={c.code} data-testid="country-row" className="text-sm">
+              <button type="button" aria-expanded={open} onClick={() => pick(c.code)} className={`flex w-full items-center gap-3 rounded px-1 py-0.5 text-left hover:bg-gray-800/60 ${open ? 'bg-gray-800/60' : ''}`}>
+                <span className="w-40 shrink-0 truncate text-gray-200">{countryName(c.code)}</span>
+                <span className="h-2 flex-1 rounded bg-gray-800">
+                  <span className="block h-2 rounded bg-blue-400" style={{ width: `${Math.max(2, Math.round((c.emails / top) * 100))}%` }} />
+                </span>
+                <span className="w-20 text-right text-gray-300">{c.emails.toLocaleString()}</span>
+                <span className={`w-16 text-right ${c.failed > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>{c.failed > 0 ? `${c.failed.toLocaleString()} failed` : 'all pass'}</span>
+              </button>
+              {open ? (
+                <div data-testid="country-addresses" className="ml-2 mt-1 rounded border border-gray-800 p-2 text-xs text-gray-300">
+                  {(c.addresses ?? []).length === 0 ? (
+                    <p className="text-gray-500">The addresses for this country are not available from this server.</p>
+                  ) : (
+                    <ul className="space-y-0.5">
+                      {(c.addresses ?? []).map((a) => (
+                        <li key={a.ip} className="flex gap-3">
+                          <span className="w-40 shrink-0 font-mono">{a.ip}</span>
+                          <span className="w-24 text-right">{a.emails.toLocaleString()} messages</span>
+                          <span className={a.failed > 0 ? 'text-amber-300' : 'text-emerald-300'}>{a.failed > 0 ? `${a.failed.toLocaleString()} failed` : 'all pass'}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
       {unplaced > 0 ? (
         <p data-testid="country-unplaced" className="text-xs text-gray-500">

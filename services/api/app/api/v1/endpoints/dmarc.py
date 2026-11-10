@@ -460,11 +460,22 @@ async def _scoped_reports(current_user: AuthUser, db: Any, days: int, domain: st
     return list(reports), clean
 
 
+class CountryAddress(BaseModel):
+    ip: str
+    emails: int
+    failed: int
+
+
+ADDRESSES_PER_COUNTRY = 5
+
+
 class CountryRow(BaseModel):
     code: str  # two-letter country code
     emails: int
     passed: int
     failed: int
+    # The busiest sending addresses placed in this country (at most ADDRESSES_PER_COUNTRY), so "who is sending from there?" has an answer on the page.
+    addresses: list[CountryAddress] = []
 
 
 class Countries(BaseModel):
@@ -499,18 +510,22 @@ async def countries(
     busiest = sorted(by_ip.items(), key=lambda kv: -(kv[1][0] + kv[1][1]))[:MAX_LOOKUPS]
     found = await asyncio.gather(*(country_of(ip, resolver) for ip, _ in busiest))
     per: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+    senders: dict[str, list[CountryAddress]] = defaultdict(list)
     unknown = 0
-    for (_, (p, f)), code in zip(busiest, found, strict=True):
+    for (ip, (p, f)), code in zip(busiest, found, strict=True):
         if code is None:
             unknown += p + f
         else:
             per[code][0] += p
             per[code][1] += f
+            senders[code].append(CountryAddress(ip=ip, emails=p + f, failed=f))  # `busiest` is already busiest first
     looked = sum(p + f for _, (p, f) in busiest)
     return Countries(
         days=days,
         emails=total,
-        countries=sorted((CountryRow(code=c, emails=p + f, passed=p, failed=f) for c, (p, f) in per.items()), key=lambda c: -c.emails),
+        countries=sorted(
+            (CountryRow(code=c, emails=p + f, passed=p, failed=f, addresses=senders[c][:ADDRESSES_PER_COUNTRY]) for c, (p, f) in per.items()), key=lambda c: -c.emails
+        ),
         unknown=unknown,
         not_looked_up=total - looked,
     )
