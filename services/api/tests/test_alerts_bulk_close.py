@@ -120,3 +120,95 @@ def test_a_reason_of_only_spaces_is_refused_before_anything_is_closed(audit):
         assert (await rows(s))["own"].status == "new" and audit == []
 
     run(go)
+
+
+# ---------------------------------------------------------------- undoing a bulk close
+
+
+def undo(s, caller, items, status="resolved"):
+    body = ep.BulkCloseUndoRequest(items=[ep.UndoItem(id=i, status_from=f) for i, f in items], status=status)
+    user = SimpleNamespace(tenant_id=caller, user_id=uuid.uuid4())
+    return ep.undo_bulk_close(body, SimpleNamespace(headers={}, client=None), user, s)
+
+
+def test_the_close_says_what_it_closed_and_undoing_puts_each_alert_back_as_it_was(audit):
+    async def go(s):
+        parent, a, b, other = await seed(s)
+        before = await rows(s)
+        before["tecovas"].status = "investigating"
+        await s.commit()
+        ids = [before["own"].id, before["tecovas"].id]
+        closed = await close(s, parent.id, ids)
+        assert [(i.id, i.status_from) for i in closed.closed_items] == [(before["own"].id, "new"), (before["tecovas"].id, "investigating")]
+        out = await undo(s, parent.id, [(i.id, i.status_from) for i in closed.closed_items])
+        assert (out.reopened, out.changed_since, out.too_late, out.not_found) == (2, 0, 0, 0)
+        s.expire_all()
+        after = await rows(s)
+        assert (after["own"].status, after["own"].resolved_at) == ("new", None)
+        assert (after["tecovas"].status, after["tecovas"].resolved_at) == ("investigating", None)
+        undone = [e for e in audit if e["action"] == "alerts:bulk_close_undone"]
+        assert [(e["resource_id"], e["changes"]) for e in undone] == [
+            (str(before["own"].id), {"status_from": "resolved", "status_to": "new"}),
+            (str(before["tecovas"].id), {"status_from": "resolved", "status_to": "investigating"}),
+        ]
+
+    run(go)
+
+
+def test_undo_leaves_alone_an_alert_changed_since_one_closed_too_long_ago_and_one_the_caller_cannot_see(audit):
+    from datetime import UTC, datetime, timedelta
+
+    async def go(s):
+        parent, a, b, other = await seed(s)
+        pid = parent.id  # read now: the objects are expired below
+        before = await rows(s)
+        closed = await close(s, pid, [before["own"].id, before["setpoint-new"].id, before["tecovas"].id])
+        s.expire_all()
+        now = await rows(s)
+        now["own"].status = "closed"  # somebody changed it after the bulk close
+        now["setpoint-new"].resolved_at = datetime.now(UTC) - timedelta(minutes=11)  # the close was more than ten minutes ago
+        await s.commit()
+        items = [(i.id, i.status_from) for i in closed.closed_items] + [(now["secret"].id, "new"), (uuid.uuid4(), "new")]
+        out = await undo(s, pid, items)
+        assert (out.reopened, out.changed_since, out.too_late, out.not_found) == (1, 1, 1, 2)
+        s.expire_all()
+        after = await rows(s)
+        assert after["own"].status == "closed" and after["setpoint-new"].status == "resolved" and after["tecovas"].status == "new"
+        assert after["secret"].status == "new", "another organization's alert is never touched"
+
+    run(go)
+
+
+def test_undoing_a_false_positive_close_takes_the_verdict_back_with_it(audit):
+    async def go(s):
+        parent, *_ = await seed(s)
+        before = await rows(s)
+        closed = await close(s, parent.id, [before["own"].id], status="false_positive")
+        await undo(s, parent.id, [(i.id, i.status_from) for i in closed.closed_items], status="false_positive")
+        s.expire_all()
+        after = await rows(s)
+        assert (after["own"].status, after["own"].disposition) == ("new", None)
+
+    run(go)
+
+
+def test_undo_cannot_be_used_to_put_an_alert_into_a_finished_status_or_to_reopen_one_it_did_not_close(audit):
+    from fastapi import HTTPException
+
+    async def go(s):
+        parent, *_ = await seed(s)
+        before = await rows(s)
+        with pytest.raises(HTTPException) as refused:
+            await undo(s, parent.id, [(before["own"].id, "closed")])
+        assert refused.value.status_code == 422
+        out = await undo(s, parent.id, [(before["own"].id, "investigating")])  # never closed: its status is not the one the request names
+        assert (out.reopened, out.changed_since) == (0, 1)
+        s.expire_all()
+        assert (await rows(s))["own"].status == "new"
+        assert audit == []
+
+    run(go)
+    with pytest.raises(ValidationError):
+        ep.UndoItem(id=uuid.uuid4(), status_from="New; DROP")
+    with pytest.raises(ValidationError):
+        ep.BulkCloseUndoRequest(items=[], status="resolved")

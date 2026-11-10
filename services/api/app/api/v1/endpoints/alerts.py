@@ -32,7 +32,7 @@ from app.services.alert_rail import (
     build_rail_envelope,
 )
 from app.services.alert_scope import alert_scope
-from app.services.alert_status import FINISHED_ALERT_STATUSES
+from app.services.alert_status import FINISHED_ALERT_STATUSES, is_finished
 from app.services.audit import emit_audit
 from app.services.event_sanitiser import (
     SubmitPayloadTooLarge,
@@ -1246,12 +1246,19 @@ class BulkCloseRequest(BaseModel):
     )
 
 
+class ClosedItem(BaseModel):
+    id: uuid.UUID
+    status_from: str
+
+
 class BulkCloseResponse(BaseModel):
     closed: int
     already_finished: int
     not_found: int
     status: str
     reason: str
+    # What was closed and the status each had before, so the close can be undone for a few minutes (POST /alerts/bulk-close/undo).
+    closed_items: list[ClosedItem] = []
 
 
 @router.post("/bulk-close", response_model=BulkCloseResponse)
@@ -1270,6 +1277,7 @@ async def bulk_close_alerts(
     if len(reason) < 3:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Give a reason of at least three characters.")
     closed = already = missing = 0
+    closed_items: list[ClosedItem] = []
     for alert_id in dict.fromkeys(body.alert_ids):
         try:
             async with alert_scope(db, current_user.tenant_id, alert_id) as tid:
@@ -1299,12 +1307,88 @@ async def bulk_close_alerts(
                     request=request,
                 )
                 closed += 1
+                closed_items.append(ClosedItem(id=alert_id, status_from=before))
         except HTTPException as exc:
             if exc.status_code != status.HTTP_404_NOT_FOUND:
                 raise
             missing += 1
     await db.commit()
-    return BulkCloseResponse(closed=closed, already_finished=already, not_found=missing, status=body.status, reason=reason)
+    return BulkCloseResponse(closed=closed, already_finished=already, not_found=missing, status=body.status, reason=reason, closed_items=closed_items)
+
+
+BULK_CLOSE_UNDO_MINUTES = 10
+
+
+class UndoItem(BaseModel):
+    id: uuid.UUID
+    status_from: str = Field(pattern=r"^[a-z_]{1,32}$", description="The status the alert had before the bulk close, as the close answered it.")
+
+
+class BulkCloseUndoRequest(BaseModel):
+    items: list[UndoItem] = Field(min_length=1, max_length=200)
+    status: Literal["resolved", "false_positive", "closed"] = Field(description="The status the bulk close gave these alerts.")
+
+
+class BulkCloseUndoResponse(BaseModel):
+    reopened: int
+    changed_since: int
+    too_late: int
+    not_found: int
+
+
+@router.post("/bulk-close/undo", response_model=BulkCloseUndoResponse)
+async def undo_bulk_close(
+    body: BulkCloseUndoRequest,
+    request: Request,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:write"))],
+    db: DBSession,
+) -> BulkCloseUndoResponse:
+    """Put alerts back the way they were before a bulk close made in the last ten minutes (a slip of the hand on 200 alerts).
+
+    An alert is only put back when it is still exactly as the close left it: it still has the status the close gave it and it was finished within the last ten minutes. One that somebody has
+    changed since is left alone and counted, as is one closed longer ago. It can only be put back to a status that is not itself finished. Each alert put back is written to the audit log.
+    """
+    if any(is_finished(i.status_from) for i in body.items):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="An alert can only be put back to a status that is not finished.")
+    reopened = changed = late = missing = 0
+    now = datetime.now(UTC)
+    for item in {i.id: i for i in body.items}.values():
+        try:
+            async with alert_scope(db, current_user.tenant_id, item.id) as tid:
+                alert = (await db.execute(select(Alert).where(Alert.id == item.id, Alert.tenant_id == tid))).scalar_one_or_none()
+                if alert is None:
+                    missing += 1
+                    continue
+                if alert.status != body.status:
+                    changed += 1
+                    continue
+                finished_at = alert.resolved_at
+                if finished_at is not None and finished_at.tzinfo is None:
+                    finished_at = finished_at.replace(tzinfo=UTC)
+                if finished_at is None or now - finished_at > timedelta(minutes=BULK_CLOSE_UNDO_MINUTES):
+                    late += 1
+                    continue
+                values: dict = {"status": item.status_from, "resolved_at": None, "updated_at": now}
+                if body.status == "false_positive" and alert.disposition == "false_positive":
+                    values["disposition"] = None  # the verdict the close set goes with it
+                await db.execute(update(Alert).where(Alert.id == item.id).values(**values))
+                await emit_audit(
+                    db=db,
+                    tenant_id=tid,
+                    actor_id=current_user.user_id,
+                    action="alerts:bulk_close_undone",
+                    resource="alert",
+                    resource_id=str(item.id),
+                    changes={"status_from": body.status, "status_to": item.status_from},
+                    request=request,
+                )
+                reopened += 1
+        except HTTPException as exc:
+            if exc.status_code != status.HTTP_404_NOT_FOUND:
+                raise
+            missing += 1
+    await db.commit()
+    return BulkCloseUndoResponse(reopened=reopened, changed_since=changed, too_late=late, not_found=missing)
 
 
 class BulkAssignRequest(BaseModel):

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: toast }));
-vi.mock('@/lib/api', () => ({ alertsApi: { bulkClose: vi.fn() } }));
+vi.mock('@/lib/api', () => ({ alertsApi: { bulkClose: vi.fn(), bulkCloseUndo: vi.fn() } }));
 
-import BulkCloseBar, { closeReason, closeSummary } from './BulkCloseBar';
+import BulkCloseBar, { closeReason, closeSummary, undoSummary } from './BulkCloseBar';
 
 beforeEach(() => {
   toast.success.mockReset();
@@ -69,5 +69,51 @@ describe('BulkCloseBar', () => {
     expect(close).toHaveBeenCalledWith({ alert_ids: ['a1'], status: 'resolved', reason: 'rule retired' });
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('The API answered 500'));
     expect(onClear).not.toHaveBeenCalled();
+  });
+});
+
+describe('undoing a bulk close', () => {
+  it('words what was put back and what was left alone', () => {
+    expect(undoSummary({ reopened: 3, changed_since: 0, too_late: 0, not_found: 0 })).toBe('Put 3 alerts back.');
+    expect(undoSummary({ reopened: 1, changed_since: 1, too_late: 2, not_found: 1 })).toBe('Put 1 alert back. 1 had been changed since and was left alone. 2 were closed more than 10 minutes ago. 1 could not be found.');
+  });
+
+  it('offers Undo after a close, even once the selection is cleared, and sends back exactly what the close answered', async () => {
+    const closed_items = [{ id: 'a1', status_from: 'new' }, { id: 'a2', status_from: 'investigating' }];
+    const close = vi.fn().mockResolvedValue({ closed: 2, already_finished: 0, not_found: 0, status: 'resolved', reason: 'Duplicate alerts', closed_items });
+    const undo = vi.fn().mockResolvedValue({ reopened: 2, changed_since: 0, too_late: 0, not_found: 0 });
+    const onDone = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(<BulkCloseBar alertIds={['a1', 'a2']} onDone={onDone} onClear={() => undefined} close={close} undo={undo} />);
+    expect(screen.queryByTestId('bulk-close-undo')).toBeNull();
+    await user.selectOptions(screen.getByLabelText('Reason'), 'Duplicate alerts');
+    await user.click(screen.getByRole('button', { name: 'Close alerts' }));
+    expect(await screen.findByTestId('bulk-close-undo')).toHaveTextContent('Closed 2 alerts. This can be undone for 10 minutes.');
+    rerender(<BulkCloseBar alertIds={[]} onDone={onDone} onClear={() => undefined} close={close} undo={undo} />);
+    expect(screen.queryByTestId('bulk-close-bar')).toBeNull();
+    await user.click(within(screen.getByTestId('bulk-close-undo')).getByRole('button', { name: 'Undo' }));
+    expect(undo).toHaveBeenCalledWith({ items: closed_items, status: 'resolved' });
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Put 2 alerts back.'));
+    expect(screen.queryByTestId('bulk-close-undo')).toBeNull();
+    expect(onDone).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers no Undo when nothing was closed or the server is an older one, and keeps the offer when the undo fails', async () => {
+    const user = userEvent.setup();
+    const none = vi.fn().mockResolvedValue({ closed: 0, already_finished: 2, not_found: 0, status: 'resolved', reason: 'Duplicate alerts', closed_items: [] });
+    const first = render(<BulkCloseBar alertIds={['a1']} onDone={() => undefined} onClear={() => undefined} close={none} undo={vi.fn()} />);
+    await user.selectOptions(screen.getByLabelText('Reason'), 'Duplicate alerts');
+    await user.click(screen.getByRole('button', { name: 'Close alerts' }));
+    await waitFor(() => expect(none).toHaveBeenCalled());
+    expect(screen.queryByTestId('bulk-close-undo')).toBeNull();
+    first.unmount();
+    const close = vi.fn().mockResolvedValue({ closed: 1, already_finished: 0, not_found: 0, status: 'resolved', reason: 'Duplicate alerts', closed_items: [{ id: 'a1', status_from: 'new' }] });
+    const undo = vi.fn().mockRejectedValue(new Error('The API answered 500'));
+    render(<BulkCloseBar alertIds={['a1']} onDone={() => undefined} onClear={() => undefined} close={close} undo={undo} />);
+    await user.selectOptions(screen.getByLabelText('Reason'), 'Duplicate alerts');
+    await user.click(screen.getByRole('button', { name: 'Close alerts' }));
+    await user.click(within(await screen.findByTestId('bulk-close-undo')).getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('The API answered 500'));
+    expect(screen.getByTestId('bulk-close-undo')).toBeInTheDocument();
   });
 });

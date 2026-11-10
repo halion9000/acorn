@@ -13,7 +13,7 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-10",
-    "commits": 43,
+    "commits": 44,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Autonomy: proposal log (table, API, evidence rule)",
@@ -23,12 +23,12 @@ export const REVISIONS: Revision[] = [
       "Posture: disk and RAID health from NinjaOne raises an alert when a disk is failing",
       "Readable BEC report, delete for revoked status links, QR code for authenticator setup, manual hunt hit counts",
       "Revisions regenerated",
-      "Autonomy page: per-agent scorecard (logged, did on its own, only recorded, agreed, rejected)",
-      "Audit role changes; Reset MFA also removes the authenticator app",
-      "Weekly digest: DMARC pass rate per domain",
-      "Case: Copy as ticket note",
-      "Software update: a history of earlier runs",
-      "Platform health: a worker that failed lately and recovered says so"
+      "Revisions regenerated",
+      "Members list shows each person second factor",
+      "Platform health: largest database tables",
+      "Bell: a finished BEC search opens the person it was for",
+      "Guide: name Client environment, Remote tools and File Integrity; test that every sidebar page is in the guide",
+      "Client environment: Download drawing"
     ],
     "fixes": 3
   },

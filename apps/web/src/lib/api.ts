@@ -643,6 +643,15 @@ export interface BulkCloseResult {
   not_found: number;
   status: string;
   reason: string;
+  /** What was closed and the status each had before, so the close can be undone for ten minutes; absent from an older server. */
+  closed_items?: { id: string; status_from: string }[];
+}
+
+export interface BulkCloseUndoResult {
+  reopened: number;
+  changed_since: number;
+  too_late: number;
+  not_found: number;
 }
 
 export interface BulkScriptRun {
@@ -2200,6 +2209,9 @@ export const alertsApi = {
     request<BulkAssignResult>('/api/v1/alerts/bulk-assign', { method: 'POST', body: JSON.stringify(body) }),
   bulkClose: (body: { alert_ids: string[]; status: 'resolved' | 'false_positive' | 'closed'; reason: string }) =>
     request<BulkCloseResult>('/api/v1/alerts/bulk-close', { method: 'POST', body: JSON.stringify(body) }),
+  /** Put back alerts a bulk close finished in the last ten minutes; one changed since, or closed longer ago, is left alone and counted. */
+  bulkCloseUndo: (body: { items: { id: string; status_from: string }[]; status: 'resolved' | 'false_positive' | 'closed' }) =>
+    request<BulkCloseUndoResult>('/api/v1/alerts/bulk-close/undo', { method: 'POST', body: JSON.stringify(body) }),
   runScriptBulk: (body: { script_id: number; alert_ids: string[]; preview?: boolean }) =>
     request<BulkScriptRun>('/api/v1/alerts/scripts/run-bulk', { method: 'POST', body: JSON.stringify(body) }),
 
