@@ -69,6 +69,23 @@ def _aware(moment: datetime | None) -> datetime | None:
     return moment if moment is None or moment.tzinfo is not None else moment.replace(tzinfo=UTC)
 
 
+def unsent_condition(cfg, now: datetime):
+    """The alerts still to be emailed: created since the setting was switched on (and not older than the age limit), at or above the chosen severity, and not yet in the sent log."""
+    since = max(filter(None, (_aware(cfg.enabled_since), now - timedelta(hours=settings.ALERT_EMAIL_MAX_ALERT_AGE_HOURS))))
+    return and_(
+        alerts_t.c.created_at >= since,
+        alerts_t.c.severity.in_(_eligible_severities(cfg.min_severity)),
+        ~exists(select(1).where(AlertEmailLog.alert_id == alerts_t.c.id)),
+    )
+
+
+async def waiting_count(db, cfg, now: datetime | None = None) -> int:
+    """How many alerts are waiting to be emailed right now, by the worker's own rule; 0 while alert email is off (nothing is waiting for a switch that is off)."""
+    if not cfg.enabled:
+        return 0
+    return int((await db.execute(select(func.count()).select_from(alerts_t).where(unsent_condition(cfg, now or datetime.now(UTC))))).scalar_one())
+
+
 async def run_once(*, session_factory: Callable | None = None, mailer: GraphMailer | None = None, now: datetime | None = None) -> RunResult:
     """One cycle. Never raises for an expected problem: it returns what happened (and records a send failure on the setting row)."""
     factory = session_factory or AsyncSessionLocal
@@ -90,12 +107,7 @@ async def run_once(*, session_factory: Callable | None = None, mailer: GraphMail
             await db.commit()
             return RunResult(skipped="not_configured", error=NOT_CONFIGURED_MESSAGE)
 
-        since = max(filter(None, (_aware(cfg.enabled_since), now - timedelta(hours=settings.ALERT_EMAIL_MAX_ALERT_AGE_HOURS))))
-        unsent = and_(
-            alerts_t.c.created_at >= since,
-            alerts_t.c.severity.in_(_eligible_severities(cfg.min_severity)),
-            ~exists(select(1).where(AlertEmailLog.alert_id == alerts_t.c.id)),
-        )
+        unsent = unsent_condition(cfg, now)
         rank = case(*[(alerts_t.c.severity == s, r) for s, r in SEVERITY_ORDER.items()], else_=0)
         cap = settings.ALERT_EMAIL_MAX_ALERTS_PER_EMAIL
         rows = (

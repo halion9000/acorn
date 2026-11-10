@@ -210,6 +210,13 @@ class TestStatus:
             j["last_error"],
             j["consecutive_failures"],
         ) == (False, "high", [], None, None, None, 0)
+        assert j["waiting"] == 0, "nothing waits for a switch that is off"
+
+    def test_when_the_waiting_alerts_cannot_be_counted_the_page_still_loads_and_says_unknown(self, world):
+        # This test database has no alerts table, which is exactly a count that cannot be made.
+        assert put(world, {"recipients": ["ops@msp.example"], "enabled": True}).status_code == 200
+        r = get(world)
+        assert r.status_code == 200 and r.json()["waiting"] is None and r.json()["enabled"] is True
 
     def test_it_says_whether_the_deployment_can_send_and_which_variables_are_missing_by_name_only(self, world, monkeypatch):
         j = get(world).json()

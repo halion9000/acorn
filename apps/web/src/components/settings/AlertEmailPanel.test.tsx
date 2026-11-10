@@ -94,6 +94,24 @@ describe('AlertEmailPanel', () => {
     expect(screen.queryByTestId('alert-email-last-error')).toBeNull();
   });
 
+  it('says how many alerts are waiting while it is on, ties the wait to an error when there is one, and says nothing when none wait or the count is unknown', async () => {
+    alertEmailApi.get.mockResolvedValue(status({ enabled: true, recipients: ['ops@msp.example'], waiting: 4 }));
+    const first = renderPanel();
+    expect(await screen.findByTestId('alert-email-waiting')).toHaveTextContent('4 alerts are waiting to be emailed and will go out on the next pass.');
+    first.unmount();
+    alertEmailApi.get.mockResolvedValue(status({ enabled: true, recipients: ['ops@msp.example'], waiting: 1, last_error: 'HTTP 503', consecutive_failures: 1 }));
+    const second = renderPanel();
+    expect(await screen.findByTestId('alert-email-waiting')).toHaveTextContent('1 alert is waiting to be emailed and will go out once the error below is fixed.');
+    second.unmount();
+    for (const waiting of [0, null, undefined]) {
+      alertEmailApi.get.mockResolvedValue(status({ enabled: true, recipients: ['ops@msp.example'], waiting, last_error: 'HTTP 503' }));
+      const r = renderPanel();
+      await screen.findByTestId('alert-email-last-error');
+      expect(screen.queryByTestId('alert-email-waiting')).not.toBeInTheDocument();
+      r.unmount();
+    }
+  });
+
   it('shows the last error with how often it has failed, and says unsent alerts wait', async () => {
     alertEmailApi.get.mockResolvedValue(status({ last_error: 'Microsoft Graph refused the message: HTTP 403 ErrorAccessDenied', last_error_at: '2026-10-10T12:00:00Z', consecutive_failures: 3 }));
     renderPanel();

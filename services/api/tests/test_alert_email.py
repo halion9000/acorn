@@ -939,3 +939,34 @@ class TestWiringAndTheTables:
             for n, text in enumerate((APP / path).read_text(encoding="utf-8").splitlines(), 1):
                 if re.search(r"\blogger\.\w+\(", text):
                     assert not re.search(r"recipient|secret|token|subject|body", text, re.I), f"{path}:{n}: {text.strip()}"
+
+
+class TestHowManyAreWaiting:
+    """The count the settings page shows is the worker's own rule, so the two cannot disagree."""
+
+    def waiting(self, world, now=NOW):
+        async def go(s):
+            return await worker.waiting_count(s, await settings_store.get_settings(s), now)
+
+        return db(world, go)
+
+    def test_nothing_is_waiting_while_it_is_off_even_with_alerts_there(self, world):
+        world.add(world.ta)
+        assert self.waiting(world) == 0
+
+    def test_it_counts_only_alerts_the_worker_would_send_and_drops_to_zero_once_they_are_sent(self, world):
+        turn_on(world, severity="high")
+        world.add(world.ta, severity="critical")
+        world.add(world.tb, severity="high")
+        world.add(world.ta, severity="low")  # below the chosen severity
+        world.add(world.ta, severity="high", age=60 * 5)  # from before it was switched on
+        assert self.waiting(world) == 2
+        m = FakeMailer()
+        assert cycle(world, m).sent == 2
+        assert self.waiting(world) == 0
+
+    def test_a_failed_send_leaves_them_waiting(self, world):
+        turn_on(world)
+        world.add(world.ta)
+        cycle(world, FakeMailer(error=MailError("Graph said no", permanent=False)))
+        assert self.waiting(world) == 1

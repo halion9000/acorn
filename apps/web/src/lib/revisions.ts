@@ -13,22 +13,22 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-10",
-    "commits": 34,
+    "commits": 35,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Autonomy: proposal log (table, API, evidence rule)",
       "Autonomy: proposals:log permission for the proposal log; test fixtures brought current",
-      "Vulnerabilities page: vulnerability alerts from the connected tools, each linking to its alert",
+      "Vulnerabilities: all-clients view with a count per client; Ninja update and support checks raise vulnerability alerts",
       "Vulnerabilities: Defender vulnerabilities (from CIPP) raise vulnerability alerts",
       "Proposal log: filter by kind of action and by verdict (decision memory)",
-      "Vulnerabilities: Meraki end-of-support check raises vulnerability alerts",
+      "Posture: disk and RAID health from NinjaOne raises an alert when a disk is failing",
       "Secret-scan hook installed here; public Azure role id marked as not a secret",
       "Client posture: time-to-fix target on each not-met check (critical 4 h, high 24 h, medium 5 days, low 14 days)",
+      "Inventory: technicians can check a device out and in (new inventory:checkout permission)",
       "Revisions regenerated",
-      "Autonomy page: per-agent scorecard (logged, did on its own, only recorded, agreed, rejected)",
       "Audit role changes; Reset MFA also removes the authenticator app",
-      "New recovery codes for the authenticator app",
-      "Platform health: largest database tables"
+      "Weekly digest: DMARC pass rate per domain",
+      "Change password: show the rule while typing"
     ],
     "fixes": 2
   },

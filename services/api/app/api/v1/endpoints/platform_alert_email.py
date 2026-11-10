@@ -49,6 +49,8 @@ class AlertEmailStatus(BaseModel):
     last_error: str | None = None
     last_error_at: datetime | None = None
     consecutive_failures: int = 0
+    # Alerts waiting to be emailed right now (the worker's own rule); None when it could not be counted.
+    waiting: int | None = None
     worker_enabled: bool  # ALERT_EMAIL_WORKER_ENABLED: the process-level switch
     credentials_configured: bool
     missing_credentials: list[str]  # environment variable NAMES only, never values
@@ -92,7 +94,18 @@ def missing_credentials() -> list[str]:
     return [name for name, attr in _CREDENTIAL_VARIABLES if not getattr(settings, attr)]
 
 
-def _status(row) -> AlertEmailStatus:
+async def _waiting(db, row) -> int | None:
+    """The count for the status line; a problem counting must not take the settings page down, so it is then unknown."""
+    from app.workers.alert_email_worker import waiting_count  # noqa: PLC0415
+
+    try:
+        async with db.begin_nested():
+            return await waiting_count(db, row)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _status(row, waiting: int | None = None) -> AlertEmailStatus:
     missing = missing_credentials()
     warnings: list[str] = []
     if row.enabled and not settings.ALERT_EMAIL_WORKER_ENABLED:
@@ -112,6 +125,7 @@ def _status(row) -> AlertEmailStatus:
         last_error=row.last_error,
         last_error_at=row.last_error_at,
         consecutive_failures=row.consecutive_failures or 0,
+        waiting=waiting,
         worker_enabled=bool(settings.ALERT_EMAIL_WORKER_ENABLED),
         credentials_configured=not missing,
         missing_credentials=missing,
@@ -125,7 +139,8 @@ async def get_alert_email(
     current_user: Annotated[AuthUser, Depends(require_permission("platform:cross_tenant_query"))], db: DBSession
 ) -> AlertEmailStatus:
     """The setting, whether the deployment can actually send (which environment variables are missing, by name), and the last error."""
-    return _status(await get_settings(db))
+    row = await get_settings(db)
+    return _status(row, await _waiting(db, row))
 
 
 @router.put("", response_model=AlertEmailStatus)

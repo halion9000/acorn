@@ -137,6 +137,11 @@ function Inner() {
             </span>
             {status.last_sent_at ? <span className="text-gray-400" suppressHydrationWarning>Last sent {safeDistance(status.last_sent_at, { addSuffix: true })}</span> : <span className="text-gray-500">Nothing sent yet</span>}
           </div>
+          {status.enabled && typeof status.waiting === 'number' && status.waiting > 0 ? (
+            <p data-testid="alert-email-waiting" className={`text-sm ${status.last_error ? 'text-amber-300' : 'text-gray-300'}`}>
+              {status.waiting} alert{status.waiting === 1 ? ' is' : 's are'} waiting to be emailed{status.last_error ? ' and will go out once the error below is fixed.' : ' and will go out on the next pass.'}
+            </p>
+          ) : null}
           {status.warnings.map((w) => (
             <p key={w} data-testid="alert-email-warning" className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">{w}</p>
           ))}
