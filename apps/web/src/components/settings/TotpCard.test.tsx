@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ status: vi.fn(), enrol: vi.fn(), confirm: vi.fn(), disable: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), totpApi: { status: api.status, enrol: api.enrol, confirm: api.confirm, disable: api.disable } }));
+const api = vi.hoisted(() => ({ status: vi.fn(), enrol: vi.fn(), confirm: vi.fn(), disable: vi.fn(), newRecoveryCodes: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), totpApi: { status: api.status, enrol: api.enrol, confirm: api.confirm, disable: api.disable, newRecoveryCodes: api.newRecoveryCodes } }));
 vi.mock('react-hot-toast', () => ({ default: api.toast }));
 
 import { TotpCard } from './TotpCard';
@@ -13,6 +13,7 @@ beforeEach(() => {
   api.enrol.mockReset();
   api.confirm.mockReset();
   api.disable.mockReset();
+  api.newRecoveryCodes.mockReset();
 });
 
 describe('TotpCard', () => {
@@ -61,6 +62,20 @@ describe('TotpCard', () => {
     await user.click(screen.getByRole('button', { name: 'Turn off' }));
     await waitFor(() => expect(api.disable).toHaveBeenCalledWith('pw', '123456'));
     expect(await screen.findByRole('button', { name: 'Set up an authenticator app' })).toBeInTheDocument();
+  });
+
+  it('makes new recovery codes with the password and a code, and shows them once', async () => {
+    api.status.mockResolvedValue({ enabled: true, recovery_codes_left: 0 });
+    api.newRecoveryCodes.mockResolvedValue({ recovery_codes: ['nnnnn-mmmmm'], note: '' });
+    const user = userEvent.setup();
+    render(<TotpCard />);
+    await user.click(await screen.findByRole('button', { name: 'New recovery codes…' }));
+    expect(screen.getByRole('button', { name: 'Make new recovery codes' })).toBeDisabled();
+    await user.type(screen.getByLabelText('Current password'), 'pw');
+    await user.type(screen.getByLabelText('Code for new recovery codes'), '123456');
+    await user.click(screen.getByRole('button', { name: 'Make new recovery codes' }));
+    await waitFor(() => expect(api.newRecoveryCodes).toHaveBeenCalledWith('pw', '123456'));
+    expect(await screen.findByTestId('totp-recovery')).toHaveTextContent('nnnnn-mmmmm');
   });
 
   it('says when the setting could not be loaded instead of showing it as off', async () => {

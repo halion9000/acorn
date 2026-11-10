@@ -7445,4 +7445,6 @@ export const totpApi = {
   /** The person typed a code from the app: it is then on, and the recovery codes come back ONCE. */
   confirm: (code: string) => request<{ recovery_codes: string[]; note: string }>('/api/v1/auth/totp/confirm', { method: 'POST', body: JSON.stringify({ code }) }),
   disable: (password: string, code: string) => request<{ ok: boolean }>('/api/v1/auth/totp/disable', { method: 'POST', body: JSON.stringify({ password, code }) }),
+  /** Ten new recovery codes (the old ones stop working), returned ONCE; needs the password and a current code. */
+  newRecoveryCodes: (password: string, code: string) => request<{ recovery_codes: string[]; note: string }>('/api/v1/auth/totp/recovery', { method: 'POST', body: JSON.stringify({ password, code }) }),
 };

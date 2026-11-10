@@ -41,6 +41,7 @@ export function TotpCard() {
   const [code, setCode] = useState('');
   const [recovery, setRecovery] = useState<string[] | null>(null);
   const [disabling, setDisabling] = useState(false);
+  const [replacing, setReplacing] = useState(false);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -83,6 +84,23 @@ export function TotpCard() {
       await load();
     } catch (err) {
       setProblem(problemOf(err, 'That code is not right.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const replaceCodes = async () => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const r = await totpApi.newRecoveryCodes(password, code.trim());
+      setRecovery(r.recovery_codes);
+      setReplacing(false);
+      setPassword('');
+      setCode('');
+      await load();
+    } catch (err) {
+      setProblem(problemOf(err, 'The password or the code is not right.'));
     } finally {
       setBusy(false);
     }
@@ -136,7 +154,28 @@ export function TotpCard() {
           <p className="text-sm text-emerald-300" data-testid="totp-on">
             On. {status.recovery_codes_left} recovery code{status.recovery_codes_left === 1 ? '' : 's'} left.
           </p>
-          {disabling ? (
+          {replacing ? (
+            <div className="space-y-2" data-testid="totp-replace">
+              <p className="text-xs text-gray-400">New codes replace the old ones: any you have saved stop working.</p>
+              <input aria-label="Current password" type="password" autoComplete="current-password" placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} className={input} />
+              <input aria-label="Code for new recovery codes" type="text" autoComplete="one-time-code" placeholder="Current code from the app" value={code} onChange={(e) => setCode(e.target.value)} className={input} />
+              <div className="flex gap-2">
+                <button type="button" disabled={busy || !password || !code.trim()} onClick={() => void replaceCodes()} className="rounded bg-indigo-600 px-3 py-1.5 text-xs text-white disabled:opacity-50">
+                  Make new recovery codes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReplacing(false);
+                    setProblem(null);
+                  }}
+                  className={ghost}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : disabling ? (
             <div className="space-y-2">
               <input aria-label="Current password" type="password" autoComplete="current-password" placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} className={input} />
               <input aria-label="Code to turn it off" type="text" autoComplete="one-time-code" placeholder="Current code or a recovery code" value={code} onChange={(e) => setCode(e.target.value)} className={input} />
@@ -157,9 +196,14 @@ export function TotpCard() {
               </div>
             </div>
           ) : (
-            <button type="button" onClick={() => setDisabling(true)} className={ghost}>
-              Turn off…
-            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setReplacing(true)} className={ghost}>
+                New recovery codes…
+              </button>
+              <button type="button" onClick={() => setDisabling(true)} className={ghost}>
+                Turn off…
+              </button>
+            </div>
           )}
         </div>
       ) : setup ? (

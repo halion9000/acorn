@@ -168,3 +168,23 @@ def test_turning_it_off_needs_the_password_and_a_code_and_then_signing_in_needs_
 def test_a_second_setup_is_refused_while_one_is_on(world):
     turn_on(world)
     assert world.client.post("/auth/totp/enrol").status_code == 409
+
+
+def test_new_recovery_codes_need_the_password_and_a_code_and_the_old_ones_stop_working(world):
+    secret, old = turn_on(world)
+    assert world.client.post("/auth/totp/recovery", json={"password": "wrong", "code": code_now(world, secret)}).status_code == 403
+    assert world.client.post("/auth/totp/recovery", json={"password": PASSWORD, "code": "000000"}).status_code == 403
+    assert world.client.get("/auth/totp").json()["recovery_codes_left"] == 10 and login(world, totp_code=old[0]).status_code == 200  # nothing changed yet (and that sign-in used one old code)
+    world.clock["t"] += 30
+    r = world.client.post("/auth/totp/recovery", json={"password": PASSWORD, "code": code_now(world, secret)})
+    assert r.status_code == 200, r.text
+    fresh = r.json()["recovery_codes"]
+    assert len(fresh) == 10 and not set(fresh) & set(old)
+    assert world.client.get("/auth/totp").json() == {"enabled": True, "recovery_codes_left": 10}
+    assert login(world, totp_code=old[1]).status_code in (400, 401, 403, 428), "an old recovery code is dead once replaced"
+    assert login(world, totp_code=fresh[0]).status_code == 200
+    assert world.client.get("/auth/totp").json()["recovery_codes_left"] == 9
+
+
+def test_new_recovery_codes_are_refused_when_the_app_is_not_on(world):
+    assert world.client.post("/auth/totp/recovery", json={"password": PASSWORD, "code": "123456"}).status_code == 403

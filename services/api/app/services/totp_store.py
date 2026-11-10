@@ -82,6 +82,18 @@ async def check_code(db: Any, user_id: uuid.UUID, tenant_id: uuid.UUID, code: st
     return None
 
 
+async def new_recovery_codes(db: Any, user_id: uuid.UUID, tenant_id: uuid.UUID) -> list[str] | None:
+    """Replace the recovery codes with ten new ones (the old ones stop working) and return them, shown once. None when the authenticator app is not on."""
+    row = await load(db, user_id, tenant_id)
+    if row is None or row.confirmed_at is None:
+        return None
+    codes = totp.new_recovery_codes()
+    async with acting_as_tenant(db, tenant_id):
+        row.recovery_hashes = [totp.hash_recovery(c) for c in codes]
+        await db.flush()
+    return codes
+
+
 async def remove(db: Any, user_id: uuid.UUID, tenant_id: uuid.UUID) -> bool:
     row = await load(db, user_id, tenant_id)
     if row is None:

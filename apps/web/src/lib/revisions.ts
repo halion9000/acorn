@@ -13,7 +13,7 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-10",
-    "commits": 26,
+    "commits": 27,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Digest: 12-hour and 24-hour windows for a shift handover, with the hours in the label",
@@ -23,12 +23,12 @@ export const REVISIONS: Revision[] = [
       "Vulnerabilities: Defender vulnerabilities (from CIPP) raise vulnerability alerts",
       "Proposal log: filter by kind of action and by verdict (decision memory)",
       "Vulnerabilities: Meraki end-of-support check raises vulnerability alerts",
-      "Posture: disk and RAID health from NinjaOne raises an alert when a disk is failing",
-      "Secret-scan hook installed here; public Azure role id marked as not a secret",
-      "Client posture: time-to-fix target on each not-met check (critical 4 h, high 24 h, medium 5 days, low 14 days)",
+      "Hunts: a manual run of a saved hunt stores its hit count, shown beside Last run",
+      "Readable BEC report, delete for revoked status links, QR code for authenticator setup, manual hunt hit counts",
+      "Insurance readiness checklist: seven more questions answered from the new checks",
+      "Inventory: technicians can check a device out and in (new inventory:checkout permission)",
       "Revisions regenerated",
-      "Autonomy page: per-agent scorecard (logged, did on its own, only recorded, agreed, rejected)",
-      "Web tests: fix three type errors in test files"
+      "Audit role changes; Reset MFA also removes the authenticator app"
     ],
     "fixes": 0
   },

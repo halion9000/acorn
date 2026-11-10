@@ -3,6 +3,7 @@
 ``GET /auth/totp``           whether it is on, and how many recovery codes are left
 ``POST /auth/totp/enrol``    start: a new secret, as text and as the address an authenticator app reads (nothing changes about signing in yet)
 ``POST /auth/totp/confirm``  the person types a code from the app: it is then ON, and the ten recovery codes are returned ONCE
+``POST /auth/totp/recovery``  ten new recovery codes (the old ones stop working); needs the current password AND a current code, like turning it off
 ``POST /auth/totp/disable``  turn it off; needs the current password AND a current code (or a recovery code), so a stolen session alone cannot remove the protection
 
 Signing in with a password when it is on: ``POST /auth/login`` also takes ``totp_code`` (an app code or a recovery code); without it the answer is 428 "enter the code" (after the password was right).
@@ -103,3 +104,19 @@ async def disable(body: DisableIn, request: Request, db: DBSession, who: Session
     await db.commit()
     return Done()
 
+
+
+@router.post("/recovery", response_model=ConfirmOut)
+async def new_recovery_codes(body: DisableIn, request: Request, db: DBSession, who: SessionUser) -> ConfirmOut:
+    """Replace the recovery codes (used up, or lost). Counted like a failed sign-in when the password or code is wrong, so it cannot be used to guess either."""
+    user = await _user(db, who)
+    await login_throttle.ensure_not_locked(db, user.account_name, None)
+    if not verify_password_or_equalise(body.password, user.hashed_password) or await totp_store.check_code(db, user.id, user.tenant_id, body.code) is None:
+        await login_throttle.record_failure(db, user.account_name, None)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="The password or the code is not right.")
+    codes = await totp_store.new_recovery_codes(db, user.id, user.tenant_id)
+    if codes is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The authenticator app is not on, so there are no recovery codes to replace.")
+    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.id, action="auth:totp_recovery_codes_replaced", resource="user", resource_id=str(user.id), changes={}, request=request)
+    await db.commit()
+    return ConfirmOut(recovery_codes=codes)
