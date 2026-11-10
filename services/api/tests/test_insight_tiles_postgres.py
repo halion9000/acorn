@@ -358,3 +358,32 @@ async def test_the_check_tiles_count_the_clients_whose_tool_reported_a_failing_c
             await conn.execute(text("delete from client_m365_checks where tenant_id = :t"), {"t": second})
             await conn.execute(text("delete from tenants where id = :t"), {"t": second})
         await _cleanup(engine, first)
+
+
+async def test_the_mttr_tile_says_how_long_each_severity_took_on_a_real_database():
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints import insights as ins
+
+    engine, tenant = await _tenant()
+    now = datetime.now(UTC)
+    ins._cache.clear()
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            for severity, hours in (("critical", 1), ("critical", 3), ("high", 6), ("low", 2)):
+                created = now - timedelta(hours=10)
+                await conn.execute(
+                    text(
+                        "insert into alerts (id, tenant_id, title, severity, status, created_at, updated_at, resolved_at) "
+                        "values (:i, :t, 'x', :sev, 'resolved', :c, :c, :r)"
+                    ),
+                    {"i": uuid.uuid4(), "t": tenant, "sev": severity, "c": created, "r": created + timedelta(hours=hours)},
+                )
+        async with AsyncSession(engine) as db:
+            out = await ins.get_soc_insights(SimpleNamespace(tenant_id=tenant), db, "24h", None)
+        tile = next(t for t in out.tiles if t.key == "mttr")
+        assert tile.detail.endswith("over 4 alerts. By severity: critical 2 h (2), high 6 h (1), low 2 h (1).")
+    finally:
+        ins._cache.clear()
+        await _cleanup(engine, tenant)

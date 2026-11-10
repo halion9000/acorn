@@ -47,6 +47,9 @@ async def test_window_takes_the_median_of_responses_and_leaves_out_stale_unresol
             assert got.p90_hours > 100
             both = await mttr.window(db, [mine], t0 - timedelta(hours=1))
             assert both.n == 5
+            parts = await mttr.window_by_severity(db, [mine], t0 - timedelta(hours=1))
+            assert [(name, m.median_hours, m.n) for name, m in parts] == [("high", 2.5, 4), ("low", 9.0, 1)], "the same alerts as the tile, split by severity"
+            assert sum(m.n for _, m in parts) == both.n
     finally:
         async with engine.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))

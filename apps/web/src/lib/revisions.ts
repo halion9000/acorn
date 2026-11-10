@@ -13,7 +13,7 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-10",
-    "commits": 37,
+    "commits": 39,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Autonomy: proposal log (table, API, evidence rule)",
@@ -22,15 +22,15 @@ export const REVISIONS: Revision[] = [
       "CIPP checks: legacy sign-in blocked, and mailbox rules that forward mail to another domain",
       "Autonomy page: last-24-hours view of what the agents did, and a since-hours filter on the proposal log",
       "Hunts: a manual run of a saved hunt stores its hit count, shown beside Last run",
-      "Readable BEC report, delete for revoked status links, QR code for authenticator setup, manual hunt hit counts",
+      "Client posture: time-to-fix target on each not-met check (critical 4 h, high 24 h, medium 5 days, low 14 days)",
       "Revisions regenerated",
-      "Autonomy page: per-agent scorecard (logged, did on its own, only recorded, agreed, rejected)",
+      "Revisions regenerated",
       "Audit role changes; Reset MFA also removes the authenticator app",
-      "New recovery codes for the authenticator app",
+      "Weekly digest: DMARC pass rate per domain",
       "Change password: show the rule while typing",
-      "Bell: a finished BEC search opens the person it was for"
+      "Alert email: say how many alerts are waiting to be sent"
     ],
-    "fixes": 2
+    "fixes": 3
   },
   {
     "version": "1.22",

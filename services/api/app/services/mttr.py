@@ -76,3 +76,36 @@ async def window(db: Any, tenant_ids: list[Any], start: datetime, end: datetime 
         where.append(Alert.severity == severity)
     rows = (await db.execute(select(Alert.created_at, Alert.resolved_at, Alert.stale_at).where(*where).limit(MAX_ROWS))).all()
     return summarize_pairs((r[0], r[1], r[2]) for r in rows)
+
+
+SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
+
+
+def by_severity(rows: Iterable[tuple[str | None, datetime | None, datetime | None, datetime | None]]) -> list[tuple[str, Mttr]]:
+    """MTTR per severity from (severity, created_at, resolved_at, stale_at) rows, by the one rule, most severe first (pure). A severity with nothing finished is left out, never shown as zero;
+    a severity outside the known five is listed after them by name."""
+    groups: dict[str, list[float]] = {}
+    for severity, created, resolved, stale in rows:
+        if is_response(created, resolved, stale) and created is not None and resolved is not None:
+            groups.setdefault(str(severity or "unknown").lower(), []).append(hours(created, resolved))
+    order = {name: i for i, name in enumerate(SEVERITY_ORDER)}
+    out = [(name, summarize(values)) for name, values in groups.items()]
+    return sorted((x for x in out if x[1].n > 0), key=lambda x: (order.get(x[0], len(order)), x[0]))
+
+
+def severity_sentence(parts: list[tuple[str, Mttr]]) -> str:
+    """The breakdown as one plain sentence for a tile, or "" when there is nothing to break down (one severity says no more than the tile's own figure)."""
+    if len(parts) < 2:
+        return ""
+    return "By severity: " + ", ".join(f"{name} {m.median_hours:g} h ({m.n})" for name, m in parts) + "."
+
+
+async def window_by_severity(db: Any, tenant_ids: list[Any], start: datetime, end: datetime | None = None) -> list[tuple[str, Mttr]]:
+    """``window`` broken down by severity: the same alerts (created in [start, end), finished by a person, not swept as stale), in one query. Same scope rule for the caller as ``window``."""
+    from app.models.alert import Alert  # noqa: PLC0415
+
+    where = [Alert.tenant_id.in_(tenant_ids), Alert.resolved_at.isnot(None), Alert.stale_at.is_(None), Alert.created_at >= start]
+    if end is not None:
+        where.append(Alert.created_at < end)
+    rows = (await db.execute(select(Alert.severity, Alert.created_at, Alert.resolved_at, Alert.stale_at).where(*where).limit(MAX_ROWS))).all()
+    return by_severity((r[0], r[1], r[2], r[3]) for r in rows)

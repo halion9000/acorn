@@ -64,7 +64,7 @@ from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.tenant import Tenant
 from app.services import case_metrics, insight_tiles
-from app.services.mttr import window as mttr_window
+from app.services.mttr import severity_sentence, window as mttr_window, window_by_severity
 from app.services.timeutil import as_utc
 
 logger = logging.getLogger(__name__)
@@ -707,6 +707,14 @@ async def _build_soc_insights(user: AuthUser, db: DBSession, window: str, client
             raise HTTPException(status_code=404, detail="client not found")
         scope_ids = [client_id]
     total = await _scope_totals(db, tenant_id, scope_ids, start, now, prev_start)
+    # The same alerts as the MTTR tile, split by severity for its detail line. Extra detail: a failure here must not take the tiles down.
+    mttr_breakdown = ""
+    try:
+        async with db.begin_nested():
+            async with cross_tenant_reads(db):
+                mttr_breakdown = severity_sentence(await window_by_severity(db, list(scope_ids), start, now))
+    except Exception:  # noqa: BLE001
+        mttr_breakdown = ""
     extra_parts = await _gather_extras(db, scope_ids, start, now, prev_start)
 
     history_since = total["first_alert"]
@@ -764,6 +772,7 @@ async def _build_soc_insights(user: AuthUser, db: DBSession, window: str, client
             sparkline=InsightSparkline(points=alert_spark),
             has_data=mttr_has,
             detail=f"Median time from an alert arriving to a person finishing it (alerts swept as stale are not counted), over {total['mttr_n']} alerts"
+            + (f". {mttr_breakdown}" if mttr_breakdown else "")
             if mttr_has
             else "No alert from this window has been finished yet",
         ),
