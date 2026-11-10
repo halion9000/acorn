@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -79,6 +79,7 @@ async def list_proposals(
     rung: str | None = Query(default=None, pattern="^(shadow|suggest|ask|act_tell|act_quiet)$"),
     action_type: str | None = Query(default=None, max_length=80, description="Only proposals of this kind of action (lower case, as logged)."),
     outcome: str | None = Query(default=None, pattern="^(none|accepted|edited|rejected|expired)$", description="Only proposals a person judged this way; rejected with the reason is the decision memory."),
+    since_hours: int | None = Query(default=None, ge=1, le=720, description="Only proposals logged in the last this many hours (24 for the daily view)."),
     limit: int = Query(default=100, ge=1, le=MAX_LIST),
 ) -> ProposalList:
     where = [AgentProposal.tenant_id == user.tenant_id]
@@ -86,6 +87,8 @@ async def list_proposals(
         where.append(AgentProposal.agent == agent)
     if rung:
         where.append(AgentProposal.rung == rung)
+    if since_hours:
+        where.append(AgentProposal.created_at >= datetime.now(UTC) - timedelta(hours=since_hours))
     if action_type:
         where.append(AgentProposal.action_type == action_type.strip().lower())
     if outcome:

@@ -26,7 +26,8 @@ const OUTCOME: Record<AgentProposal['outcome'], string> = {
 };
 
 export function AgentProposalLog() {
-  const { data, error, mutate } = useSWR('agent-proposals', () => agentProposalsApi.list(), { revalidateOnFocus: false, shouldRetryOnError: false });
+  const [daily, setDaily] = useState(false);
+  const { data, error, mutate } = useSWR(['agent-proposals', daily], () => agentProposalsApi.list(daily ? 24 : undefined), { revalidateOnFocus: false, shouldRetryOnError: false });
   const [failed, setFailed] = useState<string | null>(null);
 
   if (error) return <p className="mb-4 text-sm text-gray-500" data-testid="proposals-error">The proposal log could not be loaded.</p>;
@@ -44,7 +45,20 @@ export function AgentProposalLog() {
 
   return (
     <section className="mb-6 rounded-lg border border-gray-800 bg-gray-900/60 p-4" data-testid="proposals">
-      <h3 className="text-sm font-semibold text-gray-100">What the agents proposed or did</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-gray-100">What the agents proposed or did</h3>
+        <div className="flex gap-1 text-xs" role="group" aria-label="Period">
+          <button type="button" aria-pressed={daily} onClick={() => setDaily(true)} className={`rounded border px-2 py-0.5 ${daily ? 'border-sky-500/60 text-sky-200' : 'border-gray-700 text-gray-400'}`}>Last 24 hours</button>
+          <button type="button" aria-pressed={!daily} onClick={() => setDaily(false)} className={`rounded border px-2 py-0.5 ${!daily ? 'border-sky-500/60 text-sky-200' : 'border-gray-700 text-gray-400'}`}>Everything</button>
+        </div>
+      </div>
+      {daily ? (
+        <p className="mt-2 text-sm text-gray-300" data-testid="proposals-daily">
+          {data.summary.total === 0
+            ? 'Nothing from the agents in the last 24 hours.'
+            : `In the last 24 hours: ${data.summary.by_rung.act_tell + data.summary.by_rung.act_quiet} done on their own, ${data.summary.by_rung.shadow} recorded as would-have-done, ${data.summary.by_rung.ask} asked for approval, ${data.summary.by_rung.suggest} suggested.`}
+        </p>
+      ) : null}
       <p className="mt-1 text-xs text-gray-400">
         Each row is one action with the evidence behind it. A row marked &quot;would have done&quot; is shadow mode: nothing happened, and your verdict is what tells us whether the agent could be trusted with it.
         {data.summary.shadow_unreviewed > 0 ? ` ${data.summary.shadow_unreviewed} shadow row${data.summary.shadow_unreviewed === 1 ? '' : 's'} still waiting for a verdict.` : ''}

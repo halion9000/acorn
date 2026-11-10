@@ -39,6 +39,16 @@ describe('AgentProposalLog', () => {
     expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull();
   });
 
+  it('switches to the last 24 hours, asks for that window, and sums what the agents did on their own', async () => {
+    api.list.mockResolvedValue({ items: [row()], summary: { total: 4, by_rung: { shadow: 1, suggest: 0, ask: 1, act_tell: 1, act_quiet: 1 }, by_outcome: {}, shadow_unreviewed: 1 } });
+    show();
+    await screen.findByTestId('proposal-p1');
+    expect(api.list).toHaveBeenLastCalledWith(undefined);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Last 24 hours' }));
+    expect(await screen.findByTestId('proposals-daily')).toHaveTextContent('In the last 24 hours: 2 done on their own, 1 recorded as would-have-done, 1 asked for approval, 0 suggested.');
+    expect(api.list).toHaveBeenLastCalledWith(24);
+  });
+
   it('says so when the verdict cannot be saved, and when there is nothing logged or the log cannot load', async () => {
     api.list.mockResolvedValue(list([row()], 1));
     api.setOutcome.mockRejectedValue(new Error('403 sign in as a person'));

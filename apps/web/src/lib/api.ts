@@ -6344,7 +6344,7 @@ export interface AgentProposalList {
 
 export const agentProposalsApi = {
   /** Every action an agent proposed or took, newest first, with the header counts. */
-  list: () => request<AgentProposalList>('/api/v1/agent-proposals?limit=50'),
+  list: (sinceHours?: number) => request<AgentProposalList>(`/api/v1/agent-proposals?limit=50${sinceHours ? `&since_hours=${sinceHours}` : ''}`),
   /** A person records what they made of a proposal (a signed-in session is required). */
   setOutcome: (id: string, outcome: 'accepted' | 'edited' | 'rejected' | 'expired', note?: string) =>
     request<AgentProposal>(`/api/v1/agent-proposals/${id}/outcome`, { method: 'POST', body: JSON.stringify({ outcome, note: note || null }) }),
