@@ -104,3 +104,51 @@ def test_the_vm_runner_takes_the_request_runs_the_script_once_and_the_screen_rea
     before = (ctl / uc.RUN_LOG).read_text()
     run()
     assert (ctl / uc.RUN_LOG).read_text() == before
+
+
+TAB = chr(9)
+
+
+def _line(*fields):
+    return TAB.join(fields)
+
+
+def test_history_is_read_newest_first_with_ok_only_for_the_statuses_that_mean_it_worked(tmp_path):
+    (tmp_path / uc.HISTORY_FILE).write_text(
+        "\n".join(
+            [
+                _line("2026-11-09T10:00:00Z", "ok", "aaa1111", "update"),
+                _line("2026-11-09T11:00:00Z", "rolled_back", "aaa1111", "update"),
+                _line("2026-11-10T09:00:00Z", "failed", "none", "update"),
+                _line("2026-11-10T12:00:00Z", "rollback_ok", "aaa1111", "rollback"),
+            ]
+        )
+        + "\n"
+    )
+    history = uc.read_state(tmp_path).history
+    assert [h["at"] for h in history] == ["2026-11-10T12:00:00Z", "2026-11-10T09:00:00Z", "2026-11-09T11:00:00Z", "2026-11-09T10:00:00Z"]
+    assert [h["ok"] for h in history] == [True, False, False, True]
+    assert history[1]["commit"] is None and history[0] == {"at": "2026-11-10T12:00:00Z", "status": "rollback_ok", "ok": True, "commit": "aaa1111", "mode": "rollback"}
+
+
+def test_a_line_that_is_not_four_plain_fields_is_skipped_and_only_the_newest_twenty_are_shown():
+    good = _line("2026-11-10T12:00:00Z", "ok", "aaa1111", "update")
+    text = "\n".join(
+        [
+            "",
+            "garbage",
+            _line("2026-11-10T12:00:00Z", "ok", "aaa1111"),
+            _line("not-a-time", "ok", "aaa1111", "update"),
+            _line("2026-11-10T12:00:00Z", "<script>alert(1)</script>", "aaa1111", "update"),
+            _line("2026-11-10T12:00:00Z", "ok", "aaa1111", "update", "extra"),
+            good,
+        ]
+    )
+    assert uc.parse_history(text) == [{"at": "2026-11-10T12:00:00Z", "status": "ok", "ok": True, "commit": "aaa1111", "mode": "update"}]
+    many = "\n".join(_line(f"2026-11-{d:02d}T12:00:00Z", "ok", "aaa1111", "update") for d in range(1, 29))
+    shown = uc.parse_history(many)
+    assert len(shown) == uc.HISTORY_SHOWN and shown[0]["at"] == "2026-11-28T12:00:00Z"
+
+
+def test_no_history_file_is_an_empty_history_not_an_error(tmp_path):
+    assert uc.read_state(tmp_path).history == []

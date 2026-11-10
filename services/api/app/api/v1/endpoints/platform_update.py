@@ -26,6 +26,7 @@ class UpdateStatus(BaseModel):
     last_run_ok: bool | None = None
     summary: str | None = None
     log: list[str] = []
+    history: list[dict] = []
 
 
 def _out(state: uc.UpdateState) -> UpdateStatus:

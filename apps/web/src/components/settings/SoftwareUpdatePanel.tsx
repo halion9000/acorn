@@ -32,6 +32,18 @@ export function SoftwareUpdatePanel() {
   return <Inner />;
 }
 
+/** The update script's own words for a run, in plain language. */
+const HISTORY_STATUS: Record<string, string> = {
+  ok: 'Updated',
+  verify_ok: 'Checked: healthy',
+  rollback_ok: 'Went back to the earlier version',
+  rolled_back: 'Failed and went back to the earlier version',
+  failed: 'Failed',
+  verify_failed: 'Checked: not healthy',
+  rollback_failed: 'Could not go back to the earlier version',
+};
+const HISTORY_MODE: Record<string, string> = { update: 'Update', force: 'Rebuild', verify: 'Health check', rollback: 'Roll back' };
+
 function stateLabel(s: PlatformUpdateStatus): string {
   if (s.state === 'queued') return 'Waiting to start';
   if (s.state === 'running') return 'Updating…';
@@ -118,6 +130,29 @@ function Inner() {
           </button>
           {busy ? <p className="mt-2 text-xs text-gray-500">A.C.O.R.N restarts during the update, so this page may pause for a minute or two. It keeps checking.</p> : null}
         </div>
+        {data.history && data.history.length > 0 ? (
+          <table data-testid="update-history" className="w-full text-left text-xs text-gray-300">
+            <caption className="pb-1 text-left text-sm text-gray-400">Earlier runs (times in UTC)</caption>
+            <thead>
+              <tr className="text-gray-500">
+                <th scope="col">When</th>
+                <th scope="col">What</th>
+                <th scope="col">Result</th>
+                <th scope="col">Version</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.history.map((h) => (
+                <tr key={`${h.at}-${h.status}`}>
+                  <td>{h.at.replace('T', ' ').replace('Z', '')}</td>
+                  <td>{HISTORY_MODE[h.mode] ?? h.mode}</td>
+                  <td className={h.ok ? 'text-emerald-300' : 'text-red-300'}>{HISTORY_STATUS[h.status] ?? h.status}</td>
+                  <td className="font-mono">{h.commit ?? 'unknown'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
         {data.log.length > 0 ? (
           <pre data-testid="update-log" aria-label="Update output" className="max-h-80 overflow-auto rounded-lg border border-gray-800 bg-black/40 p-3 text-xs text-gray-300">{data.log.join('\n')}</pre>
         ) : null}

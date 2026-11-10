@@ -36,7 +36,21 @@ exec > >(tee -a "$LOG") 2>&1
 # status is one of: ok, up_to_date, verify_ok, rollback_ok, rolled_back, failed, verify_failed, rollback_failed, busy.
 STATUS=failed
 emit_result() { echo "RESULT {\"status\":\"$STATUS\",\"commit\":\"$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo none)\"}"; }
-trap emit_result EXIT
+# One line per run that did something, for the Update panel's history: time (UTC), status, commit, mode, separated by tabs, newest last, the latest 50 kept.
+# A run that was turned away (busy) or found nothing new (up_to_date) is not history. Writes only into the hand-off folder and only when it exists; it can never fail a run.
+record_history() {
+  local dir=${ACORN_UPDATE_CTL:-/srv/acorn/update-ctl} file commit
+  case "$STATUS" in busy|up_to_date) return 0 ;; esac
+  [ -d "$dir" ] || return 0
+  file=$dir/history.log
+  commit=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo none)
+  {
+    printf '%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$STATUS" "$commit" "$MODE" >> "$file" &&
+      tail -n 50 "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+  } 2>/dev/null || true
+  return 0
+}
+trap 'record_history; emit_result' EXIT
 
 exec 9>"$STATE/update.lock"
 flock -n 9 || { echo "Another update is already running."; STATUS=busy; exit 3; }

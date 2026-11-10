@@ -338,3 +338,60 @@ def test_the_public_tripwire_listener_serves_only_the_canary_path_and_the_tunnel
     assert svc["profiles"] == ["extras"], "the tunnel must not start unless the owner lists it"
     assert svc["environment"]["TUNNEL_TOKEN"] == "${CLOUDFLARED_TUNNEL_TOKEN:-}", "the token must come from .env, never be written in the file"
     assert "ports" not in svc, "the tunnel connects out; nothing is published"
+
+
+def run_record_history(tmp_path: Path, status: str, mode: str = "update", ctl: Path | None = None):
+    """The script's own history function, run in bash with the folder it writes to pointed at a temporary one."""
+    folder = ctl if ctl is not None else tmp_path
+    program = (
+        f"REPO={tmp_path.as_posix()}\nSTATUS={status}\nMODE={mode}\nexport ACORN_UPDATE_CTL={folder.as_posix()}\n"
+        f"eval \"$(sed -n '/^record_history() {{/,/^}}/p' {SCRIPT.as_posix()})\"\n"
+        'record_history; echo "exit=$?"\n'
+    )
+    return subprocess.run([BASH, "-c", program], capture_output=True, text=True, timeout=60).stdout
+
+
+def test_a_run_that_did_something_adds_one_history_line_the_api_can_read(tmp_path):
+    from app.services import update_control as uc
+
+    assert "exit=0" in run_record_history(tmp_path, "ok")
+    assert "exit=0" in run_record_history(tmp_path, "rolled_back")
+    assert "exit=0" in run_record_history(tmp_path, "rollback_ok", mode="rollback")
+    rows = uc.parse_history((tmp_path / "history.log").read_text())
+    assert [(r["status"], r["mode"], r["ok"], r["commit"]) for r in rows] == [("rollback_ok", "rollback", True, None), ("rolled_back", "update", False, None), ("ok", "update", True, None)]
+
+
+def test_a_run_that_was_turned_away_or_found_nothing_new_is_not_history(tmp_path):
+    for status in ("busy", "up_to_date"):
+        assert "exit=0" in run_record_history(tmp_path, status)
+    assert not (tmp_path / "history.log").exists()
+
+
+def test_history_never_fails_a_run_when_the_folder_is_missing_and_keeps_only_the_latest_fifty(tmp_path):
+    assert "exit=0" in run_record_history(tmp_path, "ok", ctl=tmp_path / "missing")
+    assert not (tmp_path / "missing").exists()
+    (tmp_path / "history.log").write_text("".join(f"old-line-{i}\n" for i in range(60)))
+    assert "exit=0" in run_record_history(tmp_path, "ok")
+    lines = (tmp_path / "history.log").read_text().splitlines()
+    assert len(lines) == 50 and lines[0] == "old-line-11" and lines[-1].split(chr(9))[1] == "ok"
+
+
+@pytest.mark.skipif(shutil.which("flock") is None, reason="needs flock")
+def test_a_real_failed_run_writes_history_and_the_result_line_is_still_last(tmp_path):
+    import os
+
+    from app.services import update_control as uc
+
+    ctl = tmp_path / "ctl"
+    ctl.mkdir()
+    text = (
+        SCRIPT.read_text()
+        .replace("REPO=/srv/acorn/AiSOC", f"REPO={(tmp_path / 'no-checkout').as_posix()}")
+        .replace("STATE=/srv/acorn", f"STATE={tmp_path.as_posix()}")
+    )
+    copy = tmp_path / "update-acorn.sh"
+    copy.write_text(text)
+    out = subprocess.run([BASH, str(copy)], capture_output=True, text=True, timeout=60, env={**os.environ, "ACORN_UPDATE_CTL": ctl.as_posix()})
+    assert out.stdout.strip().splitlines()[-1] == 'RESULT {"status":"failed","commit":"none"}'
+    rows = uc.parse_history((ctl / "history.log").read_text())
+    assert [(r["status"], r["mode"]) for r in rows] == [("failed", "update")]

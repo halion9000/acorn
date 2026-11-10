@@ -15,6 +15,10 @@ from pathlib import Path
 REQUEST_FILE = "request.json"
 RUNNING_FILE = "running"
 RUN_LOG = "last-run.log"
+HISTORY_FILE = "history.log"
+HISTORY_SHOWN = 20
+_HISTORY_OK = {"ok", "verify_ok", "rollback_ok"}
+_SAFE = re.compile(r"^[A-Za-z0-9_.:-]{1,40}$")
 TAIL_LINES = 40
 _SUCCESS = re.compile(r"UPDATE OK|already up to date|VERIFY OK|ROLLBACK OK")
 _FAILURE = re.compile(r"FAILED|ROLLED BACK|NOT healthy")
@@ -30,6 +34,8 @@ class UpdateState:
     last_run_ok: bool | None = None
     summary: str | None = None
     log: list[str] = field(default_factory=list)
+    # Past runs that did something, newest first: when, the script's own status word, the commit it ended on, and what kind of run it was.
+    history: list[dict] = field(default_factory=list)
 
 
 class UpdateRefused(Exception):
@@ -55,6 +61,23 @@ def _verdict(lines: list[str]) -> tuple[bool | None, str | None]:
     return None, (lines[-1].strip()[:300] if lines else None)
 
 
+def parse_history(text: str, shown: int = HISTORY_SHOWN) -> list[dict]:
+    """The update script's history lines (time, status, commit, mode, tab-separated, newest last) as rows, newest first. A line that is not four plain fields is skipped: the file is written
+    by a script, but it is shown on a page, so nothing unexpected is passed through."""
+    rows = []
+    for line in text.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 4 or not all(_SAFE.match(p) for p in parts):
+            continue
+        at, status, commit, mode = parts
+        try:
+            datetime.strptime(at, "%Y-%m-%dT%H:%M:%SZ")
+        except ValueError:
+            continue
+        rows.append({"at": at, "status": status, "ok": status in _HISTORY_OK, "commit": None if commit == "none" else commit, "mode": mode})
+    return rows[::-1][:shown]
+
+
 def read_state(directory: Path | None) -> UpdateState:
     if directory is None or not directory.is_dir():
         return UpdateState(available=False, state="unavailable")
@@ -69,6 +92,10 @@ def read_state(directory: Path | None) -> UpdateState:
             out.requested_at = str(data.get("requested_at", "")) or None
         except (OSError, ValueError):
             pass
+    try:
+        out.history = parse_history((directory / HISTORY_FILE).read_text(encoding="utf-8", errors="replace"))
+    except OSError:
+        pass  # no history yet
     log = directory / RUN_LOG
     if log.exists():
         try:

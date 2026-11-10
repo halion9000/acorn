@@ -66,6 +66,31 @@ describe('SoftwareUpdatePanel', () => {
     expect(screen.getByTestId('update-summary')).toHaveTextContent('ROLLED BACK to abc');
   });
 
+  it('lists earlier runs in plain words, newest first as given, and shows no table when there are none', async () => {
+    platformUpdateApi.get.mockResolvedValue(
+      status({
+        history: [
+          { at: '2026-11-10T12:00:00Z', status: 'rolled_back', ok: false, commit: 'aaa1111', mode: 'update' },
+          { at: '2026-11-09T10:00:00Z', status: 'ok', ok: true, commit: null, mode: 'force' },
+        ],
+      }),
+    );
+    const first = renderPanel();
+    const rows = (await screen.findByTestId('update-history')).querySelectorAll('tbody tr');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('2026-11-10 12:00:00');
+    expect(rows[0]).toHaveTextContent('Failed and went back to the earlier version');
+    expect(rows[0]).toHaveTextContent('aaa1111');
+    expect(rows[1]).toHaveTextContent('Rebuild');
+    expect(rows[1]).toHaveTextContent('Updated');
+    expect(rows[1]).toHaveTextContent('unknown');
+    first.unmount();
+    platformUpdateApi.get.mockResolvedValue(status());
+    renderPanel();
+    await screen.findByTestId('update-state');
+    expect(screen.queryByTestId('update-history')).not.toBeInTheDocument();
+  });
+
   it('a refused request shows the reason and leaves the button usable', async () => {
     platformUpdateApi.start.mockRejectedValue(new ApiError('API 409 - /x', 409, JSON.stringify({ detail: 'An update is already waiting or running.' })));
     renderPanel();

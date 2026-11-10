@@ -7382,6 +7382,8 @@ export interface PlatformUpdateStatus {
   last_run_ok: boolean | null;
   summary: string | null;
   log: string[];
+  /** Past runs that did something, newest first; absent from an older server. */
+  history?: { at: string; status: string; ok: boolean; commit: string | null; mode: string }[];
 }
 
 export const platformUpdateApi = {
