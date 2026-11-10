@@ -198,6 +198,14 @@ def test_the_ninjaone_and_addigy_update_and_support_checks_are_vulnerability_che
         assert [s["key"] for s in ca.standing_specs([check(key, "not_met", "3 of 10 machines")], "x")] == [key]
 
 
+def test_the_cipp_legacy_sign_in_and_mailbox_forwarding_checks_alert_when_not_met_but_are_not_vulnerabilities():
+    for key in ("cipp_ca_legacy_auth", "cipp_mailbox_forwarding"):
+        assert key in ca.WATCHED and key not in ca.VULN_CHECK_KEYS, key
+        assert ca.WATCHED[key][2] == "not_met" and ca.WATCHED[key][1] == "high"
+        out = specs([check(key, "met")], [check(key, "not_met", "x")], source="cipp-health")
+        assert len(out) == 1 and out[0]["key"] == key
+
+
 def test_addigy_may_send_its_own_checks():
     from app.services.infra_review import TOOL_CHECK_SOURCES
 

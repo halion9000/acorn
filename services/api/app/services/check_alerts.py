@@ -26,6 +26,8 @@ WATCHED: dict[str, tuple[str, str, str]] = {
     "threatmate_google_failed_logins": ("Many failed Google sign-ins for this client", "medium", "not_met"),
     "liongard_m365_external_forwarding": ("Microsoft 365 mailboxes forward mail outside this client", "high", "not_met"),
     "liongard_m365_admin_mfa_policy": ("Privileged Microsoft 365 users have no policy that requires multi-factor sign-in", "high", "not_met"),
+    "cipp_ca_legacy_auth": ("Legacy sign-in is not blocked for this client (no policy or security defaults)", "high", "not_met"),
+    "cipp_mailbox_forwarding": ("Mailbox rules send this client's mail to another domain", "high", "not_met"),
     "liongard_m365_legacy_auth": ("Microsoft 365 users can still sign in with legacy authentication", "high", "not_met"),
     "liongard_inspections": ("Liongard stopped inspecting parts of this client", "medium", "not_met"),
     "threatmate_google_apps": ("Several third-party apps can read this client's Google mail or every Drive file", "medium", "not_met"),

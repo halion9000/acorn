@@ -85,6 +85,8 @@ const TITLE: Record<string, string> = {
   ninjaone_software_patches: 'Application updates',
   addigy_unsupported_macos: 'macOS support status',
   cipp_defender_vulnerabilities: 'Defender vulnerabilities',
+  cipp_ca_legacy_auth: 'Legacy sign-in blocked',
+  cipp_mailbox_forwarding: 'Mailbox forwarding rules',
   halopsa_agreement: 'Support agreement',
   meraki_licence: 'Meraki licence',
   meraki_admin_2fa: 'Meraki administrators',
