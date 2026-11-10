@@ -13,7 +13,7 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-10",
-    "commits": 29,
+    "commits": 32,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Autonomy: proposal log (table, API, evidence rule)",
@@ -22,15 +22,15 @@ export const REVISIONS: Revision[] = [
       "Vulnerabilities: macOS support check from Addigy; two guard fixtures declare the public client status page",
       "CIPP checks: legacy sign-in blocked, and mailbox rules that forward mail to another domain",
       "Autonomy page: last-24-hours view of what the agents did, and a since-hours filter on the proposal log",
-      "Posture: disk and RAID health from NinjaOne raises an alert when a disk is failing",
-      "Secret-scan hook installed here; public Azure role id marked as not a secret",
-      "Client posture: time-to-fix target on each not-met check (critical 4 h, high 24 h, medium 5 days, low 14 days)",
+      "Hunts: a manual run of a saved hunt stores its hit count, shown beside Last run",
+      "Readable BEC report, delete for revoked status links, QR code for authenticator setup, manual hunt hit counts",
+      "Insurance readiness checklist: seven more questions answered from the new checks",
+      "Inventory: technicians can check a device out and in (new inventory:checkout permission)",
       "Revisions regenerated",
-      "Autonomy page: per-agent scorecard (logged, did on its own, only recorded, agreed, rejected)",
-      "Web tests: fix three type errors in test files",
-      "Members list shows each person second factor"
+      "Audit role changes; Reset MFA also removes the authenticator app",
+      "New recovery codes for the authenticator app"
     ],
-    "fixes": 0
+    "fixes": 2
   },
   {
     "version": "1.22",

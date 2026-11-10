@@ -25,6 +25,16 @@ describe('ChangePasswordCard', () => {
     expect(button).toBeEnabled();
   });
 
+  it('shows the rule while the new password is typed: a countdown first, then that it is long enough', async () => {
+    const user = userEvent.setup();
+    render(<ChangePasswordCard />);
+    expect(screen.queryByTestId('password-hint')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('New password'), 'short');
+    expect(screen.getByTestId('password-hint')).toHaveTextContent('7 more characters needed (at least 12).');
+    await user.type(screen.getByLabelText('New password'), ' and longer now');
+    expect(screen.getByTestId('password-hint')).toHaveTextContent('Good length.');
+  });
+
   it('sends both passwords, then says every session ended and offers to sign in again', async () => {
     api.change.mockResolvedValue({ changed: true, detail: 'Password changed. Every session was ended: sign in again with the new password.' });
     const user = userEvent.setup();

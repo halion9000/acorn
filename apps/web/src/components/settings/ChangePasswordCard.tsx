@@ -6,6 +6,7 @@
  */
 import { useState } from 'react';
 import { apiErrorDetail, passwordApi } from '@/lib/api';
+import { passwordHint } from '@/lib/passwordHint';
 
 const input = 'w-full rounded-md border border-gray-700 bg-gray-950/60 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600';
 
@@ -17,6 +18,7 @@ export function ChangePasswordCard() {
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
+  const hint = passwordHint(next, current);
   const mismatch = again !== '' && next !== again;
   const ready = current !== '' && next !== '' && next === again && !busy;
 
@@ -59,6 +61,7 @@ export function ChangePasswordCard() {
           New password
           <input type="password" autoComplete="new-password" className={input} value={next} onChange={(e) => setNext(e.target.value)} />
         </label>
+        {hint ? <p className={`text-xs ${hint.ok ? 'text-emerald-300' : 'text-amber-300'}`} data-testid="password-hint">{hint.text}</p> : null}
         <label className="text-xs text-gray-400">
           New password again
           <input type="password" autoComplete="new-password" className={input} value={again} onChange={(e) => setAgain(e.target.value)} />
