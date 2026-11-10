@@ -192,7 +192,7 @@ def test_a_vulnerability_check_that_gets_worse_later_still_raises_its_dated_aler
 
 
 def test_the_ninjaone_and_addigy_update_and_support_checks_are_vulnerability_checks_that_alert_when_not_met():
-    for key in ("ninjaone_patching", "ninjaone_software_patches", "ninjaone_unsupported_os", "addigy_unsupported_macos", "cipp_defender_vulnerabilities"):
+    for key in ("ninjaone_patching", "ninjaone_software_patches", "ninjaone_unsupported_os", "addigy_unsupported_macos", "cipp_defender_vulnerabilities", "meraki_end_of_support"):
         assert key in ca.VULN_CHECK_KEYS and key in ca.WATCHED, key
         assert ca.standing_specs([check(key, "partly")], "x") == [], "partly is not enough to alert"
         assert [s["key"] for s in ca.standing_specs([check(key, "not_met", "3 of 10 machines")], "x")] == [key]
