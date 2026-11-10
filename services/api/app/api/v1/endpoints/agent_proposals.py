@@ -77,6 +77,8 @@ async def list_proposals(
     db: TenantDBSession,
     agent: str | None = Query(default=None, max_length=120),
     rung: str | None = Query(default=None, pattern="^(shadow|suggest|ask|act_tell|act_quiet)$"),
+    action_type: str | None = Query(default=None, max_length=80, description="Only proposals of this kind of action (lower case, as logged)."),
+    outcome: str | None = Query(default=None, pattern="^(none|accepted|edited|rejected|expired)$", description="Only proposals a person judged this way; rejected with the reason is the decision memory."),
     limit: int = Query(default=100, ge=1, le=MAX_LIST),
 ) -> ProposalList:
     where = [AgentProposal.tenant_id == user.tenant_id]
@@ -84,6 +86,10 @@ async def list_proposals(
         where.append(AgentProposal.agent == agent)
     if rung:
         where.append(AgentProposal.rung == rung)
+    if action_type:
+        where.append(AgentProposal.action_type == action_type.strip().lower())
+    if outcome:
+        where.append(AgentProposal.outcome == outcome)
     rows = (await db.execute(select(AgentProposal).where(*where).order_by(AgentProposal.created_at.desc()).limit(limit))).scalars().all()
     return ProposalList(items=[_out(r) for r in rows], summary=tally([{"rung": r.rung, "outcome": r.outcome} for r in rows]))
 

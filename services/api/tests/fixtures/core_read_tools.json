@@ -507,6 +507,31 @@
     "numbers": {}
   },
   {
+    "tool": "aisoc_decision_memory",
+    "method": "GET",
+    "path": "/agent-proposals",
+    "query": [
+      "action_type",
+      "outcome",
+      "limit"
+    ],
+    "enums": {
+      "outcome": [
+        "rejected",
+        "edited",
+        "accepted",
+        "expired",
+        "none"
+      ]
+    },
+    "numbers": {
+      "limit": {
+        "min": 1,
+        "max": 200
+      }
+    }
+  },
+  {
     "tool": "aisoc_entity_risk_stats",
     "method": "GET",
     "path": "/fusion/entity-risk/stats",

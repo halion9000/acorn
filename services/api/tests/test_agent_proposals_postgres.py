@@ -65,11 +65,11 @@ async def test_a_proposal_is_stored_under_the_callers_tenant_with_its_evidence_a
     out = await record_proposal(body(), None, user(s.info["mine"]), s)
     assert out.action_type == "close-as-false-positive" and out.outcome == "none" and out.evidence == [{"label": "the alert", "url": "https://x/a/42"}]
     await off(s)
-    got = await list_proposals(user(s.info["mine"]), s, agent=None, rung=None, limit=50)
+    got = await list_proposals(user(s.info["mine"]), s, agent=None, rung=None, action_type=None, outcome=None, limit=50)
     assert [p.id for p in got.items] == [out.id]
     assert got.summary["shadow_unreviewed"] == 1 and got.summary["by_rung"]["shadow"] == 1
     await off(s)
-    theirs = await list_proposals(user(s.info["other"]), s, agent=None, rung=None, limit=50)
+    theirs = await list_proposals(user(s.info["other"]), s, agent=None, rung=None, action_type=None, outcome=None, limit=50)
     assert theirs.items == []
 
 
@@ -96,6 +96,25 @@ async def test_the_database_itself_refuses_a_made_up_rung_or_outcome(world):
             )
         await s.rollback()
         await off(s)
+
+
+async def test_the_list_can_be_narrowed_to_one_kind_of_action_and_one_verdict(world):
+    s = world
+    await off(s)
+    a = await record_proposal(body(action_type="snooze-alert"), None, user(s.info["mine"]), s)
+    await off(s)
+    await record_proposal(body(action_type="comment-case"), None, user(s.info["mine"]), s)
+    await off(s)
+    await set_outcome(a.id, OutcomeIn(outcome="rejected", note="a script does this on purpose"), None, user(s.info["mine"]), s)
+    await off(s)
+    only_snooze = await list_proposals(user(s.info["mine"]), s, agent=None, rung=None, action_type="Snooze-Alert", outcome=None, limit=50)
+    assert [p.action_type for p in only_snooze.items] == ["snooze-alert"]
+    await off(s)
+    rejected = await list_proposals(user(s.info["mine"]), s, agent=None, rung=None, action_type=None, outcome="rejected", limit=50)
+    assert [(p.action_type, p.outcome_note) for p in rejected.items] == [("snooze-alert", "a script does this on purpose")]
+    await off(s)
+    nothing = await list_proposals(user(s.info["mine"]), s, agent=None, rung=None, action_type="snooze-alert", outcome="accepted", limit=50)
+    assert nothing.items == []
 
 
 async def test_an_outcome_is_set_once_and_another_tenants_proposal_is_not_found(world):

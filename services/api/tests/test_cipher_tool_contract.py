@@ -50,6 +50,7 @@ CIPHER_CALLS = [
     ("aisoc_claim_alert", "POST", "/alerts/{id}/claim", [], None, False),
     ("aisoc_snooze_alert", "POST", "/alerts/{id}/snooze", [], ["reason", "duration_minutes"], False),
     ("aisoc_comment_case", "POST", "/cases/{id}/comments", [], ["body"], False),
+    ("aisoc_decision_memory", "GET", "/agent-proposals", ["action_type", "outcome", "limit"], None, False),
     ("aisoc_log_proposal", "POST", "/agent-proposals", [], ["agent", "action_type", "summary", "rung", "evidence", "target", "confidence"], False),
     ("aisoc_launch_investigation", "POST", "/cases/{id}/investigate", [], [], False),
     ("aisoc_update_case", "PATCH", "/cases/{id}", [], ["status"], False),
@@ -289,7 +290,7 @@ def test_the_page_size_cap_is_at_least_what_core_sends(path):
 
 def test_the_table_covers_all_fifty_three_tools():
     tools = {re.sub(r" \(.*\)$", "", name) for name in CALL_IDS}
-    assert len(tools) == 85, sorted(tools)
+    assert len(tools) == 86, sorted(tools)
 
 
 READ_ONLY_TOOLS = [c for c in CIPHER_CALLS if c[1] == "GET"]
@@ -360,7 +361,7 @@ def test_every_tool_in_the_contract_is_a_get():
 
 def test_the_contract_has_no_tool_listed_twice():
     names = [r["tool"] for r in CONTRACT]
-    assert len(names) == len(set(names)) == 67
+    assert len(names) == len(set(names)) == 68
 
 
 def test_the_copy_is_the_same_as_the_file_in_the_core_checkout_when_one_is_next_to_this_repo():
@@ -539,6 +540,7 @@ ESTATE_TOOLS = [
     "aisoc_check_weights",
     "aisoc_fleet_boards",
     "aisoc_fleet_board",
+    "aisoc_decision_memory",
     "aisoc_fleet_changes",
     "aisoc_fleet_acceptances",
     "aisoc_fleet_coverage",
