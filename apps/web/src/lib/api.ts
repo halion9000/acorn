@@ -6717,6 +6717,8 @@ export interface ExecutiveDigest {
   high_risk_alerts: HighRiskAlertHighlight[];
   automation: AutomationSummary;
   recommendations: DigestRecommendation[];
+  /** DMARC pass rate per domain, worst first; absent or empty when no reports came in. */
+  email_authentication?: { domain: string; total: number; passed: number; failed: number; pass_rate: number | null; policy: string }[];
 }
 
 export interface WeeklyDigestParams {

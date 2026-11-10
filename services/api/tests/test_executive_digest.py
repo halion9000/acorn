@@ -402,3 +402,58 @@ def test_mttr_in_the_digest_is_the_median_and_leaves_out_alerts_swept_as_stale()
 
     got = _compute_mtt([row(1), row(2), row(3), row(500), row(400, stale=True)])
     assert got.mttr_hours == 2.5, "the median of 1, 2, 3 and 500; the stale sweep is not counted"
+
+
+# ---------------------------------------------------------------------------
+# Email authentication (DMARC) section
+# ---------------------------------------------------------------------------
+
+
+def _dmarc_inputs(rows):
+    return DigestInputs(tenant_id=TENANT_ID, period_start=PERIOD_START, period_end=PERIOD_END, dmarc_reports=rows)
+
+
+def test_dmarc_reports_are_added_up_per_domain_worst_pass_rate_first() -> None:
+    from app.services.executive_digest import DmarcRow
+
+    digest = build_digest_from_rows(
+        _dmarc_inputs(
+            [
+                DmarcRow("Good.example", "reject", 100, 100, 0),
+                DmarcRow("leaky.example", "none", 60, 30, 30),
+                DmarcRow("leaky.example", "quarantine", 40, 40, 0),
+                DmarcRow("empty.example", "none", 0, 0, 0),
+            ]
+        )
+    )
+    lines = digest.email_authentication
+    assert [x.domain for x in lines] == ["leaky.example", "good.example", "empty.example"]
+    leaky = lines[0]
+    assert (leaky.total, leaky.passed, leaky.failed, leaky.pass_rate, leaky.policy) == (100, 70, 30, 0.7, "quarantine")
+    assert lines[2].pass_rate is None
+
+
+def test_a_domain_below_ninety_percent_with_enough_mail_adds_a_recommendation_and_a_small_one_does_not() -> None:
+    from app.services.executive_digest import DmarcRow
+
+    weak = build_digest_from_rows(_dmarc_inputs([DmarcRow("leaky.example", "none", 100, 70, 30)]))
+    assert any(r.title == "Mail failing DMARC checks" and "leaky.example (70%)" in r.body for r in weak.recommendations)
+    tiny = build_digest_from_rows(_dmarc_inputs([DmarcRow("tiny.example", "none", 5, 1, 4)]))
+    assert not any(r.title == "Mail failing DMARC checks" for r in tiny.recommendations)
+    healthy = build_digest_from_rows(_dmarc_inputs([DmarcRow("ok.example", "reject", 100, 95, 5)]))
+    assert not any(r.title == "Mail failing DMARC checks" for r in healthy.recommendations)
+
+
+def test_the_html_has_the_dmarc_section_only_when_reports_came_in() -> None:
+    from app.services.executive_digest import DmarcRow
+
+    with_reports = render_digest_html(build_digest_from_rows(_dmarc_inputs([DmarcRow("leaky.example", "none", 100, 70, 30)])))
+    assert "Email authentication (DMARC)" in with_reports and "leaky.example" in with_reports and "70%" in with_reports
+    assert "Email authentication (DMARC)" not in render_digest_html(build_digest_from_rows(_dmarc_inputs([])))
+
+
+def test_a_domain_name_in_a_report_cannot_inject_markup_into_the_page() -> None:
+    from app.services.executive_digest import DmarcRow
+
+    html = render_digest_html(build_digest_from_rows(_dmarc_inputs([DmarcRow("<script>x</script>.example", "none", 10, 10, 0)])))
+    assert "<script>x</script>" not in html and "&lt;script&gt;" in html

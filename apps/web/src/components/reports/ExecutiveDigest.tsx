@@ -379,6 +379,32 @@ function DigestBody({ digest, clientId }: { digest: ExecutiveDigestPayload; clie
         )}
       </Card>
 
+      {/* Email authentication: only when DMARC reports came in during the window */}
+      {digest.email_authentication && digest.email_authentication.length > 0 ? (
+        <Card title="Email authentication (DMARC)" subtitle="How each domain's mail did in the DMARC reports received in this window, lowest pass rate first">
+          <table className="w-full text-sm" data-testid="digest-dmarc">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                <th className="py-1 pr-3">Domain</th>
+                <th className="py-1 pr-3">Policy</th>
+                <th className="py-1 pr-3 text-right">Messages</th>
+                <th className="py-1 text-right">Passed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {digest.email_authentication.map((x) => (
+                <tr key={x.domain} className="border-t border-gray-800 text-gray-200">
+                  <td className="py-1.5 pr-3">{x.domain}</td>
+                  <td className="py-1.5 pr-3">{x.policy}</td>
+                  <td className="py-1.5 pr-3 text-right">{x.total}</td>
+                  <td className="py-1.5 text-right font-medium">{x.pass_rate === null ? 'none counted' : `${Math.round(x.pass_rate * 100)}%`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      ) : null}
+
       {/* Recommendations */}
       <Card
         title="Recommendations"

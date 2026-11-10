@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 from .executive_digest import (
     AutomationSummary,
     DigestRecommendation,
+    EmailAuthLine,
     ExecutiveDigest,
     HighRiskAlertHighlight,
     SeveritySplit,
@@ -176,6 +177,28 @@ def _automation_block(automation: AutomationSummary) -> str:
     )
 
 
+def _email_auth_table(lines: list[EmailAuthLine]) -> str:
+    """The whole section (heading and table), or nothing when no DMARC reports came in."""
+    if not lines:
+        return ""
+    body = "".join(
+        f'<tr><td style="padding:6px 8px;">{_esc(x.domain)}</td>'
+        f'<td style="padding:6px 8px;">{_esc(x.policy)}</td>'
+        f'<td style="padding:6px 8px;text-align:right;">{x.total}</td>'
+        f'<td style="padding:6px 8px;text-align:right;font-weight:600;">'
+        f"{'no messages counted' if x.pass_rate is None else f'{round(x.pass_rate * 100)}%'}</td></tr>"
+        for x in lines
+    )
+    return (
+        "<h2>Email authentication (DMARC)</h2>"
+        '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+        '<thead><tr style="text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;">'
+        '<th style="padding:6px 8px;">Domain</th><th style="padding:6px 8px;">Policy</th>'
+        '<th style="padding:6px 8px;text-align:right;">Messages</th><th style="padding:6px 8px;text-align:right;">Passed</th></tr></thead>'
+        f"<tbody>{body}</tbody></table>"
+    )
+
+
 def _recommendation_cards(recs: list[DigestRecommendation]) -> str:
     if not recs:
         return ""
@@ -262,6 +285,8 @@ def render_digest_html(digest: ExecutiveDigest) -> str:
 
   <h2>Automation</h2>
   {_automation_block(digest.automation)}
+
+  {_email_auth_table(digest.email_authentication)}
 
   <h2>Recommendations</h2>
   {_recommendation_cards(digest.recommendations)}

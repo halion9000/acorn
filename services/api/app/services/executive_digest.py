@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.mttr import summarize
 from app.models.alert import Alert
+from app.models.dmarc import DmarcReport
 from app.models.remediation import RemediationGateLog
 from app.services import case_metrics
 from app.services.alert_status import FINISHED_ALERT_STATUSES
@@ -120,6 +121,18 @@ class DigestRecommendation(BaseModel):
     body: str
 
 
+class EmailAuthLine(BaseModel):
+    """How one domain's mail did in the DMARC reports received during the window."""
+
+    domain: str
+    total: int
+    passed: int
+    failed: int
+    # Share of messages that passed, 0 to 1; None when the reports counted no messages.
+    pass_rate: float | None
+    policy: str
+
+
 class ExecutiveDigest(BaseModel):
     """Top-level deterministic snapshot of one digest window."""
 
@@ -136,6 +149,8 @@ class ExecutiveDigest(BaseModel):
     high_risk_alerts: list[HighRiskAlertHighlight] = Field(default_factory=list)
     automation: AutomationSummary
     recommendations: list[DigestRecommendation] = Field(default_factory=list)
+    # DMARC pass rate per domain, worst first; empty when no reports came in (the section is then left out).
+    email_authentication: list[EmailAuthLine] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +192,17 @@ class GateLogRow:
     decision: str  # "auto" | "review" | "escalate" | other
 
 
+@dataclass(frozen=True)
+class DmarcRow:
+    """One DMARC aggregate report, reduced to what the digest needs."""
+
+    domain: str
+    policy: str
+    total: int
+    passed: int
+    failed: int
+
+
 @dataclass
 class DigestInputs:
     """Bundle of pre-fetched rows for a tenant + period."""
@@ -190,6 +216,7 @@ class DigestInputs:
     gate_log: list[GateLogRow] = field(default_factory=list)
     open_alerts_at_period_end: int = 0
     open_cases_at_period_end: int = 0
+    dmarc_reports: list[DmarcRow] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -386,12 +413,33 @@ def _build_headline(alerts: AlertSummary, mtt: MttSummary, automation: Automatio
     return " · ".join(parts)
 
 
+EMAIL_AUTH_MIN_MESSAGES = 20  # fewer messages than this is too little to call a pass rate a problem
+EMAIL_AUTH_WARN_BELOW = 0.9
+
+
+def _email_authentication(reports: list[DmarcRow], *, limit: int = 8) -> list[EmailAuthLine]:
+    """Add the reports up per domain and list the domains with the lowest pass rate first (a domain with no counted messages goes last). The policy shown is the most recent report's."""
+    by_domain: dict[str, list[DmarcRow]] = {}
+    for r in reports:
+        by_domain.setdefault(r.domain.lower(), []).append(r)
+    lines = []
+    for domain, rows in by_domain.items():
+        total = sum(r.total for r in rows)
+        passed = sum(r.passed for r in rows)
+        lines.append(
+            EmailAuthLine(domain=domain, total=total, passed=passed, failed=sum(r.failed for r in rows), pass_rate=(passed / total) if total > 0 else None, policy=rows[-1].policy)
+        )
+    lines.sort(key=lambda x: (x.pass_rate is None, x.pass_rate if x.pass_rate is not None else 0.0, x.domain))
+    return lines[:limit]
+
+
 def _build_recommendations(
     alerts: AlertSummary,
     cases: CaseSummary,
     mtt: MttSummary,
     automation: AutomationSummary,
     top_tactics: list[TacticHighlight],
+    email_authentication: list[EmailAuthLine] | None = None,
 ) -> list[DigestRecommendation]:
     """Heuristic, deterministic CISO-facing call-to-actions.
 
@@ -456,6 +504,17 @@ def _build_recommendations(
             )
         )
 
+    weak = [x for x in email_authentication or [] if x.pass_rate is not None and x.total >= EMAIL_AUTH_MIN_MESSAGES and x.pass_rate < EMAIL_AUTH_WARN_BELOW]
+    if weak:
+        names = ", ".join(f"{x.domain} ({round(x.pass_rate * 100)}%)" for x in weak[:3] if x.pass_rate is not None)
+        recs.append(
+            DigestRecommendation(
+                severity="warning",
+                title="Mail failing DMARC checks",
+                body=f"Fewer than {round(EMAIL_AUTH_WARN_BELOW * 100)}% of messages passed for {names}. Check that every service sending as these domains is set up in SPF and DKIM.",
+            )
+        )
+
     if not recs:
         recs.append(
             DigestRecommendation(
@@ -499,7 +558,8 @@ def build_digest_from_rows(inputs: DigestInputs) -> ExecutiveDigest:
     high_risk = _high_risk_alerts(inputs.current_alerts)
     automation = _automation_summary(inputs.gate_log)
     headline = _build_headline(alerts, mtt, automation)
-    recommendations = _build_recommendations(alerts, cases, mtt, automation, top_tactics)
+    email_auth = _email_authentication(inputs.dmarc_reports)
+    recommendations = _build_recommendations(alerts, cases, mtt, automation, top_tactics, email_auth)
 
     return ExecutiveDigest(
         tenant_id=inputs.tenant_id,
@@ -513,6 +573,7 @@ def build_digest_from_rows(inputs: DigestInputs) -> ExecutiveDigest:
         high_risk_alerts=high_risk,
         automation=automation,
         recommendations=recommendations,
+        email_authentication=email_auth,
     )
 
 
@@ -606,6 +667,16 @@ async def _fetch_gate_log(
     return [GateLogRow(decision=r.decision or "unknown") for r in result.all()]
 
 
+async def _fetch_dmarc(db: AsyncSession, tenant_id: uuid.UUID, start: datetime, end: datetime) -> list[DmarcRow]:
+    """The DMARC reports this client received whose period falls in the window (unmatched ones, kept under the owner's tenant, are not a client's)."""
+    result = await db.execute(
+        select(DmarcReport.domain, DmarcReport.policy, DmarcReport.total, DmarcReport.passed, DmarcReport.failed)
+        .where(and_(DmarcReport.tenant_id == tenant_id, DmarcReport.matched.is_(True), DmarcReport.end_at >= start, DmarcReport.end_at < end))
+        .order_by(DmarcReport.end_at)
+    )
+    return [DmarcRow(domain=r.domain, policy=r.policy, total=r.total, passed=r.passed, failed=r.failed) for r in result.all()]
+
+
 async def _count_open_alerts(db: AsyncSession, tenant_id: uuid.UUID, at: datetime) -> int:
     """Open == not resolved as of `at`."""
     val = await db.scalar(
@@ -649,6 +720,7 @@ async def build_weekly_digest(
     gate_log = await _fetch_gate_log(db, tenant_id, start, end)
     open_alerts = await _count_open_alerts(db, tenant_id, end)
     open_cases = await _count_open_cases(db, tenant_id, end)
+    dmarc = await _fetch_dmarc(db, tenant_id, start, end)
 
     inputs = DigestInputs(
         tenant_id=tenant_id,
@@ -660,6 +732,7 @@ async def build_weekly_digest(
         gate_log=gate_log,
         open_alerts_at_period_end=open_alerts,
         open_cases_at_period_end=open_cases,
+        dmarc_reports=dmarc,
     )
     return build_digest_from_rows(inputs)
 
@@ -673,6 +746,8 @@ __all__ = [
     "DigestInputs",
     "DigestPeriod",
     "DigestRecommendation",
+    "DmarcRow",
+    "EmailAuthLine",
     "ExecutiveDigest",
     "GateLogRow",
     "HighRiskAlertHighlight",

@@ -38,6 +38,20 @@ beforeEach(() => { api.weeklyDigest.mockReset(); api.weeklyDigestHtml.mockReset(
 afterEach(() => vi.unstubAllGlobals());
 
 describe('ExecutiveDigest', () => {
+  it('lists DMARC pass rates per domain when reports came in, and leaves the section out otherwise', async () => {
+    api.weeklyDigest.mockResolvedValue(digest({ email_authentication: [{ domain: 'leaky.example', total: 100, passed: 70, failed: 30, pass_rate: 0.7, policy: 'none' }, { domain: 'empty.example', total: 0, passed: 0, failed: 0, pass_rate: null, policy: 'none' }] }));
+    const first = renderIt();
+    const table = await screen.findByTestId('digest-dmarc');
+    expect(within(table).getByText('leaky.example')).toBeInTheDocument();
+    expect(within(table).getByText('70%')).toBeInTheDocument();
+    expect(within(table).getByText('none counted')).toBeInTheDocument();
+    first.unmount();
+    api.weeklyDigest.mockResolvedValue(digest());
+    renderIt();
+    await screen.findByText('Oct 1 to Oct 7');
+    expect(screen.queryByTestId('digest-dmarc')).not.toBeInTheDocument();
+  });
+
   it('shows a computing message first, with Print disabled', () => {
     api.weeklyDigest.mockReturnValue(new Promise(() => {}));
     renderIt();
