@@ -62,6 +62,96 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+/** A text that is really a list or record written as JSON (CIPP sends the score breakdown that way) becomes that list or record; anything else is returned unchanged (pure). */
+export function maybeParse(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  const t = v.trim();
+  if (!(t.startsWith('[') || t.startsWith('{'))) return v;
+  try {
+    return JSON.parse(t);
+  } catch {
+    return v;
+  }
+}
+
+export interface ScoreSignal {
+  signal: string;
+  count: number;
+  weight: number;
+  applied: boolean;
+  description: string;
+}
+
+/** CIPP's score for the mailbox, split into the signals that fired and the ones that were checked and found nothing (pure). Null when the report has no readable score. */
+export function scoreOf(report: Record<string, unknown> | null | undefined): { level: string; value: number | null; fired: ScoreSignal[]; quiet: ScoreSignal[] } | null {
+  const raw = report ? (report.Score ?? report.score) : undefined;
+  if (!isRecord(raw)) return null;
+  const parsed = maybeParse(raw.Breakdown ?? raw.breakdown);
+  if (!Array.isArray(parsed)) return null;
+  const signals: ScoreSignal[] = parsed.filter(isRecord).map((s) => ({
+    signal: String(s.Signal ?? s.signal ?? ''),
+    count: Number(s.Count ?? s.count ?? 0) || 0,
+    weight: Number(s.Weight ?? s.weight ?? 0) || 0,
+    applied: (s.Applied ?? s.applied) === true,
+    description: String(s.Description ?? s.description ?? ''),
+  }));
+  const value = Number(raw.Value ?? raw.value);
+  return { level: String(raw.Level ?? raw.level ?? ''), value: Number.isFinite(value) ? value : null, fired: signals.filter((s) => s.applied), quiet: signals.filter((s) => !s.applied) };
+}
+
+function ScoreSummary({ report }: { report: Record<string, unknown> }) {
+  const score = scoreOf(report);
+  if (!score) return null;
+  return (
+    <section className="rounded border border-gray-700 bg-gray-950 p-3" data-testid="bec-score-summary">
+      <p className="text-sm font-medium text-gray-100">
+        CIPP score: {score.level || 'not given'}
+        {score.value !== null ? ` (${score.value})` : ''}
+      </p>
+      {score.fired.length === 0 ? (
+        <p className="mt-1 text-xs text-gray-400">None of the {score.quiet.length} signals CIPP looks for fired.</p>
+      ) : (
+        <>
+          <p className="mt-1 text-xs text-gray-400">
+            {score.fired.length} signal{score.fired.length === 1 ? '' : 's'} fired. A signal firing is a reason to look, not proof of a takeover; weight is how much it adds to the score.
+          </p>
+          <table className="mt-2 w-full text-left text-xs">
+            <thead className="text-gray-500">
+              <tr>
+                <th scope="col" className="px-2 py-1 font-medium">What CIPP saw</th>
+                <th scope="col" className="px-2 py-1 font-medium">How many</th>
+                <th scope="col" className="px-2 py-1 font-medium">Weight</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800">
+              {score.fired.map((s) => (
+                <tr key={s.signal} data-testid={`signal-${s.signal}`}>
+                  <td className="px-2 py-1 text-gray-200">
+                    {s.description || sectionTitle(s.signal)}
+                    <span className="ml-2 text-gray-500">({sectionTitle(s.signal)})</span>
+                  </td>
+                  <td className="px-2 py-1 text-gray-300">{s.count}</td>
+                  <td className="px-2 py-1 text-gray-300">{s.weight}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {score.quiet.length > 0 ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs text-gray-400">Checked and found nothing ({score.quiet.length})</summary>
+          <ul className="mt-1 list-disc pl-5 text-xs text-gray-400">
+            {score.quiet.map((s) => (
+              <li key={s.signal}>{s.description || sectionTitle(s.signal)}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </section>
+  );
+}
+
 function cell(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—';
   if (typeof v === 'object') return JSON.stringify(v);
@@ -104,15 +194,26 @@ export function Section({ name, value }: { name: string; value: unknown }) {
       </div>
     );
   } else if (isRecord(value)) {
+    // A value that is a list or record written as JSON text is shown as a section of its own, not as one long line.
+    const entries = Object.entries(value).map(([k, v]) => [k, maybeParse(v)] as const);
+    const plain = entries.filter(([, v]) => !(Array.isArray(v) || isRecord(v)));
+    const nested = entries.filter(([, v]) => Array.isArray(v) || isRecord(v));
     body = (
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-xs">
-        {Object.entries(value).map(([k, v]) => (
-          <div key={k} className="contents">
-            <dt className="text-gray-500">{sectionTitle(k)}</dt>
-            <dd className="break-words text-gray-300">{cell(v)}</dd>
-          </div>
+      <div className="space-y-2">
+        {plain.length > 0 ? (
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-xs">
+            {plain.map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt className="text-gray-500">{sectionTitle(k)}</dt>
+                <dd className="break-words text-gray-300">{cell(v)}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+        {nested.map(([k, v]) => (
+          <Section key={k} name={k} value={v} />
         ))}
-      </dl>
+      </div>
     );
   } else body = <p className="break-words text-xs text-gray-300">{cell(value)}</p>;
   return (
@@ -155,6 +256,7 @@ function ReportWindow({ clientId, item, onClose }: { clientId: string; item: Bec
           {data?.report ? (
             <>
               <p className="text-xs text-gray-500">As CIPP returned it. A section that is missing or empty is not a pass: check the data-source notes CIPP gives for checks that could not run.</p>
+              <ScoreSummary report={data.report as Record<string, unknown>} />
               {Object.entries(data.report).map(([k, v]) => (
                 <Section key={k} name={k} value={v} />
               ))}

@@ -75,3 +75,34 @@ async def test_the_last_opened_time_is_recorded_and_only_a_hash_is_stored(world)
     row = (await s.execute(text("select token_hash, last_opened_at from client_status_links where tenant_id = :o"), {"o": s.info["owner"]})).one()
     assert row[0] == cs.hash_token(token) and token not in row[0]
     assert row[1] is not None
+
+
+async def test_only_a_revoked_or_expired_link_can_be_deleted_and_a_live_one_is_refused(world, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints import client_status as ep
+
+    async def no_audit(**_kw):
+        return None
+
+    monkeypatch.setattr(ep, "emit_audit", no_audit)
+    s = world
+    live, revoked, expired = (cs.new_token() for _ in range(3))
+    rows = [link(s, live), link(s, revoked, revoked_at=NOW), link(s, expired, expires_at=NOW - timedelta(days=1))]
+    s.add_all(rows)
+    await s.commit()
+    user = SimpleNamespace(tenant_id=s.info["owner"], user_id=None)
+    await off(s)
+    with pytest.raises(HTTPException) as err:
+        await ep.delete_link(rows[0].id, None, user, s)
+    assert err.value.status_code == 409
+    for gone in (rows[1], rows[2]):
+        await off(s)
+        assert (await ep.delete_link(gone.id, None, user, s)).status_code == 204
+    await off(s)
+    left = (await s.execute(text("select count(*) from client_status_links where tenant_id = :o"), {"o": s.info["owner"]})).scalar_one()
+    assert left == 1, "only the live link remains"
+    await off(s)
+    with pytest.raises(HTTPException) as missing:
+        await ep.delete_link(uuid.uuid4(), None, user, s)
+    assert missing.value.status_code == 404

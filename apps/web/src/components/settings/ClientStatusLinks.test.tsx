@@ -3,8 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), preview: vi.fn(), review: vi.fn(), revoke: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), clientStatusLinksApi: { list: api.list, create: api.create, preview: api.preview, review: api.review, revoke: api.revoke } }));
+const api = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), preview: vi.fn(), review: vi.fn(), revoke: vi.fn(), remove: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), clientStatusLinksApi: { list: api.list, create: api.create, preview: api.preview, review: api.review, revoke: api.revoke, remove: api.remove } }));
 vi.mock('react-hot-toast', () => ({ default: api.toast }));
 
 import { ClientStatusLinks } from './ClientStatusLinks';
@@ -13,7 +13,7 @@ const show = () => render(<SWRConfig value={{ provider: () => new Map() }}><Clie
 const link = (over = {}) => ({ id: 'l1', client_id: 'c1', client_name: 'Acme', label: '', created_at: '2026-11-01T00:00:00Z', expires_at: '2027-02-01T00:00:00Z', reviewed_at: null, revoked_at: null, last_opened_at: null, state: 'not reviewed', ...over });
 
 beforeEach(() => {
-  for (const f of [api.list, api.create, api.preview, api.review, api.revoke, api.toast.success, api.toast.error]) f.mockReset();
+  for (const f of [api.list, api.create, api.preview, api.review, api.revoke, api.remove, api.toast.success, api.toast.error]) f.mockReset();
   api.list.mockResolvedValue({ links: [], clients: [{ id: 'c1', name: 'Acme' }, { id: 'c2', name: 'Beta' }], default_days: 90 });
 });
 
@@ -65,4 +65,24 @@ describe('ClientStatusLinks', () => {
     await screen.findByTestId('status-link-l1');
     expect(screen.queryByRole('button', { name: 'Approve wording' })).toBeNull();
   });
+
+  it('offers Delete only on a revoked or expired link, asks first, and removes it', async () => {
+    api.list.mockResolvedValue({
+      links: [link({ id: 'live', state: 'live', reviewed_at: '2026-11-02T00:00:00Z' }), link({ id: 'gone', client_name: 'Revoked Co', revoked_at: '2026-11-05T00:00:00Z', state: 'revoked' }), link({ id: 'old', client_name: 'Old Co', state: 'expired', reviewed_at: '2026-01-01T00:00:00Z' })],
+      clients: [{ id: 'c1', name: 'Acme' }],
+      default_days: 90,
+    });
+    api.remove.mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValue(true);
+    show();
+    const buttons = await screen.findAllByRole('button', { name: 'Delete' });
+    expect(buttons).toHaveLength(2);
+    const user = userEvent.setup();
+    await user.click(buttons[0]);
+    expect(api.remove).not.toHaveBeenCalled();
+    await user.click(buttons[0]);
+    await waitFor(() => expect(api.remove).toHaveBeenCalledWith('gone'));
+    confirm.mockRestore();
+  });
 });
+

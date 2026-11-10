@@ -6299,6 +6299,8 @@ export const clientStatusLinksApi = {
   preview: (id: string) => request<ClientStatusPreview>(`/api/v1/client-status-links/${encodeURIComponent(id)}/preview`),
   review: (id: string) => request<ClientStatusLink>(`/api/v1/client-status-links/${encodeURIComponent(id)}/review`, { method: 'POST' }),
   revoke: (id: string) => request<ClientStatusLink>(`/api/v1/client-status-links/${encodeURIComponent(id)}/revoke`, { method: 'POST' }),
+  /** Remove a revoked or expired link from the list for good. */
+  remove: (id: string) => request<void>(`/api/v1/client-status-links/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
 
 export interface AlertNote {

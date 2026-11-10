@@ -12,23 +12,23 @@ export const REVISIONS: Revision[] = [
   {
     "version": "1.23",
     "weekOf": "2026-11-09",
-    "lastChange": "2026-11-09",
-    "commits": 15,
+    "lastChange": "2026-11-10",
+    "commits": 17,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Digest: 12-hour and 24-hour windows for a shift handover, with the hours in the label",
       "Autonomy: proposal log (table, API, evidence rule)",
       "Autonomy: proposal log on the Autonomy settings page, with Agree/Reject verdicts",
       "Autonomy: proposals:log permission for the proposal log; test fixtures brought current",
-      "Remove the Nessus pages, routes and import service",
       "Vulnerabilities page: vulnerability alerts from the connected tools, each linking to its alert",
       "Vulnerabilities: all-clients view with a count per client; Ninja update and support checks raise vulnerability alerts",
       "Vulnerabilities: macOS support check from Addigy; two guard fixtures declare the public client status page",
       "Vulnerabilities: Defender vulnerabilities (from CIPP) raise vulnerability alerts",
       "CIPP checks: legacy sign-in blocked, and mailbox rules that forward mail to another domain",
-      "Proposal log: filter by kind of action and by verdict (decision memory)",
       "Autonomy page: last-24-hours view of what the agents did, and a since-hours filter on the proposal log",
-      "Vulnerabilities: Meraki end-of-support check raises vulnerability alerts"
+      "Vulnerabilities: Meraki end-of-support check raises vulnerability alerts",
+      "Posture: disk and RAID health from NinjaOne raises an alert when a disk is failing",
+      "Hunts: a manual run of a saved hunt stores its hit count, shown beside Last run"
     ],
     "fixes": 0
   },

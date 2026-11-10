@@ -173,6 +173,19 @@ async def revoke_link(link_id: uuid.UUID, request: Request, user: Annotated[Auth
     return _out(row, await _names(db, user.tenant_id), now)
 
 
+@router.delete("/{link_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_signed_in_session)])
+async def delete_link(link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession) -> Response:
+    """Remove a link from the list for good. Only a link that is already revoked or has run out can be deleted: a live link must be revoked first, so a click cannot silently take a client's page away."""
+    row = await _own_link(db, user.tenant_id, link_id)
+    now = datetime.now(UTC)
+    if row.revoked_at is None and row.expires_at > now:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Revoke the link first; only a revoked or expired link can be deleted.")
+    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="client_status_link:deleted", resource="client_status_link", resource_id=str(row.id), changes={"client_id": str(row.client_id)}, request=request)
+    await db.delete(row)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @public_router.get("/{token}")
 async def public_status(token: str, response: Response, db: DBSession) -> dict[str, Any]:
     """The client's page. No sign-in: the secret in the address is the credential, and every failure is the same 404."""

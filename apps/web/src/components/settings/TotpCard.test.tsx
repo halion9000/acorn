@@ -23,6 +23,9 @@ describe('TotpCard', () => {
     render(<TotpCard />);
     await user.click(await screen.findByRole('button', { name: 'Set up an authenticator app' }));
     expect(await screen.findByTestId('totp-secret')).toHaveTextContent('ABCD2345ABCD2345');
+    const qr = await screen.findByTestId('totp-qr');
+    expect(qr.querySelector('svg')).not.toBeNull();
+    expect(qr).toHaveAccessibleName('QR code for the authenticator app');
     await user.type(screen.getByLabelText('Code from the app'), '123456');
     api.status.mockResolvedValue({ enabled: true, recovery_codes_left: 2 });
     await user.click(screen.getByRole('button', { name: 'Turn on' }));

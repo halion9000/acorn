@@ -6,6 +6,7 @@
  * Passkeys (above) and Microsoft sign-in are separate ways in and are not affected.
  */
 import { useCallback, useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import toast from 'react-hot-toast';
 import { apiErrorDetail, totpApi, type TotpStatus } from '@/lib/api';
 
@@ -15,6 +16,23 @@ function problemOf(err: unknown, fallback: string): string {
 
 const input = 'w-full rounded-md border border-gray-700 bg-gray-950/60 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600';
 const ghost = 'rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-200 hover:bg-gray-800';
+
+/** The setup address as a QR code the authenticator app scans (drawn in the browser; the secret never leaves the page). Nothing is shown if it cannot be drawn: the typed key below always works. */
+export function SetupQr({ uri }: { uri: string }) {
+  const [svg, setSvg] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    QRCode.toString(uri, { type: 'svg', margin: 1, width: 176, errorCorrectionLevel: 'M' })
+      .then((s) => live && setSvg(s))
+      .catch(() => live && setSvg(null));
+    return () => {
+      live = false;
+    };
+  }, [uri]);
+  if (!svg) return null;
+  // The markup is produced by the QR library from the address above and holds only shapes, no scripts or text from outside.
+  return <div role="img" aria-label="QR code for the authenticator app" data-testid="totp-qr" className="inline-block rounded bg-white p-1" dangerouslySetInnerHTML={{ __html: svg }} />;
+}
 
 export function TotpCard() {
   const [status, setStatus] = useState<TotpStatus | null>(null);
@@ -146,8 +164,9 @@ export function TotpCard() {
         </div>
       ) : setup ? (
         <div className="space-y-2" data-testid="totp-setup">
+          <SetupQr uri={setup.uri} />
           <ol className="list-decimal pl-5 text-xs text-gray-400 space-y-1">
-            <li>In your authenticator app choose Add account, then enter a setup key (or setup code) by hand.</li>
+            <li>In your authenticator app choose Add account and scan the QR code above, or enter a setup key (or setup code) by hand.</li>
             <li>
               Account name: A.C.O.R.N. Key:{' '}
               <code className="select-all rounded bg-gray-900 px-1 py-0.5 text-gray-100" data-testid="totp-secret">

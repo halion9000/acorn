@@ -9,7 +9,7 @@ vi.mock('@/lib/api', () => ({
   identitiesApi: { becCases: api.becCases, startBec: api.startBec, becCase: api.becCase },
 }));
 
-import { BecSearch, Section, canOfferBec, sectionTitle, shortenedNote } from './BecSearch';
+import { BecSearch, Section, canOfferBec, maybeParse, scoreOf, sectionTitle, shortenedNote } from './BecSearch';
 
 const item = (over: Record<string, unknown> = {}) => ({
   id: 'c1', case_ref: 'BEC-1', email: 'pat@acme.com', status: 'running', step: 2, steps_total: 15, step_label: 'Sign-ins and mobile devices', message: null, summary: {},
@@ -140,6 +140,42 @@ describe('the note about shortened lists', () => {
     expect(note).toContain('L5: first 10 of 25');
     expect(note).not.toContain('L6:');
     expect(note).toContain('and 5 more');
+  });
+});
+
+describe('the score in the report', () => {
+  const breakdown = JSON.stringify([
+    { Count: 10, Signal: 'NewRules', Weight: 1, Applied: true, Description: 'Inbox rules exist on the mailbox' },
+    { Count: 0, Signal: 'SuspiciousRules', Weight: 4, Applied: false, Description: 'An inbox rule forwards externally' },
+    { Count: 16, Signal: 'ForeignActivity', Weight: 3, Applied: true, Description: 'Rule, safelist, sharing or mail activity from outside the usage location' },
+  ]);
+  const report = { Score: { Level: 'High', Value: 29, Breakdown: breakdown }, MailboxRules: [] };
+
+  it('reads the breakdown CIPP sends as JSON text, split into the signals that fired and the ones that found nothing', () => {
+    expect(maybeParse('[{"a":1}]')).toEqual([{ a: 1 }]);
+    expect(maybeParse('not json [')).toBe('not json [');
+    expect(maybeParse(5)).toBe(5);
+    const score = scoreOf(report);
+    expect(score?.level).toBe('High');
+    expect(score?.value).toBe(29);
+    expect(score?.fired.map((s) => s.signal)).toEqual(['NewRules', 'ForeignActivity']);
+    expect(score?.quiet.map((s) => s.signal)).toEqual(['SuspiciousRules']);
+    expect(scoreOf({})).toBeNull();
+    expect(scoreOf({ Score: 3 })).toBeNull();
+  });
+
+  it('shows a summary above the sections: the score, a row for each signal that fired with its plain description, and the quiet ones folded away', async () => {
+    api.becCases.mockResolvedValue({ items: [item({ status: 'done' })] });
+    api.becCase.mockResolvedValue({ ...item({ status: 'done' }), report });
+    show();
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'View report' }));
+    const summary = await screen.findByTestId('bec-score-summary');
+    expect(summary).toHaveTextContent('CIPP score: High (29)');
+    expect(summary).toHaveTextContent('2 signals fired');
+    expect(screen.getByTestId('signal-ForeignActivity')).toHaveTextContent('Rule, safelist, sharing or mail activity from outside the usage location');
+    expect(screen.getByTestId('signal-ForeignActivity')).toHaveTextContent('16');
+    expect(summary).toHaveTextContent('Checked and found nothing (1)');
+    expect(screen.queryByText(/Breakdown.*\[\{/)).toBeNull();
   });
 });
 

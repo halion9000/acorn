@@ -103,6 +103,19 @@ export function ClientStatusLinks() {
                   {!l.revoked_at ? (
                     <button type="button" className={ghost} disabled={busy} onClick={() => void run(async () => { await clientStatusLinksApi.revoke(l.id); await list.mutate(); }, 'Could not revoke it.')}>Revoke</button>
                   ) : null}
+                  {l.revoked_at || l.state === 'expired' ? (
+                    <button
+                      type="button"
+                      className={ghost}
+                      disabled={busy}
+                      onClick={() => {
+                        if (!window.confirm('Delete this link from the list? It has already stopped working.')) return;
+                        void run(async () => { await clientStatusLinksApi.remove(l.id); await list.mutate(); }, 'Could not delete it.');
+                      }}
+                    >
+                      Delete
+                    </button>
+                  ) : null}
                 </span>
               </div>
               {preview?.id === l.id ? (
