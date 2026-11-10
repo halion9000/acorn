@@ -411,7 +411,7 @@ resource coreVm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
 }
 
 // Each VM may read its own secrets from Key Vault (role: Key Vault Secrets User).
-var keyVaultSecretsUser = '4633458b-17de-408a-b874-0445c86b69e6'
+var keyVaultSecretsUser = '4633458b-17de-408a-b874-0445c86b69e6'  // secret-scan:allow Azure's public built-in role definition id for Key Vault Secrets User, not a credential
 
 resource acornReadsSecrets 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: keyVault
