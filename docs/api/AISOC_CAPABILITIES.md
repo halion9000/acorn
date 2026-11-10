@@ -70,7 +70,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | [inbox](#inbox) | 3 | 36 | `connectors:read`, `connectors:write`; 34 with no sign-in required |
 | [insider-threat](#insider-threat) | 4 | 4 | `alerts:read`, `alerts:write` |
 | [insights](#insights) | 1 | 0 | `alerts:read` |
-| [inventory](#inventory) | 3 | 9 | `alerts:read`, `inventory:write` |
+| [inventory](#inventory) | 3 | 9 | `alerts:read`, `inventory:checkout`, `inventory:write` |
 | [investigations](#investigations) | 10 | 1 | `cases:read`, `cases:work` |
 | [kb](#kb) | 2 | 3 | `alerts:read`, `settings:write` |
 | [lake](#lake) | 1 | 1 | `lake:query`, `lake:read_schema` |
@@ -878,8 +878,8 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | POST | `/inventory/sync-nucs` | Add the NinjaOne devices with NUC in the name to the NUC list when they are missing | `inventory:write` |
 | DELETE | `/inventory/{item_id}` | Delete an item from the stock for good (its history goes with it) | `inventory:write` |
 | PATCH | `/inventory/{item_id}` | Change an item, or move it to another client | `inventory:write` |
-| POST | `/inventory/{item_id}/check-in` | Check an item back in | `inventory:write` |
-| POST | `/inventory/{item_id}/check-out` | Check an item out to a person or a site | `inventory:write` |
+| POST | `/inventory/{item_id}/check-in` | Check an item back in | `inventory:checkout` |
+| POST | `/inventory/{item_id}/check-out` | Check an item out to a person or a site | `inventory:checkout` |
 | GET | `/inventory/{item_id}/events` | Everything that has happened to an item, newest first | `alerts:read` |
 
 ## investigations

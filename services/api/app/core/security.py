@@ -96,6 +96,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "plugins:read",
     ],
     "soc_lead": [
+        "inventory:checkout",
         "alerts:read",
         "alerts:write",
         "cases:read",
@@ -127,6 +128,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "shifts:write",
     ],
     "soc_analyst": [
+        "inventory:checkout",
         "alerts:read",
         "alerts:write",
         "cases:read",
@@ -391,6 +393,7 @@ IMPLIED_BY: dict[str, tuple[str, ...]] = {
     "cases:work": ("cases:write",),
     "proposals:log": ("cases:write",),
     "billing:view": ("alerts:read",),
+    "inventory:checkout": ("inventory:write",),  # checking a device out and in: held by the technician roles; administrators hold it through inventory:write
     "inventory:write": ("mssp:manage",),  # whoever could manage the MSSP console could always change inventory; a custom role can be given inventory:write on its own
 }  # noqa: E501
 

@@ -610,14 +610,14 @@ async def _move(item_id: uuid.UUID, body: MoveIn, user: AuthUser, db: Any, to: s
 
 @router.post("/{item_id}/check-out", response_model=ItemOut, summary="Check an item out to a person or a site")
 async def check_out(
-    item_id: uuid.UUID, body: MoveIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession
+    item_id: uuid.UUID, body: MoveIn, user: Annotated[AuthUser, Depends(require_permission("inventory:checkout"))], db: DBSession
 ) -> ItemOut:
     return await _move(item_id, body, user, db, "checked_out")
 
 
 @router.post("/{item_id}/check-in", response_model=ItemOut, summary="Check an item back in")
 async def check_in(
-    item_id: uuid.UUID, body: MoveIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession
+    item_id: uuid.UUID, body: MoveIn, user: Annotated[AuthUser, Depends(require_permission("inventory:checkout"))], db: DBSession
 ) -> ItemOut:
     return await _move(item_id, body, user, db, "checked_in")
 
