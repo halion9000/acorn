@@ -49,6 +49,14 @@ describe('AgentProposalLog', () => {
     expect(api.list).toHaveBeenLastCalledWith(24);
   });
 
+  it('shows a scorecard row for each agent: what it logged, did on its own, only recorded, and how people judged it', async () => {
+    api.list.mockResolvedValue({ items: [row()], summary: { total: 5, by_rung: {}, by_outcome: {}, shadow_unreviewed: 0, by_agent: { cipher: { total: 4, acted: 2, shadow: 1, asked: 1, suggested: 0, accepted: 1, edited: 1, rejected: 1, expired: 0 }, jax: { total: 1, acted: 0, shadow: 0, asked: 0, suggested: 1, accepted: 0, edited: 0, rejected: 0, expired: 1 } } } });
+    show();
+    const cipher = await screen.findByTestId('scorecard-cipher');
+    expect(cipher).toHaveTextContent('cipher42121');
+    expect(screen.getByTestId('scorecard-jax')).toHaveTextContent('jax10000');
+  });
+
   it('says so when the verdict cannot be saved, and when there is nothing logged or the log cannot load', async () => {
     api.list.mockResolvedValue(list([row()], 1));
     api.setOutcome.mockRejectedValue(new Error('403 sign in as a person'));

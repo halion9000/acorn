@@ -48,7 +48,23 @@ def tally(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Counts for the log's header: how many per rung, how many per outcome, and how many shadow proposals still await a person's verdict (pure)."""
     rungs = Counter(r.get("rung") for r in rows)
     outcomes = Counter(r.get("outcome") for r in rows)
+    per_agent: dict[str, dict[str, int]] = {}
+    for r in rows:
+        a = per_agent.setdefault(str(r.get("agent") or "unknown"), {"total": 0, "acted": 0, "shadow": 0, "asked": 0, "suggested": 0, "accepted": 0, "edited": 0, "rejected": 0, "expired": 0})
+        a["total"] += 1
+        rung = r.get("rung")
+        if rung in ("act_tell", "act_quiet"):
+            a["acted"] += 1
+        elif rung == "shadow":
+            a["shadow"] += 1
+        elif rung == "ask":
+            a["asked"] += 1
+        elif rung == "suggest":
+            a["suggested"] += 1
+        if r.get("outcome") in ("accepted", "edited", "rejected", "expired"):
+            a[str(r["outcome"])] += 1
     return {
+        "by_agent": dict(sorted(per_agent.items(), key=lambda kv: (-kv[1]["total"], kv[0]))),
         "total": len(rows),
         "by_rung": {k: rungs.get(k, 0) for k in RUNGS},
         "by_outcome": {k: outcomes.get(k, 0) for k in OUTCOMES},

@@ -94,7 +94,7 @@ async def list_proposals(
     if outcome:
         where.append(AgentProposal.outcome == outcome)
     rows = (await db.execute(select(AgentProposal).where(*where).order_by(AgentProposal.created_at.desc()).limit(limit))).scalars().all()
-    return ProposalList(items=[_out(r) for r in rows], summary=tally([{"rung": r.rung, "outcome": r.outcome} for r in rows]))
+    return ProposalList(items=[_out(r) for r in rows], summary=tally([{"rung": r.rung, "outcome": r.outcome, "agent": r.agent} for r in rows]))
 
 
 @router.post("", response_model=ProposalOut, status_code=status.HTTP_201_CREATED)

@@ -59,3 +59,18 @@ def test_an_agents_token_cannot_mark_its_own_proposal():
 def test_the_routes_do_not_expose_anything_that_approves_or_resolves():
     paths = {r.path for r in ep.router.routes}
     assert paths == {"/agent-proposals", "/agent-proposals/{proposal_id}/outcome"}
+
+
+def test_the_tally_gives_each_agent_its_own_scorecard_busiest_first():
+    rows = [
+        {"agent": "cipher", "rung": "act_tell", "outcome": "none"},
+        {"agent": "cipher", "rung": "shadow", "outcome": "accepted"},
+        {"agent": "cipher", "rung": "ask", "outcome": "rejected"},
+        {"agent": "jax", "rung": "suggest", "outcome": "expired"},
+        {"agent": "cipher", "rung": "act_quiet", "outcome": "edited"},
+    ]
+    t = tally(rows)
+    assert list(t["by_agent"]) == ["cipher", "jax"]
+    assert t["by_agent"]["cipher"] == {"total": 4, "acted": 2, "shadow": 1, "asked": 1, "suggested": 0, "accepted": 1, "edited": 1, "rejected": 1, "expired": 0}
+    assert t["by_agent"]["jax"]["suggested"] == 1 and t["by_agent"]["jax"]["expired"] == 1
+    assert tally([{"rung": "ask", "outcome": "none"}])["by_agent"]["unknown"]["asked"] == 1

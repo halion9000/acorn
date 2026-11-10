@@ -6345,7 +6345,14 @@ export interface AgentProposal {
 
 export interface AgentProposalList {
   items: AgentProposal[];
-  summary: { total: number; by_rung: Record<string, number>; by_outcome: Record<string, number>; shadow_unreviewed: number };
+  summary: {
+    total: number;
+    by_rung: Record<string, number>;
+    by_outcome: Record<string, number>;
+    shadow_unreviewed: number;
+    /** Each agent's own counts (what it did, asked, only recorded, and what people made of it), busiest first. */
+    by_agent?: Record<string, { total: number; acted: number; shadow: number; asked: number; suggested: number; accepted: number; edited: number; rejected: number; expired: number }>;
+  };
 }
 
 export const agentProposalsApi = {

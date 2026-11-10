@@ -64,6 +64,32 @@ export function AgentProposalLog() {
         {data.summary.shadow_unreviewed > 0 ? ` ${data.summary.shadow_unreviewed} shadow row${data.summary.shadow_unreviewed === 1 ? '' : 's'} still waiting for a verdict.` : ''}
       </p>
       {failed ? <p className="mt-2 text-sm text-red-300" role="alert">{failed}</p> : null}
+      {Object.keys(data.summary.by_agent ?? {}).length > 0 ? (
+        <table className="mt-3 w-full text-left text-xs" data-testid="proposals-scorecard">
+          <thead className="text-gray-500">
+            <tr>
+              <th scope="col" className="py-1 pr-3 font-medium">Agent</th>
+              <th scope="col" className="py-1 pr-3 font-medium">Logged</th>
+              <th scope="col" className="py-1 pr-3 font-medium">Did on its own</th>
+              <th scope="col" className="py-1 pr-3 font-medium">Only recorded</th>
+              <th scope="col" className="py-1 pr-3 font-medium">Agreed</th>
+              <th scope="col" className="py-1 font-medium">Rejected</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(data.summary.by_agent ?? {}).map(([agent, a]) => (
+              <tr key={agent} className="border-t border-gray-800" data-testid={`scorecard-${agent}`}>
+                <td className="py-1 pr-3 text-gray-200">{agent}</td>
+                <td className="py-1 pr-3">{a.total}</td>
+                <td className="py-1 pr-3">{a.acted}</td>
+                <td className="py-1 pr-3">{a.shadow}</td>
+                <td className="py-1 pr-3">{a.accepted + a.edited}</td>
+                <td className="py-1">{a.rejected}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : null}
       {data.items.length === 0 ? (
         <p className="mt-3 text-sm text-gray-500" data-testid="proposals-empty">No agent has logged a proposal yet.</p>
       ) : (
