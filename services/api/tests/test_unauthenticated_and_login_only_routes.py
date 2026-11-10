@@ -223,6 +223,7 @@ LOGIN_ONLY_NO_CHECK: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/auth/totp/enrol"): OWN + " (starts the caller's own authenticator-app setup; changes nothing about signing in until confirmed; needs a real session)",
     ("POST", "/api/v1/auth/totp/confirm"): OWN + " (turns on the caller's own authenticator app after a right code; needs a real session)",
     ("POST", "/api/v1/auth/totp/disable"): OWN + " (turns off the caller's own authenticator app, only with the current password AND a current code; wrong guesses are throttled like sign-ins)",
+    ("POST", "/api/v1/auth/totp/recovery"): OWN + " (replaces the caller's own recovery codes, only with the current password AND a current code; wrong guesses are throttled like sign-ins)",
     ("PATCH", "/api/v1/auth/me/preferences"): OWN,
     ("GET", "/api/v1/tenants/me/identity"): "the caller's own tenant's name and identity",
     ("GET", "/api/v1/oncall/me"): OWN,

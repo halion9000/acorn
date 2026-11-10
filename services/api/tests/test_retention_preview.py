@@ -3,7 +3,7 @@
 import asyncio
 
 from app.api.v1.endpoints import data_lifecycle as ep
-from app.core.config import settings
+import app.core.config as config
 from app.core.security import has_permission
 from app.workers import retention_sweeper as rs
 
@@ -16,7 +16,7 @@ def test_the_preview_is_a_dry_run_that_reports_counts_by_kind_and_failures(monke
         return rs.SweepResult(dry_run=True, counts={"response_actions": 12, "alerts": 0, "copilot_conversations": 3}, errors={"posture_history": "OperationalError"})
 
     monkeypatch.setattr(rs, "sweep_once", fake_sweep_once)
-    monkeypatch.setattr(settings, "RETENTION_DRY_RUN", False)
+    monkeypatch.setattr(config.settings, "RETENTION_DRY_RUN", False)  # the object in place now: the handler reads it at call time
     out = asyncio.run(ep.retention_preview())
     assert seen["kwargs"] == {"dry_run": True}, "it must never be asked to delete"
     assert out.would_delete == {"alerts": 0, "copilot_conversations": 3, "response_actions": 12}
@@ -29,7 +29,8 @@ def test_a_sweeper_set_to_dry_run_says_it_deletes_nothing(monkeypatch):
         return rs.SweepResult(dry_run=True, counts={})
 
     monkeypatch.setattr(rs, "sweep_once", fake_sweep_once)
-    monkeypatch.setattr(settings, "RETENTION_DRY_RUN", True)
+    # The handler reads the settings object at call time; another test may have replaced it since this file was imported, so patch the one in place now.
+    monkeypatch.setattr(config.settings, "RETENTION_DRY_RUN", True)
     out = asyncio.run(ep.retention_preview())
     assert out.switched_on is False and "deletes nothing" in out.note
 

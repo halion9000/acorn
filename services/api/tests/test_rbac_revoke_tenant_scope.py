@@ -7,6 +7,8 @@ It now requires the role AND the user to belong to the caller's tenant, like ass
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
+from types import SimpleNamespace
+
 import pytest
 from app.api.v1.deps import CurrentUser
 from app.api.v1.endpoints import rbac
@@ -40,7 +42,13 @@ class FakeDB:
         return [s for s in self.statements if s[0].startswith("DELETE")]
 
 
-ROLE, USER = object(), object()
+ROLE, USER = SimpleNamespace(name="Reader"), object()  # the audit entry names the role
+
+
+@pytest.fixture(autouse=True)
+def _audit_recorder(monkeypatch):
+    """The audit table is Postgres-side; the entries themselves are checked in test_rbac_audit.py."""
+    monkeypatch.setattr(rbac, "emit_audit", AsyncMock())
 
 
 @pytest.mark.asyncio

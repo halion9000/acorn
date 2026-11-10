@@ -120,6 +120,8 @@ def test_each_worker_registers_itself_and_beats_after_a_pass_and_records_a_faile
     monkeypatch.setattr(sw, "sweep_stale", fake_stale)
     monkeypatch.setattr(sw, "exempt_tenant_ids", _no_exempt_clients)
     monkeypatch.setattr(sw, "sweep_ticket_rules", _no_ticket_rules)
+    monkeypatch.setattr(sw, "sweep_script_rules", _no_ticket_rules)
+    monkeypatch.setattr(sw, "sweep_deploy_rules", _no_ticket_rules)
     monkeypatch.setattr(sw, "queue_auto_checks", _no_auto_checks)
     monkeypatch.setattr(sw, "mark_platform", lambda s: None)
     with pytest.raises(Stop):
@@ -268,6 +270,8 @@ def test_a_failing_hourly_stale_pass_shows_as_a_failing_worker_not_a_silent_one(
     monkeypatch.setattr(sw, "sweep_stale", failing_stale)
     monkeypatch.setattr(sw, "exempt_tenant_ids", _no_exempt_clients)
     monkeypatch.setattr(sw, "sweep_ticket_rules", _no_ticket_rules)
+    monkeypatch.setattr(sw, "sweep_script_rules", _no_ticket_rules)
+    monkeypatch.setattr(sw, "sweep_deploy_rules", _no_ticket_rules)
     monkeypatch.setattr(sw, "queue_auto_checks", _no_auto_checks)
     monkeypatch.setattr(sw, "mark_platform", lambda s: None)
     with pytest.raises(Stop):

@@ -160,14 +160,20 @@ class TestNothingElseChanged:
             assert set(_required_permissions(route)) == {perm}
             assert require_signed_in_session not in [d.call for d in route.dependant.dependencies], f"{method} {template}"
 
-    def test_exactly_two_routes_got_the_session_requirement_among_the_case_and_approval_routes(self):
+    def test_exactly_these_routes_have_the_session_requirement_among_the_case_and_approval_routes(self):
+        """Marking how an agent's proposal turned out and undoing an approval are a person's decisions too, so they were given the same requirement when they were added."""
         found = sorted(
             (m, p)
             for p, r in walk_routes(app.routes)
             for m in r.methods
             if "cases:write" in _required_permissions(r) and require_signed_in_session in [d.call for d in r.dependant.dependencies]
         )
-        assert found == [("POST", "/api/v1/approvals/{approval_id}/decide"), ("POST", "/api/v1/ledger/{run_id}/publish")]
+        assert found == [
+            ("POST", "/api/v1/agent-proposals/{proposal_id}/outcome"),
+            ("POST", "/api/v1/approvals/{approval_id}/decide"),
+            ("POST", "/api/v1/approvals/{approval_id}/undo"),
+            ("POST", "/api/v1/ledger/{run_id}/publish"),
+        ]
 
     def test_what_the_decide_handler_enforces_and_what_it_still_does_not_is_written_down_here(self):
         """Enforced (behaviour tests in test_approvals_decide_rules.py): an `expired` or past-`expires_at` approval cannot be APPROVED (it can still be denied), and a request that names
