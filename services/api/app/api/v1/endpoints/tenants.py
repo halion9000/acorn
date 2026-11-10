@@ -885,9 +885,10 @@ async def reset_user_mfa(
     current_user: Annotated[AuthUser, Depends(require_permission("users:write"))],
     db: DBSession,
 ) -> AdminActionResponse:
-    """Remove every passkey this person has enrolled (a lost phone or security key) and end their sessions. They sign in with their password and can enrol a new passkey from Settings > Profile."""
+    """Remove every passkey and the authenticator app this person has set up (a lost phone or security key) and end their sessions. They sign in with their password and can set up a new second factor from Settings > Profile."""
     from app.core.token_revocation import RevocationUnavailable, sign_out_everywhere  # noqa: PLC0415
     from app.models.responder import PasskeyCredential  # noqa: PLC0415
+    from app.services import totp_store  # noqa: PLC0415
 
     user = await _user_the_caller_may_manage(db, current_user, user_id)
     result = await db.execute(
@@ -896,11 +897,13 @@ async def reset_user_mfa(
         .values(revoked_at=datetime.now(UTC))
     )
     count = result.rowcount or 0
-    await _audit_user(db, current_user, "user:mfa_reset", user.id, {"account_name": user.account_name, "passkeys_removed": count})
+    # A lost phone also holds the authenticator app: removing only the passkeys left a code prompt nobody could answer, and a stolen phone still able to.
+    totp_removed = await totp_store.remove(db, user.id, current_user.tenant_id)
+    await _audit_user(db, current_user, "user:mfa_reset", user.id, {"account_name": user.account_name, "passkeys_removed": count, "totp_removed": totp_removed})
     await db.commit()
     logger.warning("user passkeys removed by an administrator", extra={"acting_user": str(current_user.user_id), "target_user": str(user.id), "passkeys": count})
     try:
         await sign_out_everywhere(user.id)
     except RevocationUnavailable:
-        return AdminActionResponse(done=True, detail=f"{count} passkey(s) removed, but their sessions could not be ended right now (the revocation store is unavailable). Use Sign out everywhere again shortly.")
-    return AdminActionResponse(done=True, detail=f"{count} passkey(s) removed and their sessions ended. They sign in with their password and can enrol a new passkey.")
+        return AdminActionResponse(done=True, detail=f"{count} passkey(s){' and the authenticator app' if totp_removed else ''} removed, but their sessions could not be ended right now (the revocation store is unavailable). Use Sign out everywhere again shortly.")
+    return AdminActionResponse(done=True, detail=f"{count} passkey(s){' and the authenticator app' if totp_removed else ''} removed and their sessions ended. They sign in with their password and can set up a new second factor.")

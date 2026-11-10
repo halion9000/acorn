@@ -218,6 +218,27 @@ class TestResetMfa:
         assert run(world, live) == 0
         assert world.client.get("/auth/me", headers=analyst_h).status_code == 401  # their old session no longer works
 
+    def test_it_also_removes_the_authenticator_app_and_says_so_in_the_audit_entry(self, world):
+        from app.services import totp, totp_store
+
+        async def enrol(s):
+            secret, _ = await totp_store.start_enrolment(s, world.ann.id, world.tenant.id, "ann")
+            codes = await totp_store.confirm(s, world.ann.id, world.tenant.id, totp.code_for_step(secret, totp.current_step()))
+            await s.commit()
+            return codes
+
+        assert run(world, enrol), "the authenticator app is on before the reset"
+
+        async def on(s):
+            return await totp_store.is_enabled(s, world.ann.id, world.tenant.id)
+
+        assert run(world, on) is True
+        r = world.client.post(f"/tenants/me/users/{world.ann.id}/reset-mfa", headers=login(world, "boss"))
+        assert r.status_code == 200 and "authenticator app" in r.json()["detail"]
+        assert run(world, on) is False, "a lost phone must not keep a code prompt (or a stolen phone a working one)"
+        entries = [c.kwargs for c in world.audit.await_args_list if c.kwargs.get("action") == "user:mfa_reset"]
+        assert entries and entries[-1]["changes"]["totp_removed"] is True
+
     def test_only_a_manager_of_the_same_workspace_may_do_it(self, world):
         h = login(world, "boss")
         assert world.client.post(f"/tenants/me/users/{world.eve.id}/reset-mfa", headers=h).status_code == 404
@@ -278,6 +299,6 @@ class TestPeopleAreAudited:
         assert world.client.delete(f"/tenants/me/users/{world.ann.id}", headers=h).status_code == 200
         got = {c["action"]: c for c in self.calls(world)}
         assert {"user:signed_out_everywhere", "user:password_reset", "user:mfa_reset"} <= set(got)
-        assert got["user:mfa_reset"]["changes"] == {"account_name": "ann", "passkeys_removed": 1}
+        assert got["user:mfa_reset"]["changes"] == {"account_name": "ann", "passkeys_removed": 1, "totp_removed": False}
         assert "brand new" not in str(self.calls(world))  # the new password is never in the trail
         assert got["user:deleted"]["changes"] == {"account_name": "ann", "role": "soc_analyst"}

@@ -182,7 +182,7 @@ export function MemberEditor({
                 Sign out everywhere
               </button>
               <button type="button" disabled={busy} onClick={() => setPending('mfa')} className={BUTTON}>
-                Reset MFA (remove passkeys)
+                Reset MFA (passkeys and authenticator app)
               </button>
               <button type="button" disabled={busy} onClick={() => (member.is_active ? setPending('disable') : void act(() => tenantsApi.updateUser(member.id, { is_active: true }), `${name} can sign in again`))} className={BUTTON}>
                 {member.is_active ? 'Disable account' : 'Enable account'}
@@ -206,12 +206,12 @@ export function MemberEditor({
       />
       <ConfirmDialog
         open={pending === 'mfa'}
-        title="Remove this person's passkeys?"
-        message={`${name}'s enrolled passkeys stop working and their sessions end. They sign in with their password and can enrol a new passkey under Profile.`}
-        confirmLabel="Remove passkeys"
+        title="Reset this person's second factor?"
+        message={`${name}'s passkeys and authenticator app are removed and their sessions end. They sign in with their password and can set up a new second factor under Profile.`}
+        confirmLabel="Reset second factor"
         destructive
         busy={busy}
-        onConfirm={() => void act(() => tenantsApi.resetUserMfa(member.id), 'Passkeys removed')}
+        onConfirm={() => void act(() => tenantsApi.resetUserMfa(member.id), 'Second factor reset')}
         onCancel={() => setPending(null)}
       />
       <ConfirmDialog

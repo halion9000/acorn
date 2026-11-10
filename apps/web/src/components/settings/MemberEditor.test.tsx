@@ -140,7 +140,7 @@ describe('account actions', () => {
     open();
     await userEvent.click(screen.getByRole('button', { name: /Reset MFA/ }));
     expect(resetUserMfa).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: 'Remove passkeys' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Reset second factor' }));
     await waitFor(() => expect(resetUserMfa).toHaveBeenCalledWith('u1'));
     await userEvent.click(screen.getByRole('button', { name: 'Sign out everywhere' }));
     expect(signUserOut).not.toHaveBeenCalled();

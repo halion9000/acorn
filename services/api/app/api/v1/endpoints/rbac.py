@@ -278,6 +278,7 @@ async def create_role(
     for perm in perms_to_attach:
         db.add(RolePermission(role_id=role.id, permission_id=perm.id))
 
+    await _audit_role(db, current_user, "role:created", role.id, {"name": role.name, "permissions": sorted(p.name for p in perms_to_attach)})
     await db.commit()
     await db.refresh(role)
 
@@ -323,6 +324,8 @@ async def update_role(
     if role.is_system:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System roles cannot be modified")
 
+    before_name = role.name
+    before_permissions = {p.name for p in await _load_role_permissions(db, role.id)}
     perms = None
     if body.permission_ids is not None:
         perms = await _resolve_permissions(db, body.permission_ids)
@@ -343,6 +346,18 @@ async def update_role(
         for perm in perms:
             db.add(RolePermission(role_id=role.id, permission_id=perm.id))
 
+    after_permissions = {p.name for p in perms} if perms is not None else before_permissions
+    await _audit_role(
+        db,
+        current_user,
+        "role:updated",
+        role.id,
+        {
+            "name": {"before": before_name, "after": role.name},
+            "permissions_added": sorted(after_permissions - before_permissions),
+            "permissions_removed": sorted(before_permissions - after_permissions),
+        },
+    )
     await db.commit()
     await db.refresh(role)
     perms_out = await _load_role_permissions(db, role.id)
@@ -366,6 +381,7 @@ async def delete_role(
     role = await _get_role_or_404(db, role_id, current_user.tenant_id)
     if role.is_system:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System roles cannot be deleted")
+    await _audit_role(db, current_user, "role:deleted", role.id, {"name": role.name, "permissions": sorted(p.name for p in await _load_role_permissions(db, role.id))})
     await db.delete(role)
     await db.commit()
 
@@ -432,6 +448,7 @@ async def assign_role(
 
     assignment = UserRole(user_id=user_id, role_id=role.id, assigned_by=current_user.user_id)
     db.add(assignment)
+    await _audit_role(db, current_user, "role:assigned", role.id, {"user_id": str(user_id), "role_name": role.name})
     await db.commit()
     return UserRoleOut(user_id=user_id, role_id=role.id, role_name=role.name)
 
@@ -447,11 +464,12 @@ async def revoke_role(
 
     Both the role and the user must belong to the caller's tenant, exactly as assign_role requires. This used to delete the assignment by the two ids alone (user_roles has no tenant column to filter on), so any tenant admin with users:write could strip any role from any user of ANY tenant, shown on real
     Postgres by the two-tenant flows (tenant B removed tenant A's role assignment, HTTP 204). A role or user that is not this tenant's is the same 404 as one that does not exist."""
-    await _get_role_or_404(db, role_id, current_user.tenant_id)
+    revoked_role = await _get_role_or_404(db, role_id, current_user.tenant_id)
     user_res = await db.execute(select(User).where(User.id == user_id, User.tenant_id == current_user.tenant_id))
     if user_res.scalar_one_or_none() is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found in tenant")
     await db.execute(delete(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role_id))
+    await _audit_role(db, current_user, "role:revoked", role_id, {"user_id": str(user_id), "role_name": revoked_role.name})
     await db.commit()
 
 
@@ -476,6 +494,20 @@ def _require_permissions_held(current_user: Any, names: list[str]) -> None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail=f"You cannot grant the permission {name!r}: you do not hold it yourself."
             )
+
+
+async def _audit_role(db: AsyncSession, current_user: AuthUser, action: str, role_id: uuid.UUID, changes: dict) -> None:
+    """One audit entry for a change to a custom role or to who holds one: what changed in names (never a secret). A role gaining or losing permissions is exactly what an investigation after an incident asks about."""
+    await emit_audit(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        actor_id=current_user.user_id,
+        actor_email=current_user.email,
+        action=action,
+        resource="role",
+        resource_id=str(role_id),
+        changes=changes,
+    )
 
 
 async def _resolve_permissions(db: AsyncSession, permission_ids: list[uuid.UUID]) -> list[Permission]:
