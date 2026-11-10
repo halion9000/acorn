@@ -22,6 +22,7 @@ from app.core.security import create_access_token, hash_api_key
 from app.db.database import Base
 from app.models.login_failure import LoginFailure
 from app.models.rbac import Role, UserRole
+from app.models.responder import PasskeyCredential
 from app.models.tenant import ApiKey, Tenant, User
 from app.models.user_totp import UserTotp
 from app.models.tenant_access import AllTenantAccessGrant, TenantAccessGrant
@@ -73,6 +74,7 @@ def world(tmp_path, monkeypatch):
                 AllTenantAccessGrant.__table__,
                 Role.__table__,
                 UserRole.__table__,
+                PasskeyCredential.__table__,  # the members list counts each person's passkeys
             ],
         )
     finally:
