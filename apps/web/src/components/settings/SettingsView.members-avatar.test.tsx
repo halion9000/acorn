@@ -249,3 +249,17 @@ describe('Settings > Workspace > the role chips on each member', () => {
     expect(within(row('plain')).getByText('viewer')).toBeInTheDocument();
   });
 });
+
+describe('Settings > Workspace > members show their second factor', () => {
+  it('warns on a person with none and names what the others have set up', async () => {
+    currentUser.mockReturnValue(account);
+    users.mockResolvedValue([
+      { ...member('hal.owner'), passkeys: 2, authenticator: true },
+      { ...member('bare'), passkeys: 0, authenticator: false },
+    ]);
+    renderSettings();
+    await userEvent.click(await screen.findByRole('button', { name: /^workspace/i }));
+    const badges = await screen.findAllByTestId('second-factor');
+    expect(badges.map((b) => b.textContent)).toEqual(['2 passkeys + authenticator app', 'No second factor']);
+  });
+});

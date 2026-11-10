@@ -77,6 +77,9 @@ class UserResponse(BaseModel):
     created_at: datetime
     # Roles the workspace made itself, held in addition to the built-in role above (their permissions add up). Filled by the member routes.
     custom_roles: list[CustomRoleRef] = []
+    # Second factors this person has set up: how many passkeys, and whether the authenticator app is confirmed. Filled only by the members list; a count and a yes/no, never a key or secret.
+    passkeys: int = 0
+    authenticator: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -578,12 +581,25 @@ async def list_users(
     result = await db.execute(select(User).where(User.tenant_id == current_user.tenant_id).order_by(User.created_at))
     users = result.scalars().all()
     roles = await _custom_roles_of(db, current_user.tenant_id, [u.id for u in users])
+    passkeys, authenticator = await _second_factors_of(db, current_user.tenant_id)
     out = []
     for u in users:
         item = UserResponse.model_validate(u)
         item.custom_roles = roles.get(u.id, [])
+        item.passkeys = passkeys.get(u.id, 0)
+        item.authenticator = u.id in authenticator
         out.append(item)
     return out
+
+
+async def _second_factors_of(db: Any, tenant_id: uuid.UUID) -> tuple[dict[uuid.UUID, int], set[uuid.UUID]]:
+    """Passkey counts per person and the people with a confirmed authenticator app, in two queries for the whole workspace."""
+    from app.models.responder import PasskeyCredential  # noqa: PLC0415
+    from app.models.user_totp import UserTotp  # noqa: PLC0415
+
+    counts = (await db.execute(select(PasskeyCredential.user_id, func.count()).where(PasskeyCredential.tenant_id == tenant_id).group_by(PasskeyCredential.user_id))).all()
+    apps = (await db.execute(select(UserTotp.user_id).where(UserTotp.tenant_id == tenant_id, UserTotp.confirmed_at.is_not(None)))).scalars().all()
+    return {uid: int(n) for uid, n in counts}, set(apps)
 
 
 def _require_grantable_role(current_user: Any, role: str) -> None:

@@ -17,6 +17,7 @@
  * the panel says so instead of showing invented content (it used to show a made-up person, workspace and member list).
  */
 
+import { secondFactorBadge } from '@/lib/secondFactor';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { docs } from '@/lib/docs';
@@ -767,6 +768,18 @@ function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
                       {(m.custom_roles ?? []).map((r) => (
                         <span key={r.id} className="rounded-full bg-indigo-500/10 px-2.5 py-1 text-xs text-indigo-200 ring-1 ring-indigo-500/30">{r.name}</span>
                       ))}
+                      {(() => {
+                        const factor = secondFactorBadge(m);
+                        if (!factor) return null;
+                        return (
+                          <span
+                            data-testid="second-factor"
+                            className={factor.warn ? 'rounded-full bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300 ring-1 ring-amber-500/30' : 'rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300 ring-1 ring-emerald-500/30'}
+                          >
+                            {factor.text}
+                          </span>
+                        );
+                      })()}
                       {canAdd ? (
                         <button
                           type="button"

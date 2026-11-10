@@ -245,6 +245,34 @@ class TestResetMfa:
         assert world.client.post(f"/tenants/me/users/{world.second.id}/reset-mfa", headers=login(world, "ann")).status_code == 403
 
 
+class TestSecondFactorsShownInTheList:
+    def test_the_list_says_who_has_passkeys_and_an_authenticator_app(self, world):
+        from app.services import totp, totp_store
+
+        async def enrol(s):
+            secret, _ = await totp_store.start_enrolment(s, world.second.id, world.tenant.id, "second")
+            await totp_store.confirm(s, world.second.id, world.tenant.id, totp.code_for_step(secret, totp.current_step()))
+            await s.commit()
+
+        run(world, enrol)
+        listed = {u["account_name"]: u for u in world.client.get("/tenants/me/users", headers=login(world, "boss")).json()}
+        assert (listed["ann"]["passkeys"], listed["ann"]["authenticator"]) == (1, False)
+        assert (listed["second"]["passkeys"], listed["second"]["authenticator"]) == (0, True)
+        assert (listed["boss"]["passkeys"], listed["boss"]["authenticator"]) == (0, False)
+        assert not any(k in listed["ann"] for k in ("secret", "secret_enc", "recovery_hashes", "public_key"))
+
+    def test_an_unfinished_authenticator_setup_does_not_count(self, world):
+        from app.services import totp_store
+
+        async def start(s):
+            await totp_store.start_enrolment(s, world.second.id, world.tenant.id, "second")
+            await s.commit()
+
+        run(world, start)
+        listed = {u["account_name"]: u for u in world.client.get("/tenants/me/users", headers=login(world, "boss")).json()}
+        assert listed["second"]["authenticator"] is False
+
+
 class TestPeopleAreAudited:
     """Every administrative change to a person is in the audit trail with what changed. A password is never in it."""
 

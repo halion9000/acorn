@@ -470,6 +470,9 @@ export interface TenantUser {
   created_at: string;
   /** Roles this workspace made itself, held in addition to `role`. */
   custom_roles?: { id: string; name: string }[];
+  /** Passkeys this person has set up, and whether their authenticator app is confirmed. */
+  passkeys?: number;
+  authenticator?: boolean;
 }
 
 /** A role the workspace made itself (the built-in roles are not listed here). */
