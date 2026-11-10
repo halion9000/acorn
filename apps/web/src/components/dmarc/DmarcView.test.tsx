@@ -138,7 +138,7 @@ describe('DMARC results', () => {
 
 describe('DMARC setup', () => {
   it('says for each record whether public DNS shows it yet, and "not checked" when the server did not say', async () => {
-    const base = setup.lines[0]!;
+    const base = (setup.lines as Record<string, unknown>[])[0]!;
     const line = (over: object) => ({ ...base, ...over });
     setup = { ...setup, lines: [line({ rua_published: true, authorization_published: false })] };
     const a = render(view());

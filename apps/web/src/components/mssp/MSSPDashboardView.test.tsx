@@ -510,7 +510,7 @@ describe('unreviewed remote tools per client', () => {
     render(<MSSPDashboardView />);
     await screen.findByText('Some Co');
     const cells = Object.fromEntries(screen.getAllByTestId('client-line').map((l) => [l.querySelector('a')?.textContent, within(l).getByTestId('unreviewed-tools')]));
-    expect(Object.fromEntries(Object.entries(cells).map(([k, v]) => [k, v.textContent]))).toEqual({ 'Some Co': '3', 'Zero Co': '0', 'Unknown Co': '—', 'Old Server Co': '—' });
+    expect(Object.fromEntries(Object.entries(cells).map(([k, v]) => [k, (v as HTMLElement).textContent]))).toEqual({ 'Some Co': '3', 'Zero Co': '0', 'Unknown Co': '—', 'Old Server Co': '—' });
     expect(cells['Some Co']).toHaveClass('text-amber-300');
     expect(cells['Zero Co']).not.toHaveClass('text-amber-300');
   });
@@ -550,7 +550,7 @@ describe('alerts due soon per client', () => {
     render(<MSSPDashboardView />);
     await screen.findByText('Some Co');
     const cells = Object.fromEntries(screen.getAllByTestId('client-line').map((l) => [l.querySelector('a')?.textContent, within(l).getByTestId('sla-due-soon')]));
-    expect(Object.fromEntries(Object.entries(cells).map(([k, v]) => [k, v.textContent]))).toEqual({ 'Some Co': '3', 'Zero Co': '0', 'Unknown Co': '—', 'Old Server Co': '—' });
+    expect(Object.fromEntries(Object.entries(cells).map(([k, v]) => [k, (v as HTMLElement).textContent]))).toEqual({ 'Some Co': '3', 'Zero Co': '0', 'Unknown Co': '—', 'Old Server Co': '—' });
     expect(cells['Some Co']).toHaveClass('text-amber-300');
     expect(cells['Zero Co']).not.toHaveClass('text-amber-300');
   });
