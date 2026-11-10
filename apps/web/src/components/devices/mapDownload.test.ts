@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapFileName, standaloneSvg } from './mapDownload';
+import { deviceHref, mapFileName, standaloneSvg } from './mapDownload';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -27,7 +27,23 @@ describe('mapFileName', () => {
   });
 });
 
+describe('deviceHref', () => {
+  it('opens the Devices page searching for that device, safely encoded', () => {
+    expect(deviceHref('fw-1')).toBe('/devices?search=fw-1');
+    expect(deviceHref(' Front Desk & Lobby #2 ')).toBe('/devices?search=Front%20Desk%20%26%20Lobby%20%232');
+  });
+});
+
 describe('standaloneSvg', () => {
+  it('drops links to pages of this site, which lead nowhere from a saved file', () => {
+    const svg = drawing();
+    const link = document.createElementNS(NS, 'a');
+    link.setAttribute('href', '/devices?search=fw-1');
+    svg.appendChild(link);
+    expect(standaloneSvg(svg)).not.toContain('/devices?search');
+    expect(link.getAttribute('href')).toBe('/devices?search=fw-1');
+  });
+
   it('is a complete SVG file with its own size and a background, and parses back as SVG', () => {
     const text = standaloneSvg(drawing());
     expect(text.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n<svg')).toBe(true);

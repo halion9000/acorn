@@ -10,7 +10,7 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { environmentApi, msspApi, type ChildTenant, type ClientEnvironment } from '@/lib/api';
 import { buildMap, type Tier } from './networkMap';
-import { downloadText, mapFileName, standaloneSvg } from './mapDownload';
+import { deviceHref, downloadText, mapFileName, standaloneSvg } from './mapDownload';
 
 const TIER_FILL: Record<Tier, string> = { 0: '#b45309', 1: '#1d4ed8', 2: '#0f766e', 3: '#4b5563' };
 const TIER_NAME: Record<Tier, string> = { 0: 'Firewall / router', 1: 'Switch', 2: 'Access point', 3: 'Other device' };
@@ -56,13 +56,15 @@ function NetworkMapDrawing({ devices, clientName }: { devices: ClientEnvironment
             );
           })}
           {map.nodes.map((n) => (
-            <g key={n.id} data-testid="map-node" opacity={n.online === false ? 0.45 : 1}>
+            <a key={n.id} href={deviceHref(n.label)} aria-label={`Open ${n.label} in Devices`}>
+            <g data-testid="map-node" opacity={n.online === false ? 0.45 : 1} style={{ cursor: 'pointer' }}>
               <rect x={n.x - 56} y={n.y - 16} width={112} height={32} rx={6} fill={TIER_FILL[n.tier]} stroke="#111827" />
               <text x={n.x} y={n.y + 4} textAnchor="middle" fontSize={11} fill="#f9fafb">
                 {n.label.length > 16 ? `${n.label.slice(0, 15)}…` : n.label}
               </text>
               <title>{`${n.label}${n.role ? ` (${n.role})` : ''}${n.online === false ? ' · offline' : ''}`}</title>
             </g>
+            </a>
           ))}
         </svg>
       </div>

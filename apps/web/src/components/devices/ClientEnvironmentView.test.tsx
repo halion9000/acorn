@@ -56,6 +56,9 @@ describe('ClientEnvironmentView', () => {
     render(<ClientEnvironmentView />);
     expect(await screen.findByTestId('network-map')).toBeInTheDocument();
     expect(screen.getAllByTestId('map-node')).toHaveLength(2);
+    // Each box opens that device on the Devices page.
+    expect(screen.getAllByTestId('map-node').map((n) => n.closest('a')?.getAttribute('href'))).toEqual(expect.arrayContaining(['/devices?search=fw-1', '/devices?search=sw-1']));
+    expect(screen.getByRole('button', { name: 'Download drawing' })).toBeInTheDocument();
   });
 
   it('offers a push only for a Mac that can be pushed to, asks once, and says what CORE was asked', async () => {

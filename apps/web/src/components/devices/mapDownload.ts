@@ -17,6 +17,11 @@ export function mapFileName(clientName: string, day: Date): string {
   return `network-map-${slug || 'client'}-${day.toISOString().slice(0, 10)}.svg`;
 }
 
+/** Where a box on the map goes: the Devices page, already searching for that device. */
+export function deviceHref(label: string): string {
+  return `/devices?search=${encodeURIComponent(label.trim().slice(0, 100))}`;
+}
+
 /** The drawing as SVG text that opens by itself in a browser or a document. The element on the page is not changed. */
 export function standaloneSvg(svg: SVGSVGElement): string {
   const copy = svg.cloneNode(true) as SVGSVGElement;
@@ -33,6 +38,8 @@ export function standaloneSvg(svg: SVGSVGElement): string {
   copy.removeAttribute('style');
   copy.removeAttribute('class');
   for (const el of [copy, ...Array.from(copy.querySelectorAll('*'))]) el.removeAttribute('data-testid');
+  // A link to a page of this site leads nowhere from a saved file.
+  for (const link of Array.from(copy.querySelectorAll('a'))) link.removeAttribute('href');
   // The serializer writes the SVG namespace itself for an element that is in it (setting it by hand as well would write it twice, which is not valid XML).
   const body = new XMLSerializer().serializeToString(copy);
   const named = /^<svg[^>]*\sxmlns=/.test(body) ? body : body.replace(/^<svg/, `<svg xmlns="${SVG_NS}"`);
