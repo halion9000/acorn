@@ -34,8 +34,15 @@ interface SlowQueries {
   queries: { query: string; calls: number; typical_seconds: number; total_seconds: number }[];
 }
 
+interface TableSizes {
+  available: boolean;
+  note: string | null;
+  tables: { table: string; megabytes: number; rows_estimate: number | null }[];
+}
+
 interface DatabaseSecurity {
   slow_queries?: SlowQueries;
+  table_sizes?: TableSizes;
   enforced: boolean | null;
   reason: string;
   fix?: string;
@@ -212,6 +219,33 @@ export function PlatformHealth() {
                         <td>{q.calls}</td>
                         <td>{q.typical_seconds}</td>
                         <td>{q.total_seconds}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+          {snapshot.database?.table_sizes && (
+            <div data-testid="table-sizes">
+              {!snapshot.database.table_sizes.available ? (
+                <p className="text-sm text-gray-500">{snapshot.database.table_sizes.note}</p>
+              ) : (
+                <table className="w-full text-left text-xs text-gray-300">
+                  <caption className="pb-1 text-left text-sm text-gray-400">Largest database tables (data and indexes)</caption>
+                  <thead>
+                    <tr className="text-gray-500">
+                      <th scope="col">Table</th>
+                      <th scope="col">Size (MB)</th>
+                      <th scope="col">Rows (estimate)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {snapshot.database.table_sizes.tables.map((t) => (
+                      <tr key={t.table}>
+                        <td className="font-mono">{t.table}</td>
+                        <td>{t.megabytes}</td>
+                        <td>{t.rows_estimate === null ? 'unknown' : t.rows_estimate.toLocaleString('en-US')}</td>
                       </tr>
                     ))}
                   </tbody>

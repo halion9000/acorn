@@ -381,3 +381,32 @@ describe('rateLimitLabel', () => {
     expect(rateLimitLabel({ mode: 'off', per_minute: 100, checked: 0, over_limit: 0, callers_over_limit: 0 })).toBe('Request limit: off.');
   });
 });
+
+describe('largest database tables', () => {
+  const withSizes = (table_sizes: unknown) => ({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ overall: 'ok', down: [], services: [], database: { enforced: true, reason: 'ok', table_sizes }, generated_at: '2026-10-19T02:00:00Z' }),
+  });
+
+  it('lists each table with its size and row estimate, and shows an unanalysed table as unknown', async () => {
+    authFetch.mockResolvedValue(withSizes({ available: true, note: null, tables: [{ table: 'alerts', megabytes: 1536, rows_estimate: 1200000 }, { table: 'brand_new', megabytes: 0, rows_estimate: null }] }));
+    render(<PlatformHealth />);
+    const box = await screen.findByTestId('table-sizes');
+    expect(box).toHaveTextContent('alerts');
+    expect(box).toHaveTextContent('1536');
+    expect(box).toHaveTextContent('1,200,000');
+    expect(box).toHaveTextContent('unknown');
+  });
+
+  it('says why when the sizes cannot be read, and shows nothing for an older server', async () => {
+    authFetch.mockResolvedValue(withSizes({ available: false, note: 'The sizes could not be read.', tables: [] }));
+    const { unmount } = render(<PlatformHealth />);
+    expect(await screen.findByTestId('table-sizes')).toHaveTextContent('The sizes could not be read.');
+    unmount();
+    authFetch.mockResolvedValue(withSizes(undefined));
+    render(<PlatformHealth />);
+    await waitFor(() => expect(screen.getByTestId('overall')).toBeInTheDocument());
+    expect(screen.queryByTestId('table-sizes')).not.toBeInTheDocument();
+  });
+});

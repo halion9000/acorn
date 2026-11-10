@@ -963,6 +963,37 @@ async def slow_queries(db: Any) -> dict[str, Any]:
     return {"available": True, "note": None, "queries": slow_query_rows(rows)}
 
 
+TABLE_SIZES_SHOWN = 10
+
+
+def table_size_rows(rows: list[Any]) -> list[dict[str, Any]]:
+    """The biggest tables as the page shows them: name, total size on disk (data, indexes and out-of-line values) in megabytes, and the database's own row estimate; a negative estimate (never analysed) is shown as unknown (pure)."""
+    out = []
+    for name, total_bytes, estimate in rows:
+        out.append({"table": str(name), "megabytes": round(int(total_bytes) / 1024 / 1024, 1), "rows_estimate": int(estimate) if estimate is not None and int(estimate) >= 0 else None})
+    return out
+
+
+async def table_sizes(db: Any) -> dict[str, Any]:
+    """The largest tables in the database, so a table growing without bound is seen before the disk fills. Says so when the sizes cannot be read, rather than listing nothing."""
+    from sqlalchemy import text
+
+    try:
+        async with db.begin_nested():
+            rows = (
+                await db.execute(
+                    text(
+                        "SELECT c.relname, pg_total_relation_size(c.oid), c.reltuples::bigint FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+                        "WHERE c.relkind = 'r' AND n.nspname = 'public' ORDER BY pg_total_relation_size(c.oid) DESC LIMIT :n"
+                    ),
+                    {"n": TABLE_SIZES_SHOWN},
+                )
+            ).all()
+    except Exception:  # noqa: BLE001 - extra detail on a health page must not take it down
+        return {"available": False, "note": "The sizes of the database's tables could not be read with this account.", "tables": []}
+    return {"available": True, "note": None, "tables": table_size_rows(rows)}
+
+
 CONNECTOR_FAILING_AFTER = timedelta(hours=24)
 
 
@@ -1263,7 +1294,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
         "overall": "degraded" if down else "ok",
         "down": down,
         "services": rows,
-        "database": {**await database_row_security(db), "pool": _pool_now(), "slow_queries": await slow_queries(db)},
+        "database": {**await database_row_security(db), "pool": _pool_now(), "slow_queries": await slow_queries(db), "table_sizes": await table_sizes(db)},
         "device_feeds": feeds,
         "core_feed": core_feed,
         "signins": signins,
