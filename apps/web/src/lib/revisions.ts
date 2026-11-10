@@ -13,7 +13,7 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-09",
-    "commits": 13,
+    "commits": 14,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Digest: 12-hour and 24-hour windows for a shift handover, with the hours in the label",
@@ -27,7 +27,8 @@ export const REVISIONS: Revision[] = [
       "Vulnerabilities: Defender vulnerabilities (from CIPP) raise vulnerability alerts",
       "CIPP checks: legacy sign-in blocked, and mailbox rules that forward mail to another domain",
       "Proposal log: filter by kind of action and by verdict (decision memory)",
-      "Autonomy page: last-24-hours view of what the agents did, and a since-hours filter on the proposal log"
+      "Autonomy page: last-24-hours view of what the agents did, and a since-hours filter on the proposal log",
+      "Vulnerabilities: Meraki end-of-support check raises vulnerability alerts"
     ],
     "fixes": 0
   },

@@ -206,6 +206,12 @@ def test_the_cipp_legacy_sign_in_and_mailbox_forwarding_checks_alert_when_not_me
         assert len(out) == 1 and out[0]["key"] == key
 
 
+def test_a_failing_disk_alerts_but_is_not_a_vulnerability():
+    assert "ninjaone_disk_health" in ca.WATCHED and "ninjaone_disk_health" not in ca.VULN_CHECK_KEYS
+    out = specs([check("ninjaone_disk_health", "met")], [check("ninjaone_disk_health", "not_met", "1 device has a failing disk")], source="ninjaone")
+    assert len(out) == 1 and out[0]["key"] == "ninjaone_disk_health"
+
+
 def test_addigy_may_send_its_own_checks():
     from app.services.infra_review import TOOL_CHECK_SOURCES
 

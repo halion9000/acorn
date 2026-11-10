@@ -87,6 +87,7 @@ const TITLE: Record<string, string> = {
   cipp_defender_vulnerabilities: 'Defender vulnerabilities',
   cipp_ca_legacy_auth: 'Legacy sign-in blocked',
   meraki_end_of_support: 'Meraki end of support',
+  ninjaone_disk_health: 'Disk and RAID health',
   cipp_mailbox_forwarding: 'Mailbox forwarding rules',
   halopsa_agreement: 'Support agreement',
   meraki_licence: 'Meraki licence',
