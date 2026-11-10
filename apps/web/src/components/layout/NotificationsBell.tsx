@@ -64,6 +64,12 @@ export function becFinishedLine(b: BecFinished): { title: string; detail: string
   return { title: `BEC search for ${b.email} finished`, detail: `${b.level ? `CIPP rates it ${b.level}` : 'CIPP gave no rating'}${where}${ticket}` };
 }
 
+/** Where a finished search's row goes: the person it was for (the Identities page opens the one person a ?search= finds), or the whole list when the row names nobody. */
+export function becHref(b: Pick<BecFinished, 'email'>): string {
+  const email = (b.email ?? '').trim();
+  return email ? `/identities?search=${encodeURIComponent(email)}` : '/identities';
+}
+
 const BEC_SEEN_KEY = 'bell-bec-seen';
 
 function readSeen(): string[] {
@@ -218,7 +224,7 @@ export function NotificationsBell() {
                 const line = becFinishedLine(b);
                 return (
                   <li key={b.id}>
-                    <Link href="/identities" onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-gray-800/50">
+                    <Link href={becHref(b)} onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-gray-800/50">
                       <p className="text-sm text-blue-300 truncate">{line.title}</p>
                       <p className="text-xs text-gray-500">{line.detail}</p>
                     </Link>

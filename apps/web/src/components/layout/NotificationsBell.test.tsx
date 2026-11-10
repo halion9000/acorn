@@ -10,7 +10,7 @@ vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => fetchMock
 vi.mock('@/lib/api', () => ({ alertsApi: { list: (...a: unknown[]) => listMock(...a) } }));
 vi.mock('next/link', () => ({ default: ({ children, href, onClick, ...rest }: { children: React.ReactNode; href: string; onClick?: () => void; 'data-testid'?: string }) => <a href={href} onClick={onClick} data-testid={rest['data-testid']}>{children}</a> }));
 
-import { NotificationsBell, approvalsLine, becFinishedLine, billingLinesOff, needsAttention } from './NotificationsBell';
+import { NotificationsBell, approvalsLine, becFinishedLine, becHref, billingLinesOff, needsAttention } from './NotificationsBell';
 
 const alert = (id: string, severity: string, createdAt: string, clientName?: string) => ({ id, title: `Alert ${id}`, severity, createdAt, clientName }) as unknown as Alert;
 const wrap = () => render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}><NotificationsBell /></SWRConfig>);
@@ -157,6 +157,13 @@ describe('finished BEC searches in the bell', () => {
     expect(becFinishedLine({ id: '3', client_name: 'Acme', email: 'p@x.com', status: 'failed' }).title).toBe('BEC search for p@x.com did not finish');
   });
 
+  it('links a row to the person it was for, safely encoded, and to the list when it names nobody', () => {
+    expect(becHref({ email: 'p@x.com' })).toBe('/identities?search=p%40x.com');
+    expect(becHref({ email: ' first.last+tag@x.com ' })).toBe('/identities?search=first.last%2Btag%40x.com');
+    expect(becHref({ email: 'a&b=c@x.com' })).toBe('/identities?search=a%26b%3Dc%40x.com');
+    expect(becHref({ email: '' })).toBe('/identities');
+  });
+
   it('shows a blue dot and a row for a finished search, and the dot goes once the bell has been opened', async () => {
     window.localStorage.clear();
     listMock.mockResolvedValue({ alerts: [], total: 0 });
@@ -169,7 +176,8 @@ describe('finished BEC searches in the bell', () => {
     wrap();
     expect(await screen.findByTestId('bell-dot-bec')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Open notifications' }));
-    expect(await screen.findByText('BEC search for p@x.com finished')).toBeTruthy();
+    const row = await screen.findByText('BEC search for p@x.com finished');
+    expect(row.closest('a')?.getAttribute('href')).toBe('/identities?search=p%40x.com'); // the row opens that person, not the whole list
     expect(screen.queryByTestId('bell-dot-bec')).toBeNull();
   });
 
