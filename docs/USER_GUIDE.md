@@ -314,6 +314,20 @@ All of these were tested against test data and a scratch database and deployed, 
 - **Closing one alert needs a reason.** Choosing Resolved, False positive or Closed on an alert's page opens the same reason picker the list's bulk bar uses (a short list, or Other with your own words); the reason and the change are kept in the audit log, and a false-positive close counts in the false-positive rate.
 - **Alerts > Group by device or person.** A selector in the list header gathers the alerts on the page under the device or the person they name, whichever tool raised them, biggest group first. It groups only the page you are looking at.
 - **Settings > Profile > Password.** Change your own password: it needs the current one, and signs you out everywhere.
+- **Password rule while you type.** The change-password box counts down to the minimum length (12 characters) and says before you send it when a password is too long, starts or ends with a space, or is the same as the current one.
+- **Settings > Profile > Authenticator app > New recovery codes.** Makes ten new recovery codes; the old ones stop working. It needs your password and a current code from the app.
+- **Members list shows the second factor.** Each person in Settings > Workspace shows how many passkeys they have and whether their authenticator app is on; a person with neither is marked "No second factor". **Reset MFA** now removes the authenticator app as well as the passkeys.
+- **Role changes are in the audit log.** Creating, changing or deleting a custom role, and giving or taking one from a person, each write an audit entry that names the permissions added and removed.
+- **Alerts > Undo a bulk close.** After closing several alerts at once, an **Undo** strip stays above the list for ten minutes. It puts back only alerts that are still as the close left them; one that somebody changed since, or closed longer ago, is left alone and counted.
+- **Case > Copy as ticket note.** Copies the case as plain text (what it is, where it stands, what happened, the resolution and the last eight timeline events, times in UTC) for pasting into a HaloPSA ticket.
+- **Bell: a finished BEC search opens the person.** The row goes to Identities already searching for the person the search was for.
+- **Executive Digest > Email authentication (DMARC).** When DMARC reports came in during the window, the digest (page, email and PDF) lists each domain's pass rate, lowest first, and recommends a look when fewer than 90% of a domain's messages passed.
+- **SOC Insights > MTTR by severity.** The MTTR tile's detail line also says how long each severity took (median hours and how many alerts), when more than one severity has a figure.
+- **Client environment > Download drawing, and click a device.** The network map can be saved as an SVG file, and each box on the map opens that device on the Devices page.
+- **Platform health > Download health report** (platform administrators). Saves what the page shows as a file for a support ticket; no passwords, keys or tokens are in it.
+- **Platform health > Largest database tables, and workers that recovered.** The ten biggest tables with their size and row estimate; and a background worker whose last pass was fine but which failed some of its latest ten passes says so in amber.
+- **Settings > Update A.C.O.R.N > Earlier runs.** A list of past updates, health checks and roll backs with the time, the result and the version each ended on.
+- **Alert email > alerts waiting.** While alert email is on, its settings page says how many alerts are waiting to be sent.
 
 ---
 
