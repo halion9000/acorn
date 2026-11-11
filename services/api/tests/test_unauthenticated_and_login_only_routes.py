@@ -36,7 +36,10 @@ OWN = "acts only on the caller's own account, credential, subscription or prefer
 OWN_VIEWS = "the caller's own saved views: every handler filters on SavedView.user_id == the caller"
 
 OPEN_ROUTES: dict[tuple[str, str], str] = {
-    ("GET", "/api/v1/public/client-status/{token}"): "a client's private read-only status page: the secret in the address is the credential (only its hash is stored); an unknown, revoked, expired or unreviewed link all get the same 404; it returns counts and plain labels only",
+    (
+        "GET",
+        "/api/v1/public/client-status/{token}",
+    ): "a client's private read-only status page: the secret in the address is the credential (only its hash is stored); an unknown, revoked, expired or unreviewed link all get the same 404; it returns counts and plain labels only",
     ("POST", "/api/v1/auth/login"): ENTRY + " (locked after repeated failures, see login_throttle)",
     ("POST", "/api/v1/auth/refresh"): ENTRY + " (refresh token)",
     ("POST", "/api/v1/passkeys/authenticate/begin"): ENTRY + " (passkey sign-in)",
@@ -220,10 +223,13 @@ LOGIN_ONLY_NO_CHECK: dict[tuple[str, str], str] = {
     + " (changes only the caller's own password, and only with the current password; sign-in throttling applies to wrong guesses; needs a real session, not an API key)",
     ("GET", "/api/v1/auth/me"): OWN,
     ("GET", "/api/v1/auth/totp"): OWN + " (whether the caller's own authenticator app is on)",
-    ("POST", "/api/v1/auth/totp/enrol"): OWN + " (starts the caller's own authenticator-app setup; changes nothing about signing in until confirmed; needs a real session)",
+    ("POST", "/api/v1/auth/totp/enrol"): OWN
+    + " (starts the caller's own authenticator-app setup; changes nothing about signing in until confirmed; needs a real session)",
     ("POST", "/api/v1/auth/totp/confirm"): OWN + " (turns on the caller's own authenticator app after a right code; needs a real session)",
-    ("POST", "/api/v1/auth/totp/disable"): OWN + " (turns off the caller's own authenticator app, only with the current password AND a current code; wrong guesses are throttled like sign-ins)",
-    ("POST", "/api/v1/auth/totp/recovery"): OWN + " (replaces the caller's own recovery codes, only with the current password AND a current code; wrong guesses are throttled like sign-ins)",
+    ("POST", "/api/v1/auth/totp/disable"): OWN
+    + " (turns off the caller's own authenticator app, only with the current password AND a current code; wrong guesses are throttled like sign-ins)",
+    ("POST", "/api/v1/auth/totp/recovery"): OWN
+    + " (replaces the caller's own recovery codes, only with the current password AND a current code; wrong guesses are throttled like sign-ins)",
     ("PATCH", "/api/v1/auth/me/preferences"): OWN,
     ("GET", "/api/v1/tenants/me/identity"): "the caller's own tenant's name and identity",
     ("GET", "/api/v1/oncall/me"): OWN,

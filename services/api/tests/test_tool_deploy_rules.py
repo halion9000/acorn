@@ -144,7 +144,10 @@ def test_a_rule_can_be_addigy_only_but_only_for_huntress(wired):
     db = FakeDB(Rows([]), Rows([]))
     out = run(body(windows_script_id=None, mac_script_id=None, via_addigy=True), db)
     assert db.added[0].via_addigy is True and out.via_addigy is True and wired[0]["changes"]["via_addigy"] is True
-    for b in (body(tool="fieldeffect", via_addigy=True, windows_script_id=None, mac_script_id=None), body(tool="screenconnect", via_addigy=True)):
+    for b in (
+        body(tool="fieldeffect", via_addigy=True, windows_script_id=None, mac_script_id=None),
+        body(tool="screenconnect", via_addigy=True),
+    ):
         with pytest.raises(HTTPException) as e:
             run(b, FakeDB())
         assert e.value.status_code == 422

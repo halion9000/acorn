@@ -54,18 +54,34 @@ def graph(messages, attachments, calls):
                 return httpx.Response(200, json=next(a for a in attachments[mid] if a["id"] == att_id))
             # the list: Microsoft refuses contentBytes here (it is on a file attachment only), and the contents are not sent
             if "contentBytes" in url:
-                return httpx.Response(400, json={"error": {"message": "Could not find a property named 'contentBytes' on type 'microsoft.graph.attachment'."}})
+                return httpx.Response(
+                    400, json={"error": {"message": "Could not find a property named 'contentBytes' on type 'microsoft.graph.attachment'."}}
+                )
             return httpx.Response(200, json={"value": [{k: v for k, v in a.items() if k != "contentBytes"} for a in attachments[mid]]})
         if "page2" in url:
             return httpx.Response(200, json={"value": messages[1:]})
-        return httpx.Response(200, json={"value": messages[:1] if len(messages) > 1 else messages, **({"@odata.nextLink": "https://graph.test/page2"} if len(messages) > 1 else {})})
+        return httpx.Response(
+            200,
+            json={
+                "value": messages[:1] if len(messages) > 1 else messages,
+                **({"@odata.nextLink": "https://graph.test/page2"} if len(messages) > 1 else {}),
+            },
+        )
 
     return handler
 
 
 def reader(handler):
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    return mb.GraphMailboxReader(tenant_id="t", client_id="c", client_secret="s", sender="dmarc@goliveoak.com", base_url="https://graph.test/v1.0", authority="https://login.test", client=client)
+    return mb.GraphMailboxReader(
+        tenant_id="t",
+        client_id="c",
+        client_secret="s",
+        sender="dmarc@goliveoak.com",
+        base_url="https://graph.test/v1.0",
+        authority="https://login.test",
+        client=client,
+    )
 
 
 def msg(mid, at="2026-11-02T10:00:00Z"):
@@ -74,7 +90,14 @@ def msg(mid, at="2026-11-02T10:00:00Z"):
 
 def test_it_reads_report_attachments_only_and_skips_everything_else():
     calls = []
-    atts = {"m1": [attachment("google.com!client.com!1!2.xml.gz", gzip.compress(xml())), attachment("signature.png", b"png"), attachment("note.txt", b"hi"), attachment("item", b"x", "#microsoft.graph.itemAttachment")]}
+    atts = {
+        "m1": [
+            attachment("google.com!client.com!1!2.xml.gz", gzip.compress(xml())),
+            attachment("signature.png", b"png"),
+            attachment("note.txt", b"hi"),
+            attachment("item", b"x", "#microsoft.graph.itemAttachment"),
+        ]
+    }
     out = asyncio.run(reader(graph([msg("m1")], atts, calls)).new_messages(None))
     assert [m.id for m in out] == ["m1"] and [n for n, _ in out[0].attachments] == ["google.com!client.com!1!2.xml.gz"]
     assert out[0].received == datetime(2026, 11, 2, 10, tzinfo=UTC)
@@ -139,7 +162,11 @@ def make_factory():
 
 async def prepare(engine, factory):
     async with engine.begin() as c:
-        await c.run_sync(lambda conn: Base.metadata.create_all(conn, tables=[m.__table__ for m in (Tenant, IdentitySource, IdentityMfaUser, DmarcReport, DmarcIngestState, TlsReport)]))
+        await c.run_sync(
+            lambda conn: Base.metadata.create_all(
+                conn, tables=[m.__table__ for m in (Tenant, IdentitySource, IdentityMfaUser, DmarcReport, DmarcIngestState, TlsReport)]
+            )
+        )
     async with factory() as s:
         owner = Tenant(id=uuid.uuid4(), name="Owner", slug="o-" + uuid.uuid4().hex[:6])
         s.add(owner)
@@ -163,7 +190,12 @@ def test_a_pass_stores_the_reports_moves_the_cursor_and_a_second_pass_stores_not
     async def go():
         engine, factory = make_factory()
         owner, acme = await prepare(engine, factory)
-        r = FakeReader(mailbox(("a.xml", xml(report_id="r1"), "2026-11-02T10:00:00+00:00"), ("b.xml.gz", gzip.compress(xml(report_id="r2")), "2026-11-02T11:00:00+00:00")))
+        r = FakeReader(
+            mailbox(
+                ("a.xml", xml(report_id="r1"), "2026-11-02T10:00:00+00:00"),
+                ("b.xml.gz", gzip.compress(xml(report_id="r2")), "2026-11-02T11:00:00+00:00"),
+            )
+        )
         first = await mb.ingest_once(factory, r, owner, store=store.store_report, now=lambda: datetime(2026, 11, 2, 12, tzinfo=UTC))
         second = await mb.ingest_once(factory, r, owner, store=store.store_report, now=lambda: datetime(2026, 11, 2, 12, 30, tzinfo=UTC))
         async with factory() as s:
@@ -184,7 +216,12 @@ def test_an_attachment_that_is_not_a_report_is_counted_as_rejected_and_does_not_
     async def go():
         engine, factory = make_factory()
         owner, _ = await prepare(engine, factory)
-        r = FakeReader(mailbox(("junk.zip", b"PK\x03\x04 not really", "2026-11-02T10:00:00+00:00"), ("ok.xml", xml(report_id="r9"), "2026-11-02T11:00:00+00:00")))
+        r = FakeReader(
+            mailbox(
+                ("junk.zip", b"PK\x03\x04 not really", "2026-11-02T10:00:00+00:00"),
+                ("ok.xml", xml(report_id="r9"), "2026-11-02T11:00:00+00:00"),
+            )
+        )
         out = await mb.ingest_once(factory, r, owner, store=store.store_report)
         await engine.dispose()
         return out
@@ -257,21 +294,38 @@ def tls_json(report_id="t1", domain="client.com"):
             "organization-name": "Google Inc.",
             "date-range": {"start-datetime": "2026-11-01T00:00:00Z", "end-datetime": "2026-11-01T23:59:59Z"},
             "report-id": report_id,
-            "policies": [{"policy": {"policy-type": "sts", "policy-domain": domain}, "summary": {"total-successful-session-count": 90, "total-failure-session-count": 10}}],
+            "policies": [
+                {
+                    "policy": {"policy-type": "sts", "policy-domain": domain},
+                    "summary": {"total-successful-session-count": 90, "total-failure-session-count": 10},
+                }
+            ],
         }
     ).encode()
 
 
 def test_a_tls_report_in_the_mailbox_is_stored_apart_from_dmarc_reports_and_not_counted_as_rejected():
-
     async def go():
         engine, factory = make_factory()
         owner, acme = await prepare(engine, factory)
         async with engine.begin() as c:
             await c.run_sync(lambda conn: Base.metadata.create_all(conn, tables=[TlsReport.__table__]))
-        r = FakeReader(mailbox(("google.com!client.com!1!2!001.json.gz", gzip.compress(tls_json()), "2026-11-02T10:00:00+00:00"), ("a.xml", xml(report_id="r1"), "2026-11-02T11:00:00+00:00")))
-        out = await mb.ingest_once(factory, r, owner, store=store.store_report, store_tls=store.store_tls_policy, now=lambda: datetime(2026, 11, 2, 12, tzinfo=UTC))
-        again = await mb.ingest_once(factory, FakeReader(mailbox(("google.com!client.com!1!2!001.json.gz", gzip.compress(tls_json()), "2026-11-02T13:00:00+00:00"))), owner, store=store.store_report, store_tls=store.store_tls_policy)
+        r = FakeReader(
+            mailbox(
+                ("google.com!client.com!1!2!001.json.gz", gzip.compress(tls_json()), "2026-11-02T10:00:00+00:00"),
+                ("a.xml", xml(report_id="r1"), "2026-11-02T11:00:00+00:00"),
+            )
+        )
+        out = await mb.ingest_once(
+            factory, r, owner, store=store.store_report, store_tls=store.store_tls_policy, now=lambda: datetime(2026, 11, 2, 12, tzinfo=UTC)
+        )
+        again = await mb.ingest_once(
+            factory,
+            FakeReader(mailbox(("google.com!client.com!1!2!001.json.gz", gzip.compress(tls_json()), "2026-11-02T13:00:00+00:00"))),
+            owner,
+            store=store.store_report,
+            store_tls=store.store_tls_policy,
+        )
         async with factory() as s:
             tls = (await s.execute(select(TlsReport))).scalars().all()
             state = (await s.execute(select(DmarcIngestState))).scalar_one()
@@ -289,7 +343,12 @@ def test_a_tls_report_with_nowhere_to_keep_it_is_counted_as_rejected_and_a_broke
     async def go():
         engine, factory = make_factory()
         owner, _ = await prepare(engine, factory)
-        r = FakeReader(mailbox(("t.json.gz", gzip.compress(tls_json()), "2026-11-02T10:00:00+00:00"), ("bad.json.gz", gzip.compress(b'{"policies": 1}'), "2026-11-02T11:00:00+00:00")))
+        r = FakeReader(
+            mailbox(
+                ("t.json.gz", gzip.compress(tls_json()), "2026-11-02T10:00:00+00:00"),
+                ("bad.json.gz", gzip.compress(b'{"policies": 1}'), "2026-11-02T11:00:00+00:00"),
+            )
+        )
         out = await mb.ingest_once(factory, r, owner, store=store.store_report)
         await engine.dispose()
         return out

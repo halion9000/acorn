@@ -72,25 +72,61 @@ async def auto_bec(db: Any, tenant_id: uuid.UUID, findings: list[Any], settings:
                 cipp = (
                     await db.execute(
                         select(ClientAlias.vendor_client_id)
-                        .where(ClientAlias.tenant_id == owner, ClientAlias.child_tenant_id == tenant_id, ClientAlias.vendor == "cipp", ClientAlias.ignored.is_(False))
+                        .where(
+                            ClientAlias.tenant_id == owner,
+                            ClientAlias.child_tenant_id == tenant_id,
+                            ClientAlias.vendor == "cipp",
+                            ClientAlias.ignored.is_(False),
+                        )
                         .order_by(ClientAlias.updated_at.desc())
                         .limit(1)
                     )
                 ).scalar_one_or_none()
-                total = (await db.execute(select(func.count()).select_from(BecCase).where(BecCase.requested_by.is_(None), BecCase.created_at > since))).scalar_one()
-                here = (await db.execute(select(func.count()).select_from(BecCase).where(BecCase.requested_by.is_(None), BecCase.tenant_id == tenant_id, BecCase.created_at > since))).scalar_one()
+                total = (
+                    await db.execute(
+                        select(func.count()).select_from(BecCase).where(BecCase.requested_by.is_(None), BecCase.created_at > since)
+                    )
+                ).scalar_one()
+                here = (
+                    await db.execute(
+                        select(func.count())
+                        .select_from(BecCase)
+                        .where(BecCase.requested_by.is_(None), BecCase.tenant_id == tenant_id, BecCase.created_at > since)
+                    )
+                ).scalar_one()
             if not cipp:
                 return 0
             for address in wanted:
                 if total + queued >= settings.BEC_AUTO_PER_DAY or here + queued >= settings.BEC_AUTO_PER_CLIENT_PER_DAY:
                     break
-                recent = (await db.execute(select(func.count()).select_from(BecCase).where(BecCase.tenant_id == tenant_id, BecCase.email == address, BecCase.created_at > since))).scalar_one()
+                recent = (
+                    await db.execute(
+                        select(func.count())
+                        .select_from(BecCase)
+                        .where(BecCase.tenant_id == tenant_id, BecCase.email == address, BecCase.created_at > since)
+                    )
+                ).scalar_one()
                 if recent:
                     continue
-                uid = (await db.execute(select(IdentityMfaUser.user_id).where(IdentityMfaUser.tenant_id == tenant_id, func.lower(IdentityMfaUser.upn) == address).limit(1))).scalar_one_or_none()
+                uid = (
+                    await db.execute(
+                        select(IdentityMfaUser.user_id)
+                        .where(IdentityMfaUser.tenant_id == tenant_id, func.lower(IdentityMfaUser.upn) == address)
+                        .limit(1)
+                    )
+                ).scalar_one_or_none()
                 if not uid:
                     continue  # Microsoft 365 does not know this person
-                queue_case(db, client_id=tenant_id, email=address, microsoft_id=str(uid), cipp_customer_id=str(cipp), requested_by=None, requested_by_name="A.C.O.R.N (automatic, after an alert)", now=now)
+                queue_case(
+                    db,
+                    client_id=tenant_id,
+                    email=address,
+                    microsoft_id=str(uid),
+                    cipp_customer_id=str(cipp),
+                    requested_by=None,
+                    requested_by_name="A.C.O.R.N (automatic, after an alert)",
+                    now=now,
+                )
                 queued += 1
             await db.flush()
         return queued

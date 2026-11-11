@@ -31,7 +31,10 @@ async def tenant():
     try:
         async with engine.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-            await conn.execute(text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :s, 'parent')"), {"i": tid, "n": f"adm-{tag}", "s": f"adm-{tag}"})
+            await conn.execute(
+                text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :s, 'parent')"),
+                {"i": tid, "n": f"adm-{tag}", "s": f"adm-{tag}"},
+            )
         yield tid, engine
     finally:
         async with engine.begin() as conn:

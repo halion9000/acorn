@@ -14,7 +14,10 @@ from fastapi import HTTPException
 OWNER, CLIENT = uuid.uuid4(), uuid.uuid4()
 
 
-@pytest.mark.parametrize("count,hidden,expected", [(0, False, False), (2, False, False), (3, False, True), (40, False, True), (3, True, False), (40, True, False)])
+@pytest.mark.parametrize(
+    "count,hidden,expected",
+    [(0, False, False), (2, False, False), (3, False, True), (40, False, True), (3, True, False), (40, True, False)],
+)
 def test_it_suggests_from_three_false_positives_unless_a_rule_already_hides_the_type(count, hidden, expected):
     assert sup.should_suggest_hiding(count, hidden) is expected
 

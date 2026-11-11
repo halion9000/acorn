@@ -13,24 +13,24 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-10",
-    "commits": 47,
+    "commits": 51,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Autonomy: proposal log on the Autonomy settings page, with Agree/Reject verdicts",
       "Vulnerabilities page: vulnerability alerts from the connected tools, each linking to its alert",
       "Vulnerabilities: Defender vulnerabilities (from CIPP) raise vulnerability alerts",
-      "Autonomy page: last-24-hours view of what the agents did, and a since-hours filter on the proposal log",
-      "Hunts: a manual run of a saved hunt stores its hit count, shown beside Last run",
-      "Client posture: time-to-fix target on each not-met check (critical 4 h, high 24 h, medium 5 days, low 14 days)",
-      "Autonomy page: per-agent scorecard (logged, did on its own, only recorded, agreed, rejected)",
-      "Audit role changes; Reset MFA also removes the authenticator app",
-      "Weekly digest: DMARC pass rate per domain",
-      "Case: Copy as ticket note",
-      "Software update: a history of earlier runs",
-      "Platform health: a worker that failed lately and recovered says so",
-      "Platform health: Download health report"
+      "Vulnerabilities: Meraki end-of-support check raises vulnerability alerts",
+      "Secret-scan hook installed here; public Azure role id marked as not a secret",
+      "Insurance readiness checklist: seven more questions answered from the new checks",
+      "Revisions regenerated",
+      "Members list shows each person second factor",
+      "Platform health: largest database tables",
+      "Bell: a finished BEC search opens the person it was for",
+      "SOC Insights: the MTTR tile says how long each severity took",
+      "Client environment: a box on the map opens that device",
+      "Guide: the features added on 2026-11-10"
     ],
-    "fixes": 3
+    "fixes": 5
   },
   {
     "version": "1.22",

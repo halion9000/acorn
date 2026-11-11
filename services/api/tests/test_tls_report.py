@@ -19,7 +19,10 @@ def doc(**over):
             {
                 "policy": {"policy-type": "sts", "policy-domain": "Client.COM."},
                 "summary": {"total-successful-session-count": 120, "total-failure-session-count": 5},
-                "failure-details": [{"result-type": "certificate-expired", "failed-session-count": 3}, {"result-type": "starttls-not-supported", "failed-session-count": 2}],
+                "failure-details": [
+                    {"result-type": "certificate-expired", "failed-session-count": 3},
+                    {"result-type": "starttls-not-supported", "failed-session-count": 2},
+                ],
             }
         ],
     }
@@ -61,7 +64,11 @@ def test_a_missing_report_id_or_date_or_usable_domain_is_refused():
 def test_counts_are_capped_and_garbage_counts_read_as_zero_and_a_bad_policy_does_not_hide_a_good_one():
     policies = [
         "not a dict",
-        {"policy": {"policy-type": "tlsa", "policy-domain": "client.com"}, "summary": {"total-successful-session-count": -4, "total-failure-session-count": "9"}, "failure-details": [{"result-type": "x" * 200, "failed-session-count": 10**12}, {"failed-session-count": 3}]},
+        {
+            "policy": {"policy-type": "tlsa", "policy-domain": "client.com"},
+            "summary": {"total-successful-session-count": -4, "total-failure-session-count": "9"},
+            "failure-details": [{"result-type": "x" * 200, "failed-session-count": 10**12}, {"failed-session-count": 3}],
+        },
     ]
     p = parse_tls_report(doc(policies=policies)).policies
     assert len(p) == 1 and (p[0].success, p[0].failure) == (0, 0)
@@ -69,5 +76,8 @@ def test_counts_are_capped_and_garbage_counts_read_as_zero_and_a_bad_policy_does
 
 
 def test_the_number_of_policies_is_limited():
-    many = [{"policy": {"policy-type": "sts", "policy-domain": f"d{i}.example.com"}, "summary": {"total-successful-session-count": 1}} for i in range(80)]
+    many = [
+        {"policy": {"policy-type": "sts", "policy-domain": f"d{i}.example.com"}, "summary": {"total-successful-session-count": 1}}
+        for i in range(80)
+    ]
     assert len(parse_tls_report(doc(policies=many)).policies) == 50

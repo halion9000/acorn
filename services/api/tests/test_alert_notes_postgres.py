@@ -14,7 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
-pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database")]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database"),
+]
 
 
 async def off(s):
@@ -38,10 +41,15 @@ async def world():
         await off(s)
         for t in (owner, other):
             await s.execute(text("insert into tenants (id, name, slug) values (:t, 'x', :s)"), {"t": t, "s": f"n-{t.hex[:10]}"})
-        await s.execute(text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, 'Acme', :s, :p)"), {"t": client, "s": f"c-{client.hex[:10]}", "p": owner})
+        await s.execute(
+            text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, 'Acme', :s, :p)"),
+            {"t": client, "s": f"c-{client.hex[:10]}", "p": owner},
+        )
         for aid, tid in ((alert_id, client), (foreign_alert, other)):
             await s.execute(
-                text("insert into alerts (id, tenant_id, title, severity, status, priority, affected_hosts, raw_event, enrichment_data, created_at, updated_at) values (:i, :t, 'T', 'low', 'new', 50, '[]'::jsonb, '{}'::jsonb, '{}'::jsonb, now(), now())"),
+                text(
+                    "insert into alerts (id, tenant_id, title, severity, status, priority, affected_hosts, raw_event, enrichment_data, created_at, updated_at) values (:i, :t, 'T', 'low', 'new', 50, '[]'::jsonb, '{}'::jsonb, '{}'::jsonb, now(), now())"
+                ),
                 {"i": aid, "t": tid},
             )
         await s.commit()

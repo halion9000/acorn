@@ -17,7 +17,14 @@ NOW = datetime(2026, 11, 6, 12, 0, tzinfo=UTC)
 
 
 def _row(**over):
-    base = {"target_path": "/etc/passwd", "action": "UPDATED", "md5": "d41d8cd98f00b204e9800998ecf8427e", "sha256": "e3b0c442", "time": "1793880000", "uid": "0"}
+    base = {
+        "target_path": "/etc/passwd",
+        "action": "UPDATED",
+        "md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "sha256": "e3b0c442",
+        "time": "1793880000",
+        "uid": "0",
+    }
     base.update(over)
     return base
 
@@ -34,7 +41,17 @@ def test_a_file_events_row_becomes_a_fim_event_with_its_hashes_and_time():
 
 
 def test_rows_that_are_not_file_events_are_ignored():
-    for row in ({}, {"pid": "1", "name": "evil", "path": "/tmp/evil"}, {"target_path": "/etc/passwd"}, {"target_path": "", "action": "UPDATED"}, {"target_path": "/x", "action": "added"}, "x", None, 5, []):
+    for row in (
+        {},
+        {"pid": "1", "name": "evil", "path": "/tmp/evil"},
+        {"target_path": "/etc/passwd"},
+        {"target_path": "", "action": "UPDATED"},
+        {"target_path": "/x", "action": "added"},
+        "x",
+        None,
+        5,
+        [],
+    ):
         assert _build(row) is None, row
 
 
@@ -60,7 +77,11 @@ async def test_a_result_batch_stores_only_its_file_rows_and_still_forwards_every
     key = await _enroll(client, "fim-host-1")
     entries = [
         {"name": "pack_aisoc-fim-baseline_passwd_changes", "unixTime": 1793880000, "columns": _row()},
-        {"name": "pack_aisoc-fim-baseline_sudoers_changes", "unixTime": 1793880001, "columns": _row(target_path="/etc/sudoers.d/x", action="CREATED")},
+        {
+            "name": "pack_aisoc-fim-baseline_sudoers_changes",
+            "unixTime": 1793880001,
+            "columns": _row(target_path="/etc/sudoers.d/x", action="CREATED"),
+        },
         {"name": "logged_in_users", "unixTime": 1793880002, "columns": {"user": "root", "tty": "pts/0"}},
     ]
     with patch("app.api.v1.endpoints.log.forward_events", new=AsyncMock()) as fwd:
@@ -68,7 +89,10 @@ async def test_a_result_batch_stores_only_its_file_rows_and_still_forwards_every
     assert r.status_code == 200
     assert len(fwd.call_args[0][0]) == 3, "every row is still forwarded to ingest"
     stored = (await db_session.execute(select(FimEvent).order_by(FimEvent.target_path))).scalars().all()
-    assert [(e.target_path, e.action, e.hostname) for e in stored] == [("/etc/passwd", "UPDATED", "fim-host-1"), ("/etc/sudoers.d/x", "CREATED", "fim-host-1")]
+    assert [(e.target_path, e.action, e.hostname) for e in stored] == [
+        ("/etc/passwd", "UPDATED", "fim-host-1"),
+        ("/etc/sudoers.d/x", "CREATED", "fim-host-1"),
+    ]
     node = (await db_session.execute(select(OsqueryNode).where(OsqueryNode.host_identifier == "fim-host-1"))).scalar_one()
     assert {e.tenant_id for e in stored} == {node.tenant_id}, "stored under the node's own tenant"
 
@@ -94,7 +118,13 @@ async def test_a_batch_with_no_file_rows_stores_nothing_and_a_storage_failure_do
     assert (await db_session.execute(select(FimEvent))).scalars().all() == []
 
     files = [{"name": "passwd_changes", "unixTime": 1793880000, "columns": _row()}]
-    with patch("app.api.v1.endpoints.log.forward_events", new=AsyncMock()) as fwd, patch("app.api.v1.endpoints.log.fim_event_from", side_effect=lambda *a, **k: FimEvent(tenant_id="t", node_key="k", target_path=None, action="X", event_time=NOW)):
+    with (
+        patch("app.api.v1.endpoints.log.forward_events", new=AsyncMock()) as fwd,
+        patch(
+            "app.api.v1.endpoints.log.fim_event_from",
+            side_effect=lambda *a, **k: FimEvent(tenant_id="t", node_key="k", target_path=None, action="X", event_time=NOW),
+        ),
+    ):
         r = await client.post("/api/v1/osquery/log", json={"node_key": key, "log_type": "result", "data": json.dumps(files)})
     assert r.status_code == 200 and r.json() == {"node_invalid": False}
     fwd.assert_awaited_once()

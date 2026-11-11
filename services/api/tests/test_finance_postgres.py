@@ -16,7 +16,10 @@ from sqlalchemy.pool import NullPool
 
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 NOW = datetime.now(UTC)
-pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database")]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database"),
+]
 
 
 async def off(s):
@@ -39,11 +42,22 @@ async def world():
     async with AsyncSession(engine, expire_on_commit=False) as s:
         await off(s)
         for t, name in ((owner, "owner"), (other, "other")):
-            await s.execute(text("insert into tenants (id, name, slug) values (:t, :n, :s)"), {"t": t, "n": name, "s": f"{name}-{t.hex[:10]}"})
-        await s.execute(text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, 'Acme Test', :s, :p)"), {"t": client, "s": f"cl-{client.hex[:10]}", "p": owner})
-        for item, count, unit in (("Huntress per endpoint", 10, "device"), ("Unpriced line", 2, "device"), ("Tickets last month", 40, "ticket")):
             await s.execute(
-                text("insert into client_license_counts (tenant_id, source, item, unit, count, first_seen_at, updated_at) values (:t, 'halopsa', :i, :u, :c, :n, :n)"),
+                text("insert into tenants (id, name, slug) values (:t, :n, :s)"), {"t": t, "n": name, "s": f"{name}-{t.hex[:10]}"}
+            )
+        await s.execute(
+            text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, 'Acme Test', :s, :p)"),
+            {"t": client, "s": f"cl-{client.hex[:10]}", "p": owner},
+        )
+        for item, count, unit in (
+            ("Huntress per endpoint", 10, "device"),
+            ("Unpriced line", 2, "device"),
+            ("Tickets last month", 40, "ticket"),
+        ):
+            await s.execute(
+                text(
+                    "insert into client_license_counts (tenant_id, source, item, unit, count, first_seen_at, updated_at) values (:t, 'halopsa', :i, :u, :c, :n, :n)"
+                ),
                 {"t": client, "i": item, "u": unit, "c": count, "n": NOW},
             )
         await s.commit()
@@ -69,7 +83,9 @@ async def test_a_price_is_saved_once_per_line_and_the_margin_uses_the_billed_qua
     await off(s)
     await save_price(PriceIn(invoice_item="Huntress per endpoint", unit_price=Decimal("6"), unit_cost=Decimal("3.5")), None, owner, s)
     await off(s)
-    again = await save_price(PriceIn(invoice_item="  Huntress  per endpoint ", unit_price=Decimal("7"), unit_cost=Decimal("3.5")), None, owner, s)
+    again = await save_price(
+        PriceIn(invoice_item="  Huntress  per endpoint ", unit_price=Decimal("7"), unit_cost=Decimal("3.5")), None, owner, s
+    )
     assert again.unit_price == "7.00", "the same line is replaced, not duplicated"
     await off(s)
     got = await list_prices(owner, s)
@@ -86,8 +102,13 @@ async def test_a_price_is_saved_once_per_line_and_the_margin_uses_the_billed_qua
 async def test_another_owners_prices_are_never_used(world):
     s = world
     await off(s)
-    await save_price(PriceIn(invoice_item="Huntress per endpoint", unit_price=Decimal("99"), unit_cost=Decimal("1")), None, user(s.info["other"]), s)
+    await save_price(
+        PriceIn(invoice_item="Huntress per endpoint", unit_price=Decimal("99"), unit_cost=Decimal("1")), None, user(s.info["other"]), s
+    )
     await off(s)
     out = await margin(user(s.info["owner"]), s)
     assert out["priced_items"] == 0
-    assert out["clients"][0]["revenue"] == "0.00" and sorted(out["clients"][0]["unpriced_items"]) == ["Huntress per endpoint", "Unpriced line"]
+    assert out["clients"][0]["revenue"] == "0.00" and sorted(out["clients"][0]["unpriced_items"]) == [
+        "Huntress per endpoint",
+        "Unpriced line",
+    ]

@@ -8,7 +8,14 @@ T0 = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 
 
 def row(status="resolved", hours=2.0, ticket=False, disposition=None, stale=None):
-    return {"status": status, "disposition": disposition, "has_ticket": ticket, "created_at": T0, "resolved_at": T0 + timedelta(hours=hours) if hours is not None else None, "stale_at": stale}
+    return {
+        "status": status,
+        "disposition": disposition,
+        "has_ticket": ticket,
+        "created_at": T0,
+        "resolved_at": T0 + timedelta(hours=hours) if hours is not None else None,
+        "stale_at": stale,
+    }
 
 
 def test_fewer_than_three_earlier_alerts_is_too_few_and_no_pattern_is_offered():
@@ -18,7 +25,13 @@ def test_fewer_than_three_earlier_alerts_is_too_few_and_no_pattern_is_offered():
 
 
 def test_counts_by_status_and_disposition_ticket_share_open_ones_and_the_median_hours():
-    rows = [row("resolved", 1, True, "false_positive"), row("resolved", 3, False, "false_positive"), row("closed", 8, True, "benign"), row("fp", 2), row("new", None)]
+    rows = [
+        row("resolved", 1, True, "false_positive"),
+        row("resolved", 3, False, "false_positive"),
+        row("closed", 8, True, "benign"),
+        row("fp", 2),
+        row("new", None),
+    ]
     out = ao.summarize(rows)
     assert out["total"] == 5 and out["enough"] is True
     assert out["by_status"] == {"resolved": 2, "closed": 1, "fp": 1, "new": 1}

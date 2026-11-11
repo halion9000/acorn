@@ -22,8 +22,17 @@ def count(records, domain="acme.com", **kw):
 
 
 def test_a_plain_record_counts_its_own_lookups_and_ip_terms_cost_nothing():
-    r = count({"acme.com": "v=spf1 ip4:1.2.3.4 ip6:2001:db8::/32 a mx include:_spf.example.net -all", "_spf.example.net": "v=spf1 ip4:5.6.7.8 -all"})
-    assert (r.count, r.complete, r.over_limit) == (3, True, False)  # a, mx and the include; the ip terms are free and the included record costs nothing more
+    r = count(
+        {
+            "acme.com": "v=spf1 ip4:1.2.3.4 ip6:2001:db8::/32 a mx include:_spf.example.net -all",
+            "_spf.example.net": "v=spf1 ip4:5.6.7.8 -all",
+        }
+    )
+    assert (r.count, r.complete, r.over_limit) == (
+        3,
+        True,
+        False,
+    )  # a, mx and the include; the ip terms are free and the included record costs nothing more
 
 
 def test_the_includes_are_followed_and_their_lookups_are_counted_too():

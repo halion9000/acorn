@@ -193,7 +193,16 @@ def test_the_settings_the_health_page_reads_actually_reach_the_api_container():
     assert env["MICROSOFT_CLIENT_SECRET_EXPIRES"] == "${MICROSOFT_CLIENT_SECRET_EXPIRES:-}"
     assert env["RETENTION_ALERTS_KEEP_FOREVER_OK"] == "${RETENTION_ALERTS_KEEP_FOREVER_OK:-false}"
     # the container only receives what is listed here: the DMARC mailbox reader needs these, or it silently does nothing
-    for name in ("DMARC_MAILBOX", "DMARC_OWNER_TENANT_ID", "DMARC_GRAPH_TENANT_ID", "DMARC_GRAPH_CLIENT_ID", "DMARC_GRAPH_CLIENT_SECRET", "ALERT_EMAIL_GRAPH_TENANT_ID", "ALERT_EMAIL_GRAPH_CLIENT_ID", "ALERT_EMAIL_GRAPH_CLIENT_SECRET"):
+    for name in (
+        "DMARC_MAILBOX",
+        "DMARC_OWNER_TENANT_ID",
+        "DMARC_GRAPH_TENANT_ID",
+        "DMARC_GRAPH_CLIENT_ID",
+        "DMARC_GRAPH_CLIENT_SECRET",
+        "ALERT_EMAIL_GRAPH_TENANT_ID",
+        "ALERT_EMAIL_GRAPH_CLIENT_ID",
+        "ALERT_EMAIL_GRAPH_CLIENT_SECRET",
+    ):
         assert env[name] == "${" + name + ":-}", name
 
 
@@ -225,7 +234,9 @@ def test_the_live_feed_websocket_and_the_event_stream_go_straight_to_the_realtim
 def test_a_changed_proxy_file_is_loaded_when_an_update_runs_not_only_when_the_container_is_recreated():
     script = SCRIPT.read_text(encoding="utf-8")
     start = script.index("$COMPOSE up -d")
-    assert "caddy reload --config /etc/caddy/Caddyfile" in script[start : start + 900], "the proxy is not told to read its file again after the services start"
+    assert (
+        "caddy reload --config /etc/caddy/Caddyfile" in script[start : start + 900]
+    ), "the proxy is not told to read its file again after the services start"
 
 
 def test_a_failing_reload_never_fails_the_update():
@@ -317,10 +328,14 @@ def test_the_public_tripwire_listener_serves_only_the_canary_path_and_the_tunnel
 
     text = CADDYFILE.read_text(encoding="utf-8")
     block = text[text.index("\n:8088 {") :]
-    assert re.search(r"path_regexp\s+canary\s+\^/api/v1/canary/\[0-9a-fA-F-\]\{36\}\$", block), "the tripwire matcher is no longer an exact id path"
+    assert re.search(
+        r"path_regexp\s+canary\s+\^/api/v1/canary/\[0-9a-fA-F-\]\{36\}\$", block
+    ), "the tripwire matcher is no longer an exact id path"
     assert 'respond "Not found" 404' in block, "everything but the tripwire path must be a 404"
     assert "web:3000" not in block and "realtime:4000" not in block, "the public name must not reach the console or the realtime service"
-    assert "header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}" in block, "the visitor address must come from Cloudflare, not from the visitor"
+    assert (
+        "header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}" in block
+    ), "the visitor address must come from Cloudflare, not from the visitor"
 
     class Loader(yaml.SafeLoader):
         pass
@@ -336,7 +351,9 @@ def test_the_public_tripwire_listener_serves_only_the_canary_path_and_the_tunnel
     compose = yaml.load((SCRIPT.parent / "docker-compose.azure.yml").read_text(), Loader=Loader)  # noqa: S506 - SafeLoader subclass
     svc = compose["services"]["cloudflared"]
     assert svc["profiles"] == ["extras"], "the tunnel must not start unless the owner lists it"
-    assert svc["environment"]["TUNNEL_TOKEN"] == "${CLOUDFLARED_TUNNEL_TOKEN:-}", "the token must come from .env, never be written in the file"
+    assert (
+        svc["environment"]["TUNNEL_TOKEN"] == "${CLOUDFLARED_TUNNEL_TOKEN:-}"
+    ), "the token must come from .env, never be written in the file"
     assert "ports" not in svc, "the tunnel connects out; nothing is published"
 
 
@@ -358,7 +375,11 @@ def test_a_run_that_did_something_adds_one_history_line_the_api_can_read(tmp_pat
     assert "exit=0" in run_record_history(tmp_path, "rolled_back")
     assert "exit=0" in run_record_history(tmp_path, "rollback_ok", mode="rollback")
     rows = uc.parse_history((tmp_path / "history.log").read_text())
-    assert [(r["status"], r["mode"], r["ok"], r["commit"]) for r in rows] == [("rollback_ok", "rollback", True, None), ("rolled_back", "update", False, None), ("ok", "update", True, None)]
+    assert [(r["status"], r["mode"], r["ok"], r["commit"]) for r in rows] == [
+        ("rollback_ok", "rollback", True, None),
+        ("rolled_back", "update", False, None),
+        ("ok", "update", True, None),
+    ]
 
 
 def test_a_run_that_was_turned_away_or_found_nothing_new_is_not_history(tmp_path):
@@ -391,7 +412,9 @@ def test_a_real_failed_run_writes_history_and_the_result_line_is_still_last(tmp_
     )
     copy = tmp_path / "update-acorn.sh"
     copy.write_text(text)
-    out = subprocess.run([BASH, str(copy)], capture_output=True, text=True, timeout=60, env={**os.environ, "ACORN_UPDATE_CTL": ctl.as_posix()})
+    out = subprocess.run(
+        [BASH, str(copy)], capture_output=True, text=True, timeout=60, env={**os.environ, "ACORN_UPDATE_CTL": ctl.as_posix()}
+    )
     assert out.stdout.strip().splitlines()[-1] == 'RESULT {"status":"failed","commit":"none"}'
     rows = uc.parse_history((ctl / "history.log").read_text())
     assert [(r["status"], r["mode"]) for r in rows] == [("failed", "update")]

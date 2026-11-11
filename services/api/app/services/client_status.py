@@ -99,7 +99,9 @@ def project(posture: dict[str, Any]) -> dict[str, Any]:
         "client_name": posture.get("client_name") or "",
         "generated_at": generated.isoformat() if isinstance(generated, datetime) else generated,
         "devices": {"total": total, "protected": covered, "percent": percent(covered, total)},
-        "people": {"total": people, "protected": min(protected, people), "percent": percent(min(protected, people), people)} if identity else None,
+        "people": {"total": people, "protected": min(protected, people), "percent": percent(min(protected, people), people)}
+        if identity
+        else None,
         "alerts": {"open": open_alerts, "being_worked_on": handled},
         "tools": sorted(seen),
         "copy": COPY,

@@ -97,7 +97,9 @@ async def make_deploy_rule(
     if body.via_addigy and body.tool not in ADDIGY_TOOLS:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only Huntress can be pushed through Addigy.")
     if body.windows_script_id is None and body.mac_script_id is None and not body.via_addigy:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Choose a Windows script, a Mac script, Addigy, or a combination.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Choose a Windows script, a Mac script, Addigy, or a combination."
+        )
     if body.scope == "client" and body.client_id is None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Choose the client this rule is for.")
     scripts = await published(db, current_user.tenant_id)

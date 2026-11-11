@@ -42,7 +42,15 @@ def plain(monkeypatch):
 
 
 def event(tenant, who, ok, minutes_ago=30, code=None):
-    return SigninEvent(tenant_id=tenant, source="m365", source_id=uuid.uuid4().hex, user_principal=who, success=ok, error_code=code, occurred_at=datetime.now(UTC) - timedelta(minutes=minutes_ago))
+    return SigninEvent(
+        tenant_id=tenant,
+        source="m365",
+        source_id=uuid.uuid4().hex,
+        user_principal=who,
+        success=ok,
+        error_code=code,
+        occurred_at=datetime.now(UTC) - timedelta(minutes=minutes_ago),
+    )
 
 
 def test_failed_signins_are_counted_for_24_hours_and_a_person_with_ten_is_flagged():
@@ -68,7 +76,11 @@ def test_a_sign_in_that_only_asked_for_more_proof_is_not_a_failure():
     async def body(s):
         s.add(Tenant(id=A, name="Acme", slug="acme"))
         await s.flush()
-        s.add_all([event(A, "bob@acme.com", False, code=50074) for _ in range(12)] + [event(A, "bob@acme.com", False, code=50076) for _ in range(3)] + [event(A, "bob@acme.com", False, code=50126) for _ in range(2)])
+        s.add_all(
+            [event(A, "bob@acme.com", False, code=50074) for _ in range(12)]
+            + [event(A, "bob@acme.com", False, code=50076) for _ in range(3)]
+            + [event(A, "bob@acme.com", False, code=50126) for _ in range(2)]
+        )
         await s.commit()
         return await ep.signin_failures(s, [A], datetime.now(UTC))
 
@@ -85,7 +97,12 @@ def test_nobody_failing_gives_zero_not_none():
 
 
 def test_guests_are_counted_from_the_kind_of_account():
-    people = ip.build_people({A: "Acme"}, [ms(A, "amy@acme.com"), ms(A, "ext@partner.com", user_type="Guest")], [src(A, "cipp", "g2@other.com", kind="guest")], NOW)
+    people = ip.build_people(
+        {A: "Acme"},
+        [ms(A, "amy@acme.com"), ms(A, "ext@partner.com", user_type="Guest")],
+        [src(A, "cipp", "g2@other.com", kind="guest")],
+        NOW,
+    )
     assert ep.summarize(people).guests == 2
 
 
@@ -107,7 +124,11 @@ def test_the_failed_signin_and_brute_force_lists_hold_exactly_the_people_the_til
         )
         await s.commit()
         now = datetime.now(UTC)
-        return await ep.failing_people(s, [A], now, 1), await ep.failing_people(s, [A], now, ep.BRUTE_FORCE_FAILURES), await ep.signin_failures(s, [A], now)
+        return (
+            await ep.failing_people(s, [A], now, 1),
+            await ep.failing_people(s, [A], now, ep.BRUTE_FORCE_FAILURES),
+            await ep.signin_failures(s, [A], now),
+        )
 
     failed, brute, (total, flagged) = run(body)
     assert failed == {(A, "bob@acme.com"), (A, "amy@acme.com")}
@@ -127,7 +148,10 @@ def test_a_disabled_account_is_not_counted_or_listed_as_missing_multi_factor_or_
     people = ip.build_people(
         {A: "Acme"},
         [ms(A, "on@acme.com", enabled=True), ms(A, "off@acme.com", enabled=False)],
-        [src(A, "dropsuite", "on@acme.com", enabled=True, details={"last_backup": None}), src(A, "dropsuite", "off@acme.com", enabled=True, details={"last_backup": None})],
+        [
+            src(A, "dropsuite", "on@acme.com", enabled=True, details={"last_backup": None}),
+            src(A, "dropsuite", "off@acme.com", enabled=True, details={"last_backup": None}),
+        ],
         NOW,
     )
     for p in people:

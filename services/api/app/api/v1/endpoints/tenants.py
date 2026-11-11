@@ -540,7 +540,9 @@ async def _one_role(db: Any, current_user: Any, role: str, role_ids: list[uuid.U
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Choose exactly one custom role.")
         return await _checked_custom_roles(db, current_user, role_ids)
     if role_ids:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="A person has one role: a built-in role or a custom role, not both.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="A person has one role: a built-in role or a custom role, not both."
+        )
     return []
 
 
@@ -597,8 +599,18 @@ async def _second_factors_of(db: Any, tenant_id: uuid.UUID) -> tuple[dict[uuid.U
     from app.models.responder import PasskeyCredential  # noqa: PLC0415
     from app.models.user_totp import UserTotp  # noqa: PLC0415
 
-    counts = (await db.execute(select(PasskeyCredential.user_id, func.count()).where(PasskeyCredential.tenant_id == tenant_id).group_by(PasskeyCredential.user_id))).all()
-    apps = (await db.execute(select(UserTotp.user_id).where(UserTotp.tenant_id == tenant_id, UserTotp.confirmed_at.is_not(None)))).scalars().all()
+    counts = (
+        await db.execute(
+            select(PasskeyCredential.user_id, func.count())
+            .where(PasskeyCredential.tenant_id == tenant_id)
+            .group_by(PasskeyCredential.user_id)
+        )
+    ).all()
+    apps = (
+        (await db.execute(select(UserTotp.user_id).where(UserTotp.tenant_id == tenant_id, UserTotp.confirmed_at.is_not(None))))
+        .scalars()
+        .all()
+    )
     return {uid: int(n) for uid, n in counts}, set(apps)
 
 
@@ -689,7 +701,13 @@ async def create_user(
         await db.flush()
         for role in custom_roles:
             db.add(UserRole(user_id=user.id, role_id=role.id, assigned_by=current_user.user_id))
-    await _audit_user(db, current_user, "user:created", user.id, {"account_name": name, "role": request.role, "custom_roles": [r.name for r in custom_roles]})
+    await _audit_user(
+        db,
+        current_user,
+        "user:created",
+        user.id,
+        {"account_name": name, "role": request.role, "custom_roles": [r.name for r in custom_roles]},
+    )
     try:
         await db.commit()
     except IntegrityError:
@@ -844,7 +862,9 @@ async def reset_user_password(
         .where(User.id == user.id, User.tenant_id == current_user.tenant_id)
         .values(hashed_password=get_password_hash(request.new_password), updated_at=datetime.now(UTC))
     )
-    await _audit_user(db, current_user, "user:password_reset", user.id, {"account_name": user.account_name})  # the new password is never recorded
+    await _audit_user(
+        db, current_user, "user:password_reset", user.id, {"account_name": user.account_name}
+    )  # the new password is never recorded
     await db.commit()
     logger.warning("user password reset by an administrator", extra={"acting_user": str(current_user.user_id), "target_user": str(user.id)})
     try:
@@ -876,7 +896,8 @@ async def delete_user(
         await sign_out_everywhere(user.id)
     except RevocationUnavailable:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Could not end their sessions first: the revocation store is unavailable. Nothing was deleted. Try again."
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not end their sessions first: the revocation store is unavailable. Nothing was deleted. Try again.",
         ) from None
     name = user.account_name
     try:
@@ -891,7 +912,10 @@ async def delete_user(
             status_code=status.HTTP_409_CONFLICT,
             detail="This person cannot be deleted because cases, notes or audit entries still refer to them. Disable the account instead: they keep their history and cannot sign in.",
         ) from None
-    logger.warning("user deleted by an administrator", extra={"acting_user": str(current_user.user_id), "deleted_user": str(user_id), "account_name": name})
+    logger.warning(
+        "user deleted by an administrator",
+        extra={"acting_user": str(current_user.user_id), "deleted_user": str(user_id), "account_name": name},
+    )
     return AdminActionResponse(done=True, detail=f"{name} was deleted.")
 
 
@@ -909,17 +933,36 @@ async def reset_user_mfa(
     user = await _user_the_caller_may_manage(db, current_user, user_id)
     result = await db.execute(
         update(PasskeyCredential)
-        .where(PasskeyCredential.user_id == user.id, PasskeyCredential.tenant_id == current_user.tenant_id, PasskeyCredential.revoked_at.is_(None))
+        .where(
+            PasskeyCredential.user_id == user.id,
+            PasskeyCredential.tenant_id == current_user.tenant_id,
+            PasskeyCredential.revoked_at.is_(None),
+        )
         .values(revoked_at=datetime.now(UTC))
     )
     count = result.rowcount or 0
     # A lost phone also holds the authenticator app: removing only the passkeys left a code prompt nobody could answer, and a stolen phone still able to.
     totp_removed = await totp_store.remove(db, user.id, current_user.tenant_id)
-    await _audit_user(db, current_user, "user:mfa_reset", user.id, {"account_name": user.account_name, "passkeys_removed": count, "totp_removed": totp_removed})
+    await _audit_user(
+        db,
+        current_user,
+        "user:mfa_reset",
+        user.id,
+        {"account_name": user.account_name, "passkeys_removed": count, "totp_removed": totp_removed},
+    )
     await db.commit()
-    logger.warning("user passkeys removed by an administrator", extra={"acting_user": str(current_user.user_id), "target_user": str(user.id), "passkeys": count})
+    logger.warning(
+        "user passkeys removed by an administrator",
+        extra={"acting_user": str(current_user.user_id), "target_user": str(user.id), "passkeys": count},
+    )
     try:
         await sign_out_everywhere(user.id)
     except RevocationUnavailable:
-        return AdminActionResponse(done=True, detail=f"{count} passkey(s){' and the authenticator app' if totp_removed else ''} removed, but their sessions could not be ended right now (the revocation store is unavailable). Use Sign out everywhere again shortly.")
-    return AdminActionResponse(done=True, detail=f"{count} passkey(s){' and the authenticator app' if totp_removed else ''} removed and their sessions ended. They sign in with their password and can set up a new second factor.")
+        return AdminActionResponse(
+            done=True,
+            detail=f"{count} passkey(s){' and the authenticator app' if totp_removed else ''} removed, but their sessions could not be ended right now (the revocation store is unavailable). Use Sign out everywhere again shortly.",
+        )
+    return AdminActionResponse(
+        done=True,
+        detail=f"{count} passkey(s){' and the authenticator app' if totp_removed else ''} removed and their sessions ended. They sign in with their password and can set up a new second factor.",
+    )

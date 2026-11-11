@@ -15,7 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
-pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database")]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database"),
+]
 TODAY = datetime.now(UTC).date()
 
 
@@ -57,15 +60,23 @@ def user(t):
 async def test_items_are_listed_soonest_first_with_their_state_and_a_review_moves_the_date(world):
     s, a = world, world.info["a"]
     await off(s)
-    late = await ep.create_item(ItemIn(kind="vendor", title="Vendor review: Pax8", interval_days=180, next_due=TODAY - timedelta(days=3)), None, user(a), s)
+    late = await ep.create_item(
+        ItemIn(kind="vendor", title="Vendor review: Pax8", interval_days=180, next_due=TODAY - timedelta(days=3)), None, user(a), s
+    )
     await off(s)
-    soon = await ep.create_item(ItemIn(kind="policy", title="Acceptable use", interval_days=365, next_due=TODAY + timedelta(days=5)), None, user(a), s)
+    soon = await ep.create_item(
+        ItemIn(kind="policy", title="Acceptable use", interval_days=365, next_due=TODAY + timedelta(days=5)), None, user(a), s
+    )
     await off(s)
     default = await ep.create_item(ItemIn(kind="evidence", title="Cyber insurance renewal evidence", interval_days=90), None, user(a), s)
     assert default.next_due == TODAY + timedelta(days=90), "no date given: today plus the interval"
     await off(s)
     rows = await ep.list_items(user(a), s)
-    assert [(r.title, r.state) for r in rows] == [("Vendor review: Pax8", "overdue"), ("Acceptable use", "due soon"), ("Cyber insurance renewal evidence", "ok")]
+    assert [(r.title, r.state) for r in rows] == [
+        ("Vendor review: Pax8", "overdue"),
+        ("Acceptable use", "due soon"),
+        ("Cyber insurance renewal evidence", "ok"),
+    ]
     await off(s)
     done = await ep.mark_reviewed(late.id, None, user(a), s)
     assert done.last_reviewed_at == TODAY and done.next_due == TODAY + timedelta(days=180) and done.state == "ok"

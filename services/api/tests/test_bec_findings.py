@@ -21,7 +21,9 @@ def test_a_high_level_is_a_high_alert_for_that_person_with_cipps_own_words():
     assert "CIPP rates it High" in f.title and "pat@acme.com" in f.title
     fields = dict(f.fields)
     assert fields["CIPP's level"] == "High" and fields["CIPP's score"] == "9" and fields["Search"] == "BEC-1"
-    assert fields["Seen in the report"] == "2 new inbox rules; 1 mailbox permission change", "only lists with entries, counted from the report itself"
+    assert (
+        fields["Seen in the report"] == "2 new inbox rules; 1 mailbox permission change"
+    ), "only lists with entries, counted from the report itself"
 
 
 def test_medium_is_a_medium_alert_and_low_or_missing_or_unknown_raises_nothing():

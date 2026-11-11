@@ -22,7 +22,17 @@ from sqlalchemy.pool import NullPool
 # OLD: the key an early version issued (it held alerts:write). NEW: what CORE's key holds now: the narrow alerts:triage instead of
 # alerts:write, plus the read scopes added since.
 OLD = ["alerts:read", "alerts:write", "cases:read", "cases:write", "connectors:read"]
-NEW = ["alerts:read", "alerts:triage", "cases:read", "cases:work", "proposals:log", "connectors:view", "rules:view", "hunts:read", "intel:read"]
+NEW = [
+    "alerts:read",
+    "alerts:triage",
+    "cases:read",
+    "cases:work",
+    "proposals:log",
+    "connectors:view",
+    "rules:view",
+    "hunts:read",
+    "intel:read",
+]
 OWNER = uuid.uuid4()
 OTHER_TENANT = uuid.uuid4()
 

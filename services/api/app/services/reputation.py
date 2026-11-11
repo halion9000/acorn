@@ -56,7 +56,15 @@ def _years(days: int) -> str:
     return f"{days // 365} years" if days >= 730 else f"{days // 30} months" if days >= 60 else f"{days} days"
 
 
-def facts(registration: Registration | None, problem: str | None, policy: str, pass_rate: float | None, total: int, failed: int, now: datetime | None = None) -> list[Fact]:
+def facts(
+    registration: Registration | None,
+    problem: str | None,
+    policy: str,
+    pass_rate: float | None,
+    total: int,
+    failed: int,
+    now: datetime | None = None,
+) -> list[Fact]:
     """The reputation facts, most telling first. `registration` is None when it could not be read (and `problem` says why)."""
     moment = now or datetime.now(UTC)
     out: list[Fact] = []
@@ -72,7 +80,13 @@ def facts(registration: Registration | None, problem: str | None, policy: str, p
         if left < 0:
             out.append(Fact("Registration ends", f"Expired on {registration.expires.date()}.", "bad"))
         elif left <= 30:
-            out.append(Fact("Registration ends", f"Expires in {left} days ({registration.expires.date()}). If it lapses, someone else can register it and receive its mail.", "warn"))
+            out.append(
+                Fact(
+                    "Registration ends",
+                    f"Expires in {left} days ({registration.expires.date()}). If it lapses, someone else can register it and receive its mail.",
+                    "warn",
+                )
+            )
         else:
             out.append(Fact("Registration ends", f"{registration.expires.date()}.", "good"))
     if pass_rate is None or total == 0:
@@ -80,7 +94,11 @@ def facts(registration: Registration | None, problem: str | None, policy: str, p
     else:
         tone = "good" if pass_rate >= 98 else "warn" if pass_rate >= 90 else "bad"
         out.append(Fact("Its own mail", f"{pass_rate}% of {total:,} messages pass DMARC; {failed:,} failed.", tone))
-    policy_text = {"none": ("Monitor only: pretenders are not stopped.", "warn"), "quarantine": ("Quarantine: failing mail goes to spam.", "good"), "reject": ("Reject: failing mail is refused.", "good")}
+    policy_text = {
+        "none": ("Monitor only: pretenders are not stopped.", "warn"),
+        "quarantine": ("Quarantine: failing mail goes to spam.", "good"),
+        "reject": ("Reject: failing mail is refused.", "good"),
+    }
     text, ptone = policy_text.get(policy, (f"Unrecognised policy '{policy}'.", "unknown"))
     out.append(Fact("DMARC policy", text, ptone))  # type: ignore[arg-type]
     return out

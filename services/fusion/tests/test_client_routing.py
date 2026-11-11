@@ -48,7 +48,10 @@ def test_each_vendor_names_its_client_in_its_own_field():
         "09a136cc-13f7-410e-9017-55fe3750c7b6",
     )
     assert client_key(_event("liongard", liongard_environment_id=7)) == ("liongard", "7")
-    assert client_key(_event("cipp", cipp_tenant_id="5e2307a9-2209-40ef-9233-9e73313aa89a")) == ("cipp", "5e2307a9-2209-40ef-9233-9e73313aa89a")
+    assert client_key(_event("cipp", cipp_tenant_id="5e2307a9-2209-40ef-9233-9e73313aa89a")) == (
+        "cipp",
+        "5e2307a9-2209-40ef-9233-9e73313aa89a",
+    )
 
 
 @pytest.mark.parametrize(

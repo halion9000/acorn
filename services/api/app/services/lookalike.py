@@ -20,7 +20,22 @@ _CACHE: dict[str, tuple[float, list[Lookalike]]] = {}
 _LABEL = re.compile(r"^[a-z0-9-]{1,63}$")
 
 # Characters that read alike at a glance.
-_HOMOGLYPHS: dict[str, list[str]] = {"o": ["0"], "0": ["o"], "l": ["1", "i"], "1": ["l"], "i": ["l", "1"], "m": ["rn"], "w": ["vv"], "a": ["e"], "e": ["a"], "s": ["5"], "g": ["q"], "q": ["g"], "u": ["v"], "v": ["u"]}
+_HOMOGLYPHS: dict[str, list[str]] = {
+    "o": ["0"],
+    "0": ["o"],
+    "l": ["1", "i"],
+    "1": ["l"],
+    "i": ["l", "1"],
+    "m": ["rn"],
+    "w": ["vv"],
+    "a": ["e"],
+    "e": ["a"],
+    "s": ["5"],
+    "g": ["q"],
+    "q": ["g"],
+    "u": ["v"],
+    "v": ["u"],
+}
 _OTHER_ENDINGS = ("com", "net", "org", "co", "us", "biz", "info", "cm", "om", "co.uk", "io")
 
 
@@ -47,7 +62,13 @@ def generate(domain: str) -> dict[str, str]:
 
     def add(new_label: str, kind: str, new_ending: str | None = None) -> None:
         name = f"{new_label}.{new_ending or ending}"
-        if name != f"{label}.{ending}" and _LABEL.match(new_label) and not new_label.startswith("-") and not new_label.endswith("-") and name not in out:
+        if (
+            name != f"{label}.{ending}"
+            and _LABEL.match(new_label)
+            and not new_label.startswith("-")
+            and not new_label.endswith("-")
+            and name not in out
+        ):
             out[name] = kind
 
     for i, ch in enumerate(label):

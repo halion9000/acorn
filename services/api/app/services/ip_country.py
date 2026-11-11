@@ -31,7 +31,7 @@ def cymru_name(ip: str) -> str | None:
 
 
 def parse_country(txt: str) -> str | None:
-    """"15169 | 8.8.8.0/24 | US | arin | 2000-03-30" gives "US". Anything else gives None."""
+    """ "15169 | 8.8.8.0/24 | US | arin | 2000-03-30" gives "US". Anything else gives None."""
     fields = [f.strip() for f in txt.strip().strip('"').split("|")]
     return fields[2] if len(fields) >= 3 and _COUNTRY.match(fields[2]) else None
 

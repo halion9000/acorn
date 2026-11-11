@@ -16,7 +16,9 @@ def build():
             ms(A, "nolicence@acme.com", licensed=False),  # no licence: no
         ],
         [
-            src(A, "google-workspace", "g.on@acme.com", enabled=True, details={"directory": True, "licensed": True}),  # a licensed Google account: active
+            src(
+                A, "google-workspace", "g.on@acme.com", enabled=True, details={"directory": True, "licensed": True}
+            ),  # a licensed Google account: active
             src(A, "google-workspace", "g.free@acme.com", enabled=True, details={"directory": True, "licensed": False}),  # not licensed: no
             src(A, "google-workspace", "g.off@acme.com", enabled=False, details={"directory": True, "licensed": True}),  # disabled: no
             src(A, "huntress", "tool.only@acme.com", enabled=True),  # a tool that says nothing about licences: no
@@ -49,5 +51,7 @@ def test_everyone_is_still_counted_under_all_identities_and_the_filter_combines_
 
 
 def test_an_account_no_tool_says_is_disabled_is_not_called_disabled():
-    people = ip.build_people({A: "Acme"}, [], [src(A, "google-workspace", "quiet@acme.com", enabled=None, details={"directory": True, "licensed": True})], NOW)
+    people = ip.build_people(
+        {A: "Acme"}, [], [src(A, "google-workspace", "quiet@acme.com", enabled=None, details={"directory": True, "licensed": True})], NOW
+    )
     assert [p.email for p in people if ip.is_active(p)] == ["quiet@acme.com"]

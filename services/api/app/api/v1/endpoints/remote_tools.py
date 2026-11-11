@@ -143,7 +143,11 @@ def build_inventory(
     )
 
 
-@router.get("/inventory", response_model=Inventory, summary="Every remote management and remote access tool found on client devices, with what has been decided about each")
+@router.get(
+    "/inventory",
+    response_model=Inventory,
+    summary="Every remote management and remote access tool found on client devices, with what has been decided about each",
+)
 async def inventory(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> Inventory:
     owner = current_user.tenant_id
     await _load_custom(db, owner)
@@ -173,10 +177,14 @@ class CatalogEntry(BaseModel):
     custom: bool = False
 
 
-@router.get("/catalog", response_model=list[CatalogEntry], summary="The tools that are looked for, the built-in list and the ones added by hand")
+@router.get(
+    "/catalog", response_model=list[CatalogEntry], summary="The tools that are looked for, the built-in list and the ones added by hand"
+)
 async def catalog(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> list[CatalogEntry]:
     await _load_custom(db, current_user.tenant_id)
-    return [CatalogEntry(key=t.key, name=t.name, category=t.category) for t in rt.CATALOG] + [CatalogEntry(key=t.key, name=t.name, category=t.category, custom=True) for t in rt.custom_tools()]
+    return [CatalogEntry(key=t.key, name=t.name, category=t.category) for t in rt.CATALOG] + [
+        CatalogEntry(key=t.key, name=t.name, category=t.category, custom=True) for t in rt.custom_tools()
+    ]
 
 
 class DeviceRow(BaseModel):
@@ -192,8 +200,6 @@ class DeviceRow(BaseModel):
     instance_id: str = ""
     # For an install that belongs to another server than yours (see the tool's own identifiers): True.
     foreign: bool = False
-
-
 
 
 @router.get("/tools/{tool_key}/devices", response_model=list[DeviceRow], summary="The devices one tool was found on")
@@ -289,7 +295,12 @@ async def _save(db: Any, tenant_id: uuid.UUID, findings: list[Any], now: datetim
 
 
 async def _raise_alerts(
-    db: Any, owner: uuid.UUID, rows: list[Any], rules: dict[tuple[str, uuid.UUID | None], str], now: datetime, trusted: dict[str, list[str]] | None = None
+    db: Any,
+    owner: uuid.UUID,
+    rows: list[Any],
+    rules: dict[tuple[str, uuid.UUID | None], str],
+    now: datetime,
+    trusted: dict[str, list[str]] | None = None,
 ) -> int:
     """Alerts for the blocked tools, and the installs that belong to another server than yours, among ``rows`` (stored sightings of any clients), each raised in its own client's tenant. One alert per device and
     tool (blocked) or per device, tool and server (another server's); a fixed id, so a repeat raises nothing."""
@@ -321,7 +332,15 @@ def back_note(title: str, scanned: datetime) -> str:
     return f"Found again: {title}. The device scan of {scanned.astimezone(UTC):%Y-%m-%d %H:%M UTC} lists it again, so A.C.O.R.N reopened this alert."
 
 
-async def reconcile_alerts(db: Any, owner: uuid.UUID, target: uuid.UUID, sightings: list[Any], rules: dict[tuple[str, uuid.UUID | None], str], now: datetime, trusted: dict[str, list[str]] | None = None) -> tuple[int, int]:
+async def reconcile_alerts(
+    db: Any,
+    owner: uuid.UUID,
+    target: uuid.UUID,
+    sightings: list[Any],
+    rules: dict[tuple[str, uuid.UUID | None], str],
+    now: datetime,
+    trusted: dict[str, list[str]] | None = None,
+) -> tuple[int, int]:
     """Close the open alerts this page raised for one client whose finding is no longer true (the tool is gone, allowed now, or the server is now yours), and reopen one that had gone and is back.
     Only an alert nobody has started on is closed (a person's own decision is left alone), and only one this function closed is ever reopened. Each change is written on the alert's HaloPSA tickets, so a ticket made from
     the alert says the same. Call only after a scan that looked at devices: an empty or failed scan proves nothing. Returns (closed, reopened). The caller owns the transaction."""
@@ -336,8 +355,10 @@ async def reconcile_alerts(db: Any, owner: uuid.UUID, target: uuid.UUID, sightin
     closed = reopened = 0
     async with _in_tenant(db, owner, target):
         mine = (
-            await db.execute(select(Alert).where(Alert.tenant_id == target, Alert.raw_event["source"].astext == "aisoc-remote-tools"))
-        ).scalars().all()
+            (await db.execute(select(Alert).where(Alert.tenant_id == target, Alert.raw_event["source"].astext == "aisoc-remote-tools")))
+            .scalars()
+            .all()
+        )
         for alert in mine:
             enrichment = dict(alert.enrichment_data) if isinstance(alert.enrichment_data, dict) else {}
             tickets = halo_ticket_ids(enrichment)
@@ -362,7 +383,9 @@ async def reconcile_alerts(db: Any, owner: uuid.UUID, target: uuid.UUID, sightin
     return closed, reopened
 
 
-@router.put("/tools/{tool_key}/verdict", response_model=VerdictOut, summary="Allow, block or leave unreviewed a tool, for every client or for one")
+@router.put(
+    "/tools/{tool_key}/verdict", response_model=VerdictOut, summary="Allow, block or leave unreviewed a tool, for every client or for one"
+)
 async def set_verdict(
     tool_key: str,
     body: VerdictIn,
@@ -381,18 +404,35 @@ async def set_verdict(
     scope_id = body.client_id or ALL_CLIENTS
     now = datetime.now(UTC)
     existing = (
-        await db.execute(select(RemoteToolRule).where(RemoteToolRule.tenant_id == owner, RemoteToolRule.tool_key == tool_key, RemoteToolRule.client_id == scope_id))
+        await db.execute(
+            select(RemoteToolRule).where(
+                RemoteToolRule.tenant_id == owner, RemoteToolRule.tool_key == tool_key, RemoteToolRule.client_id == scope_id
+            )
+        )
     ).scalar_one_or_none()
     before = existing.verdict if existing is not None else "unreviewed"
     note = " ".join((body.note or "").split()) or None
     if body.verdict == "unreviewed" and body.client_id is not None:
         # "Unreviewed" for one client means "no rule of its own": it goes back to following the rule for every client.
-        await db.execute(delete(RemoteToolRule).where(RemoteToolRule.tenant_id == owner, RemoteToolRule.tool_key == tool_key, RemoteToolRule.client_id == scope_id))
+        await db.execute(
+            delete(RemoteToolRule).where(
+                RemoteToolRule.tenant_id == owner, RemoteToolRule.tool_key == tool_key, RemoteToolRule.client_id == scope_id
+            )
+        )
     else:
-        stmt = pg_insert(RemoteToolRule).values(tenant_id=owner, tool_key=tool_key, client_id=scope_id, verdict=body.verdict, note=note, decided_by=current_user.user_id, decided_at=now)
+        stmt = pg_insert(RemoteToolRule).values(
+            tenant_id=owner,
+            tool_key=tool_key,
+            client_id=scope_id,
+            verdict=body.verdict,
+            note=note,
+            decided_by=current_user.user_id,
+            decided_at=now,
+        )
         await db.execute(
             stmt.on_conflict_do_update(
-                index_elements=["tenant_id", "tool_key", "client_id"], set_={"verdict": body.verdict, "note": note, "decided_by": current_user.user_id, "decided_at": now}
+                index_elements=["tenant_id", "tool_key", "client_id"],
+                set_={"verdict": body.verdict, "note": note, "decided_by": current_user.user_id, "decided_at": now},
             )
         )
     await db.flush()
@@ -409,7 +449,13 @@ async def set_verdict(
             action="remote_tool:verdict_changed",
             resource="remote_tool",
             resource_id=tool_key,
-            changes={"tool": tool.name, "client": str(body.client_id) if body.client_id else "all", "before": before, "after": body.verdict, "note": note},
+            changes={
+                "tool": tool.name,
+                "client": str(body.client_id) if body.client_id else "all",
+                "before": before,
+                "after": body.verdict,
+                "note": note,
+            },
             request=request,
         )
     await db.commit()
@@ -417,7 +463,11 @@ async def set_verdict(
 
 
 class InstancesIn(BaseModel):
-    ids: list[str] = Field(default_factory=list, max_length=20, description="The server identifiers that are yours, as they appear in the install (ScreenConnect: the 16 characters in 'ScreenConnect Client (...)').")
+    ids: list[str] = Field(
+        default_factory=list,
+        max_length=20,
+        description="The server identifiers that are yours, as they appear in the install (ScreenConnect: the 16 characters in 'ScreenConnect Client (...)').",
+    )
 
 
 class InstancesOut(BaseModel):
@@ -495,7 +545,14 @@ class CustomOut(BaseModel):
 
 
 def _custom_out(r: Any) -> CustomOut:
-    return CustomOut(key=r.tool_key, name=r.name, category=r.category, match=r.match_text, publisher=r.publisher_text, created_at=getattr(r, "created_at", None))
+    return CustomOut(
+        key=r.tool_key,
+        name=r.name,
+        category=r.category,
+        match=r.match_text,
+        publisher=r.publisher_text,
+        created_at=getattr(r, "created_at", None),
+    )
 
 
 @router.get("/custom", response_model=list[CustomOut], summary="The tools added by hand")
@@ -525,7 +582,15 @@ async def add_custom(
     key = rt.slug_key(name)
     if not key or any(r.tool_key == key for r in existing) or rt.tool_by_key(key) is not None:
         raise HTTPException(status_code=409, detail="A tool with that name is already in the list; give it a different name")
-    row = CustomRemoteTool(tenant_id=owner, tool_key=key, name=name, category=category, match_text=match, publisher_text=publisher, created_by=current_user.user_id)
+    row = CustomRemoteTool(
+        tenant_id=owner,
+        tool_key=key,
+        name=name,
+        category=category,
+        match_text=match,
+        publisher_text=publisher,
+        created_by=current_user.user_id,
+    )
     db.add(row)
     await db.flush()
     await emit_audit(
@@ -556,7 +621,9 @@ async def remove_custom(
         raise HTTPException(status_code=404, detail="That is not a tool you added")
     clients = await _clients(db, owner)
     async with cross_tenant_reads(db):
-        await db.execute(delete(DeviceRemoteTool).where(DeviceRemoteTool.tenant_id.in_([owner, *clients]), DeviceRemoteTool.tool_key == tool_key))
+        await db.execute(
+            delete(DeviceRemoteTool).where(DeviceRemoteTool.tenant_id.in_([owner, *clients]), DeviceRemoteTool.tool_key == tool_key)
+        )
     await db.execute(delete(RemoteToolRule).where(RemoteToolRule.tenant_id == owner, RemoteToolRule.tool_key == tool_key))
     await db.execute(delete(CustomRemoteTool).where(CustomRemoteTool.tenant_id == owner, CustomRemoteTool.tool_key == tool_key))
     await emit_audit(
@@ -586,7 +653,9 @@ class FoundIn(BaseModel):
 class RemoteToolsReport(BaseModel):
     vendor: str = Field(pattern=_VENDOR, description="The tool the software list came from (ninjaone).")
     vendor_client_id: str | None = Field(default=None, max_length=200)
-    devices_scanned: int = Field(ge=0, le=200000, description="How many of the client's devices were looked at in this scan, with or without a tool on them.")
+    devices_scanned: int = Field(
+        ge=0, le=200000, description="How many of the client's devices were looked at in this scan, with or without a tool on them."
+    )
     items: list[FoundIn] = Field(default_factory=list, max_length=5000)
 
 
@@ -607,11 +676,19 @@ async def apply_report(db: Any, owner: uuid.UUID, report: RemoteToolsReport, now
     target = owner
     if report.vendor_client_id:
         alias = (
-            await db.execute(select(ClientAlias).where(ClientAlias.tenant_id == owner, ClientAlias.vendor == report.vendor, ClientAlias.vendor_client_id == report.vendor_client_id))
+            await db.execute(
+                select(ClientAlias).where(
+                    ClientAlias.tenant_id == owner,
+                    ClientAlias.vendor == report.vendor,
+                    ClientAlias.vendor_client_id == report.vendor_client_id,
+                )
+            )
         ).scalar_one_or_none()
         children = set((await db.execute(select(Tenant.id).where(Tenant.parent_tenant_id == owner))).scalars().all())
         if alias is None or alias.ignored or alias.child_tenant_id is None or alias.child_tenant_id not in children:
-            return ReportOut(stored=0, removed=0, unknown_tools=0, unmapped=True, alerts_raised=0)  # not mapped to a client yet: it arrives again after the mapping
+            return ReportOut(
+                stored=0, removed=0, unknown_tools=0, unmapped=True, alerts_raised=0
+            )  # not mapped to a client yet: it arrives again after the mapping
         target = alias.child_tenant_id
     unknown = sum(1 for i in report.items if rt.tool_by_key(i.tool_key) is None)
     wanted: dict[tuple[str, str, str], FoundIn] = {}
@@ -621,15 +698,40 @@ async def apply_report(db: Any, owner: uuid.UUID, report: RemoteToolsReport, now
             wanted[(rt.host_key(i.hostname), i.tool_key, rt.instance_of(i.tool_key, i.program, i.path))] = i
     stored = removed = 0
     async with _in_tenant(db, owner, target):
-        held = (await db.execute(select(DeviceRemoteTool).where(DeviceRemoteTool.tenant_id == target, DeviceRemoteTool.vendor == report.vendor))).scalars().all()
+        held = (
+            (
+                await db.execute(
+                    select(DeviceRemoteTool).where(DeviceRemoteTool.tenant_id == target, DeviceRemoteTool.vendor == report.vendor)
+                )
+            )
+            .scalars()
+            .all()
+        )
         for (hk, tk, inst), item in wanted.items():
             stmt = pg_insert(DeviceRemoteTool).values(
-                tenant_id=target, hostname_key=hk, tool_key=tk, instance_id=inst, hostname=item.hostname, vendor=report.vendor, version=item.version, program=item.program, install_path=item.path, first_seen=now, last_seen=now
+                tenant_id=target,
+                hostname_key=hk,
+                tool_key=tk,
+                instance_id=inst,
+                hostname=item.hostname,
+                vendor=report.vendor,
+                version=item.version,
+                program=item.program,
+                install_path=item.path,
+                first_seen=now,
+                last_seen=now,
             )
             await db.execute(
                 stmt.on_conflict_do_update(
                     index_elements=["tenant_id", "hostname_key", "tool_key", "instance_id"],
-                    set_={"hostname": item.hostname, "vendor": report.vendor, "version": item.version, "program": item.program, "install_path": item.path, "last_seen": now},
+                    set_={
+                        "hostname": item.hostname,
+                        "vendor": report.vendor,
+                        "version": item.version,
+                        "program": item.program,
+                        "install_path": item.path,
+                        "last_seen": now,
+                    },
                 )
             )
             stored += 1
@@ -645,8 +747,14 @@ async def apply_report(db: Any, owner: uuid.UUID, report: RemoteToolsReport, now
                         )
                     )
                     removed += 1
-        scan = pg_insert(RemoteToolScan).values(tenant_id=target, vendor=report.vendor, scanned_at=now, devices_scanned=report.devices_scanned)
-        await db.execute(scan.on_conflict_do_update(index_elements=["tenant_id", "vendor"], set_={"scanned_at": now, "devices_scanned": report.devices_scanned}))
+        scan = pg_insert(RemoteToolScan).values(
+            tenant_id=target, vendor=report.vendor, scanned_at=now, devices_scanned=report.devices_scanned
+        )
+        await db.execute(
+            scan.on_conflict_do_update(
+                index_elements=["tenant_id", "vendor"], set_={"scanned_at": now, "devices_scanned": report.devices_scanned}
+            )
+        )
     rules = await _rules(db, owner)
     sightings = await _sightings(db, [target])
     raised = await _raise_alerts(db, owner, sightings, rules, now)
@@ -656,7 +764,15 @@ async def apply_report(db: Any, owner: uuid.UUID, report: RemoteToolsReport, now
             closed, reopened = await reconcile_alerts(db, owner, target, sightings, rules, now)
         except Exception:  # noqa: BLE001 - tidying old alerts must never lose the scan itself
             logger.warning("remote tool alert reconcile failed", exc_info=True)
-    return ReportOut(stored=stored, removed=removed, unknown_tools=unknown, unmapped=False, alerts_raised=raised, alerts_closed=closed, alerts_reopened=reopened)
+    return ReportOut(
+        stored=stored,
+        removed=removed,
+        unknown_tools=unknown,
+        unmapped=False,
+        alerts_raised=raised,
+        alerts_closed=closed,
+        alerts_reopened=reopened,
+    )
 
 
 @ingest_router.post("/core-feed/{tenant_token}/remote-tools", response_model=ReportOut)

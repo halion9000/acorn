@@ -32,7 +32,14 @@ def test_the_question_is_the_reversed_address_and_only_public_addresses_are_aske
 
 @pytest.mark.parametrize(
     "txt,expected",
-    [("15169 | 8.8.8.0/24 | US | arin | 2000-03-30", "US"), ('"15169 | 8.8.8.0/24 | DE | ripencc | 2000"', "DE"), ("15169 | 8.8.8.0/24 | ZZZ | x", None), ("garbage", None), ("1 | 2", None), ("1 | 2 | us | x", None)],
+    [
+        ("15169 | 8.8.8.0/24 | US | arin | 2000-03-30", "US"),
+        ('"15169 | 8.8.8.0/24 | DE | ripencc | 2000"', "DE"),
+        ("15169 | 8.8.8.0/24 | ZZZ | x", None),
+        ("garbage", None),
+        ("1 | 2", None),
+        ("1 | 2 | us | x", None),
+    ],
 )
 def test_the_country_is_the_third_field_when_it_is_two_capital_letters(txt, expected):
     assert ic.parse_country(txt) == expected

@@ -84,7 +84,9 @@ def test_nothing_is_queued_without_the_confirmation(wired):
     assert e.value.status_code == 422 and db.added == [] and db.commits == 0
 
 
-@pytest.mark.parametrize("bad", ["", "pat", "pat@acme", "pat@acme.com, ceo@acme.com", "pat@acme.com\nx", "a b@acme.com", "pat@acme.com'; drop"])
+@pytest.mark.parametrize(
+    "bad", ["", "pat", "pat@acme", "pat@acme.com, ceo@acme.com", "pat@acme.com\nx", "a b@acme.com", "pat@acme.com'; drop"]
+)
 def test_an_address_that_is_not_one_plain_mailbox_is_refused_before_it_can_reach_core(wired, bad):
     db = Fake()
     with pytest.raises(HTTPException) as e:
@@ -123,7 +125,15 @@ def test_a_client_that_is_not_this_companys_is_refused_by_the_scope_check(wired,
 
 
 def test_the_page_says_running_for_a_row_core_has_collected_and_shows_core_s_own_words():
-    row = ep.build_row(tenant_id=CLIENT, cipp_client="c", email="Pat@Acme.com", action="enable_user", requested_by=None, requested_by_name="Hal", now=datetime.now(UTC))
+    row = ep.build_row(
+        tenant_id=CLIENT,
+        cipp_client="c",
+        email="Pat@Acme.com",
+        action="enable_user",
+        requested_by=None,
+        requested_by_name="Hal",
+        now=datetime.now(UTC),
+    )
     row.status, row.result_message, row.finished_at = "claimed", None, None
     assert ep.item_of(row).status == "running"
     row.status, row.result_message = "failed", "Refused by CORE: this account is protected."

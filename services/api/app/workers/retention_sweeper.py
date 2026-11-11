@@ -242,7 +242,11 @@ async def run_retention_sweeper(
     session_factory: Callable[[], AsyncSession] = AsyncSessionLocal,
 ) -> None:
     """The long-running loop (started under the scheduler lock from the API lifespan). The first sweep waits RETENTION_INITIAL_DELAY_SECONDS; a failure never ends the loop; cancellation does."""
-    worker_heartbeat.expect("retention", max(60, settings.RETENTION_SWEEP_INTERVAL_SECONDS), first_turn_after_seconds=max(0, settings.RETENTION_INITIAL_DELAY_SECONDS))
+    worker_heartbeat.expect(
+        "retention",
+        max(60, settings.RETENTION_SWEEP_INTERVAL_SECONDS),
+        first_turn_after_seconds=max(0, settings.RETENTION_INITIAL_DELAY_SECONDS),
+    )
     await sleep(max(0, settings.RETENTION_INITIAL_DELAY_SECONDS))
     while True:
         try:

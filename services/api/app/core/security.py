@@ -393,8 +393,12 @@ IMPLIED_BY: dict[str, tuple[str, ...]] = {
     "cases:work": ("cases:write",),
     "proposals:log": ("cases:write",),
     "billing:view": ("alerts:read",),
-    "inventory:checkout": ("inventory:write",),  # checking a device out and in: held by the technician roles; administrators hold it through inventory:write
-    "inventory:write": ("mssp:manage",),  # whoever could manage the MSSP console could always change inventory; a custom role can be given inventory:write on its own
+    "inventory:checkout": (
+        "inventory:write",
+    ),  # checking a device out and in: held by the technician roles; administrators hold it through inventory:write
+    "inventory:write": (
+        "mssp:manage",
+    ),  # whoever could manage the MSSP console could always change inventory; a custom role can be given inventory:write on its own
 }  # noqa: E501
 
 
@@ -419,7 +423,12 @@ def has_permission(role: str, permission: str) -> bool:
 
 # What the CONSOLE needs to know to decide which controls to show. The server is still the only boundary (every route checks its own permission); this just lets the screen not dangle controls a person cannot use, without
 # copying the role table into the browser. Each name is derived from a real permission, here and nowhere else.
-UI_CAPABILITIES: dict[str, str] = {"platform_admin": "platform:cross_tenant_query", "manage_users": "users:write", "respond_identities": "identities:respond", "run_bec": "identities:bec"}
+UI_CAPABILITIES: dict[str, str] = {
+    "platform_admin": "platform:cross_tenant_query",
+    "manage_users": "users:write",
+    "respond_identities": "identities:respond",
+    "run_bec": "identities:bec",
+}
 
 
 def capabilities_for_role(role: str) -> list[str]:

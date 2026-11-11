@@ -42,7 +42,12 @@ def row(domain, expires, tenant=T):
 
 
 def test_each_threshold_raises_with_its_severity_and_a_key_of_its_own():
-    got = {f.key: (f.severity, f.title) for _, f in detect_expiring([row("a.com", days(25)), row("b.com", days(10)), row("c.com", days(3)), row("d.com", NOW - timedelta(days=2))], NOW)}
+    got = {
+        f.key: (f.severity, f.title)
+        for _, f in detect_expiring(
+            [row("a.com", days(25)), row("b.com", days(10)), row("c.com", days(3)), row("d.com", NOW - timedelta(days=2))], NOW
+        )
+    }
     assert got["a.com:30"][0] == "low" and "expires in 25 days" in got["a.com:30"][1]
     assert got["b.com:14"][0] == "medium"
     assert got["c.com:7"][0] == "high"
@@ -81,7 +86,10 @@ def test_never_checked_domains_go_first_then_failures_then_those_nearest_their_e
 
 
 def test_a_recent_check_is_not_repeated_and_near_the_end_it_is_checked_daily_not_weekly():
-    k = {(T, "a.com"): known("a.com", expires=days(10), checked=NOW - timedelta(hours=5)), (T, "b.com"): known("b.com", error="x", checked=NOW - timedelta(hours=5))}
+    k = {
+        (T, "a.com"): known("a.com", expires=days(10), checked=NOW - timedelta(hours=5)),
+        (T, "b.com"): known("b.com", error="x", checked=NOW - timedelta(hours=5)),
+    }
     assert due_for_lookup([(T, "a.com"), (T, "b.com")], k, NOW) == []
     k2 = {(T, "a.com"): known("a.com", expires=days(10), checked=NOW - timedelta(hours=25))}
     assert due_for_lookup([(T, "a.com")], k2, NOW) == [(T, "a.com")]
@@ -171,7 +179,12 @@ def test_a_pass_stores_what_it_found_and_alerts_for_a_domain_ending_soon():
     assert "ON CONFLICT (tenant_id, domain) DO UPDATE" in sql0 and p0["domain"] == "acme.com" and p0["error"] is None
     sql1, p1 = compiled(db.writes[1])
     assert "ON CONFLICT (id) DO NOTHING" in sql1
-    assert p1["tenant_id"] == T and p1["category"] == "domain" and p1["severity"] == "high" and p1["title"] == "Domain acme.com expires in 5 days"
+    assert (
+        p1["tenant_id"] == T
+        and p1["category"] == "domain"
+        and p1["severity"] == "high"
+        and p1["title"] == "Domain acme.com expires in 5 days"
+    )
 
 
 def test_a_failed_lookup_is_stored_with_its_reason_and_raises_no_alert():

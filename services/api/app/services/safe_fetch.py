@@ -36,10 +36,17 @@ async def fetch(url: str, max_bytes: int = 200_000, max_redirects: int = 0, acce
     for hop in range(max_redirects + 1):
         await _check(current)
         try:
-            async with httpx.AsyncClient(follow_redirects=False, timeout=8.0) as client, client.stream("GET", current, headers={"Accept": accept}) as res:
+            async with (
+                httpx.AsyncClient(follow_redirects=False, timeout=8.0) as client,
+                client.stream("GET", current, headers={"Accept": accept}) as res,
+            ):
                 if res.status_code in (301, 302, 303, 307, 308) and res.headers.get("location"):
                     if hop == max_redirects:
-                        raise FetchRefused("The address redirects, which is not followed here." if max_redirects == 0 else "The address redirects too many times.")
+                        raise FetchRefused(
+                            "The address redirects, which is not followed here."
+                            if max_redirects == 0
+                            else "The address redirects too many times."
+                        )
                     current = urljoin(current, res.headers["location"])
                     continue
                 if res.status_code != 200:

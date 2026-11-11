@@ -40,7 +40,9 @@ def clean_evidence(raw: Any) -> list[dict[str, str]]:
             if len(out) == MAX_EVIDENCE:
                 break
     if not out:
-        raise EvidenceError("A proposal needs at least one piece of evidence (a label, a link or both): an action with nothing behind it is refused.")
+        raise EvidenceError(
+            "A proposal needs at least one piece of evidence (a label, a link or both): an action with nothing behind it is refused."
+        )
     return out
 
 
@@ -50,7 +52,10 @@ def tally(rows: list[dict[str, Any]]) -> dict[str, Any]:
     outcomes = Counter(r.get("outcome") for r in rows)
     per_agent: dict[str, dict[str, int]] = {}
     for r in rows:
-        a = per_agent.setdefault(str(r.get("agent") or "unknown"), {"total": 0, "acted": 0, "shadow": 0, "asked": 0, "suggested": 0, "accepted": 0, "edited": 0, "rejected": 0, "expired": 0})
+        a = per_agent.setdefault(
+            str(r.get("agent") or "unknown"),
+            {"total": 0, "acted": 0, "shadow": 0, "asked": 0, "suggested": 0, "accepted": 0, "edited": 0, "rejected": 0, "expired": 0},
+        )
         a["total"] += 1
         rung = r.get("rung")
         if rung in ("act_tell", "act_quiet"):

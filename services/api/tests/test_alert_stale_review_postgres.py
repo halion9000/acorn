@@ -20,10 +20,14 @@ PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 APP_URL = os.environ.get("AISOC_TEST_PG_APP_URL", "")
 pytestmark = [
     pytest.mark.asyncio,
-    pytest.mark.skipif(not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"),
+    pytest.mark.skipif(
+        not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"
+    ),
 ]
 
-REQUEST = SimpleNamespace(headers={}, client=SimpleNamespace(host="127.0.0.1"), state=SimpleNamespace(), url=SimpleNamespace(path="/alert-stale"))
+REQUEST = SimpleNamespace(
+    headers={}, client=SimpleNamespace(host="127.0.0.1"), state=SimpleNamespace(), url=SimpleNamespace(path="/alert-stale")
+)
 
 
 @pytest.fixture
@@ -63,7 +67,9 @@ async def world():
             await conn.execute(text("delete from audit_log where tenant_id = any(cast(:t as uuid[]))"), {"t": everyone})
             await conn.execute(text("alter table audit_log enable trigger user"))
             await conn.execute(text("delete from alerts where tenant_id = any(cast(:t as uuid[]))"), {"t": everyone})
-            await conn.execute(text("delete from tenants where id = any(cast(:t as uuid[])) and parent_tenant_id is not null"), {"t": everyone})
+            await conn.execute(
+                text("delete from tenants where id = any(cast(:t as uuid[])) and parent_tenant_id is not null"), {"t": everyone}
+            )
             await conn.execute(text("delete from tenants where id = any(cast(:t as uuid[]))"), {"t": everyone})
         await owner.dispose()
 
@@ -85,7 +91,12 @@ async def statuses(ids):
     try:
         async with owner.connect() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-            rows = (await conn.execute(text("select tenant_id, title, status, status_before_stale from alerts where tenant_id = any(cast(:t as uuid[]))"), {"t": [str(x) for x in ids.values()]})).all()
+            rows = (
+                await conn.execute(
+                    text("select tenant_id, title, status, status_before_stale from alerts where tenant_id = any(cast(:t as uuid[]))"),
+                    {"t": [str(x) for x in ids.values()]},
+                )
+            ).all()
         return {(r[0], r[1]): (r[2], r[3]) for r in rows}
     finally:
         await owner.dispose()
@@ -111,7 +122,11 @@ async def test_close_finishes_the_stale_ones_of_one_client_and_writes_its_audit_
     try:
         async with owner.connect() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-            n = (await conn.execute(text("select count(*) from audit_log where tenant_id = :t and action = 'alerts:stale_closed'"), {"t": world["parent"]})).scalar_one()
+            n = (
+                await conn.execute(
+                    text("select count(*) from audit_log where tenant_id = :t and action = 'alerts:stale_closed'"), {"t": world["parent"]}
+                )
+            ).scalar_one()
         assert n == 1
     finally:
         await owner.dispose()

@@ -50,12 +50,29 @@ async def list_notes(alert_id: uuid.UUID, user: AuthUser, db: TenantDBSession) -
         found = (await db.execute(select(Alert.id).where(Alert.id == alert_id, Alert.tenant_id == tid))).first()
         if found is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
-        rows = (await db.execute(select(AlertNote).where(AlertNote.alert_id == alert_id, AlertNote.tenant_id == tid).order_by(AlertNote.created_at, AlertNote.id).limit(MAX_NOTES))).scalars().all()
+        rows = (
+            (
+                await db.execute(
+                    select(AlertNote)
+                    .where(AlertNote.alert_id == alert_id, AlertNote.tenant_id == tid)
+                    .order_by(AlertNote.created_at, AlertNote.id)
+                    .limit(MAX_NOTES)
+                )
+            )
+            .scalars()
+            .all()
+        )
     return [NoteOut(id=r.id, author=r.author, body=r.body, created_at=r.created_at) for r in rows]
 
 
 @router.post("/{alert_id}/notes", response_model=NoteOut, status_code=status.HTTP_201_CREATED)
-async def add_note(alert_id: uuid.UUID, body: NoteIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("alerts:triage"))], db: TenantDBSession) -> NoteOut:
+async def add_note(
+    alert_id: uuid.UUID,
+    body: NoteIn,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("alerts:triage"))],
+    db: TenantDBSession,
+) -> NoteOut:
     text = clean_body(body.body)
     if not text:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The note is empty.")
@@ -63,13 +80,26 @@ async def add_note(alert_id: uuid.UUID, body: NoteIn, request: Request, user: An
         found = (await db.execute(select(Alert.id).where(Alert.id == alert_id, Alert.tenant_id == tid))).first()
         if found is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
-        count = (await db.execute(select(func.count()).select_from(AlertNote).where(AlertNote.alert_id == alert_id, AlertNote.tenant_id == tid))).scalar_one()
+        count = (
+            await db.execute(select(func.count()).select_from(AlertNote).where(AlertNote.alert_id == alert_id, AlertNote.tenant_id == tid))
+        ).scalar_one()
         if count >= MAX_NOTES:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"This alert already has {MAX_NOTES} notes.")
-        row = AlertNote(tenant_id=tid, alert_id=alert_id, author_id=user.user_id, author=(getattr(user, "email", "") or "")[:160], body=text)
+        row = AlertNote(
+            tenant_id=tid, alert_id=alert_id, author_id=user.user_id, author=(getattr(user, "email", "") or "")[:160], body=text
+        )
         db.add(row)
         await db.flush()
-        await emit_audit(db=db, tenant_id=tid, actor_id=user.user_id, action="alert_note:added", resource="alert", resource_id=str(alert_id), changes={"length": len(text)}, request=request)
+        await emit_audit(
+            db=db,
+            tenant_id=tid,
+            actor_id=user.user_id,
+            action="alert_note:added",
+            resource="alert",
+            resource_id=str(alert_id),
+            changes={"length": len(text)},
+            request=request,
+        )
         await db.commit()
         await db.refresh(row)
     return NoteOut(id=row.id, author=row.author, body=row.body, created_at=row.created_at)

@@ -50,7 +50,9 @@ class RetentionPreviewOut(BaseModel):
     note: str
 
 
-@router.get("/retention/preview", response_model=RetentionPreviewOut, dependencies=[Depends(require_permission("platform:cross_tenant_query"))])
+@router.get(
+    "/retention/preview", response_model=RetentionPreviewOut, dependencies=[Depends(require_permission("platform:cross_tenant_query"))]
+)
 async def retention_preview() -> RetentionPreviewOut:
     """How many rows the next retention sweep would delete, in every client, by kind of data. A dry run: it counts and deletes nothing. It reads across all clients, so only a platform administrator may ask."""
     from app.core.config import settings
@@ -63,7 +65,11 @@ async def retention_preview() -> RetentionPreviewOut:
         switched_on=not bool(settings.RETENTION_DRY_RUN),
         note=(
             "A dry run: nothing was deleted. Alerts and posture history are only listed when their retention is switched on. "
-            + ("The sweeper is deleting for real." if not settings.RETENTION_DRY_RUN else "The sweeper itself is set to a dry run, so it deletes nothing.")
+            + (
+                "The sweeper is deleting for real."
+                if not settings.RETENTION_DRY_RUN
+                else "The sweeper itself is set to a dry run, so it deletes nothing."
+            )
         ),
     )
 

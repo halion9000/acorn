@@ -267,7 +267,9 @@ async def _get_dashboard_metrics_impl(
     shown = Alert.status != "suppressed"
     total_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), shown)))
     new_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), Alert.status == "new")))
-    last_24h_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), shown, Alert.created_at >= now - timedelta(hours=24))))
+    last_24h_q = await db.scalar(
+        select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), shown, Alert.created_at >= now - timedelta(hours=24)))
+    )
     critical_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), shown, Alert.severity == "critical")))
     high_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), shown, Alert.severity == "high")))
     medium_q = await db.scalar(select(func.count()).where(and_(Alert.tenant_id.in_(tenant_ids), shown, Alert.severity == "medium")))

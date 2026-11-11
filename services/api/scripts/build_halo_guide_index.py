@@ -16,7 +16,14 @@ from pathlib import Path
 
 BASE = "https://www.usehalo.com"
 # The six sections linked from the Halo guides introduction (guide 2338).
-ROOTS = {"459": "About Halo", "47": "Configuration Settings Guides", "479": "Integrations", "310": "On-Premises Guides", "45": "Security", "499": "Using and Configuring Halo"}
+ROOTS = {
+    "459": "About Halo",
+    "47": "Configuration Settings Guides",
+    "479": "Integrations",
+    "310": "On-Premises Guides",
+    "45": "Security",
+    "499": "Using and Configuring Halo",
+}
 LINK = re.compile(r'href="/(guides|faq)/(\d+)[^"]*"[^>]*>(.*?)</a>', re.S)
 OUT = Path(__file__).resolve().parents[1] / "app" / "data" / "halo_guides_index.json"
 PAUSE = 0.4

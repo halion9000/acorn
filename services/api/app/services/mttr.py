@@ -107,5 +107,7 @@ async def window_by_severity(db: Any, tenant_ids: list[Any], start: datetime, en
     where = [Alert.tenant_id.in_(tenant_ids), Alert.resolved_at.isnot(None), Alert.stale_at.is_(None), Alert.created_at >= start]
     if end is not None:
         where.append(Alert.created_at < end)
-    rows = (await db.execute(select(Alert.severity, Alert.created_at, Alert.resolved_at, Alert.stale_at).where(*where).limit(MAX_ROWS))).all()
+    rows = (
+        await db.execute(select(Alert.severity, Alert.created_at, Alert.resolved_at, Alert.stale_at).where(*where).limit(MAX_ROWS))
+    ).all()
     return by_severity((r[0], r[1], r[2], r[3]) for r in rows)

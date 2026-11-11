@@ -24,7 +24,14 @@ def test_revenue_cost_and_margin_per_client_in_whole_cents_lowest_margin_first()
 
 
 def test_a_line_with_no_price_is_listed_not_counted_as_free_and_junk_lines_are_ignored():
-    billed = {"c": [{"item": "Mystery line", "count": 5}, {"item": "Huntress per endpoint", "count": 0}, {"item": "", "count": 3}, {"item": "Huntress per endpoint", "count": "x"}]}
+    billed = {
+        "c": [
+            {"item": "Mystery line", "count": 5},
+            {"item": "Huntress per endpoint", "count": 0},
+            {"item": "", "count": 3},
+            {"item": "Huntress per endpoint", "count": "x"},
+        ]
+    }
     out = fin.margin_rows(billed, P, NAMES)
     (row,) = out["clients"]
     assert row["unpriced_items"] == ["Mystery line"]

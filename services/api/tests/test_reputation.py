@@ -14,7 +14,9 @@ def rdap(**events):
 
 
 def test_registration_and_expiry_dates_are_read_from_an_rdap_record():
-    r = rp.parse_rdap(rdap(registration="2019-03-02T10:00:00Z", expiration="2027-03-02T10:00:00Z", **{"last changed": "2026-01-01T00:00:00Z"}))
+    r = rp.parse_rdap(
+        rdap(registration="2019-03-02T10:00:00Z", expiration="2027-03-02T10:00:00Z", **{"last changed": "2026-01-01T00:00:00Z"})
+    )
     assert r.registered == datetime(2019, 3, 2, 10, tzinfo=UTC) and r.expires == datetime(2027, 3, 2, 10, tzinfo=UTC)
     assert rp.parse_rdap(rdap(registration="2019-03-02T10:00:00")).registered.tzinfo is not None  # a date with no zone is read as UTC
     assert rp.parse_rdap(rdap(registration="not a date")) == rp.Registration(None, None)
@@ -59,5 +61,8 @@ def test_its_own_mail_is_judged_by_the_pass_rate_and_no_mail_is_unknown(rate, to
 
 
 def test_the_policy_is_a_warning_only_while_it_merely_monitors():
-    tones = {p: [f for f in rp.facts(None, None, p, 99.0, 1000, 1, NOW) if f.label == "DMARC policy"][0].tone for p in ("none", "quarantine", "reject", "weird")}
+    tones = {
+        p: [f for f in rp.facts(None, None, p, 99.0, 1000, 1, NOW) if f.label == "DMARC policy"][0].tone
+        for p in ("none", "quarantine", "reject", "weird")
+    }
     assert tones == {"none": "warn", "quarantine": "good", "reject": "good", "weird": "unknown"}

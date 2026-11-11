@@ -70,7 +70,10 @@ def parse(by_service_payload: dict[str, Any], daily_payload: dict[str, Any], tod
     )
     daily = sorted(
         (
-            {"date": f"{str(r['UsageDate'])[:4]}-{str(r['UsageDate'])[4:6]}-{str(r['UsageDate'])[6:8]}", "cost": round(float(r.get("Cost") or 0), 2)}
+            {
+                "date": f"{str(r['UsageDate'])[:4]}-{str(r['UsageDate'])[4:6]}-{str(r['UsageDate'])[6:8]}",
+                "cost": round(float(r.get("Cost") or 0), 2),
+            }
             for r in days
             if r.get("UsageDate")
         ),
@@ -99,7 +102,9 @@ Get = Callable[..., Awaitable[httpx.Response]]
 
 
 async def _token(get: Get) -> str:
-    response = await get(_IMDS, params={"api-version": "2018-02-01", "resource": "https://management.azure.com/"}, headers={"Metadata": "true"})
+    response = await get(
+        _IMDS, params={"api-version": "2018-02-01", "resource": "https://management.azure.com/"}, headers={"Metadata": "true"}
+    )
     if response.status_code != 200:
         raise RuntimeError("This server has no Azure identity to read costs with (is it an Azure VM with a managed identity?)")
     return str(response.json()["access_token"])
@@ -112,7 +117,9 @@ async def _query(post: Post, token: str, scope: str, grouping: str | None, granu
     body = {"type": "ActualCost", "timeframe": "MonthToDate", "dataset": dataset}
     response = await post(_QUERY.format(scope=scope), json=body, headers={"Authorization": f"Bearer {token}"})
     if response.status_code == 403:
-        raise RuntimeError('Azure refused the cost request: give this server\'s identity the "Cost Management Reader" role on the resource group.')
+        raise RuntimeError(
+            'Azure refused the cost request: give this server\'s identity the "Cost Management Reader" role on the resource group.'
+        )
     if response.status_code == 429:
         raise RuntimeError("Azure is rate-limiting cost requests; showing the last answer. Try again in a few minutes.")
     if response.status_code != 200:

@@ -70,7 +70,10 @@ def detect_pass_rate_drops(reports: list[Any], now: datetime) -> list[Drop]:
         if rate_before - rate_now < DROP_POINTS:
             continue
         failing_now, failing_before = _failing_by_sender(w["this"]), _failing_by_sender(w["before"])
-        grown = sorted(((ip, n - failing_before.get(ip, 0), n) for ip, n in failing_now.items() if n > failing_before.get(ip, 0)), key=lambda t: (-t[1], t[0]))[:TOP_SENDERS]
+        grown = sorted(
+            ((ip, n - failing_before.get(ip, 0), n) for ip, n in failing_now.items() if n > failing_before.get(ip, 0)),
+            key=lambda t: (-t[1], t[0]),
+        )[:TOP_SENDERS]
         fields = [
             ("Domain", domain),
             ("Pass rate this week", f"{rate_now:.0f}% of {total_now} messages"),
@@ -126,7 +129,11 @@ async def run_pass_rate_detection(db: Any, now: datetime | None = None) -> int:
 
     now = now or datetime.now(UTC)
     try:
-        reports = (await db.execute(select(DmarcReport).where(DmarcReport.matched.is_(True), DmarcReport.end_at >= now - 2 * WINDOW))).scalars().all()
+        reports = (
+            (await db.execute(select(DmarcReport).where(DmarcReport.matched.is_(True), DmarcReport.end_at >= now - 2 * WINDOW)))
+            .scalars()
+            .all()
+        )
         drops = detect_pass_rate_drops(list(reports), now)
         made = 0
         async with db.begin_nested():

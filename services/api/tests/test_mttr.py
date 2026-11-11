@@ -51,7 +51,13 @@ def test_the_breakdown_gives_each_severity_its_own_median_most_severe_first():
 
 
 def test_the_breakdown_uses_the_same_rule_as_the_tile_and_leaves_out_a_severity_with_nothing_finished():
-    rows = [sev("critical", 1), sev("high", 2, stale=True), ("high", T0, None, None), ("medium", T0, T0 - timedelta(hours=1), None), (None, T0, T0 + timedelta(hours=5), None)]
+    rows = [
+        sev("critical", 1),
+        sev("high", 2, stale=True),
+        ("high", T0, None, None),
+        ("medium", T0, T0 - timedelta(hours=1), None),
+        (None, T0, T0 + timedelta(hours=5), None),
+    ]
     got = mttr.by_severity(rows)
     assert [name for name, _ in got] == ["critical", "unknown"]
     everything = mttr.summarize_pairs((c, r, s) for _, c, r, s in rows)

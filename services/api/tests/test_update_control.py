@@ -128,7 +128,13 @@ def test_history_is_read_newest_first_with_ok_only_for_the_statuses_that_mean_it
     history = uc.read_state(tmp_path).history
     assert [h["at"] for h in history] == ["2026-11-10T12:00:00Z", "2026-11-10T09:00:00Z", "2026-11-09T11:00:00Z", "2026-11-09T10:00:00Z"]
     assert [h["ok"] for h in history] == [True, False, False, True]
-    assert history[1]["commit"] is None and history[0] == {"at": "2026-11-10T12:00:00Z", "status": "rollback_ok", "ok": True, "commit": "aaa1111", "mode": "rollback"}
+    assert history[1]["commit"] is None and history[0] == {
+        "at": "2026-11-10T12:00:00Z",
+        "status": "rollback_ok",
+        "ok": True,
+        "commit": "aaa1111",
+        "mode": "rollback",
+    }
 
 
 def test_a_line_that_is_not_four_plain_fields_is_skipped_and_only_the_newest_twenty_are_shown():

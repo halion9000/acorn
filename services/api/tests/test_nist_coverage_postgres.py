@@ -13,7 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
-pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database")]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database"),
+]
 
 
 async def off(s):
@@ -27,9 +30,14 @@ async def world():
     async with AsyncSession(engine, expire_on_commit=False) as s:
         await off(s)
         for t, name in ((owner, "owner"), (other, "other")):
-            await s.execute(text("insert into tenants (id, name, slug) values (:t, :n, :s)"), {"t": t, "n": name, "s": f"{name}-{t.hex[:10]}"})
+            await s.execute(
+                text("insert into tenants (id, name, slug) values (:t, :n, :s)"), {"t": t, "n": name, "s": f"{name}-{t.hex[:10]}"}
+            )
         for t, name, parent in ((client, "Acme Test", owner), (foreign, "Not yours", other)):
-            await s.execute(text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, :n, :s, :p)"), {"t": t, "n": name, "s": f"c-{t.hex[:10]}", "p": parent})
+            await s.execute(
+                text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, :n, :s, :p)"),
+                {"t": t, "n": name, "s": f"c-{t.hex[:10]}", "p": parent},
+            )
         await s.commit()
         s.info.update(owner=owner, client=client, foreign=foreign)
         yield s

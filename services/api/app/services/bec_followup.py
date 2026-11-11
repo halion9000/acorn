@@ -36,11 +36,17 @@ def start_note(case_ref: str, email: str) -> str:
     return f"A business email compromise search for {email} was started in A.C.O.R.N ({case_ref}). It reads Microsoft 365 through CIPP and changes nothing. The result will be added when it finishes."
 
 
-def result_text(*, case_ref: str, email: str, status: str, message: str | None, summary: dict[str, Any], report: dict[str, Any] | None) -> str:
+def result_text(
+    *, case_ref: str, email: str, status: str, message: str | None, summary: dict[str, Any], report: dict[str, Any] | None
+) -> str:
     """The plain-language result, for the case and the ticket (pure). A failed search says why; a finished one repeats CIPP's rating and what its lists hold, and never calls a Low rating "clean"."""
     if status != "done":
         why = f" Reason: {message}" if message else ""
-        return f"The BEC search {case_ref} for {email} did not finish.{why} No result was produced; start it again from the Identities page."[:3000]
+        return (
+            f"The BEC search {case_ref} for {email} did not finish.{why} No result was produced; start it again from the Identities page."[
+                :3000
+            ]
+        )
     level = str(summary.get("level") or "").strip()
     score = summary.get("score")
     parts = [f"The BEC search {case_ref} for {email} finished."]
@@ -72,7 +78,10 @@ async def halo_client_for(db: Any, owner_id: uuid.UUID, client_id: uuid.UUID) ->
         (
             await db.execute(
                 select(ClientAlias.vendor_client_id).where(
-                    ClientAlias.tenant_id == owner_id, ClientAlias.vendor == "halopsa", ClientAlias.child_tenant_id == client_id, ClientAlias.ignored.is_(False)
+                    ClientAlias.tenant_id == owner_id,
+                    ClientAlias.vendor == "halopsa",
+                    ClientAlias.child_tenant_id == client_id,
+                    ClientAlias.ignored.is_(False),
                 )
             )
         )
@@ -82,7 +91,9 @@ async def halo_client_for(db: Any, owner_id: uuid.UUID, client_id: uuid.UUID) ->
     return str(row) if row else None
 
 
-async def open_followup(db: Any, *, owner_id: uuid.UUID, client_id: uuid.UUID, bec: BecCase, requested_by_name: str | None, now: datetime) -> None:
+async def open_followup(
+    db: Any, *, owner_id: uuid.UUID, client_id: uuid.UUID, bec: BecCase, requested_by_name: str | None, now: datetime
+) -> None:
     """Open the case and queue the ticket for a search the caller has just added (``db`` is in the client's scope; the caller commits). Never raises: the search matters more than its paperwork."""
     try:
         async with db.begin_nested():
@@ -151,7 +162,14 @@ async def _update_case(db: Any, bec: BecCase, note: str, severity: str, ticket_i
             "severity = CASE WHEN CAST(:sev AS TEXT) IN ('high', 'medium') THEN CAST(:sev AS TEXT) ELSE severity END, "
             "tags = tags || CAST(:tags AS JSONB), updated_at = :now WHERE id = :id AND tenant_id = :t"
         ),
-        {"note": note, "sev": severity, "tags": json.dumps({"ticket": ticket_id} if ticket_id else {}), "now": now, "id": bec.aisoc_case_id, "t": bec.tenant_id},
+        {
+            "note": note,
+            "sev": severity,
+            "tags": json.dumps({"ticket": ticket_id} if ticket_id else {}),
+            "now": now,
+            "id": bec.aisoc_case_id,
+            "t": bec.tenant_id,
+        },
     )
 
 
@@ -159,7 +177,9 @@ async def on_result(db: Any, bec: BecCase, now: datetime) -> None:
     """The search has finished (or failed): write the result on the case, and on the ticket if CORE has already given its number. Never raises."""
     try:
         async with db.begin_nested():
-            note = result_text(case_ref=bec.case_ref, email=bec.email, status=bec.status, message=bec.message, summary=bec.summary or {}, report=bec.report)
+            note = result_text(
+                case_ref=bec.case_ref, email=bec.email, status=bec.status, message=bec.message, summary=bec.summary or {}, report=bec.report
+            )
             await _update_case(db, bec, note, case_severity(bec.summary or {}), bec.ticket_id, now)
             if bec.ticket_id and not bec.ticket_note_queued:
                 _queue_note(db, bec.tenant_id, bec.id, bec.ticket_id, note, now)
@@ -187,7 +207,9 @@ async def on_ticket_created(db: Any, tenant_id: uuid.UUID, incident_uid: str, ti
             {"tags": json.dumps({"ticket": ticket_id}), "now": now, "id": bec.aisoc_case_id, "t": tenant_id},
         )
     if bec.status in ("done", "failed") and not bec.ticket_note_queued:
-        note = result_text(case_ref=bec.case_ref, email=bec.email, status=bec.status, message=bec.message, summary=bec.summary or {}, report=bec.report)
+        note = result_text(
+            case_ref=bec.case_ref, email=bec.email, status=bec.status, message=bec.message, summary=bec.summary or {}, report=bec.report
+        )
         _queue_note(db, tenant_id, bec.id, ticket_id, note, now)
         bec.ticket_note_queued = True
     return True

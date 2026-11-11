@@ -480,7 +480,9 @@ class DeletedOut(BaseModel):
 
 
 @router.delete("/{item_id}", response_model=DeletedOut, summary="Delete an item from the stock for good (its history goes with it)")
-async def delete_item(item_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession) -> DeletedOut:
+async def delete_item(
+    item_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession
+) -> DeletedOut:
     """Remove an item and its history. Refused for an item that is checked out (check it in first, so nothing is lost track of) and for one a tool keeps in step (a NinjaOne device
     would come back at the next sync: mark it Retired instead). The deletion is written to the audit log with what the item was, since its own history goes with it."""
     owner = user.tenant_id
@@ -489,7 +491,8 @@ async def delete_item(item_id: uuid.UUID, user: Annotated[AuthUser, Depends(requ
         raise HTTPException(status_code=409, detail="This item is checked out. Check it in first, then delete it.")
     if item.source == "device":
         raise HTTPException(
-            status_code=409, detail="This item is kept in step with a tool (it comes from a synced device), so it would come back at the next sync. Mark it Retired instead."
+            status_code=409,
+            detail="This item is kept in step with a tool (it comes from a synced device), so it would come back at the next sync. Mark it Retired instead.",
         )
     summary = {
         "kind": item.kind,
@@ -935,7 +938,9 @@ class ImportOut(BaseModel):
 @router.post(
     "/import", response_model=ImportOut, summary="Import an exported SharePoint list; a dry run first says where each customer would go"
 )
-async def import_items(body: ImportIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession) -> ImportOut:
+async def import_items(
+    body: ImportIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession
+) -> ImportOut:
     owner = user.tenant_id
     names = await _tenants(db, owner)
     if body.default_client_id is not None and body.default_client_id != owner and body.default_client_id not in names:

@@ -14,7 +14,15 @@ OTHER = uuid.uuid4()
 
 
 def report(days_ago, passed, failed, *, tenant=TENANT, domain="acme.com", rows=None):
-    return NS(tenant_id=tenant, domain=domain, end_at=NOW - timedelta(days=days_ago), total=passed + failed, passed=passed, failed=failed, rows=rows or [])
+    return NS(
+        tenant_id=tenant,
+        domain=domain,
+        end_at=NOW - timedelta(days=days_ago),
+        total=passed + failed,
+        passed=passed,
+        failed=failed,
+        rows=rows or [],
+    )
 
 
 def rows(**by_ip):
@@ -53,7 +61,9 @@ def test_a_rate_under_half_is_high_severity():
 
 
 def test_reports_are_placed_in_a_week_by_when_they_ended_and_older_ones_are_ignored():
-    out = drops([report(20, 0, 500), report(10, 98, 2), report(8, 98, 2), report(2, 71, 29), report(-1, 0, 500)])  # 20 days ago and a future one are in neither week
+    out = drops(
+        [report(20, 0, 500), report(10, 98, 2), report(8, 98, 2), report(2, 71, 29), report(-1, 0, 500)]
+    )  # 20 days ago and a future one are in neither week
     assert len(out) == 1 and ("Pass rate the week before", "98% of 200 messages") in out[0].finding.fields
 
 
@@ -67,13 +77,20 @@ def test_clients_and_domains_are_judged_separately():
         report(2, 50, 50, tenant=OTHER),  # the same domain for another client drops too
     ]
     got = sorted((str(d.tenant_id), d.finding.title) for d in drops(reports))
-    assert got == sorted([(str(TENANT), "DMARC pass rate for acme.com fell from 98% to 71%"), (str(OTHER), "DMARC pass rate for acme.com fell from 98% to 50%")])
+    assert got == sorted(
+        [
+            (str(TENANT), "DMARC pass rate for acme.com fell from 98% to 71%"),
+            (str(OTHER), "DMARC pass rate for acme.com fell from 98% to 50%"),
+        ]
+    )
 
 
 def test_it_names_the_senders_whose_failing_mail_grew_most_and_ignores_ones_that_did_not():
     before = report(10, 98, 2, rows=rows(**{"10.0.0.1": (98, True), "10.0.0.2": (2, False)}))
     now = report(
-        2, 71, 29,
+        2,
+        71,
+        29,
         rows=rows(**{"10.0.0.1": (71, True), "10.0.0.2": (2, False), "203.0.113.9": (20, False), "198.51.100.4": (7, False)}),
     )
     f = drops([before, now])[0].finding
@@ -86,7 +103,9 @@ def test_it_names_the_senders_whose_failing_mail_grew_most_and_ignores_ones_that
 
 def test_when_no_single_address_explains_it_the_alert_says_so_instead_of_naming_none():
     f = drops([report(10, 98, 2), report(2, 71, 29)])[0].finding  # no per-sender rows stored
-    assert [v for k, v in f.fields if k == "Failing more"] == ["No single sending address accounts for it; the failures are spread across many"]
+    assert [v for k, v in f.fields if k == "Failing more"] == [
+        "No single sending address accounts for it; the failures are spread across many"
+    ]
     assert f.ips == []
 
 
@@ -177,6 +196,7 @@ def _one_pass(monkeypatch, stored, alerts):
 
     monkeypatch.setattr(w, "ingest_once", fake_ingest)
     monkeypatch.setattr(w, "raise_alerts", fake_alerts)
+
     async def fake_expiry():
         return (0, 0)
 

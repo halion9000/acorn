@@ -494,14 +494,23 @@ def test_a_microsoft_address_only_threatmate_lists_is_the_same_account_as_the_re
 
 
 def test_two_accounts_a_client_has_no_cipp_for_are_still_two_seats_when_both_hold_a_licence():
-    people = build([], [threatmate(A, "chris@onnit.com", display_name="Chris Park"), threatmate(A, "chris@onnitlabs.onmicrosoft.com", display_name="Chris Park")])
+    people = build(
+        [],
+        [
+            threatmate(A, "chris@onnit.com", display_name="Chris Park"),
+            threatmate(A, "chris@onnitlabs.onmicrosoft.com", display_name="Chris Park"),
+        ],
+    )
     assert len(people) == 2, "with no CIPP list to say the second address is not an account, both licences count"
 
 
 def test_an_address_the_psa_and_threatmate_hold_but_cipp_does_not_list_is_still_the_same_account():
     people = build(
         [ms(A, "cwcnurse@gsnetx.org", display_name="CWC Nurse", licensed=True)],
-        [threatmate(A, "cwcnurse@gsnetx.onmicrosoft.com", display_name="CWC Nurse"), src(A, "halopsa", "cwcnurse@gsnetx.onmicrosoft.com", enabled=True)],
+        [
+            threatmate(A, "cwcnurse@gsnetx.onmicrosoft.com", display_name="CWC Nurse"),
+            src(A, "halopsa", "cwcnurse@gsnetx.onmicrosoft.com", enabled=True),
+        ],
     )
     assert len(people) == 1
     assert people[0].email == "cwcnurse@gsnetx.org" and people[0].aliases == ["cwcnurse@gsnetx.onmicrosoft.com"]
@@ -509,5 +518,10 @@ def test_an_address_the_psa_and_threatmate_hold_but_cipp_does_not_list_is_still_
 
 
 def test_two_accounts_cipp_lists_that_both_hold_a_licence_are_never_joined_by_a_name():
-    people = build([ms(A, "chris@onnit.com", display_name="Chris Park", licensed=True), ms(A, "chris@onnitlabs.onmicrosoft.com", display_name="Chris Park", licensed=True)])
+    people = build(
+        [
+            ms(A, "chris@onnit.com", display_name="Chris Park", licensed=True),
+            ms(A, "chris@onnitlabs.onmicrosoft.com", display_name="Chris Park", licensed=True),
+        ]
+    )
     assert len(people) == 2

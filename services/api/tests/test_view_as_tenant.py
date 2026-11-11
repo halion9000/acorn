@@ -1220,7 +1220,12 @@ class TestCapabilities:
     def test_the_capability_names_are_derived_from_real_permissions(self):
         from app.core.security import UI_CAPABILITIES, capabilities_for_role
 
-        assert UI_CAPABILITIES == {"platform_admin": "platform:cross_tenant_query", "manage_users": "users:write", "respond_identities": "identities:respond", "run_bec": "identities:bec"}
+        assert UI_CAPABILITIES == {
+            "platform_admin": "platform:cross_tenant_query",
+            "manage_users": "users:write",
+            "respond_identities": "identities:respond",
+            "run_bec": "identities:bec",
+        }
         assert capabilities_for_role("platform_admin") == ["manage_users", "platform_admin", "respond_identities", "run_bec"]
         assert capabilities_for_role("no-such-role") == []
 

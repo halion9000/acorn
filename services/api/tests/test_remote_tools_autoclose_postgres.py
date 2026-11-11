@@ -28,7 +28,12 @@ async def owner():
         await c.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
         await c.execute(
             text("insert into tenants (id, name, slug, mssp_role, settings) values (:i, :n, :s, 'parent', cast(:st as jsonb))"),
-            {"i": tid, "n": f"rt-{tid.hex[:8]}", "s": f"rt-{tid.hex[:8]}", "st": json.dumps({"remote_tool_instances": {"screenconnect": [MINE]}})},
+            {
+                "i": tid,
+                "n": f"rt-{tid.hex[:8]}",
+                "s": f"rt-{tid.hex[:8]}",
+                "st": json.dumps({"remote_tool_instances": {"screenconnect": [MINE]}}),
+            },
         )
     yield tid
     async with engine.begin() as c:
@@ -78,7 +83,11 @@ async def notes(owner):
 
 
 async def link_ticket(owner, ticket="555"):
-    await sql(owner, "update alerts set enrichment_data = cast(:e as jsonb) where tenant_id = :t", e=json.dumps({"tickets": [{"system": "halopsa", "id": ticket}]}))
+    await sql(
+        owner,
+        "update alerts set enrichment_data = cast(:e as jsonb) where tenant_id = :t",
+        e=json.dumps({"tickets": [{"system": "halopsa", "id": ticket}]}),
+    )
 
 
 async def test_an_alert_closes_when_a_scan_no_longer_finds_the_install_and_the_ticket_is_told(owner):
@@ -139,7 +148,11 @@ async def test_an_alert_a_person_closed_stays_closed_when_the_install_is_still_t
 
 async def test_an_install_that_is_now_yours_closes_its_alert(owner):
     await scan(owner, [found("PC-1", OTHER)], 5, T0)
-    await sql(owner, "update tenants set settings = cast(:s as jsonb) where id = :t", s=json.dumps({"remote_tool_instances": {"screenconnect": [MINE, OTHER]}}))
+    await sql(
+        owner,
+        "update tenants set settings = cast(:s as jsonb) where id = :t",
+        s=json.dumps({"remote_tool_instances": {"screenconnect": [MINE, OTHER]}}),
+    )
     out = await scan(owner, [found("PC-1", OTHER)], 5, T0 + timedelta(hours=1))
     assert out.alerts_closed == 1
 

@@ -425,7 +425,9 @@ class TestASkippedStepIsNotASuccess:
             return {"ok": True}
 
         patch_handlers({StepType.NOTIFY: nothing, StepType.ENRICH: acted})
-        pb = _make_playbook([PlaybookStep(id="s1", name="tell", type=StepType.NOTIFY), PlaybookStep(id="s2", name="look", type=StepType.ENRICH)])
+        pb = _make_playbook(
+            [PlaybookStep(id="s1", name="tell", type=StepType.NOTIFY), PlaybookStep(id="s2", name="look", type=StepType.ENRICH)]
+        )
         run = await PlaybookEngine().run(pb, trigger_context={})
         assert [r["status"] for r in run.step_results] == [StepStatus.SKIPPED, StepStatus.SUCCESS]
 

@@ -81,7 +81,13 @@ def parse_tls_report(unpacked: bytes) -> TlsReport:
             if isinstance(d, dict) and _clip(d.get("result-type"), 60)
         ]
         policies.append(
-            TlsPolicy(domain, _clip(item["policy"].get("policy-type"), 30).lower() or "unknown", _count(summary.get("total-successful-session-count")), _count(summary.get("total-failure-session-count")), failures)
+            TlsPolicy(
+                domain,
+                _clip(item["policy"].get("policy-type"), 30).lower() or "unknown",
+                _count(summary.get("total-successful-session-count")),
+                _count(summary.get("total-failure-session-count")),
+                failures,
+            )
         )
     if not policies:
         raise DmarcReportError("The TLS report names no usable domain.")

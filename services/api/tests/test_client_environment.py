@@ -23,7 +23,13 @@ def device(name, os_name, *sources, hidden=False):
     )
 
 
-FIREWALL = ("auvik", {"device_type": "firewall", "connected_to": [{"id": "s", "name": "core-switch", "port": "LAN", "remote_port": "Gi1/0/1", "speed": "1 Gbps"}]})
+FIREWALL = (
+    "auvik",
+    {
+        "device_type": "firewall",
+        "connected_to": [{"id": "s", "name": "core-switch", "port": "LAN", "remote_port": "Gi1/0/1", "speed": "1 Gbps"}],
+    },
+)
 
 
 def test_counts_kinds_tools_and_gaps_and_lists_network_gear_before_computers():

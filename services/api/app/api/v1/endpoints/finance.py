@@ -44,7 +44,9 @@ class PricesOut(BaseModel):
 
 
 def _out(r: FinanceItemPrice) -> PriceOut:
-    return PriceOut(invoice_item=r.invoice_item, unit_price=str(fin.money(r.unit_price)), unit_cost=str(fin.money(r.unit_cost)), updated_at=r.updated_at)
+    return PriceOut(
+        invoice_item=r.invoice_item, unit_price=str(fin.money(r.unit_price)), unit_cost=str(fin.money(r.unit_cost)), updated_at=r.updated_at
+    )
 
 
 async def _billed(db: Any, owner: uuid.UUID) -> tuple[dict[str, list[dict[str, Any]]], dict[str, str]]:
@@ -58,37 +60,78 @@ async def _billed(db: Any, owner: uuid.UUID) -> tuple[dict[str, list[dict[str, A
 
 @router.get("/prices", response_model=PricesOut, dependencies=[Depends(require_permission("finance:view"))])
 async def list_prices(user: AuthUser, db: DBSession) -> PricesOut:
-    rows = (await db.execute(select(FinanceItemPrice).where(FinanceItemPrice.tenant_id == user.tenant_id).order_by(FinanceItemPrice.invoice_item))).scalars().all()
+    rows = (
+        (
+            await db.execute(
+                select(FinanceItemPrice).where(FinanceItemPrice.tenant_id == user.tenant_id).order_by(FinanceItemPrice.invoice_item)
+            )
+        )
+        .scalars()
+        .all()
+    )
     billed, _ = await _billed(db, user.tenant_id)
     items = sorted({line["item"] for lines in billed.values() for line in lines})
     return PricesOut(prices=[_out(r) for r in rows], billed_items=items)
 
 
 @router.put("/prices", response_model=PriceOut)
-async def save_price(body: PriceIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession) -> PriceOut:
+async def save_price(
+    body: PriceIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession
+) -> PriceOut:
     item = " ".join(body.invoice_item.split())
     if not item:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Name the invoice line")
-    row = (await db.execute(select(FinanceItemPrice).where(FinanceItemPrice.tenant_id == user.tenant_id, FinanceItemPrice.invoice_item == item))).scalar_one_or_none()
+    row = (
+        await db.execute(
+            select(FinanceItemPrice).where(FinanceItemPrice.tenant_id == user.tenant_id, FinanceItemPrice.invoice_item == item)
+        )
+    ).scalar_one_or_none()
     now = datetime.now(UTC)
     if row is None:
-        row = FinanceItemPrice(tenant_id=user.tenant_id, invoice_item=item, unit_price=body.unit_price, unit_cost=body.unit_cost, updated_by=user.user_id, updated_at=now)
+        row = FinanceItemPrice(
+            tenant_id=user.tenant_id,
+            invoice_item=item,
+            unit_price=body.unit_price,
+            unit_cost=body.unit_cost,
+            updated_by=user.user_id,
+            updated_at=now,
+        )
         db.add(row)
     else:
         row.unit_price, row.unit_cost, row.updated_by, row.updated_at = body.unit_price, body.unit_cost, user.user_id, now
     await db.flush()
     # The audit entry names the line and who changed it, not the amounts (money stays out of the log).
-    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="finance_price:saved", resource="finance_item_price", resource_id=str(row.id), changes={"invoice_item": item}, request=request)
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="finance_price:saved",
+        resource="finance_item_price",
+        resource_id=str(row.id),
+        changes={"invoice_item": item},
+        request=request,
+    )
     await db.commit()
     await db.refresh(row)
     return _out(row)
 
 
 @router.delete("/prices", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_price(invoice_item: str, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession) -> None:
+async def delete_price(
+    invoice_item: str, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession
+) -> None:
     item = " ".join(invoice_item.split())
     await db.execute(delete(FinanceItemPrice).where(FinanceItemPrice.tenant_id == user.tenant_id, FinanceItemPrice.invoice_item == item))
-    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="finance_price:deleted", resource="finance_item_price", resource_id=item, changes={"invoice_item": item}, request=request)
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="finance_price:deleted",
+        resource="finance_item_price",
+        resource_id=item,
+        changes={"invoice_item": item},
+        request=request,
+    )
     await db.commit()
 
 
@@ -100,5 +143,7 @@ async def margin(user: AuthUser, db: DBSession) -> dict[str, Any]:
     billed, names = await _billed(db, user.tenant_id)
     out = fin.margin_rows(billed, prices, names)
     out["priced_items"] = len(prices)
-    out["note"] = "An estimate: only invoice lines with both a price and a cost are counted, using the quantities each client is billed for. Lines billed but not priced are listed per client."
+    out["note"] = (
+        "An estimate: only invoice lines with both a price and a cost are counted, using the quantities each client is billed for. Lines billed but not priced are listed per client."
+    )
     return out

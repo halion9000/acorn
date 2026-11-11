@@ -88,7 +88,16 @@ def clean_email(value: str) -> str:
     return email
 
 
-def build_row(*, tenant_id: uuid.UUID, cipp_client: str, email: str, action: str, requested_by: uuid.UUID | None, requested_by_name: str | None, now: datetime) -> VendorAction:
+def build_row(
+    *,
+    tenant_id: uuid.UUID,
+    cipp_client: str,
+    email: str,
+    action: str,
+    requested_by: uuid.UUID | None,
+    requested_by_name: str | None,
+    now: datetime,
+) -> VendorAction:
     """The queue row CORE will collect. ``params.client_id`` is the CIPP customer id and ``params.user`` the sign-in name, as CORE's CIPP route reads them."""
     return VendorAction(
         id=uuid.uuid4(),
@@ -109,7 +118,12 @@ async def cipp_customer(db: Any, owner: uuid.UUID, client: uuid.UUID) -> str | N
     row = (
         await db.execute(
             select(ClientAlias.vendor_client_id)
-            .where(ClientAlias.tenant_id == owner, ClientAlias.child_tenant_id == client, ClientAlias.vendor == "cipp", ClientAlias.ignored.is_(False))
+            .where(
+                ClientAlias.tenant_id == owner,
+                ClientAlias.child_tenant_id == client,
+                ClientAlias.vendor == "cipp",
+                ClientAlias.ignored.is_(False),
+            )
             .order_by(ClientAlias.updated_at.desc())
             .limit(1)
         )
@@ -131,10 +145,15 @@ async def request_identity_action(
     owner = user.tenant_id
     await _scope(db, owner, body.client_id)  # 404 for a client that is not this company's
     if body.client_id == owner:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Pick a client: account actions are for a client's people.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Pick a client: account actions are for a client's people."
+        )
     cipp = await cipp_customer(db, owner, body.client_id)
     if not cipp:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This client is not linked to CIPP (Settings, Client mapping), so there is no Microsoft 365 account to act on.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This client is not linked to CIPP (Settings, Client mapping), so there is no Microsoft 365 account to act on.",
+        )
     now = datetime.now(UTC)
     async with _as(db, owner, body.client_id):
         waiting = (
@@ -154,8 +173,18 @@ async def request_identity_action(
             .all()
         )
         if waiting:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The same request for this person is already waiting for CORE.")
-        row = build_row(tenant_id=body.client_id, cipp_client=cipp, email=email, action=body.action, requested_by=user.user_id, requested_by_name=getattr(user, "email", None), now=now)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="The same request for this person is already waiting for CORE."
+            )
+        row = build_row(
+            tenant_id=body.client_id,
+            cipp_client=cipp,
+            email=email,
+            action=body.action,
+            requested_by=user.user_id,
+            requested_by_name=getattr(user, "email", None),
+            now=now,
+        )
         db.add(row)
         await db.flush()
         await emit_audit(

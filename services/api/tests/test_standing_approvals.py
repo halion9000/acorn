@@ -25,7 +25,9 @@ def test_a_card_matches_by_kind_and_a_client_approval_needs_the_same_client_on_t
     assert sa.matches(standing(), card, "t", NOW), "an approval for all clients covers any client"
     assert sa.matches(standing(client_id="acme"), card, "t", NOW)
     assert not sa.matches(standing(client_id="beta"), card, "t", NOW)
-    assert not sa.matches(standing(client_id="acme"), {"type": "add_case_comment"}, "t", NOW), "a card naming no client never matches a client approval"
+    assert not sa.matches(
+        standing(client_id="acme"), {"type": "add_case_comment"}, "t", NOW
+    ), "a card naming no client never matches a client approval"
     assert not sa.matches(standing(), {"type": "close_alert"}, "t", NOW), "another kind of action"
 
 
@@ -34,7 +36,9 @@ def test_revoked_expired_and_destructive_never_match_even_if_a_row_somehow_exist
     assert not sa.matches(standing(revoked_at=NOW - timedelta(minutes=1)), card, "t", NOW)
     assert not sa.matches(standing(expires_at=NOW), card, "t", NOW), "ends at the end date, not after it"
     assert not sa.matches(standing(expires_at=NOW - timedelta(days=1)), card, "t", NOW)
-    assert not sa.matches(standing(action_type="isolate_host"), {"type": "isolate_host"}, "t", NOW), "a destructive kind in the table still never matches"
+    assert not sa.matches(
+        standing(action_type="isolate_host"), {"type": "isolate_host"}, "t", NOW
+    ), "a destructive kind in the table still never matches"
 
 
 def test_the_client_is_read_from_client_id_or_client_tenant_id():

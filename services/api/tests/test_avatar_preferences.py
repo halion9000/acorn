@@ -7,9 +7,14 @@ from app.api.v1.endpoints.auth import AVATAR_MAX_CHARS, PreferencesPatch, merge_
 from pydantic import ValidationError
 
 # the smallest valid PNG (1 x 1)
-PNG = "data:image/png;base64," + base64.b64encode(
-    bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000001e221bc330000000049454e44ae426082")
-).decode()
+PNG = (
+    "data:image/png;base64,"
+    + base64.b64encode(
+        bytes.fromhex(
+            "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000001e221bc330000000049454e44ae426082"
+        )
+    ).decode()
+)
 JPEG = "data:image/jpeg;base64," + base64.b64encode(b"\xff\xd8\xff\xe0" + b"0" * 50).decode()
 WEBP = "data:image/webp;base64," + base64.b64encode(b"RIFFxxxxWEBPVP8 " + b"0" * 20).decode()
 
@@ -24,7 +29,9 @@ def test_a_small_png_jpeg_or_webp_is_accepted(picture):
     [
         pytest.param("https://evil.example/pixel.png", id="a link to another site"),
         pytest.param("http://169.254.169.254/latest", id="a link to the cloud metadata address"),
-        pytest.param("data:image/svg+xml;base64," + base64.b64encode(b"<svg onload=alert(1)/>").decode(), id="an SVG, which can carry script"),
+        pytest.param(
+            "data:image/svg+xml;base64," + base64.b64encode(b"<svg onload=alert(1)/>").decode(), id="an SVG, which can carry script"
+        ),
         pytest.param("data:text/html;base64," + base64.b64encode(b"<script>x</script>").decode(), id="a web page"),
         pytest.param("data:image/png;base64,@@@not base64@@@", id="not base64"),
         pytest.param("javascript:alert(1)", id="a javascript address"),
@@ -51,7 +58,11 @@ def test_the_whole_set_of_preferences_has_a_size_limit_too():
 
 def test_merging_keeps_other_keys_replaces_the_one_sent_and_removing_a_picture_drops_the_key():
     existing = {"theme": "dark", "avatar": PNG, "profile": {"title": "old"}}
-    assert merge_preferences(existing, {"profile": {"title": "new"}}) == {"theme": "dark", "avatar": PNG, "profile": {"title": "new"}}, "saving the profile does not touch the picture"
+    assert merge_preferences(existing, {"profile": {"title": "new"}}) == {
+        "theme": "dark",
+        "avatar": PNG,
+        "profile": {"title": "new"},
+    }, "saving the profile does not touch the picture"
     assert merge_preferences(existing, {"avatar": JPEG})["avatar"] == JPEG
     assert "avatar" not in merge_preferences(existing, {"avatar": None})
     assert "avatar" not in merge_preferences(existing, {"avatar": ""})

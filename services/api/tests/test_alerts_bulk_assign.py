@@ -53,7 +53,16 @@ def run(fn):
 
 
 def person(t, name, active=True):
-    return User(id=uuid.uuid4(), tenant_id=t.id, email=f"{name}@example.com", account_name=name, username=name, hashed_password="x", role="soc_analyst", is_active=active)
+    return User(
+        id=uuid.uuid4(),
+        tenant_id=t.id,
+        email=f"{name}@example.com",
+        account_name=name,
+        username=name,
+        hashed_password="x",
+        role="soc_analyst",
+        is_active=active,
+    )
 
 
 async def seed(s):
@@ -86,7 +95,9 @@ def test_the_organizations_and_its_clients_alerts_go_to_the_person_with_the_note
         after = await alerts(s)
         assert after["own"].assigned_to_id == amy.id and after["client-alert"].assigned_to_id == amy.id
         assert after["own"].assigned_at is not None and after["own"].first_seen_at is not None
-        assert [(e["action"], e["changes"]["assignee_to"], e["changes"]["note"]) for e in audit] == [("alerts:bulk_assign", str(amy.id), "on call this week")] * 2
+        assert [(e["action"], e["changes"]["assignee_to"], e["changes"]["note"]) for e in audit] == [
+            ("alerts:bulk_assign", str(amy.id), "on call this week")
+        ] * 2
         assert {e["tenant_id"] for e in audit} == {parent.id, a.id}, "each is audited under the tenant that holds it"
 
     run(go)
@@ -129,7 +140,11 @@ def test_a_finished_alert_is_left_alone_and_one_the_caller_cannot_see_is_not_fou
         out = await assign(s, parent.id, [rows["own"].id, rows["client-alert"].id, rows["secret"].id], amy.id)
         assert (out.assigned, out.already_finished, out.not_found) == (1, 1, 1)
         after = await alerts(s)
-        assert after["own"].assigned_to_id is None and after["secret"].assigned_to_id is None and after["client-alert"].assigned_to_id == amy.id
+        assert (
+            after["own"].assigned_to_id is None
+            and after["secret"].assigned_to_id is None
+            and after["client-alert"].assigned_to_id == amy.id
+        )
 
     run(go)
 

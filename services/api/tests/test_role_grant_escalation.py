@@ -73,7 +73,9 @@ class FakeDB:
         self.commit, self.rollback = AsyncMock(), AsyncMock()
         self.refresh = AsyncMock(side_effect=self._refresh)
         self.execute = AsyncMock(side_effect=self._execute)
-        self.scalar = AsyncMock(return_value=1)  # "how many other active administrators are there?": one, so the last-administrator rule never fires here
+        self.scalar = AsyncMock(
+            return_value=1
+        )  # "how many other active administrators are there?": one, so the last-administrator rule never fires here
 
     async def _refresh(self, obj):
         obj.id = getattr(obj, "id", None) or uuid.uuid4()

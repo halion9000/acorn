@@ -85,7 +85,9 @@ async def _names(db: Any, owner: uuid.UUID) -> dict[uuid.UUID, str]:
 
 
 async def _own_link(db: Any, owner: uuid.UUID, link_id: uuid.UUID) -> ClientStatusLink:
-    row = (await db.execute(select(ClientStatusLink).where(ClientStatusLink.id == link_id, ClientStatusLink.tenant_id == owner))).scalar_one_or_none()
+    row = (
+        await db.execute(select(ClientStatusLink).where(ClientStatusLink.id == link_id, ClientStatusLink.tenant_id == owner))
+    ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such link")
     return row
@@ -112,7 +114,18 @@ class LinksOut(BaseModel):
 @router.get("", response_model=LinksOut, dependencies=[Depends(require_permission("settings:read"))])
 async def list_links(user: AuthUser, db: DBSession) -> LinksOut:
     now = datetime.now(UTC)
-    rows = (await db.execute(select(ClientStatusLink).where(ClientStatusLink.tenant_id == user.tenant_id).order_by(ClientStatusLink.created_at.desc()).limit(300))).scalars().all()
+    rows = (
+        (
+            await db.execute(
+                select(ClientStatusLink)
+                .where(ClientStatusLink.tenant_id == user.tenant_id)
+                .order_by(ClientStatusLink.created_at.desc())
+                .limit(300)
+            )
+        )
+        .scalars()
+        .all()
+    )
     names = await _names(db, user.tenant_id)
     return LinksOut(
         links=[_out(r, names, now) for r in rows],
@@ -122,19 +135,43 @@ async def list_links(user: AuthUser, db: DBSession) -> LinksOut:
 
 
 @router.post("", response_model=LinkCreated, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_signed_in_session)])
-async def create_link(body: LinkIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession) -> LinkCreated:
+async def create_link(
+    body: LinkIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession
+) -> LinkCreated:
     names = await _names(db, user.tenant_id)
     if body.client_id not in names:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
     now = datetime.now(UTC)
-    active = (await db.execute(select(func.count()).select_from(ClientStatusLink).where(ClientStatusLink.tenant_id == user.tenant_id, ClientStatusLink.revoked_at.is_(None), ClientStatusLink.expires_at > now))).scalar_one()
+    active = (
+        await db.execute(
+            select(func.count())
+            .select_from(ClientStatusLink)
+            .where(ClientStatusLink.tenant_id == user.tenant_id, ClientStatusLink.revoked_at.is_(None), ClientStatusLink.expires_at > now)
+        )
+    ).scalar_one()
     if active >= MAX_ACTIVE:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"There are already {MAX_ACTIVE} active links; revoke some first.")
     token = cs.new_token()
-    row = ClientStatusLink(tenant_id=user.tenant_id, client_id=body.client_id, token_hash=cs.hash_token(token), label=body.label.strip(), created_by=user.user_id, expires_at=now + timedelta(days=body.days))
+    row = ClientStatusLink(
+        tenant_id=user.tenant_id,
+        client_id=body.client_id,
+        token_hash=cs.hash_token(token),
+        label=body.label.strip(),
+        created_by=user.user_id,
+        expires_at=now + timedelta(days=body.days),
+    )
     db.add(row)
     await db.flush()
-    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="client_status_link:created", resource="client_status_link", resource_id=str(row.id), changes={"client_id": str(body.client_id), "days": body.days}, request=request)
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="client_status_link:created",
+        resource="client_status_link",
+        resource_id=str(row.id),
+        changes={"client_id": str(body.client_id), "days": body.days},
+        request=request,
+    )
     await db.commit()
     await db.refresh(row)
     return LinkCreated(**_out(row, names, now).model_dump(), token=token)
@@ -148,39 +185,74 @@ async def preview_link(link_id: uuid.UUID, user: AuthUser, db: DBSession) -> dic
 
 
 @router.post("/{link_id}/review", response_model=LinkOut, dependencies=[Depends(require_signed_in_session)])
-async def review_link(link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession) -> LinkOut:
+async def review_link(
+    link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession
+) -> LinkOut:
     """A person has read the preview and is happy with what the client will see: the link starts to work."""
     row = await _own_link(db, user.tenant_id, link_id)
     now = datetime.now(UTC)
     if row.reviewed_at is None:
         row.reviewed_at = now
         row.reviewed_by = user.user_id
-        await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="client_status_link:reviewed", resource="client_status_link", resource_id=str(row.id), changes={"client_id": str(row.client_id)}, request=request)
+        await emit_audit(
+            db=db,
+            tenant_id=user.tenant_id,
+            actor_id=user.user_id,
+            action="client_status_link:reviewed",
+            resource="client_status_link",
+            resource_id=str(row.id),
+            changes={"client_id": str(row.client_id)},
+            request=request,
+        )
         await db.commit()
         await db.refresh(row)
     return _out(row, await _names(db, user.tenant_id), now)
 
 
 @router.post("/{link_id}/revoke", response_model=LinkOut, dependencies=[Depends(require_signed_in_session)])
-async def revoke_link(link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession) -> LinkOut:
+async def revoke_link(
+    link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession
+) -> LinkOut:
     row = await _own_link(db, user.tenant_id, link_id)
     now = datetime.now(UTC)
     if row.revoked_at is None:
         row.revoked_at = now
-        await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="client_status_link:revoked", resource="client_status_link", resource_id=str(row.id), changes={"client_id": str(row.client_id)}, request=request)
+        await emit_audit(
+            db=db,
+            tenant_id=user.tenant_id,
+            actor_id=user.user_id,
+            action="client_status_link:revoked",
+            resource="client_status_link",
+            resource_id=str(row.id),
+            changes={"client_id": str(row.client_id)},
+            request=request,
+        )
         await db.commit()
         await db.refresh(row)
     return _out(row, await _names(db, user.tenant_id), now)
 
 
 @router.delete("/{link_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_signed_in_session)])
-async def delete_link(link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession) -> Response:
+async def delete_link(
+    link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession
+) -> Response:
     """Remove a link from the list for good. Only a link that is already revoked or has run out can be deleted: a live link must be revoked first, so a click cannot silently take a client's page away."""
     row = await _own_link(db, user.tenant_id, link_id)
     now = datetime.now(UTC)
     if row.revoked_at is None and row.expires_at > now:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Revoke the link first; only a revoked or expired link can be deleted.")
-    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="client_status_link:deleted", resource="client_status_link", resource_id=str(row.id), changes={"client_id": str(row.client_id)}, request=request)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Revoke the link first; only a revoked or expired link can be deleted."
+        )
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="client_status_link:deleted",
+        resource="client_status_link",
+        resource_id=str(row.id),
+        changes={"client_id": str(row.client_id)},
+        request=request,
+    )
     await db.delete(row)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

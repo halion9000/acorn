@@ -45,7 +45,13 @@ def test_a_new_secret_is_160_bits_of_base32_and_the_uri_carries_what_an_app_need
     s = totp.new_secret()
     assert len(base64.b32decode(s + "=" * (-len(s) % 8))) == 20 and s != totp.new_secret()
     uri = totp.otpauth_uri(s, "hal@example.com")
-    assert uri.startswith("otpauth://totp/A.C.O.R.N%3Ahal%40example.com?") and f"secret={s}" in uri and "issuer=A.C.O.R.N" in uri and "digits=6" in uri and "period=30" in uri
+    assert (
+        uri.startswith("otpauth://totp/A.C.O.R.N%3Ahal%40example.com?")
+        and f"secret={s}" in uri
+        and "issuer=A.C.O.R.N" in uri
+        and "digits=6" in uri
+        and "period=30" in uri
+    )
 
 
 def test_recovery_codes_are_ten_distinct_values_stored_only_as_hashes_and_each_works_once():

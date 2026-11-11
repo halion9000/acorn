@@ -31,7 +31,19 @@ CONTRACT = [
     (
         "vendor_actions",
         "action",
-        ["approve", "reject", "resolve", scripts.SCRIPT_ACTION, ticket_rules.ACTION, quarantine_release.ACTION, quarantine_release.TICKET_NOTE_ACTION, quarantine_release.CHECK_ACTION, quarantine_release.ALLOW_ACTION, halo_user.ACTION, tool_deploy_rules.ACTION_ADDIGY],
+        [
+            "approve",
+            "reject",
+            "resolve",
+            scripts.SCRIPT_ACTION,
+            ticket_rules.ACTION,
+            quarantine_release.ACTION,
+            quarantine_release.TICKET_NOTE_ACTION,
+            quarantine_release.CHECK_ACTION,
+            quarantine_release.ALLOW_ACTION,
+            halo_user.ACTION,
+            tool_deploy_rules.ACTION_ADDIGY,
+        ],
         "alert_vendor_actions.py (approve, reject, resolve), alert_scripts.SCRIPT_ACTION and alert_ticket_rules.ACTION",
     ),
     (

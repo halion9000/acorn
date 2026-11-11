@@ -12,7 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
-pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database")]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database"),
+]
 
 NOW = datetime.now(UTC)
 
@@ -23,7 +26,9 @@ async def db():
     tenant, case = uuid.uuid4(), uuid.uuid4()
     async with AsyncSession(engine) as s:
         await s.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-        await s.execute(text("insert into tenants (id, name, slug) values (:t, 'stale-test', :s)"), {"t": tenant, "s": f"stale-{tenant.hex[:10]}"})
+        await s.execute(
+            text("insert into tenants (id, name, slug) values (:t, 'stale-test', :s)"), {"t": tenant, "s": f"stale-{tenant.hex[:10]}"}
+        )
         ids = {}
         for key, status, severity, days, with_case in (
             ("old_low_new", "new", "low", 40, False),
@@ -41,7 +46,15 @@ async def db():
                     "insert into alerts (id, tenant_id, title, severity, status, priority, case_id, created_at, updated_at) "
                     "values (:i, :t, :title, :sev, :st, 50, :c, :at, :at)"
                 ),
-                {"i": ids[key], "t": tenant, "title": key, "sev": severity, "st": status, "c": case if with_case else None, "at": NOW - timedelta(days=days)},
+                {
+                    "i": ids[key],
+                    "t": tenant,
+                    "title": key,
+                    "sev": severity,
+                    "st": status,
+                    "c": case if with_case else None,
+                    "at": NOW - timedelta(days=days),
+                },
             )
         await s.commit()
         s.info["tenant"], s.info["ids"] = tenant, ids
@@ -55,7 +68,11 @@ async def db():
 
 async def status_of(db):
     await db.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-    rows = (await db.execute(text("select title, status, status_before_stale, updated_at from alerts where tenant_id = :t"), {"t": db.info["tenant"]})).all()
+    rows = (
+        await db.execute(
+            text("select title, status, status_before_stale, updated_at from alerts where tenant_id = :t"), {"t": db.info["tenant"]}
+        )
+    ).all()
     return {r[0]: r for r in rows}
 
 

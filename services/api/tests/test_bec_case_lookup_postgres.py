@@ -19,7 +19,9 @@ PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 APP_URL = os.environ.get("AISOC_TEST_PG_APP_URL", "")
 pytestmark = [
     pytest.mark.asyncio,
-    pytest.mark.skipif(not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"),
+    pytest.mark.skipif(
+        not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"
+    ),
 ]
 
 
@@ -36,7 +38,13 @@ async def world(monkeypatch):
                 parent = {"acme": "parent", "birch": "parent", "stranger": "stranger_parent"}.get(key)
                 await conn.execute(
                     text("insert into tenants (id, name, slug, parent_tenant_id, mssp_role) values (:i, :n, :s, :p, :r)"),
-                    {"i": tid, "n": f"{key}-{tag}", "s": f"{key}-{tag}", "p": ids[parent] if parent else None, "r": "child" if parent else "parent"},
+                    {
+                        "i": tid,
+                        "n": f"{key}-{tag}",
+                        "s": f"{key}-{tag}",
+                        "p": ids[parent] if parent else None,
+                        "r": "child" if parent else "parent",
+                    },
                 )
             for who, case in cases.items():
                 await conn.execute(
@@ -54,7 +62,9 @@ async def world(monkeypatch):
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
             everyone = [str(x) for x in ids.values()]
             await conn.execute(text("delete from bec_cases where tenant_id = any(cast(:t as uuid[]))"), {"t": everyone})
-            await conn.execute(text("delete from tenants where id = any(cast(:t as uuid[])) and parent_tenant_id is not null"), {"t": everyone})
+            await conn.execute(
+                text("delete from tenants where id = any(cast(:t as uuid[])) and parent_tenant_id is not null"), {"t": everyone}
+            )
             await conn.execute(text("delete from tenants where id = any(cast(:t as uuid[]))"), {"t": everyone})
         await owner.dispose()
 
@@ -107,7 +117,11 @@ async def alerts_of(tenant_id):
     try:
         async with owner.connect() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-            return (await conn.execute(text("select title, severity, rule_id, affected_users from alerts where tenant_id = :t"), {"t": tenant_id})).all()
+            return (
+                await conn.execute(
+                    text("select title, severity, rule_id, affected_users from alerts where tenant_id = :t"), {"t": tenant_id}
+                )
+            ).all()
     finally:
         await owner.dispose()
 
@@ -128,7 +142,11 @@ async def test_a_finished_search_rated_high_by_cipp_raises_one_alert_for_the_cli
 
 async def test_a_low_rating_and_a_failed_search_raise_no_alert(world):
     ids, cases = world
-    await call(feed.report_bec_result, cases["acme"], feed.BecResult(status="done", report={"Score": {"Value": 1, "Level": "Low"}}, summary={"score": 1, "level": "Low"}))
+    await call(
+        feed.report_bec_result,
+        cases["acme"],
+        feed.BecResult(status="done", report={"Score": {"Value": 1, "Level": "Low"}}, summary={"score": 1, "level": "Low"}),
+    )
     assert await alerts_of(ids["acme"]) == []
 
 
@@ -188,7 +206,11 @@ async def notes_for(tenant_id):
 async def test_the_result_then_the_ticket_number_writes_the_result_on_the_case_and_once_on_the_ticket(with_case_and_ticket):
     ids, cases, case_row, action = with_case_and_ticket
     report = {"Score": {"Value": 9, "Level": "High"}, "NewRules": [{"Name": "x"}]}
-    await call(feed.report_bec_result, cases["acme"], feed.BecResult(status="done", message="ok", report=report, summary={"score": 9, "level": "High"}))
+    await call(
+        feed.report_bec_result,
+        cases["acme"],
+        feed.BecResult(status="done", message="ok", report=report, summary={"score": 9, "level": "High"}),
+    )
     (case,) = await owner_rows("select description, severity from aisoc_cases where id = :c", c=case_row)
     assert "CIPP rates it High" in case[0] and case[1] == "high"
     assert await notes_for(ids["acme"]) == [], "there is no ticket number yet, so nothing can be written on a ticket"
@@ -218,7 +240,11 @@ async def test_the_bell_list_shows_only_this_organizations_recent_finished_searc
     from app.api.v1.endpoints import identity_bec as ep
 
     ids, cases = world
-    await owner_exec("update bec_cases set status = 'done', finished_at = :f, summary = '{\"level\": \"High\"}' where id = :b", f=datetime.now(UTC), b=cases["acme"])
+    await owner_exec(
+        "update bec_cases set status = 'done', finished_at = :f, summary = '{\"level\": \"High\"}' where id = :b",
+        f=datetime.now(UTC),
+        b=cases["acme"],
+    )
     await owner_exec("update bec_cases set status = 'done', finished_at = :f where id = :b", f=datetime.now(UTC), b=cases["stranger"])
     engine = create_async_engine(APP_URL, poolclass=NullPool)
     try:
@@ -228,7 +254,9 @@ async def test_the_bell_list_shows_only_this_organizations_recent_finished_searc
             out = await ep.finished_bec_searches(NS(tenant_id=ids["parent"], user_id=uuid.uuid4()), db)
     finally:
         await engine.dispose()
-    assert [(i.id, i.level, i.status) for i in out.items] == [(cases["acme"], "High", "done")], "the other organization's search is not listed"
+    assert [(i.id, i.level, i.status) for i in out.items] == [
+        (cases["acme"], "High", "done")
+    ], "the other organization's search is not listed"
     await owner_exec("update bec_cases set finished_at = :f where id = :b", f=datetime.now(UTC) - timedelta(hours=30), b=cases["acme"])
     engine = create_async_engine(APP_URL, poolclass=NullPool)
     try:

@@ -16,7 +16,9 @@ PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 APP_URL = os.environ.get("AISOC_TEST_PG_APP_URL", "")
 pytestmark = [
     pytest.mark.asyncio,
-    pytest.mark.skipif(not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"),
+    pytest.mark.skipif(
+        not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"
+    ),
 ]
 
 
@@ -34,7 +36,12 @@ async def world():
                     text("insert into tenants (id, name, slug, parent_tenant_id, mssp_role) values (:i, :n, :s, :p, :r)"),
                     {"i": tid, "n": f"{key}-{tag}", "s": f"{key}-{tag}", "p": parent, "r": "child" if parent else "parent"},
                 )
-            for who, item, count, available in (("acme", "Business Premium", 50, 5), ("acme", "Exchange Online", 10, 0), ("birch", "E3", 20, 12), ("stranger", "Secret licence", 99, 90)):
+            for who, item, count, available in (
+                ("acme", "Business Premium", 50, 5),
+                ("acme", "Exchange Online", 10, 0),
+                ("birch", "E3", 20, 12),
+                ("stranger", "Secret licence", 99, 90),
+            ):
                 await conn.execute(
                     text(
                         "insert into client_license_counts (tenant_id, source, item, unit, count, available, first_seen_at, updated_at) "
@@ -78,5 +85,7 @@ async def test_the_licence_waste_report_lists_the_unassigned_licences_of_this_or
 
 
 async def test_the_other_organization_sees_its_own_client_only(world):
-    out = await as_owner(world["other_parent"], lambda db: billing.licence_waste(SimpleNamespace(tenant_id=world["other_parent"]), db, 1, 500))
+    out = await as_owner(
+        world["other_parent"], lambda db: billing.licence_waste(SimpleNamespace(tenant_id=world["other_parent"]), db, 1, 500)
+    )
     assert [(r.item, r.unassigned) for r in out.rows] == [("Secret licence", 90)]

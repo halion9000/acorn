@@ -129,7 +129,10 @@ async def list_builtin_roles(
     """The built-in roles and exactly what each grants. They cannot be edited (they are part of the product); make a custom role from one to change it."""
     from app.core.security import ROLE_PERMISSIONS  # noqa: PLC0415
 
-    return [BuiltinRoleOut(key=key, label=label, description=hint, permissions=sorted(ROLE_PERMISSIONS[key])) for key, label, hint in BUILTIN_ASSIGNABLE]
+    return [
+        BuiltinRoleOut(key=key, label=label, description=hint, permissions=sorted(ROLE_PERMISSIONS[key]))
+        for key, label, hint in BUILTIN_ASSIGNABLE
+    ]
 
 
 class SsoDefaultOut(BaseModel):
@@ -181,9 +184,15 @@ async def set_sso_default(
     """Choose the role new Microsoft sign-ins get: a built-in role (never an administrator) or one of this workspace's custom roles, which then stands alone."""
     configured, cfg = _sso_state()
     if not configured:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Microsoft sign-in is not set up on this server, so there is nothing to choose a role for.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Microsoft sign-in is not set up on this server, so there is nothing to choose a role for.",
+        )
     if cfg.home_tenant != current_user.tenant_id:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Microsoft sign-in creates new people in a different workspace. Choose the role there.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Microsoft sign-in creates new people in a different workspace. Choose the role there.",
+        )
     if body.role not in ALLOWED_BUILTIN:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -209,11 +218,19 @@ async def set_sso_default(
         action="sso:default_role_changed",
         resource="sso_default_role",
         resource_id=str(tenant.id),
-        changes={"before": {"role": before[0], "custom_role_id": str(before[1]) if before[1] else None}, "after": stored_default_role(role, body.custom_role_id)},
+        changes={
+            "before": {"role": before[0], "custom_role_id": str(before[1]) if before[1] else None},
+            "after": stored_default_role(role, body.custom_role_id),
+        },
     )
     await db.commit()
     return SsoDefaultOut(
-        sso_configured=True, applies_here=True, role=role, custom_role_id=body.custom_role_id, source="setting", allowed_builtin=list(ALLOWED_BUILTIN)
+        sso_configured=True,
+        applies_here=True,
+        role=role,
+        custom_role_id=body.custom_role_id,
+        source="setting",
+        allowed_builtin=list(ALLOWED_BUILTIN),
     )
 
 
@@ -281,7 +298,9 @@ async def create_role(
     for perm in perms_to_attach:
         db.add(RolePermission(role_id=role.id, permission_id=perm.id))
 
-    await _audit_role(db, current_user, "role:created", role.id, {"name": role.name, "permissions": sorted(p.name for p in perms_to_attach)})
+    await _audit_role(
+        db, current_user, "role:created", role.id, {"name": role.name, "permissions": sorted(p.name for p in perms_to_attach)}
+    )
     await db.commit()
     await db.refresh(role)
 
@@ -384,7 +403,13 @@ async def delete_role(
     role = await _get_role_or_404(db, role_id, current_user.tenant_id)
     if role.is_system:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System roles cannot be deleted")
-    await _audit_role(db, current_user, "role:deleted", role.id, {"name": role.name, "permissions": sorted(p.name for p in await _load_role_permissions(db, role.id))})
+    await _audit_role(
+        db,
+        current_user,
+        "role:deleted",
+        role.id,
+        {"name": role.name, "permissions": sorted(p.name for p in await _load_role_permissions(db, role.id))},
+    )
     await db.delete(role)
     await db.commit()
 
@@ -436,7 +461,10 @@ async def assign_role(
     # A person has ONE role. Only someone whose role is already "custom" can be given another custom role here (it replaces the first); a person with a built-in role changes
     # role under Settings > Workspace > Edit, which keeps the built-in role and the custom role in step.
     if target.role != "custom":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A person has one role. Change their role to this custom role under Settings > Workspace > Edit.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A person has one role. Change their role to this custom role under Settings > Workspace > Edit.",
+        )
     await db.execute(
         delete(UserRole).where(
             UserRole.user_id == user_id,

@@ -31,7 +31,11 @@ def test_met_only_when_every_mapped_check_is_met_not_met_when_any_is_and_met_sin
     assert row["status"] == "met" and row["met_since"] == D2
     partly = nc.coverage(CONTROLS, tc(("huntress_protection", "met", D1), ("ninjaone_antivirus", "partly", D2)), None)
     assert {r["control_id"]: r for r in partly["controls"]}["DE.AE-02"]["status"] == "partly"
-    bad = nc.coverage(CONTROLS, tc(("huntress_protection", "met", D1), ("ninjaone_antivirus", "not_met", D2), ("liongard_edr_coverage", "partly", None)), None)
+    bad = nc.coverage(
+        CONTROLS,
+        tc(("huntress_protection", "met", D1), ("ninjaone_antivirus", "not_met", D2), ("liongard_edr_coverage", "partly", None)),
+        None,
+    )
     row = {r["control_id"]: r for r in bad["controls"]}["DE.AE-02"]
     assert row["status"] == "not_met" and row["met_since"] is None
     assert [c["key"] for c in row["checks"]][0] == "ninjaone_antivirus", "the worst check is listed first"
@@ -54,7 +58,16 @@ def test_second_factor_coverage_counts_as_evidence_for_authentication_at_95_and_
 
 
 def test_the_same_check_from_two_sources_keeps_the_worse_status_and_junk_is_ignored():
-    both = {"a": {"checks": [{"key": "ninjaone_antivirus", "status": "met", "evidence": "x", "since": D1}]}, "b": {"checks": [{"key": "ninjaone_antivirus", "status": "not_met", "evidence": "y", "since": D1}, {"key": 5, "status": "met"}, {"key": "z", "status": "weird"}]}}
+    both = {
+        "a": {"checks": [{"key": "ninjaone_antivirus", "status": "met", "evidence": "x", "since": D1}]},
+        "b": {
+            "checks": [
+                {"key": "ninjaone_antivirus", "status": "not_met", "evidence": "y", "since": D1},
+                {"key": 5, "status": "met"},
+                {"key": "z", "status": "weird"},
+            ]
+        },
+    }
     flat = nc.flatten_checks(both)
     assert flat["ninjaone_antivirus"]["status"] == "not_met" and set(flat) == {"ninjaone_antivirus"}
 

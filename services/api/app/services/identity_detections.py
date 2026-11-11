@@ -144,7 +144,11 @@ def detect_dormant_active(
         if _utc(history_start) > when - timedelta(days=DORMANT_DAYS):
             continue  # the client's history is too short to call anyone dormant
         quiet = when - _utc(last)
-        if quiet < timedelta(days=DORMANT_DAYS) or country in countries_before.get(r.user_principal, set()) or (r.user_principal, country) in seen:
+        if (
+            quiet < timedelta(days=DORMANT_DAYS)
+            or country in countries_before.get(r.user_principal, set())
+            or (r.user_principal, country) in seen
+        ):
             continue
         seen.add((r.user_principal, country))
         days = quiet.days
@@ -874,7 +878,11 @@ def detect_stale_admins(users: list[Any], last_signin: dict[str, datetime], hist
                 key=f"{who}:{now.year}-Q{(now.month - 1) // 3 + 1}",
                 occurred_at=now,
                 summary=f"This account holds an administrator role and has not signed in for {quiet}. An admin account nobody uses is one nobody would miss: remove the role or disable the account if it is not needed.",
-                fields=[("Account", who), ("Last sign-in", _stamp(last) if last is not None else "none in the history we hold"), ("Quiet for", quiet)],
+                fields=[
+                    ("Account", who),
+                    ("Last sign-in", _stamp(last) if last is not None else "none in the history we hold"),
+                    ("Quiet for", quiet),
+                ],
                 users=[who],
             )
         )
@@ -895,16 +903,26 @@ async def run_mfa_detections(db: Any, tenant_id: uuid.UUID, now: datetime | None
             last_signin: dict[str, datetime] = {}
             history_start = None
             if admins:
-                history_start = (await db.execute(select(func.min(SigninEvent.occurred_at)).where(SigninEvent.tenant_id == tenant_id))).scalar_one_or_none()
+                history_start = (
+                    await db.execute(select(func.min(SigninEvent.occurred_at)).where(SigninEvent.tenant_id == tenant_id))
+                ).scalar_one_or_none()
                 for who, last in (
                     await db.execute(
                         select(func.lower(SigninEvent.user_principal), func.max(SigninEvent.occurred_at))
-                        .where(SigninEvent.tenant_id == tenant_id, SigninEvent.success.is_(True), func.lower(SigninEvent.user_principal).in_(admins))
+                        .where(
+                            SigninEvent.tenant_id == tenant_id,
+                            SigninEvent.success.is_(True),
+                            func.lower(SigninEvent.user_principal).in_(admins),
+                        )
                         .group_by(func.lower(SigninEvent.user_principal))
                     )
                 ).all():
                     last_signin[who] = last
-            findings = detect_admins_without_mfa(list(users), now) + detect_admins_mfa_not_required(list(users), now) + detect_stale_admins(list(users), last_signin, history_start, now)
+            findings = (
+                detect_admins_without_mfa(list(users), now)
+                + detect_admins_mfa_not_required(list(users), now)
+                + detect_stale_admins(list(users), last_signin, history_start, now)
+            )
             return await save_findings(db, tenant_id, findings, now)
     except Exception:  # noqa: BLE001
         logger.warning("identity detections: the multi-factor rule failed for tenant=%s", tenant_id, exc_info=True)
@@ -1067,7 +1085,9 @@ async def run_signin_detections(db: Any, tenant_id: uuid.UUID, rows: list[Any], 
         # Each person's earlier history, far enough back to tell a long-quiet account: when they last signed in, from where, and how far back the client's history goes at all.
         last_before: dict[str, datetime] = {}
         countries_before: dict[str, set[str]] = defaultdict(set)
-        history_start = (await db.execute(select(func.min(SigninEvent.occurred_at)).where(SigninEvent.tenant_id == tenant_id))).scalar_one_or_none()
+        history_start = (
+            await db.execute(select(func.min(SigninEvent.occurred_at)).where(SigninEvent.tenant_id == tenant_id))
+        ).scalar_one_or_none()
         for who, last in (
             await db.execute(
                 select(SigninEvent.user_principal, func.max(SigninEvent.occurred_at))

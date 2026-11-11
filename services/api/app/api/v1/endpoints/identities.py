@@ -344,7 +344,11 @@ async def list_identities(
         default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$", description="Only people known to this one tool and no other."
     ),
     has_alerts: bool = Query(default=False),
-    halo_check: str | None = Query(default=None, pattern="^(cloud_not_in_halo|halo_inactive_cloud_enabled)$", description="Only people whose cloud account needs a look against the client's HaloPSA users."),
+    halo_check: str | None = Query(
+        default=None,
+        pattern="^(cloud_not_in_halo|halo_inactive_cloud_enabled)$",
+        description="Only people whose cloud account needs a look against the client's HaloPSA users.",
+    ),
     backup: str | None = Query(
         default=None,
         pattern="^(ok|problem|none)$",
@@ -364,8 +368,14 @@ async def list_identities(
     enabled: bool = Query(default=False, description="Only accounts that are not disabled."),
     active: bool = Query(default=False, description="Only active identities: a licensed account, not a guest, not disabled."),
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
-    password_never_expires: bool = Query(default=False, description="Only working accounts whose password is set never to expire (the tile's list)."),
-    inactivity: str | None = Query(default=None, pattern="^(inactive|never)$", description="inactive: working accounts with no sign-in for 90+ days; never: no sign-in on record (the two tiles' lists). Unknown is never listed."),
+    password_never_expires: bool = Query(
+        default=False, description="Only working accounts whose password is set never to expire (the tile's list)."
+    ),
+    inactivity: str | None = Query(
+        default=None,
+        pattern="^(inactive|never)$",
+        description="inactive: working accounts with no sign-in for 90+ days; never: no sign-in on record (the two tiles' lists). Unknown is never listed.",
+    ),
     signin: str | None = Query(
         default=None,
         pattern="^(failed|brute_force)$",
@@ -457,7 +467,11 @@ async def export_identities(
     source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
     only_in: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
     has_alerts: bool = Query(default=False),
-    halo_check: str | None = Query(default=None, pattern="^(cloud_not_in_halo|halo_inactive_cloud_enabled)$", description="Only people whose cloud account needs a look against the client's HaloPSA users."),
+    halo_check: str | None = Query(
+        default=None,
+        pattern="^(cloud_not_in_halo|halo_inactive_cloud_enabled)$",
+        description="Only people whose cloud account needs a look against the client's HaloPSA users.",
+    ),
     backup: str | None = Query(default=None, pattern="^(ok|problem|none)$"),
     alert_source: str | None = Query(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$"),
     exposed: str | None = Query(default=None, pattern="^(any|serious)$"),

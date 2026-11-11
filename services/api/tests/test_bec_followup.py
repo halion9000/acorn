@@ -59,7 +59,19 @@ class FakeDB:
 
 
 def bec(**over):
-    base = {"id": uuid.uuid4(), "tenant_id": CLIENT, "case_ref": "BEC-1", "email": "p@x.com", "status": "pending", "message": None, "summary": {}, "report": None, "aisoc_case_id": None, "ticket_id": None, "ticket_note_queued": False}
+    base = {
+        "id": uuid.uuid4(),
+        "tenant_id": CLIENT,
+        "case_ref": "BEC-1",
+        "email": "p@x.com",
+        "status": "pending",
+        "message": None,
+        "summary": {},
+        "report": None,
+        "aisoc_case_id": None,
+        "ticket_id": None,
+        "ticket_note_queued": False,
+    }
     base.update(over)
     return NS(**base)
 
@@ -70,7 +82,12 @@ def run(coro):
 
 def test_a_finished_search_is_worded_from_ciphers_own_rating_and_never_calls_low_clean():
     high = f.result_text(
-        case_ref="BEC-1", email="p@x.com", status="done", message=None, summary={"level": "High", "score": 80, "incomplete": ["Sign-ins"]}, report={"NewRules": [1, 2], "AddedApps": [1]}
+        case_ref="BEC-1",
+        email="p@x.com",
+        status="done",
+        message=None,
+        summary={"level": "High", "score": 80, "incomplete": ["Sign-ins"]},
+        report={"NewRules": [1, 2], "AddedApps": [1]},
     )
     assert "CIPP rates it High (score 80)" in high and "2 new inbox rules" in high and "1 added app" in high and "Sign-ins" in high
     low = f.result_text(case_ref="BEC-1", email="p@x.com", status="done", message=None, summary={"level": "Low"}, report={})

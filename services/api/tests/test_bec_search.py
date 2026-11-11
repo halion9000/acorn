@@ -76,11 +76,20 @@ def test_a_confirmed_start_records_the_case_and_queues_it_for_core_with_the_ids_
     item = start(db)
     assert item.status == "pending" and item.email == "pat@acme.com" and item.case_ref.startswith("BEC-")
     case, action, ticket = db.added
-    assert (ticket.action, ticket.vendor, ticket.alert_id, ticket.incident_uid) == ("create_ticket", "core", None, f"bec-ticket:{case.id}"), "a person's search also asks CORE to open a HaloPSA ticket"
+    assert (ticket.action, ticket.vendor, ticket.alert_id, ticket.incident_uid) == (
+        "create_ticket",
+        "core",
+        None,
+        f"bec-ticket:{case.id}",
+    ), "a person's search also asks CORE to open a HaloPSA ticket"
     assert case.aisoc_case_id is not None, "and opens a case"
     assert (case.tenant_id, case.requested_by, case.status) == (CLIENT, USER.user_id, "pending")
     assert (action.vendor, action.action, action.status, action.alert_id) == ("core", "bec_search", "pending", None)
-    assert action.params["client_id"] == "cipp-cust-1" and action.params["user_id"] == "entra-guid-1" and action.params["user"] == "pat@acme.com"
+    assert (
+        action.params["client_id"] == "cipp-cust-1"
+        and action.params["user_id"] == "entra-guid-1"
+        and action.params["user"] == "pat@acme.com"
+    )
     assert action.params["case_id"] == str(case.id) and action.incident_uid == f"bec:{case.id}"
     assert db.commits == 1 and wired.await_args.kwargs["action"] == "identities:bec_requested"
 
@@ -114,7 +123,10 @@ def test_the_owners_own_tenant_is_not_a_client_to_search(wired):
 
 def test_an_open_case_nobody_reports_on_shows_as_failed_not_running_for_ever():
     row = NS(status="running", updated_at=NOW - timedelta(minutes=40), message=None)
-    assert ep.effective_status(row, NOW) == ("failed", "CORE stopped reporting on this search (it may have been restarted). Start it again.")
+    assert ep.effective_status(row, NOW) == (
+        "failed",
+        "CORE stopped reporting on this search (it may have been restarted). Start it again.",
+    )
     fresh = NS(status="running", updated_at=NOW - timedelta(minutes=2), message=None)
     assert ep.effective_status(fresh, NOW) == ("running", None)
     done = NS(status="done", updated_at=NOW - timedelta(days=3), message="finished")
@@ -138,7 +150,13 @@ def finding(rule="aisoc-id-impossible-travel", severity="high", users=("Pat@Acme
 
 
 def test_only_high_or_critical_findings_of_account_takeover_rules_name_people_to_check_each_once_and_in_lowercase():
-    found = [finding(), finding(users=("pat@acme.com", "eve@acme.com", "third@acme.com")), finding(severity="medium"), finding(rule="aisoc-id-legacy-protocol"), finding(users=("not an address",))]
+    found = [
+        finding(),
+        finding(users=("pat@acme.com", "eve@acme.com", "third@acme.com")),
+        finding(severity="medium"),
+        finding(rule="aisoc-id-legacy-protocol"),
+        finding(users=("not an address",)),
+    ]
     assert bec_auto.people_to_check(found) == ["pat@acme.com", "eve@acme.com"]
 
 
@@ -195,7 +213,20 @@ from app.api.v1.endpoints import inbox_core_feed as feed  # noqa: E402
 
 @pytest.fixture
 def core(monkeypatch):
-    case = NS(id=uuid.uuid4(), case_ref="BEC-1", email="pat@acme.com", status="pending", step=0, steps_total=0, step_label=None, message=None, report=None, summary={}, updated_at=NOW - timedelta(minutes=1), finished_at=None)
+    case = NS(
+        id=uuid.uuid4(),
+        case_ref="BEC-1",
+        email="pat@acme.com",
+        status="pending",
+        step=0,
+        steps_total=0,
+        step_label=None,
+        message=None,
+        report=None,
+        summary={},
+        updated_at=NOW - timedelta(minutes=1),
+        finished_at=None,
+    )
     monkeypatch.setattr(feed, "_verify_core_feed_token", AsyncMock(return_value=OWNER))
     monkeypatch.setattr(feed, "adopt_tenant", AsyncMock())
     monkeypatch.setattr(feed, "_bec_case_for", AsyncMock(return_value=(case, CLIENT)))
@@ -207,14 +238,22 @@ def core(monkeypatch):
 def test_progress_marks_the_case_running_and_records_the_step_and_label(core):
     case, db = core
     out = run(feed.report_bec_progress("tok", case.id, feed.BecProgress(step=3, steps_total=15, label="Sign-ins and mobile devices"), db))
-    assert out.recorded and case.status == "running" and (case.step, case.steps_total, case.step_label) == (3, 15, "Sign-ins and mobile devices")
+    assert (
+        out.recorded
+        and case.status == "running"
+        and (case.step, case.steps_total, case.step_label) == (3, 15, "Sign-ins and mobile devices")
+    )
     assert db.commits == 1
 
 
 def test_a_result_stores_the_whole_report_and_finishes_the_case(core):
     case, db = core
     report = {"Score": 3, "MailboxRules": []}
-    run(feed.report_bec_result("tok", case.id, feed.BecResult(status="done", message="CIPP finished", report=report, summary={"sections": ["Score"]}), db))
+    run(
+        feed.report_bec_result(
+            "tok", case.id, feed.BecResult(status="done", message="CIPP finished", report=report, summary={"sections": ["Score"]}), db
+        )
+    )
     assert (case.status, case.report, case.summary, case.finished_at is not None) == ("done", report, {"sections": ["Score"]}, True)
 
 
@@ -228,7 +267,11 @@ def test_a_high_rating_from_cipp_saves_an_alert_for_that_person_and_the_report_i
 
     monkeypatch.setattr("app.services.identity_detections.save_findings", fake_save)
     summary = {"score": 9, "level": "High", "incomplete": ["SignIns"]}
-    run(feed.report_bec_result("tok", case.id, feed.BecResult(status="done", report={"Score": {"Value": 9, "Level": "High"}}, summary=summary), db))
+    run(
+        feed.report_bec_result(
+            "tok", case.id, feed.BecResult(status="done", report={"Score": {"Value": 9, "Level": "High"}}, summary=summary), db
+        )
+    )
     assert case.status == "done" and db.commits == 1
     assert len(saved) == 1 and saved[0][0] == CLIENT
     finding = saved[0][1][0]
@@ -244,7 +287,14 @@ def test_a_low_rating_or_a_failed_search_saves_no_alert(core, monkeypatch):
         return 1
 
     monkeypatch.setattr("app.services.identity_detections.save_findings", fake_save)
-    run(feed.report_bec_result("tok", case.id, feed.BecResult(status="done", report={"Score": {"Value": 1, "Level": "Low"}}, summary={"level": "Low", "score": 1}), db))
+    run(
+        feed.report_bec_result(
+            "tok",
+            case.id,
+            feed.BecResult(status="done", report={"Score": {"Value": 1, "Level": "Low"}}, summary={"level": "Low", "score": 1}),
+            db,
+        )
+    )
     assert saved == [] and case.status == "done"
 
 
@@ -255,7 +305,14 @@ def test_an_odd_summary_or_a_failure_making_the_alert_never_loses_the_report(cor
         raise RuntimeError("database trouble")
 
     monkeypatch.setattr("app.services.identity_detections.save_findings", boom)
-    run(feed.report_bec_result("tok", case.id, feed.BecResult(status="done", report={"Score": {"Level": "High"}}, summary={"level": "High", "incomplete": 5, "score": "nine"}), db))
+    run(
+        feed.report_bec_result(
+            "tok",
+            case.id,
+            feed.BecResult(status="done", report={"Score": {"Level": "High"}}, summary={"level": "High", "incomplete": 5, "score": "nine"}),
+            db,
+        )
+    )
     assert case.status == "done" and case.report == {"Score": {"Level": "High"}} and db.commits == 1
 
 

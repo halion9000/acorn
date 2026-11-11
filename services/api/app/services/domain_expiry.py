@@ -54,7 +54,9 @@ def _utc(t: datetime) -> datetime:
     return t if t.tzinfo else t.replace(tzinfo=UTC)
 
 
-def due_for_lookup(domains: list[tuple[uuid.UUID, str]], known: dict[tuple[uuid.UUID, str], Known], now: datetime) -> list[tuple[uuid.UUID, str]]:
+def due_for_lookup(
+    domains: list[tuple[uuid.UUID, str]], known: dict[tuple[uuid.UUID, str], Known], now: datetime
+) -> list[tuple[uuid.UUID, str]]:
     """The domains to look up this pass: never looked at first, then failures, then those nearest their end; at most ``MAX_LOOKUPS_PER_PASS``."""
     now = _utc(now)
     wanted: list[tuple[int, datetime, tuple[uuid.UUID, str]]] = []
@@ -138,7 +140,11 @@ def detect_expiring(rows: list[Known], now: datetime) -> list[tuple[uuid.UUID, F
                     key=f"{r.domain}:{b}",
                     occurred_at=now,
                     summary=summary,
-                    fields=[("Domain", r.domain), ("Registration ends", when), ("Checked", _utc(r.checked_at).strftime("%Y-%m-%d") if r.checked_at else "unknown")],
+                    fields=[
+                        ("Domain", r.domain),
+                        ("Registration ends", when),
+                        ("Checked", _utc(r.checked_at).strftime("%Y-%m-%d") if r.checked_at else "unknown"),
+                    ],
                 ),
             )
         )
@@ -155,7 +161,13 @@ async def run_expiry_check(db: Any, fetch: Callable[[str], Awaitable[bytes]], no
 
     now = now or datetime.now(UTC)
     try:
-        seen = (await db.execute(select(DmarcReport.tenant_id, DmarcReport.domain).where(DmarcReport.matched.is_(True), DmarcReport.end_at >= now - timedelta(days=90)).distinct())).all()
+        seen = (
+            await db.execute(
+                select(DmarcReport.tenant_id, DmarcReport.domain)
+                .where(DmarcReport.matched.is_(True), DmarcReport.end_at >= now - timedelta(days=90))
+                .distinct()
+            )
+        ).all()
         domains = sorted(set(seen), key=lambda k: (str(k[0]), k[1]))
         stored = (await db.execute(select(DomainRegistration))).scalars().all()
         known = {(s.tenant_id, s.domain): Known(s.tenant_id, s.domain, s.expires_at, s.checked_at, s.error) for s in stored}
@@ -167,9 +179,20 @@ async def run_expiry_check(db: Any, fetch: Callable[[str], Awaitable[bytes]], no
                 return key, await look_up(key[1], fetch)
 
         for (tenant_id, domain), got in await asyncio.gather(*(one(k) for k in todo)):
-            values = {"tenant_id": tenant_id, "domain": domain, "registered": got.registered, "expires_at": got.expires_at, "checked_at": now, "error": got.error}
+            values = {
+                "tenant_id": tenant_id,
+                "domain": domain,
+                "registered": got.registered,
+                "expires_at": got.expires_at,
+                "checked_at": now,
+                "error": got.error,
+            }
             await db.execute(
-                pg_insert(DomainRegistration).values(**values).on_conflict_do_update(index_elements=["tenant_id", "domain"], set_={k: v for k, v in values.items() if k not in ("tenant_id", "domain")})
+                pg_insert(DomainRegistration)
+                .values(**values)
+                .on_conflict_do_update(
+                    index_elements=["tenant_id", "domain"], set_={k: v for k, v in values.items() if k not in ("tenant_id", "domain")}
+                )
             )
             known[(tenant_id, domain)] = Known(tenant_id, domain, got.expires_at, now, got.error)
         made = 0

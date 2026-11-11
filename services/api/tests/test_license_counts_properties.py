@@ -84,7 +84,9 @@ def test_totals_add_up_whatever_the_rows_are():
                             }
                         )
         out = lc.totals(rows)
-        assert [(t["source"], t["item"]) for t in out] == sorted({(r["source"], r["item"]) for r in rows}), "one line per tool and item, in order"
+        assert [(t["source"], t["item"]) for t in out] == sorted(
+            {(r["source"], r["item"]) for r in rows}
+        ), "one line per tool and item, in order"
         assert sum(t["total"] for t in out) == sum(r["count"] for r in rows)
         assert sum(t["clients"] for t in out) == len(rows)
         for t in out:
@@ -103,7 +105,9 @@ def test_unusual_never_fires_on_small_counts_or_no_change_and_is_the_same_up_or_
         previous = rng.randint(0, 400)
         step = rng.randint(0, 200)
         assert lc.unusual(previous, previous) is False
-        assert lc.unusual(previous + step, previous) == lc.unusual(previous - step, previous), "a rise and a fall of the same size are judged alike"
+        assert lc.unusual(previous + step, previous) == lc.unusual(
+            previous - step, previous
+        ), "a rise and a fall of the same size are judged alike"
         if previous < lc.UNUSUAL_MIN_PREVIOUS:
             assert lc.unusual(previous + step, previous) is False
     assert lc.unusual(10, None) is False

@@ -12,7 +12,21 @@ from typing import Any
 
 from app.models.fim_event import FimEvent
 
-_ACTIONS = {"CREATED", "UPDATED", "DELETED", "ATTRIBUTES_MODIFIED", "MOVED_FROM", "MOVED_TO", "OPENED", "ACCESSED", "CLOSED", "TRUNCATED", "LINKED", "UNLINKED", "RENAMED"}
+_ACTIONS = {
+    "CREATED",
+    "UPDATED",
+    "DELETED",
+    "ATTRIBUTES_MODIFIED",
+    "MOVED_FROM",
+    "MOVED_TO",
+    "OPENED",
+    "ACCESSED",
+    "CLOSED",
+    "TRUNCATED",
+    "LINKED",
+    "UNLINKED",
+    "RENAMED",
+}
 
 
 def _int(value: Any) -> int | None:
@@ -38,7 +52,9 @@ def _when(row: dict, entry: dict, now: datetime) -> datetime:
     return now
 
 
-def fim_event_from(row: Any, *, entry: dict, node_key: str, hostname: str | None, tenant_id: str, now: datetime | None = None) -> FimEvent | None:
+def fim_event_from(
+    row: Any, *, entry: dict, node_key: str, hostname: str | None, tenant_id: str, now: datetime | None = None
+) -> FimEvent | None:
     """A ``FimEvent`` for a ``file_events`` row, else None (pure: nothing is stored here)."""
     if not isinstance(row, dict):
         return None

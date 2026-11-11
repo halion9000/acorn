@@ -26,7 +26,9 @@ class _Worker:
     last_error: str | None = None
     passes: int = 0
     next_within: float | None = None  # this pass told us when to expect the next (a worker that backs off after failures)
-    recent: deque[tuple[float, str | None]] = field(default_factory=lambda: deque(maxlen=RECENT_PASSES))  # (when, error or None), oldest first
+    recent: deque[tuple[float, str | None]] = field(
+        default_factory=lambda: deque(maxlen=RECENT_PASSES)
+    )  # (when, error or None), oldest first
 
 
 _WORKERS: dict[str, _Worker] = {}
@@ -35,7 +37,9 @@ _WORKERS: dict[str, _Worker] = {}
 def expect(name: str, interval_seconds: float, first_turn_after_seconds: float = 0, now: float | None = None) -> None:
     """A worker announces itself: how often it runs, and how long before its first pass (many sleep first)."""
     t = time.monotonic() if now is None else now
-    _WORKERS[name] = _Worker(interval=max(1.0, float(interval_seconds)), first_turn_after=max(0.0, float(first_turn_after_seconds)), registered_at=t)
+    _WORKERS[name] = _Worker(
+        interval=max(1.0, float(interval_seconds)), first_turn_after=max(0.0, float(first_turn_after_seconds)), registered_at=t
+    )
 
 
 def beat(name: str, error: str | None = None, now: float | None = None, next_within_seconds: float | None = None) -> None:

@@ -23,7 +23,11 @@ OWNED = {m.class_.__name__ for m in Base.registry.mappers if hasattr(m.class_, "
 
 # (file, function, model): a fetch whose row's tenant is knowingly not examined, with the reason. Empty: there is none.
 ALLOWED: dict[tuple[str, str, str], str] = {
-    ("client_status.py", "public_status", "ClientStatusLink"): "the public status page has no signed-in caller: the link is found by the hash of its secret and this re-read is by the id of that same row, taken after adopting the link's own tenant (last_opened_at only), so no caller-chosen id is fetched and there is no caller tenant to compare",
+    (
+        "client_status.py",
+        "public_status",
+        "ClientStatusLink",
+    ): "the public status page has no signed-in caller: the link is found by the hash of its secret and this re-read is by the id of that same row, taken after adopting the link's own tenant (last_opened_at only), so no caller-chosen id is fetched and there is no caller tenant to compare",
 }
 
 

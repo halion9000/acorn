@@ -252,7 +252,13 @@ async def _all_tool_checks(db: Any, owner: uuid.UUID, client_id: uuid.UUID, alia
                 owner=owners.get(str(c["key"]), (None, None))[0],
                 due_date=owners.get(str(c["key"]), (None, None))[1],
                 overdue=is_overdue(str(c["status"]), owners.get(str(c["key"]), (None, None))[1], datetime.now(UTC).date()),
-                **dict(zip(("target_hours", "over_target"), standing(str(c["key"]), str(c["status"]), since.get(str(c["key"])), now), strict=True)),
+                **dict(
+                    zip(
+                        ("target_hours", "over_target"),
+                        standing(str(c["key"]), str(c["status"]), since.get(str(c["key"])), now),
+                        strict=True,
+                    )
+                ),
                 comments=comment_counts.get(str(c["key"]), 0),
             )
             for c in (row.checks or [])
@@ -416,7 +422,11 @@ class ToolExclusionsOut(BaseModel):
     choices: list[str]
 
 
-@router.get("/{client_id}/tool-exclusions", response_model=ToolExclusionsOut, summary="The tools this client does not use, which are never reported as missing for it")
+@router.get(
+    "/{client_id}/tool-exclusions",
+    response_model=ToolExclusionsOut,
+    summary="The tools this client does not use, which are never reported as missing for it",
+)
 async def get_tool_exclusions(
     client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
 ) -> ToolExclusionsOut:
@@ -467,7 +477,9 @@ async def put_tool_exclusions(
     forget_loaded()
     fleet_cache.clear()
     if chosen and before != chosen:
-        await tool_exclusions.run_excluded_present(db, owner, [client_id])  # marking a tool as not used while it reports devices is itself worth an alert
+        await tool_exclusions.run_excluded_present(
+            db, owner, [client_id]
+        )  # marking a tool as not used while it reports devices is itself worth an alert
         await db.commit()
     return ToolExclusionsOut(tools=chosen, choices=list(tool_exclusions.EXCLUDABLE))
 
@@ -1064,7 +1076,9 @@ async def _read_fleet_checks(
 ) -> tuple[list[FleetCheck], dict[uuid.UUID, str], dict[uuid.UUID, dict[str, datetime]]]:
     _ids, clients = await _scope(db, owner, None)
     shown, names = _ids[1:], clients
-    settings_of = {r.id: r.settings for r in (await db.execute(select(Tenant.id, Tenant.settings).where(Tenant.parent_tenant_id == owner))).all()}
+    settings_of = {
+        r.id: r.settings for r in (await db.execute(select(Tenant.id, Tenant.settings).where(Tenant.parent_tenant_id == owner))).all()
+    }
     sources = list(TOOL_CHECK_SOURCES)
     now = datetime.now(UTC)
     out: list[FleetCheck] = []

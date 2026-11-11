@@ -176,7 +176,9 @@ async def approval_agreement(user: AuthUser, db: TenantDBSession) -> AgreementRe
     Only reports; it never changes an autonomy setting. See ``app.services.autonomy_agreement`` for the rules.
     """
     since = datetime.now(UTC) - timedelta(days=agreement.WINDOW_DAYS)
-    stmt = select(AgentApproval.action, AgentApproval.title, AgentApproval.status, AgentApproval.created_at).where(AgentApproval.tenant_id == user.tenant_id, AgentApproval.created_at >= since)
+    stmt = select(AgentApproval.action, AgentApproval.title, AgentApproval.status, AgentApproval.created_at).where(
+        AgentApproval.tenant_id == user.tenant_id, AgentApproval.created_at >= since
+    )
     rows = [{"action": a, "title": t, "status": st, "created_at": c} for a, t, st, c in (await db.execute(stmt)).all()]
     out = agreement.summarize(rows, datetime.now(UTC))
     return AgreementResponse(
@@ -259,7 +261,9 @@ async def create_approval(
         # A person already said "always allow this" for this kind of action: approve it now, say which decision did it, and leave an audit entry.
         row.status = "approved"
         row.decided_at = datetime.now(UTC)
-        row.decision_comment = f"Approved by a standing approval ({standing.action_type}, until {standing.expires_at.date().isoformat()}) made by a person."
+        row.decision_comment = (
+            f"Approved by a standing approval ({standing.action_type}, until {standing.expires_at.date().isoformat()}) made by a person."
+        )
         row.standing_approval_id = standing.id
         await emit_audit(
             db=db,
@@ -282,9 +286,24 @@ async def create_approval(
 async def _matching_standing_approval(db: Any, tenant_id: uuid.UUID, action: dict[str, Any], title: str) -> StandingApproval | None:
     """The first active standing approval of this tenant that covers the card, or None. Matching is the pure function in app.services.standing_approvals."""
     now = datetime.now(UTC)
-    rows = (await db.execute(select(StandingApproval).where(StandingApproval.tenant_id == tenant_id, StandingApproval.revoked_at.is_(None), StandingApproval.expires_at > now))).scalars().all()
+    rows = (
+        (
+            await db.execute(
+                select(StandingApproval).where(
+                    StandingApproval.tenant_id == tenant_id, StandingApproval.revoked_at.is_(None), StandingApproval.expires_at > now
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
     for r in rows:
-        if standing_approvals.matches({"action_type": r.action_type, "client_id": r.client_id, "expires_at": r.expires_at, "revoked_at": r.revoked_at}, action, title, now):
+        if standing_approvals.matches(
+            {"action_type": r.action_type, "client_id": r.client_id, "expires_at": r.expires_at, "revoked_at": r.revoked_at},
+            action,
+            title,
+            now,
+        ):
             return r
     return None
 
@@ -295,8 +314,14 @@ UNDO_HOURS = 24
 # Undoing is a person's act, like deciding: a signed-in session, not an API key. Within 24 hours of the decision, once, and only for an approved action that said how it can be reversed. It marks the card
 # and tells the agents service (event ``approval_undone``) to reverse it; the reversal itself is the agent's step.
 @router.post("/{approval_id}/undo", response_model=ApprovalResponse, dependencies=[Depends(require_signed_in_session)])
-async def undo_approval(approval_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("cases:write"))], db: TenantDBSession) -> ApprovalResponse:
-    row = (await db.execute(select(AgentApproval).where(AgentApproval.id == approval_id, AgentApproval.tenant_id == user.tenant_id).with_for_update())).scalar_one_or_none()
+async def undo_approval(
+    approval_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("cases:write"))], db: TenantDBSession
+) -> ApprovalResponse:
+    row = (
+        await db.execute(
+            select(AgentApproval).where(AgentApproval.id == approval_id, AgentApproval.tenant_id == user.tenant_id).with_for_update()
+        )
+    ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found")
     problem = undo_problem(row.status, row.undo, row.decided_at, row.undone_at, datetime.now(UTC))
@@ -304,7 +329,15 @@ async def undo_approval(approval_id: uuid.UUID, user: Annotated[AuthUser, Depend
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=problem)
     row.undone_at = datetime.now(UTC)
     row.undone_by_id = user.user_id
-    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="approval:undone", resource="agent_approval", resource_id=str(row.id), changes={"undo": row.undo})
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="approval:undone",
+        resource="agent_approval",
+        resource_id=str(row.id),
+        changes={"undo": row.undo},
+    )
     await db.commit()
     await db.refresh(row)
     await _notify_realtime(row, event="approval_undone")

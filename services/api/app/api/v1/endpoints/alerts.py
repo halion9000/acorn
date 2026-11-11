@@ -725,7 +725,12 @@ def _aware(moment: datetime) -> datetime:
 def _repeat_key() -> tuple:
     """What makes two alerts repeats of each other: the same rule (or title) about the same machines and the same users."""
     # The client is part of the key: two clients can each have a machine called PC-01, and their alerts are never repeats of each other (this lets several clients be read in one query).
-    return (Alert.tenant_id, func.lower(func.coalesce(Alert.rule_name, Alert.title)), cast(Alert.affected_hosts, Text), cast(Alert.affected_users, Text))
+    return (
+        Alert.tenant_id,
+        func.lower(func.coalesce(Alert.rule_name, Alert.title)),
+        cast(Alert.affected_hosts, Text),
+        cast(Alert.affected_users, Text),
+    )
 
 
 async def _newest_of_each_repeat(db: Any, flt: Any, limit: int, offset: int) -> tuple[int, list[tuple[Alert, int]]]:
@@ -902,7 +907,11 @@ async def list_alerts(
 
     async def add_tally(tid: uuid.UUID) -> int:
         """Add one tenant's counts to the tally and return how many alerts it has (under the ``source`` filter). The caller has the session scoped to that tenant."""
-        base = and_(Alert.tenant_id == tid, *date_filters, Alert.raw_event["source"].astext == source) if source else and_(Alert.tenant_id == tid, *date_filters)
+        base = (
+            and_(Alert.tenant_id == tid, *date_filters, Alert.raw_event["source"].astext == source)
+            if source
+            else and_(Alert.tenant_id == tid, *date_filters)
+        )
         grouped = (
             await db.execute(select(Alert.severity, Alert.status, func.count()).where(base).group_by(Alert.severity, Alert.status))
         ).all()
@@ -951,15 +960,27 @@ async def list_alerts(
         flt = or_(*parts) if parts else false()
         async with cross_tenant_reads(db):
             if reading:
-                scoped_base = and_(Alert.tenant_id.in_(reading), *date_filters, Alert.raw_event["source"].astext == source) if source else and_(Alert.tenant_id.in_(reading), *date_filters)
-                for sev, st, n in (await db.execute(select(Alert.severity, Alert.status, func.count()).where(scoped_base).group_by(Alert.severity, Alert.status))).all():
+                scoped_base = (
+                    and_(Alert.tenant_id.in_(reading), *date_filters, Alert.raw_event["source"].astext == source)
+                    if source
+                    else and_(Alert.tenant_id.in_(reading), *date_filters)
+                )
+                for sev, st, n in (
+                    await db.execute(
+                        select(Alert.severity, Alert.status, func.count()).where(scoped_base).group_by(Alert.severity, Alert.status)
+                    )
+                ).all():
                     tally["total"] += n
                     tally["critical"] += n if sev == "critical" else 0
                     tally["high"] += n if sev == "high" else 0
                     tally["unresolved"] += n if st in _UNRESOLVED else 0
                 if tally["total"]:
                     tally["no_ticket"] += (
-                        await db.execute(select(func.count()).select_from(Alert).where(and_(scoped_base, Alert.status.notin_(FINISHED_STATUSES), not_(has_ticket_expr()))))
+                        await db.execute(
+                            select(func.count())
+                            .select_from(Alert)
+                            .where(and_(scoped_base, Alert.status.notin_(FINISHED_STATUSES), not_(has_ticket_expr())))
+                        )
                     ).scalar_one() or 0
             tallied.update(scope)
             if collapse:
@@ -968,7 +989,11 @@ async def list_alerts(
                 repeats = {alert.id: n for alert, n in found}
             else:
                 total = (await db.execute(select(func.count()).select_from(Alert).where(flt))).scalar_one()
-                rows = (await db.execute(select(Alert).where(flt).order_by(Alert.created_at.desc(), Alert.id).offset(offset).limit(page_size))).scalars().all()
+                rows = (
+                    (await db.execute(select(Alert).where(flt).order_by(Alert.created_at.desc(), Alert.id).offset(offset).limit(page_size)))
+                    .scalars()
+                    .all()
+                )
 
     # The tally covers the whole scope (within the chosen dates), so it doesn't change as the severity / status buttons are used.
     for tid in scope:
@@ -1075,7 +1100,9 @@ async def get_alert_queue(
 
 
 @router.get("/{alert_id}/earlier-outcomes")
-async def earlier_outcomes(alert_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> dict[str, Any]:
+async def earlier_outcomes(
+    alert_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
+) -> dict[str, Any]:
     """What usually happened to earlier alerts of the same kind (same client, same exact title, last 180 days): how they ended, how often a ticket was made, the median time. Counts only, and "too few" under three."""
     async with alert_scope(db, current_user.tenant_id, alert_id) as tid:
         this = (await db.execute(select(Alert.title).where(Alert.id == alert_id, Alert.tenant_id == tid))).first()
@@ -1084,13 +1111,23 @@ async def earlier_outcomes(alert_id: uuid.UUID, current_user: Annotated[AuthUser
         since = datetime.now(UTC) - timedelta(days=alert_outcomes.WINDOW_DAYS)
         found = (
             await db.execute(
-                select(Alert.status, Alert.disposition, has_ticket_expr().label("has_ticket"), Alert.created_at, Alert.resolved_at, Alert.stale_at)
+                select(
+                    Alert.status,
+                    Alert.disposition,
+                    has_ticket_expr().label("has_ticket"),
+                    Alert.created_at,
+                    Alert.resolved_at,
+                    Alert.stale_at,
+                )
                 .where(Alert.tenant_id == tid, Alert.title == this[0], Alert.id != alert_id, Alert.created_at >= since)
                 .limit(2000)
             )
         ).all()
     return alert_outcomes.summarize(
-        [{"status": r[0], "disposition": r[1], "has_ticket": bool(r[2]), "created_at": r[3], "resolved_at": r[4], "stale_at": r[5]} for r in found]
+        [
+            {"status": r[0], "disposition": r[1], "has_ticket": bool(r[2]), "created_at": r[3], "resolved_at": r[4], "stale_at": r[5]}
+            for r in found
+        ]
     )
 
 
@@ -1313,7 +1350,9 @@ async def bulk_close_alerts(
                 raise
             missing += 1
     await db.commit()
-    return BulkCloseResponse(closed=closed, already_finished=already, not_found=missing, status=body.status, reason=reason, closed_items=closed_items)
+    return BulkCloseResponse(
+        closed=closed, already_finished=already, not_found=missing, status=body.status, reason=reason, closed_items=closed_items
+    )
 
 
 BULK_CLOSE_UNDO_MINUTES = 10
@@ -1321,7 +1360,9 @@ BULK_CLOSE_UNDO_MINUTES = 10
 
 class UndoItem(BaseModel):
     id: uuid.UUID
-    status_from: str = Field(pattern=r"^[a-z_]{1,32}$", description="The status the alert had before the bulk close, as the close answered it.")
+    status_from: str = Field(
+        pattern=r"^[a-z_]{1,32}$", description="The status the alert had before the bulk close, as the close answered it."
+    )
 
 
 class BulkCloseUndoRequest(BaseModel):
@@ -1349,7 +1390,9 @@ async def undo_bulk_close(
     changed since is left alone and counted, as is one closed longer ago. It can only be put back to a status that is not itself finished. Each alert put back is written to the audit log.
     """
     if any(is_finished(i.status_from) for i in body.items):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="An alert can only be put back to a status that is not finished.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="An alert can only be put back to a status that is not finished."
+        )
     reopened = changed = late = missing = 0
     now = datetime.now(UTC)
     for item in {i.id: i for i in body.items}.values():
@@ -1417,7 +1460,11 @@ async def bulk_assign_alerts(
     note = " ".join((body.note or "").split()) or None
     name: str | None = None
     if body.assignee_id is not None:
-        person = (await db.execute(select(User).where(User.id == body.assignee_id, User.tenant_id == current_user.tenant_id, User.is_active.is_(True)))).scalar_one_or_none()
+        person = (
+            await db.execute(
+                select(User).where(User.id == body.assignee_id, User.tenant_id == current_user.tenant_id, User.is_active.is_(True))
+            )
+        ).scalar_one_or_none()
         if person is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That person is not in this workspace, or is switched off.")
         name = person.email or person.account_name
@@ -1445,7 +1492,11 @@ async def bulk_assign_alerts(
                     action="alerts:bulk_assign",
                     resource="alert",
                     resource_id=str(alert_id),
-                    changes={"assignee_from": str(before) if before else None, "assignee_to": str(body.assignee_id) if body.assignee_id else None, "note": note},
+                    changes={
+                        "assignee_from": str(before) if before else None,
+                        "assignee_to": str(body.assignee_id) if body.assignee_id else None,
+                        "note": note,
+                    },
                     request=request,
                 )
                 assigned += 1
@@ -1454,7 +1505,9 @@ async def bulk_assign_alerts(
                 raise
             missing += 1
     await db.commit()
-    return BulkAssignResponse(assigned=assigned, already_finished=already, not_found=missing, assignee_id=body.assignee_id, assignee_name=name)
+    return BulkAssignResponse(
+        assigned=assigned, already_finished=already, not_found=missing, assignee_id=body.assignee_id, assignee_name=name
+    )
 
 
 @router.patch("/{alert_id}", response_model=AlertResponse)

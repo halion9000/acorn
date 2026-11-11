@@ -59,7 +59,17 @@ class TestEffective:
         # an older saved value of Viewer plus a custom role means the same thing: the custom role alone
         assert sdr.effective({sdr.KEY: sdr.stored("viewer", cid)}, "viewer") == ("custom", cid, "setting")
 
-    @pytest.mark.parametrize("bad", [{"role": "tenant_admin"}, {"role": "platform_admin"}, {"role": "nonsense"}, {"role": "viewer", "custom_role_id": "not-a-uuid"}, "text", 5])
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            {"role": "tenant_admin"},
+            {"role": "platform_admin"},
+            {"role": "nonsense"},
+            {"role": "viewer", "custom_role_id": "not-a-uuid"},
+            "text",
+            5,
+        ],
+    )
     def test_an_unusable_stored_value_falls_back_to_the_server_setting(self, bad):
         assert sdr.effective({sdr.KEY: bad}, "viewer")[2] == "server"
 
@@ -132,7 +142,14 @@ class TestTheNewPersonIsCreatedWithIt:
 
 class TestChoosingIt:
     def caller(self, tenant_id, can_grant=lambda role: True, holds=lambda name: True):
-        return SimpleNamespace(tenant_id=tenant_id, user_id=uuid.uuid4(), email="boss@example.test", can_grant_role=can_grant, holds=holds, holds_wildcard=lambda: True)
+        return SimpleNamespace(
+            tenant_id=tenant_id,
+            user_id=uuid.uuid4(),
+            email="boss@example.test",
+            can_grant_role=can_grant,
+            holds=holds,
+            holds_wildcard=lambda: True,
+        )
 
     def put(self, s, home, body, caller=None, env=None, monkeypatch=None):
         for k, v in (env if env is not None else sso_env(home.id)).items():
@@ -160,9 +177,14 @@ class TestChoosingIt:
             return out, home.settings
 
         out, settings = run(body)
-        assert (out.role, out.source) == ("soc_analyst", "setting") and settings["other"] == 1 and settings[sdr.KEY]["role"] == "soc_analyst"
+        assert (
+            (out.role, out.source) == ("soc_analyst", "setting") and settings["other"] == 1 and settings[sdr.KEY]["role"] == "soc_analyst"
+        )
         assert audit.await_args.kwargs["action"] == "sso:default_role_changed"
-        assert audit.await_args.kwargs["changes"]["after"]["role"] == "soc_analyst" and audit.await_args.kwargs["changes"]["before"]["role"] == "viewer"
+        assert (
+            audit.await_args.kwargs["changes"]["after"]["role"] == "soc_analyst"
+            and audit.await_args.kwargs["changes"]["before"]["role"] == "viewer"
+        )
 
     def test_a_custom_role_is_saved_as_the_one_role(self, monkeypatch):
         monkeypatch.setattr(rbac, "emit_audit", AsyncMock())
@@ -196,9 +218,21 @@ class TestChoosingIt:
             s.add(RolePermission(role_id=role.id, permission_id=perm.id))
             await s.commit()
             with pytest.raises(HTTPException) as built_in:  # a built-in role above the caller's own
-                await self.put(s, home, rbac.SsoDefaultIn(role="soc_lead"), caller=self.caller(home.id, can_grant=lambda r: False), monkeypatch=monkeypatch)
+                await self.put(
+                    s,
+                    home,
+                    rbac.SsoDefaultIn(role="soc_lead"),
+                    caller=self.caller(home.id, can_grant=lambda r: False),
+                    monkeypatch=monkeypatch,
+                )
             with pytest.raises(HTTPException) as custom:  # a custom role holding a permission the caller does not have
-                await self.put(s, home, rbac.SsoDefaultIn(role="viewer", custom_role_id=role.id), caller=self.caller(home.id, holds=lambda n: False), monkeypatch=monkeypatch)
+                await self.put(
+                    s,
+                    home,
+                    rbac.SsoDefaultIn(role="viewer", custom_role_id=role.id),
+                    caller=self.caller(home.id, holds=lambda n: False),
+                    monkeypatch=monkeypatch,
+                )
             return built_in.value.status_code, custom.value.status_code
 
         assert run(body) == (403, 403)

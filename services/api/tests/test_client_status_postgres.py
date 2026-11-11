@@ -16,7 +16,10 @@ from sqlalchemy.pool import NullPool
 
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 NOW = datetime.now(UTC)
-pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database")]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database"),
+]
 
 
 async def off(s):
@@ -30,7 +33,10 @@ async def world():
     async with AsyncSession(engine, expire_on_commit=False) as s:
         await off(s)
         await s.execute(text("insert into tenants (id, name, slug) values (:t, 'owner', :s)"), {"t": owner, "s": f"own-{owner.hex[:10]}"})
-        await s.execute(text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, 'Acme Test', :s, :p)"), {"t": client, "s": f"cl-{client.hex[:10]}", "p": owner})
+        await s.execute(
+            text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, 'Acme Test', :s, :p)"),
+            {"t": client, "s": f"cl-{client.hex[:10]}", "p": owner},
+        )
         await s.commit()
         s.info.update(owner=owner, client=client)
         yield s
@@ -43,14 +49,27 @@ async def world():
 
 
 def link(s, token, **over):
-    base = {"tenant_id": s.info["owner"], "client_id": s.info["client"], "token_hash": cs.hash_token(token), "expires_at": NOW + timedelta(days=30), "reviewed_at": NOW}
+    base = {
+        "tenant_id": s.info["owner"],
+        "client_id": s.info["client"],
+        "token_hash": cs.hash_token(token),
+        "expires_at": NOW + timedelta(days=30),
+        "reviewed_at": NOW,
+    }
     return ClientStatusLink(**{**base, **over})
 
 
 async def test_a_live_reviewed_link_returns_the_safe_page_and_every_other_state_is_the_same_404(world):
     s = world
     live, unreviewed, revoked, expired = (cs.new_token() for _ in range(4))
-    s.add_all([link(s, live), link(s, unreviewed, reviewed_at=None), link(s, revoked, revoked_at=NOW), link(s, expired, expires_at=NOW - timedelta(days=1))])
+    s.add_all(
+        [
+            link(s, live),
+            link(s, unreviewed, reviewed_at=None),
+            link(s, revoked, revoked_at=NOW),
+            link(s, expired, expires_at=NOW - timedelta(days=1)),
+        ]
+    )
     await s.commit()
     await off(s)
     page = await public_status(live, Response(), s)
@@ -72,7 +91,9 @@ async def test_the_last_opened_time_is_recorded_and_only_a_hash_is_stored(world)
     await off(s)
     await public_status(token, Response(), s)
     await off(s)
-    row = (await s.execute(text("select token_hash, last_opened_at from client_status_links where tenant_id = :o"), {"o": s.info["owner"]})).one()
+    row = (
+        await s.execute(text("select token_hash, last_opened_at from client_status_links where tenant_id = :o"), {"o": s.info["owner"]})
+    ).one()
     assert row[0] == cs.hash_token(token) and token not in row[0]
     assert row[1] is not None
 

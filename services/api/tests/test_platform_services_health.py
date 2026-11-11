@@ -174,6 +174,10 @@ async def test_the_ones_that_are_down_come_first_then_the_ones_that_are_off_then
             raise httpx.ConnectError("x")
         return httpx.Response(503 if request.url.host == "agents" else 200)
 
-    _serve(monkeypatch, handler, {"fusion": "http://fusion/readyz", "agents": "http://agents/readyz", "purple-team": "http://purple-team/livez"})
+    _serve(
+        monkeypatch,
+        handler,
+        {"fusion": "http://fusion/readyz", "agents": "http://agents/readyz", "purple-team": "http://purple-team/livez"},
+    )
     out = await health.platform_services(user=object(), db=_Db(("app_user", False, False)))
     assert [r["service"] for r in out["services"]] == ["agents", "purple-team", "fusion"]

@@ -25,11 +25,21 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 PW = "correct horse battery staple"
-TABLES = [m.__table__ for m in (Tenant, User, ApiKey, LoginFailure, UserTotp, Role, Permission, RolePermission, UserRole, PasskeyCredential)]
+TABLES = [
+    m.__table__ for m in (Tenant, User, ApiKey, LoginFailure, UserTotp, Role, Permission, RolePermission, UserRole, PasskeyCredential)
+]
 
 
 def make_user(tenant, name, role):
-    return User(id=uuid.uuid4(), tenant_id=tenant.id, account_name=name, email=f"{name}@example.com", username=name, hashed_password=get_password_hash(PW), role=role)
+    return User(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        account_name=name,
+        email=f"{name}@example.com",
+        username=name,
+        hashed_password=get_password_hash(PW),
+        role=role,
+    )
 
 
 @pytest.fixture
@@ -47,7 +57,12 @@ def world(tmp_path, monkeypatch):
         column.server_default = saved
     tenant = Tenant(id=uuid.uuid4(), name="T", slug="t-" + uuid.uuid4().hex[:6])
     other = Tenant(id=uuid.uuid4(), name="U", slug="u-" + uuid.uuid4().hex[:6])
-    boss, second, ann, eve = make_user(tenant, "boss", "tenant_admin"), make_user(tenant, "second", "tenant_admin"), make_user(tenant, "ann", "soc_analyst"), make_user(other, "eve", "soc_analyst")
+    boss, second, ann, eve = (
+        make_user(tenant, "boss", "tenant_admin"),
+        make_user(tenant, "second", "tenant_admin"),
+        make_user(tenant, "ann", "soc_analyst"),
+        make_user(other, "eve", "soc_analyst"),
+    )
     perm = Permission(id=uuid.uuid4(), name="alerts:read", description="read alerts", category="alerts")
     mine = Role(id=uuid.uuid4(), tenant_id=tenant.id, name="Client reviewer", is_system=False)
     theirs = Role(id=uuid.uuid4(), tenant_id=other.id, name="Their role", is_system=False)
@@ -55,7 +70,16 @@ def world(tmp_path, monkeypatch):
         s.add_all([tenant, other, boss, second, ann, eve, perm, mine, theirs])
         s.flush()
         s.add_all([RolePermission(role_id=mine.id, permission_id=perm.id), RolePermission(role_id=theirs.id, permission_id=perm.id)])
-        s.add(PasskeyCredential(tenant_id=tenant.id, user_id=ann.id, credential_id="c1", public_key="k", device_name="Ann phone", created_at=datetime.now(UTC)))
+        s.add(
+            PasskeyCredential(
+                tenant_id=tenant.id,
+                user_id=ann.id,
+                credential_id="c1",
+                public_key="k",
+                device_name="Ann phone",
+                created_at=datetime.now(UTC),
+            )
+        )
         s.commit()
     factory = async_sessionmaker(create_async_engine(f"sqlite+aiosqlite:///{path}", poolclass=NullPool), expire_on_commit=False)
     app = FastAPI()
@@ -67,7 +91,22 @@ def world(tmp_path, monkeypatch):
             yield s
 
     app.dependency_overrides[deps.get_db] = session
-    yield type("World", (), {"audit": audit, "client": TestClient(app), "factory": factory, "boss": boss, "second": second, "ann": ann, "eve": eve, "mine": mine, "theirs": theirs, "tenant": tenant})
+    yield type(
+        "World",
+        (),
+        {
+            "audit": audit,
+            "client": TestClient(app),
+            "factory": factory,
+            "boss": boss,
+            "second": second,
+            "ann": ann,
+            "eve": eve,
+            "mine": mine,
+            "theirs": theirs,
+            "tenant": tenant,
+        },
+    )
     sync.dispose()
 
 
@@ -116,10 +155,14 @@ class TestCustomRoles:
 
     def test_switching_between_a_built_in_role_and_a_custom_role_keeps_one_role(self, world):
         h = login(world, "boss")
-        to_custom = world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "custom", "custom_role_ids": [str(world.mine.id)]}, headers=h)
+        to_custom = world.client.patch(
+            f"/tenants/me/users/{world.ann.id}", json={"role": "custom", "custom_role_ids": [str(world.mine.id)]}, headers=h
+        )
         assert to_custom.status_code == 200 and to_custom.json()["role"] == "custom" and len(to_custom.json()["custom_roles"]) == 1
         # naming a custom role for a built-in one is refused
-        mixed = world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "soc_lead", "custom_role_ids": [str(world.mine.id)]}, headers=h)
+        mixed = world.client.patch(
+            f"/tenants/me/users/{world.ann.id}", json={"role": "soc_lead", "custom_role_ids": [str(world.mine.id)]}, headers=h
+        )
         assert mixed.status_code == 422
         # back to a built-in role clears the custom role
         back = world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "soc_lead"}, headers=h)
@@ -138,7 +181,9 @@ class TestCustomRoles:
 
     def test_the_old_way_of_stacking_a_second_role_is_refused(self, world):
         h = login(world, "boss")
-        r = world.client.post(f"/rbac/users/{world.ann.id}/roles", json={"user_id": str(world.ann.id), "role_id": str(world.mine.id)}, headers=h)
+        r = world.client.post(
+            f"/rbac/users/{world.ann.id}/roles", json={"user_id": str(world.ann.id), "role_id": str(world.mine.id)}, headers=h
+        )
         assert r.status_code in (404, 409)  # the route is not mounted in this test app, or it refuses: either way nothing is stacked
 
 
@@ -168,6 +213,7 @@ class TestDisablingAndRoles:
             await s.commit()
 
         run(world, body)
+
         # boss cannot change their own role (403 first); the rule that protects the last admin also covers someone else demoting them:
         async def check(s):
             boss = await s.get(User, world.boss.id)
@@ -213,7 +259,13 @@ class TestResetMfa:
         assert r.status_code == 200 and "1 passkey" in r.json()["detail"]
 
         async def live(s):
-            return len((await s.execute(select(PasskeyCredential).where(PasskeyCredential.user_id == world.ann.id, PasskeyCredential.revoked_at.is_(None)))).all())
+            return len(
+                (
+                    await s.execute(
+                        select(PasskeyCredential).where(PasskeyCredential.user_id == world.ann.id, PasskeyCredential.revoked_at.is_(None))
+                    )
+                ).all()
+            )
 
         assert run(world, live) == 0
         assert world.client.get("/auth/me", headers=analyst_h).status_code == 401  # their old session no longer works
@@ -303,7 +355,9 @@ class TestPeopleAreAudited:
         world.client.patch(f"/tenants/me/users/{world.ann.id}", json={"role": "custom", "custom_role_ids": [str(world.mine.id)]}, headers=h)
         first, second = self.calls(world)
         assert first["changes"]["is_active"] == {"before": True, "after": False}
-        assert second["changes"]["role"] == {"before": "soc_analyst", "after": "custom"} and second["changes"]["custom_roles"] == ["Client reviewer"]
+        assert second["changes"]["role"] == {"before": "soc_analyst", "after": "custom"} and second["changes"]["custom_roles"] == [
+            "Client reviewer"
+        ]
 
     def test_a_request_that_changes_nothing_is_not_recorded(self, world):
         h = login(world, "boss")
@@ -322,7 +376,12 @@ class TestPeopleAreAudited:
         monkeypatch.setattr(token_revocation, "sign_out_everywhere", AsyncMock())
         h = login(world, "boss")
         assert world.client.post(f"/tenants/me/users/{world.ann.id}/sign-out", headers=h).status_code == 200
-        assert world.client.post(f"/tenants/me/users/{world.ann.id}/password", json={"new_password": "a brand new long passphrase 42"}, headers=h).status_code == 200
+        assert (
+            world.client.post(
+                f"/tenants/me/users/{world.ann.id}/password", json={"new_password": "a brand new long passphrase 42"}, headers=h
+            ).status_code
+            == 200
+        )
         assert world.client.post(f"/tenants/me/users/{world.ann.id}/reset-mfa", headers=h).status_code == 200
         assert world.client.delete(f"/tenants/me/users/{world.ann.id}", headers=h).status_code == 200
         got = {c["action"]: c for c in self.calls(world)}

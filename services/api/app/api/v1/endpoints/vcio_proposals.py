@@ -113,7 +113,9 @@ async def _rows(db: Any, owner: uuid.UUID, client_id: uuid.UUID) -> list[ClientV
         )
 
 
-@router.get("/{client_id}/vcio-proposals", response_model=ProposalsOut, summary="What A.C.O.R.N suggests adding to this client's vCIO Toolbox")
+@router.get(
+    "/{client_id}/vcio-proposals", response_model=ProposalsOut, summary="What A.C.O.R.N suggests adding to this client's vCIO Toolbox"
+)
 async def list_proposals(
     client_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
 ) -> ProposalsOut:

@@ -83,7 +83,9 @@ async def waiting_count(db, cfg, now: datetime | None = None) -> int:
     """How many alerts are waiting to be emailed right now, by the worker's own rule; 0 while alert email is off (nothing is waiting for a switch that is off)."""
     if not cfg.enabled:
         return 0
-    return int((await db.execute(select(func.count()).select_from(alerts_t).where(unsent_condition(cfg, now or datetime.now(UTC))))).scalar_one())
+    return int(
+        (await db.execute(select(func.count()).select_from(alerts_t).where(unsent_condition(cfg, now or datetime.now(UTC))))).scalar_one()
+    )
 
 
 async def run_once(*, session_factory: Callable | None = None, mailer: GraphMailer | None = None, now: datetime | None = None) -> RunResult:

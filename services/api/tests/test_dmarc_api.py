@@ -48,6 +48,7 @@ class FakeResolver:
 def settings_and_rls(monkeypatch):
     ep._MX_CACHE.clear()
     ep._PUBLISHED_CACHE.clear()
+
     @contextlib.asynccontextmanager
     async def plain(_db):
         yield
@@ -100,7 +101,6 @@ async def no_policy_fetch(url):
     raise AssertionError("no MTA-STS record was published, so no policy file should be fetched")
 
 
-
 def caller(owner):
     return SimpleNamespace(tenant_id=owner.id)
 
@@ -109,12 +109,22 @@ def test_the_overview_adds_up_each_client_domain_and_lists_the_worst_first():
     async def body(s):
         owner = await tenant(s, "Owner")
         acme, birch = await tenant(s, "Acme", owner.id), await tenant(s, "Birch", owner.id)
-        s.add_all([rep(acme.id, "acme.com", 100, 99), rep(acme.id, "acme.com", 100, 91, days_ago=2, policy="reject"), rep(birch.id, "birch.com", 50, 10), rep(birch.id, "old.com", 10, 10, days_ago=60)])
+        s.add_all(
+            [
+                rep(acme.id, "acme.com", 100, 99),
+                rep(acme.id, "acme.com", 100, 91, days_ago=2, policy="reject"),
+                rep(birch.id, "birch.com", 50, 10),
+                rep(birch.id, "old.com", 10, 10, days_ago=60),
+            ]
+        )
         await s.commit()
         return await ep.overview(caller(owner), s, days=30)
 
     out = run(body)
-    assert [d.domain for d in out.domains] == ["birch.com", "acme.com"]  # birch.com is the worst (20%), the 60-day-old report is outside the window
+    assert [d.domain for d in out.domains] == [
+        "birch.com",
+        "acme.com",
+    ]  # birch.com is the worst (20%), the 60-day-old report is outside the window
     acme = out.domains[1]
     assert (acme.reports, acme.total, acme.passed, acme.failed, acme.pass_rate, acme.client_name) == (2, 200, 190, 10, 95.0, "Acme")
     assert acme.policy == "none"  # the newest report's published policy (the 1-day-old one)
@@ -148,8 +158,28 @@ def test_one_owner_never_sees_another_owners_reports():
 
 
 def test_a_domain_shows_its_daily_series_and_the_biggest_failing_sources():
-    rows_a = [{"ip": "1.2.3.4", "count": 90, "pass": True, "header_from": "acme.com", "envelope_from": "acme.com", "disposition": "none"}, {"ip": "9.9.9.9", "count": 6, "pass": False, "header_from": "acme.com", "envelope_from": "evil.example", "disposition": "quarantine"}]
-    rows_b = [{"ip": "9.9.9.9", "count": 4, "pass": False, "header_from": "acme.com", "envelope_from": "evil.example", "disposition": "quarantine"}, {"ip": "8.8.8.8", "count": 1, "pass": False, "header_from": "acme.com", "envelope_from": "x.example", "disposition": "none"}]
+    rows_a = [
+        {"ip": "1.2.3.4", "count": 90, "pass": True, "header_from": "acme.com", "envelope_from": "acme.com", "disposition": "none"},
+        {
+            "ip": "9.9.9.9",
+            "count": 6,
+            "pass": False,
+            "header_from": "acme.com",
+            "envelope_from": "evil.example",
+            "disposition": "quarantine",
+        },
+    ]
+    rows_b = [
+        {
+            "ip": "9.9.9.9",
+            "count": 4,
+            "pass": False,
+            "header_from": "acme.com",
+            "envelope_from": "evil.example",
+            "disposition": "quarantine",
+        },
+        {"ip": "8.8.8.8", "count": 1, "pass": False, "header_from": "acme.com", "envelope_from": "x.example", "disposition": "none"},
+    ]
 
     async def body(s):
         owner = await tenant(s, "Owner")
@@ -183,7 +213,13 @@ def test_the_status_says_when_the_mailbox_was_last_read_and_what_went_wrong():
         return (await ep.overview(caller(owner), s, days=7)).status
 
     st = run(body)
-    assert (st.configured, st.mailbox, st.last_error, st.stored, st.rejected) == (True, "dmarc@goliveoak.com", "HTTP 403 ErrorAccessDenied", 12, 2)
+    assert (st.configured, st.mailbox, st.last_error, st.stored, st.rejected) == (
+        True,
+        "dmarc@goliveoak.com",
+        "HTTP 403 ErrorAccessDenied",
+        12,
+        2,
+    )
 
 
 def test_the_setup_gives_each_client_domain_an_alias_and_the_dns_line_for_your_zone():
@@ -194,11 +230,13 @@ def test_the_setup_gives_each_client_domain_an_alias_and_the_dns_line_for_your_z
             [
                 IdentityMfaUser(tenant_id=acme.id, source="m365", user_id="u1", upn="a@acmedental.com", snapshot_id=uuid.uuid4()),
                 IdentityMfaUser(tenant_id=acme.id, source="m365", user_id="u2", upn="b@acmedental.com", snapshot_id=uuid.uuid4()),
-                IdentitySource(tenant_id=acme.id, vendor="huntress", external_id="x", email="c@gmail.com"),  # a provider domain is not a client's
+                IdentitySource(
+                    tenant_id=acme.id, vendor="huntress", external_id="x", email="c@gmail.com"
+                ),  # a provider domain is not a client's
             ]
         )
         await s.commit()
-        return await ep.setup(caller(owner), s, FakeResolver({'acmedental.com': ['mail.acmedental.com']}))
+        return await ep.setup(caller(owner), s, FakeResolver({"acmedental.com": ["mail.acmedental.com"]}))
 
     out = run(body)
     assert (out.mailbox, out.mailbox_domain) == ("dmarc@goliveoak.com", "goliveoak.com")
@@ -254,7 +292,11 @@ def test_aliases_are_readable_the_random_slug_tail_is_dropped_and_no_two_clients
 
 
 def test_a_domain_with_no_mail_records_is_marked_and_one_with_mail_or_an_unclear_lookup_is_not():
-    r = FakeResolver(mx={"mail.example": ["mx1.mail.example"], "null.example": [""], "slow.example": ["mx.slow.example"]}, flaky={"slow.example": 1}, broken=["down.example"])
+    r = FakeResolver(
+        mx={"mail.example": ["mx1.mail.example"], "null.example": [""], "slow.example": ["mx.slow.example"]},
+        flaky={"slow.example": 1},
+        broken=["down.example"],
+    )
     got = asyncio.run(ep.mail_domains(["mail.example", "none.example", "null.example", "slow.example", "down.example"], r))
     assert got == {
         "mail.example": True,
@@ -294,7 +336,9 @@ def test_the_setup_marks_each_line_with_whether_its_domain_has_mail():
     assert {ln.domain: ln.has_mx for ln in out.lines} == {"acme.com": True, "parked.example": False}
 
 
-def line_row(ip, count, ok=True, dkim=None, spf=None, disposition="none", reason="", spf_domains=(), dkim_domains=(), header_from="acme.com"):
+def line_row(
+    ip, count, ok=True, dkim=None, spf=None, disposition="none", reason="", spf_domains=(), dkim_domains=(), header_from="acme.com"
+):
     return {
         "ip": ip,
         "count": count,
@@ -317,7 +361,9 @@ def test_every_message_lands_in_exactly_one_delivery_outcome():
         line_row("3.3.3.3", 5, ok=False, reason="forwarded"),  # delivered because the receiver overrode the policy
         line_row("4.4.4.4", 4, ok=False, disposition="quarantine"),
         line_row("5.5.5.5", 3, ok=False, disposition="reject"),
-        line_row("6.6.6.6", 2, ok=False, disposition="quarantine", reason="forwarded"),  # what the receiver did decides: quarantined, not overridden
+        line_row(
+            "6.6.6.6", 2, ok=False, disposition="quarantine", reason="forwarded"
+        ),  # what the receiver did decides: quarantined, not overridden
     ]
     assert [ep.delivery_class(r) for r in rows] == ["passed", "failed_delivered", "overridden", "quarantined", "rejected", "quarantined"]
 
@@ -335,7 +381,10 @@ def test_every_message_lands_in_exactly_one_delivery_outcome():
 
 
 def test_failure_rates_overall_and_per_day_count_dkim_and_spf_separately():
-    day1 = [line_row("1.1.1.1", 90), line_row("2.2.2.2", 10, ok=False, dkim=False, spf=True)]  # fails DKIM only; DMARC passes? no: pass=False here, so DMARC fails
+    day1 = [
+        line_row("1.1.1.1", 90),
+        line_row("2.2.2.2", 10, ok=False, dkim=False, spf=True),
+    ]  # fails DKIM only; DMARC passes? no: pass=False here, so DMARC fails
     day3 = [line_row("1.1.1.1", 100)]
 
     async def body(s):
@@ -396,7 +445,13 @@ def test_insights_can_be_narrowed_to_one_client_and_never_include_another_owners
         owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
         acme, birch = await tenant(s, "Acme", owner.id), await tenant(s, "Birch", owner.id)
         theirs = await tenant(s, "Theirs", other.id)
-        s.add_all([rep(acme.id, "acme.com", 10, 10, rows=[line_row("1.1.1.1", 10)]), rep(birch.id, "birch.com", 20, 20, rows=[line_row("2.2.2.2", 20)]), rep(theirs.id, "theirs.com", 99, 99, rows=[line_row("3.3.3.3", 99)])])
+        s.add_all(
+            [
+                rep(acme.id, "acme.com", 10, 10, rows=[line_row("1.1.1.1", 10)]),
+                rep(birch.id, "birch.com", 20, 20, rows=[line_row("2.2.2.2", 20)]),
+                rep(theirs.id, "theirs.com", 99, 99, rows=[line_row("3.3.3.3", 99)]),
+            ]
+        )
         await s.commit()
         everyone = await ep.insights(caller(owner), s, days=30, domain=None, client_id=None)
         just_acme = await ep.insights(caller(owner), s, days=30, domain=None, client_id=str(acme.id))
@@ -494,7 +549,12 @@ def test_countries_never_include_another_owners_mail_and_a_foreign_client_is_ref
     async def body(s):
         owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
         theirs = await tenant(s, "Theirs", other.id)
-        s.add_all([rep(owner.id, "goliveoak.com", 5, 5, rows=[line_row("8.8.8.8", 5)]), rep(theirs.id, "theirs.com", 99, 99, rows=[line_row("1.1.1.1", 99)])])
+        s.add_all(
+            [
+                rep(owner.id, "goliveoak.com", 5, 5, rows=[line_row("8.8.8.8", 5)]),
+                rep(theirs.id, "theirs.com", 99, 99, rows=[line_row("1.1.1.1", 99)]),
+            ]
+        )
         await s.commit()
         mine = await ep.countries(caller(owner), s, r, days=30, domain=None, client_id=None)
         with pytest.raises(HTTPException) as foreign:
@@ -525,7 +585,12 @@ class DnsResolver:
         return []
 
 
-def posture(domain="acme.com", mx=("mx.acme.com",), spf="v=spf1 include:spf.protection.outlook.com -all", dmarc="v=DMARC1; p=none; rua=mailto:a@goliveoak.com"):
+def posture(
+    domain="acme.com",
+    mx=("mx.acme.com",),
+    spf="v=spf1 include:spf.protection.outlook.com -all",
+    dmarc="v=DMARC1; p=none; rua=mailto:a@goliveoak.com",
+):
     from app.services.domain_posture import check_domain
 
     r = DnsResolver({domain: [spf] if spf else [], f"_dmarc.{domain}": [dmarc] if dmarc else []}, {domain: list(mx)})
@@ -565,12 +630,23 @@ def test_a_domain_with_no_mail_records_is_told_it_should_not_send_and_dns_proble
 
 
 def test_the_card_checks_dns_only_for_a_domain_that_has_reports_and_combines_it_with_the_results():
-    resolver = DnsResolver({"acme.com": ["v=spf1 include:spf.protection.outlook.com -all"], "_dmarc.acme.com": ["v=DMARC1; p=none; rua=mailto:a@goliveoak.com"]}, {"acme.com": ["mx.acme.com"]})
+    resolver = DnsResolver(
+        {
+            "acme.com": ["v=spf1 include:spf.protection.outlook.com -all"],
+            "_dmarc.acme.com": ["v=DMARC1; p=none; rua=mailto:a@goliveoak.com"],
+        },
+        {"acme.com": ["mx.acme.com"]},
+    )
 
     async def body(s):
         owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
         acme, theirs = await tenant(s, "Acme", owner.id), await tenant(s, "Theirs", other.id)
-        s.add_all([rep(acme.id, "acme.com", 1000, 990, rows=[line_row("1.1.1.1", 1000)]), rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)])])
+        s.add_all(
+            [
+                rep(acme.id, "acme.com", 1000, 990, rows=[line_row("1.1.1.1", 1000)]),
+                rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)]),
+            ]
+        )
         await s.commit()
         card = await ep.domain_report_card("Acme.com.", caller(owner), s, resolver, no_policy_fetch, days=30)
         before = len(resolver.calls)
@@ -591,7 +667,11 @@ def test_the_card_checks_dns_only_for_a_domain_that_has_reports_and_combines_it_
 
 def test_at_risk_lists_every_sender_with_failures_by_failing_volume_even_when_it_is_not_a_top_sender():
     rows = [line_row(f"20.0.0.{i}", 100 + i) for i in range(1, 12)]  # eleven busy, passing senders push the quiet one out of the top ten
-    rows += [line_row("30.0.0.1", 3, ok=False), line_row("30.0.0.2", 9, ok=False, spf_domains=["spf.protection.outlook.com"]), line_row("30.0.0.2", 500)]
+    rows += [
+        line_row("30.0.0.1", 3, ok=False),
+        line_row("30.0.0.2", 9, ok=False, spf_domains=["spf.protection.outlook.com"]),
+        line_row("30.0.0.2", 500),
+    ]
 
     async def body(s):
         owner = await tenant(s, "Owner")
@@ -620,7 +700,12 @@ def test_lookalikes_are_scanned_only_for_a_domain_in_the_callers_reports_and_mai
     async def body(s):
         owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
         acme, theirs = await tenant(s, "Acme", owner.id), await tenant(s, "Theirs", other.id)
-        s.add_all([rep(acme.id, "acme.com", 10, 10, rows=[line_row("1.1.1.1", 10)]), rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)])])
+        s.add_all(
+            [
+                rep(acme.id, "acme.com", 10, 10, rows=[line_row("1.1.1.1", 10)]),
+                rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)]),
+            ]
+        )
         await s.commit()
         out = await ep.domain_lookalikes("acme.com", caller(owner), s, dns)
         before = len(dns.calls)
@@ -640,12 +725,22 @@ def test_the_bimi_check_runs_only_for_a_domain_in_the_callers_reports_and_never_
         fetched.append(url)
         raise bimi_check_module.FetchRefused("The certificate address did not answer.")
 
-    resolver = DnsResolver({"default._bimi.acme.com": ["v=BIMI1; l=https://acme.com/l.svg; a=https://acme.com/vmc.pem"], "_dmarc.acme.com": ["v=DMARC1; p=reject"]})
+    resolver = DnsResolver(
+        {
+            "default._bimi.acme.com": ["v=BIMI1; l=https://acme.com/l.svg; a=https://acme.com/vmc.pem"],
+            "_dmarc.acme.com": ["v=DMARC1; p=reject"],
+        }
+    )
 
     async def body(s):
         owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
         acme, theirs = await tenant(s, "Acme", owner.id), await tenant(s, "Theirs", other.id)
-        s.add_all([rep(acme.id, "acme.com", 10, 10, rows=[line_row("1.1.1.1", 10)]), rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)])])
+        s.add_all(
+            [
+                rep(acme.id, "acme.com", 10, 10, rows=[line_row("1.1.1.1", 10)]),
+                rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)]),
+            ]
+        )
         await s.commit()
         out = await ep.domain_bimi("acme.com", caller(owner), s, resolver, fetch)
         with pytest.raises(HTTPException) as foreign:
@@ -702,7 +797,14 @@ def test_reputation_combines_registration_with_the_domains_own_mail_and_says_unk
 
     async def good(url):
         asked.append(url)
-        return json.dumps({"events": [{"eventAction": "registration", "eventDate": "2010-01-01T00:00:00Z"}, {"eventAction": "expiration", "eventDate": "2040-01-01T00:00:00Z"}]}).encode()
+        return json.dumps(
+            {
+                "events": [
+                    {"eventAction": "registration", "eventDate": "2010-01-01T00:00:00Z"},
+                    {"eventAction": "expiration", "eventDate": "2040-01-01T00:00:00Z"},
+                ]
+            }
+        ).encode()
 
     async def refused(url):
         raise sf.FetchRefused("The address did not answer.")
@@ -710,7 +812,12 @@ def test_reputation_combines_registration_with_the_domains_own_mail_and_says_unk
     async def body(s):
         owner, other = await tenant(s, "Owner"), await tenant(s, "Other")
         acme, theirs = await tenant(s, "Acme", owner.id), await tenant(s, "Theirs", other.id)
-        s.add_all([rep(acme.id, "acme.com", 1000, 800, policy="quarantine", rows=[line_row("1.1.1.1", 1000)]), rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)])])
+        s.add_all(
+            [
+                rep(acme.id, "acme.com", 1000, 800, policy="quarantine", rows=[line_row("1.1.1.1", 1000)]),
+                rep(theirs.id, "theirs.com", 5, 5, rows=[line_row("2.2.2.2", 5)]),
+            ]
+        )
         await s.commit()
         ok = await ep.domain_reputation("acme.com", caller(owner), s, good, days=30)
         before = len(asked)
@@ -724,7 +831,9 @@ def test_reputation_combines_registration_with_the_domains_own_mail_and_says_unk
     assert facts["Registered"].tone == "good" and facts["Registration ends"].tone == "good"
     assert facts["Its own mail"].tone == "bad" and "80.0%" in facts["Its own mail"].text  # 800 of 1000 pass
     assert facts["DMARC policy"].tone == "good" and asked == ["https://rdap.org/domain/acme.com"]
-    assert {f.label: f for f in down.facts}["Registered"].tone == "unknown" and "did not answer" in {f.label: f for f in down.facts}["Registered"].text
+    assert {f.label: f for f in down.facts}["Registered"].tone == "unknown" and "did not answer" in {f.label: f for f in down.facts}[
+        "Registered"
+    ].text
     assert foreign == 404 and after == before  # no lookup for another owner's domain
 
 
@@ -732,8 +841,19 @@ def tls_row(tenant_id, domain, success, failure, failures=(), days_ago=1, matche
     from app.models.dmarc import TlsReport
 
     end = NOW - timedelta(days=days_ago)
-    return TlsReport(tenant_id=tenant_id, matched=matched, domain=domain, reporter="google.com", report_id=rid or uuid.uuid4().hex, policy_type="sts", begin_at=end - timedelta(days=1), end_at=end,
-                     success=success, failure=failure, failures=[{"type": t, "count": n} for t, n in failures])
+    return TlsReport(
+        tenant_id=tenant_id,
+        matched=matched,
+        domain=domain,
+        reporter="google.com",
+        report_id=rid or uuid.uuid4().hex,
+        policy_type="sts",
+        begin_at=end - timedelta(days=1),
+        end_at=end,
+        success=success,
+        failure=failure,
+        failures=[{"type": t, "count": n} for t, n in failures],
+    )
 
 
 def test_tls_reports_are_summed_per_domain_with_the_worst_first_and_never_include_another_owners():
@@ -755,7 +875,10 @@ def test_tls_reports_are_summed_per_domain_with_the_worst_first_and_never_includ
         return await ep.tls_overview(caller(owner), s, days=30)
 
     out = run(body)
-    assert [d.domain for d in out.domains] == ["acme.com", "goliveoak.com"]  # worst first; the old report and the other owner's are left out
+    assert [d.domain for d in out.domains] == [
+        "acme.com",
+        "goliveoak.com",
+    ]  # worst first; the old report and the other owner's are left out
     acme_row = out.domains[0]
     assert (acme_row.reports, acme_row.success, acme_row.failure, acme_row.success_rate) == (2, 190, 10, 95.0)
     assert [(f.type, f.count) for f in acme_row.failures] == [("certificate-expired", 6), ("starttls-not-supported", 4)]
@@ -787,7 +910,9 @@ def test_the_advice_warns_near_the_spf_lookup_limit_and_says_when_it_is_only_a_m
     near = adv("none", 99.0, 5000, good, SpfLookups(9, True, False))
     assert any("9 of the 10 DNS lookups" in a for a in near)
     assert not any("DNS lookups" in a for a in adv("none", 99.0, 5000, good, SpfLookups(5, True, False)))
-    assert not any("of the 10 DNS lookups" in a for a in adv("none", 99.0, 5000, good, SpfLookups(9, False, False))), "a partial count under the limit makes no claim"
+    assert not any(
+        "of the 10 DNS lookups" in a for a in adv("none", 99.0, 5000, good, SpfLookups(9, False, False))
+    ), "a partial count under the limit makes no claim"
     assert not any("DNS lookups" in a for a in adv("none", 99.0, 5000, good, None))
 
 
@@ -803,9 +928,16 @@ def test_the_card_reports_the_spf_lookup_count_through_the_includes_and_none_wit
     async def body(s):
         owner = await tenant(s, "Owner")
         acme, bare = await tenant(s, "Acme", owner.id), await tenant(s, "Bare", owner.id)
-        s.add_all([rep(acme.id, "acme.com", 1000, 990, rows=[line_row("1.1.1.1", 1000)]), rep(bare.id, "bare.example", 1000, 990, rows=[line_row("2.2.2.2", 1000)])])
+        s.add_all(
+            [
+                rep(acme.id, "acme.com", 1000, 990, rows=[line_row("1.1.1.1", 1000)]),
+                rep(bare.id, "bare.example", 1000, 990, rows=[line_row("2.2.2.2", 1000)]),
+            ]
+        )
         await s.commit()
-        full = await ep.domain_report_card("acme.com", caller(owner), s, DnsResolver(records, {"acme.com": ["mx.acme.com"]}), no_policy_fetch, days=30)
+        full = await ep.domain_report_card(
+            "acme.com", caller(owner), s, DnsResolver(records, {"acme.com": ["mx.acme.com"]}), no_policy_fetch, days=30
+        )
         none = await ep.domain_report_card("bare.example", caller(owner), s, DnsResolver({}, {}), no_policy_fetch, days=30)
         return full, none
 
@@ -827,7 +959,9 @@ def test_the_card_carries_the_mta_sts_result_and_its_advice_with_the_real_mail_s
         acme = await tenant(s, "Acme", owner.id)
         s.add(rep(acme.id, "acme.com", 1000, 990, rows=[line_row("1.1.1.1", 1000)]))
         await s.commit()
-        return await ep.domain_report_card("acme.com", caller(owner), s, DnsResolver(records, {"acme.com": ["mx.acme.com"]}), policy, days=30)
+        return await ep.domain_report_card(
+            "acme.com", caller(owner), s, DnsResolver(records, {"acme.com": ["mx.acme.com"]}), policy, days=30
+        )
 
     card = run(body)
     assert card.mta_sts.state == "ok" and card.mta_sts.mode == "enforce" and card.mta_sts.uncovered_mx == ["mx.acme.com"]
@@ -863,7 +997,9 @@ def _setup_with(resolver):
 
 
 def test_the_setup_says_which_records_are_published_and_when_it_looked():
-    both = FakeResolver({"acmedental.com": ["mx"]}, txt={"_dmarc.acmedental.com": [f"v=DMARC1; p=none; rua=mailto:{ALIAS}"], AUTH_NAME: ["v=DMARC1"]})
+    both = FakeResolver(
+        {"acmedental.com": ["mx"]}, txt={"_dmarc.acmedental.com": [f"v=DMARC1; p=none; rua=mailto:{ALIAS}"], AUTH_NAME: ["v=DMARC1"]}
+    )
     out = _setup_with(both)
     (line,) = out.lines
     assert (line.rua_published, line.authorization_published) == (True, True) and out.checked_at
@@ -871,8 +1007,16 @@ def test_the_setup_says_which_records_are_published_and_when_it_looked():
     none = _setup_with(FakeResolver({"acmedental.com": ["mx"]}))
     assert (none.lines[0].rua_published, none.lines[0].authorization_published) == (False, False), "nothing seen in DNS yet"
     ep._PUBLISHED_CACHE.clear()
-    wrong = _setup_with(FakeResolver({"acmedental.com": ["mx"]}, txt={"_dmarc.acmedental.com": ["v=DMARC1; p=none; rua=mailto:other@else.example"], AUTH_NAME: ["v=DMARC1"]}))
-    assert (wrong.lines[0].rua_published, wrong.lines[0].authorization_published) == (False, True), "a record that names someone else's address does not count"
+    wrong = _setup_with(
+        FakeResolver(
+            {"acmedental.com": ["mx"]},
+            txt={"_dmarc.acmedental.com": ["v=DMARC1; p=none; rua=mailto:other@else.example"], AUTH_NAME: ["v=DMARC1"]},
+        )
+    )
+    assert (wrong.lines[0].rua_published, wrong.lines[0].authorization_published) == (
+        False,
+        True,
+    ), "a record that names someone else's address does not count"
 
 
 def test_a_failed_lookup_is_unknown_not_unpublished_and_an_empty_answer_is_asked_twice():
@@ -888,7 +1032,9 @@ def test_a_domain_with_no_mail_is_not_looked_up_and_answers_are_kept_for_a_few_m
     out = _setup_with(FakeResolver({}))
     assert (out.lines[0].has_mx, out.lines[0].rua_published, out.lines[0].authorization_published) == (False, None, None)
     ep._PUBLISHED_CACHE.clear()
-    resolver = FakeResolver({"acmedental.com": ["mx"]}, txt={"_dmarc.acmedental.com": [f"v=DMARC1; rua=mailto:{ALIAS}"], AUTH_NAME: ["v=DMARC1"]})
+    resolver = FakeResolver(
+        {"acmedental.com": ["mx"]}, txt={"_dmarc.acmedental.com": [f"v=DMARC1; rua=mailto:{ALIAS}"], AUTH_NAME: ["v=DMARC1"]}
+    )
     _setup_with(resolver)
     first = len(resolver.calls)
     _setup_with(resolver)

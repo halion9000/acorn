@@ -124,12 +124,30 @@ async def run_excluded_present(db: Any, owner: Any, tenant_ids: list[Any], now: 
             excluded = of_settings(row.settings)
             if not excluded:
                 continue
-            aliases = (await db.execute(select(ClientAlias.vendor).where(ClientAlias.tenant_id == owner, ClientAlias.child_tenant_id == row.id, ClientAlias.ignored.is_(False)))).scalars().all()
+            aliases = (
+                (
+                    await db.execute(
+                        select(ClientAlias.vendor).where(
+                            ClientAlias.tenant_id == owner, ClientAlias.child_tenant_id == row.id, ClientAlias.ignored.is_(False)
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
             async with acting_as_tenant(db, row.id):
                 counts = dict(
-                    (await db.execute(select(DeviceSource.vendor, func.count(distinct(DeviceSource.device_id))).where(DeviceSource.tenant_id == row.id, DeviceSource.vendor.in_(excluded)).group_by(DeviceSource.vendor))).all()
+                    (
+                        await db.execute(
+                            select(DeviceSource.vendor, func.count(distinct(DeviceSource.device_id)))
+                            .where(DeviceSource.tenant_id == row.id, DeviceSource.vendor.in_(excluded))
+                            .group_by(DeviceSource.vendor)
+                        )
+                    ).all()
                 )
-                findings = detect_excluded_but_present(row.id, row.name, excluded, {k: int(v) for k, v in counts.items()}, set(aliases) & set(excluded), now)
+                findings = detect_excluded_but_present(
+                    row.id, row.name, excluded, {k: int(v) for k, v in counts.items()}, set(aliases) & set(excluded), now
+                )
                 async with db.begin_nested():
                     for f in findings:
                         values = alert_values(row.id, f, now)

@@ -72,20 +72,41 @@ def _out(row: StandingApproval, now: datetime) -> StandingOut:
 @router.get("", response_model=StandingList, dependencies=[Depends(require_permission("settings:read"))])
 async def list_standing(user: AuthUser, db: TenantDBSession) -> StandingList:
     now = datetime.now(UTC)
-    rows = (await db.execute(select(StandingApproval).where(StandingApproval.tenant_id == user.tenant_id).order_by(StandingApproval.created_at.desc()).limit(200))).scalars().all()
+    rows = (
+        (
+            await db.execute(
+                select(StandingApproval)
+                .where(StandingApproval.tenant_id == user.tenant_id)
+                .order_by(StandingApproval.created_at.desc())
+                .limit(200)
+            )
+        )
+        .scalars()
+        .all()
+    )
     return StandingList(items=[_out(r, now) for r in rows], allowed_types=sorted(sa.ALLOWED), default_days=sa.DEFAULT_DAYS)
 
 
 @router.post("", response_model=StandingOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_signed_in_session)])
-async def create_standing(body: StandingIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: TenantDBSession) -> StandingOut:
+async def create_standing(
+    body: StandingIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: TenantDBSession
+) -> StandingOut:
     action_type = body.action_type.strip().lower()
     problem = sa.refusal(action_type)
     if problem:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=problem)
     now = datetime.now(UTC)
-    active = (await db.execute(select(func.count()).select_from(StandingApproval).where(StandingApproval.tenant_id == user.tenant_id, StandingApproval.revoked_at.is_(None), StandingApproval.expires_at > now))).scalar_one()
+    active = (
+        await db.execute(
+            select(func.count())
+            .select_from(StandingApproval)
+            .where(StandingApproval.tenant_id == user.tenant_id, StandingApproval.revoked_at.is_(None), StandingApproval.expires_at > now)
+        )
+    ).scalar_one()
     if active >= MAX_ACTIVE:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"There are already {MAX_ACTIVE} active standing approvals; revoke some first.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=f"There are already {MAX_ACTIVE} active standing approvals; revoke some first."
+        )
     row = StandingApproval(
         tenant_id=user.tenant_id,
         action_type=action_type,
@@ -112,8 +133,12 @@ async def create_standing(body: StandingIn, request: Request, user: Annotated[Au
 
 
 @router.post("/{standing_id}/revoke", response_model=StandingOut, dependencies=[Depends(require_signed_in_session)])
-async def revoke_standing(standing_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: TenantDBSession) -> StandingOut:
-    row = (await db.execute(select(StandingApproval).where(StandingApproval.id == standing_id, StandingApproval.tenant_id == user.tenant_id))).scalar_one_or_none()
+async def revoke_standing(
+    standing_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: TenantDBSession
+) -> StandingOut:
+    row = (
+        await db.execute(select(StandingApproval).where(StandingApproval.id == standing_id, StandingApproval.tenant_id == user.tenant_id))
+    ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such standing approval")
     now = datetime.now(UTC)

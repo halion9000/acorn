@@ -15,7 +15,10 @@ from sqlalchemy.pool import NullPool
 
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 NOW = datetime.now(UTC)
-pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database")]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database"),
+]
 
 
 async def off(s):
@@ -42,7 +45,13 @@ async def world():
 
 
 def row(tenant, **over):
-    base = {"tenant_id": tenant, "action_type": "add_case_comment", "client_id": None, "expires_at": NOW + timedelta(days=30), "created_at": NOW}
+    base = {
+        "tenant_id": tenant,
+        "action_type": "add_case_comment",
+        "client_id": None,
+        "expires_at": NOW + timedelta(days=30),
+        "created_at": NOW,
+    }
     return StandingApproval(**{**base, **over})
 
 
@@ -52,7 +61,9 @@ async def test_a_card_finds_only_an_active_approval_of_its_own_tenant(world):
     s.add_all([row(b), row(a, revoked_at=NOW), row(a, expires_at=NOW - timedelta(days=1)), row(a, action_type="close_alert")])
     await s.commit()
     await off(s)
-    assert await _matching_standing_approval(s, a, {"type": "add_case_comment"}, "t") is None, "another tenant's, revoked, expired and other-kind approvals do not match"
+    assert (
+        await _matching_standing_approval(s, a, {"type": "add_case_comment"}, "t") is None
+    ), "another tenant's, revoked, expired and other-kind approvals do not match"
     good = row(a)
     s.add(good)
     await s.commit()
@@ -66,7 +77,16 @@ async def test_the_new_approval_columns_are_stored_and_read_back(world):
     s = world
     a = s.info["a"]
     sid = uuid.uuid4()
-    ap = AgentApproval(tenant_id=a, title="t", summary="s", action={"type": "add_case_comment"}, undo={"how": "delete the comment"}, standing_approval_id=sid, status="approved", decided_at=NOW)
+    ap = AgentApproval(
+        tenant_id=a,
+        title="t",
+        summary="s",
+        action={"type": "add_case_comment"},
+        undo={"how": "delete the comment"},
+        standing_approval_id=sid,
+        status="approved",
+        decided_at=NOW,
+    )
     s.add(ap)
     await s.commit()
     await off(s)

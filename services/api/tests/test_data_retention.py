@@ -46,7 +46,13 @@ def test_stale_alerts_are_said_to_be_set_aside_never_deleted_and_the_number_foll
 def test_when_the_cleaner_is_off_or_only_counting_nothing_that_it_would_delete_is_promised():
     for over, words in (({"RETENTION_SWEEPER_ENABLED": False}, "switched off"), ({"RETENTION_DRY_RUN": True}, "count-only")):
         lines = retention_lines(settings(RETENTION_ALERTS_DAYS=400, RETENTION_POSTURE_HISTORY_DAYS=200, **over))
-        for what in ("Alerts", "Copilot conversations", "Detection suggestions", "Finished response actions", "Check and count history (security checks, licence counts, scores)"):
+        for what in (
+            "Alerts",
+            "Copilot conversations",
+            "Detection suggestions",
+            "Finished response actions",
+            "Check and count history (security checks, licence counts, scores)",
+        ):
             assert words in by(lines, what)["ends"], (what, over)
 
 

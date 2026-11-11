@@ -98,11 +98,31 @@ def microsoft_id_of(person: Any) -> str | None:
 
 
 def queue_case(
-    db: Any, *, client_id: uuid.UUID, email: str, microsoft_id: str, cipp_customer_id: str, requested_by: uuid.UUID | None, requested_by_name: str | None, now: datetime
+    db: Any,
+    *,
+    client_id: uuid.UUID,
+    email: str,
+    microsoft_id: str,
+    cipp_customer_id: str,
+    requested_by: uuid.UUID | None,
+    requested_by_name: str | None,
+    now: datetime,
 ) -> BecCase:
     """Add one case and the queue row CORE will collect for it (the caller owns the transaction). Used by the button and by the automatic trigger, so both make exactly the same thing."""
     cid = uuid.uuid4()
-    case = BecCase(id=cid, tenant_id=client_id, case_ref=case_ref(now, cid), email=email, status="pending", step=0, steps_total=0, summary={}, requested_by=requested_by, created_at=now, updated_at=now)
+    case = BecCase(
+        id=cid,
+        tenant_id=client_id,
+        case_ref=case_ref(now, cid),
+        email=email,
+        status="pending",
+        step=0,
+        steps_total=0,
+        summary={},
+        requested_by=requested_by,
+        created_at=now,
+        updated_at=now,
+    )
     db.add(case)
     db.add(
         VendorAction(
@@ -112,7 +132,14 @@ def queue_case(
             vendor="core",
             incident_uid=f"bec:{cid}",
             action="bec_search",
-            params={"client_id": cipp_customer_id, "user": email, "user_id": microsoft_id, "case_id": str(cid), "case_ref": case.case_ref, "requested_by_name": (requested_by_name or "")[:200] or None},
+            params={
+                "client_id": cipp_customer_id,
+                "user": email,
+                "user_id": microsoft_id,
+                "case_id": str(cid),
+                "case_ref": case.case_ref,
+                "requested_by_name": (requested_by_name or "")[:200] or None,
+            },
             status="pending",
             requested_by=requested_by,
             created_at=now,
@@ -137,7 +164,10 @@ async def start_bec_search(
     person = next((p for p in people if p.tenant_id == body.client_id and email.lower() in p.addresses), None)
     uid = microsoft_id_of(person) if person else None
     if person is None or uid is None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Microsoft 365 does not know this person, so there is nothing for CIPP to investigate.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Microsoft 365 does not know this person, so there is nothing for CIPP to investigate.",
+        )
     cipp = await cipp_customer(db, owner, body.client_id)
     if not cipp:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This client is not linked to CIPP (Settings, Client mapping).")
@@ -249,7 +279,12 @@ async def finished_bec_searches(user: Annotated[AuthUser, Depends(require_permis
             (
                 await db.execute(
                     select(BecCase)
-                    .where(BecCase.tenant_id.in_(scope), BecCase.status.in_(("done", "failed")), BecCase.finished_at.isnot(None), BecCase.finished_at > since)
+                    .where(
+                        BecCase.tenant_id.in_(scope),
+                        BecCase.status.in_(("done", "failed")),
+                        BecCase.finished_at.isnot(None),
+                        BecCase.finished_at > since,
+                    )
                     .order_by(BecCase.finished_at.desc())
                     .limit(10)
                 )
@@ -275,7 +310,9 @@ async def finished_bec_searches(user: Annotated[AuthUser, Depends(require_permis
 
 
 @router.get("/{case_id}", response_model=CaseDetail)
-async def read_bec_case(case_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("identities:bec"))], db: DBSession, client_id: uuid.UUID) -> CaseDetail:
+async def read_bec_case(
+    case_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("identities:bec"))], db: DBSession, client_id: uuid.UUID
+) -> CaseDetail:
     """One search with its whole report."""
     owner = user.tenant_id
     await _scope(db, owner, client_id)

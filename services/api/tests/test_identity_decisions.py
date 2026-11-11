@@ -41,7 +41,13 @@ def wired(monkeypatch):
     monkeypatch.setattr(ep, "_as", lambda db, owner, tid: contextlib.nullcontext())
     monkeypatch.setattr(ep, "emit_audit", audit)
     # Brandon is known by two addresses (joined by his display name); Adam by one.
-    people = build([acct(A, "bmoore@acme.com", display_name="brandon.moore@acme.com"), acct(A, "brandon.moore@acme.com", display_name="Brandon Moore"), acct(A, "adam@acme.com")])
+    people = build(
+        [
+            acct(A, "bmoore@acme.com", display_name="brandon.moore@acme.com"),
+            acct(A, "brandon.moore@acme.com", display_name="Brandon Moore"),
+            acct(A, "adam@acme.com"),
+        ]
+    )
     monkeypatch.setattr(ep, "_people", AsyncMock(return_value=(people, {})))
     return audit
 
@@ -91,7 +97,9 @@ def test_one_persons_decisions_are_those_touching_any_address_they_are_known_by(
     async def body(s):
         seed(s, ROWS)
         await s.commit()
-        return await ep.list_decisions(USER, s, client_id=A, email="brandon.moore@acme.com")  # asked by the OTHER address of the same person
+        return await ep.list_decisions(
+            USER, s, client_id=A, email="brandon.moore@acme.com"
+        )  # asked by the OTHER address of the same person
 
     out = run(body)
     assert {(d.address_a, d.address_b) for d in out.items} == {("adam@acme.com", "bmoore@acme.com"), ("bmoore@acme.com", "zed@acme.com")}
@@ -119,7 +127,11 @@ def test_a_decision_is_removed_whichever_way_round_it_is_named_and_audited(wired
     assert ("adam@acme.com", "bmoore@acme.com") not in left and len(left) == 2
     assert len(other) == 1, "another client's decision is untouched"
     kw = wired.await_args.kwargs
-    assert kw["action"] == "identities:decision_removed" and kw["tenant_id"] == A and kw["changes"] == {"address": "adam@acme.com", "other": "bmoore@acme.com", "was": "separate"}
+    assert (
+        kw["action"] == "identities:decision_removed"
+        and kw["tenant_id"] == A
+        and kw["changes"] == {"address": "adam@acme.com", "other": "bmoore@acme.com", "was": "separate"}
+    )
 
 
 def test_removing_a_decision_that_does_not_exist_or_belongs_to_another_client_is_a_404_and_audits_nothing(wired):
@@ -145,7 +157,10 @@ def test_a_bad_address_is_refused(wired):
 
 
 def test_taking_back_a_not_the_same_person_mark_lets_the_rules_join_the_pair_again(wired):
-    users = [acct(A, "bmoore@acme.com", display_name="brandon.moore@acme.com"), acct(A, "brandon.moore@acme.com", display_name="Brandon Moore")]
+    users = [
+        acct(A, "bmoore@acme.com", display_name="brandon.moore@acme.com"),
+        acct(A, "brandon.moore@acme.com", display_name="Brandon Moore"),
+    ]
     pair = (A, *ep.ordered("bmoore@acme.com", "brandon.moore@acme.com"))
     assert len(build(users, separate=[pair])) == 2, "marked: kept apart"
     assert len(build(users, separate=[])) == 1, "mark removed: joined by the rule again"

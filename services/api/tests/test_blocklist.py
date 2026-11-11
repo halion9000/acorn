@@ -51,9 +51,16 @@ def test_only_public_ipv4_addresses_are_ever_sent_to_a_list():
 
 
 def test_an_address_is_asked_of_every_ip_list_and_each_answer_is_kept_apart():
-    look = lookup_from({"4.3.2.1.zen.spamhaus.org": ["127.0.0.2"], "4.3.2.1.bl.spamcop.net": ["127.255.255.254"]}, failing=("uceprotect.net",))
+    look = lookup_from(
+        {"4.3.2.1.zen.spamhaus.org": ["127.0.0.2"], "4.3.2.1.bl.spamcop.net": ["127.255.255.254"]}, failing=("uceprotect.net",)
+    )
     out = {r.zone: r.status for r in asyncio.run(bl.check_ip("1.2.3.4", look))}
-    assert out == {"zen.spamhaus.org": "listed", "bl.spamcop.net": "refused", "psbl.surriel.com": "clear", "dnsbl-1.uceprotect.net": "no_answer"}
+    assert out == {
+        "zen.spamhaus.org": "listed",
+        "bl.spamcop.net": "refused",
+        "psbl.surriel.com": "clear",
+        "dnsbl-1.uceprotect.net": "no_answer",
+    }
     assert sorted(look.seen) == sorted(f"4.3.2.1.{z}" for z, _ in bl.IP_LISTS)
 
 

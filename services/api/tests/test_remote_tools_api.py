@@ -20,8 +20,17 @@ OWNER, A, B = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
 
 def seen(tenant, host, tool, version=None, days_ago=0, path=None, instance=""):
     return NS(
-        tenant_id=tenant, hostname=host, tool_key=tool, version=version, first_seen=NOW - timedelta(days=30), last_seen=NOW - timedelta(days=days_ago), hostname_key=rt.host_key(host), vendor="ninjaone",
-        install_path=path, program=None, instance_id=instance,
+        tenant_id=tenant,
+        hostname=host,
+        tool_key=tool,
+        version=version,
+        first_seen=NOW - timedelta(days=30),
+        last_seen=NOW - timedelta(days=days_ago),
+        hostname_key=rt.host_key(host),
+        vendor="ninjaone",
+        install_path=path,
+        program=None,
+        instance_id=instance,
     )
 
 
@@ -34,8 +43,11 @@ def scan(tenant, n, days_ago=0):
 
 def test_the_inventory_counts_clients_devices_and_what_is_decided_per_tool():
     rows = [
-        seen(A, "PC-1", "anydesk", "8.0"), seen(A, "PC-2", "anydesk"), seen(B, "PC-9", "anydesk"),
-        seen(A, "PC-1.acme.local", "teamviewer"), seen(B, "PC-9", "screenconnect", days_ago=3),
+        seen(A, "PC-1", "anydesk", "8.0"),
+        seen(A, "PC-2", "anydesk"),
+        seen(B, "PC-9", "anydesk"),
+        seen(A, "PC-1.acme.local", "teamviewer"),
+        seen(B, "PC-9", "screenconnect", days_ago=3),
     ]
     rules = {("anydesk", None): "blocked", ("anydesk", B): "allowed", ("screenconnect", None): "allowed"}
     inv = ep.build_inventory(rows, rules, [scan(A, 40), scan(B, 10, days_ago=2)])
@@ -162,12 +174,21 @@ MAPPED = NS(child_tenant_id=A, ignored=False)
 
 def test_a_report_stores_each_tool_once_per_device_and_stamps_the_scan():
     db = FakeDb(alias=MAPPED, children=[A])
-    out = run(db, report([{"hostname": "PC-1", "tool_key": "anydesk", "version": "8.0"}, {"hostname": "pc-1.acme.local", "tool_key": "anydesk"}, {"hostname": "PC-2", "tool_key": "teamviewer"}]))
+    out = run(
+        db,
+        report(
+            [
+                {"hostname": "PC-1", "tool_key": "anydesk", "version": "8.0"},
+                {"hostname": "pc-1.acme.local", "tool_key": "anydesk"},
+                {"hostname": "PC-2", "tool_key": "teamviewer"},
+            ]
+        ),
+    )
     assert (out.stored, out.removed, out.unmapped, out.alerts_raised) == (2, 0, False, 0)
     inserts = [sql(w) for w in db.writes if "INSERT INTO device_remote_tools" in str(w)]
     assert {p["hostname_key"] for _, p in inserts} == {"pc-1", "pc-2"} and all(p["tenant_id"] == A for _, p in inserts)
     assert all("ON CONFLICT (tenant_id, hostname_key, tool_key, instance_id) DO UPDATE" in s for s, _ in inserts)
-    (scan_sql, scan_params), = (sql(w) for w in db.writes if "INSERT INTO remote_tool_scans" in str(w))
+    ((scan_sql, scan_params),) = (sql(w) for w in db.writes if "INSERT INTO remote_tool_scans" in str(w))
     assert scan_params["devices_scanned"] == 10 and scan_params["tenant_id"] == A
 
 
@@ -201,9 +222,14 @@ def test_no_alert_unless_the_tool_is_blocked_and_then_one_in_the_clients_tenant_
     rule = NS(tool_key="anydesk", client_id=ALL_CLIENTS, verdict="blocked")
     loud = FakeDb(alias=MAPPED, children=[A], held=[row], rules=[rule])
     out = run(loud, report([{"hostname": "PC-1", "tool_key": "anydesk"}]))
-    (text, p), = alerts(loud)
+    ((text, p),) = alerts(loud)
     assert out.alerts_raised == 1 and "ON CONFLICT (id) DO NOTHING" in text
-    assert p["tenant_id"] == A and p["title"] == "Blocked remote tool AnyDesk found on PC-1" and p["category"] == "remote_access" and p["severity"] == "high"
+    assert (
+        p["tenant_id"] == A
+        and p["title"] == "Blocked remote tool AnyDesk found on PC-1"
+        and p["category"] == "remote_access"
+        and p["severity"] == "high"
+    )
 
 
 def test_the_managing_companys_own_devices_are_stored_under_itself_when_no_client_id_is_given():
@@ -237,8 +263,15 @@ def test_blocking_a_tool_for_everyone_saves_the_rule_audits_it_and_raises_an_ale
     out = decide(db, "anydesk", "blocked", note="  never   allowed ")
     assert (out.verdict, out.client_id) == ("blocked", None)
     rule_sql, rule = [sql(w) for w in db.writes if "INSERT INTO remote_tool_rules" in str(w)][0]
-    assert rule["client_id"] == ALL_CLIENTS and rule["verdict"] == "blocked" and rule["note"] == "never allowed" and "ON CONFLICT (tenant_id, tool_key, client_id) DO UPDATE" in rule_sql
-    assert audited.await_args.kwargs["action"] == "remote_tool:verdict_changed" and audited.await_args.kwargs["changes"]["after"] == "blocked"
+    assert (
+        rule["client_id"] == ALL_CLIENTS
+        and rule["verdict"] == "blocked"
+        and rule["note"] == "never allowed"
+        and "ON CONFLICT (tenant_id, tool_key, client_id) DO UPDATE" in rule_sql
+    )
+    assert (
+        audited.await_args.kwargs["action"] == "remote_tool:verdict_changed" and audited.await_args.kwargs["changes"]["after"] == "blocked"
+    )
 
 
 def test_allowing_for_one_client_stores_that_clients_own_rule_and_raises_nothing(audited):
@@ -294,7 +327,9 @@ def test_the_instance_id_is_read_from_the_program_name_or_the_folder_and_only_fo
     assert rt.instance_of("screenconnect", "ScreenConnect Client (798cebdb8316a8ff)", None) == OURS
     assert rt.instance_of("screenconnect", "ScreenConnect Client", SC_PATH.format("798CEBDB8316A8FF")) == OURS  # the folder, any case
     assert rt.instance_of("screenconnect", "ScreenConnect Client", None) == ""
-    assert rt.instance_of("screenconnect", "ScreenConnect Client (not-an-id-at-all)", "C:\\Windows\\Temp\\0123456789abcdef0") == ""  # 17 hex digits is not a 16-digit id
+    assert (
+        rt.instance_of("screenconnect", "ScreenConnect Client (not-an-id-at-all)", "C:\\Windows\\Temp\\0123456789abcdef0") == ""
+    )  # 17 hex digits is not a 16-digit id
     assert rt.instance_of("anydesk", "AnyDesk (798cebdb8316a8ff)") == ""
 
 
@@ -342,7 +377,11 @@ def test_a_blocked_tool_installed_twice_on_a_device_is_one_alert_and_it_says_whe
 
 
 def test_the_inventory_counts_a_device_once_however_many_installs_and_counts_the_other_servers_installs():
-    rows = [seen(A, "PC-1", "screenconnect", instance=OURS), seen(A, "PC-1", "screenconnect", instance=THEIRS), seen(A, "PC-2", "screenconnect", instance=OURS)]
+    rows = [
+        seen(A, "PC-1", "screenconnect", instance=OURS),
+        seen(A, "PC-1", "screenconnect", instance=THEIRS),
+        seen(A, "PC-2", "screenconnect", instance=OURS),
+    ]
     inv = ep.build_inventory(rows, {}, [], {"screenconnect": [OURS]})
     t = inv.tools[0]
     assert (t.devices, t.has_instances, t.trusted_instances, t.foreign_installs) == (2, True, [OURS], 1)
@@ -356,9 +395,24 @@ def test_a_report_keeps_each_install_apart_with_its_path_and_program():
         db,
         report(
             [
-                {"hostname": "PC-1", "tool_key": "screenconnect", "program": f"ScreenConnect Client ({OURS})", "path": SC_PATH.format(OURS)},
-                {"hostname": "PC-1", "tool_key": "screenconnect", "program": f"ScreenConnect Client ({THEIRS})", "path": SC_PATH.format(THEIRS)},
-                {"hostname": "pc-1.acme.local", "tool_key": "screenconnect", "program": f"ScreenConnect Client ({THEIRS})", "path": SC_PATH.format(THEIRS)},
+                {
+                    "hostname": "PC-1",
+                    "tool_key": "screenconnect",
+                    "program": f"ScreenConnect Client ({OURS})",
+                    "path": SC_PATH.format(OURS),
+                },
+                {
+                    "hostname": "PC-1",
+                    "tool_key": "screenconnect",
+                    "program": f"ScreenConnect Client ({THEIRS})",
+                    "path": SC_PATH.format(THEIRS),
+                },
+                {
+                    "hostname": "pc-1.acme.local",
+                    "tool_key": "screenconnect",
+                    "program": f"ScreenConnect Client ({THEIRS})",
+                    "path": SC_PATH.format(THEIRS),
+                },
             ]
         ),
     )
@@ -371,8 +425,26 @@ def test_a_report_keeps_each_install_apart_with_its_path_and_program():
 
 def test_a_scan_that_no_longer_finds_one_of_two_installs_removes_only_that_one():
     held = [
-        NS(hostname_key="pc-1", tool_key="screenconnect", instance_id=OURS, tenant_id=A, hostname="PC-1", version=None, last_seen=NOW, first_seen=NOW),
-        NS(hostname_key="pc-1", tool_key="screenconnect", instance_id=THEIRS, tenant_id=A, hostname="PC-1", version=None, last_seen=NOW, first_seen=NOW),
+        NS(
+            hostname_key="pc-1",
+            tool_key="screenconnect",
+            instance_id=OURS,
+            tenant_id=A,
+            hostname="PC-1",
+            version=None,
+            last_seen=NOW,
+            first_seen=NOW,
+        ),
+        NS(
+            hostname_key="pc-1",
+            tool_key="screenconnect",
+            instance_id=THEIRS,
+            tenant_id=A,
+            hostname="PC-1",
+            version=None,
+            last_seen=NOW,
+            first_seen=NOW,
+        ),
     ]
     db = FakeDb(alias=MAPPED, children=[A], held=held)
     out = run(db, report([{"hostname": "PC-1", "tool_key": "screenconnect", "program": f"ScreenConnect Client ({OURS})"}]))
@@ -383,10 +455,13 @@ def test_a_scan_that_no_longer_finds_one_of_two_installs_removes_only_that_one()
 def test_a_report_raises_a_critical_alert_for_another_servers_install_once_the_owner_has_set_theirs():
     row = seen(A, "PC-1", "screenconnect", path=SC_PATH.format(THEIRS), instance=THEIRS)
     quiet = FakeDb(alias=MAPPED, children=[A], held=[row])
-    assert run(quiet, report([{"hostname": "PC-1", "tool_key": "screenconnect", "program": f"ScreenConnect Client ({THEIRS})"}])).alerts_raised == 0
+    assert (
+        run(quiet, report([{"hostname": "PC-1", "tool_key": "screenconnect", "program": f"ScreenConnect Client ({THEIRS})"}])).alerts_raised
+        == 0
+    )
     loud = FakeDb(alias=MAPPED, children=[A], held=[row], owner_settings={"remote_tool_instances": {"screenconnect": [OURS]}})
     out = run(loud, report([{"hostname": "PC-1", "tool_key": "screenconnect", "program": f"ScreenConnect Client ({THEIRS})"}]))
-    (text, p), = alerts(loud)
+    ((text, p),) = alerts(loud)
     assert out.alerts_raised == 1 and p["severity"] == "critical" and p["tenant_id"] == A and THEIRS in p["title"]
     assert "foreign-server" in p["tags"]
 
@@ -402,7 +477,9 @@ def test_saving_your_identifiers_stores_them_on_the_company_audits_it_and_alerts
     out = set_instances(db, "screenconnect", ["798CEBDB8316A8FF"])
     assert (out.ids, out.alerts_raised) == ([OURS], 1)
     assert db.owner_tenant.settings == {"hidden": False, "remote_tool_instances": {"screenconnect": [OURS]}}
-    assert audited.await_args.kwargs["action"] == "remote_tool:instances_changed" and audited.await_args.kwargs["changes"]["after"] == [OURS]
+    assert audited.await_args.kwargs["action"] == "remote_tool:instances_changed" and audited.await_args.kwargs["changes"]["after"] == [
+        OURS
+    ]
 
 
 def test_a_tool_with_no_server_identifier_an_unknown_tool_and_a_bad_identifier_are_refused(audited):
@@ -465,8 +542,16 @@ def test_adding_a_tool_stores_it_under_a_key_made_from_its_name_and_audits_it(au
     out = add_custom(db, name="  Acme   Remote ", match=" Acme  Remote Desk ", publisher="Acme Inc")
     assert (out.key, out.name, out.match, out.publisher) == ("custom_acme_remote", "Acme Remote", "Acme Remote Desk", "Acme Inc")
     (row,) = db.added
-    assert (row.tenant_id, row.tool_key, row.category, row.created_by) == (OWNER, "custom_acme_remote", "remote_access", user().user_id) or row.tenant_id == OWNER
-    assert audited.await_args.kwargs["action"] == "remote_tool:custom_added" and audited.await_args.kwargs["resource_id"] == "custom_acme_remote"
+    assert (row.tenant_id, row.tool_key, row.category, row.created_by) == (
+        OWNER,
+        "custom_acme_remote",
+        "remote_access",
+        user().user_id,
+    ) or row.tenant_id == OWNER
+    assert (
+        audited.await_args.kwargs["action"] == "remote_tool:custom_added"
+        and audited.await_args.kwargs["resource_id"] == "custom_acme_remote"
+    )
 
 
 def test_a_tool_that_is_refused_says_why_and_stores_and_audits_nothing(audited):
@@ -530,7 +615,9 @@ def test_a_tool_added_by_hand_is_found_in_a_report_decided_on_and_counted_like_a
         assert inv.tools_found == 1 and inv.tools[0].name == "Acme Remote"
     finally:
         rt.set_custom([])
-    assert ep.build_inventory([seen(A, "PC-1", "custom_acme_remote")], {}, []).tools_found == 0  # a request that did not load them does not see them
+    assert (
+        ep.build_inventory([seen(A, "PC-1", "custom_acme_remote")], {}, []).tools_found == 0
+    )  # a request that did not load them does not see them
 
 
 def test_the_catalog_core_reads_includes_the_tools_added_by_hand_with_their_patterns(monkeypatch):

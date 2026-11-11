@@ -299,11 +299,21 @@ async def test_a_search_of_several_words_prefers_documents_with_all_of_them_and_
         app,
         {
             w.park: [
-                doc("m1", "Microsoft 365 login steps", "How staff sign in to 365: use the work email, then approve the prompt on the login page."),
+                doc(
+                    "m1",
+                    "Microsoft 365 login steps",
+                    "How staff sign in to 365: use the work email, then approve the prompt on the login page.",
+                ),
                 doc("p1", "Front desk printer", "Scan to email uses a 365 mailbox. Printer IP 10.0.0.9, firmware 365.2.", kind="document"),
                 doc("p2", "Copier", "Toner 365 pages left.", kind="document"),
             ]
         },
     )
-    assert [h.title for h in await ask(app, w, "365 login")] == ["Microsoft 365 login steps"], "only the document with both words, not every one that says 365"
-    assert {h.title for h in await ask(app, w, "365 pelican")} == {"Microsoft 365 login steps", "Front desk printer", "Copier"}, "no document has both words, so any word matches"
+    assert [h.title for h in await ask(app, w, "365 login")] == [
+        "Microsoft 365 login steps"
+    ], "only the document with both words, not every one that says 365"
+    assert {h.title for h in await ask(app, w, "365 pelican")} == {
+        "Microsoft 365 login steps",
+        "Front desk printer",
+        "Copier",
+    }, "no document has both words, so any word matches"

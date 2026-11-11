@@ -163,8 +163,16 @@ TOOL_ITEMS = (
     ("fieldeffect_device_risk", "device_risk", "Are the client's computers free of critical and high-risk findings?"),
     ("cipp_ca_legacy_auth", "legacy_auth_blocked", "Is legacy e-mail sign-in (old protocols that skip multi-factor) blocked?"),
     ("cipp_mailbox_forwarding", "mailbox_forwarding", "Is mail free of rules that forward it outside the organisation?"),
-    ("cipp_defender_vulnerabilities", "known_vulnerabilities", "Are computers free of critical and high vulnerabilities that have a known exploit?"),
-    ("ninjaone_software_patches", "application_updates", "Are critical application updates (browsers, PDF readers) installed within 30 days?"),
+    (
+        "cipp_defender_vulnerabilities",
+        "known_vulnerabilities",
+        "Are computers free of critical and high vulnerabilities that have a known exploit?",
+    ),
+    (
+        "ninjaone_software_patches",
+        "application_updates",
+        "Are critical application updates (browsers, PDF readers) installed within 30 days?",
+    ),
     ("addigy_unsupported_macos", "supported_macos", "Are all Macs on a macOS version Apple still patches?"),
     ("meraki_end_of_support", "network_gear_supported", "Is the network equipment still supported by its maker?"),
     ("ninjaone_disk_health", "disk_health", "Are computers and servers free of failing disks and RAID faults?"),

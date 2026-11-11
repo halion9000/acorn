@@ -57,8 +57,24 @@ def person(tenant_id, upn, via="mfa"):
 
 
 def report(domain="client.com", report_id="r1", reporter="google.com", records=None):
-    recs = records if records is not None else [Record("1.2.3.4", 40, "none", True, True, domain, domain), Record("9.9.9.9", 5, "quarantine", False, False, domain, "evil.example")]
-    return Parsed(reporter, "noreply@google.com", report_id, domain, datetime(2026, 11, 1, tzinfo=UTC), datetime(2026, 11, 2, tzinfo=UTC), "none", recs)
+    recs = (
+        records
+        if records is not None
+        else [
+            Record("1.2.3.4", 40, "none", True, True, domain, domain),
+            Record("9.9.9.9", 5, "quarantine", False, False, domain, "evil.example"),
+        ]
+    )
+    return Parsed(
+        reporter,
+        "noreply@google.com",
+        report_id,
+        domain,
+        datetime(2026, 11, 1, tzinfo=UTC),
+        datetime(2026, 11, 2, tzinfo=UTC),
+        "none",
+        recs,
+    )
 
 
 def test_a_report_goes_to_the_client_whose_people_use_the_domain():
@@ -74,7 +90,15 @@ def test_a_report_goes_to_the_client_whose_people_use_the_domain():
 
     out, acme_id, row = run(body)
     assert (out.outcome, out.tenant_id, out.matched) == ("stored", acme_id, True)
-    assert (row.domain, row.reporter, row.report_id, row.total, row.passed, row.failed, row.policy) == ("client.com", "google.com", "r1", 45, 40, 5, "none")
+    assert (row.domain, row.reporter, row.report_id, row.total, row.passed, row.failed, row.policy) == (
+        "client.com",
+        "google.com",
+        "r1",
+        45,
+        40,
+        5,
+        "none",
+    )
     assert row.rows[0]["ip"] == "1.2.3.4" and row.rows[0]["pass"] is True and row.rows[1]["disposition"] == "quarantine"
 
 
@@ -109,7 +133,11 @@ def test_the_domain_is_matched_without_regard_to_case_and_only_among_the_owners_
         mine, theirs = await tenant(s, "Mine", owner.id), await tenant(s, "Theirs", stranger.id)
         s.add_all([person(mine.id, "A@Client.COM"), person(theirs.id, "z@client.com"), person(theirs.id, "y@onlytheirs.example")])
         await s.commit()
-        return await store.client_for_domain(s, owner.id, "CLIENT.com."), await store.client_for_domain(s, owner.id, "onlytheirs.example"), mine.id
+        return (
+            await store.client_for_domain(s, owner.id, "CLIENT.com."),
+            await store.client_for_domain(s, owner.id, "onlytheirs.example"),
+            mine.id,
+        )
 
     got, theirs_only, mine = run(body)
     assert got == mine and theirs_only is None
@@ -152,7 +180,14 @@ def test_the_managing_companys_own_domain_is_matched_to_itself_not_left_unmatche
 
 
 def test_the_override_reason_is_stored_with_each_source_line():
-    rows = store.compact_rows(report(records=[Record("1.1.1.1", 4, "none", False, False, "client.com", "client.com", reason="forwarded"), Record("2.2.2.2", 1, "none", True, True, "client.com", "client.com")]))
+    rows = store.compact_rows(
+        report(
+            records=[
+                Record("1.1.1.1", 4, "none", False, False, "client.com", "client.com", reason="forwarded"),
+                Record("2.2.2.2", 1, "none", True, True, "client.com", "client.com"),
+            ]
+        )
+    )
     assert [r["reason"] for r in rows] == ["forwarded", ""]
 
 
@@ -174,7 +209,9 @@ def test_a_tls_report_goes_to_the_client_whose_people_use_the_domain_and_is_stor
         first = await store.store_tls_policy(s, owner.id, rep, pol)
         await s.commit()
         again = await store.store_tls_policy(s, owner.id, rep, pol)
-        other_kind = await store.store_tls_policy(s, owner.id, rep, tls_report(policy_type="tlsa")[1])  # the same report under another policy type is a separate row
+        other_kind = await store.store_tls_policy(
+            s, owner.id, rep, tls_report(policy_type="tlsa")[1]
+        )  # the same report under another policy type is a separate row
         await s.commit()
         rows = (await s.execute(select(TlsReport))).scalars().all()
         return first, again, other_kind, rows, acme.id

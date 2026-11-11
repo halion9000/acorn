@@ -65,6 +65,7 @@ NEVER_AT_FIRST = ADMIN_ROLES | {"api_service"}
 
 # ─── Settings ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+
 class SsoConfig(BaseModel):
     tenant_id: str
     client_id: str
@@ -80,7 +81,9 @@ class SsoConfig(BaseModel):
 def load_config(env: dict[str, str] | None = None) -> SsoConfig | None:
     """The settings, or None when SSO is not (fully) configured."""
     e = env if env is not None else os.environ
-    tenant, client, secret, redirect = (e.get(k, "").strip() for k in ("MS_SSO_TENANT_ID", "MS_SSO_CLIENT_ID", "MS_SSO_CLIENT_SECRET", "MS_SSO_REDIRECT_URI"))
+    tenant, client, secret, redirect = (
+        e.get(k, "").strip() for k in ("MS_SSO_TENANT_ID", "MS_SSO_CLIENT_ID", "MS_SSO_CLIENT_SECRET", "MS_SSO_REDIRECT_URI")
+    )
     if not (tenant and client and secret and redirect):
         return None
     home: uuid.UUID | None = None
@@ -254,6 +257,7 @@ def check_group(cfg: SsoConfig, claims: dict[str, Any]) -> None:
 
 # ─── People ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+
 def identity_key(claims: dict[str, Any]) -> str:
     return f"entra:{claims['tid']}:{claims['oid']}"
 
@@ -325,6 +329,7 @@ def tokens_for(user: User) -> dict[str, str]:
 
 # ─── Routes ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+
 def safe_next(value: str | None) -> str:
     """Only a path on this site: anything else (another site, a scheme, a protocol-relative address, a backslash trick) becomes the front page."""
     if not value or not value.startswith("/") or value.startswith("//") or "\\" in value or "\n" in value or "\r" in value:
@@ -361,7 +366,9 @@ async def microsoft_login(next: str | None = Query(default=None, max_length=300)
     try:
         await _put(f"aisoc:sso:state:{state}", {"nonce": nonce, "verifier": verifier, "next": safe_next(next)}, STATE_TTL)
     except Unavailable:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Sign-in is temporarily unavailable. Try again in a moment.") from None
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Sign-in is temporarily unavailable. Try again in a moment."
+        ) from None
     query = urlencode(
         {
             "client_id": cfg.client_id,
@@ -475,7 +482,11 @@ async def exchange(body: ExchangeRequest) -> ExchangeResponse:
     try:
         tokens = await _take(f"aisoc:sso:code:{body.code[:200]}")
     except Unavailable:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Sign-in is temporarily unavailable. Try again in a moment.") from None
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Sign-in is temporarily unavailable. Try again in a moment."
+        ) from None
     if tokens is None or "access_token" not in tokens:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="That sign-in link has expired or was already used. Start again.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="That sign-in link has expired or was already used. Start again."
+        )
     return ExchangeResponse(access_token=str(tokens["access_token"]), refresh_token=str(tokens["refresh_token"]))

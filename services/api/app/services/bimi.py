@@ -105,12 +105,16 @@ async def check(domain: str, resolver: Resolver, fetch: Fetcher = public_https_f
     if not ready:
         problems.append(why)
     if record is None:
-        return Bimi(domain=domain, published=False, logo_url=None, certificate_url=None, dmarc_ready=ready, certificate=None, problems=problems)
+        return Bimi(
+            domain=domain, published=False, logo_url=None, certificate_url=None, dmarc_ready=ready, certificate=None, problems=problems
+        )
     if not record.logo or not record.logo.lower().startswith("https://"):
         problems.append("The record has no https logo address (l=).")
     cert: CertInfo | None = None
     if not record.authority:
-        problems.append("The record names no certificate (a=): most mail clients will not show the logo without a Verified Mark Certificate.")
+        problems.append(
+            "The record names no certificate (a=): most mail clients will not show the logo without a Verified Mark Certificate."
+        )
     else:
         try:
             cert = read_certificate(await fetch(record.authority), now)
@@ -122,7 +126,17 @@ async def check(domain: str, resolver: Resolver, fetch: Fetcher = public_https_f
             if not cert.valid:
                 problems.append(f"The certificate is not valid now (it ended {cert.not_after.date()}). The logo will not show.")
             elif cert.days_left <= EXPIRY_WARNING_DAYS:
-                problems.append(f"The certificate expires in {cert.days_left} days ({cert.not_after.date()}). When it lapses the logo disappears without warning.")
+                problems.append(
+                    f"The certificate expires in {cert.days_left} days ({cert.not_after.date()}). When it lapses the logo disappears without warning."
+                )
             if not cert.is_vmc:
                 problems.append("This is not a Verified Mark Certificate (it has no logotype extension).")
-    return Bimi(domain=domain, published=True, logo_url=record.logo, certificate_url=record.authority, dmarc_ready=ready, certificate=cert, problems=problems)
+    return Bimi(
+        domain=domain,
+        published=True,
+        logo_url=record.logo,
+        certificate_url=record.authority,
+        dmarc_ready=ready,
+        certificate=cert,
+        problems=problems,
+    )

@@ -47,7 +47,9 @@ async def exempt_tenant_ids(db: Any) -> list[uuid.UUID]:
     return [t.id for t in rows if tenant_stale_exempt(t)]
 
 
-async def sweep_stale(db: Any, days: int, exempt: Iterable[str], now: datetime | None = None, skip_tenants: Iterable[uuid.UUID] = ()) -> int:
+async def sweep_stale(
+    db: Any, days: int, exempt: Iterable[str], now: datetime | None = None, skip_tenants: Iterable[uuid.UUID] = ()
+) -> int:
     """Set aside every alert that has been quiet for ``days``. Returns how many. ``days`` of 0 or less does nothing. The caller owns the transaction."""
     if days <= 0:
         return 0

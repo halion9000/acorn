@@ -14,7 +14,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
-pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database")]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database"),
+]
 
 
 async def test_only_this_clients_matched_reports_inside_the_window_are_read():
@@ -30,14 +33,28 @@ async def test_only_this_clients_matched_reports_inside_the_window_are_read():
                 "insert into dmarc_reports (id, tenant_id, matched, domain, reporter, report_id, begin_at, end_at, policy, total, passed, failed, rows, received_at) "
                 "values (:i, :t, :m, :d, 'r', :r, :b, :e, 'none', :tot, :p, :f, '[]'::jsonb, now())"
             ),
-            {"i": uuid.uuid4(), "t": tenant, "m": matched, "d": domain, "r": f"{tag}-{uuid.uuid4().hex[:6]}", "b": ended - timedelta(days=1), "e": ended, "tot": total, "p": passed, "f": total - passed},
+            {
+                "i": uuid.uuid4(),
+                "t": tenant,
+                "m": matched,
+                "d": domain,
+                "r": f"{tag}-{uuid.uuid4().hex[:6]}",
+                "b": ended - timedelta(days=1),
+                "e": ended,
+                "tot": total,
+                "p": passed,
+                "f": total - passed,
+            },
         )
 
     try:
         async with engine.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
             for t in (mine, other):
-                await conn.execute(text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :s, 'parent')"), {"i": t, "n": f"d-{tag}-{str(t)[:4]}", "s": f"d-{tag}-{str(t)[:4]}"})
+                await conn.execute(
+                    text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :s, 'parent')"),
+                    {"i": t, "n": f"d-{tag}-{str(t)[:4]}", "s": f"d-{tag}-{str(t)[:4]}"},
+                )
             await add(conn, mine, "in-window.example", end - timedelta(days=2))
             await add(conn, mine, "too-old.example", start - timedelta(days=1))
             await add(conn, mine, "too-new.example", end + timedelta(hours=1))

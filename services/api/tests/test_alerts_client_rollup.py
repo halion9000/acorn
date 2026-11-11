@@ -26,8 +26,6 @@ async def record_scope(_db, tenant_id):
     yield
 
 
-
-
 crossed: list[int] = []
 
 
@@ -183,7 +181,12 @@ def test_several_tenants_are_read_in_one_block_across_them_not_entered_one_by_on
         out = await call(s, parent.id)
         assert scoped == [], "no client is entered on its own any more: entering each cost four statements before its query"
         assert crossed, "the read is made inside the cross-tenant read block"
-        assert {i.title for i in out.items} == {"own", "setpoint-new", "setpoint-old", "tecovas"}, "the organization and its clients, and nobody else (the unrelated tenant's alert is not here)"
+        assert {i.title for i in out.items} == {
+            "own",
+            "setpoint-new",
+            "setpoint-old",
+            "tecovas",
+        }, "the organization and its clients, and nobody else (the unrelated tenant's alert is not here)"
 
     run(go)
 

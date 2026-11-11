@@ -12,8 +12,14 @@ def test_a_proposal_with_no_evidence_is_refused():
 
 
 def test_evidence_is_trimmed_strings_become_labels_and_a_url_alone_is_enough():
-    got = clean_evidence(["  the alert  ", {"label": "Huntress incident", "url": " https://x/y "}, {"url": "https://only/link"}, {"label": ""}])
-    assert got == [{"label": "the alert"}, {"label": "Huntress incident", "url": "https://x/y"}, {"label": "https://only/link", "url": "https://only/link"}]
+    got = clean_evidence(
+        ["  the alert  ", {"label": "Huntress incident", "url": " https://x/y "}, {"url": "https://only/link"}, {"label": ""}]
+    )
+    assert got == [
+        {"label": "the alert"},
+        {"label": "Huntress incident", "url": "https://x/y"},
+        {"label": "https://only/link", "url": "https://only/link"},
+    ]
 
 
 def test_evidence_is_capped():
@@ -70,6 +76,16 @@ def test_the_tally_gives_each_agent_its_own_scorecard_busiest_first():
     ]
     t = tally(rows)
     assert list(t["by_agent"]) == ["cipher", "jax"]
-    assert t["by_agent"]["cipher"] == {"total": 4, "acted": 2, "shadow": 1, "asked": 1, "suggested": 0, "accepted": 1, "edited": 1, "rejected": 1, "expired": 0}
+    assert t["by_agent"]["cipher"] == {
+        "total": 4,
+        "acted": 2,
+        "shadow": 1,
+        "asked": 1,
+        "suggested": 0,
+        "accepted": 1,
+        "edited": 1,
+        "rejected": 1,
+        "expired": 0,
+    }
     assert t["by_agent"]["jax"]["suggested"] == 1 and t["by_agent"]["jax"]["expired"] == 1
     assert tally([{"rung": "ask", "outcome": "none"}])["by_agent"]["unknown"]["asked"] == 1

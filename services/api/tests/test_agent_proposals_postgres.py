@@ -15,7 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
-pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database")]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database"),
+]
 
 
 async def off(s):
@@ -54,7 +57,15 @@ def user(tenant):
 
 
 def body(**over):
-    base = {"agent": "cipher", "action_type": "Close-As-False-Positive", "target": "alert 42", "summary": "Looks benign", "rung": "shadow", "evidence": [{"label": "the alert", "url": "https://x/a/42"}], "confidence": 0.8}
+    base = {
+        "agent": "cipher",
+        "action_type": "Close-As-False-Positive",
+        "target": "alert 42",
+        "summary": "Looks benign",
+        "rung": "shadow",
+        "evidence": [{"label": "the alert", "url": "https://x/a/42"}],
+        "confidence": 0.8,
+    }
     base.update(over)
     return ProposalIn(**base)
 
@@ -63,13 +74,19 @@ async def test_a_proposal_is_stored_under_the_callers_tenant_with_its_evidence_a
     s = world
     await off(s)
     out = await record_proposal(body(), None, user(s.info["mine"]), s)
-    assert out.action_type == "close-as-false-positive" and out.outcome == "none" and out.evidence == [{"label": "the alert", "url": "https://x/a/42"}]
+    assert (
+        out.action_type == "close-as-false-positive"
+        and out.outcome == "none"
+        and out.evidence == [{"label": "the alert", "url": "https://x/a/42"}]
+    )
     await off(s)
     got = await list_proposals(user(s.info["mine"]), s, agent=None, rung=None, action_type=None, outcome=None, since_hours=None, limit=50)
     assert [p.id for p in got.items] == [out.id]
     assert got.summary["shadow_unreviewed"] == 1 and got.summary["by_rung"]["shadow"] == 1
     await off(s)
-    theirs = await list_proposals(user(s.info["other"]), s, agent=None, rung=None, action_type=None, outcome=None, since_hours=None, limit=50)
+    theirs = await list_proposals(
+        user(s.info["other"]), s, agent=None, rung=None, action_type=None, outcome=None, since_hours=None, limit=50
+    )
     assert theirs.items == []
 
 
@@ -91,7 +108,9 @@ async def test_the_database_itself_refuses_a_made_up_rung_or_outcome(world):
         row = {"rung": "shadow", "outcome": "none", col: val}
         with pytest.raises(IntegrityError):
             await s.execute(
-                text("insert into agent_proposals (tenant_id, agent, action_type, summary, rung, outcome) values (:t, 'a', 'x', 's', :rung, :outcome)"),
+                text(
+                    "insert into agent_proposals (tenant_id, agent, action_type, summary, rung, outcome) values (:t, 'a', 'x', 's', :rung, :outcome)"
+                ),
                 {"t": s.info["mine"], **row},
             )
         await s.rollback()
@@ -107,13 +126,19 @@ async def test_the_list_can_be_narrowed_to_one_kind_of_action_and_one_verdict(wo
     await off(s)
     await set_outcome(a.id, OutcomeIn(outcome="rejected", note="a script does this on purpose"), None, user(s.info["mine"]), s)
     await off(s)
-    only_snooze = await list_proposals(user(s.info["mine"]), s, agent=None, rung=None, action_type="Snooze-Alert", outcome=None, since_hours=None, limit=50)
+    only_snooze = await list_proposals(
+        user(s.info["mine"]), s, agent=None, rung=None, action_type="Snooze-Alert", outcome=None, since_hours=None, limit=50
+    )
     assert [p.action_type for p in only_snooze.items] == ["snooze-alert"]
     await off(s)
-    rejected = await list_proposals(user(s.info["mine"]), s, agent=None, rung=None, action_type=None, outcome="rejected", since_hours=None, limit=50)
+    rejected = await list_proposals(
+        user(s.info["mine"]), s, agent=None, rung=None, action_type=None, outcome="rejected", since_hours=None, limit=50
+    )
     assert [(p.action_type, p.outcome_note) for p in rejected.items] == [("snooze-alert", "a script does this on purpose")]
     await off(s)
-    nothing = await list_proposals(user(s.info["mine"]), s, agent=None, rung=None, action_type="snooze-alert", outcome="accepted", since_hours=None, limit=50)
+    nothing = await list_proposals(
+        user(s.info["mine"]), s, agent=None, rung=None, action_type="snooze-alert", outcome="accepted", since_hours=None, limit=50
+    )
     assert nothing.items == []
 
 
@@ -122,9 +147,16 @@ async def test_the_list_can_be_limited_to_the_last_hours(world):
     await off(s)
     await record_proposal(body(), None, user(s.info["mine"]), s)
     await off(s)
-    await s.execute(text("insert into agent_proposals (tenant_id, agent, action_type, summary, rung, created_at) values (:t, 'a', 'old-one', 's', 'shadow', now() - interval '3 days')"), {"t": s.info["mine"]})
+    await s.execute(
+        text(
+            "insert into agent_proposals (tenant_id, agent, action_type, summary, rung, created_at) values (:t, 'a', 'old-one', 's', 'shadow', now() - interval '3 days')"
+        ),
+        {"t": s.info["mine"]},
+    )
     await off(s)
-    everything = await list_proposals(user(s.info["mine"]), s, agent=None, rung=None, action_type=None, outcome=None, since_hours=None, limit=50)
+    everything = await list_proposals(
+        user(s.info["mine"]), s, agent=None, rung=None, action_type=None, outcome=None, since_hours=None, limit=50
+    )
     assert len(everything.items) == 2
     await off(s)
     today = await list_proposals(user(s.info["mine"]), s, agent=None, rung=None, action_type=None, outcome=None, since_hours=24, limit=50)

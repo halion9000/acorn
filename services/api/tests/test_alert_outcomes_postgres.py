@@ -17,7 +17,10 @@ from sqlalchemy.pool import NullPool
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 NOW = datetime.now(UTC)
 TITLE = "Impossible travel sign-in"
-pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database")]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database"),
+]
 
 
 async def off(s):
@@ -42,7 +45,16 @@ async def world():
                     "insert into alerts (id, tenant_id, title, severity, status, priority, affected_hosts, raw_event, enrichment_data, disposition, created_at, updated_at, resolved_at) "
                     "values (:i, :t, :title, 'low', :st, 50, '[]'::jsonb, '{}'::jsonb, cast(:enr as jsonb), :d, :c, :c, :r)"
                 ),
-                {"i": ids[key], "t": tenant, "title": title, "st": status, "enr": json.dumps({"tickets": [{"system": "halopsa", "id": "5"}]} if ticket else {}), "d": disposition if status != "new" else None, "c": created, "r": created + timedelta(hours=hours) if status != "new" else None},
+                {
+                    "i": ids[key],
+                    "t": tenant,
+                    "title": title,
+                    "st": status,
+                    "enr": json.dumps({"tickets": [{"system": "halopsa", "id": "5"}]} if ticket else {}),
+                    "d": disposition if status != "new" else None,
+                    "c": created,
+                    "r": created + timedelta(hours=hours) if status != "new" else None,
+                },
             )
 
         await alert("this", a, status="new")

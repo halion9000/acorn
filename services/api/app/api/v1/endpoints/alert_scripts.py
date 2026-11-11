@@ -168,7 +168,12 @@ async def alert_script_runs(
             (
                 await db.execute(
                     select(VendorAction)
-                    .where(VendorAction.alert_id == alert_id, VendorAction.tenant_id == tid, VendorAction.vendor == SCRIPT_VENDOR, VendorAction.action == SCRIPT_ACTION)
+                    .where(
+                        VendorAction.alert_id == alert_id,
+                        VendorAction.tenant_id == tid,
+                        VendorAction.vendor == SCRIPT_VENDOR,
+                        VendorAction.action == SCRIPT_ACTION,
+                    )
                     .order_by(VendorAction.created_at.desc())
                     .limit(20)
                 )

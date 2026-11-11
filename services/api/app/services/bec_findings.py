@@ -32,7 +32,7 @@ LEVEL_SEVERITY = {"high": "high", "medium": "medium"}
 
 
 def _plural(n: int, word: str) -> str:
-    """"1 new inbox rule", "3 new inbox rules"."""
+    """ "1 new inbox rule", "3 new inbox rules"."""
     return f"{n} {word}" if n == 1 else f"{n} {word}s"
 
 
@@ -46,7 +46,9 @@ def signal_counts(report: dict[str, Any] | None) -> list[tuple[str, int]]:
     return out
 
 
-def finding_for_case(*, case_ref: str, case_id: str, email: str, summary: dict[str, Any], report: dict[str, Any] | None, now: datetime | None = None) -> Finding | None:
+def finding_for_case(
+    *, case_ref: str, case_id: str, email: str, summary: dict[str, Any], report: dict[str, Any] | None, now: datetime | None = None
+) -> Finding | None:
     """The alert for a finished search, or None when CIPP's level is not High or Medium (or is not there)."""
     level = str(summary.get("level") or "").strip()
     severity = LEVEL_SEVERITY.get(level.lower())
@@ -56,8 +58,17 @@ def finding_for_case(*, case_ref: str, case_id: str, email: str, summary: dict[s
     raw = summary.get("incomplete")
     incomplete = [x for x in raw if isinstance(x, str)][:12] if isinstance(raw, list) else []
     signals = signal_counts(report)
-    found = "; ".join(_plural(n, w) for w, n in signals) if signals else "none of the lists CIPP's score reads has an entry (the rating came from other signals, see the report)"
-    fields = [("Search", case_ref), ("CIPP's level", level), ("CIPP's score", str(score) if score is not None else "not given"), ("Seen in the report", found)]
+    found = (
+        "; ".join(_plural(n, w) for w, n in signals)
+        if signals
+        else "none of the lists CIPP's score reads has an entry (the rating came from other signals, see the report)"
+    )
+    fields = [
+        ("Search", case_ref),
+        ("CIPP's level", level),
+        ("CIPP's score", str(score) if score is not None else "not given"),
+        ("Seen in the report", found),
+    ]
     if incomplete:
         fields.append(("Checks that could not finish", ", ".join(incomplete)))
     when = now or datetime.now(UTC)

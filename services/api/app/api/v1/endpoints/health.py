@@ -970,7 +970,13 @@ def table_size_rows(rows: list[Any]) -> list[dict[str, Any]]:
     """The biggest tables as the page shows them: name, total size on disk (data, indexes and out-of-line values) in megabytes, and the database's own row estimate; a negative estimate (never analysed) is shown as unknown (pure)."""
     out = []
     for name, total_bytes, estimate in rows:
-        out.append({"table": str(name), "megabytes": round(int(total_bytes) / 1024 / 1024, 1), "rows_estimate": int(estimate) if estimate is not None and int(estimate) >= 0 else None})
+        out.append(
+            {
+                "table": str(name),
+                "megabytes": round(int(total_bytes) / 1024 / 1024, 1),
+                "rows_estimate": int(estimate) if estimate is not None and int(estimate) >= 0 else None,
+            }
+        )
     return out
 
 
@@ -1294,14 +1300,25 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
         "overall": "degraded" if down else "ok",
         "down": down,
         "services": rows,
-        "database": {**await database_row_security(db), "pool": _pool_now(), "slow_queries": await slow_queries(db), "table_sizes": await table_sizes(db)},
+        "database": {
+            **await database_row_security(db),
+            "pool": _pool_now(),
+            "slow_queries": await slow_queries(db),
+            "table_sizes": await table_sizes(db),
+        },
         "device_feeds": feeds,
         "core_feed": core_feed,
         "signins": signins,
         "disk": disk,
         "pending_migrations": pending or [],
         "migrations": await migration_summary(db),
-        "runtime": {"loop": loop, "slow_routes": slow_routes(), "workers": workers, "version": running_version(), "rate_limit": rate_limit_tally.snapshot()},
+        "runtime": {
+            "loop": loop,
+            "slow_routes": slow_routes(),
+            "workers": workers,
+            "version": running_version(),
+            "rate_limit": rate_limit_tally.snapshot(),
+        },
         "feed_routes": feed_receipts(),
         "warnings": platform_warnings(
             down=down,

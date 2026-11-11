@@ -159,9 +159,17 @@ def parse_report(attachment: bytes) -> DmarcReport:
                 spf_aligned=(evaluated.findtext("spf") if evaluated is not None else "") == "pass",
                 header_from=_clip(ident.findtext("header_from") if ident is not None else None, 255).lower(),
                 envelope_from=_clip(ident.findtext("envelope_from") if ident is not None else None, 255).lower(),
-                dkim_domains=[d for d in (_clip(x.findtext("domain"), 255).lower() for x in (auth.findall("dkim") if auth is not None else [])) if d][:10],
-                spf_domains=[d for d in (_clip(x.findtext("domain"), 255).lower() for x in (auth.findall("spf") if auth is not None else [])) if d][:10],
-                reason=",".join(t for t in (_clip(x.findtext("type"), 30).lower() for x in (evaluated.findall("reason") if evaluated is not None else [])) if t)[:120],
+                dkim_domains=[
+                    d for d in (_clip(x.findtext("domain"), 255).lower() for x in (auth.findall("dkim") if auth is not None else [])) if d
+                ][:10],
+                spf_domains=[
+                    d for d in (_clip(x.findtext("domain"), 255).lower() for x in (auth.findall("spf") if auth is not None else [])) if d
+                ][:10],
+                reason=",".join(
+                    t
+                    for t in (_clip(x.findtext("type"), 30).lower() for x in (evaluated.findall("reason") if evaluated is not None else []))
+                    if t
+                )[:120],
             )
         )
     return DmarcReport(

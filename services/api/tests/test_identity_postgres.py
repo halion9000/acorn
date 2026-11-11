@@ -299,19 +299,31 @@ async def test_the_password_never_expires_flag_is_stored_as_yes_no_or_unknown_an
         lambda db: ep.apply_mfa_users(
             db,
             world["msp"],
-            snapshot(snap, [mfa("1", "yes@x.com", password_never_expires=True), mfa("2", "no@x.com", password_never_expires=False), mfa("3", "unknown@x.com")]),
+            snapshot(
+                snap,
+                [
+                    mfa("1", "yes@x.com", password_never_expires=True),
+                    mfa("2", "no@x.com", password_never_expires=False),
+                    mfa("3", "unknown@x.com"),
+                ],
+            ),
             NOW,
         ),
     )
     flags = {}
     for uid in ("1", "2", "3"):
-        flags[uid] = await scalar("select password_never_expires from identity_mfa_users where user_id = :u and tenant_id = :t", u=uid, t=world["mapped"])
+        flags[uid] = await scalar(
+            "select password_never_expires from identity_mfa_users where user_id = :u and tenant_id = :t", u=uid, t=world["mapped"]
+        )
     assert flags == {"1": True, "2": False, "3": None}, "unknown stays unknown: it is never stored as 'expires'"
     await run(
         world["msp"],
         lambda db: ep.apply_mfa_users(db, world["msp"], snapshot(uuid.uuid4(), [mfa("1", "yes@x.com", password_never_expires=False)]), NOW),
     )
-    assert await scalar("select password_never_expires from identity_mfa_users where user_id = '1' and tenant_id = :t", t=world["mapped"]) is False
+    assert (
+        await scalar("select password_never_expires from identity_mfa_users where user_id = '1' and tenant_id = :t", t=world["mapped"])
+        is False
+    )
 
 
 async def test_the_sign_in_state_is_stored_as_active_inactive_never_or_unknown(world):
@@ -337,7 +349,9 @@ async def test_the_sign_in_state_is_stored_as_active_inactive_never_or_unknown(w
     for uid in ("1", "2", "3", "4"):
         got[uid] = (
             await scalar("select signin_state from identity_mfa_users where user_id = :u and tenant_id = :t", u=uid, t=world["mapped"]),
-            await scalar("select days_since_signin from identity_mfa_users where user_id = :u and tenant_id = :t", u=uid, t=world["mapped"]),
+            await scalar(
+                "select days_since_signin from identity_mfa_users where user_id = :u and tenant_id = :t", u=uid, t=world["mapped"]
+            ),
         )
     assert got == {"1": ("inactive", 160), "2": ("never", None), "3": ("active", None), "4": (None, None)}, "unknown stays unknown"
     import pytest

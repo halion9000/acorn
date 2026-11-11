@@ -15,8 +15,19 @@ OWNER, CLIENT, OTHER = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
 
 
 def window(**over):
-    base = {"id": uuid.uuid4(), "tenant_id": OWNER, "scope": "client", "client_tenant_id": CLIENT, "device_key": None, "source": None, "signature": sup.WINDOW_SIGNATURE, "revoked_at": None, "starts_at": None, "expires_at": None,
-                "revoked_reason": None}
+    base = {
+        "id": uuid.uuid4(),
+        "tenant_id": OWNER,
+        "scope": "client",
+        "client_tenant_id": CLIENT,
+        "device_key": None,
+        "source": None,
+        "signature": sup.WINDOW_SIGNATURE,
+        "revoked_at": None,
+        "starts_at": None,
+        "expires_at": None,
+        "revoked_reason": None,
+    }
     base.update(over)
     return SimpleNamespace(**base)
 

@@ -23,7 +23,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 PW = "correct horse battery staple"
-TABLES = [m.__table__ for m in (Tenant, User, ApiKey, LoginFailure, UserTotp, Role, Permission, RolePermission, UserRole, PasskeyCredential)]
+TABLES = [
+    m.__table__ for m in (Tenant, User, ApiKey, LoginFailure, UserTotp, Role, Permission, RolePermission, UserRole, PasskeyCredential)
+]
 
 
 @pytest.fixture
@@ -37,9 +39,27 @@ def world(tmp_path, monkeypatch):
     finally:
         column.server_default = saved
     tenant = Tenant(id=uuid.uuid4(), name="T", slug="t-" + uuid.uuid4().hex[:6])
-    perms = {n: Permission(id=uuid.uuid4(), name=n, description=n, category=n.split(":")[0]) for n in ("alerts:read", "cases:read", "users:read")}
-    boss = User(id=uuid.uuid4(), tenant_id=tenant.id, account_name="boss", email="boss@example.com", username="boss", hashed_password=get_password_hash(PW), role="tenant_admin")
-    ann = User(id=uuid.uuid4(), tenant_id=tenant.id, account_name="ann", email="ann@example.com", username="ann", hashed_password=get_password_hash(PW), role="custom")
+    perms = {
+        n: Permission(id=uuid.uuid4(), name=n, description=n, category=n.split(":")[0]) for n in ("alerts:read", "cases:read", "users:read")
+    }
+    boss = User(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        account_name="boss",
+        email="boss@example.com",
+        username="boss",
+        hashed_password=get_password_hash(PW),
+        role="tenant_admin",
+    )
+    ann = User(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        account_name="ann",
+        email="ann@example.com",
+        username="ann",
+        hashed_password=get_password_hash(PW),
+        role="custom",
+    )
     with Session(sync, expire_on_commit=False) as s:
         s.add(tenant)
         s.flush()
@@ -82,11 +102,17 @@ def test_creating_changing_assigning_revoking_and_deleting_a_role_each_leave_an_
     assert len(created) == 1 and created[0]["changes"] == {"name": "Reader", "permissions": ["alerts:read", "cases:read"]}
     assert created[0]["resource_id"] == role_id and created[0]["actor_email"] == "boss@example.com"
 
-    changed = world.client.patch(f"/rbac/roles/{role_id}", json={"name": "Reader+", "permission_ids": [ids["alerts:read"], ids["users:read"]]}, headers=h)
+    changed = world.client.patch(
+        f"/rbac/roles/{role_id}", json={"name": "Reader+", "permission_ids": [ids["alerts:read"], ids["users:read"]]}, headers=h
+    )
     assert changed.status_code == 200, changed.text
     updated = entries(world, "role:updated")
     assert len(updated) == 1
-    assert updated[0]["changes"] == {"name": {"before": "Reader", "after": "Reader+"}, "permissions_added": ["users:read"], "permissions_removed": ["cases:read"]}
+    assert updated[0]["changes"] == {
+        "name": {"before": "Reader", "after": "Reader+"},
+        "permissions_added": ["users:read"],
+        "permissions_removed": ["cases:read"],
+    }
 
     assigned = world.client.post(f"/rbac/users/{world.ann.id}/roles", json={"user_id": str(world.ann.id), "role_id": role_id}, headers=h)
     assert assigned.status_code == 201, assigned.text
@@ -105,9 +131,12 @@ def test_a_rename_alone_records_no_permission_change_and_a_refused_change_record
     role_id = world.client.post("/rbac/roles", json={"name": "A", "permission_ids": [ids["alerts:read"]]}, headers=h).json()["id"]
     world.audit.reset_mock()
     assert world.client.patch(f"/rbac/roles/{role_id}", json={"name": "B"}, headers=h).status_code == 200
-    assert entries(world, "role:updated")[0]["changes"] == {"name": {"before": "A", "after": "B"}, "permissions_added": [], "permissions_removed": []}
+    assert entries(world, "role:updated")[0]["changes"] == {
+        "name": {"before": "A", "after": "B"},
+        "permissions_added": [],
+        "permissions_removed": [],
+    }
     world.audit.reset_mock()
     assert world.client.patch(f"/rbac/roles/{uuid.uuid4()}", json={"name": "C"}, headers=h).status_code == 404
     assert world.client.delete(f"/rbac/roles/{uuid.uuid4()}", headers=h).status_code == 404
     assert world.audit.await_count == 0
-

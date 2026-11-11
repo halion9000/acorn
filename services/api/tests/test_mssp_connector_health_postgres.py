@@ -82,10 +82,25 @@ async def world():
             await db.commit()
         async with owner.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-            for vendor, client in (("huntress", "acme"), ("ninjaone", "acme"), ("ninjaone", "birch"), ("huntress", "quiet"), ("blumira", "quiet"), ("halopsa", "quiet")):
+            for vendor, client in (
+                ("huntress", "acme"),
+                ("ninjaone", "acme"),
+                ("ninjaone", "birch"),
+                ("huntress", "quiet"),
+                ("blumira", "quiet"),
+                ("halopsa", "quiet"),
+            ):
                 await conn.execute(
-                    text("insert into client_aliases (id, tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored) values (gen_random_uuid(), :o, :v, :c, :n, :n, :k, false)"),
-                    {"o": ids["owner"], "v": vendor, "c": f"{vendor}-{client}-{tag}", "n": f"{vendor}-{client}-{tag}-name", "k": ids[client]},
+                    text(
+                        "insert into client_aliases (id, tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored) values (gen_random_uuid(), :o, :v, :c, :n, :n, :k, false)"
+                    ),
+                    {
+                        "o": ids["owner"],
+                        "v": vendor,
+                        "c": f"{vendor}-{client}-{tag}",
+                        "n": f"{vendor}-{client}-{tag}-name",
+                        "k": ids[client],
+                    },
                 )
         yield ids, tag
     finally:
@@ -115,11 +130,14 @@ async def test_each_client_gets_its_enabled_and_failing_counts_and_nothing_of_an
     ids, tag = world
     rows = await list_as(ids["owner"])
     got = {r.name.removesuffix(f"-{tag}"): (r.connectors_enabled, r.connectors_unhealthy) for r in rows if r.name.endswith(f"-{tag}")}
-    assert got == {
-        "acme": (6, 2),  # its own 4 (2 failing) plus Huntress and NinjaOne, fed by CORE (counted, never failing)
-        "birch": (3, 0),  # its own 2 plus NinjaOne
-        "quiet": (1, 0),  # nothing of its own; Huntress is fed and fine; Blumira is switched off and HaloPSA is not a feed
-    }, "a switched-off connector is not counted, a tool CORE does not feed is not counted, and the other organization's client is not listed"
+    assert (
+        got
+        == {
+            "acme": (6, 2),  # its own 4 (2 failing) plus Huntress and NinjaOne, fed by CORE (counted, never failing)
+            "birch": (3, 0),  # its own 2 plus NinjaOne
+            "quiet": (1, 0),  # nothing of its own; Huntress is fed and fine; Blumira is switched off and HaloPSA is not a feed
+        }
+    ), "a switched-off connector is not counted, a tool CORE does not feed is not counted, and the other organization's client is not listed"
 
 
 async def test_the_other_organization_sees_only_its_own_client_and_its_numbers(world):

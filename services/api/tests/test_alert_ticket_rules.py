@@ -193,7 +193,13 @@ def test_a_rule_for_all_clients_is_not_tied_to_the_alerts_client(wired):
 
 
 def test_a_rule_made_from_an_alert_with_a_rule_id_is_listed_under_the_types_name_not_one_devices_title(wired):
-    alert = NS(rule_id="aisoc-remote-foreign", rule_name="ScreenConnect for another server", title="ScreenConnect for another server (514f25df7bb0852b) found on D68HM3L3", raw_event={"source": "aisoc-remote-tools"}, connector_type=None)
+    alert = NS(
+        rule_id="aisoc-remote-foreign",
+        rule_name="ScreenConnect for another server",
+        title="ScreenConnect for another server (514f25df7bb0852b) found on D68HM3L3",
+        raw_event={"source": "aisoc-remote-tools"},
+        connector_type=None,
+    )
     db = FakeDB(Rows([alert]), Rows([]), Rows([]), Rows([]))
     asyncio.run(ep.make_ticket_rule(ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="all"), MagicMock(), user(), db))
     assert db.added[0].title == "ScreenConnect for another server" and db.added[0].signature == "rule:aisoc-remote-foreign"
@@ -266,7 +272,10 @@ def test_type_key_ignores_the_parts_of_a_title_that_change_from_one_alert_to_the
         'title:A user asked to release a quarantined message: "x"',
     ]
     assert len({type_key(t) for t in same_quarantine}) == 1
-    same_sc = ["title:ScreenConnect for another server (514f25df7bb0852b) found on D68HM3L3", "title:ScreenConnect for another server (344e459ab554378d) found on Mac.localdomain"]
+    same_sc = [
+        "title:ScreenConnect for another server (514f25df7bb0852b) found on D68HM3L3",
+        "title:ScreenConnect for another server (344e459ab554378d) found on Mac.localdomain",
+    ]
     assert len({type_key(t) for t in same_sc}) == 1
     assert type_key(same_sc[0]) != type_key(same_quarantine[0])
     assert type_key("title:Possible initial access from an emerging threat") == "type:possible initial access from an emerging threat"
@@ -279,7 +288,13 @@ def test_a_rule_made_from_one_message_or_device_covers_the_others_of_that_type_b
 
     t0 = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
     tenant = uuid.uuid4()
-    rule = NS(signature='title:A user asked to release a quarantined message: "Re: Block 2027"', source="cipp", scope="all", client_tenant_id=None, created_at=t0)
+    rule = NS(
+        signature='title:A user asked to release a quarantined message: "Re: Block 2027"',
+        source="cipp",
+        scope="all",
+        client_tenant_id=None,
+        created_at=t0,
+    )
 
     def covers(title, source="cipp", when=t0 + timedelta(minutes=5)):
         return rule_covers(rule, tenant_id=tenant, rule_id=None, title=title, source=source, created_at=when)
@@ -287,13 +302,18 @@ def test_a_rule_made_from_one_message_or_device_covers_the_others_of_that_type_b
     assert covers('A user asked to release a quarantined message: "A different subject"')
     assert not covers("A user reported a phishing message")
     assert not covers('A user asked to release a quarantined message: "x"', source="huntress"), "the tool still has to match"
-    assert not covers('A user asked to release a quarantined message: "x"', when=t0 - timedelta(minutes=5)), "and only alerts raised after the rule was made"
+    assert not covers(
+        'A user asked to release a quarantined message: "x"', when=t0 - timedelta(minutes=5)
+    ), "and only alerts raised after the rule was made"
 
 
 def test_a_rule_asks_for_the_catch_up_unless_the_person_turns_it_off(wired):
     audits, queued = wired
     alert = NS(rule_id=None, rule_name=None, title=TITLE, raw_event={"source": "cipp"}, connector_type=None)
-    for body, expected in ((ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="all"), True), (ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="all", catch_up=False), False)):
+    for body, expected in (
+        (ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="all"), True),
+        (ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="all", catch_up=False), False),
+    ):
         db = FakeDB(Rows([alert]), Rows([]), Rows([]), Rows([]))
         asyncio.run(ep.make_ticket_rule(body, MagicMock(), user(), db))
         assert queued.catch_ups[-1] is expected and audits[-1]["changes"]["catch_up"] is expected

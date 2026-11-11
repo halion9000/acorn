@@ -164,7 +164,9 @@ class PushOut(BaseModel):
     message: str
 
 
-@router.post("/{client_id}/push", response_model=PushOut, status_code=status.HTTP_201_CREATED, summary="Push a tool to one Mac through Addigy")
+@router.post(
+    "/{client_id}/push", response_model=PushOut, status_code=status.HTTP_201_CREATED, summary="Push a tool to one Mac through Addigy"
+)
 async def push_tool(
     client_id: uuid.UUID,
     body: PushIn,
@@ -226,4 +228,6 @@ async def push_tool(
         request=request,
     )
     await db.commit()
-    return PushOut(queued=True, message=f"Asked CORE to push {body.tool.capitalize()} to {device.hostname}. It checks the Mac's Addigy policy first.")
+    return PushOut(
+        queued=True, message=f"Asked CORE to push {body.tool.capitalize()} to {device.hostname}. It checks the Mac's Addigy policy first."
+    )

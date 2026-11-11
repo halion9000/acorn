@@ -19,7 +19,9 @@ PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 APP_URL = os.environ.get("AISOC_TEST_PG_APP_URL", "")
 pytestmark = [
     pytest.mark.asyncio,
-    pytest.mark.skipif(not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"),
+    pytest.mark.skipif(
+        not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"
+    ),
 ]
 
 # Pairs whose order differs between Python and a punctuation-ignoring database collation.

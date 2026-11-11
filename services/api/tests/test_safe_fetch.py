@@ -7,7 +7,19 @@ import pytest
 from app.services import safe_fetch as sf
 
 
-@pytest.mark.parametrize("url", ["http://example.com/x", "ftp://example.com", "https://u:p@example.com/x", "https:///x", "https://127.0.0.1/x", "https://10.1.2.3/x", "https://[::1]/x", "https://169.254.169.254/latest"])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://example.com/x",
+        "ftp://example.com",
+        "https://u:p@example.com/x",
+        "https:///x",
+        "https://127.0.0.1/x",
+        "https://10.1.2.3/x",
+        "https://[::1]/x",
+        "https://169.254.169.254/latest",
+    ],
+)
 def test_a_non_https_credentialed_or_non_public_address_never_reaches_a_client(url, monkeypatch):
     made = []
     monkeypatch.setattr(sf.httpx, "AsyncClient", lambda *a, **k: made.append(1))

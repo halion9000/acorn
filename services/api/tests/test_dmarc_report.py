@@ -29,8 +29,20 @@ def report(*records, domain="Client.COM.", policy="none"):
 
 
 def test_it_reads_the_report_and_counts_pass_and_fail():
-    r = parse_report(report(record("1.2.3.4", 40), record("5.6.7.8", 6, dkim="fail", spf="pass"), record("9.9.9.9", 4, dkim="fail", spf="fail", disp="quarantine")))
-    assert (r.reporter, r.reporter_email, r.report_id, r.domain, r.policy) == ("google.com", "noreply-dmarc@google.com", "123", "client.com", "none")
+    r = parse_report(
+        report(
+            record("1.2.3.4", 40),
+            record("5.6.7.8", 6, dkim="fail", spf="pass"),
+            record("9.9.9.9", 4, dkim="fail", spf="fail", disp="quarantine"),
+        )
+    )
+    assert (r.reporter, r.reporter_email, r.report_id, r.domain, r.policy) == (
+        "google.com",
+        "noreply-dmarc@google.com",
+        "123",
+        "client.com",
+        "none",
+    )
     assert r.begin == datetime(2025, 11, 2, tzinfo=UTC) and r.end == datetime(2025, 11, 3, tzinfo=UTC)
     assert (r.total, r.passed, r.failed) == (50, 46, 4)
     bad = r.records[2]
@@ -67,7 +79,9 @@ def test_a_zip_with_two_files_or_a_bomb_is_refused(monkeypatch):
         parse_report(b"x" * 11)
 
 
-@pytest.mark.parametrize("bad", [b'<!DOCTYPE feedback [<!ENTITY a "aaaa">]><feedback/>', b"<feedback><!ENTITY x SYSTEM 'file:///etc/passwd'></feedback>"])
+@pytest.mark.parametrize(
+    "bad", [b'<!DOCTYPE feedback [<!ENTITY a "aaaa">]><feedback/>', b"<feedback><!ENTITY x SYSTEM 'file:///etc/passwd'></feedback>"]
+)
 def test_a_doctype_or_entity_is_refused(bad):
     with pytest.raises(DmarcReportError, match="DOCTYPE or ENTITY"):
         parse_report(bad)

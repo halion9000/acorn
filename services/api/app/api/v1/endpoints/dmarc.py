@@ -243,7 +243,9 @@ async def _children(db: Any, owner: Any) -> dict[Any, Tenant]:
 async def _status(db: Any, owner: Any) -> Status:
     async with cross_tenant_reads(db):
         state = (await db.execute(select(DmarcIngestState).where(DmarcIngestState.tenant_id == owner))).scalar_one_or_none()
-        unmatched = len((await db.execute(select(DmarcReport.id).where(DmarcReport.tenant_id == owner, DmarcReport.matched.is_(False)))).scalars().all())
+        unmatched = len(
+            (await db.execute(select(DmarcReport.id).where(DmarcReport.tenant_id == owner, DmarcReport.matched.is_(False)))).scalars().all()
+        )
     return Status(
         configured=_configured(),
         mailbox=settings.DMARC_MAILBOX.strip() or None,
@@ -262,7 +264,12 @@ def policy_progress(rows: list[DomainRow]) -> list[PolicyProgress]:
     """One line per client: how many of its domains reject, quarantine or only monitor, and how many of the monitoring ones are ready to enforce. Least enforced first, so the clients furthest behind lead (pure)."""
     by_client: dict[str, PolicyProgress] = {}
     for r in rows:
-        p = by_client.setdefault(r.client_id, PolicyProgress(client_id=r.client_id, client_name=r.client_name, domains=0, rejecting=0, quarantining=0, monitoring=0, ready_to_enforce=0))
+        p = by_client.setdefault(
+            r.client_id,
+            PolicyProgress(
+                client_id=r.client_id, client_name=r.client_name, domains=0, rejecting=0, quarantining=0, monitoring=0, ready_to_enforce=0
+            ),
+        )
         p.domains += 1
         policy = (r.policy or "").lower()
         if policy == "reject":
@@ -287,10 +294,16 @@ async def overview(
     since = datetime.now(UTC) - timedelta(days=days)
     async with cross_tenant_reads(db):
         reports = (
-            await db.execute(
-                select(DmarcReport).where(DmarcReport.tenant_id.in_([owner, *clients]), DmarcReport.end_at >= since).order_by(DmarcReport.end_at.desc())
+            (
+                await db.execute(
+                    select(DmarcReport)
+                    .where(DmarcReport.tenant_id.in_([owner, *clients]), DmarcReport.end_at >= since)
+                    .order_by(DmarcReport.end_at.desc())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     groups: dict[tuple[Any, str], list[DmarcReport]] = defaultdict(list)
     for r in reports:
         groups[(r.tenant_id, r.domain)].append(r)
@@ -301,7 +314,9 @@ async def overview(
             DomainRow(
                 client_id=str(tenant_id),
                 # the managing company's own domain is matched too (to itself); only a domain nobody could be matched to is "not matched"
-                client_name=clients[tenant_id].name if tenant_id in clients else (f"{owner_name} (own)" if all(i.matched for i in items) else "Not matched to a client"),
+                client_name=clients[tenant_id].name
+                if tenant_id in clients
+                else (f"{owner_name} (own)" if all(i.matched for i in items) else "Not matched to a client"),
                 matched=all(i.matched for i in items),
                 domain=domain,
                 reports=len(items),
@@ -319,7 +334,10 @@ async def overview(
 
 @router.get("/domains/{domain}", response_model=DomainDetail, summary="One domain: its daily results and the sources failing DMARC")
 async def domain_detail(
-    domain: str, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: int = Query(30, ge=1, le=365)
+    domain: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    days: int = Query(30, ge=1, le=365),
 ) -> DomainDetail:
     domain = domain.strip().lower().rstrip(".")
     if not _DOMAIN.match(domain):
@@ -329,12 +347,16 @@ async def domain_detail(
     since = datetime.now(UTC) - timedelta(days=days)
     async with cross_tenant_reads(db):
         reports = (
-            await db.execute(
-                select(DmarcReport)
-                .where(DmarcReport.tenant_id.in_([owner, *clients]), DmarcReport.domain == domain, DmarcReport.end_at >= since)
-                .order_by(DmarcReport.end_at.desc())
+            (
+                await db.execute(
+                    select(DmarcReport)
+                    .where(DmarcReport.tenant_id.in_([owner, *clients]), DmarcReport.domain == domain, DmarcReport.end_at >= since)
+                    .order_by(DmarcReport.end_at.desc())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     if not reports:
         raise HTTPException(status_code=404, detail="No reports for that domain in this period.")
     daily: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0])
@@ -346,7 +368,14 @@ async def domain_detail(
         daily[day][2] += r.failed
         for row in r.rows or []:
             if not row.get("pass"):
-                failing[(str(row.get("ip", "")), str(row.get("header_from", "")), str(row.get("envelope_from", "")), str(row.get("disposition", "")))] += int(row.get("count", 0))
+                failing[
+                    (
+                        str(row.get("ip", "")),
+                        str(row.get("header_from", "")),
+                        str(row.get("envelope_from", "")),
+                        str(row.get("disposition", "")),
+                    )
+                ] += int(row.get("count", 0))
     total, passed = sum(r.total for r in reports), sum(r.passed for r in reports)
     return DomainDetail(
         domain=domain,
@@ -357,7 +386,9 @@ async def domain_detail(
         failed=total - passed,
         policy=reports[0].policy,
         series=[DayPoint(day=d, total=v[0], passed=v[1], failed=v[2]) for d, v in sorted(daily.items())],
-        failing_sources=[FailingSource(ip=k[0], count=n, header_from=k[1], envelope_from=k[2], disposition=k[3]) for k, n in failing.most_common(25)],
+        failing_sources=[
+            FailingSource(ip=k[0], count=n, header_from=k[1], envelope_from=k[2], disposition=k[3]) for k, n in failing.most_common(25)
+        ],
     )
 
 
@@ -435,7 +466,9 @@ def delivery_class(row: dict[str, Any]) -> str:
     return "passed" if row.get("pass") else "failed_delivered"
 
 
-async def _scoped_reports(current_user: AuthUser, db: Any, days: int, domain: str | None, client_id: str | None) -> tuple[list[DmarcReport], str | None]:
+async def _scoped_reports(
+    current_user: AuthUser, db: Any, days: int, domain: str | None, client_id: str | None
+) -> tuple[list[DmarcReport], str | None]:
     """The stored reports the caller may see (their own and their clients'), narrowed to one client or domain; the domain as cleaned. 422 for a malformed filter, 404 for a client that is not theirs."""
     owner = current_user.tenant_id
     clients = await _children(db, owner)
@@ -524,7 +557,11 @@ async def countries(
         days=days,
         emails=total,
         countries=sorted(
-            (CountryRow(code=c, emails=p + f, passed=p, failed=f, addresses=senders[c][:ADDRESSES_PER_COUNTRY]) for c, (p, f) in per.items()), key=lambda c: -c.emails
+            (
+                CountryRow(code=c, emails=p + f, passed=p, failed=f, addresses=senders[c][:ADDRESSES_PER_COUNTRY])
+                for c, (p, f) in per.items()
+            ),
+            key=lambda c: -c.emails,
         ),
         unknown=unknown,
         not_looked_up=total - looked,
@@ -547,7 +584,9 @@ class ReportCard(BaseModel):
     pass_rate: float | None
     policy: str
     posture: DomainPosture  # the live DNS check: mail records, SPF, DMARC, DKIM
-    spf_lookups: int | None = None  # DNS lookups the SPF record costs through every include (the limit is 10); None when there is no SPF record
+    spf_lookups: int | None = (
+        None  # DNS lookups the SPF record costs through every include (the limit is 10); None when there is no SPF record
+    )
     spf_lookups_complete: bool = True  # False when part of the chain could not be read: spf_lookups is then a minimum
     mta_sts: MtaStsOut | None = None  # the MTA-STS policy (RFC 8461): whether senders must use an encrypted, correctly named connection
     advice: list[str]  # plain-language next steps, most useful first
@@ -557,25 +596,38 @@ MIN_MAIL_TO_JUDGE = 100
 
 
 def report_card_advice(
-    policy: str, pass_rate: float | None, total: int, posture: DomainPosture, lookups: SpfLookups | None = None, sts: mta_sts.MtaSts | None = None
+    policy: str,
+    pass_rate: float | None,
+    total: int,
+    posture: DomainPosture,
+    lookups: SpfLookups | None = None,
+    sts: mta_sts.MtaSts | None = None,
 ) -> list[str]:
     """What to do next for one domain, from its published policy, how much of its mail passes, and what DNS says. Rules only: no guessing about senders."""
     out: list[str] = []
     has_mail = bool(posture.mx)
     if not has_mail:
-        out.append("This domain has no mail records, so it should not send mail. Publishing a reject policy and an SPF record that allows nobody stops others pretending to be it.")
+        out.append(
+            "This domain has no mail records, so it should not send mail. Publishing a reject policy and an SPF record that allows nobody stops others pretending to be it."
+        )
     if total < MIN_MAIL_TO_JUDGE or pass_rate is None:
         out.append(f"Only {total:,} messages so far, which is too few to judge. Wait for more reports before changing the policy.")
     elif policy == "none":
         if pass_rate >= 98:
-            out.append(f"{pass_rate}% of mail passes and the policy only monitors. It is reasonable to start enforcing: move to quarantine for a small share first (p=quarantine; pct=25), then raise it.")
+            out.append(
+                f"{pass_rate}% of mail passes and the policy only monitors. It is reasonable to start enforcing: move to quarantine for a small share first (p=quarantine; pct=25), then raise it."
+            )
         else:
-            out.append(f"Only {pass_rate}% of mail passes. Find the failing senders (the list below) and fix or remove them before enforcing, or real mail will be quarantined.")
+            out.append(
+                f"Only {pass_rate}% of mail passes. Find the failing senders (the list below) and fix or remove them before enforcing, or real mail will be quarantined."
+            )
     elif policy == "quarantine":
         if pass_rate >= 99.5:
             out.append(f"{pass_rate}% passes under quarantine. The next step is reject, which stops pretenders completely.")
         elif pass_rate < 95:
-            out.append(f"{pass_rate}% passes while failing mail is being quarantined. Check that the failures are not real mail going to spam.")
+            out.append(
+                f"{pass_rate}% passes while failing mail is being quarantined. Check that the failures are not real mail going to spam."
+            )
     elif policy == "reject" and pass_rate is not None and pass_rate < 95:
         out.append(f"{pass_rate}% passes under a reject policy. Real mail may be bouncing: check the failing senders now.")
     elif policy == "reject":
@@ -591,7 +643,9 @@ def report_card_advice(
                 "Remove an include you no longer use, or replace includes with the sender's IP ranges."
             )
         elif lookups.complete and lookups.count >= SPF_WARN_AT:
-            out.append(f"SPF uses {lookups.count} of the {SPF_LIMIT} DNS lookups receivers allow. Adding one more sender could push it over and break SPF for everyone.")
+            out.append(
+                f"SPF uses {lookups.count} of the {SPF_LIMIT} DNS lookups receivers allow. Adding one more sender could push it over and break SPF for everyone."
+            )
     if sts is not None:
         out.extend(mta_sts.advice(sts, has_mail))
     return out
@@ -632,7 +686,14 @@ async def domain_report_card(
         posture=posture,
         spf_lookups=lookups.count if lookups is not None else None,
         spf_lookups_complete=lookups.complete if lookups is not None else True,
-        mta_sts=MtaStsOut(state=sts.state, mode=sts.mode, max_age=sts.max_age, mx_patterns=sts.mx_patterns, uncovered_mx=sts.uncovered_mx, issues=sts.issues),
+        mta_sts=MtaStsOut(
+            state=sts.state,
+            mode=sts.mode,
+            max_age=sts.max_age,
+            mx_patterns=sts.mx_patterns,
+            uncovered_mx=sts.uncovered_mx,
+            issues=sts.issues,
+        ),
         advice=report_card_advice(newest.policy, rate, total, posture, lookups, sts),
     )
 
@@ -649,7 +710,9 @@ class Lookalikes(BaseModel):
     found: list[LookalikeRow]
 
 
-@router.get("/domains/{domain}/lookalikes", response_model=Lookalikes, summary="Look-alike domains of one of the caller's domains that exist in DNS")
+@router.get(
+    "/domains/{domain}/lookalikes", response_model=Lookalikes, summary="Look-alike domains of one of the caller's domains that exist in DNS"
+)
 async def domain_lookalikes(
     domain: str,
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
@@ -661,7 +724,11 @@ async def domain_lookalikes(
     if not reports or clean is None:
         raise HTTPException(status_code=404, detail="No reports for that domain.")
     found = await scan_lookalikes(clean, resolver)
-    return Lookalikes(domain=clean, checked=len(generate_lookalikes(clean)), found=[LookalikeRow(domain=x.domain, kind=x.kind, has_mail=x.has_mail) for x in found])
+    return Lookalikes(
+        domain=clean,
+        checked=len(generate_lookalikes(clean)),
+        found=[LookalikeRow(domain=x.domain, kind=x.kind, has_mail=x.has_mail) for x in found],
+    )
 
 
 def get_cert_fetcher() -> bimi_check.Fetcher:
@@ -716,7 +783,11 @@ def _rows(results: list[blocklist.ListResult]) -> list[ListRow]:
     return [ListRow(list_name=r.list_name, status=r.status, detail=r.detail) for r in results]
 
 
-@router.get("/domains/{domain}/blocklists", response_model=Blocklists, summary="Blocklist status of one of the caller's domains and its busiest sending addresses")
+@router.get(
+    "/domains/{domain}/blocklists",
+    response_model=Blocklists,
+    summary="Blocklist status of one of the caller's domains and its busiest sending addresses",
+)
 async def domain_blocklists(
     domain: str,
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
@@ -733,7 +804,9 @@ async def domain_blocklists(
         for row in r.rows or []:
             volume[str(row.get("ip") or "")] += int(row.get("count", 0))
     busiest = [(ip, n) for ip, n in volume.most_common() if blocklist.reverse_ipv4(ip)][:MAX_BLOCKLIST_ADDRESSES]
-    domain_results, *per_ip = await asyncio.gather(blocklist.check_domain(clean, lookup), *(blocklist.check_ip(ip, lookup) for ip, _ in busiest))
+    domain_results, *per_ip = await asyncio.gather(
+        blocklist.check_domain(clean, lookup), *(blocklist.check_ip(ip, lookup) for ip, _ in busiest)
+    )
     addresses = [AddressBlocklists(ip=ip, emails=n, results=_rows(res)) for (ip, n), res in zip(busiest, per_ip, strict=True)]
     everything = [*domain_results, *(r for res in per_ip for r in res)]
     return Blocklists(
@@ -765,7 +838,11 @@ def get_rdap_fetcher() -> Callable[[str], Awaitable[bytes]]:
     return fetch
 
 
-@router.get("/domains/{domain}/reputation", response_model=Reputation, summary="Facts that bear on one of the caller's domains' reputation (registration age, expiry, its own mail)")
+@router.get(
+    "/domains/{domain}/reputation",
+    response_model=Reputation,
+    summary="Facts that bear on one of the caller's domains' reputation (registration age, expiry, its own mail)",
+)
 async def domain_reputation(
     domain: str,
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
@@ -813,7 +890,11 @@ class TlsOverview(BaseModel):
     domains: list[TlsDomainRow]
 
 
-@router.get("/tls", response_model=TlsOverview, summary="TLS reports per domain: how many TLS-protected connections to the domain's mail servers worked, and why the rest failed")
+@router.get(
+    "/tls",
+    response_model=TlsOverview,
+    summary="TLS reports per domain: how many TLS-protected connections to the domain's mail servers worked, and why the rest failed",
+)
 async def tls_overview(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
     db: DBSession,
@@ -823,7 +904,11 @@ async def tls_overview(
     clients = await _children(db, owner)
     since = datetime.now(UTC) - timedelta(days=days)
     async with cross_tenant_reads(db):
-        rows = (await db.execute(select(TlsReport).where(TlsReport.tenant_id.in_([owner, *clients]), TlsReport.end_at >= since))).scalars().all()
+        rows = (
+            (await db.execute(select(TlsReport).where(TlsReport.tenant_id.in_([owner, *clients]), TlsReport.end_at >= since)))
+            .scalars()
+            .all()
+        )
     groups: dict[tuple[uuid.UUID, str], list[TlsReport]] = defaultdict(list)
     for r in rows:
         groups[(r.tenant_id, r.domain)].append(r)
@@ -891,7 +976,14 @@ async def insights(
             from_domains[str(row.get("header_from") or r.domain)][0 if ok else 1] += count
 
     sender_rows = [
-        SenderRow(name=name if kind == "named" else f"Unknown ({name})", identified=kind == "named", emails=p + f, passed=p, failed=f, status=_health(p, f))
+        SenderRow(
+            name=name if kind == "named" else f"Unknown ({name})",
+            identified=kind == "named",
+            emails=p + f,
+            passed=p,
+            failed=f,
+            status=_health(p, f),
+        )
         for (name, kind), (p, f) in senders.items()
     ]
     # At risk: any sender (not only the busiest) with failures, most failing messages first. A sender with a handful of failures among thousands is still listed: the count says how small it is.
@@ -902,21 +994,32 @@ async def insights(
         domain=clean,
         emails=total,
         delivery=Delivery(
-            passed=delivery["passed"], failed_delivered=delivery["failed_delivered"], overridden=delivery["overridden"], quarantined=delivery["quarantined"], rejected=delivery["rejected"]
+            passed=delivery["passed"],
+            failed_delivered=delivery["failed_delivered"],
+            overridden=delivery["overridden"],
+            quarantined=delivery["quarantined"],
+            rejected=delivery["rejected"],
         ),
         rates=FailureRates(dmarc=_pct(dmarc_fail, total), dkim=_pct(dkim_fail, total), spf=_pct(spf_fail, total)),
         series=[RatePoint(day=k, total=v[0], dmarc_fail=v[1], dkim_fail=v[2], spf_fail=v[3]) for k, v in sorted(daily.items())],
         senders=sorted(sender_rows, key=lambda x: -x.emails)[:10],
         at_risk=at_risk,
         sending_domains=sorted(
-            (SendingDomainRow(domain=k, emails=p + f, passed=p, failed=f, status=_health(p, f)) for k, (p, f) in from_domains.items()), key=lambda s: -s.emails
+            (SendingDomainRow(domain=k, emails=p + f, passed=p, failed=f, status=_health(p, f)) for k, (p, f) in from_domains.items()),
+            key=lambda s: -s.emails,
         )[:10],
     )
 
 
-@router.get("/setup", response_model=Setup, summary="For each client domain: the address to put in its DMARC record and the DNS line that authorises it")
+@router.get(
+    "/setup",
+    response_model=Setup,
+    summary="For each client domain: the address to put in its DMARC record and the DNS line that authorises it",
+)
 async def setup(
-    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, resolver: Annotated[Resolver, Depends(get_resolver)]
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    resolver: Annotated[Resolver, Depends(get_resolver)],
 ) -> Setup:
     """Nothing is changed. Each client domain gets its own alias on the shared mailbox (so its reports are recognisable and can be retired alone) and the one DNS record, in YOUR zone, that lets receivers send a
     client domain's reports to you (receivers require it before reporting to a different domain)."""
@@ -927,8 +1030,12 @@ async def setup(
     lines: list[SetupLine] = []
     if mailbox_domain and clients:
         async with cross_tenant_reads(db):
-            upns = (await db.execute(select(IdentityMfaUser.tenant_id, IdentityMfaUser.upn).where(IdentityMfaUser.tenant_id.in_(list(clients))))).all()
-            mails = (await db.execute(select(IdentitySource.tenant_id, IdentitySource.email).where(IdentitySource.tenant_id.in_(list(clients))))).all()
+            upns = (
+                await db.execute(select(IdentityMfaUser.tenant_id, IdentityMfaUser.upn).where(IdentityMfaUser.tenant_id.in_(list(clients))))
+            ).all()
+            mails = (
+                await db.execute(select(IdentitySource.tenant_id, IdentitySource.email).where(IdentitySource.tenant_id.in_(list(clients))))
+            ).all()
         emails: dict[Any, list[str]] = defaultdict(list)
         for tenant_id, address in [*upns, *mails]:
             emails[tenant_id].append(address)

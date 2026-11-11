@@ -20,7 +20,13 @@ OWNER, CLIENT = uuid.uuid4(), uuid.uuid4()
 
 def device(excluded=(), vendors=("ninjaone",), tenant=CLIENT, os="Windows 11"):
     return DeviceOut(
-        id=uuid.uuid4(), tenant_id=tenant, client_name="Acme", hostname=f"PC-{uuid.uuid4().hex[:4]}", os=os, last_seen=NOW, first_seen=NOW,
+        id=uuid.uuid4(),
+        tenant_id=tenant,
+        client_name="Acme",
+        hostname=f"PC-{uuid.uuid4().hex[:4]}",
+        os=os,
+        last_seen=NOW,
+        first_seen=NOW,
         sources=[DeviceSourceOut(vendor=v, name="x", last_seen=NOW, details={}, last_checkin=NOW, stale=False) for v in vendors],
         excluded_tools=list(excluded),
     )
@@ -161,7 +167,11 @@ def test_choosing_tools_stores_them_on_the_client_audits_the_change_and_drops_th
     assert out.tools == ["addigy", "fieldeffect", "huntress", "screenconnect"]
     assert db.tenant.settings == {"hidden": True, "tool_exclusions": out.tools}
     (call,) = audited.await_args_list
-    assert call.kwargs["action"] == "posture:tool_exclusions_changed" and call.kwargs["changes"]["before"] == [] and call.kwargs["changes"]["after"] == out.tools
+    assert (
+        call.kwargs["action"] == "posture:tool_exclusions_changed"
+        and call.kwargs["changes"]["before"] == []
+        and call.kwargs["changes"]["after"] == out.tools
+    )
     assert forgot == [1]
 
 
@@ -203,7 +213,11 @@ def test_a_tool_marked_as_not_used_that_reports_devices_is_a_finding_naming_how_
 
 def test_being_linked_to_an_organization_of_the_tool_counts_even_with_no_devices_and_both_are_said():
     only_linked = tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {}, {"huntress"}, NOW)
-    assert len(only_linked) == 1 and "is linked to one of its organizations" in only_linked[0].summary and "reports" not in only_linked[0].summary
+    assert (
+        len(only_linked) == 1
+        and "is linked to one of its organizations" in only_linked[0].summary
+        and "reports" not in only_linked[0].summary
+    )
     both = tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {"huntress": 1}, {"huntress"}, NOW)[0]
     assert "reports 1 device and is linked to one of its organizations" in both.summary
 
@@ -211,13 +225,21 @@ def test_being_linked_to_an_organization_of_the_tool_counts_even_with_no_devices
 def test_nothing_is_raised_for_an_excluded_tool_that_is_really_absent_or_for_a_tool_that_is_not_excluded():
     assert tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {}, set(), NOW) == []
     assert tx.detect_excluded_but_present(CLIENT, "Acme", frozenset(), {"huntress": 5}, {"huntress"}, NOW) == []
-    assert tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {"screenconnect": 5}, {"screenconnect"}, NOW) == []  # another tool's devices are not this tool's
+    assert (
+        tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {"screenconnect": 5}, {"screenconnect"}, NOW) == []
+    )  # another tool's devices are not this tool's
 
 
 def test_it_comes_back_each_month_and_not_each_day():
-    june = tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {"huntress": 1}, set(), datetime(2026, 6, 3, tzinfo=UTC))[0].key
-    later_june = tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {"huntress": 1}, set(), datetime(2026, 6, 28, tzinfo=UTC))[0].key
-    july = tx.detect_excluded_but_present(CLIENT, "Acme", frozenset({"huntress"}), {"huntress": 1}, set(), datetime(2026, 7, 1, tzinfo=UTC))[0].key
+    june = tx.detect_excluded_but_present(
+        CLIENT, "Acme", frozenset({"huntress"}), {"huntress": 1}, set(), datetime(2026, 6, 3, tzinfo=UTC)
+    )[0].key
+    later_june = tx.detect_excluded_but_present(
+        CLIENT, "Acme", frozenset({"huntress"}), {"huntress": 1}, set(), datetime(2026, 6, 28, tzinfo=UTC)
+    )[0].key
+    july = tx.detect_excluded_but_present(
+        CLIENT, "Acme", frozenset({"huntress"}), {"huntress": 1}, set(), datetime(2026, 7, 1, tzinfo=UTC)
+    )[0].key
     assert june == later_june == "huntress:2026-06" and july == "huntress:2026-07"
 
 
@@ -271,7 +293,11 @@ def test_the_runner_raises_one_alert_in_the_clients_tenant_for_a_tool_that_is_ex
     assert asyncio.run(tx.run_excluded_present(db, OWNER, [CLIENT], NOW)) == 1
     c = db.writes[0].compile(dialect=postgresql.dialect())
     assert "ON CONFLICT (id) DO NOTHING" in str(c)
-    assert c.params["tenant_id"] == CLIENT and c.params["title"] == "huntress is marked as not used for Acme, but it is there" and c.params["category"] == "posture"
+    assert (
+        c.params["tenant_id"] == CLIENT
+        and c.params["title"] == "huntress is marked as not used for Acme, but it is there"
+        and c.params["category"] == "posture"
+    )
 
 
 def test_the_runner_raises_nothing_for_a_client_with_no_exclusions_or_no_such_devices(no_rls):

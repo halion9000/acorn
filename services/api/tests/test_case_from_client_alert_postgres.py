@@ -30,11 +30,19 @@ async def world():
         for key, tid in ids.items():
             await c.execute(
                 text("insert into tenants (id, name, slug, parent_tenant_id, mssp_role) values (:i, :n, :s, :p, :r)"),
-                {"i": tid, "n": f"cfa-{key}-{tag}", "s": f"cfa-{key}-{tag}", "p": ids["msp"] if key == "client" else None, "r": "child" if key == "client" else "parent"},
+                {
+                    "i": tid,
+                    "n": f"cfa-{key}-{tag}",
+                    "s": f"cfa-{key}-{tag}",
+                    "p": ids["msp"] if key == "client" else None,
+                    "r": "child" if key == "client" else "parent",
+                },
             )
         for key, aid in alerts.items():
             await c.execute(
-                text("insert into alerts (id, tenant_id, title, severity, status, created_at, updated_at) values (:a, :t, 'x', 'high', 'new', now(), now())"),
+                text(
+                    "insert into alerts (id, tenant_id, title, severity, status, created_at, updated_at) values (:a, :t, 'x', 'high', 'new', now(), now())"
+                ),
                 {"a": aid, "t": ids[key]},
             )
     yield ids, alerts
@@ -73,21 +81,36 @@ async def case_link(alert_id: uuid.UUID):
 
 async def test_the_parent_can_make_a_case_from_a_client_alert_and_the_alert_points_back_at_it(world):
     ids, alerts = world
-    out = await run(ids["msp"], lambda db: create_case(body=CreateCaseRequest(title="from a client alert", alert_ids=[alerts["client"]]), db=db, user=user(ids["msp"])))
+    out = await run(
+        ids["msp"],
+        lambda db: create_case(
+            body=CreateCaseRequest(title="from a client alert", alert_ids=[alerts["client"]]), db=db, user=user(ids["msp"])
+        ),
+    )
     assert out.alert_ids == [alerts["client"]]
     assert await case_link(alerts["client"]) == out.id, "the client's alert now points at the case"
 
 
 async def test_a_parent_can_mix_its_own_alert_and_a_clients_and_link_both(world):
     ids, alerts = world
-    out = await run(ids["msp"], lambda db: create_case(body=CreateCaseRequest(title="mixed", alert_ids=[alerts["msp"], alerts["client"]]), db=db, user=user(ids["msp"])))
+    out = await run(
+        ids["msp"],
+        lambda db: create_case(
+            body=CreateCaseRequest(title="mixed", alert_ids=[alerts["msp"], alerts["client"]]), db=db, user=user(ids["msp"])
+        ),
+    )
     assert await case_link(alerts["msp"]) == out.id and await case_link(alerts["client"]) == out.id
 
 
 async def test_somebody_elses_alert_is_still_not_found_and_nothing_is_linked(world):
     ids, alerts = world
     with pytest.raises(HTTPException) as exc:
-        await run(ids["msp"], lambda db: create_case(body=CreateCaseRequest(title="not mine", alert_ids=[alerts["client"], alerts["stranger"]]), db=db, user=user(ids["msp"])))
+        await run(
+            ids["msp"],
+            lambda db: create_case(
+                body=CreateCaseRequest(title="not mine", alert_ids=[alerts["client"], alerts["stranger"]]), db=db, user=user(ids["msp"])
+            ),
+        )
     assert exc.value.status_code == 404 and exc.value.detail == "One or more alerts were not found."
     assert await case_link(alerts["client"]) is None and await case_link(alerts["stranger"]) is None
 
@@ -95,13 +118,19 @@ async def test_somebody_elses_alert_is_still_not_found_and_nothing_is_linked(wor
 async def test_a_client_cannot_cite_its_parents_alert(world):
     ids, alerts = world
     with pytest.raises(HTTPException) as exc:
-        await run(ids["client"], lambda db: create_case(body=CreateCaseRequest(title="up the tree", alert_ids=[alerts["msp"]]), db=db, user=user(ids["client"])))
+        await run(
+            ids["client"],
+            lambda db: create_case(body=CreateCaseRequest(title="up the tree", alert_ids=[alerts["msp"]]), db=db, user=user(ids["client"])),
+        )
     assert exc.value.status_code == 404
 
 
 async def test_adding_a_client_alert_to_an_existing_case_works_too(world):
     ids, alerts = world
     made = await run(ids["msp"], lambda db: create_case(body=CreateCaseRequest(title="empty", alert_ids=[]), db=db, user=user(ids["msp"])))
-    out = await run(ids["msp"], lambda db: add_alerts(case_id=str(made.id), body=AddAlertsRequest(alert_ids=[alerts["client"]]), db=db, user=user(ids["msp"])))
+    out = await run(
+        ids["msp"],
+        lambda db: add_alerts(case_id=str(made.id), body=AddAlertsRequest(alert_ids=[alerts["client"]]), db=db, user=user(ids["msp"])),
+    )
     assert out.alert_ids == [alerts["client"]]
     assert await case_link(alerts["client"]) == made.id

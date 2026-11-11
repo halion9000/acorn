@@ -422,7 +422,9 @@ async def test_a_catch_up_also_covers_older_open_alerts_of_the_type_but_not_ones
     await off(world)
     rule = make_rule(world, "client", created_minutes_ago=1)  # made a minute ago: every alert of the type is older than it
     await world.flush()
-    assert await svc.queue_for_rule(world, rule, NOW, source_alert_id=world.info["ids"]["old_source"]) == 1, "without a catch-up only the alert it was made from"
+    assert (
+        await svc.queue_for_rule(world, rule, NOW, source_alert_id=world.info["ids"]["old_source"]) == 1
+    ), "without a catch-up only the alert it was made from"
     await world.commit()
     await off(world)
     await world.execute(text("delete from vendor_actions where tenant_id = :c"), {"c": world.info["client"]})
@@ -488,7 +490,10 @@ async def test_the_status_follows_the_request_from_waiting_to_failed_with_cores_
     await world.commit()
     assert (await status_of(world, "new_a")).state == "waiting"
     await off(world)
-    await world.execute(text("update vendor_actions set status = 'failed', result_message = 'No HaloPSA client is linked' where alert_id = :a"), {"a": world.info["ids"]["new_a"]})
+    await world.execute(
+        text("update vendor_actions set status = 'failed', result_message = 'No HaloPSA client is linked' where alert_id = :a"),
+        {"a": world.info["ids"]["new_a"]},
+    )
     await world.commit()
     out = await status_of(world, "new_a")
     assert out.state == "failed" and out.message == "No HaloPSA client is linked"
@@ -502,7 +507,8 @@ async def fail_requests(world, *keys):
     await off(world)
     for key in keys:
         await world.execute(
-            text("update vendor_actions set status = 'failed', result_message = 'Ticket Type not set' where alert_id = :a"), {"a": world.info["ids"][key]}
+            text("update vendor_actions set status = 'failed', result_message = 'Ticket Type not set' where alert_id = :a"),
+            {"a": world.info["ids"][key]},
         )
     await world.commit()
 
@@ -516,12 +522,24 @@ async def test_a_catch_up_tries_again_for_a_failed_request_but_the_ordinary_swee
     await fail_requests(world, "new_a")
     assert await svc.queue_for_rule(world, rule, NOW) == 0, "the sweep: one request per alert, ever"
     await world.commit()
-    assert await svc.queue_for_rule(world, rule, NOW, catch_up=True) == 3, "the one that failed, and the two older open alerts that never had a request; not the one still waiting"
+    assert (
+        await svc.queue_for_rule(world, rule, NOW, catch_up=True) == 3
+    ), "the one that failed, and the two older open alerts that never had a request; not the one still waiting"
     await world.commit()
     await off(world)
-    rows = (await world.execute(text("select status from vendor_actions where alert_id = :a order by created_at"), {"a": world.info["ids"]["new_a"]})).scalars().all()
+    rows = (
+        (
+            await world.execute(
+                text("select status from vendor_actions where alert_id = :a order by created_at"), {"a": world.info["ids"]["new_a"]}
+            )
+        )
+        .scalars()
+        .all()
+    )
     assert sorted(rows) == ["failed", "pending"]
-    waiting = (await world.execute(text("select count(*) from vendor_actions where alert_id = :a"), {"a": world.info["ids"]["new_b"]})).scalar_one()
+    waiting = (
+        await world.execute(text("select count(*) from vendor_actions where alert_id = :a"), {"a": world.info["ids"]["new_b"]})
+    ).scalar_one()
     assert waiting == 1, "the alert whose request was still waiting got no second one"
     assert await svc.queue_for_rule(world, rule, NOW, catch_up=True) == 0, "and a second catch-up while those wait asks for nothing more"
 
@@ -549,7 +567,11 @@ async def test_try_again_asks_once_after_a_failure_and_never_when_waiting_done_a
     assert await retry("has_halo_ticket") is False, "an alert with a ticket"
     assert await retry("resolved") is False, "an alert that was never asked for has nothing to retry"
     await off(world)
-    row = (await world.execute(text("select params, status from vendor_actions where alert_id = :a and status = 'pending'"), {"a": world.info["ids"]["new_a"]})).one()
+    row = (
+        await world.execute(
+            text("select params, status from vendor_actions where alert_id = :a and status = 'pending'"), {"a": world.info["ids"]["new_a"]}
+        )
+    ).one()
     assert row.params["halo_client_id"] == "77" and row.params["summary"] == TITLE[:200]
 
 
@@ -565,7 +587,9 @@ async def test_a_rule_opens_one_linked_case_per_alert_it_covers_with_or_without_
     async def cases():
         rows = (
             await world.execute(
-                text("select a.id, a.case_id, c.alert_ids, c.created_by, c.tags->>'source' from alerts a left join aisoc_cases c on c.id = a.case_id where a.tenant_id in (:a, :b, :c)"),
+                text(
+                    "select a.id, a.case_id, c.alert_ids, c.created_by, c.tags->>'source' from alerts a left join aisoc_cases c on c.id = a.case_id where a.tenant_id in (:a, :b, :c)"
+                ),
                 {"a": world.info["owner"], "b": world.info["client"], "c": world.info["other"]},
             )
         ).all()
@@ -573,7 +597,13 @@ async def test_a_rule_opens_one_linked_case_per_alert_it_covers_with_or_without_
 
     got = await cases()
     with_case = {k for k, r in got.items() if r[1] is not None}
-    assert with_case == {"new_a", "new_b", "old_source", "has_halo_ticket", "has_manual_ticket"}, "a case for each alert the rule covers, even one that already has a ticket; none for the rest"
+    assert with_case == {
+        "new_a",
+        "new_b",
+        "old_source",
+        "has_halo_ticket",
+        "has_manual_ticket",
+    }, "a case for each alert the rule covers, even one that already has a ticket; none for the rest"
     row = got["new_a"]
     assert row[2] == [ids["new_a"]] and row[3] == "system" and row[4] == "ticket-rule", "linked both ways"
     first = {k: r[1] for k, r in got.items()}

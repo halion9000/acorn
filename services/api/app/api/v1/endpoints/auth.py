@@ -110,7 +110,9 @@ class UserMeResponse(BaseModel):
 
 def _me(user: User, custom_permissions: list[str] | None = None) -> UserMeResponse:
     response = UserMeResponse.model_validate(user)
-    response.capabilities = capabilities_for_permissions(custom_permissions) if custom_permissions is not None else capabilities_for_role(user.role)
+    response.capabilities = (
+        capabilities_for_permissions(custom_permissions) if custom_permissions is not None else capabilities_for_role(user.role)
+    )
     return response
 
 
@@ -193,7 +195,9 @@ async def login(
             )
         if await totp_store.check_code(db, user.id, user.tenant_id, request.totp_code) is None:
             await login_throttle.record_failure(db, request.identifier, client_ip)
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="That code is not right.", headers={"WWW-Authenticate": "Bearer"})
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="That code is not right.", headers={"WWW-Authenticate": "Bearer"}
+            )
 
     # Only now, with the password AND any second factor right, does this name start again (the client address's count stays). Clearing it after the password alone would let someone who knows the password guess codes for ever.
     await login_throttle.clear_failures(db, request.identifier)

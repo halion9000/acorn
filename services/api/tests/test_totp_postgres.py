@@ -15,7 +15,12 @@ from sqlalchemy.pool import NullPool
 
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 APP_URL = os.environ.get("AISOC_TEST_PG_APP_URL", "")
-pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database")]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(
+        not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"
+    ),
+]
 
 
 async def test_setup_confirm_and_sign_in_work_in_the_persons_tenant_and_are_invisible_from_another():
@@ -27,9 +32,14 @@ async def test_setup_confirm_and_sign_in_work_in_the_persons_tenant_and_are_invi
         async with owner.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
             for t in (ta, tb):
-                await conn.execute(text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :s, 'parent')"), {"i": t, "n": f"t-{tag}-{str(t)[:4]}", "s": f"t-{tag}-{str(t)[:4]}"})
+                await conn.execute(
+                    text("insert into tenants (id, name, slug, mssp_role) values (:i, :n, :s, 'parent')"),
+                    {"i": t, "n": f"t-{tag}-{str(t)[:4]}", "s": f"t-{tag}-{str(t)[:4]}"},
+                )
             await conn.execute(
-                text("insert into users (id, tenant_id, email, username, account_name, hashed_password, role, is_active) values (:i, :t, :e, 'u', :a, 'x', 'admin', true)"),
+                text(
+                    "insert into users (id, tenant_id, email, username, account_name, hashed_password, role, is_active) values (:i, :t, :e, 'u', :a, 'x', 'admin', true)"
+                ),
                 {"i": uid, "t": ta, "e": f"u-{tag}@x.example", "a": f"u{tag}"},
             )
         async with async_sessionmaker(app, expire_on_commit=False)() as db:

@@ -16,7 +16,9 @@ def money(v: Any) -> Decimal:
     return Decimal(str(v)).quantize(CENT, rounding=ROUND_HALF_UP)
 
 
-def margin_rows(billed: dict[str, list[dict[str, Any]]], prices: dict[str, tuple[Decimal, Decimal]], names: dict[str, str]) -> dict[str, Any]:
+def margin_rows(
+    billed: dict[str, list[dict[str, Any]]], prices: dict[str, tuple[Decimal, Decimal]], names: dict[str, str]
+) -> dict[str, Any]:
     """``billed``: client id -> [{item, count}] (the invoice lines each client is billed for and how many units). ``prices``: invoice item -> (unit price, unit cost). Returns per-client rows and totals (pure).
 
     margin_percent is margin / revenue, or None when nothing priced was billed.
@@ -54,5 +56,10 @@ def margin_rows(billed: dict[str, list[dict[str, Any]]], prices: dict[str, tuple
     total_margin = total_rev - total_cost
     return {
         "clients": clients,
-        "totals": {"revenue": str(total_rev), "cost": str(total_cost), "margin": str(total_margin), "margin_percent": round(float(total_margin / total_rev) * 100, 1) if total_rev > 0 else None},
+        "totals": {
+            "revenue": str(total_rev),
+            "cost": str(total_cost),
+            "margin": str(total_margin),
+            "margin_percent": round(float(total_margin / total_rev) * 100, 1) if total_rev > 0 else None,
+        },
     }

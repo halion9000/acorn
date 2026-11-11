@@ -50,7 +50,15 @@ async def tenant(s, name, parent=None):
 
 
 def connector(tenant_id, health, enabled=True, name=None):
-    return Connector(id=uuid.uuid4(), tenant_id=tenant_id, name=name or uuid.uuid4().hex[:6], connector_type="cipp", category="identity", is_enabled=enabled, health_status=health)
+    return Connector(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        name=name or uuid.uuid4().hex[:6],
+        connector_type="cipp",
+        category="identity",
+        is_enabled=enabled,
+        health_status=health,
+    )
 
 
 def rows_by_name(rows):
@@ -65,8 +73,13 @@ def test_each_client_gets_its_enabled_and_failing_counts_and_switched_off_connec
         theirs = await tenant(s, "Theirs", other.id)
         s.add_all(
             [
-                connector(acme.id, "healthy"), connector(acme.id, "healthy"), connector(acme.id, "unhealthy"), connector(acme.id, "degraded"), connector(acme.id, "unhealthy", enabled=False),
-                connector(birch.id, "unknown"), connector(birch.id, "healthy"),
+                connector(acme.id, "healthy"),
+                connector(acme.id, "healthy"),
+                connector(acme.id, "unhealthy"),
+                connector(acme.id, "degraded"),
+                connector(acme.id, "unhealthy", enabled=False),
+                connector(birch.id, "unknown"),
+                connector(birch.id, "healthy"),
                 connector(theirs.id, "unhealthy"),
             ]
         )
@@ -74,7 +87,11 @@ def test_each_client_gets_its_enabled_and_failing_counts_and_switched_off_connec
         return await mssp.list_managed_tenants(include_hidden=False, db=s, current_user=SimpleNamespace(tenant_id=parent.id))
 
     got = rows_by_name(run(body))
-    assert got == {"Acme": (4, 2), "Birch": (2, 0), "Quiet": (0, 0)}  # a client with none is 0 and 0; the other MSSP's client is not in the list
+    assert got == {
+        "Acme": (4, 2),
+        "Birch": (2, 0),
+        "Quiet": (0, 0),
+    }  # a client with none is 0 and 0; the other MSSP's client is not in the list
 
 
 def test_a_connector_read_that_fails_gives_unknown_not_zero_and_the_list_still_loads():

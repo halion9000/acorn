@@ -161,29 +161,61 @@ def test_the_fleet_board_rows_say_whether_an_alert_exists_for_the_check():
 
 
 def test_more_than_three_google_apps_with_mail_or_drive_access_raise_a_medium_alert_but_a_few_do_not():
-    worse = specs([check("threatmate_google_apps", "met")], [check("threatmate_google_apps", "not_met", "5 of 9 third-party apps can read mail or every Drive file")])
+    worse = specs(
+        [check("threatmate_google_apps", "met")],
+        [check("threatmate_google_apps", "not_met", "5 of 9 third-party apps can read mail or every Drive file")],
+    )
     assert [(a["key"], a["severity"]) for a in worse] == [("threatmate_google_apps", "medium")]
-    assert specs([check("threatmate_google_apps", "met")], [check("threatmate_google_apps", "partly", "2 of 9 third-party apps can read mail or every Drive file")]) == [], "a few chosen apps is not news"
-    assert specs([check("threatmate_google_apps", "not_met")], [check("threatmate_google_apps", "not_met")]) == [], "an unchanged result raises nothing again"
+    assert (
+        specs(
+            [check("threatmate_google_apps", "met")],
+            [check("threatmate_google_apps", "partly", "2 of 9 third-party apps can read mail or every Drive file")],
+        )
+        == []
+    ), "a few chosen apps is not news"
+    assert (
+        specs([check("threatmate_google_apps", "not_met")], [check("threatmate_google_apps", "not_met")]) == []
+    ), "an unchanged result raises nothing again"
 
 
 def test_liongard_losing_sight_of_a_client_raises_a_medium_alert_only_when_it_is_not_met():
-    out = specs([check("liongard_inspections", "met")], [check("liongard_inspections", "not_met", "3 of 4 inspections have stopped or failed")])
+    out = specs(
+        [check("liongard_inspections", "met")], [check("liongard_inspections", "not_met", "3 of 4 inspections have stopped or failed")]
+    )
     assert [(a["key"], a["severity"]) for a in out] == [("liongard_inspections", "medium")]
     assert specs([check("liongard_inspections", "met")], [check("liongard_inspections", "partly", "1 of 20 inspections has failed")]) == []
 
 
-
 def test_a_vulnerability_check_that_is_failing_when_first_seen_raises_one_standing_alert_in_the_vulnerability_category():
-    new = [check("threatmate_patching", "not_met", "10 of 40 devices are patch-compliant in ThreatMate (25%)"), check("threatmate_end_of_life", "partly", "one app near end of life"), check("threatmate_google_admins", "not_met", "x")]
+    new = [
+        check("threatmate_patching", "not_met", "10 of 40 devices are patch-compliant in ThreatMate (25%)"),
+        check("threatmate_end_of_life", "partly", "one app near end of life"),
+        check("threatmate_google_admins", "not_met", "x"),
+    ]
     out = ca.standing_specs(new, "threatmate")
-    assert [s["key"] for s in out] == ["threatmate_patching"], "only vulnerability checks at their alerting level or worse, and not the identity check"
-    assert out[0]["idempotency_key"] == "check:threatmate:threatmate_patching:standing", "no date: raised once however long it stays failing"
+    assert [s["key"] for s in out] == [
+        "threatmate_patching"
+    ], "only vulnerability checks at their alerting level or worse, and not the identity check"
+    assert (
+        out[0]["idempotency_key"] == "check:threatmate:threatmate_patching:standing"
+    ), "no date: raised once however long it stays failing"
     assert "10 of 40 devices" in out[0]["description"]
     assert ca.standing_specs(None, "threatmate") == [] and ca.standing_specs([check("threatmate_patching", "met")], "threatmate") == []
     row = ca.build_alert(uuid.uuid4(), "threatmate", out[0], NOW)
     assert row.category == "vulnerability" and "threatmate_patching" in row.tags
-    assert ca.build_alert(uuid.uuid4(), "threatmate-google", ca.alerts_for_changes(changes([check("threatmate_google_admins", "met")], [check("threatmate_google_admins", "not_met")], "threatmate-google"), "threatmate-google", NOW)[0], NOW).category == "posture"
+    assert (
+        ca.build_alert(
+            uuid.uuid4(),
+            "threatmate-google",
+            ca.alerts_for_changes(
+                changes([check("threatmate_google_admins", "met")], [check("threatmate_google_admins", "not_met")], "threatmate-google"),
+                "threatmate-google",
+                NOW,
+            )[0],
+            NOW,
+        ).category
+        == "posture"
+    )
 
 
 def test_a_vulnerability_check_that_gets_worse_later_still_raises_its_dated_alert():
@@ -192,7 +224,14 @@ def test_a_vulnerability_check_that_gets_worse_later_still_raises_its_dated_aler
 
 
 def test_the_ninjaone_and_addigy_update_and_support_checks_are_vulnerability_checks_that_alert_when_not_met():
-    for key in ("ninjaone_patching", "ninjaone_software_patches", "ninjaone_unsupported_os", "addigy_unsupported_macos", "cipp_defender_vulnerabilities", "meraki_end_of_support"):
+    for key in (
+        "ninjaone_patching",
+        "ninjaone_software_patches",
+        "ninjaone_unsupported_os",
+        "addigy_unsupported_macos",
+        "cipp_defender_vulnerabilities",
+        "meraki_end_of_support",
+    ):
         assert key in ca.VULN_CHECK_KEYS and key in ca.WATCHED, key
         assert ca.standing_specs([check(key, "partly")], "x") == [], "partly is not enough to alert"
         assert [s["key"] for s in ca.standing_specs([check(key, "not_met", "3 of 10 machines")], "x")] == [key]
@@ -208,7 +247,9 @@ def test_the_cipp_legacy_sign_in_and_mailbox_forwarding_checks_alert_when_not_me
 
 def test_a_failing_disk_alerts_but_is_not_a_vulnerability():
     assert "ninjaone_disk_health" in ca.WATCHED and "ninjaone_disk_health" not in ca.VULN_CHECK_KEYS
-    out = specs([check("ninjaone_disk_health", "met")], [check("ninjaone_disk_health", "not_met", "1 device has a failing disk")], source="ninjaone")
+    out = specs(
+        [check("ninjaone_disk_health", "met")], [check("ninjaone_disk_health", "not_met", "1 device has a failing disk")], source="ninjaone"
+    )
     assert len(out) == 1 and out[0]["key"] == "ninjaone_disk_health"
 
 

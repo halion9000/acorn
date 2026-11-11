@@ -101,7 +101,10 @@ async def search(
         alerts = (
             await db.execute(
                 select(Alert.id, Alert.title, Alert.severity, Alert.status, Alert.tenant_id)
-                .where(Alert.tenant_id.in_(scope), or_(Alert.title.ilike(pattern, escape="\\"), Alert.tenant_id.in_(by_client or [uuid.UUID(int=0)])))
+                .where(
+                    Alert.tenant_id.in_(scope),
+                    or_(Alert.title.ilike(pattern, escape="\\"), Alert.tenant_id.in_(by_client or [uuid.UUID(int=0)])),
+                )
                 .order_by(Alert.created_at.desc())
                 .limit(limit)
             )
@@ -113,7 +116,11 @@ async def search(
                 select(Case.id, Case.case_number, Case.title, Case.status, Case.tenant_id)
                 .where(
                     Case.tenant_id.in_(scope),
-                    or_(Case.title.ilike(pattern, escape="\\"), Case.case_number.ilike(pattern, escape="\\"), Case.tenant_id.in_(by_client or [uuid.UUID(int=0)])),
+                    or_(
+                        Case.title.ilike(pattern, escape="\\"),
+                        Case.case_number.ilike(pattern, escape="\\"),
+                        Case.tenant_id.in_(by_client or [uuid.UUID(int=0)]),
+                    ),
                 )
                 .order_by(Case.created_at.desc())
                 .limit(limit)
@@ -126,7 +133,11 @@ async def search(
                 select(Device.id, Device.hostname, Device.serial_number, Device.os, Device.tenant_id)
                 .where(
                     Device.tenant_id.in_(scope),
-                    or_(Device.hostname.ilike(pattern, escape="\\"), Device.serial_number.ilike(pattern, escape="\\"), Device.tenant_id.in_(by_client or [uuid.UUID(int=0)])),
+                    or_(
+                        Device.hostname.ilike(pattern, escape="\\"),
+                        Device.serial_number.ilike(pattern, escape="\\"),
+                        Device.tenant_id.in_(by_client or [uuid.UUID(int=0)]),
+                    ),
                 )
                 .order_by(Device.last_seen.desc())
                 .limit(limit)
@@ -136,7 +147,15 @@ async def search(
             add("device", d.id, d.hostname, " · ".join(x for x in (d.serial_number, d.os) if x) or None, d.tenant_id)
         items = (
             await db.execute(
-                select(InventoryItem.id, InventoryItem.kind, InventoryItem.name, InventoryItem.serial, InventoryItem.person, InventoryItem.status, InventoryItem.tenant_id)
+                select(
+                    InventoryItem.id,
+                    InventoryItem.kind,
+                    InventoryItem.name,
+                    InventoryItem.serial,
+                    InventoryItem.person,
+                    InventoryItem.status,
+                    InventoryItem.tenant_id,
+                )
                 .where(
                     InventoryItem.tenant_id.in_(scope),
                     or_(

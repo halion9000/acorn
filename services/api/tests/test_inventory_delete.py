@@ -16,7 +16,16 @@ OWNER, CLIENT = uuid.uuid4(), uuid.uuid4()
 
 
 def item(**over):
-    base = {"id": uuid.uuid4(), "tenant_id": CLIENT, "kind": "stock", "name": "Dell 7440", "serial": "ABC123", "category": "Laptop", "status": "checked_in", "source": "manual"}
+    base = {
+        "id": uuid.uuid4(),
+        "tenant_id": CLIENT,
+        "kind": "stock",
+        "name": "Dell 7440",
+        "serial": "ABC123",
+        "category": "Laptop",
+        "status": "checked_in",
+        "source": "manual",
+    }
     return SimpleNamespace(**{**base, **over})
 
 

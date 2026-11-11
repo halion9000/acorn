@@ -23,7 +23,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 PW = "correct horse battery staple"
-TABLES = [m.__table__ for m in (Tenant, User, ApiKey, LoginFailure, UserTotp, Role, Permission, RolePermission, UserRole, PasskeyCredential)]
+TABLES = [
+    m.__table__ for m in (Tenant, User, ApiKey, LoginFailure, UserTotp, Role, Permission, RolePermission, UserRole, PasskeyCredential)
+]
 
 
 @pytest.fixture
@@ -68,7 +70,15 @@ def person(world, name, role, custom_perms=None):
     """A person; with custom_perms (a list) they hold role "custom" and ONE new custom role granting exactly those permissions."""
 
     async def go(s):
-        u = User(id=uuid.uuid4(), tenant_id=world.tenant.id, account_name=name, email=f"{name}@example.com", username=name, hashed_password=get_password_hash(PW), role=role)
+        u = User(
+            id=uuid.uuid4(),
+            tenant_id=world.tenant.id,
+            account_name=name,
+            email=f"{name}@example.com",
+            username=name,
+            hashed_password=get_password_hash(PW),
+            role=role,
+        )
         s.add(u)
         if custom_perms is not None:
             r = Role(id=uuid.uuid4(), tenant_id=world.tenant.id, name=f"role-of-{name}", is_system=False)
@@ -141,11 +151,15 @@ def test_nobody_manages_a_custom_role_person_who_holds_more_than_they_do(world):
     assert world.client.patch(f"/tenants/me/users/{power}", json={"username": "P"}, headers=dave).status_code == 403
     assert world.client.post(f"/tenants/me/users/{power}/reset-mfa", headers=dave).status_code == 403
     assert world.client.delete(f"/tenants/me/users/{power}", headers=dave).status_code == 403
-    assert world.client.patch(f"/tenants/me/users/{power}", json={"username": "P"}, headers=boss).status_code == 200  # the administrator holds all of it
+    assert (
+        world.client.patch(f"/tenants/me/users/{power}", json={"username": "P"}, headers=boss).status_code == 200
+    )  # the administrator holds all of it
 
 
 def test_a_custom_role_person_cannot_hand_out_a_role_that_grants_more_than_their_own(world):
     person(world, "dave", "custom", ["users:read", "users:write"])
     h = sign_in(world, "dave")
-    r = world.client.post("/tenants/me/users", json={"account_name": "newbie", "password": "a long enough passphrase", "role": "tenant_admin"}, headers=h)
+    r = world.client.post(
+        "/tenants/me/users", json={"account_name": "newbie", "password": "a long enough passphrase", "role": "tenant_admin"}, headers=h
+    )
     assert r.status_code == 403

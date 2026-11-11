@@ -452,7 +452,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if settings.PLATFORM_WATCH_ENABLED:
         try:
             platform_watch_task = asyncio.create_task(
-                _run_guarded_scheduler_worker(job_name="platform_watch", ttl_seconds=_ALERT_EMAIL_LOCK_TTL_SECONDS, worker=run_platform_watch),
+                _run_guarded_scheduler_worker(
+                    job_name="platform_watch", ttl_seconds=_ALERT_EMAIL_LOCK_TTL_SECONDS, worker=run_platform_watch
+                ),
                 name="platform_watch_worker",
             )
             logger.info("platform_watch worker started")

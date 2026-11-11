@@ -39,7 +39,10 @@ def test_each_kind_of_lookalike_is_generated_and_the_domain_itself_never_is():
     assert out["a-cme.com"] == "hyphen" and out["acme.co"] == "other-ending" and out["acme.net"] == "other-ending"
     assert lk.generate("rome.com")["rorne.com"] == "lookalike-character"  # m looks like rn
     assert "acme.com" not in out
-    assert lk.generate("l0gic.com").get("logic.com") == "lookalike-character" and lk.generate("l0gic.com").get("10gic.com") == "lookalike-character"
+    assert (
+        lk.generate("l0gic.com").get("logic.com") == "lookalike-character"
+        and lk.generate("l0gic.com").get("10gic.com") == "lookalike-character"
+    )
 
 
 def test_a_bad_domain_gives_nothing_and_the_list_is_capped_and_names_are_valid():
@@ -52,7 +55,11 @@ def test_a_bad_domain_gives_nothing_and_the_list_is_capped_and_names_are_valid()
 def test_only_names_that_dns_shows_are_reported_and_the_ones_that_can_send_mail_come_first():
     dns = Dns(a={"acme.net", "acm.com"}, mx={"acme.co", "acme.net"})
     out = asyncio.run(lk.scan("acme.com", dns))
-    assert [(x.domain, x.kind, x.has_mail) for x in out] == [("acme.co", "other-ending", True), ("acme.net", "other-ending", True), ("acm.com", "omission", False)]
+    assert [(x.domain, x.kind, x.has_mail) for x in out] == [
+        ("acme.co", "other-ending", True),
+        ("acme.net", "other-ending", True),
+        ("acm.com", "omission", False),
+    ]
     assert all(x.registered for x in out)
 
 

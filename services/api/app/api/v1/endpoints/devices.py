@@ -493,7 +493,9 @@ async def _alerts_by_host_many(db: Any, tids: list[uuid.UUID]) -> dict[uuid.UUID
         )
     for grouped in out.values():
         for items in grouped.values():
-            items.sort(key=lambda a: (_SEVERITY_RANK.get((a.severity or "").lower(), 5), -(a.created_at.timestamp() if a.created_at else 0)))
+            items.sort(
+                key=lambda a: (_SEVERITY_RANK.get((a.severity or "").lower(), 5), -(a.created_at.timestamp() if a.created_at else 0))
+            )
     return out
 
 
@@ -1369,7 +1371,9 @@ async def apply_devices(db: Any, owner: uuid.UUID, report: DevicesReport) -> Dev
                     known,
                 )
                 accepted += 1
-    await tool_exclusions.run_excluded_present(db, owner, list(by_tenant))  # a tool marked as not used for a client that is reporting devices for it
+    await tool_exclusions.run_excluded_present(
+        db, owner, list(by_tenant)
+    )  # a tool marked as not used for a client that is reporting devices for it
     merged = await _auto_merge_touched(db, list(by_tenant))
     return DevicesResponse(
         accepted=accepted, unmapped=unmapped, ignored=ignored, unmapped_clients=unmapped_clients, auto_linked=auto_linked, merged=merged

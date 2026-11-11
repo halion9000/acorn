@@ -22,7 +22,9 @@ PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 APP_URL = os.environ.get("AISOC_TEST_PG_APP_URL", "")
 pytestmark = [
     pytest.mark.asyncio,
-    pytest.mark.skipif(not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"),
+    pytest.mark.skipif(
+        not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"
+    ),
 ]
 
 
@@ -39,7 +41,13 @@ async def world():
                 parent = {"acme": "owner", "birch": "owner", "stranger": "other_owner"}.get(key)
                 await conn.execute(
                     text("insert into tenants (id, name, slug, parent_tenant_id, mssp_role) values (:i, :n, :s, :p, :r)"),
-                    {"i": tid, "n": f"{key}-{tag}", "s": f"{key}-{tag}", "p": ids[parent] if parent else None, "r": "child" if parent else "parent"},
+                    {
+                        "i": tid,
+                        "n": f"{key}-{tag}",
+                        "s": f"{key}-{tag}",
+                        "p": ids[parent] if parent else None,
+                        "r": "child" if parent else "parent",
+                    },
                 )
             for who in ("acme", "birch", "stranger"):
                 await conn.execute(
@@ -56,14 +64,25 @@ async def world():
             everyone = [str(x) for x in ids.values()]
             for table in ("dmarc_reports", "identity_mfa_users"):
                 await conn.execute(text(f"delete from {table} where tenant_id = any(cast(:t as uuid[]))"), {"t": everyone})
-            await conn.execute(text("delete from tenants where id = any(cast(:t as uuid[])) and parent_tenant_id is not null"), {"t": everyone})
+            await conn.execute(
+                text("delete from tenants where id = any(cast(:t as uuid[])) and parent_tenant_id is not null"), {"t": everyone}
+            )
             await conn.execute(text("delete from tenants where id = any(cast(:t as uuid[]))"), {"t": everyone})
         await owner.dispose()
 
 
 def report(domain, report_id="r1", count=10):
     now = datetime.now(UTC)
-    return Parsed("google.com", "noreply@google.com", report_id, domain, now, now, "none", [Record("1.2.3.4", count, "none", True, True, domain, domain)])
+    return Parsed(
+        "google.com",
+        "noreply@google.com",
+        report_id,
+        domain,
+        now,
+        now,
+        "none",
+        [Record("1.2.3.4", count, "none", True, True, domain, domain)],
+    )
 
 
 async def store_as_platform(owner_id, parsed):

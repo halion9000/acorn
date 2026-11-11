@@ -64,7 +64,9 @@ def verify(secret_b32: str, code: str, now: float | None = None, last_used_step:
 def otpauth_uri(secret_b32: str, account: str, issuer: str = "A.C.O.R.N") -> str:
     """The address an authenticator app reads (as text or a QR code): the account label, the secret and the issuer (pure)."""
     label = quote(f"{issuer}:{account}", safe="")
-    return f"otpauth://totp/{label}?secret={secret_b32}&issuer={quote(issuer, safe='')}&algorithm=SHA1&digits={DIGITS}&period={STEP_SECONDS}"
+    return (
+        f"otpauth://totp/{label}?secret={secret_b32}&issuer={quote(issuer, safe='')}&algorithm=SHA1&digits={DIGITS}&period={STEP_SECONDS}"
+    )
 
 
 def new_recovery_codes() -> list[str]:

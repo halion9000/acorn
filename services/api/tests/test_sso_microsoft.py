@@ -147,11 +147,20 @@ async def begin(world, next_="/alerts?x=1"):
 
 
 def user(db_tenant=HOME, **over):
-    base = {"tenant_id": db_tenant, "email": "jane.doe@liveoak.example", "account_name": "jane.doe", "username": "Jane", "hashed_password": "x", "role": "soc_analyst", "is_active": True}
+    base = {
+        "tenant_id": db_tenant,
+        "email": "jane.doe@liveoak.example",
+        "account_name": "jane.doe",
+        "username": "Jane",
+        "hashed_password": "x",
+        "role": "soc_analyst",
+        "is_active": True,
+    }
     return User(**{**base, **over})
 
 
 # ─── Off by default ──────────────────────────────────────────────────────────────────────────────────────────────────────
+
 
 def test_it_is_off_until_all_four_settings_are_there(monkeypatch):
     for k in ("MS_SSO_TENANT_ID", "MS_SSO_CLIENT_ID", "MS_SSO_CLIENT_SECRET", "MS_SSO_REDIRECT_URI"):
@@ -168,7 +177,12 @@ def test_it_is_off_until_all_four_settings_are_there(monkeypatch):
 
 def test_settings_are_read_safely(world):
     cfg = sso.load_config()
-    assert cfg.new_user_role == "viewer" and cfg.password_login == "admins" and cfg.web_url == "https://acorn.example.com" and cfg.home_tenant == HOME
+    assert (
+        cfg.new_user_role == "viewer"
+        and cfg.password_login == "admins"
+        and cfg.web_url == "https://acorn.example.com"
+        and cfg.home_tenant == HOME
+    )
     for bad in ("tenant_admin", "platform_admin", "admin", "api_service", "no-such-role", ""):
         world.monkeypatch.setenv("MS_SSO_NEW_USER_ROLE", bad)
         assert sso.load_config().new_user_role == "viewer", bad
@@ -198,6 +212,7 @@ def test_with_sso_on_only_administrators_may_use_a_password_unless_the_setting_s
 
 # ─── Starting ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+
 def test_the_browser_is_sent_to_this_tenants_microsoft_with_state_nonce_and_pkce_and_they_are_kept_for_ten_minutes(world):
     async def go():
         response = await sso.microsoft_login(next="/cases/1")
@@ -205,7 +220,12 @@ def test_the_browser_is_sent_to_this_tenants_microsoft_with_state_nonce_and_pkce
         parts = urlsplit(response.headers["location"])
         assert f"{parts.scheme}://{parts.netloc}{parts.path}" == f"https://login.microsoftonline.com/{TID}/oauth2/v2.0/authorize"
         q = query(response)
-        assert q["client_id"] == CLIENT and q["redirect_uri"] == REDIRECT and q["response_type"] == "code" and q["code_challenge_method"] == "S256"
+        assert (
+            q["client_id"] == CLIENT
+            and q["redirect_uri"] == REDIRECT
+            and q["response_type"] == "code"
+            and q["code_challenge_method"] == "S256"
+        )
         assert "openid" in q["scope"].split()
         saved = json.loads(world.redis.data[f"aisoc:sso:state:{q['state']}"])
         assert saved["next"] == "/cases/1" and len(saved["nonce"]) >= 32 and q["nonce"] == saved["nonce"]
@@ -252,6 +272,7 @@ def test_if_the_short_lived_store_is_down_the_start_says_so(world):
 
 # ─── The ID token ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+
 def verify(token, nonce="NONCE"):
     return asyncio.run(sso.verify_id_token(sso.load_config(), token, nonce))
 
@@ -289,7 +310,20 @@ def test_a_token_with_no_permanent_id_is_refused(world):
 
 
 def test_unsigned_and_symmetric_tokens_are_refused(world):
-    unsigned = pyjwt.encode({"iss": f"https://login.microsoftonline.com/{TID}/v2.0", "aud": CLIENT, "exp": int(time.time()) + 600, "iat": int(time.time()), "sub": "x", "oid": OID, "tid": TID, "nonce": "NONCE"}, key=None, algorithm="none")
+    unsigned = pyjwt.encode(
+        {
+            "iss": f"https://login.microsoftonline.com/{TID}/v2.0",
+            "aud": CLIENT,
+            "exp": int(time.time()) + 600,
+            "iat": int(time.time()),
+            "sub": "x",
+            "oid": OID,
+            "tid": TID,
+            "nonce": "NONCE",
+        },
+        key=None,
+        algorithm="none",
+    )
     refused(unsigned, "token")
     hs = pyjwt.encode({"aud": CLIENT, "exp": int(time.time()) + 600}, "secret", algorithm="HS256", headers={"kid": "good-key"})
     refused(hs, "token")
@@ -310,6 +344,7 @@ def test_the_keys_are_kept_so_a_second_sign_in_does_not_fetch_them_again(world):
 
 
 # ─── The group ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+
 
 def test_with_no_group_set_anyone_in_the_tenant_passes_the_group_check(world):
     sso.check_group(sso.load_config(), {})
@@ -336,7 +371,11 @@ def test_a_stranger_is_created_as_a_viewer_in_the_home_tenant_with_a_password_no
         person, outcome = await sso.resolve_user(db, sso.load_config(), CLAIMS)
         await db.commit()
         assert outcome == "created"
-        assert (person.role, person.tenant_id, person.email) == ("viewer", HOME, "jane.doe@liveoak.example"), "the email comes from the user name, never the email claim"
+        assert (person.role, person.tenant_id, person.email) == (
+            "viewer",
+            HOME,
+            "jane.doe@liveoak.example",
+        ), "the email comes from the user name, never the email claim"
         assert person.external_identity == f"entra:{TID}:{OID}" and person.username == "Jane Doe" and person.is_active
         assert not verify_password("", person.hashed_password) and not verify_password("password", person.hashed_password)
 
@@ -424,6 +463,7 @@ def test_a_token_with_no_user_name_cannot_be_matched_or_created(world):
 
 
 # ─── The whole sign-in ───────────────────────────────────────────────────────────────────────────────────────────────────
+
 
 def finish(world, db, *, state, code="auth-code", error=None):
     return sso.microsoft_callback(db, code=code, state=state, error=error)

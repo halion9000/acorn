@@ -59,7 +59,9 @@ def test_the_report_lists_the_rules_in_the_order_the_query_gives_with_each_line_
     out = asyncio.run(ep.noisy_rules(NS(tenant_id=uuid.uuid4()), db, None, 30, 10))
     assert [r.name for r in out] == ["Disk space low", "Impossible travel"]
     assert out[0].suggest_hide is True and out[1].suggest_hide is False
-    assert out[0].sample_alert_id is not None and out[1].sample_alert_id is None, "the sample comes through the query, only for the one worth hiding"
+    assert (
+        out[0].sample_alert_id is not None and out[1].sample_alert_id is None
+    ), "the sample comes through the query, only for the one worth hiding"
 
 
 def test_the_query_counts_only_alerts_still_in_play_names_a_rule_by_its_rule_or_title_and_only_reads(wired):

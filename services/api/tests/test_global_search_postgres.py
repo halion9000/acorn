@@ -40,11 +40,15 @@ async def world():
                 {"t": tid, "n": name, "s": f"gs-{tag}-{str(tid)[:6]}", "p": parent},
             )
             await conn.execute(
-                text("insert into alerts (id, tenant_id, title, severity, status, event_time, first_seen, last_seen, created_at) values (:i, :t, :ti, 'high', 'new', :n, :n, :n, :n)"),
+                text(
+                    "insert into alerts (id, tenant_id, title, severity, status, event_time, first_seen, last_seen, created_at) values (:i, :t, :ti, 'high', 'new', :n, :n, :n, :n)"
+                ),
                 {"i": uuid.uuid4(), "t": tid, "ti": f"Router login from new country at {name}", "n": now},
             )
             await conn.execute(
-                text("insert into cases (id, tenant_id, case_number, title, status, severity, created_at) values (:i, :t, :c, :ti, 'open', 'medium', :n)"),
+                text(
+                    "insert into cases (id, tenant_id, case_number, title, status, severity, created_at) values (:i, :t, :c, :ti, 'open', 'medium', :n)"
+                ),
                 {"i": uuid.uuid4(), "t": tid, "c": f"C-{tag}-{str(tid)[:4]}", "ti": f"Replace router for {name}", "n": now},
             )
             await conn.execute(
@@ -52,7 +56,9 @@ async def world():
                 {"i": uuid.uuid4(), "t": tid, "h": f"ROUTER-{str(tid)[:4]}", "s": f"SN{str(tid)[:6]}", "n": now},
             )
             await conn.execute(
-                text("insert into inventory_items (id, tenant_id, kind, name, quantity, status) values (:i, :t, 'stock', :nm, 1, 'checked_in')"),
+                text(
+                    "insert into inventory_items (id, tenant_id, kind, name, quantity, status) values (:i, :t, 'stock', :nm, 1, 'checked_in')"
+                ),
                 {"i": uuid.uuid4(), "t": tid, "nm": f"Spare router {str(tid)[:4]}"},
             )
             for source in ("microsoft", "google"):
@@ -61,7 +67,15 @@ async def world():
                         "insert into identity_mfa_users (tenant_id, source, user_id, upn, display_name, enabled, admin, licensed, registered, capable, ca_enforced, security_defaults, snapshot_id, refreshed_at) "
                         "values (:t, :src, :u, :upn, :dn, true, false, true, true, true, false, false, :snap, :n)"
                     ),
-                    {"t": tid, "src": source, "u": f"{source}-{str(tid)[:6]}", "upn": f"jane.doe@{str(tid)[:6]}.example", "dn": "Jane Doe", "snap": uuid.uuid4(), "n": now},
+                    {
+                        "t": tid,
+                        "src": source,
+                        "u": f"{source}-{str(tid)[:6]}",
+                        "upn": f"jane.doe@{str(tid)[:6]}.example",
+                        "dn": "Jane Doe",
+                        "snap": uuid.uuid4(),
+                        "n": now,
+                    },
                 )
     return engine, SimpleNamespace(tenant_id=ids.owner, email="hal@goliveoak.com"), ids
 

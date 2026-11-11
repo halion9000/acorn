@@ -11,7 +11,17 @@ NOW = datetime(2026, 11, 4, 12, 0, tzinfo=UTC)
 
 
 def signin(user="amy@x.com", country="RO", ok=True, interactive=True, mfa=None, at=NOW):
-    return NS(source_id=f"s-{user}-{country}", user_principal=user, success=ok, interactive=interactive, country=country, city="Bucharest", ip_address="9.9.9.9", mfa=mfa, occurred_at=at)
+    return NS(
+        source_id=f"s-{user}-{country}",
+        user_principal=user,
+        success=ok,
+        interactive=interactive,
+        country=country,
+        city="Bucharest",
+        ip_address="9.9.9.9",
+        mfa=mfa,
+        occurred_at=at,
+    )
 
 
 LONG_AGO = NOW - timedelta(days=400)
@@ -65,7 +75,16 @@ def test_one_alert_per_person_and_country_even_with_several_sign_ins():
 
 
 def invite(i, actor="amy@x.com", ok=True, activity="Invite external user", at=NOW, app=False):
-    return NS(source_id=f"a{i}", actor=actor, success=ok, activity=activity, occurred_at=at + timedelta(minutes=i), target=f"guest{i}@other.com", actor_is_app=app, actor_ip="1.2.3.4")
+    return NS(
+        source_id=f"a{i}",
+        actor=actor,
+        success=ok,
+        activity=activity,
+        occurred_at=at + timedelta(minutes=i),
+        target=f"guest{i}@other.com",
+        actor_is_app=app,
+        actor_ip="1.2.3.4",
+    )
 
 
 def test_five_guests_invited_by_one_person_in_a_day_is_one_alert():

@@ -50,7 +50,21 @@ def test_known_programs_are_recognised(name, publisher, expected):
 
 @pytest.mark.parametrize(
     "name",
-    ["Microsoft Office 365", "Google Chrome", "Remote Desktop Connection Manager", "Microsoft Remote Desktop", "Mozilla Firefox", "Notepad++", "Adobe Acrobat", "Zoom", "Microsoft Teams", "7-Zip", "", "VMware Tools", "Windows Subsystem for Linux"],
+    [
+        "Microsoft Office 365",
+        "Google Chrome",
+        "Remote Desktop Connection Manager",
+        "Microsoft Remote Desktop",
+        "Mozilla Firefox",
+        "Notepad++",
+        "Adobe Acrobat",
+        "Zoom",
+        "Microsoft Teams",
+        "7-Zip",
+        "",
+        "VMware Tools",
+        "Windows Subsystem for Linux",
+    ],
 )
 def test_ordinary_programs_and_microsofts_own_remote_desktop_are_not_flagged(name):
     assert rt.match_software(name) is None
@@ -87,7 +101,22 @@ def test_a_device_with_nothing_of_interest_has_no_tools_and_a_huge_version_is_cu
 def test_the_catalog_has_unique_keys_valid_patterns_and_every_tool_in_the_screenshot():
     keys = [t.key for t in rt.CATALOG]
     assert len(keys) == len(set(keys))
-    for name in ("AnyDesk", "TeamViewer", "ScreenConnect", "Splashtop", "Atera", "Kaseya (VSA)", "ConnectWise RMM", "WinSCP", "PuTTY", "Zoho Assist", "SimpleHelp", "Pulseway", "RemotePC", "LogMeIn"):
+    for name in (
+        "AnyDesk",
+        "TeamViewer",
+        "ScreenConnect",
+        "Splashtop",
+        "Atera",
+        "Kaseya (VSA)",
+        "ConnectWise RMM",
+        "WinSCP",
+        "PuTTY",
+        "Zoho Assist",
+        "SimpleHelp",
+        "Pulseway",
+        "RemotePC",
+        "LogMeIn",
+    ):
         assert any(t.name.startswith(name) or name.startswith(t.name) for t in rt.CATALOG), name
     assert rt.tool_by_key("anydesk").name == "AnyDesk" and rt.tool_by_key("nope") is None
 
@@ -104,14 +133,37 @@ def test_a_clients_own_rule_beats_the_one_for_everyone_and_nothing_decided_is_un
     assert rt.effective_verdict("anydesk", B, rules) == "blocked"
     assert rt.effective_verdict("putty", B, rules) == "allowed"
     assert rt.effective_verdict("teamviewer", A, rules) == "unreviewed"
-    assert rt.effective_verdict("anydesk", A, {("anydesk", A): "garbage", ("anydesk", None): "blocked"}) == "blocked"  # an unknown value is ignored
+    assert (
+        rt.effective_verdict("anydesk", A, {("anydesk", A): "garbage", ("anydesk", None): "blocked"}) == "blocked"
+    )  # an unknown value is ignored
 
 
 MORE = {
-    "Quick Assist": "quick_assist", "Remote Help": "remote_help", "RustDesk": "rustdesk", "NoMachine": "nomachine", "Parsec": "parsec", "MeshAgent": "meshcentral", "Mesh Agent": "meshcentral",
-    "Tactical RMM Agent": "tactical_rmm", "Action1 Agent": "action1", "Level Agent": "level", "ManageEngine Endpoint Central - Agent": "manageengine_rap", "Remote Access Plus": "manageengine_rap",
-    "DameWare Mini Remote Control": "dameware", "ISL Light": "isl_online", "Supremo": "supremo", "UltraViewer": "ultraviewer", "Ammyy Admin": "ammyy", "Remote Utilities - Host": "remote_utilities",
-    "DWAgent": "dwservice", "AnyViewer": "anyviewer", "HopToDesk": "hoptodesk", "Sunlogin": "sunlogin", "N-central Windows Agent": "nable_ncentral", "Tailscale": "tailscale", "ZeroTier One": "zerotier",
+    "Quick Assist": "quick_assist",
+    "Remote Help": "remote_help",
+    "RustDesk": "rustdesk",
+    "NoMachine": "nomachine",
+    "Parsec": "parsec",
+    "MeshAgent": "meshcentral",
+    "Mesh Agent": "meshcentral",
+    "Tactical RMM Agent": "tactical_rmm",
+    "Action1 Agent": "action1",
+    "Level Agent": "level",
+    "ManageEngine Endpoint Central - Agent": "manageengine_rap",
+    "Remote Access Plus": "manageengine_rap",
+    "DameWare Mini Remote Control": "dameware",
+    "ISL Light": "isl_online",
+    "Supremo": "supremo",
+    "UltraViewer": "ultraviewer",
+    "Ammyy Admin": "ammyy",
+    "Remote Utilities - Host": "remote_utilities",
+    "DWAgent": "dwservice",
+    "AnyViewer": "anyviewer",
+    "HopToDesk": "hoptodesk",
+    "Sunlogin": "sunlogin",
+    "N-central Windows Agent": "nable_ncentral",
+    "Tailscale": "tailscale",
+    "ZeroTier One": "zerotier",
     "ngrok": "ngrok",
 }
 
@@ -131,14 +183,30 @@ def test_a_program_named_level_is_found_by_its_publisher_alongside_it():
 
 def test_the_catalog_now_has_the_original_list_and_the_additions_with_no_program_claimed_by_two_tools():
     assert len(rt.CATALOG) >= 61
-    everything = {**MORE, "AnyDesk": "anydesk", "TeamViewer Host": "teamviewer", "ScreenConnect Client (798cebdb8316a8ff)": "screenconnect", "Splashtop Streamer": "splashtop", "Datto RMM Agent": "datto_rmm", "NinjaRMMAgent": "ninjaone"}
+    everything = {
+        **MORE,
+        "AnyDesk": "anydesk",
+        "TeamViewer Host": "teamviewer",
+        "ScreenConnect Client (798cebdb8316a8ff)": "screenconnect",
+        "Splashtop Streamer": "splashtop",
+        "Datto RMM Agent": "datto_rmm",
+        "NinjaRMMAgent": "ninjaone",
+    }
     for name, key in everything.items():
         hits = [t.key for t, ps in rt._COMPILED if any(p.search(name) for p in ps)]
         assert hits == [key], (name, hits)
 
 
 def test_ordinary_software_is_still_not_flagged_after_the_additions():
-    for name in ("Level 3 Communications Client", "Remote Helpdesk Notes", "Quick Access", "Action Camera Viewer", "Microsoft Edge", "Visual Studio Code", "VLC media player"):
+    for name in (
+        "Level 3 Communications Client",
+        "Remote Helpdesk Notes",
+        "Quick Access",
+        "Action Camera Viewer",
+        "Microsoft Edge",
+        "Visual Studio Code",
+        "VLC media player",
+    ):
         assert rt.match_software(name) is None, name
 
 
@@ -152,7 +220,12 @@ def test_a_name_becomes_a_stable_key_and_nothing_else_does():
 
 
 def test_a_tool_to_add_is_cleaned_and_refused_with_a_reason_the_person_can_act_on():
-    assert rt.validate_custom("  Acme   Remote ", "remote_access", " Acme  Remote Desk ", "  Acme Inc ") == ("Acme Remote", "remote_access", "Acme Remote Desk", "Acme Inc")
+    assert rt.validate_custom("  Acme   Remote ", "remote_access", " Acme  Remote Desk ", "  Acme Inc ") == (
+        "Acme Remote",
+        "remote_access",
+        "Acme Remote Desk",
+        "Acme Inc",
+    )
     for args, words in [
         (("A", "remote_access", "Acme Remote"), "name"),
         (("Acme", "nonsense", "Acme Remote"), "kind"),

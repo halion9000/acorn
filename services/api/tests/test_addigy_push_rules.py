@@ -40,4 +40,6 @@ def test_only_addigy_only_macs_in_a_client_that_uses_huntress_are_picked():
 
 def test_nothing_is_picked_for_a_client_that_has_no_huntress_anywhere_or_for_another_tool():
     assert pick_addigy_devices([device("GAP", "macOS 14", "addigy")], "huntress") == []
-    assert pick_addigy_devices([device("HAS", "macOS 14", "addigy", "fieldeffect"), device("GAP", "macOS 14", "addigy")], "fieldeffect") == []
+    assert (
+        pick_addigy_devices([device("HAS", "macOS 14", "addigy", "fieldeffect"), device("GAP", "macOS 14", "addigy")], "fieldeffect") == []
+    )

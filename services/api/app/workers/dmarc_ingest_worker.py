@@ -27,7 +27,11 @@ logger = structlog.get_logger()
 def make_reader() -> GraphMailboxReader:
     """The reader's own app (DMARC_GRAPH_*) when all three are set, otherwise the alert-e-mail app (ALERT_EMAIL_GRAPH_*)."""
     own = (settings.DMARC_GRAPH_TENANT_ID, settings.DMARC_GRAPH_CLIENT_ID, settings.DMARC_GRAPH_CLIENT_SECRET)
-    tenant_id, client_id, client_secret = own if all(own) else (settings.ALERT_EMAIL_GRAPH_TENANT_ID, settings.ALERT_EMAIL_GRAPH_CLIENT_ID, settings.ALERT_EMAIL_GRAPH_CLIENT_SECRET)
+    tenant_id, client_id, client_secret = (
+        own
+        if all(own)
+        else (settings.ALERT_EMAIL_GRAPH_TENANT_ID, settings.ALERT_EMAIL_GRAPH_CLIENT_ID, settings.ALERT_EMAIL_GRAPH_CLIENT_SECRET)
+    )
     return GraphMailboxReader(
         tenant_id=tenant_id,
         client_id=client_id,
@@ -90,7 +94,15 @@ async def run_dmarc_ingest(*, sleep: Callable[[float], Any] = asyncio.sleep) -> 
                 worker_heartbeat.beat("dmarc_ingest")  # not being set up is not a fault: the worker is alive and has nothing to read
             else:
                 result = await ingest_once(AsyncSessionLocal, reader, owner, store=store_report, store_tls=store_tls_policy)
-                logger.info("dmarc_ingest.pass", stored=result.stored, tls_stored=result.tls_stored, duplicates=result.duplicates, rejected=result.rejected, messages=result.messages, error=result.error)
+                logger.info(
+                    "dmarc_ingest.pass",
+                    stored=result.stored,
+                    tls_stored=result.tls_stored,
+                    duplicates=result.duplicates,
+                    rejected=result.rejected,
+                    messages=result.messages,
+                    error=result.error,
+                )
                 if result.stored:
                     await raise_alerts()
                 await check_expiry()

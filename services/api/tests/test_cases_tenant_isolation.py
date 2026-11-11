@@ -426,7 +426,9 @@ async def test_add_alerts_refuses_a_foreign_alert_and_never_updates_the_case() -
     with pytest.raises(HTTPException) as exc:
         await add_alerts(case_id=str(uuid.uuid4()), body=AddAlertsRequest(alert_ids=[foreign]), db=db, user=user)
     assert exc.value.status_code == 404
-    assert len(db.executed) == 2, "the ownership check, then the look for the caller's client tenants; the case must not be updated when an alert is not the caller's"
+    assert (
+        len(db.executed) == 2
+    ), "the ownership check, then the look for the caller's client tenants; the case must not be updated when an alert is not the caller's"
     assert "from alerts" in _executed_sql(db, 0) and all("update" not in _executed_sql(db, n) for n in (0, 1))
     db.commit.assert_not_called()
 

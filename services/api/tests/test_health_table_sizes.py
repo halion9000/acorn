@@ -34,7 +34,10 @@ def test_tables_are_listed_in_megabytes_with_an_unknown_estimate_shown_as_none()
     db = Db(rows=[("alerts", 1536 * MB, 1_200_000), ("brand_new", 8192, -1)])
     out = asyncio.run(ep.table_sizes(db))
     assert out["available"] is True and out["note"] is None
-    assert out["tables"] == [{"table": "alerts", "megabytes": 1536.0, "rows_estimate": 1_200_000}, {"table": "brand_new", "megabytes": 0.0, "rows_estimate": None}]
+    assert out["tables"] == [
+        {"table": "alerts", "megabytes": 1536.0, "rows_estimate": 1_200_000},
+        {"table": "brand_new", "megabytes": 0.0, "rows_estimate": None},
+    ]
     text, params = db.statements[0]
     assert "pg_total_relation_size" in text and "ORDER BY" in text and params == {"n": ep.TABLE_SIZES_SHOWN}
 

@@ -37,7 +37,9 @@ async def _people_by_tenant(db, tenant_ids: set[uuid.UUID], domain: str) -> Coun
     counts: Counter[uuid.UUID] = Counter()
     suffix = f"%@{domain}"
     for column, tenant_column in ((IdentityMfaUser.upn, IdentityMfaUser.tenant_id), (IdentitySource.email, IdentitySource.tenant_id)):
-        for tenant_id in (await db.execute(select(tenant_column).where(tenant_column.in_(tenant_ids), column.ilike(suffix)))).scalars().all():
+        for tenant_id in (
+            (await db.execute(select(tenant_column).where(tenant_column.in_(tenant_ids), column.ilike(suffix)))).scalars().all()
+        ):
             counts[tenant_id] += 1
     return counts
 
@@ -125,7 +127,10 @@ async def store_tls_policy(db, owner_id: uuid.UUID, report: ParsedTls, policy: T
         existing = (
             await db.execute(
                 select(TlsReport.id, TlsReport.tenant_id, TlsReport.matched).where(
-                    TlsReport.domain == policy.domain, TlsReport.reporter == report.reporter, TlsReport.report_id == report.report_id, TlsReport.policy_type == policy.policy_type
+                    TlsReport.domain == policy.domain,
+                    TlsReport.reporter == report.reporter,
+                    TlsReport.report_id == report.report_id,
+                    TlsReport.policy_type == policy.policy_type,
                 )
             )
         ).first()

@@ -46,7 +46,9 @@ async def request_update(
     try:
         uc.request_update(directory, current_user.email or str(current_user.user_id))
     except uc.UpdateRefused as refused:
-        raise HTTPException(status.HTTP_409_CONFLICT if refused.code == "busy" else status.HTTP_404_NOT_FOUND, detail=str(refused)) from refused
+        raise HTTPException(
+            status.HTTP_409_CONFLICT if refused.code == "busy" else status.HTTP_404_NOT_FOUND, detail=str(refused)
+        ) from refused
     await emit_audit(
         db=db,
         tenant_id=current_user.tenant_id,

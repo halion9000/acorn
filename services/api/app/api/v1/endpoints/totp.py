@@ -85,8 +85,19 @@ async def confirm(body: CodeIn, request: Request, db: DBSession, who: SessionUse
     user = await _user(db, who)
     codes = await totp_store.confirm(db, user.id, user.tenant_id, body.code)
     if codes is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That code is not right. Check the time on your phone and try the next code.")
-    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.id, action="auth:totp_enabled", resource="user", resource_id=str(user.id), changes={}, request=request)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="That code is not right. Check the time on your phone and try the next code."
+        )
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.id,
+        action="auth:totp_enabled",
+        resource="user",
+        resource_id=str(user.id),
+        changes={},
+        request=request,
+    )
     await db.commit()
     return ConfirmOut(recovery_codes=codes)
 
@@ -96,14 +107,25 @@ async def disable(body: DisableIn, request: Request, db: DBSession, who: Session
     user = await _user(db, who)
     # Wrong password or code is counted like a failed sign-in, so this cannot be used to guess either.
     await login_throttle.ensure_not_locked(db, user.account_name, None)
-    if not verify_password_or_equalise(body.password, user.hashed_password) or await totp_store.check_code(db, user.id, user.tenant_id, body.code) is None:
+    if (
+        not verify_password_or_equalise(body.password, user.hashed_password)
+        or await totp_store.check_code(db, user.id, user.tenant_id, body.code) is None
+    ):
         await login_throttle.record_failure(db, user.account_name, None)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="The password or the code is not right.")
     await totp_store.remove(db, user.id, user.tenant_id)
-    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.id, action="auth:totp_disabled", resource="user", resource_id=str(user.id), changes={}, request=request)
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.id,
+        action="auth:totp_disabled",
+        resource="user",
+        resource_id=str(user.id),
+        changes={},
+        request=request,
+    )
     await db.commit()
     return Done()
-
 
 
 @router.post("/recovery", response_model=ConfirmOut)
@@ -111,12 +133,26 @@ async def new_recovery_codes(body: DisableIn, request: Request, db: DBSession, w
     """Replace the recovery codes (used up, or lost). Counted like a failed sign-in when the password or code is wrong, so it cannot be used to guess either."""
     user = await _user(db, who)
     await login_throttle.ensure_not_locked(db, user.account_name, None)
-    if not verify_password_or_equalise(body.password, user.hashed_password) or await totp_store.check_code(db, user.id, user.tenant_id, body.code) is None:
+    if (
+        not verify_password_or_equalise(body.password, user.hashed_password)
+        or await totp_store.check_code(db, user.id, user.tenant_id, body.code) is None
+    ):
         await login_throttle.record_failure(db, user.account_name, None)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="The password or the code is not right.")
     codes = await totp_store.new_recovery_codes(db, user.id, user.tenant_id)
     if codes is None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The authenticator app is not on, so there are no recovery codes to replace.")
-    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.id, action="auth:totp_recovery_codes_replaced", resource="user", resource_id=str(user.id), changes={}, request=request)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="The authenticator app is not on, so there are no recovery codes to replace."
+        )
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.id,
+        action="auth:totp_recovery_codes_replaced",
+        resource="user",
+        resource_id=str(user.id),
+        changes={},
+        request=request,
+    )
     await db.commit()
     return ConfirmOut(recovery_codes=codes)

@@ -88,7 +88,12 @@ def test_progress_reports_each_measure_and_says_not_recorded_for_one_with_no_fig
     async def body(s):
         parent = await tenant(s, "MSSP")
         child = await tenant(s, "Acme", parent.id)
-        s.add_all([snap(child, 10, open_alerts=12, critical_alerts=3, health_score=None), snap(child, 0, open_alerts=5, critical_alerts=0, health_score=None)])
+        s.add_all(
+            [
+                snap(child, 10, open_alerts=12, critical_alerts=3, health_score=None),
+                snap(child, 0, open_alerts=5, critical_alerts=0, health_score=None),
+            ]
+        )
         await s.commit()
         return await mssp.child_progress(child.id, days=90, db=s, current_user=SimpleNamespace(tenant_id=parent.id))
 

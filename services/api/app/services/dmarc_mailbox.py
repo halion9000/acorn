@@ -62,7 +62,12 @@ class GraphMailboxReader(GraphMailer):
         floor = (since or datetime(2000, 1, 1, tzinfo=UTC)).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         flt = f"receivedDateTime gt {floor} and hasAttachments eq true"
         url: str | None = f"{self.base_url}/users/{mailbox}/mailFolders/inbox/messages"
-        params: dict[str, str] | None = {"$filter": flt, "$orderby": "receivedDateTime asc", "$top": str(PAGE), "$select": "id,receivedDateTime"}
+        params: dict[str, str] | None = {
+            "$filter": flt,
+            "$orderby": "receivedDateTime asc",
+            "$top": str(PAGE),
+            "$select": "id,receivedDateTime",
+        }
         out: list[Message] = []
         for _ in range(MAX_PAGES):
             if url is None:
@@ -81,7 +86,9 @@ class GraphMailboxReader(GraphMailer):
         out: list[tuple[str, bytes]] = []
         for listed in data.get("value", []):
             name = str(listed.get("name") or "")
-            if listed.get("@odata.type", "#microsoft.graph.fileAttachment") != "#microsoft.graph.fileAttachment" or not looks_like_report(name):
+            if listed.get("@odata.type", "#microsoft.graph.fileAttachment") != "#microsoft.graph.fileAttachment" or not looks_like_report(
+                name
+            ):
                 continue
             if int(listed.get("size") or 0) > MAX_COMPRESSED:
                 continue  # too big to be a report: the parser would refuse it anyway

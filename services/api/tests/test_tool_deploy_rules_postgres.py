@@ -192,6 +192,10 @@ async def test_an_addigy_only_mac_gets_a_push_request_with_its_agent_id_only_whe
     await world.commit()
     got = await addigy_requests(world)
     assert set(got) == {"MAC-ADDIGY"}, "not the Windows or Ninja machines, not the Mac Ninja manages, not another client"
-    assert got["MAC-ADDIGY"]["agent_id"] == AGENT and got["MAC-ADDIGY"]["tool"] == "huntress" and got["MAC-ADDIGY"]["deploy_rule_id"] == str(rule.id)
+    assert (
+        got["MAC-ADDIGY"]["agent_id"] == AGENT
+        and got["MAC-ADDIGY"]["tool"] == "huntress"
+        and got["MAC-ADDIGY"]["deploy_rule_id"] == str(rule.id)
+    )
     assert await svc.queue_for_rule(world, rule, SCRIPTS, NOW + timedelta(hours=3)) == 0, "asked once, not every pass"
     assert await svc.queue_for_rule(world, rule, SCRIPTS, NOW + timedelta(days=15)) == 1, "after two weeks it asks again"

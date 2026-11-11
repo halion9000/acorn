@@ -427,7 +427,14 @@ def _email_authentication(reports: list[DmarcRow], *, limit: int = 8) -> list[Em
         total = sum(r.total for r in rows)
         passed = sum(r.passed for r in rows)
         lines.append(
-            EmailAuthLine(domain=domain, total=total, passed=passed, failed=sum(r.failed for r in rows), pass_rate=(passed / total) if total > 0 else None, policy=rows[-1].policy)
+            EmailAuthLine(
+                domain=domain,
+                total=total,
+                passed=passed,
+                failed=sum(r.failed for r in rows),
+                pass_rate=(passed / total) if total > 0 else None,
+                policy=rows[-1].policy,
+            )
         )
     lines.sort(key=lambda x: (x.pass_rate is None, x.pass_rate if x.pass_rate is not None else 0.0, x.domain))
     return lines[:limit]
@@ -504,7 +511,11 @@ def _build_recommendations(
             )
         )
 
-    weak = [x for x in email_authentication or [] if x.pass_rate is not None and x.total >= EMAIL_AUTH_MIN_MESSAGES and x.pass_rate < EMAIL_AUTH_WARN_BELOW]
+    weak = [
+        x
+        for x in email_authentication or []
+        if x.pass_rate is not None and x.total >= EMAIL_AUTH_MIN_MESSAGES and x.pass_rate < EMAIL_AUTH_WARN_BELOW
+    ]
     if weak:
         names = ", ".join(f"{x.domain} ({round(x.pass_rate * 100)}%)" for x in weak[:3] if x.pass_rate is not None)
         recs.append(
@@ -671,7 +682,9 @@ async def _fetch_dmarc(db: AsyncSession, tenant_id: uuid.UUID, start: datetime, 
     """The DMARC reports this client received whose period falls in the window (unmatched ones, kept under the owner's tenant, are not a client's)."""
     result = await db.execute(
         select(DmarcReport.domain, DmarcReport.policy, DmarcReport.total, DmarcReport.passed, DmarcReport.failed)
-        .where(and_(DmarcReport.tenant_id == tenant_id, DmarcReport.matched.is_(True), DmarcReport.end_at >= start, DmarcReport.end_at < end))
+        .where(
+            and_(DmarcReport.tenant_id == tenant_id, DmarcReport.matched.is_(True), DmarcReport.end_at >= start, DmarcReport.end_at < end)
+        )
         .order_by(DmarcReport.end_at)
     )
     return [DmarcRow(domain=r.domain, policy=r.policy, total=r.total, passed=r.passed, failed=r.failed) for r in result.all()]

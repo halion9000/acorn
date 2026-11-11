@@ -210,12 +210,19 @@ async def ticket_status_for_alert(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
         ticketed = has_ticket(alert.enrichment_data)
         finished = alert.status in FINISHED_ALERT_STATUSES
-        fields = {"rule_id": alert.rule_id, "title": alert.title, "source": source_of(alert.raw_event, alert.connector_type), "created_at": alert.created_at}
+        fields = {
+            "rule_id": alert.rule_id,
+            "title": alert.title,
+            "source": source_of(alert.raw_event, alert.connector_type),
+            "created_at": alert.created_at,
+        }
         state, said, _ = check_state_of(await _actions(db, tid, alert_id, TICKET_ACTION), now)
     if ticketed:
         return TicketStatusOut(state="has_ticket")
     if state in ("pending", "claimed"):
-        return TicketStatusOut(state="waiting", message="A ticket is being opened for this alert (CORE collects the request within about a minute).")
+        return TicketStatusOut(
+            state="waiting", message="A ticket is being opened for this alert (CORE collects the request within about a minute)."
+        )
     if state == "failed":
         return TicketStatusOut(state="failed", message=said or "CORE did not say why.")
     if state == "done":
@@ -223,13 +230,23 @@ async def ticket_status_for_alert(
     if finished:
         return TicketStatusOut(state="none")
     rules = (
-        (await db.execute(select(AlertTicketRule).where(AlertTicketRule.tenant_id == user.tenant_id, AlertTicketRule.revoked_at.is_(None)).order_by(AlertTicketRule.created_at.desc())))
+        (
+            await db.execute(
+                select(AlertTicketRule)
+                .where(AlertTicketRule.tenant_id == user.tenant_id, AlertTicketRule.revoked_at.is_(None))
+                .order_by(AlertTicketRule.created_at.desc())
+            )
+        )
         .scalars()
         .all()
     )
     for rule in rules:
         if rule_covers(rule, tenant_id=tid, alert_id=alert_id, **fields):
-            return TicketStatusOut(state="rule_will_open", rule_title=rule.title, message="A ticket rule covers this alert; its ticket is requested within a few minutes.")
+            return TicketStatusOut(
+                state="rule_will_open",
+                rule_title=rule.title,
+                message="A ticket rule covers this alert; its ticket is requested within a few minutes.",
+            )
     for rule in rules:
         if rule_covers(rule, tenant_id=tid, alert_id=alert_id, catch_up=True, **fields):
             return TicketStatusOut(
@@ -254,7 +271,9 @@ async def retry_ticket_for_alert(
         if alert is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
         if not await retry_ticket(db, user.tenant_id, tid, alert, now):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nothing to retry: the alert has a ticket, or its last request did not fail.")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Nothing to retry: the alert has a ticket, or its last request did not fail."
+            )
         await emit_audit(
             db=db,
             tenant_id=tid,
@@ -266,4 +285,6 @@ async def retry_ticket_for_alert(
             request=request,
         )
         await db.commit()
-    return TicketStatusOut(state="waiting", message="A ticket is being opened for this alert (CORE collects the request within about a minute).")
+    return TicketStatusOut(
+        state="waiting", message="A ticket is being opened for this alert (CORE collects the request within about a minute)."
+    )

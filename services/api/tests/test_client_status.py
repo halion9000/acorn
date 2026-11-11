@@ -31,8 +31,15 @@ POSTURE = {
     "identity": {"people": 80, "with_mfa": 60, "not_required": 10, "without_mfa": 10, "admins_without_mfa": 1},
     "alerts": {"open": 12, "critical": 3, "high": 4, "without_ticket": 5},
     "open_cases": 2,
-    "tools": [{"vendor": "huntress", "vendor_client_id": "SECRET-ID-1", "vendor_client_name": "Acme Inc"}, {"vendor": "ninjaone", "vendor_client_id": "9", "vendor_client_name": None}, {"vendor": "weird-tool", "vendor_client_id": "1"}, {"vendor": "huntress", "vendor_client_id": "2"}],
-    "tool_checks": {"threatmate": {"checks": [{"key": "k", "status": "not_met", "evidence": "internal host DC01 has a password in plain text"}]}},
+    "tools": [
+        {"vendor": "huntress", "vendor_client_id": "SECRET-ID-1", "vendor_client_name": "Acme Inc"},
+        {"vendor": "ninjaone", "vendor_client_id": "9", "vendor_client_name": None},
+        {"vendor": "weird-tool", "vendor_client_id": "1"},
+        {"vendor": "huntress", "vendor_client_id": "2"},
+    ],
+    "tool_checks": {
+        "threatmate": {"checks": [{"key": "k", "status": "not_met", "evidence": "internal host DC01 has a password in plain text"}]}
+    },
 }
 
 
@@ -42,7 +49,10 @@ def test_the_page_carries_counts_percentages_and_plain_labels_and_nothing_intern
     assert page["devices"] == {"total": 50, "protected": 45, "percent": 90}
     assert page["people"] == {"total": 80, "protected": 70, "percent": 88}
     assert page["alerts"] == {"open": 12, "being_worked_on": 7}
-    assert page["tools"] == ["Device management and patching (NinjaOne)", "Managed endpoint detection (Huntress)"], "known tools only, once each, plain labels"
+    assert page["tools"] == [
+        "Device management and patching (NinjaOne)",
+        "Managed endpoint detection (Huntress)",
+    ], "known tools only, once each, plain labels"
     text = repr(page)
     for secret in ("SECRET-ID-1", "Acme Inc", "DC01", "password", "weird-tool", "critical", "needs_attention", "stale"):
         assert secret not in text, secret

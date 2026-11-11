@@ -25,7 +25,11 @@ WATCHED: dict[str, tuple[str, str, str]] = {
     "threatmate_google_admins": ("Google super administrators without 2-Step Verification", "high", "not_met"),
     "threatmate_google_failed_logins": ("Many failed Google sign-ins for this client", "medium", "not_met"),
     "liongard_m365_external_forwarding": ("Microsoft 365 mailboxes forward mail outside this client", "high", "not_met"),
-    "liongard_m365_admin_mfa_policy": ("Privileged Microsoft 365 users have no policy that requires multi-factor sign-in", "high", "not_met"),
+    "liongard_m365_admin_mfa_policy": (
+        "Privileged Microsoft 365 users have no policy that requires multi-factor sign-in",
+        "high",
+        "not_met",
+    ),
     "ninjaone_disk_health": ("Devices at this client have a failing or predicted-to-fail disk or a RAID fault", "high", "not_met"),
     "cipp_ca_legacy_auth": ("Legacy sign-in is not blocked for this client (no policy or security defaults)", "high", "not_met"),
     "cipp_mailbox_forwarding": ("Mailbox rules send this client's mail to another domain", "high", "not_met"),
@@ -45,8 +49,17 @@ WATCHED: dict[str, tuple[str, str, str]] = {
 # failing one raises its alert once even on the first report (see ``standing_specs``). Add the key here when a new vulnerability check is built.
 VULN_CHECK_KEYS = frozenset(
     {
-        "threatmate_patching", "threatmate_firmware", "threatmate_end_of_life", "threatmate_pentest", "threatmate_external_exposure",
-        "ninjaone_patching", "ninjaone_software_patches", "ninjaone_unsupported_os", "addigy_unsupported_macos", "cipp_defender_vulnerabilities", "meraki_end_of_support",
+        "threatmate_patching",
+        "threatmate_firmware",
+        "threatmate_end_of_life",
+        "threatmate_pentest",
+        "threatmate_external_exposure",
+        "ninjaone_patching",
+        "ninjaone_software_patches",
+        "ninjaone_unsupported_os",
+        "addigy_unsupported_macos",
+        "cipp_defender_vulnerabilities",
+        "meraki_end_of_support",
     }
 )
 
@@ -58,11 +71,19 @@ WATCHED.update(
         "threatmate_pentest": ("ThreatMate's scans found serious vulnerabilities at this client", "high", "not_met"),
         "threatmate_external_exposure": ("Serious vulnerabilities on this client's internet-facing addresses", "high", "not_met"),
         "ninjaone_patching": ("Windows machines at this client have critical updates waiting over 30 days", "high", "not_met"),
-        "ninjaone_software_patches": ("Windows machines at this client have critical application updates waiting over 30 days", "high", "not_met"),
+        "ninjaone_software_patches": (
+            "Windows machines at this client have critical application updates waiting over 30 days",
+            "high",
+            "not_met",
+        ),
         "ninjaone_unsupported_os": ("Windows machines at this client run a version Microsoft no longer supports", "high", "not_met"),
         "addigy_unsupported_macos": ("Macs at this client run a macOS Apple no longer patches", "high", "not_met"),
         "meraki_end_of_support": ("Meraki devices at this client are past end of support (no more security fixes)", "high", "not_met"),
-        "cipp_defender_vulnerabilities": ("Microsoft Defender finds vulnerabilities with a known exploit on this client's devices", "high", "not_met"),
+        "cipp_defender_vulnerabilities": (
+            "Microsoft Defender finds vulnerabilities with a known exploit on this client's devices",
+            "high",
+            "not_met",
+        ),
     }
 )
 
@@ -159,12 +180,16 @@ def build_alert(tenant_id: uuid.UUID, source: str, spec: dict[str, Any], now: da
     )
 
 
-async def raise_alerts(db: Any, tenant_id: uuid.UUID, source: str, changes: list[dict[str, Any]], now: datetime, checks: list[dict[str, Any]] | None = None) -> int:
+async def raise_alerts(
+    db: Any, tenant_id: uuid.UUID, source: str, changes: list[dict[str, Any]], now: datetime, checks: list[dict[str, Any]] | None = None
+) -> int:
     """Add the alerts a report's changes call for to ``db`` (the caller commits), skipping one that already exists for the same check, day and status. Returns how many were added."""
     from app.models.tenant import Tenant  # noqa: PLC0415
     from app.services.tool_exclusions import check_is_excluded, of_settings  # noqa: PLC0415
 
-    if check_is_excluded(source, of_settings((await db.execute(select(Tenant.settings).where(Tenant.id == tenant_id))).scalar_one_or_none())):
+    if check_is_excluded(
+        source, of_settings((await db.execute(select(Tenant.settings).where(Tenant.id == tenant_id))).scalar_one_or_none())
+    ):
         return 0  # the client does not use this tool: its checks raise nothing
     specs = alerts_for_changes(changes, source, now) + standing_specs(checks, source)
     added = 0

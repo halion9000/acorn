@@ -41,7 +41,9 @@ class StaleSummary(BaseModel):
 
 class Selection(BaseModel):
     client_id: uuid.UUID | None = Field(default=None, description="Only this client's stale alerts; none given means every client's.")
-    alert_ids: list[uuid.UUID] | None = Field(default=None, max_length=500, description="Only these alerts; none given means all in the client scope.")
+    alert_ids: list[uuid.UUID] | None = Field(
+        default=None, max_length=500, description="Only these alerts; none given means all in the client scope."
+    )
     confirm: bool = Field(default=False, description="True only when the person pressed Yes in the confirmation window.")
 
 
@@ -50,12 +52,22 @@ class Changed(BaseModel):
 
 
 @router.get("", response_model=StaleSummary)
-async def stale_summary(user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, client_id: uuid.UUID | None = None) -> StaleSummary:
+async def stale_summary(
+    user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, client_id: uuid.UUID | None = None
+) -> StaleSummary:
     """How many alerts are set aside as stale, by client and severity, and the rule that sets them aside."""
     scope, _ = await _scope(db, user.tenant_id, client_id)
     async with cross_tenant_reads(db):
-        per_client = (await db.execute(select(Alert.tenant_id, func.count()).where(Alert.tenant_id.in_(scope), Alert.status == STALE).group_by(Alert.tenant_id))).all()
-        per_severity = (await db.execute(select(Alert.severity, func.count()).where(Alert.tenant_id.in_(scope), Alert.status == STALE).group_by(Alert.severity))).all()
+        per_client = (
+            await db.execute(
+                select(Alert.tenant_id, func.count()).where(Alert.tenant_id.in_(scope), Alert.status == STALE).group_by(Alert.tenant_id)
+            )
+        ).all()
+        per_severity = (
+            await db.execute(
+                select(Alert.severity, func.count()).where(Alert.tenant_id.in_(scope), Alert.status == STALE).group_by(Alert.severity)
+            )
+        ).all()
     return StaleSummary(
         days=settings.ALERT_STALE_DAYS,
         exempt_severities=list(exempt_severities(settings.ALERT_STALE_EXEMPT_SEVERITIES)),
@@ -79,7 +91,11 @@ async def _act(body: Selection, request: Request, user: AuthUser, db: DBSession,
             action=f"alerts:stale_{what}d" if what == "restore" else "alerts:stale_closed",
             resource="alert",
             resource_id=str(body.client_id or "all"),
-            changes={"count": n, "client": str(body.client_id) if body.client_id else None, "alert_ids": len(body.alert_ids) if body.alert_ids is not None else None},
+            changes={
+                "count": n,
+                "client": str(body.client_id) if body.client_id else None,
+                "alert_ids": len(body.alert_ids) if body.alert_ids is not None else None,
+            },
             request=request,
         )
         await db.commit()
@@ -87,12 +103,16 @@ async def _act(body: Selection, request: Request, user: AuthUser, db: DBSession,
 
 
 @router.post("/restore", response_model=Changed)
-async def restore(body: Selection, request: Request, user: Annotated[AuthUser, Depends(require_permission("alerts:write"))], db: DBSession) -> Changed:
+async def restore(
+    body: Selection, request: Request, user: Annotated[AuthUser, Depends(require_permission("alerts:write"))], db: DBSession
+) -> Changed:
     """Put stale alerts back as they were."""
     return await _act(body, request, user, db, "restore")
 
 
 @router.post("/close", response_model=Changed)
-async def close(body: Selection, request: Request, user: Annotated[AuthUser, Depends(require_permission("alerts:write"))], db: DBSession) -> Changed:
+async def close(
+    body: Selection, request: Request, user: Annotated[AuthUser, Depends(require_permission("alerts:write"))], db: DBSession
+) -> Changed:
     """Close stale alerts for good."""
     return await _act(body, request, user, db, "close")

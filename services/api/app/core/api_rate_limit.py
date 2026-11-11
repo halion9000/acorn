@@ -24,7 +24,9 @@ from typing import Any
 
 WINDOW_SECONDS = 60.0
 DEFAULT_PER_MINUTE = 300
-MAX_TRACKED_CALLERS = 20_000  # one entry per caller; the oldest idle ones are dropped past this so a flood of addresses cannot use up memory
+MAX_TRACKED_CALLERS = (
+    20_000  # one entry per caller; the oldest idle ones are dropped past this so a flood of addresses cannot use up memory
+)
 
 EXEMPT_PREFIXES = ("/health", "/metrics", "/api/v1/health")
 EXEMPT_FRAGMENTS = ("/inbox/core-feed/",)
@@ -98,14 +100,23 @@ class Tally:
         self.last_over_at: float | None = None
 
     def snapshot(self) -> dict[str, Any]:
-        return {"mode": mode(), "per_minute": per_minute(), "checked": self.checked, "over_limit": self.over, "callers_over_limit": len(self.callers_over), "last_over_seconds_ago": None if self.last_over_at is None else int(time.time() - self.last_over_at)}
+        return {
+            "mode": mode(),
+            "per_minute": per_minute(),
+            "checked": self.checked,
+            "over_limit": self.over,
+            "callers_over_limit": len(self.callers_over),
+            "last_over_seconds_ago": None if self.last_over_at is None else int(time.time() - self.last_over_at),
+        }
 
 
 window = SlidingWindow()
 tally = Tally()
 
 
-def decide(path: str, authorization: str | None, forwarded_for: str | None, client_host: str | None, now: float | None = None) -> tuple[bool, int]:
+def decide(
+    path: str, authorization: str | None, forwarded_for: str | None, client_host: str | None, now: float | None = None
+) -> tuple[bool, int]:
     """(over the limit, seconds to wait). Counts the request. Exempt routes and callers, and mode ``off``, are never over."""
     if mode() == "off":
         return False, 0
@@ -135,10 +146,22 @@ class RateLimitMiddleware:
             return
         headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
         client = scope.get("client")
-        over, wait = decide(scope.get("path", ""), headers.get("authorization"), headers.get("x-forwarded-for"), client[0] if client else None)
+        over, wait = decide(
+            scope.get("path", ""), headers.get("authorization"), headers.get("x-forwarded-for"), client[0] if client else None
+        )
         if over and mode() == "enforce":
             body = b'{"detail":"Too many requests. Slow down and try again shortly."}'
-            await send({"type": "http.response.start", "status": 429, "headers": [(b"content-type", b"application/json"), (b"retry-after", str(wait).encode()), (b"content-length", str(len(body)).encode())]})
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 429,
+                    "headers": [
+                        (b"content-type", b"application/json"),
+                        (b"retry-after", str(wait).encode()),
+                        (b"content-length", str(len(body)).encode()),
+                    ],
+                }
+            )
             await send({"type": "http.response.body", "body": body})
             return
         await self.app(scope, receive, send)

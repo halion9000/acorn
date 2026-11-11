@@ -778,7 +778,16 @@ def test_the_inactive_and_never_tiles_count_working_own_accounts_with_a_known_st
 
 
 def test_function_addresses_are_not_listed_as_missing_from_halo_but_ordinary_names_still_are():
-    for email in ("info@acme.com", "scan@acme.com", "scopier@acme.com", "xmdreports@acme.com", "gshake-admin@acme.com", "itadmin@acme.com", "ricoh@acme.com", "no-reply@acme.com"):
+    for email in (
+        "info@acme.com",
+        "scan@acme.com",
+        "scopier@acme.com",
+        "xmdreports@acme.com",
+        "gshake-admin@acme.com",
+        "itadmin@acme.com",
+        "ricoh@acme.com",
+        "no-reply@acme.com",
+    ):
         assert ip.looks_like_role_account([email]), email
     for email in ("scanlon@acme.com", "matthew.singer@acme.com", "adrian@acme.com", "jim@acme.com", "grace.castillo@acme.com"):
         assert not ip.looks_like_role_account([email]), email

@@ -35,7 +35,16 @@ def world(tmp_path, monkeypatch):
     sync = create_engine(f"sqlite:///{path}")
     Base.metadata.create_all(sync, tables=[Tenant.__table__, User.__table__, ApiKey.__table__, LoginFailure.__table__, UserTotp.__table__])
     tenant = Tenant(id=uuid.uuid4(), name="A", slug="a-" + uuid.uuid4().hex[:6])
-    me = User(id=uuid.uuid4(), tenant_id=tenant.id, email="me@a.example", username="me", account_name="me-acct", hashed_password=get_password_hash(PASSWORD), role="admin", is_active=True)
+    me = User(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        email="me@a.example",
+        username="me",
+        account_name="me-acct",
+        hashed_password=get_password_hash(PASSWORD),
+        role="admin",
+        is_active=True,
+    )
     with Session(sync, expire_on_commit=False) as s:
         s.add_all([tenant, me])
         s.commit()
@@ -66,7 +75,9 @@ def world(tmp_path, monkeypatch):
             await s.commit()
 
     app.dependency_overrides[deps.get_db] = session
-    app.dependency_overrides[deps.require_signed_in_session] = lambda: deps.CurrentUser(user_id=me.id, tenant_id=tenant.id, role="admin", email="me@a.example")
+    app.dependency_overrides[deps.require_signed_in_session] = lambda: deps.CurrentUser(
+        user_id=me.id, tenant_id=tenant.id, role="admin", email="me@a.example"
+    )
     yield SimpleNamespace(client=TestClient(app), factory=factory, me=me, clock=clock)
     sync.dispose()
 
@@ -174,7 +185,9 @@ def test_new_recovery_codes_need_the_password_and_a_code_and_the_old_ones_stop_w
     secret, old = turn_on(world)
     assert world.client.post("/auth/totp/recovery", json={"password": "wrong", "code": code_now(world, secret)}).status_code == 403
     assert world.client.post("/auth/totp/recovery", json={"password": PASSWORD, "code": "000000"}).status_code == 403
-    assert world.client.get("/auth/totp").json()["recovery_codes_left"] == 10 and login(world, totp_code=old[0]).status_code == 200  # nothing changed yet (and that sign-in used one old code)
+    assert (
+        world.client.get("/auth/totp").json()["recovery_codes_left"] == 10 and login(world, totp_code=old[0]).status_code == 200
+    )  # nothing changed yet (and that sign-in used one old code)
     world.clock["t"] += 30
     r = world.client.post("/auth/totp/recovery", json={"password": PASSWORD, "code": code_now(world, secret)})
     assert r.status_code == 200, r.text

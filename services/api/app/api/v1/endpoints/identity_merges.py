@@ -72,7 +72,9 @@ def address_of(raw: str) -> str:
 async def record(db, *, client: uuid.UUID, a: str, b: str, kind: str, actor: uuid.UUID | None) -> None:
     """Store one decision for the pair, replacing the opposite one. The caller owns the transaction."""
     x, y = ordered(a, b)
-    await db.execute(delete(IdentityMerge).where(IdentityMerge.tenant_id == client, IdentityMerge.address_a == x, IdentityMerge.address_b == y))
+    await db.execute(
+        delete(IdentityMerge).where(IdentityMerge.tenant_id == client, IdentityMerge.address_a == x, IdentityMerge.address_b == y)
+    )
     db.add(IdentityMerge(tenant_id=client, address_a=x, address_b=y, kind=kind, created_by=actor))
     await db.flush()
 
@@ -95,7 +97,14 @@ async def list_decisions(
         wanted = set(person.addresses) if person is not None else {address}
     async with _as(db, owner, client_id):
         rows = (
-            (await db.execute(select(IdentityMerge).where(IdentityMerge.tenant_id == client_id).order_by(IdentityMerge.created_at.desc()).limit(MAX_DECISIONS)))
+            (
+                await db.execute(
+                    select(IdentityMerge)
+                    .where(IdentityMerge.tenant_id == client_id)
+                    .order_by(IdentityMerge.created_at.desc())
+                    .limit(MAX_DECISIONS)
+                )
+            )
             .scalars()
             .all()
         )
@@ -123,12 +132,22 @@ async def remove_decision(
     await _scope(db, owner, client_id)
     async with _as(db, owner, client_id):
         found = (
-            await db.execute(select(IdentityMerge).where(IdentityMerge.tenant_id == client_id, IdentityMerge.address_a == x, IdentityMerge.address_b == y))
-        ).scalars().first()
+            (
+                await db.execute(
+                    select(IdentityMerge).where(
+                        IdentityMerge.tenant_id == client_id, IdentityMerge.address_a == x, IdentityMerge.address_b == y
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
         if found is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="There is no such decision.")
         kind = found.kind
-        await db.execute(delete(IdentityMerge).where(IdentityMerge.tenant_id == client_id, IdentityMerge.address_a == x, IdentityMerge.address_b == y))
+        await db.execute(
+            delete(IdentityMerge).where(IdentityMerge.tenant_id == client_id, IdentityMerge.address_a == x, IdentityMerge.address_b == y)
+        )
         await emit_audit(
             db=db,
             tenant_id=client_id,

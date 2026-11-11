@@ -33,16 +33,41 @@ class Tool:
 
 
 CATALOG: tuple[Tool, ...] = (
-    Tool("acronis_remotely", "Acronis Cyber Protect (Remotely)", "remote_support", (r"\bacronis\b.*\b(remote|cyber protect connect|cyber protect.*agent)\b", r"\bremotely\b.*\bacronis\b")),
+    Tool(
+        "acronis_remotely",
+        "Acronis Cyber Protect (Remotely)",
+        "remote_support",
+        (r"\bacronis\b.*\b(remote|cyber protect connect|cyber protect.*agent)\b", r"\bremotely\b.*\bacronis\b"),
+    ),
     Tool("anydesk", "AnyDesk", "remote_access", (r"^anydesk\b", r"\banydesk\b(?!.*manager)")),
     Tool("atera", "Atera", "rmm", (r"\batera\b.*\b(agent|networks)\b", r"^atera\b", r"\bateraagent\b")),
     Tool("aweray", "AweRay (AweSun)", "remote_access", (r"\bawesun\b", r"\baweray\b")),
-    Tool("beyondtrust", "BeyondTrust (Bomgar)", "remote_support", (r"\bbomgar\b", r"\bbeyondtrust\b.*\b(remote support|jump client|representative console|endpoint)\b")),
+    Tool(
+        "beyondtrust",
+        "BeyondTrust (Bomgar)",
+        "remote_support",
+        (r"\bbomgar\b", r"\bbeyondtrust\b.*\b(remote support|jump client|representative console|endpoint)\b"),
+    ),
     Tool("chrome_remote_desktop", "Chrome Remote Desktop", "remote_access", (r"\bchrome remote desktop\b",)),
-    Tool("connectwise_automate", "ConnectWise Automate (LabTech)", "rmm", (r"\blabtech\b", r"\bconnectwise automate\b", r"\bltsvc\b", r"\bautomate agent\b")),
-    Tool("connectwise_rmm", "ConnectWise RMM", "rmm", (r"\bconnectwise rmm\b", r"\bconnectwise.*\bcontinuum\b", r"\bconnectwise manage agent\b")),
+    Tool(
+        "connectwise_automate",
+        "ConnectWise Automate (LabTech)",
+        "rmm",
+        (r"\blabtech\b", r"\bconnectwise automate\b", r"\bltsvc\b", r"\bautomate agent\b"),
+    ),
+    Tool(
+        "connectwise_rmm",
+        "ConnectWise RMM",
+        "rmm",
+        (r"\bconnectwise rmm\b", r"\bconnectwise.*\bcontinuum\b", r"\bconnectwise manage agent\b"),
+    ),
     Tool("datto_rmm", "Datto RMM", "rmm", (r"\bdatto rmm\b", r"\bdattoagent\b", r"\bcentrastage\b", r"\bdatto\b.*\bagent\b")),
-    Tool("devolutions_rdm", "Devolutions Remote Desktop Manager", "remote_desktop_manager", (r"\bremote desktop manager\b.*\bdevolutions\b", r"\bdevolutions\b.*\bremote desktop manager\b", r"^remote desktop manager\b")),
+    Tool(
+        "devolutions_rdm",
+        "Devolutions Remote Desktop Manager",
+        "remote_desktop_manager",
+        (r"\bremote desktop manager\b.*\bdevolutions\b", r"\bdevolutions\b.*\bremote desktop manager\b", r"^remote desktop manager\b"),
+    ),
     Tool("duet_display", "Duet Display", "remote_access", (r"\bduet display\b",)),
     Tool("gotoassist", "GoToAssist", "remote_support", (r"\bgotoassist\b", r"\bgoto assist\b")),
     Tool("gotoresolve", "GoToAssist (GoTo Resolve)", "remote_support", (r"\bgoto resolve\b", r"\bgotoresolve\b")),
@@ -52,14 +77,30 @@ CATALOG: tuple[Tool, ...] = (
     Tool("kaseya_vsa", "Kaseya (VSA)", "rmm", (r"\bkaseya\b", r"\bkaseyad\b", r"\bkaseya agent\b")),
     Tool("logmein", "LogMeIn", "remote_access", (r"^logmein\b(?!.*rescue)", r"\blogmein pro\b", r"\blogmein hamachi\b")),
     Tool("logmein_rescue", "LogMeIn Rescue", "remote_support", (r"\blogmein rescue\b", r"\bgotoassist rescue\b")),
-    Tool("nable_ama", "N-able Advanced Monitoring Agent", "rmm", (r"\badvanced monitoring agent\b", r"\bn-able\b.*\bmonitoring\b", r"\bsolarwinds msp\b.*\bagent\b")),
-    Tool("nable_take_control", "N-able Take Control", "remote_support", (r"\btake control\b.*\b(n-able|solarwinds|mspa?)\b", r"\bbasic take control\b", r"\bbeanywhere\b")),
+    Tool(
+        "nable_ama",
+        "N-able Advanced Monitoring Agent",
+        "rmm",
+        (r"\badvanced monitoring agent\b", r"\bn-able\b.*\bmonitoring\b", r"\bsolarwinds msp\b.*\bagent\b"),
+    ),
+    Tool(
+        "nable_take_control",
+        "N-able Take Control",
+        "remote_support",
+        (r"\btake control\b.*\b(n-able|solarwinds|mspa?)\b", r"\bbasic take control\b", r"\bbeanywhere\b"),
+    ),
     Tool("ninjaone", "NinjaOne (formerly NinjaRMM)", "rmm", (r"\bninjarmm", r"\bninjaone\b", r"\bninja ?rmm agent\b")),
     Tool("pulseway", "Pulseway", "rmm", (r"\bpulseway\b",)),
     Tool("putty", "PuTTY", "remote_access", (r"^putty\b",)),
     Tool("radmin", "RAdmin", "remote_access", (r"\bradmin (server|viewer)\b", r"^radmin\b", r"\bremote administrator\b.*\bfamatech\b")),
     Tool("remotepc", "RemotePC", "remote_access", (r"^remotepc\b", r"\bremotepc (host|viewer)\b")),
-    Tool("screenconnect", "ScreenConnect", "remote_support", (r"\bscreenconnect\b", r"\bconnectwise control\b"), r"(?<![0-9a-f])([0-9a-f]{16})(?![0-9a-f])"),
+    Tool(
+        "screenconnect",
+        "ScreenConnect",
+        "remote_support",
+        (r"\bscreenconnect\b", r"\bconnectwise control\b"),
+        r"(?<![0-9a-f])([0-9a-f]{16})(?![0-9a-f])",
+    ),
     Tool("simplehelp", "SimpleHelp", "remote_support", (r"\bsimplehelp\b", r"\bsimple-help\b")),
     Tool("splashtop", "Splashtop", "remote_access", (r"\bsplashtop\b",)),
     Tool("superops", "SuperOps", "rmm", (r"\bsuperops\b",)),
@@ -80,7 +121,18 @@ CATALOG: tuple[Tool, ...] = (
     Tool("tactical_rmm", "Tactical RMM", "rmm", (r"\btactical rmm\b", r"\btacticalrmm\b", r"\btacticalagent\b")),
     Tool("action1", "Action1", "rmm", (r"\baction1\b",)),
     Tool("level", "Level", "rmm", (r"^level\b(?=.*(agent|rmm))", r"^level level\b", r"\blevel\.io\b", r"\blevel remote\b")),
-    Tool("manageengine_rap", "ManageEngine Remote Access Plus / Endpoint Central", "rmm", (r"\bremote access plus\b", r"\bendpoint central\b", r"\bdesktop central\b", r"\bmanageengine\b.*\b(agent|uems)\b", r"\bzoho assist\b.*\bmanageengine\b")),
+    Tool(
+        "manageengine_rap",
+        "ManageEngine Remote Access Plus / Endpoint Central",
+        "rmm",
+        (
+            r"\bremote access plus\b",
+            r"\bendpoint central\b",
+            r"\bdesktop central\b",
+            r"\bmanageengine\b.*\b(agent|uems)\b",
+            r"\bzoho assist\b.*\bmanageengine\b",
+        ),
+    ),
     Tool("dameware", "DameWare", "remote_support", (r"\bdameware\b",)),
     Tool("isl_online", "ISL Online", "remote_support", (r"\bisl (light|online|always on)\b", r"\bisl light\b")),
     Tool("supremo", "Supremo", "remote_access", (r"^supremo\b", r"\bnanosystems\b.*\bsupremo\b")),
@@ -195,7 +247,13 @@ def blocked_findings(rows: Iterable[object], rules: dict[tuple[str, uuid.UUID | 
                         f"{tool.name}{version} is installed on {r.hostname}, and it is marked as blocked: nobody should be running it. Remote access software is a common way for an attacker to keep a way back in, "
                         "and a forgotten technician tool is a way in too. Find out who installed it; if it is not meant to be there, remove it and check what connected through it."
                     ),
-                    fields=[("Tool", tool.name), ("Device", r.hostname), ("Version", version.strip() or "unknown"), ("Kind", tool.category.replace("_", " ")), ("Installed at", getattr(r, "install_path", None) or "unknown")],  # type: ignore[attr-defined]
+                    fields=[
+                        ("Tool", tool.name),
+                        ("Device", r.hostname),
+                        ("Version", version.strip() or "unknown"),
+                        ("Kind", tool.category.replace("_", " ")),
+                        ("Installed at", getattr(r, "install_path", None) or "unknown"),
+                    ],  # type: ignore[attr-defined]
                     source_ids=[],
                 ),
             )
@@ -296,7 +354,13 @@ def foreign_findings(rows: Iterable[object], trusted: dict[str, list[str]], now)
                         "server can control this computer. This is how attackers use a legitimate remote support tool to stay in a network (and how a technician's old or personal install is left behind). "
                         "Find out who installed it; if it is not meant to be there, remove it and treat the computer as possibly accessed."
                     ),
-                    fields=[("Tool", tool.name), ("Device", r.hostname), ("Server identifier", instance), ("Your identifiers", ", ".join(mine)), ("Installed at", path)],  # type: ignore[attr-defined]
+                    fields=[
+                        ("Tool", tool.name),
+                        ("Device", r.hostname),
+                        ("Server identifier", instance),
+                        ("Your identifiers", ", ".join(mine)),
+                        ("Installed at", path),
+                    ],  # type: ignore[attr-defined]
                     source_ids=[],
                 ),
             )
