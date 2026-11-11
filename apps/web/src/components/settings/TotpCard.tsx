@@ -6,6 +6,7 @@
  * Passkeys (above) and Microsoft sign-in are separate ways in and are not affected.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { recoveryCodesWarning } from '@/lib/secondFactor';
 import QRCode from 'qrcode';
 import toast from 'react-hot-toast';
 import { apiErrorDetail, totpApi, type TotpStatus } from '@/lib/api';
@@ -154,6 +155,11 @@ export function TotpCard() {
           <p className="text-sm text-emerald-300" data-testid="totp-on">
             On. {status.recovery_codes_left} recovery code{status.recovery_codes_left === 1 ? '' : 's'} left.
           </p>
+          {recoveryCodesWarning(status.recovery_codes_left) ? (
+            <p role="note" data-testid="totp-few-codes" className="text-xs text-amber-300">
+              {recoveryCodesWarning(status.recovery_codes_left)}
+            </p>
+          ) : null}
           {replacing ? (
             <div className="space-y-2" data-testid="totp-replace">
               <p className="text-xs text-gray-400">New codes replace the old ones: any you have saved stop working.</p>

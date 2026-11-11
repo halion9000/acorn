@@ -9,3 +9,18 @@ export function secondFactorBadge(m: { passkeys?: number; authenticator?: boolea
   if (parts.length === 0) return { text: 'No second factor', warn: true };
   return { text: parts.join(' + '), warn: false };
 }
+
+/** The members whose second-factor fields were sent and who have no passkey and no authenticator app (an older server that sends neither field is not counted as "none"). */
+export function withoutSecondFactor<T extends { passkeys?: number; authenticator?: boolean; is_active?: boolean }>(members: T[]): T[] {
+  return members.filter((m) => m.is_active !== false && secondFactorBadge(m)?.warn === true);
+}
+
+/** How many recovery codes left is few enough to say so. */
+export const FEW_RECOVERY_CODES = 2;
+
+/** A sentence for when the recovery codes are nearly used up, or null while there are enough. */
+export function recoveryCodesWarning(left: number): string | null {
+  if (left > FEW_RECOVERY_CODES) return null;
+  if (left <= 0) return 'No recovery codes left. If you lose your phone you cannot sign in: make new ones now.';
+  return `Only ${left} recovery code${left === 1 ? '' : 's'} left. Make new ones before you run out.`;
+}

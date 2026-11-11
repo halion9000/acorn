@@ -17,7 +17,7 @@
  * the panel says so instead of showing invented content (it used to show a made-up person, workspace and member list).
  */
 
-import { secondFactorBadge } from '@/lib/secondFactor';
+import { secondFactorBadge, withoutSecondFactor } from '@/lib/secondFactor';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { docs } from '@/lib/docs';
@@ -700,6 +700,7 @@ export function workspaceProblem(error: unknown, what: string): string {
 function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [onlyNoFactor, setOnlyNoFactor] = useState(false);
   const [selfId, setSelfId] = useState<string | null>(null);
   useEffect(() => {
     setSelfId(authApi.currentUser()?.id ?? null);
@@ -751,8 +752,14 @@ function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
             <p className="mt-1 text-xs text-gray-500">
               {members.length} {members.length === 1 ? 'member' : 'members'} in this workspace.
             </p>
+            {withoutSecondFactor(members).length > 0 ? (
+              <label data-testid="no-factor-filter" className="mt-2 flex items-center gap-2 text-xs text-amber-300">
+                <input type="checkbox" checked={onlyNoFactor} onChange={(e) => setOnlyNoFactor(e.target.checked)} />
+                Show only the {withoutSecondFactor(members).length} {withoutSecondFactor(members).length === 1 ? 'person' : 'people'} with no second factor
+              </label>
+            ) : null}
             <ul className="mt-3 divide-y divide-gray-800 rounded-lg border border-gray-800 bg-gray-950/40">
-              {members.map((m) => (
+              {(onlyNoFactor ? withoutSecondFactor(members) : members).map((m) => (
                 <li key={m.id} className="text-sm">
                   <div className="flex items-center justify-between px-4 py-3">
                     <div className="min-w-0">

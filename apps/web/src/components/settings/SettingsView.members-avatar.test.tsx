@@ -263,3 +263,30 @@ describe('Settings > Workspace > members show their second factor', () => {
     expect(badges.map((b) => b.textContent)).toEqual(['2 passkeys + authenticator app', 'No second factor']);
   });
 });
+
+describe('Settings > Workspace > the no-second-factor filter', () => {
+  it('offers a count of people with no second factor and, ticked, lists only them', async () => {
+    currentUser.mockReturnValue(account);
+    users.mockResolvedValue([
+      { ...member('hal.owner'), passkeys: 1, authenticator: false },
+      { ...member('bare.one'), passkeys: 0, authenticator: false },
+      { ...member('bare.two'), passkeys: 0, authenticator: false },
+    ]);
+    renderSettings();
+    await userEvent.click(await screen.findByRole('button', { name: /^workspace/i }));
+    const box = await screen.findByTestId('no-factor-filter');
+    expect(box).toHaveTextContent('Show only the 2 people with no second factor');
+    expect(screen.getAllByTestId('second-factor')).toHaveLength(3);
+    await userEvent.click(within(box).getByRole('checkbox'));
+    expect(screen.getAllByTestId('second-factor').map((b) => b.textContent)).toEqual(['No second factor', 'No second factor']);
+  });
+
+  it('shows no filter when everybody has one, or the server does not say', async () => {
+    currentUser.mockReturnValue(account);
+    users.mockResolvedValue([{ ...member('hal.owner'), passkeys: 1, authenticator: false }, member('older.server')]);
+    renderSettings();
+    await userEvent.click(await screen.findByRole('button', { name: /^workspace/i }));
+    await screen.findByText(/members? in this workspace/);
+    expect(screen.queryByTestId('no-factor-filter')).toBeNull();
+  });
+});

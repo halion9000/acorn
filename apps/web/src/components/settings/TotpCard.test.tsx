@@ -64,6 +64,17 @@ describe('TotpCard', () => {
     expect(await screen.findByRole('button', { name: 'Set up an authenticator app' })).toBeInTheDocument();
   });
 
+  it('warns when two or fewer recovery codes are left, and says nothing while there are plenty', async () => {
+    api.status.mockResolvedValue({ enabled: true, recovery_codes_left: 2 });
+    const first = render(<TotpCard />);
+    expect(await screen.findByTestId('totp-few-codes')).toHaveTextContent('Only 2 recovery codes left. Make new ones before you run out.');
+    first.unmount();
+    api.status.mockResolvedValue({ enabled: true, recovery_codes_left: 10 });
+    render(<TotpCard />);
+    await screen.findByTestId('totp-on');
+    expect(screen.queryByTestId('totp-few-codes')).not.toBeInTheDocument();
+  });
+
   it('makes new recovery codes with the password and a code, and shows them once', async () => {
     api.status.mockResolvedValue({ enabled: true, recovery_codes_left: 0 });
     api.newRecoveryCodes.mockResolvedValue({ recovery_codes: ['nnnnn-mmmmm'], note: '' });
