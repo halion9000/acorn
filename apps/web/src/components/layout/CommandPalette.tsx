@@ -22,7 +22,7 @@ import toast from 'react-hot-toast';
 import { searchApi, type SearchHit } from '@/lib/api';
 import { useHiddenNav } from '@/hooks/useHiddenNav';
 import { MORE_SETTINGS } from '@/components/settings/moreSettings';
-import { paletteNavItems } from './paletteNav';
+import { paletteNavItems, rememberSearch } from './paletteNav';
 import { shownSections } from './Sidebar';
 
 interface PaletteAction {
@@ -59,6 +59,27 @@ export function hitHref(hit: SearchHit): string {
       return `/inventory?kind=nuc&search=${encodeURIComponent(hit.title)}`;
     default:
       return `/inventory?client=${encodeURIComponent(hit.id)}`;
+  }
+}
+
+const SEARCHES_STORAGE_KEY = 'aisoc.palette.searches';
+
+function readSearches(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SEARCHES_STORAGE_KEY) ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((p) => typeof p === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSearch(text: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(SEARCHES_STORAGE_KEY, JSON.stringify(rememberSearch(readSearches(), text)));
+  } catch {
+    // localStorage may be unavailable (private mode): the palette works without it.
   }
 }
 
@@ -112,6 +133,7 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
   const [query, setQuery] = useState('');
+  const [searches, setSearches] = useState<string[]>([]);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
@@ -189,14 +211,17 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (!open) setQuery('');
+    else setSearches(readSearches());
   }, [open]);
 
   const navigate = useCallback(
     (href: string) => {
+      // What was typed to get here is remembered, so the same search is one click next time.
+      writeSearch(query);
       router.push(href);
       close();
     },
-    [router, close],
+    [router, close, query],
   );
 
   const groups = useMemo<PaletteGroup[]>(() => {
@@ -279,8 +304,14 @@ export function CommandPalette() {
       ? { id: 'recent', heading: 'Recent pages', items: recentItems }
       : null;
 
-    return recentGroup ? [navGroup, quickGroup, recentGroup] : [navGroup, quickGroup];
-  }, [recent, pathname, navigate, close, navItems]);
+    // Past searches, offered only before anything is typed: choosing one types it again.
+    const searchGroup: PaletteGroup | null =
+      query === '' && searches.length > 0
+        ? { id: 'searches', heading: 'Recent searches', items: searches.map((text) => ({ id: `search:${text}`, label: text, hint: 'Search again', perform: () => setQuery(text) })) }
+        : null;
+
+    return [navGroup, quickGroup, ...(recentGroup ? [recentGroup] : []), ...(searchGroup ? [searchGroup] : [])];
+  }, [recent, pathname, navigate, close, navItems, query, searches]);
 
   return (
     <AnimatePresence>

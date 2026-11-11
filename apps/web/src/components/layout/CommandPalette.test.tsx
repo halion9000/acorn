@@ -249,3 +249,18 @@ describe('settings pages', () => {
     expect(nav.push).toHaveBeenCalledWith('/settings/retention');
   });
 });
+
+describe('recent searches', () => {
+  it('remembers what was typed when a result is chosen, and offers it next time; choosing it types it again', async () => {
+    window.localStorage.removeItem('aisoc.palette.searches');
+    openIt();
+    await userEvent.type(screen.getByPlaceholderText(/Search anything/), 'retention');
+    await userEvent.click(await screen.findByText('Data retention'));
+    expect(JSON.parse(window.localStorage.getItem('aisoc.palette.searches') ?? '[]')).toEqual(['retention']);
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true }); // the same palette, opened again
+    await userEvent.click(await screen.findByText('retention'));
+    expect((screen.getByPlaceholderText(/Search anything/) as HTMLInputElement).value).toBe('retention');
+    expect(screen.getByText('Data retention')).toBeInTheDocument();
+    window.localStorage.removeItem('aisoc.palette.searches');
+  });
+});

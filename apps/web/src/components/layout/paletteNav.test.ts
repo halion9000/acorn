@@ -43,3 +43,19 @@ describe('settings pages in the palette', () => {
     expect(out[2].keywords).toContain('what is kept, for how long');
   });
 });
+
+describe('rememberSearch', () => {
+  it('puts the newest first, drops an earlier copy whatever its case, and keeps five', async () => {
+    const { rememberSearch } = await import('./paletteNav');
+    expect(rememberSearch(['mfa', 'billing'], 'Billing ')).toEqual(['Billing', 'mfa']);
+    expect(rememberSearch(['a1', 'b2', 'c3', 'd4', 'e5'], 'f6')).toEqual(['f6', 'a1', 'b2', 'c3', 'd4']);
+  });
+  it('does not remember a blank or one-letter search, and leaves the given list alone', async () => {
+    const { rememberSearch } = await import('./paletteNav');
+    const list = ['mfa'];
+    expect(rememberSearch(list, ' ')).toEqual(['mfa']);
+    expect(rememberSearch(list, 'x')).toEqual(['mfa']);
+    expect(rememberSearch(list, 'dmarc')).toEqual(['dmarc', 'mfa']);
+    expect(list).toEqual(['mfa']);
+  });
+});

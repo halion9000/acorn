@@ -51,3 +51,16 @@ export function paletteNavItems(
   const words = (c: PaletteNavItem): PaletteNavItem => ({ ...c, keywords: [...c.keywords, ...(PAGE_WORDS[c.href] ?? []).filter((w) => !c.keywords.includes(w))] });
   return [...curated.map(words), ...extra];
 }
+
+/** How many past searches the palette remembers. */
+export const SEARCHES_KEPT = 5;
+
+/**
+ * The remembered searches after one more is used: the new one first, an earlier copy of it (whatever its letter case) dropped, at most SEARCHES_KEPT kept. Text under two characters, or blank, is
+ * not remembered. The input list is not changed. Pure.
+ */
+export function rememberSearch(list: readonly string[], text: string): string[] {
+  const t = text.trim();
+  if (t.length < 2) return [...list];
+  return [t, ...list.filter((s) => s.toLowerCase() !== t.toLowerCase())].slice(0, SEARCHES_KEPT);
+}
