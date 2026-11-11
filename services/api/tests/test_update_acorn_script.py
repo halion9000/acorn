@@ -418,3 +418,16 @@ def test_a_real_failed_run_writes_history_and_the_result_line_is_still_last(tmp_
     assert out.stdout.strip().splitlines()[-1] == 'RESULT {"status":"failed","commit":"none"}'
     rows = uc.parse_history((ctl / "history.log").read_text())
     assert [(r["status"], r["mode"]) for r in rows] == [("failed", "update")]
+
+
+def test_each_history_line_says_how_many_seconds_the_run_took(tmp_path):
+    from app.services import update_control as uc
+
+    program = (
+        f"REPO={tmp_path.as_posix()}\nSTATUS=ok\nMODE=update\nSTARTED=$(( $(date +%s) - 95 ))\nexport ACORN_UPDATE_CTL={tmp_path.as_posix()}\n"
+        f"eval \"$(sed -n '/^record_history() {{/,/^}}/p' {SCRIPT.as_posix()})\"\n"
+        "record_history\n"
+    )
+    subprocess.run([BASH, "-c", program], capture_output=True, text=True, timeout=60)
+    rows = uc.parse_history((tmp_path / "history.log").read_text())
+    assert len(rows) == 1 and 95 <= rows[0]["seconds"] <= 100

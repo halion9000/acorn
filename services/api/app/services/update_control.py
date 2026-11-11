@@ -62,19 +62,33 @@ def _verdict(lines: list[str]) -> tuple[bool | None, str | None]:
 
 
 def parse_history(text: str, shown: int = HISTORY_SHOWN) -> list[dict]:
-    """The update script's history lines (time, status, commit, mode, tab-separated, newest last) as rows, newest first. A line that is not four plain fields is skipped: the file is written
-    by a script, but it is shown on a page, so nothing unexpected is passed through."""
+    """The update script's history lines (time, status, commit, mode and, since 2026-11-11, the seconds the run took; tab-separated, newest last) as rows, newest first. An older line has no
+    seconds (None). A line that is not four or five plain fields is skipped: the file is written by a script, but it is shown on a page, so nothing unexpected is passed through."""
     rows = []
     for line in text.splitlines():
         parts = line.split("\t")
-        if len(parts) != 4 or not all(_SAFE.match(p) for p in parts):
+        if len(parts) not in (4, 5) or not all(_SAFE.match(p) for p in parts):
             continue
-        at, status, commit, mode = parts
+        at, status, commit, mode = parts[:4]
+        seconds = None
+        if len(parts) == 5:
+            if not parts[4].isdigit():
+                continue
+            seconds = int(parts[4])
         try:
             datetime.strptime(at, "%Y-%m-%dT%H:%M:%SZ")
         except ValueError:
             continue
-        rows.append({"at": at, "status": status, "ok": status in _HISTORY_OK, "commit": None if commit == "none" else commit, "mode": mode})
+        rows.append(
+            {
+                "at": at,
+                "status": status,
+                "ok": status in _HISTORY_OK,
+                "commit": None if commit == "none" else commit,
+                "mode": mode,
+                "seconds": seconds,
+            }
+        )
     return rows[::-1][:shown]
 
 

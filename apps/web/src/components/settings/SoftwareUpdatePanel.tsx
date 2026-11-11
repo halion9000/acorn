@@ -139,6 +139,7 @@ function Inner() {
                 <th scope="col">What</th>
                 <th scope="col">Result</th>
                 <th scope="col">Version</th>
+                <th scope="col">Took</th>
               </tr>
             </thead>
             <tbody>
@@ -148,6 +149,7 @@ function Inner() {
                   <td>{HISTORY_MODE[h.mode] ?? h.mode}</td>
                   <td className={h.ok ? 'text-emerald-300' : 'text-red-300'}>{HISTORY_STATUS[h.status] ?? h.status}</td>
                   <td className="font-mono">{h.commit ?? 'unknown'}</td>
+                  <td>{tookLabel(h.seconds)}</td>
                 </tr>
               ))}
             </tbody>
@@ -168,4 +170,11 @@ function Inner() {
       />
     </div>
   );
+}
+
+/** "4 min 5 s" / "45 s" for the seconds a run took; a dash for a run recorded before the time was kept. */
+export function tookLabel(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined) return '–';
+  if (seconds < 60) return `${seconds} s`;
+  return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
 }

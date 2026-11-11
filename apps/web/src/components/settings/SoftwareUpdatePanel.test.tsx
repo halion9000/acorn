@@ -10,7 +10,18 @@ vi.mock('@/components/layout/TenantProvider', () => ({ useTenant: () => tenantSt
 vi.mock('react-hot-toast', () => ({ __esModule: true, default: { success: vi.fn(), error: vi.fn() } }));
 
 import { ApiError } from '@/lib/api';
-import { SoftwareUpdatePanel } from './SoftwareUpdatePanel';
+import { SoftwareUpdatePanel, tookLabel } from './SoftwareUpdatePanel';
+
+describe('tookLabel', () => {
+  it('says seconds under a minute, minutes and seconds above it, and a dash when it was not kept', () => {
+    expect(tookLabel(0)).toBe('0 s');
+    expect(tookLabel(59)).toBe('59 s');
+    expect(tookLabel(60)).toBe('1 min 0 s');
+    expect(tookLabel(245)).toBe('4 min 5 s');
+    expect(tookLabel(null)).toBe('–');
+    expect(tookLabel(undefined)).toBe('–');
+  });
+});
 
 const status = (over: Record<string, unknown> = {}) => ({
   available: true, state: 'idle', requested_by: null, requested_at: null, last_run_at: null, last_run_ok: null, summary: null, log: [], ...over,
@@ -70,7 +81,7 @@ describe('SoftwareUpdatePanel', () => {
     platformUpdateApi.get.mockResolvedValue(
       status({
         history: [
-          { at: '2026-11-10T12:00:00Z', status: 'rolled_back', ok: false, commit: 'aaa1111', mode: 'update' },
+          { at: '2026-11-10T12:00:00Z', status: 'rolled_back', ok: false, commit: 'aaa1111', mode: 'update', seconds: 245 },
           { at: '2026-11-09T10:00:00Z', status: 'ok', ok: true, commit: null, mode: 'force' },
         ],
       }),
@@ -81,6 +92,8 @@ describe('SoftwareUpdatePanel', () => {
     expect(rows[0]).toHaveTextContent('2026-11-10 12:00:00');
     expect(rows[0]).toHaveTextContent('Failed and went back to the earlier version');
     expect(rows[0]).toHaveTextContent('aaa1111');
+    expect(rows[0]).toHaveTextContent('4 min 5 s');
+    expect(rows[1]).toHaveTextContent('–');
     expect(rows[1]).toHaveTextContent('Rebuild');
     expect(rows[1]).toHaveTextContent('Updated');
     expect(rows[1]).toHaveTextContent('unknown');

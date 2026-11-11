@@ -35,8 +35,9 @@ exec > >(tee -a "$LOG") 2>&1
 # The last line of every run is machine-readable: CORE reads the verdict from it instead of from the wording above it.
 # status is one of: ok, up_to_date, verify_ok, rollback_ok, rolled_back, failed, verify_failed, rollback_failed, busy.
 STATUS=failed
+STARTED=$(date +%s)
 emit_result() { echo "RESULT {\"status\":\"$STATUS\",\"commit\":\"$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo none)\"}"; }
-# One line per run that did something, for the Update panel's history: time (UTC), status, commit, mode, separated by tabs, newest last, the latest 50 kept.
+# One line per run that did something, for the Update panel's history: time (UTC), status, commit, mode, seconds the run took, separated by tabs, newest last, the latest 50 kept.
 # A run that was turned away (busy) or found nothing new (up_to_date) is not history. Writes only into the hand-off folder and only when it exists; it can never fail a run.
 record_history() {
   local dir=${ACORN_UPDATE_CTL:-/srv/acorn/update-ctl} file commit
@@ -45,7 +46,7 @@ record_history() {
   file=$dir/history.log
   commit=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo none)
   {
-    printf '%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$STATUS" "$commit" "$MODE" >> "$file" &&
+    printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$STATUS" "$commit" "$MODE" "$(( $(date +%s) - ${STARTED:-$(date +%s)} ))" >> "$file" &&
       tail -n 50 "$file" > "$file.tmp" && mv "$file.tmp" "$file"
   } 2>/dev/null || true
   return 0

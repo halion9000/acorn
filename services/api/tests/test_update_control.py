@@ -134,6 +134,7 @@ def test_history_is_read_newest_first_with_ok_only_for_the_statuses_that_mean_it
         "ok": True,
         "commit": "aaa1111",
         "mode": "rollback",
+        "seconds": None,
     }
 
 
@@ -150,7 +151,9 @@ def test_a_line_that_is_not_four_plain_fields_is_skipped_and_only_the_newest_twe
             good,
         ]
     )
-    assert uc.parse_history(text) == [{"at": "2026-11-10T12:00:00Z", "status": "ok", "ok": True, "commit": "aaa1111", "mode": "update"}]
+    assert uc.parse_history(text) == [
+        {"at": "2026-11-10T12:00:00Z", "status": "ok", "ok": True, "commit": "aaa1111", "mode": "update", "seconds": None}
+    ]
     many = "\n".join(_line(f"2026-11-{d:02d}T12:00:00Z", "ok", "aaa1111", "update") for d in range(1, 29))
     shown = uc.parse_history(many)
     assert len(shown) == uc.HISTORY_SHOWN and shown[0]["at"] == "2026-11-28T12:00:00Z"
@@ -158,3 +161,17 @@ def test_a_line_that_is_not_four_plain_fields_is_skipped_and_only_the_newest_twe
 
 def test_no_history_file_is_an_empty_history_not_an_error(tmp_path):
     assert uc.read_state(tmp_path).history == []
+
+
+def test_a_line_with_the_seconds_the_run_took_shows_them_and_a_fifth_field_that_is_not_a_number_is_skipped():
+    rows = uc.parse_history(
+        "\n".join(
+            [
+                _line("2026-11-10T12:00:00Z", "ok", "aaa1111", "update", "245"),
+                _line("2026-11-10T12:05:00Z", "ok", "aaa1111", "update", "-5"),
+                _line("2026-11-10T12:06:00Z", "ok", "aaa1111", "update", "1e3"),
+                _line("2026-11-10T12:07:00Z", "failed", "none", "verify", "0"),
+            ]
+        )
+    )
+    assert [(r["at"], r["seconds"]) for r in rows] == [("2026-11-10T12:07:00Z", 0), ("2026-11-10T12:00:00Z", 245)]
