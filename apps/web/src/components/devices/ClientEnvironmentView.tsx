@@ -10,7 +10,8 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { environmentApi, msspApi, type ChildTenant, type ClientEnvironment } from '@/lib/api';
 import { buildMap, type Tier } from './networkMap';
-import { deviceHref, downloadText, mapFileName, standaloneSvg } from './mapDownload';
+import { downloadText } from '@/lib/download';
+import { deviceHref, mapFileName, standaloneSvg } from './mapDownload';
 
 const TIER_FILL: Record<Tier, string> = { 0: '#b45309', 1: '#1d4ed8', 2: '#0f766e', 3: '#4b5563' };
 const TIER_NAME: Record<Tier, string> = { 0: 'Firewall / router', 1: 'Switch', 2: 'Access point', 3: 'Other device' };

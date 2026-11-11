@@ -4,7 +4,7 @@
  * Platform health: is each internal service (fusion, connectors, agents, ...) answering its own probe right now?
  * Backed by GET /api/v1/health/services. Refreshes every 15 s; a service that does not answer is shown as down, never hidden.
  */
-import { downloadText } from "@/components/devices/mapDownload";
+import { downloadText } from "@/lib/download";
 import { healthReport, healthReportFileName } from "@/lib/healthReport";
 import { useCallback, useEffect, useState } from "react";
 
