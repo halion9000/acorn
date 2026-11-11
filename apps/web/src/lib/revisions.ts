@@ -13,7 +13,7 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-10",
-    "commits": 62,
+    "commits": 63,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Autonomy: proposals:log permission for the proposal log; test fixtures brought current",
@@ -22,13 +22,13 @@ export const REVISIONS: Revision[] = [
       "Secret-scan hook installed here; public Azure role id marked as not a secret",
       "Revisions regenerated",
       "Web tests: fix three type errors in test files",
-      "Weekly digest: DMARC pass rate per domain",
-      "Bell: a finished BEC search opens the person it was for",
-      "SOC Insights: the MTTR tile says how long each severity took",
-      "Platform health: Download health report",
-      "Regenerate docs/openapi.yaml",
-      "Dependencies: clear every Python security advisory (59 findings to 0 by the repository audit script)",
-      "Alerts: undo a bulk assign for ten minutes"
+      "Platform health: largest database tables",
+      "Alert email: say how many alerts are waiting to be sent",
+      "Platform health: a worker that failed lately and recovered says so",
+      "Alerts: undo a bulk close for ten minutes",
+      "Detection truth table: the generator says A.C.O.R.N, as the committed file does",
+      "Dependencies: clear every high and critical pnpm advisory (21 to 0)",
+      "Digest: each DMARC domain opens that domain on the DMARC page"
     ],
     "fixes": 5
   },

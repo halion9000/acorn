@@ -70,6 +70,28 @@ export function becHref(b: Pick<BecFinished, 'email'>): string {
   return email ? `/identities?search=${encodeURIComponent(email)}` : '/identities';
 }
 
+/** A connected tool as the connectors list sends it, reduced to what the bell reads. */
+export interface ConnectorFreshness {
+  name: string;
+  is_enabled?: boolean;
+  freshness?: { status?: string } | null;
+}
+
+/**
+ * The bell line for tools that have gone quiet: switched-on connectors whose last event is older than their own expected cadence (the server's red verdict). A tool that has never had an event
+ * ("unknown") is a tool still being set up, not a quiet one, and a yellow one is merely slow: neither is counted. Null when none are quiet.
+ */
+export function quietToolsLine(connectors: ConnectorFreshness[]): { title: string; detail: string } | null {
+  const quiet = connectors.filter((c) => c.is_enabled !== false && c.freshness?.status === 'red').map((c) => c.name).sort((a, b) => a.localeCompare(b));
+  if (quiet.length === 0) return null;
+  const shown = quiet.slice(0, 3).join(', ');
+  const more = quiet.length > 3 ? ` and ${quiet.length - 3} more` : '';
+  return {
+    title: quiet.length === 1 ? '1 connected tool has gone quiet' : `${quiet.length} connected tools have gone quiet`,
+    detail: `${shown}${more}: nothing has come in for longer than usual`,
+  };
+}
+
 const BEC_SEEN_KEY = 'bell-bec-seen';
 
 function readSeen(): string[] {
@@ -112,6 +134,18 @@ export function NotificationsBell() {
       if (!res.ok) return null;
       const body = (await res.json()) as { rows?: BillingRow[] };
       return billingLinesOff(Array.isArray(body.rows) ? body.rows : []);
+    },
+    { refreshInterval: 300_000, shouldRetryOnError: false },
+  );
+
+  // Connected tools whose events have stopped coming in. A person who cannot read connectors, or a failed read, simply gets no such line.
+  const { data: quiet } = useSWR(
+    'topbar-quiet-tools',
+    async () => {
+      const res = await authFetch('/api/v1/connectors');
+      if (!res.ok) return null;
+      const body = (await res.json()) as ConnectorFreshness[] | { connectors?: ConnectorFreshness[] };
+      return quietToolsLine(Array.isArray(body) ? body : Array.isArray(body.connectors) ? body.connectors : []);
     },
     { refreshInterval: 300_000, shouldRetryOnError: false },
   );
@@ -232,6 +266,12 @@ export function NotificationsBell() {
                 );
               })}
             </ul>
+          ) : null}
+          {quiet ? (
+            <Link href="/settings/connectors" onClick={() => setOpen(false)} data-testid="bell-quiet-tools" className="block px-4 py-2.5 border-t border-gray-800 hover:bg-gray-800/50">
+              <p className="text-sm text-amber-300">{quiet.title}</p>
+              <p className="text-xs text-gray-500">{quiet.detail}</p>
+            </Link>
           ) : null}
           {approvals ? (
             <div data-testid="bell-approvals" className="px-4 py-2.5 border-t border-gray-800">

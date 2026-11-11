@@ -10,7 +10,7 @@ vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => fetchMock
 vi.mock('@/lib/api', () => ({ alertsApi: { list: (...a: unknown[]) => listMock(...a) } }));
 vi.mock('next/link', () => ({ default: ({ children, href, onClick, ...rest }: { children: React.ReactNode; href: string; onClick?: () => void; 'data-testid'?: string }) => <a href={href} onClick={onClick} data-testid={rest['data-testid']}>{children}</a> }));
 
-import { NotificationsBell, approvalsLine, becFinishedLine, becHref, billingLinesOff, needsAttention } from './NotificationsBell';
+import { NotificationsBell, approvalsLine, becFinishedLine, becHref, billingLinesOff, needsAttention, quietToolsLine } from './NotificationsBell';
 
 const alert = (id: string, severity: string, createdAt: string, clientName?: string) => ({ id, title: `Alert ${id}`, severity, createdAt, clientName }) as unknown as Alert;
 const wrap = () => render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}><NotificationsBell /></SWRConfig>);
@@ -189,5 +189,40 @@ describe('finished BEC searches in the bell', () => {
     await user.click(screen.getByRole('button', { name: 'Open notifications' }));
     expect(screen.queryByTestId('bell-bec')).toBeNull();
     expect(screen.queryByTestId('bell-dot-bec')).toBeNull();
+  });
+});
+
+describe('tools that have gone quiet in the bell', () => {
+  const c = (name: string, status?: string, is_enabled = true) => ({ name, is_enabled, freshness: status ? { status } : null });
+
+  it('counts only switched-on tools the server calls red, names up to three and says how many more', () => {
+    expect(quietToolsLine([c('Huntress', 'green'), c('Ninja', 'yellow'), c('Addigy', 'unknown'), c('Old', 'red', false), c('NoVerdict')])).toBeNull();
+    expect(quietToolsLine([c('Huntress', 'red')])).toEqual({ title: '1 connected tool has gone quiet', detail: 'Huntress: nothing has come in for longer than usual' });
+    expect(quietToolsLine([c('d', 'red'), c('b', 'red'), c('a', 'red'), c('c', 'red'), c('e', 'red'), c('f', 'green')])).toEqual({
+      title: '5 connected tools have gone quiet',
+      detail: 'a, b, c and 2 more: nothing has come in for longer than usual',
+    });
+  });
+
+  it('shows a row that opens the connectors page when the connectors list has a red one, and nothing when the read fails', async () => {
+    window.localStorage.clear();
+    listMock.mockResolvedValue({ alerts: [], total: 0 });
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).endsWith('/api/v1/connectors')
+        ? { ok: true, status: 200, json: async () => [{ name: 'Huntress', is_enabled: true, freshness: { status: 'red' } }, { name: 'Ninja', is_enabled: true, freshness: { status: 'green' } }] }
+        : { ok: false, status: 403, json: async () => ({}) },
+    );
+    const user = userEvent.setup();
+    const first = wrap();
+    await user.click(screen.getByRole('button', { name: 'Open notifications' }));
+    const row = await screen.findByTestId('bell-quiet-tools');
+    expect(row).toHaveTextContent('1 connected tool has gone quiet');
+    expect(row).toHaveTextContent('Huntress');
+    expect(row.getAttribute('href')).toBe('/settings/connectors');
+    first.unmount();
+    fetchMock.mockImplementation(async () => ({ ok: false, status: 403, json: async () => ({}) }));
+    wrap();
+    await user.click(screen.getByRole('button', { name: 'Open notifications' }));
+    expect(screen.queryByTestId('bell-quiet-tools')).toBeNull();
   });
 });
