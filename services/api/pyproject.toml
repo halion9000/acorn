@@ -28,8 +28,8 @@ tenacity = ">=8.3,<10.0"
 structlog = ">=24.1,<27.0"
 prometheus-client = ">=0.20,<0.27"
 opentelemetry-sdk = "^1.24.0"
-opentelemetry-instrumentation-fastapi = "^0.45b0"
-opentelemetry-instrumentation-sqlalchemy = "^0.45b0"
+opentelemetry-instrumentation-fastapi = ">=0.45b0"
+opentelemetry-instrumentation-sqlalchemy = ">=0.45b0"
 clickhouse-driver = "^0.2.8"
 # sqlglot powers the tenant-lake SQL rewriter (Workstream 7). We use it to
 # parse user-supplied SELECTs, enforce a table allowlist, and inject the
