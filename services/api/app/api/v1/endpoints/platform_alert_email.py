@@ -51,6 +51,8 @@ class AlertEmailStatus(BaseModel):
     consecutive_failures: int = 0
     # Alerts waiting to be emailed right now (the worker's own rule); None when it could not be counted.
     waiting: int | None = None
+    # The same alerts by severity, most severe first (only severities that have some); empty when unknown or none.
+    waiting_by_severity: dict[str, int] = Field(default_factory=dict)
     worker_enabled: bool  # ALERT_EMAIL_WORKER_ENABLED: the process-level switch
     credentials_configured: bool
     missing_credentials: list[str]  # environment variable NAMES only, never values
@@ -94,18 +96,18 @@ def missing_credentials() -> list[str]:
     return [name for name, attr in _CREDENTIAL_VARIABLES if not getattr(settings, attr)]
 
 
-async def _waiting(db, row) -> int | None:
-    """The count for the status line; a problem counting must not take the settings page down, so it is then unknown."""
-    from app.workers.alert_email_worker import waiting_count  # noqa: PLC0415
+async def _waiting(db, row) -> tuple[int | None, dict[str, int]]:
+    """The count (and its split by severity) for the status line; a problem counting must not take the settings page down, so it is then unknown."""
+    from app.workers.alert_email_worker import waiting_by_severity, waiting_count  # noqa: PLC0415
 
     try:
         async with db.begin_nested():
-            return await waiting_count(db, row)
+            return await waiting_count(db, row), await waiting_by_severity(db, row)
     except Exception:  # noqa: BLE001
-        return None
+        return None, {}
 
 
-def _status(row, waiting: int | None = None) -> AlertEmailStatus:
+def _status(row, waiting: int | None = None, by_severity: dict[str, int] | None = None) -> AlertEmailStatus:
     missing = missing_credentials()
     warnings: list[str] = []
     if row.enabled and not settings.ALERT_EMAIL_WORKER_ENABLED:
@@ -126,6 +128,7 @@ def _status(row, waiting: int | None = None) -> AlertEmailStatus:
         last_error_at=row.last_error_at,
         consecutive_failures=row.consecutive_failures or 0,
         waiting=waiting,
+        waiting_by_severity=by_severity or {},
         worker_enabled=bool(settings.ALERT_EMAIL_WORKER_ENABLED),
         credentials_configured=not missing,
         missing_credentials=missing,
@@ -140,7 +143,8 @@ async def get_alert_email(
 ) -> AlertEmailStatus:
     """The setting, whether the deployment can actually send (which environment variables are missing, by name), and the last error."""
     row = await get_settings(db)
-    return _status(row, await _waiting(db, row))
+    waiting, by_severity = await _waiting(db, row)
+    return _status(row, waiting, by_severity)
 
 
 @router.put("", response_model=AlertEmailStatus)

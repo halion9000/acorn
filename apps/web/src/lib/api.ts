@@ -7355,6 +7355,8 @@ export interface AlertEmailStatus {
   consecutive_failures: number;
   /** Alerts waiting to be emailed right now; null when it could not be counted, absent from an older server. */
   waiting?: number | null;
+  /** The same alerts by severity, most severe first; absent from an older server. */
+  waiting_by_severity?: Record<string, number>;
   /** ALERT_EMAIL_WORKER_ENABLED: the deployment's switch for the background worker. */
   worker_enabled: boolean;
   credentials_configured: boolean;

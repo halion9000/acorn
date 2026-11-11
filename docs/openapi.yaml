@@ -25932,6 +25932,11 @@ components:
           - type: integer
           - type: 'null'
           title: Waiting
+        waiting_by_severity:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Waiting By Severity
         worker_enabled:
           type: boolean
           title: Worker Enabled

@@ -88,6 +88,21 @@ async def waiting_count(db, cfg, now: datetime | None = None) -> int:
     )
 
 
+async def waiting_by_severity(db, cfg, now: datetime | None = None) -> dict[str, int]:
+    """The waiting alerts split by severity (only severities that have some), by the same rule as ``waiting_count``; empty while alert email is off."""
+    if not cfg.enabled:
+        return {}
+    rows = (
+        await db.execute(
+            select(alerts_t.c.severity, func.count())
+            .select_from(alerts_t)
+            .where(unsent_condition(cfg, now or datetime.now(UTC)))
+            .group_by(alerts_t.c.severity)
+        )
+    ).all()
+    return {str(sev): int(n) for sev, n in sorted(rows, key=lambda r: -SEVERITY_ORDER.get(str(r[0]), 0)) if n}
+
+
 async def run_once(*, session_factory: Callable | None = None, mailer: GraphMailer | None = None, now: datetime | None = None) -> RunResult:
     """One cycle. Never raises for an expected problem: it returns what happened (and records a send failure on the setting row)."""
     factory = session_factory or AsyncSessionLocal

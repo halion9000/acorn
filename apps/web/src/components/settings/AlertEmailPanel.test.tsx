@@ -112,6 +112,16 @@ describe('AlertEmailPanel', () => {
     }
   });
 
+  it('splits the waiting alerts by severity when there is more than one, and leaves the split out when there is one or none', async () => {
+    alertEmailApi.get.mockResolvedValue(status({ enabled: true, recipients: ['ops@msp.example'], waiting: 5, waiting_by_severity: { critical: 2, high: 3 } }));
+    const first = renderPanel();
+    expect(await screen.findByTestId('alert-email-waiting')).toHaveTextContent('5 alerts are waiting to be emailed (2 critical, 3 high) and will go out on the next pass.');
+    first.unmount();
+    alertEmailApi.get.mockResolvedValue(status({ enabled: true, recipients: ['ops@msp.example'], waiting: 3, waiting_by_severity: { high: 3 } }));
+    renderPanel();
+    expect(await screen.findByTestId('alert-email-waiting')).toHaveTextContent(/^3 alerts are waiting to be emailed and will go out/);
+  });
+
   it('shows the last error with how often it has failed, and says unsent alerts wait', async () => {
     alertEmailApi.get.mockResolvedValue(status({ last_error: 'Microsoft Graph refused the message: HTTP 403 ErrorAccessDenied', last_error_at: '2026-10-10T12:00:00Z', consecutive_failures: 3 }));
     renderPanel();

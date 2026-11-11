@@ -27,6 +27,13 @@ export function parseRecipients(text: string): string[] {
  * platform administrator sees it, and a save that turns it on or changes the recipients asks first. The Microsoft credentials are environment variables on the
  * server: this screen shows which are missing (by name), never a value.
  */
+/** " (2 critical, 3 high)" from the split by severity, or nothing when there is no split to show or it names only one severity (the total already says it). */
+export function severitySplit(by: Record<string, number> | undefined): string {
+  const parts = Object.entries(by ?? {}).filter(([, n]) => n > 0);
+  if (parts.length < 2) return '';
+  return ` (${parts.map(([sev, n]) => `${n} ${sev}`).join(', ')})`;
+}
+
 export function AlertEmailPanel() {
   const { viewingOther, home } = useTenant();
   if (viewingOther) {
@@ -139,7 +146,7 @@ function Inner() {
           </div>
           {status.enabled && typeof status.waiting === 'number' && status.waiting > 0 ? (
             <p data-testid="alert-email-waiting" className={`text-sm ${status.last_error ? 'text-amber-300' : 'text-gray-300'}`}>
-              {status.waiting} alert{status.waiting === 1 ? ' is' : 's are'} waiting to be emailed{status.last_error ? ' and will go out once the error below is fixed.' : ' and will go out on the next pass.'}
+              {status.waiting} alert{status.waiting === 1 ? ' is' : 's are'} waiting to be emailed{severitySplit(status.waiting_by_severity)}{status.last_error ? ' and will go out once the error below is fixed.' : ' and will go out on the next pass.'}
             </p>
           ) : null}
           {status.warnings.map((w) => (

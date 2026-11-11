@@ -970,3 +970,35 @@ class TestHowManyAreWaiting:
         world.add(world.ta)
         cycle(world, FakeMailer(error=MailError("Graph said no", permanent=False)))
         assert self.waiting(world) == 1
+
+
+class TestWaitingBySeverity:
+    """The split the settings page shows is the same rule as the count, most severe first."""
+
+    def split(self, world, now=NOW):
+        async def go(s):
+            return await worker.waiting_by_severity(s, await settings_store.get_settings(s), now)
+
+        return db(world, go)
+
+    def test_it_is_empty_while_off_and_splits_by_severity_most_severe_first_once_on(self, world):
+        world.add(world.ta, severity="critical")
+        assert self.split(world) == {}
+        turn_on(world, severity="medium")
+        for sev in ("medium", "critical", "high", "high", "low"):  # low is below the chosen severity
+            world.add(world.ta, severity=sev)
+        # Two critical (one added before it was switched on, still recent enough to count), two high, one medium; the low one is below the chosen severity.
+        assert self.split(world) == {"critical": 2, "high": 2, "medium": 1}
+        assert list(self.split(world)) == ["critical", "high", "medium"], "most severe first"
+
+    def test_it_agrees_with_the_count_and_drops_to_nothing_once_sent(self, world):
+        turn_on(world, severity="high")
+        world.add(world.ta, severity="critical")
+        world.add(world.tb, severity="high")
+
+        async def count(s):
+            return await worker.waiting_count(s, await settings_store.get_settings(s), NOW)
+
+        assert sum(self.split(world).values()) == db(world, count) == 2
+        assert cycle(world, FakeMailer()).sent == 2
+        assert self.split(world) == {}
