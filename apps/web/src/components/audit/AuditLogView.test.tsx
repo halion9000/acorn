@@ -185,6 +185,22 @@ describe('AuditLogView export buttons', () => {
     });
   });
 
+  it('the Roles and Members-and-access filters use the prefixes those changes are actually logged under (role:, tenant:)', async () => {
+    seedAuditPage([sampleEvent]);
+    for (const prefix of ['role%3A', 'tenant%3A']) {
+      swrCalls.set(`/api/v1/audit?page=1&page_size=50&action=${prefix}`, { items: [sampleEvent], total: 1, page: 1, page_size: 50, total_pages: 1 });
+    }
+    exportCsvMock.mockResolvedValue({ body: 'id\n', filename: 'x.csv' });
+    render(<AuditLogView />);
+    const actionSelect = screen.getAllByRole('combobox')[0];
+    await userEvent.selectOptions(actionSelect, screen.getByRole('option', { name: 'Roles' }));
+    await userEvent.click(screen.getByRole('button', { name: /export csv/i }));
+    await waitFor(() => expect(exportCsvMock).toHaveBeenLastCalledWith({ action: 'role:' }));
+    await userEvent.selectOptions(actionSelect, screen.getByRole('option', { name: 'Members and access' }));
+    await userEvent.click(screen.getByRole('button', { name: /export csv/i }));
+    await waitFor(() => expect(exportCsvMock).toHaveBeenLastCalledWith({ action: 'tenant:' }));
+  });
+
   it('opens the print-ready HTML in a new tab on Export PDF (HTML)', async () => {
     seedAuditPage([sampleEvent]);
     exportHtmlMock.mockResolvedValueOnce({

@@ -260,7 +260,8 @@ const data = isValid ? raw : null;
           <option value="playbooks:">Playbooks</option>
           <option value="detections:">Detections</option>
           <option value="connectors:">Connectors</option>
-          <option value="roles:">Roles</option>
+          <option value="role:">Roles</option>
+          <option value="tenant:">Members and access</option>
           <option value="auth:">Auth</option>
         </select>
         <select
