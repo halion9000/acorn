@@ -92,12 +92,17 @@ def _the_chat_does_not_search_documentation_unless_a_test_says_so(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _unit_tests_do_not_write_the_user_audit_trail(monkeypatch):
+def _unit_tests_do_not_write_the_user_audit_trail(monkeypatch, request):
     """Administering people records an audit entry (a Postgres-side table with a hash chain). Unit tests that drive those endpoints with a stand-in session have no such table, so the call is replaced
-    here; tests that check what is recorded (test_member_management) patch it themselves, after this, and read what it was called with."""
+    here; tests that check what is recorded (test_member_management) patch it themselves, after this, and read what it was called with.
+
+    A test file that runs against a real Postgres (``*_postgres.py``) keeps the real writer: those tests exist to check the entry that is really written. Replacing it there made six tenant-access
+    tests fail in CI from 2026-11-02 (each passed only when it happened to run first, before the module was loaded)."""
     import sys
     from unittest.mock import AsyncMock
 
+    if request.module.__name__.endswith("_postgres"):
+        return
     module = sys.modules.get("app.api.v1.endpoints.tenants")
     if module is not None:
         monkeypatch.setattr(module, "emit_audit", AsyncMock())

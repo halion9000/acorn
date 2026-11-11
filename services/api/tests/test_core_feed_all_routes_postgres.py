@@ -8,10 +8,12 @@ Then the routes whose effect matters most are checked for what they did: clients
 Opt in with AISOC_TEST_PG_URL (owner) and AISOC_TEST_PG_APP_URL (aisoc_app); the database must be disposable and fully migrated.
 """
 
+import inspect
 import json
 import os
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from app.core.route_introspect import walk_routes
@@ -101,7 +103,10 @@ async def world(monkeypatch):
     finally:
         async with owner.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            # A route that succeeds writes an audit entry, and audit rows refuse deletion (a trigger): for this clean-up transaction only, triggers are off, as the other Postgres tests do.
+            await conn.execute(text("set local session_replication_role = replica"))
             t = [str(x) for x in ids]
+            await conn.execute(text("delete from audit_log where tenant_id = any(cast(:t as uuid[]))"), {"t": t})
             for table in (
                 "vendor_actions",
                 "client_m365_checks",
@@ -135,6 +140,9 @@ async def call(w, suffix, token, route=None):
         kwargs["proposal_id"] = uuid.uuid4()
     if "{case_id}" in suffix:
         kwargs["case_id"] = uuid.uuid4()
+    # A route that records who called (for its audit entry) takes the request itself: a stand-in with no headers and no peer address is enough here.
+    if "request" in inspect.signature(route.endpoint).parameters:
+        kwargs["request"] = SimpleNamespace(headers={}, client=None)
     async with w["factory"]() as s:
         return await route.endpoint(db=s, **kwargs)
 
@@ -177,7 +185,9 @@ async def test_every_core_feed_route_refuses_a_token_that_is_wrong_revoked_or_fo
 
 
 @pytest.mark.parametrize("suffix", sorted(ROUTES))
-async def test_every_recorded_core_request_is_accepted_by_its_route_on_a_real_database(world, suffix):
+async def test_every_recorded_core_request_is_accepted_by_its_route_on_a_real_database(world, suffix, tmp_path, monkeypatch):
+    # The tunnel-token route keeps the token in the update hand-off folder; a test run has none, so it gets an empty one of its own.
+    monkeypatch.setenv("ACORN_UPDATE_CTL_DIR", str(tmp_path))
     try:
         out = await call(world, suffix, world["good"])
     except HTTPException as e:
