@@ -345,6 +345,9 @@ All of these were tested against test data and a scratch database and deployed, 
 - **Alerts > Export all.** When the filter matches more alerts than the page shows, an Export all button beside Export CSV saves every one of them (up to 5,000) and says if the cap stopped it.
 - **Members: accounts nobody uses.** An active account with no sign-in for over 90 days, or one older than 90 days that never signed in, is marked in amber in the members list.
 - **Search (Ctrl+K) also finds settings pages.** Audit log, Platform health, Data retention and the other settings screens are in the palette, by name or by a word of their description.
+- **Vulnerabilities > the last 8 weeks.** A button loads how many findings were raised and how many were closed in each of the last eight weeks for the client chosen, with a sentence saying whether more or fewer are open than at the start.
+- **Update history > Asked by.** Each earlier run names who pressed Update, or says it was started on the server.
+- **DMARC > countries: the service behind an address.** When a sending address belongs to a known service (Microsoft 365, Google Workspace and others), its name is shown beside it.
 
 ---
 

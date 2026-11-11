@@ -16,7 +16,9 @@ import { downloadCsv } from '@/lib/csv';
 import { safeDistance } from '@/lib/safe-date';
 import { targetWords } from '@/app/(app)/settings/client-posture/ToolChecks';
 import { vulnerabilitiesCsvText } from './vulnerabilitiesCsv';
+import { collectAllAlerts } from '@/components/alerts/collectAlerts';
 import { overTargetCount, targetStanding } from './vulnTarget';
+import { trendSentence, weeklyTrend, type TrendWeek } from './vulnTrend';
 
 const SEVERITY_TEXT: Record<string, string> = {
   critical: 'text-red-300 border-red-500/40 bg-red-500/10',
@@ -68,6 +70,18 @@ export function TargetLine({ id, severity, since }: { id: string; severity: stri
 export function VulnerabilitiesView() {
   const [clientId, setClientId] = useState('');
   const [lateOnly, setLateOnly] = useState(false);
+  // The last eight weeks, loaded only when asked for (it reads every vulnerability alert of the chosen client, open and closed).
+  const [trend, setTrend] = useState<{ rows: TrendWeek[]; capped: boolean } | null>(null);
+  const [trendBusy, setTrendBusy] = useState(false);
+  const [trendError, setTrendError] = useState<string | null>(null);
+  const loadTrend = () => {
+    setTrendBusy(true);
+    setTrendError(null);
+    collectAllAlerts<Alert, NonNullable<Parameters<typeof alertsApi.list>[0]>>((f) => alertsApi.list(f), { category: 'vulnerability', ...(clientId ? { clientId } : {}) })
+      .then((all) => setTrend({ rows: weeklyTrend(all.alerts), capped: all.capped }))
+      .catch((e) => setTrendError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setTrendBusy(false));
+  };
   const { data, error, isLoading } = useSWR(
     ['vulnerability-alerts', clientId],
     () => alertsApi.list({ category: 'vulnerability', status: 'open', pageSize: 200, ...(clientId ? { clientId } : {}) }),
@@ -97,6 +111,37 @@ export function VulnerabilitiesView() {
         </p>
       ) : null}
       {isLoading && !data ? <p className="text-sm text-gray-400">Loading…</p> : null}
+
+      <div className="rounded-lg border border-gray-800 bg-gray-900/40 p-3" data-testid="vulnerabilities-trend">
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={loadTrend} disabled={trendBusy} className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800 disabled:opacity-40">
+            {trendBusy ? 'Loading…' : trend ? 'Refresh the last 8 weeks' : 'Show the last 8 weeks'}
+          </button>
+          {trend ? <span className="text-xs text-gray-300">{trendSentence(trend.rows)}</span> : <span className="text-xs text-gray-500">Raised and closed per week, for the client chosen above.</span>}
+        </div>
+        {trendError ? <p className="mt-2 text-xs text-red-300" role="alert">The trend could not be loaded: {trendError}</p> : null}
+        {trend ? (
+          <table className="mt-2 text-left text-xs text-gray-300">
+            <thead className="text-gray-500">
+              <tr>
+                <th scope="col" className="pr-4">Week of</th>
+                <th scope="col" className="pr-4">Raised</th>
+                <th scope="col">Closed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trend.rows.map((r) => (
+                <tr key={r.weekStart}>
+                  <td className="pr-4 font-mono">{r.weekStart}</td>
+                  <td className="pr-4">{r.opened}</td>
+                  <td>{r.closed}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+        {trend?.capped ? <p className="mt-1 text-xs text-amber-300">Only the newest 5,000 alerts were read: pick one client for exact figures.</p> : null}
+      </div>
 
       {data ? (
         findings.length === 0 ? (

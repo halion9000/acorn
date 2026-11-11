@@ -110,3 +110,24 @@ describe('fix-time targets', () => {
     expect(screen.queryByRole('checkbox')).toBeNull();
   });
 });
+
+describe('the last eight weeks', () => {
+  it('loads every vulnerability alert only when asked, and shows raised and closed per week with a sentence', async () => {
+    const now = Date.now();
+    const iso = (daysAgo: number) => new Date(now - daysAgo * 86_400_000).toISOString();
+    api.list.mockImplementation(async (f: { pageSize?: number; status?: string }) =>
+      f.status === 'open'
+        ? { alerts: [alert()], total: 1 }
+        : { alerts: [alert({ id: 't1', createdAt: iso(0) }), alert({ id: 't2', createdAt: iso(0), resolvedAt: iso(0), status: 'resolved' }), alert({ id: 't3', createdAt: iso(400) })], total: 3 },
+    );
+    show();
+    await screen.findByTestId('vuln-a1');
+    expect(api.list).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Show the last 8 weeks' }));
+    const box = await screen.findByTestId('vulnerabilities-trend');
+    await waitFor(() => expect(box).toHaveTextContent('Over these 8 weeks 2 were raised and 1 closed: 1 more open than at the start.'));
+    expect(box.querySelectorAll('tbody tr')).toHaveLength(8);
+    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ category: 'vulnerability', pageSize: 200 }));
+    expect(api.list.mock.calls.at(-1)?.[0]).not.toHaveProperty('status');
+  });
+});
