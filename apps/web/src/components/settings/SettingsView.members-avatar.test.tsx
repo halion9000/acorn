@@ -330,3 +330,18 @@ describe('Settings > Workspace > an active account nobody uses is marked', () =>
     expect(notes.map((n) => n.textContent)).toEqual(['No sign-in for 200 days', 'Never signed in']);
   });
 });
+
+describe('Settings > Workspace > sort by longest since a sign-in', () => {
+  it('lists never-signed-in and long-quiet people first when ticked, and the usual order when not', async () => {
+    const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+    currentUser.mockReturnValue(account);
+    users.mockResolvedValue([{ ...member('a.recent'), last_login: daysAgo(1) }, { ...member('b.old'), last_login: daysAgo(200) }, { ...member('c.never') }]);
+    renderSettings();
+    await userEvent.click(await screen.findByRole('button', { name: /^workspace/i }));
+    await screen.findByTestId('quiet-first');
+    const order = () => Array.from(document.querySelectorAll('li')).map((li) => li.textContent ?? '').filter((t) => /a\.recent|b\.old|c\.never/.test(t)).map((t) => (t.match(/a\.recent|b\.old|c\.never/) ?? [''])[0]);
+    expect(order()).toEqual(['a.recent', 'b.old', 'c.never']);
+    await userEvent.click(screen.getByTestId('quiet-first'));
+    expect(order()).toEqual(['c.never', 'b.old', 'a.recent']);
+  });
+});

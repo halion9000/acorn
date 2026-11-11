@@ -24,3 +24,19 @@ describe('quietAccountNote', () => {
     expect(quietAccountNote(m({ last_login: null, created_at: 'nope' }), NOW)).toBeNull();
   });
 });
+
+describe('byQuietest', () => {
+  it('puts never-signed-in first, then the oldest sign-in, keeps ties in order and does not change the input', async () => {
+    const { byQuietest } = await import('./memberActivity');
+    const input = [
+      { id: 'recent', last_login: ago(1) },
+      { id: 'never-a', last_login: null },
+      { id: 'old', last_login: ago(300) },
+      { id: 'never-b', last_login: null },
+      { id: 'bad', last_login: 'nope' },
+    ];
+    expect(byQuietest(input).map((m) => m.id)).toEqual(['never-a', 'never-b', 'bad', 'old', 'recent']);
+    expect(input.map((m) => m.id)).toEqual(['recent', 'never-a', 'old', 'never-b', 'bad']);
+    expect(byQuietest([])).toEqual([]);
+  });
+});

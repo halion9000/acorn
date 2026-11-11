@@ -19,3 +19,13 @@ export function quietAccountNote(member: { is_active: boolean; last_login: strin
   const days = Math.floor((now - last) / DAY);
   return days > QUIET_ACCOUNT_DAYS ? `No sign-in for ${days} days` : null;
 }
+
+/** The members with the longest since a sign-in first: never signed in at the top, then the oldest sign-in. The input is not changed; members with the same time keep their order. Pure. */
+export function byQuietest<T extends { last_login: string | null }>(members: readonly T[]): T[] {
+  const when = (m: T): number => {
+    if (m.last_login === null) return -Infinity;
+    const t = Date.parse(m.last_login);
+    return Number.isNaN(t) ? -Infinity : t;
+  };
+  return members.map((m, i) => ({ m, i })).sort((a, b) => when(a.m) - when(b.m) || a.i - b.i).map((x) => x.m);
+}
