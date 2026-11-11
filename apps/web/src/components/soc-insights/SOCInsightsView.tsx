@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
+import { ClientResponseTable } from './ClientResponseTable';
 
 import { useRealtimeChannel } from '@/lib/realtime';
 import {
@@ -88,7 +89,10 @@ export function SOCInsightsView() {
       ) : isLoading || !data ? (
         <LoadingSkeleton />
       ) : (
-        <TileGrid tiles={data.tiles} clientId={clientId || undefined} />
+        <>
+          <TileGrid tiles={data.tiles} clientId={clientId || undefined} />
+          {clientId ? null : <ClientResponseTable window={window} onPick={setClientId} />}
+        </>
       )}
     </div>
   );

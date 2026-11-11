@@ -64,7 +64,7 @@ from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.tenant import Tenant
 from app.services import case_metrics, insight_tiles
-from app.services.mttr import severity_sentence, window_by_severity
+from app.services.mttr import severity_sentence, window_by_severity, window_by_tenant
 from app.services.mttr import window as mttr_window
 from app.services.timeutil import as_utc
 
@@ -849,3 +849,46 @@ async def _build_soc_insights(user: AuthUser, db: DBSession, window: str, client
         comparison_ready=comparison_ready,
         history_since=history_since,
     )
+
+
+class ClientResponseTime(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    median_hours: float
+    p90_hours: float
+    alerts: int
+
+
+class ClientResponseTimes(BaseModel):
+    window: str
+    # Clients with at least one alert a person finished in the window, slowest median first; a client with none is left out (no figure is made up).
+    clients: list[ClientResponseTime]
+
+
+@router.get(
+    "/response-times",
+    response_model=ClientResponseTimes,
+    summary="Response time per client (median and slow end, hours)",
+    dependencies=[Depends(require_permission("alerts:read"))],
+)
+async def get_client_response_times(
+    user: AuthUser,
+    db: DBSession,
+    window: WindowLiteral = Query("7d", description="Rolling window. One of 24h, 7d, 30d."),
+) -> ClientResponseTimes:
+    """How long alerts took to finish, per client of the caller's organization (the organization's own alerts are not a client and are left out). Same alerts and same rule as the MTTR tile."""
+    now = datetime.now(UTC)
+    start = now - _window_to_timedelta(window)
+    kids = (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()
+    names = {row[0]: row[1] for row in kids}
+    if not names:
+        return ClientResponseTimes(window=window, clients=[])
+    async with cross_tenant_reads(db):
+        per = await window_by_tenant(db, list(names), start, now)
+    rows = [
+        ClientResponseTime(client_id=tid, client_name=names[tid], median_hours=m.median_hours, p90_hours=m.p90_hours, alerts=m.n)
+        for tid, m in per.items()
+        if tid in names
+    ]
+    rows.sort(key=lambda r: (-r.median_hours, r.client_name))
+    return ClientResponseTimes(window=window, clients=rows)

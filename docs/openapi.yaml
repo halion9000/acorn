@@ -9874,6 +9874,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/insights/response-times:
+    get:
+      tags:
+      - insights
+      summary: Response time per client (median and slow end, hours)
+      description: How long alerts took to finish, per client of the caller's organization
+        (the organization's own alerts are not a client and are left out). Same alerts
+        and same rule as the MTTR tile.
+      operationId: get_client_response_times_api_v1_insights_response_times_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: window
+        in: query
+        required: false
+        schema:
+          enum:
+          - 24h
+          - 7d
+          - 30d
+          type: string
+          description: Rolling window. One of 24h, 7d, 30d.
+          default: 7d
+          title: Window
+        description: Rolling window. One of 24h, 7d, 30d.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponseTimes'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/sla/metrics:
     get:
       tags:
@@ -30047,6 +30085,47 @@ components:
       - alerts
       - open_cases
       title: ClientPosture
+    ClientResponseTime:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        median_hours:
+          type: number
+          title: Median Hours
+        p90_hours:
+          type: number
+          title: P90 Hours
+        alerts:
+          type: integer
+          title: Alerts
+      type: object
+      required:
+      - client_id
+      - client_name
+      - median_hours
+      - p90_hours
+      - alerts
+      title: ClientResponseTime
+    ClientResponseTimes:
+      properties:
+        window:
+          type: string
+          title: Window
+        clients:
+          items:
+            $ref: '#/components/schemas/ClientResponseTime'
+          type: array
+          title: Clients
+      type: object
+      required:
+      - window
+      - clients
+      title: ClientResponseTimes
     ClientReview:
       properties:
         client_id:

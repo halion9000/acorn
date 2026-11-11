@@ -3533,7 +3533,14 @@ export interface SOCInsightsResponse {
   history_since?: string | null;
 }
 
+export interface ClientResponseTimes {
+  window: string;
+  clients: { client_id: string; client_name: string; median_hours: number; p90_hours: number; alerts: number }[];
+}
+
 export const insightsApi = {
+  /** How long alerts took to finish per client (median and slow end, hours), slowest median first; clients with nothing finished are left out. */
+  getResponseTimes: (window: InsightsWindow) => request<ClientResponseTimes>('/api/v1/insights/response-times', { params: { window } }),
   /**
    * Fetches the SOC Insights aggregate payload for the given window.
    *

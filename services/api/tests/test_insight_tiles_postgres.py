@@ -387,3 +387,65 @@ async def test_the_mttr_tile_says_how_long_each_severity_took_on_a_real_database
     finally:
         ins._cache.clear()
         await _cleanup(engine, tenant)
+
+
+async def test_response_times_are_per_client_slowest_first_and_leave_out_the_organizations_own_alerts_and_strangers():
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints import insights as ins
+
+    engine, parent = await _tenant()
+    tag = uuid.uuid4().hex[:8]
+    slow, quick, quiet, stranger = uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    now = datetime.now(UTC)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            for tid, name, parent_id in (
+                (slow, "Slow Co", parent),
+                (quick, "Quick Co", parent),
+                (quiet, "Quiet Co", parent),
+                (stranger, "Stranger", None),
+            ):
+                await conn.execute(
+                    text("insert into tenants (id, name, slug, parent_tenant_id) values (:i, :n, :s, :p)"),
+                    {"i": tid, "n": name, "s": f"rt-{tag}-{str(tid)[:4]}", "p": parent_id},
+                )
+
+            async def alert(tenant, hours, resolved=True, stale=False):
+                created = now - timedelta(hours=30)
+                await conn.execute(
+                    text(
+                        "insert into alerts (id, tenant_id, title, severity, status, created_at, updated_at, resolved_at, stale_at) "
+                        "values (:i, :t, 'x', 'high', 'resolved', :c, :c, :r, :s)"
+                    ),
+                    {
+                        "i": uuid.uuid4(),
+                        "t": tenant,
+                        "c": created,
+                        "r": created + timedelta(hours=hours) if resolved else None,
+                        "s": created if stale else None,
+                    },
+                )
+
+            for h in (10, 14):
+                await alert(slow, h)
+            for h in (1, 2, 3):
+                await alert(quick, h)
+            await alert(quiet, 5, resolved=False)  # nothing finished: not listed
+            await alert(quiet, 5, stale=True)  # swept as stale: not a response
+            await alert(parent, 99)  # the organization's own alert is not a client
+            await alert(stranger, 99)  # another organization's client
+        from sqlalchemy.ext.asyncio import AsyncSession
+
+        async with AsyncSession(engine) as db:
+            out = await ins.get_client_response_times(SimpleNamespace(tenant_id=parent), db, "7d")
+        assert out.window == "7d"
+        assert [(c.client_name, c.median_hours, c.alerts) for c in out.clients] == [("Slow Co", 12.0, 2), ("Quick Co", 2.0, 3)]
+    finally:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            ids = [str(x) for x in (slow, quick, quiet, stranger)]
+            await conn.execute(text("delete from alerts where tenant_id = any(cast(:t as uuid[]))"), {"t": ids})
+            await conn.execute(text("delete from tenants where id = any(cast(:t as uuid[]))"), {"t": ids})
+        await _cleanup(engine, parent)

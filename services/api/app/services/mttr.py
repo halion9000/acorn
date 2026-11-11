@@ -120,3 +120,25 @@ async def window_by_severity(db: Any, tenant_ids: list[Any], start: datetime, en
         await db.execute(select(Alert.severity, Alert.created_at, Alert.resolved_at, Alert.stale_at).where(*where).limit(MAX_ROWS))
     ).all()
     return by_severity((r[0], r[1], r[2], r[3]) for r in rows)
+
+
+def by_tenant(rows: Iterable[tuple[Any, datetime | None, datetime | None, datetime | None]]) -> dict[Any, Mttr]:
+    """MTTR per tenant from (tenant_id, created_at, resolved_at, stale_at) rows, by the one rule (pure). A tenant with nothing finished is left out, never shown as zero."""
+    groups: dict[Any, list[float]] = {}
+    for tenant, created, resolved, stale in rows:
+        if is_response(created, resolved, stale) and created is not None and resolved is not None:
+            groups.setdefault(tenant, []).append(hours(created, resolved))
+    return {t: summarize(v) for t, v in groups.items() if v}
+
+
+async def window_by_tenant(db: Any, tenant_ids: list[Any], start: datetime, end: datetime | None = None) -> dict[Any, Mttr]:
+    """``window`` per tenant: the same alerts (created in [start, end), finished by a person, not swept as stale), in one query. Same scope rule for the caller as ``window``."""
+    from app.models.alert import Alert  # noqa: PLC0415
+
+    where = [Alert.tenant_id.in_(tenant_ids), Alert.resolved_at.isnot(None), Alert.stale_at.is_(None), Alert.created_at >= start]
+    if end is not None:
+        where.append(Alert.created_at < end)
+    rows = (
+        await db.execute(select(Alert.tenant_id, Alert.created_at, Alert.resolved_at, Alert.stale_at).where(*where).limit(MAX_ROWS))
+    ).all()
+    return by_tenant((r[0], r[1], r[2], r[3]) for r in rows)
