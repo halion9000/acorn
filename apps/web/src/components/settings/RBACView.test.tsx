@@ -281,3 +281,43 @@ describe('hiding parts of the console from a role', () => {
     expect(screen.getByRole('checkbox', { name: 'Show Client Posture' })).toBeChecked();
   });
 });
+
+describe('the role editor shows the role recent changes', () => {
+  const history = (items: unknown, status = 200) => {
+    authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/v1/rbac/roles') return json(200, [analyst]);
+      if (url === '/api/v1/rbac/permissions') return json(200, [perm]);
+      if (url === '/api/v1/rbac/roles/r1/history') return json(status, items);
+      return json(404, {});
+    });
+  };
+
+  it('lists who changed what and when, for an existing role', async () => {
+    history([
+      { at: '2026-11-10T09:30:00+00:00', by: 'boss@example.com', action: 'role:updated', summary: 'Gained cases:write.' },
+      { at: null, by: null, action: 'role:created', summary: 'Created with alerts:read.' },
+    ]);
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const box = await screen.findByTestId('role-history');
+    expect(box).toHaveTextContent('2026-11-10 09:30');
+    expect(box).toHaveTextContent('boss@example.com');
+    expect(box).toHaveTextContent('Gained cases:write.');
+    expect(box).toHaveTextContent('Created with alerts:read.');
+  });
+
+  it('shows nothing when there is no history or it cannot be read, and the editor still opens', async () => {
+    history([], 200);
+    const first = render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    expect(await screen.findByRole('button', { name: 'Update' })).toBeInTheDocument();
+    expect(screen.queryByTestId('role-history')).not.toBeInTheDocument();
+    first.unmount();
+    await mutate(() => true, undefined, { revalidate: false });
+    history({ detail: 'no' }, 500);
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    expect(await screen.findByRole('button', { name: 'Update' })).toBeInTheDocument();
+    expect(screen.queryByTestId('role-history')).not.toBeInTheDocument();
+  });
+});

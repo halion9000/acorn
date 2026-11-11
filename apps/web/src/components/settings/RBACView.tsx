@@ -7,6 +7,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { authFetch } from '@/lib/auth-session';
 import { failureDetail } from '@/lib/failure-detail';
 import { NAV_CATALOG } from '@/components/layout/Sidebar';
+import { RoleHistory } from './RoleHistory';
 import { RoleVisibilityPicker } from './RoleVisibilityPicker';
 import { ROLE_PRESETS, presetPermissionIds } from './rolePresets';
 import { SsoDefaultRoleCard } from './SsoDefaultRoleCard';
@@ -310,6 +311,7 @@ function RoleForm({ allPermissions, initial, prefill, onClose }: RoleFormProps) 
             <p className="mb-2 text-xs text-gray-400">Untick a section or a page to hide it from the sidebar and stop its address opening. This is about what is shown; the permissions above are what is enforced.</p>
             <RoleVisibilityPicker catalog={NAV_CATALOG} hidden={hidden} onChange={setHidden} />
           </div>
+          {initial ? <RoleHistory roleId={initial.id} /> : null}
         </div>
         <div className="flex justify-end gap-3 border-t border-gray-800 px-6 py-4">
           <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-gray-300 hover:bg-gray-800">

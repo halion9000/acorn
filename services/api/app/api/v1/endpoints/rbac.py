@@ -19,8 +19,10 @@ from sqlalchemy.orm import selectinload
 
 from app.api.v1.deps import AuthUser, require_permission
 from app.db.rls import TenantDBSession
+from app.models.audit import AuditLog
 from app.models.rbac import Permission, Role, RolePermission, UserRole
 from app.models.tenant import Tenant, User
+from app.services import role_history
 from app.services.audit import emit_audit
 from app.services.role_nav import clean_hidden_nav
 from app.services.sso_default_role import ALLOWED_BUILTIN
@@ -332,6 +334,33 @@ async def get_role(
         hidden_nav=list(role.hidden_nav or []),
         permissions=perms,
     )
+
+
+class RoleChangeOut(BaseModel):
+    at: str | None
+    by: str | None
+    action: str
+    summary: str
+
+
+@router.get("/roles/{role_id}/history", response_model=list[RoleChangeOut])
+async def role_history_list(
+    role_id: uuid.UUID,
+    current_user: Annotated[AuthUser, Depends(require_permission("roles:read"))],
+    db: TenantDBSession,
+) -> list[RoleChangeOut]:
+    """The last ten changes to this role and to who holds it, newest first, in plain words (from the audit log)."""
+    await _get_role_or_404(db, role_id, current_user.tenant_id)
+    result = await db.execute(
+        select(AuditLog)
+        .where(AuditLog.tenant_id == current_user.tenant_id, AuditLog.resource == "role", AuditLog.resource_id == str(role_id))
+        .order_by(AuditLog.created_at.desc())
+        .limit(role_history.SHOWN)
+    )
+    entries = [
+        {"created_at": e.created_at, "actor_email": e.actor_email, "action": e.action, "changes": e.changes} for e in result.scalars().all()
+    ]
+    return [RoleChangeOut(**row) for row in role_history.rows(entries)]
 
 
 @router.patch("/roles/{role_id}", response_model=RoleOut)

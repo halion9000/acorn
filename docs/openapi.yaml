@@ -8789,6 +8789,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/rbac/roles/{role_id}/history:
+    get:
+      tags:
+      - rbac
+      summary: Role History List
+      description: The last ten changes to this role and to who holds it, newest first,
+        in plain words (from the audit log).
+      operationId: role_history_list_api_v1_rbac_roles__role_id__history_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: role_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Role Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoleChangeOut'
+                title: Response Role History List Api V1 Rbac Roles  Role Id  History
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/rbac/users/{user_id}/roles:
     get:
       tags:
@@ -44439,6 +44474,31 @@ components:
       - last_evaluated_at
       - updated_at
       title: RiskProfileOut
+    RoleChangeOut:
+      properties:
+        at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: At
+        by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: By
+        action:
+          type: string
+          title: Action
+        summary:
+          type: string
+          title: Summary
+      type: object
+      required:
+      - at
+      - by
+      - action
+      - summary
+      title: RoleChangeOut
     RoleIn:
       properties:
         name:
