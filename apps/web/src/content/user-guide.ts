@@ -338,6 +338,11 @@ All of these were tested against test data and a scratch database and deployed, 
 - **Settings > Update A.C.O.R.N > Earlier runs.** A list of past updates, health checks and roll backs with the time, the result and the version each ended on.
 - **Alert email > alerts waiting.** While alert email is on, its settings page says how many alerts are waiting to be sent.
 - **DMARC > Where it was sent from: click a country.** Clicking a country on the map or in the list shows the five addresses that sent the most mail from there, with how many of their messages failed. Clicking it again closes it.
+- **Update history > How long each run took.** The earlier-runs list has a Took column (for example 4 min 5 s); runs from before it was kept show a dash.
+- **Settings > Audit log > Roles and Members and access filters.** The Roles filter now finds role changes (it asked for the wrong prefix and always came back empty); Members and access shows who was given or lost access to a client.
+- **Settings > Roles & permissions > Recent changes.** Opening a custom role to edit it lists its last ten changes in words (created, renamed, permissions gained or lost, given to or taken from a person), with who made them and when (UTC).
+- **Search (Ctrl+K) finds every sidebar page.** The palette used to list fourteen pages; it now lists every page your role shows, and knows other words for some (billing, invoice, 2fa, cve, qbr, network map).
+- **Vulnerabilities > Export CSV, and fix-time targets.** Export CSV saves the findings shown. Each finding says how long it has to be fixed (critical 4 hours, high 24 hours, medium 5 days, low 14 days, from when it was raised) and turns red when it is past that; a count says how many, and Past target only shows just those.
 
 ---
 
