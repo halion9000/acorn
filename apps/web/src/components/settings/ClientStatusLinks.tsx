@@ -4,6 +4,7 @@
  * Settings > Workspace: private status-page links for clients. Make a link for a client (its secret is shown once), PREVIEW exactly what the client will see, approve that wording, and revoke when
  * needed. A link does nothing until its wording is approved. Making, approving and revoking are a person's acts, which the server enforces.
  */
+import { statusLinkExpiryNote } from './statusLinkExpiry';
 import { useState } from 'react';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
@@ -93,6 +94,7 @@ export function ClientStatusLinks() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-gray-200">
                   {l.client_name ?? 'Client'}{l.label ? ` (${l.label})` : ''} · until {l.expires_at.slice(0, 10)} · <span className={l.state === 'live' ? 'text-emerald-300' : 'text-gray-400'}>{l.state}</span>
+                  {statusLinkExpiryNote(l) ? <span data-testid={`status-link-expiry-${l.id}`} className="text-amber-300"> · {statusLinkExpiryNote(l)}</span> : null}
                   {l.last_opened_at ? ` · last opened ${l.last_opened_at.slice(0, 10)}` : ''}
                 </span>
                 <span className="flex gap-2">

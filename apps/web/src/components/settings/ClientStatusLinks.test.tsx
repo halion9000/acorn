@@ -18,6 +18,25 @@ beforeEach(() => {
 });
 
 describe('ClientStatusLinks', () => {
+  it('says a live link is about to expire in its last week, and says nothing for a far-off, expired or revoked one', async () => {
+    const soon = new Date(Date.now() + 3.5 * 86_400_000).toISOString();
+    const far = new Date(Date.now() + 40 * 86_400_000).toISOString();
+    const past = new Date(Date.now() - 86_400_000).toISOString();
+    api.list.mockResolvedValue({
+      links: [
+        link({ id: 'soon', state: 'live', expires_at: soon, reviewed_at: '2026-11-02T00:00:00Z' }),
+        link({ id: 'far', state: 'live', expires_at: far, reviewed_at: '2026-11-02T00:00:00Z' }),
+        link({ id: 'gone', state: 'expired', expires_at: past }),
+      ],
+      clients: [{ id: 'c1', name: 'Acme' }],
+      default_days: 90,
+    });
+    show();
+    expect(await screen.findByTestId('status-link-expiry-soon')).toHaveTextContent('Expires in 3 days');
+    expect(screen.queryByTestId('status-link-expiry-far')).toBeNull();
+    expect(screen.queryByTestId('status-link-expiry-gone')).toBeNull();
+  });
+
   it('makes a link for the chosen client and shows its secret once with a warning that it does nothing until approved', async () => {
     api.create.mockResolvedValue({ ...link(), token: 'SECRETTOKEN' });
     const user = userEvent.setup();
