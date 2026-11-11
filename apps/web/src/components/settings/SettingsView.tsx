@@ -17,7 +17,8 @@
  * the panel says so instead of showing invented content (it used to show a made-up person, workspace and member list).
  */
 
-import { secondFactorBadge, withoutSecondFactor } from '@/lib/secondFactor';
+import { membersCsvText, secondFactorBadge, withoutSecondFactor } from '@/lib/secondFactor';
+import { downloadCsv } from '@/lib/csv';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { docs } from '@/lib/docs';
@@ -752,6 +753,13 @@ function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
             <p className="mt-1 text-xs text-gray-500">
               {members.length} {members.length === 1 ? 'member' : 'members'} in this workspace.
             </p>
+            <button
+              type="button"
+              onClick={() => downloadCsv(`members-${new Date().toISOString().slice(0, 10)}.csv`, membersCsvText(members))}
+              className="mt-2 rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800"
+            >
+              Export members (CSV)
+            </button>
             {withoutSecondFactor(members).length > 0 ? (
               <label data-testid="no-factor-filter" className="mt-2 flex items-center gap-2 text-xs text-amber-300">
                 <input type="checkbox" checked={onlyNoFactor} onChange={(e) => setOnlyNoFactor(e.target.checked)} />

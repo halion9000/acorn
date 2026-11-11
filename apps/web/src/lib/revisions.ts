@@ -13,7 +13,7 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-10",
-    "commits": 59,
+    "commits": 60,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Autonomy: proposal log on the Autonomy settings page, with Agree/Reject verdicts",
@@ -23,12 +23,12 @@ export const REVISIONS: Revision[] = [
       "Insurance readiness checklist: seven more questions answered from the new checks",
       "Revisions regenerated",
       "New recovery codes for the authenticator app",
-      "Change password: show the rule while typing",
-      "Software update: a history of earlier runs",
-      "Client environment: Download drawing",
-      "Guide: the features added on 2026-11-10",
-      "Format: bring 189 Python files into the layout CI checks",
-      "Settings: warn when two or fewer recovery codes are left; filter members with no second factor"
+      "Case: Copy as ticket note",
+      "Guide: name Client environment, Remote tools and File Integrity; test that every sidebar page is in the guide",
+      "Client environment: a box on the map opens that device",
+      "DMARC: click a country to see who sent from there",
+      "Docs/openapi.yaml as CI generates it",
+      "MTTR tile: the slow end per severity where there are enough alerts"
     ],
     "fixes": 5
   },

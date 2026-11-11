@@ -290,3 +290,26 @@ describe('Settings > Workspace > the no-second-factor filter', () => {
     expect(screen.queryByTestId('no-factor-filter')).toBeNull();
   });
 });
+
+describe('Settings > Workspace > Export members', () => {
+  it('saves a CSV file of the members with their second factor', async () => {
+    currentUser.mockReturnValue(account);
+    users.mockResolvedValue([{ ...member('hal.owner'), passkeys: 1, authenticator: true }, { ...member('bare.one'), passkeys: 0, authenticator: false }]);
+    const blobs: Blob[] = [];
+    Object.assign(URL, { createObjectURL: vi.fn((b: Blob) => { blobs.push(b); return 'blob:members'; }), revokeObjectURL: vi.fn() });
+    const names: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { names.push(this.download); });
+    renderSettings();
+    await userEvent.click(await screen.findByRole('button', { name: /^workspace/i }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Export members (CSV)' }));
+    expect(names).toHaveLength(1);
+    expect(names[0]).toMatch(/^members-\d{4}-\d{2}-\d{2}\.csv$/);
+    const text = await blobs[0].text();
+    expect(text).toContain('hal.owner');
+    expect(text).toContain('1 passkey + authenticator app');
+    expect(text).toContain('bare.one');
+    expect(text).toContain('No second factor');
+    click.mockRestore();
+  });
+});
+
