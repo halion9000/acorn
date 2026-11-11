@@ -93,11 +93,20 @@ def by_severity(rows: Iterable[tuple[str | None, datetime | None, datetime | Non
     return sorted((x for x in out if x[1].n > 0), key=lambda x: (order.get(x[0], len(order)), x[0]))
 
 
+SLOW_END_MIN_ALERTS = 5  # below this many alerts a 90th percentile is just the slowest one or two, not a pattern
+
+
+def _severity_part(name: str, m: Mttr) -> str:
+    """``critical 2 h (7)``, or with the slow end where there are enough alerts for it to mean something: ``critical 2 h, slowest tenth 9 h (7)``."""
+    slow = f", slowest tenth {m.p90_hours:g} h" if m.n >= SLOW_END_MIN_ALERTS else ""
+    return f"{name} {m.median_hours:g} h{slow} ({m.n})"
+
+
 def severity_sentence(parts: list[tuple[str, Mttr]]) -> str:
     """The breakdown as one plain sentence for a tile, or "" when there is nothing to break down (one severity says no more than the tile's own figure)."""
     if len(parts) < 2:
         return ""
-    return "By severity: " + ", ".join(f"{name} {m.median_hours:g} h ({m.n})" for name, m in parts) + "."
+    return "By severity: " + ", ".join(_severity_part(name, m) for name, m in parts) + "."
 
 
 async def window_by_severity(db: Any, tenant_ids: list[Any], start: datetime, end: datetime | None = None) -> list[tuple[str, Mttr]]:

@@ -69,3 +69,9 @@ def test_the_sentence_is_plain_and_says_nothing_when_there_is_one_severity_or_no
     assert mttr.severity_sentence(two) == "By severity: critical 1.5 h (1), high 3 h (2)."
     assert mttr.severity_sentence(mttr.by_severity([sev("high", 3)])) == ""
     assert mttr.severity_sentence([]) == ""
+
+
+def test_the_slow_end_is_shown_only_for_a_severity_with_enough_alerts_to_have_one():
+    rows = [sev("critical", h) for h in (1, 1, 2, 2, 30)] + [sev("high", 3), sev("high", 40)]
+    sentence = mttr.severity_sentence(mttr.by_severity(rows))
+    assert sentence == "By severity: critical 2 h, slowest tenth 18.8 h (5), high 21.5 h (2)."
