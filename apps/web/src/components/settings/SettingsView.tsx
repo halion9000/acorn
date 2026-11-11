@@ -17,6 +17,7 @@
  * the panel says so instead of showing invented content (it used to show a made-up person, workspace and member list).
  */
 
+import { quietAccountNote } from '@/lib/memberActivity';
 import { membersCsvText, secondFactorBadge, withoutSecondFactor } from '@/lib/secondFactor';
 import { downloadCsv } from '@/lib/csv';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -795,6 +796,11 @@ function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
                           </span>
                         );
                       })()}
+                      {quietAccountNote(m) ? (
+                        <span data-testid="quiet-account" className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300 ring-1 ring-amber-500/30" title="An active account nobody is using is a way in. Switch it off if it is not needed.">
+                          {quietAccountNote(m)}
+                        </span>
+                      ) : null}
                       {canAdd ? (
                         <button
                           type="button"

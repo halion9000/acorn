@@ -313,3 +313,20 @@ describe('Settings > Workspace > Export members', () => {
   });
 });
 
+
+describe('Settings > Workspace > an active account nobody uses is marked', () => {
+  it('marks a person with no sign-in for over 90 days or an old account never used, and nobody else', async () => {
+    const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+    currentUser.mockReturnValue(account);
+    users.mockResolvedValue([
+      { ...member('in.use'), last_login: daysAgo(3) },
+      { ...member('gone.quiet'), last_login: daysAgo(200) },
+      { ...member('never.used'), created_at: daysAgo(300) },
+      { ...member('off.account'), is_active: false, last_login: daysAgo(400) },
+    ]);
+    renderSettings();
+    await userEvent.click(await screen.findByRole('button', { name: /^workspace/i }));
+    const notes = await screen.findAllByTestId('quiet-account');
+    expect(notes.map((n) => n.textContent)).toEqual(['No sign-in for 200 days', 'Never signed in']);
+  });
+});
