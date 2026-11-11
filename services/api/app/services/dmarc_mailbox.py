@@ -136,7 +136,7 @@ async def ingest_once(
         newest = since
         for message in messages:
             result.messages += 1
-            for name, blob in message.attachments:
+            for _name, blob in message.attachments:
                 try:
                     unpacked = unpack(blob)
                     if looks_like_tls_report(unpacked):

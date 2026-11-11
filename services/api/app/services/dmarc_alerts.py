@@ -76,7 +76,7 @@ def detect_pass_rate_drops(reports: list[Any], now: datetime) -> list[Drop]:
             ("Pass rate this week", f"{rate_now:.0f}% of {total_now} messages"),
             ("Pass rate the week before", f"{rate_before:.0f}% of {total_before} messages"),
         ]
-        for ip, more, n in grown:
+        for ip, _more, n in grown:
             fields.append(("Failing more", f"{ip}: {n} failing messages this week, {failing_before.get(ip, 0)} the week before"))
         if not grown:
             fields.append(("Failing more", "No single sending address accounts for it; the failures are spread across many"))

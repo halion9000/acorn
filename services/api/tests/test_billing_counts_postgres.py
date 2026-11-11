@@ -3,7 +3,6 @@ Opt in with AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL (a disposable, fully mig
 
 import os
 import uuid
-from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest

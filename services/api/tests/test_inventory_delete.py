@@ -6,7 +6,7 @@ import contextlib
 import os
 import uuid
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 from app.api.v1.endpoints import inventory as ep
@@ -16,7 +16,7 @@ OWNER, CLIENT = uuid.uuid4(), uuid.uuid4()
 
 
 def item(**over):
-    base = dict(id=uuid.uuid4(), tenant_id=CLIENT, kind="stock", name="Dell 7440", serial="ABC123", category="Laptop", status="checked_in", source="manual")
+    base = {"id": uuid.uuid4(), "tenant_id": CLIENT, "kind": "stock", "name": "Dell 7440", "serial": "ABC123", "category": "Laptop", "status": "checked_in", "source": "manual"}
     return SimpleNamespace(**{**base, **over})
 
 

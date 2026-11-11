@@ -29,7 +29,6 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import and_, func, select, text
 
-from app.services.mttr import window as mttr_window
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.core.config import settings
 from app.db.rls_scope import cross_tenant_reads
@@ -39,6 +38,7 @@ from app.models.detection_rule import DetectionRule
 from app.models.remediation import RemediationGateLog
 from app.models.tenant import Tenant
 from app.services import case_metrics as case_counts  # not `case_metrics`: get_dashboard_metrics has a local variable of that name
+from app.services.mttr import window as mttr_window
 from app.services.tactic_inference import tactics_for
 
 logger = logging.getLogger(__name__)

@@ -44,8 +44,8 @@ from app.db.database import AsyncSessionLocal
 from app.db.rls_sessions import mark_platform
 from app.models.connector import Connector
 from app.models.oauth import OAuthAppCredential
-from app.services import worker_heartbeat
 from app.security.credential_vault import CredentialVaultError, get_vault
+from app.services import worker_heartbeat
 
 logger = logging.getLogger(__name__)
 

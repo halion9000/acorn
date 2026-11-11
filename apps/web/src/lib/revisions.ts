@@ -13,7 +13,7 @@ export const REVISIONS: Revision[] = [
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-10",
-    "commits": 46,
+    "commits": 47,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Autonomy: proposal log on the Autonomy settings page, with Agree/Reject verdicts",
@@ -22,13 +22,13 @@ export const REVISIONS: Revision[] = [
       "Autonomy page: last-24-hours view of what the agents did, and a since-hours filter on the proposal log",
       "Hunts: a manual run of a saved hunt stores its hit count, shown beside Last run",
       "Client posture: time-to-fix target on each not-met check (critical 4 h, high 24 h, medium 5 days, low 14 days)",
-      "Inventory: technicians can check a device out and in (new inventory:checkout permission)",
-      "Web tests: fix three type errors in test files",
-      "New recovery codes for the authenticator app",
-      "Change password: show the rule while typing",
-      "Alert email: say how many alerts are waiting to be sent",
-      "SOC Insights: the MTTR tile says how long each severity took",
-      "Client environment: a box on the map opens that device"
+      "Autonomy page: per-agent scorecard (logged, did on its own, only recorded, agreed, rejected)",
+      "Audit role changes; Reset MFA also removes the authenticator app",
+      "Weekly digest: DMARC pass rate per domain",
+      "Case: Copy as ticket note",
+      "Software update: a history of earlier runs",
+      "Platform health: a worker that failed lately and recovered says so",
+      "Platform health: Download health report"
     ],
     "fixes": 3
   },

@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from app.api.v1.endpoints import identity_actions as ep
-from app.core.security import permission_in, ROLE_PERMISSIONS
+from app.core.security import ROLE_PERMISSIONS, permission_in
 from fastapi import HTTPException
 
 OWNER, CLIENT = uuid.uuid4(), uuid.uuid4()

@@ -82,9 +82,9 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlalchemy import and_, func, select
 
-from app.core.api_rate_limit import tally as rate_limit_tally
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.metrics import PipelineHealth, PipelineStage
+from app.core.api_rate_limit import tally as rate_limit_tally
 from app.core.config import settings
 from app.models.alert import Alert
 from app.models.connector import Connector

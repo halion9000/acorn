@@ -1,7 +1,7 @@
 """Checking a device out and back in is a technician task: soc_lead and soc_analyst can do it, and it does not give them the rest of inventory (add, change, delete, bulk edit, sync, import)."""
 
-from app.main import app
 from app.core.security import ROLE_PERMISSIONS, permission_in
+from app.main import app
 from route_introspect import required_permissions, walk_routes
 
 

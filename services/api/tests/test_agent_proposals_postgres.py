@@ -54,7 +54,7 @@ def user(tenant):
 
 
 def body(**over):
-    base = dict(agent="cipher", action_type="Close-As-False-Positive", target="alert 42", summary="Looks benign", rung="shadow", evidence=[{"label": "the alert", "url": "https://x/a/42"}], confidence=0.8)
+    base = {"agent": "cipher", "action_type": "Close-As-False-Positive", "target": "alert 42", "summary": "Looks benign", "rung": "shadow", "evidence": [{"label": "the alert", "url": "https://x/a/42"}], "confidence": 0.8}
     base.update(over)
     return ProposalIn(**base)
 

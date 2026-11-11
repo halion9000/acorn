@@ -22,8 +22,8 @@ from app.auth.oidc import router as oidc_router
 from app.auth.saml import router as saml_router
 from app.core.airgap import airgap_status
 from app.core.api_rate_limit import RateLimitMiddleware
-from app.core.core_feed_token import CoreFeedTokenMiddleware
 from app.core.config import enforce_secure_defaults, is_dev_env, settings
+from app.core.core_feed_token import CoreFeedTokenMiddleware
 from app.core.cors import build_cors_kwargs
 from app.core.db_errors import register_db_error_handlers
 from app.core.logging import configure_logging
@@ -39,12 +39,12 @@ from app.middleware.demo_mode import DemoModeMiddleware
 from app.models import Base
 from app.services.plugin_manager import get_plugin_manager
 from app.workers.alert_email_worker import run_forever as run_alert_email
+from app.workers.dmarc_ingest_worker import run_dmarc_ingest
 from app.workers.hunt_scheduler import run_forever as run_hunt_scheduler
 from app.workers.oauth_refresh import run_forever as run_oauth_refresh
+from app.workers.platform_watch_worker import run_platform_watch
 from app.workers.playbook_dry_run_worker import run_playbook_dry_runs
 from app.workers.retention_sweeper import run_retention_sweeper
-from app.workers.platform_watch_worker import run_platform_watch
-from app.workers.dmarc_ingest_worker import run_dmarc_ingest
 from app.workers.suppression_sweeper import run_suppression_sweeper
 from app.workers.weekly_digest_task import run_forever as run_weekly_digest
 
@@ -553,6 +553,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.debug("alert_email worker cancelled during shutdown")
         except Exception as exc:
             logger.warning("alert_email worker shutdown error", error=type(exc).__name__)
+
+    # The DMARC mailbox reader was started above and never stopped: it was left running into shutdown (found by the linter as a task nobody used).
+    if dmarc_task is not None and not dmarc_task.done():
+        dmarc_task.cancel()
+        try:
+            await dmarc_task
+        except asyncio.CancelledError:
+            logger.debug("dmarc_ingest worker cancelled during shutdown")
+        except Exception as exc:
+            logger.warning("dmarc_ingest worker shutdown error", error=type(exc).__name__)
 
     if platform_watch_task is not None and not platform_watch_task.done():
         platform_watch_task.cancel()

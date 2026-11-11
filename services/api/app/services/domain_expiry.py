@@ -156,7 +156,7 @@ async def run_expiry_check(db: Any, fetch: Callable[[str], Awaitable[bytes]], no
     now = now or datetime.now(UTC)
     try:
         seen = (await db.execute(select(DmarcReport.tenant_id, DmarcReport.domain).where(DmarcReport.matched.is_(True), DmarcReport.end_at >= now - timedelta(days=90)).distinct())).all()
-        domains = sorted({(t, d) for t, d in seen}, key=lambda k: (str(k[0]), k[1]))
+        domains = sorted(set(seen), key=lambda k: (str(k[0]), k[1]))
         stored = (await db.execute(select(DomainRegistration))).scalars().all()
         known = {(s.tenant_id, s.domain): Known(s.tenant_id, s.domain, s.expires_at, s.checked_at, s.error) for s in stored}
         todo = due_for_lookup(domains, known, now)

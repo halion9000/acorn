@@ -65,7 +65,7 @@ export function VulnerabilitiesView() {
         <div>
           <h1 className="text-2xl font-bold text-white">Vulnerabilities</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-400">
-            Software, operating-system, firmware and internet-facing vulnerabilities the connected tools report for each client. It opens on all clients together; pick one to narrow it, or press a client's name below. Each row is an alert: open it to work it with the rest of the alerts.
+            Software, operating-system, firmware and internet-facing vulnerabilities the connected tools report for each client. It opens on all clients together; pick one to narrow it, or press a client&apos;s name below. Each row is an alert: open it to work it with the rest of the alerts.
           </p>
         </div>
         <ClientPicker value={clientId} onChange={setClientId} label="Show" ownLabel="All clients" />

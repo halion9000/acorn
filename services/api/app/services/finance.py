@@ -28,7 +28,7 @@ def margin_rows(billed: dict[str, list[dict[str, Any]]], prices: dict[str, tuple
         unpriced: list[str] = []
         for line in lines:
             item, count = str(line.get("item", "")), line.get("count")
-            if not item or not isinstance(count, (int, float)) or count <= 0:
+            if not item or not isinstance(count, int | float) or count <= 0:
                 continue
             p = prices.get(item)
             if p is None:

@@ -18,8 +18,8 @@ from app.db.database import AsyncSessionLocal
 from app.services import worker_heartbeat
 from app.services.dmarc_alerts import run_pass_rate_detection
 from app.services.dmarc_mailbox import GraphMailboxReader, ingest_once
-from app.services.domain_expiry import run_expiry_check
 from app.services.dmarc_store import store_report, store_tls_policy
+from app.services.domain_expiry import run_expiry_check
 
 logger = structlog.get_logger()
 

@@ -97,7 +97,7 @@ async def _item(db: DBSession, tenant: uuid.UUID, item_id: uuid.UUID) -> Governa
 
 async def _version_counts(db: DBSession, tenant: uuid.UUID) -> dict[uuid.UUID, int]:
     rows = (await db.execute(select(GovernanceVersion.item_id, func.count()).where(GovernanceVersion.tenant_id == tenant).group_by(GovernanceVersion.item_id))).all()
-    return {i: n for i, n in rows}
+    return dict(rows)
 
 
 @router.get("", response_model=list[ItemOut], dependencies=[Depends(require_permission("reports:read"))])

@@ -24,25 +24,25 @@ pytestmark = [
     pytest.mark.skipif(not (PG_URL and APP_URL), reason="set AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL to a DISPOSABLE, fully migrated API database"),
 ]
 
-DEFAULTS = dict(
-    page=1,
-    page_size=50,
-    severity=None,
-    status=None,
-    category=None,
-    assigned_to_me=False,
-    search=None,
-    min_confidence=None,
-    confidence_label=None,
-    source=None,
-    client_id=None,
-    device=None,
-    since=None,
-    until=None,
-    person=None,
-    ticket=None,
-    collapse=False,
-)
+DEFAULTS = {
+    "page": 1,
+    "page_size": 50,
+    "severity": None,
+    "status": None,
+    "category": None,
+    "assigned_to_me": False,
+    "search": None,
+    "min_confidence": None,
+    "confidence_label": None,
+    "source": None,
+    "client_id": None,
+    "device": None,
+    "since": None,
+    "until": None,
+    "person": None,
+    "ticket": None,
+    "collapse": False,
+}
 
 
 @pytest.fixture

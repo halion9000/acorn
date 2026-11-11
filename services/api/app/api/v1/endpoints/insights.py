@@ -64,7 +64,8 @@ from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.tenant import Tenant
 from app.services import case_metrics, insight_tiles
-from app.services.mttr import severity_sentence, window as mttr_window, window_by_severity
+from app.services.mttr import severity_sentence, window_by_severity
+from app.services.mttr import window as mttr_window
 from app.services.timeutil import as_utc
 
 logger = logging.getLogger(__name__)

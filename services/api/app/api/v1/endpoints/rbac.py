@@ -22,8 +22,11 @@ from app.db.rls import TenantDBSession
 from app.models.rbac import Permission, Role, RolePermission, UserRole
 from app.models.tenant import Tenant, User
 from app.services.audit import emit_audit
-from app.services.sso_default_role import ALLOWED_BUILTIN, KEY as SSO_DEFAULT_KEY, effective as effective_default_role, stored as stored_default_role
 from app.services.role_nav import clean_hidden_nav
+from app.services.sso_default_role import ALLOWED_BUILTIN
+from app.services.sso_default_role import KEY as SSO_DEFAULT_KEY
+from app.services.sso_default_role import effective as effective_default_role
+from app.services.sso_default_role import stored as stored_default_role
 
 router = APIRouter(prefix="/rbac", tags=["rbac"])
 

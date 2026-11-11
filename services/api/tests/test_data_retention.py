@@ -6,17 +6,17 @@ from app.services.data_retention import retention_lines
 
 
 def settings(**over):
-    base = dict(
-        RETENTION_SWEEPER_ENABLED=True,
-        RETENTION_DRY_RUN=False,
-        RETENTION_ALERTS_DAYS=0,
-        ALERT_STALE_DAYS=30,
-        RETENTION_POSTURE_HISTORY_DAYS=0,
-        RETENTION_COPILOT_CONVERSATIONS_DAYS=90,
-        RETENTION_DETECTION_SUGGESTIONS_DAYS=180,
-        RETENTION_RESPONSE_ACTIONS_DEFAULT_DAYS=730,
-        ALERT_EMAIL_LOG_RETENTION_DAYS=90,
-    )
+    base = {
+        "RETENTION_SWEEPER_ENABLED": True,
+        "RETENTION_DRY_RUN": False,
+        "RETENTION_ALERTS_DAYS": 0,
+        "ALERT_STALE_DAYS": 30,
+        "RETENTION_POSTURE_HISTORY_DAYS": 0,
+        "RETENTION_COPILOT_CONVERSATIONS_DAYS": 90,
+        "RETENTION_DETECTION_SUGGESTIONS_DAYS": 180,
+        "RETENTION_RESPONSE_ACTIONS_DEFAULT_DAYS": 730,
+        "ALERT_EMAIL_LOG_RETENTION_DAYS": 90,
+    }
     base.update(over)
     return NS(**base)
 
@@ -44,7 +44,7 @@ def test_stale_alerts_are_said_to_be_set_aside_never_deleted_and_the_number_foll
 
 
 def test_when_the_cleaner_is_off_or_only_counting_nothing_that_it_would_delete_is_promised():
-    for over, words in ((dict(RETENTION_SWEEPER_ENABLED=False), "switched off"), (dict(RETENTION_DRY_RUN=True), "count-only")):
+    for over, words in (({"RETENTION_SWEEPER_ENABLED": False}, "switched off"), ({"RETENTION_DRY_RUN": True}, "count-only")):
         lines = retention_lines(settings(RETENTION_ALERTS_DAYS=400, RETENTION_POSTURE_HISTORY_DAYS=200, **over))
         for what in ("Alerts", "Copilot conversations", "Detection suggestions", "Finished response actions", "Check and count history (security checks, licence counts, scores)"):
             assert words in by(lines, what)["ends"], (what, over)

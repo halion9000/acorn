@@ -24,8 +24,8 @@ from app.models.login_failure import LoginFailure
 from app.models.rbac import Role, UserRole
 from app.models.responder import PasskeyCredential
 from app.models.tenant import ApiKey, Tenant, User
-from app.models.user_totp import UserTotp
 from app.models.tenant_access import AllTenantAccessGrant, TenantAccessGrant
+from app.models.user_totp import UserTotp
 from app.services import view_as
 from app.services.view_as import ERROR_HEADER, VIEW_AS_HEADER, VIEWING_HEADER
 from fastapi import APIRouter, Depends, FastAPI, HTTPException

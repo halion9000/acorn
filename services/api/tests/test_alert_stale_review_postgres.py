@@ -31,7 +31,6 @@ async def world():
     tag = uuid.uuid4().hex[:10]
     ids = {k: uuid.uuid4() for k in ("parent", "acme", "stranger")}
     actor = uuid.uuid4()
-    ids_for_cleanup = ids
     owner = create_async_engine(PG_URL)
     try:
         async with owner.begin() as conn:

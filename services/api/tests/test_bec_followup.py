@@ -59,7 +59,7 @@ class FakeDB:
 
 
 def bec(**over):
-    base = dict(id=uuid.uuid4(), tenant_id=CLIENT, case_ref="BEC-1", email="p@x.com", status="pending", message=None, summary={}, report=None, aisoc_case_id=None, ticket_id=None, ticket_note_queued=False)
+    base = {"id": uuid.uuid4(), "tenant_id": CLIENT, "case_ref": "BEC-1", "email": "p@x.com", "status": "pending", "message": None, "summary": {}, "report": None, "aisoc_case_id": None, "ticket_id": None, "ticket_note_queued": False}
     base.update(over)
     return NS(**base)
 
@@ -120,7 +120,7 @@ def test_a_result_that_arrives_before_the_ticket_number_waits_and_the_number_the
     run(f.on_result(db, b, NOW))
     assert [a for a in db.added if a.action == "ticket_note"] == [] and not b.ticket_note_queued
     assert run(f.on_ticket_created(db, CLIENT, f"bec-ticket:{b.id}", "9002", NOW)) is True
-    (note,) = [a for a in db.added if a.action == "ticket_note"]
+    (note,) = (a for a in db.added if a.action == "ticket_note")
     assert note.params["ticket_ids"] == ["9002"] and b.ticket_id == "9002" and b.ticket_note_queued
 
 
@@ -140,5 +140,5 @@ def test_a_ticket_that_is_not_for_a_search_is_ignored(uid):
 def test_a_failed_search_writes_its_failure_on_the_ticket_too():
     b, db = bec(status="failed", message="CIPP timed out", ticket_id="9004"), FakeDB()
     run(f.on_result(db, b, NOW))
-    (note,) = [a for a in db.added if a.action == "ticket_note"]
+    (note,) = (a for a in db.added if a.action == "ticket_note")
     assert "did not finish" in note.params["note"]

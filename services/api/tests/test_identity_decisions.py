@@ -6,7 +6,7 @@ Without this a mistaken "not the same person" could never be undone: it stops ev
 import asyncio
 import contextlib
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -130,7 +130,7 @@ def test_removing_a_decision_that_does_not_exist_or_belongs_to_another_client_is
 
     for a, b in (("adam@acme.com", "nobody@acme.com"), ("a@other.com", "b@other.com")):
         with pytest.raises(HTTPException) as e:
-            run(lambda s: body(s, a, b))
+            run(lambda s, a=a, b=b: body(s, a, b))
         assert e.value.status_code == 404
     wired.assert_not_awaited()
 

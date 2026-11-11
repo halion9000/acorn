@@ -16,7 +16,6 @@ from typing import Any
 
 from sqlalchemy import and_, func, select
 
-from app.services.mttr import summarize_pairs
 from app.db.rls_scope import acting_as_tenant
 from app.models.alert import Alert
 from app.models.client_alias import ClientAlias
@@ -24,6 +23,7 @@ from app.models.mssp import MSSPTenantMetrics
 from app.models.tenant import Tenant
 from app.services import case_metrics
 from app.services.alert_status import FINISHED_ALERT_STATUSES
+from app.services.mttr import summarize_pairs
 
 logger = logging.getLogger(__name__)
 

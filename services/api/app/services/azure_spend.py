@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import calendar
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import httpx
 

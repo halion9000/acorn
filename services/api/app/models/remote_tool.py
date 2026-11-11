@@ -11,7 +11,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
 
-
 # The client id of a rule that is for every client.
 ALL_CLIENTS = uuid.UUID(int=0)
 

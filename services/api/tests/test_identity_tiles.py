@@ -10,10 +10,10 @@ from app.api.v1.endpoints import identities as ep
 from app.db.database import Base
 from app.models.signin import SigninEvent
 from app.models.tenant import Tenant
+from app.services import identity_people as ip
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from tests.test_identity_people import NOW, ms, src
-from app.services import identity_people as ip
 
 A = uuid.uuid4()
 

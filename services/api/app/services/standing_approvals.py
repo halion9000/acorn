@@ -34,7 +34,7 @@ def client_of(action: Any) -> str | None:
     if isinstance(action, dict):
         for k in ("client_id", "client_tenant_id"):
             v = action.get(k)
-            if isinstance(v, (str, int)) and str(v).strip():
+            if isinstance(v, str | int) and str(v).strip():
                 return str(v).strip()[:80]
     return None
 

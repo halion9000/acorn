@@ -1,7 +1,6 @@
 """The proposal log's rules: the evidence rule, the header tally, and that the routes are guarded the way the plan says."""
 
 import pytest
-
 from app.api.v1.endpoints import agent_proposals as ep
 from app.services.agent_proposals import MAX_EVIDENCE, EvidenceError, clean_evidence, tally
 

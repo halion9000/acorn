@@ -28,9 +28,9 @@ from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.models.alert_email import AlertEmailLog
 from app.models.tenant import Tenant
+from app.services import worker_heartbeat
 from app.services.alert_email.compose import SEVERITY_ORDER, AlertLine, build_message
 from app.services.alert_email.graph import GraphMailer, MailError, scrub
-from app.services import worker_heartbeat
 from app.services.alert_email.settings_store import get_settings
 
 logger = logging.getLogger(__name__)

@@ -395,12 +395,12 @@ def is_active(p: Person) -> bool:
     return p.licensed is True and p.kind != "guest" and p.enabled is not False
 
 
-def never_expires(p: "Person") -> bool:
+def never_expires(p: Person) -> bool:
     """Whether the tile counts this person: a working (not disabled) account of the organization's own (not a guest) whose password CIPP says never expires. Unknown is never counted (pure)."""
     return p.password_never_expires is True and p.enabled is not False and p.kind != "guest"
 
 
-def counts_as(p: "Person", state: str) -> bool:
+def counts_as(p: Person, state: str) -> bool:
     """Whether the inactive or never-signed-in tile counts this person: a working (not disabled), own (not guest) account whose sign-in state is known to be ``state`` ("inactive" or "never"). Unknown is never counted (pure)."""
     return p.signin_state == state and p.enabled is not False and p.kind != "guest"
 

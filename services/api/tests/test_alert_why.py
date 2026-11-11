@@ -16,22 +16,22 @@ OWNER = uuid.uuid4()
 
 
 def alert(**over):
-    base = dict(
-        raw_event={"source": "Huntress", "password": "hunter2", "token": "abc"},
-        connector_type=None,
-        rule_id="r-17",
-        rule_name="Unexpected Country",
-        severity="high",
-        confidence=82,
-        confidence_label="high",
-        confidence_rationale=["Seen on two tools", {"text": "Admin account"}, {"other": "ignored"}],
-        affected_users=["a@acme.com"],
-        affected_hosts=["PC-1", "PC-2"],
-        affected_ips=[],
-        mitre_tactics=["Initial Access"],
-        mitre_techniques=["T1078"],
-        created_at=datetime(2026, 11, 4, 9, 0, tzinfo=UTC),
-    )
+    base = {
+        "raw_event": {"source": "Huntress", "password": "hunter2", "token": "abc"},
+        "connector_type": None,
+        "rule_id": "r-17",
+        "rule_name": "Unexpected Country",
+        "severity": "high",
+        "confidence": 82,
+        "confidence_label": "high",
+        "confidence_rationale": ["Seen on two tools", {"text": "Admin account"}, {"other": "ignored"}],
+        "affected_users": ["a@acme.com"],
+        "affected_hosts": ["PC-1", "PC-2"],
+        "affected_ips": [],
+        "mitre_tactics": ["Initial Access"],
+        "mitre_techniques": ["T1078"],
+        "created_at": datetime(2026, 11, 4, 9, 0, tzinfo=UTC),
+    }
     base.update(over)
     return NS(**base)
 

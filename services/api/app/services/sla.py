@@ -15,12 +15,12 @@ from sqlalchemy import Text, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.services.mttr import percentile
 from app.core.config import get_settings
 from app.models.alert import Alert
 from app.models.sla import AlertSLAEvent, TenantSLAConfig
 from app.models.tenant import Tenant
 from app.services.alert_status import FALSE_POSITIVE_STATUSES
+from app.services.mttr import percentile
 from app.services.timeutil import as_utc
 
 # 2026 published KPI bar defaults (tenants can override via ``settings.kpi_bar``).

@@ -25,8 +25,8 @@ from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.models.device import Device, DeviceSource
 from app.models.inventory import InventoryEvent, InventoryItem
 from app.models.tenant import Tenant
-from app.services.audit import emit_audit
 from app.services import inventory as inv
+from app.services.audit import emit_audit
 from app.services.client_matching import Candidate
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])

@@ -7,10 +7,9 @@ The certificate address comes from a public DNS record anyone can write, so it i
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Awaitable, Callable
-from urllib.parse import urlparse
 
 from cryptography import x509
 from cryptography.x509.oid import ObjectIdentifier

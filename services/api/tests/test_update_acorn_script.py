@@ -229,7 +229,7 @@ def test_a_changed_proxy_file_is_loaded_when_an_update_runs_not_only_when_the_co
 
 
 def test_a_failing_reload_never_fails_the_update():
-    line = next(l for l in SCRIPT.read_text(encoding="utf-8").splitlines() if "caddy reload" in l)
+    line = next(ln for ln in SCRIPT.read_text(encoding="utf-8").splitlines() if "caddy reload" in ln)
     assert line.rstrip().endswith("|| true"), line
 
 
@@ -246,7 +246,7 @@ def run_extras(tmp_path: Path, env_text: str | None):
     program = (
         f'say() {{ echo "$*"; }}\nREPO={tmp_path.as_posix()}\n'
         f'COMPOSE() {{ echo "compose $*" >> {tmp_path.as_posix()}/compose.log; }}\n'
-        f"eval \"$(sed -n '/^start_extras() {{/,/^}}/p' {SCRIPT.as_posix()} | sed 's/\$COMPOSE /COMPOSE /g')\"\n"
+        f"eval \"$(sed -n '/^start_extras() {{/,/^}}/p' {SCRIPT.as_posix()} | sed 's/\\$COMPOSE /COMPOSE /g')\"\n"
         'start_extras; echo "exit=$?"\n'
     )
     out = subprocess.run([BASH, "-c", program], capture_output=True, text=True, timeout=60)

@@ -2,7 +2,6 @@
 
 import asyncio
 
-import pytest
 from app.services import spf_lookups as sl
 
 

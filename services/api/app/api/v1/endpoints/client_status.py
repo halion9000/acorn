@@ -81,7 +81,7 @@ def _out(row: ClientStatusLink, names: dict[uuid.UUID, str], now: datetime) -> L
 
 async def _names(db: Any, owner: uuid.UUID) -> dict[uuid.UUID, str]:
     rows = (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == owner))).all()
-    return {i: n for i, n in rows}
+    return dict(rows)
 
 
 async def _own_link(db: Any, owner: uuid.UUID, link_id: uuid.UUID) -> ClientStatusLink:

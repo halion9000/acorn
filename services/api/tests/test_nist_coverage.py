@@ -14,7 +14,7 @@ CONTROLS = [
 
 
 def tc(*checks):
-    return {"src": {"checks": [dict(key=k, status=s, evidence=f"ev {k}", since=d) for k, s, d in checks]}}
+    return {"src": {"checks": [{"key": k, "status": s, "evidence": f"ev {k}", "since": d} for k, s, d in checks]}}
 
 
 def test_a_control_with_no_mapped_check_present_is_no_evidence_never_met():
@@ -54,7 +54,7 @@ def test_second_factor_coverage_counts_as_evidence_for_authentication_at_95_and_
 
 
 def test_the_same_check_from_two_sources_keeps_the_worse_status_and_junk_is_ignored():
-    both = {"a": {"checks": [dict(key="ninjaone_antivirus", status="met", evidence="x", since=D1)]}, "b": {"checks": [dict(key="ninjaone_antivirus", status="not_met", evidence="y", since=D1), dict(key=5, status="met"), dict(key="z", status="weird")]}}
+    both = {"a": {"checks": [{"key": "ninjaone_antivirus", "status": "met", "evidence": "x", "since": D1}]}, "b": {"checks": [{"key": "ninjaone_antivirus", "status": "not_met", "evidence": "y", "since": D1}, {"key": 5, "status": "met"}, {"key": "z", "status": "weird"}]}}
     flat = nc.flatten_checks(both)
     assert flat["ninjaone_antivirus"]["status"] == "not_met" and set(flat) == {"ninjaone_antivirus"}
 

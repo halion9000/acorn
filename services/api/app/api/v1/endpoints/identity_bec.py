@@ -19,9 +19,9 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.devices import _as, _scope
 from app.api.v1.endpoints.identities import _people
 from app.api.v1.endpoints.identity_actions import cipp_customer, clean_email
+from app.db.rls_scope import cross_tenant_reads
 from app.models.bec_case import BecCase
 from app.models.vendor_action import VendorAction
-from app.db.rls_scope import cross_tenant_reads
 from app.services.audit import emit_audit
 from app.services.bec_followup import open_followup
 
@@ -71,20 +71,20 @@ def effective_status(row: Any, now: datetime) -> tuple[str, str | None]:
 def item_of(row: Any, now: datetime | None = None, with_report: bool = False) -> CaseItem | CaseDetail:
     now = now or datetime.now(UTC)
     state, message = effective_status(row, now)
-    fields = dict(
-        id=row.id,
-        case_ref=row.case_ref,
-        email=row.email,
-        status=state,
-        step=row.step,
-        steps_total=row.steps_total,
-        step_label=row.step_label,
-        message=message,
-        summary=row.summary or {},
-        created_at=row.created_at,
-        updated_at=row.updated_at,
-        finished_at=row.finished_at,
-    )
+    fields = {
+        "id": row.id,
+        "case_ref": row.case_ref,
+        "email": row.email,
+        "status": state,
+        "step": row.step,
+        "steps_total": row.steps_total,
+        "step_label": row.step_label,
+        "message": message,
+        "summary": row.summary or {},
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+        "finished_at": row.finished_at,
+    }
     return CaseDetail(**fields, report=row.report) if with_report else CaseItem(**fields)
 
 

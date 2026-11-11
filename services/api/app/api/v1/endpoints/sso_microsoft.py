@@ -46,9 +46,9 @@ from app.core.emails import normalize_email
 from app.core.security import ROLE_PERMISSIONS, create_access_token, create_refresh_token, get_password_hash
 from app.models.rbac import Role, UserRole
 from app.models.tenant import Tenant, User
-from app.services.sso_default_role import effective as effective_default_role
 from app.services.account_names import unique_account_name
 from app.services.audit import emit_audit
+from app.services.sso_default_role import effective as effective_default_role
 from app.services.user_lookup import find_user_by_email
 
 logger = logging.getLogger("aisoc.sso.microsoft")

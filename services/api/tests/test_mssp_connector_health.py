@@ -60,7 +60,7 @@ def rows_by_name(rows):
 def test_each_client_gets_its_enabled_and_failing_counts_and_switched_off_connectors_are_not_counted():
     async def body(s):
         parent = await tenant(s, "Parent")
-        acme, birch, quiet = await tenant(s, "Acme", parent.id), await tenant(s, "Birch", parent.id), await tenant(s, "Quiet", parent.id)
+        acme, birch, _quiet = await tenant(s, "Acme", parent.id), await tenant(s, "Birch", parent.id), await tenant(s, "Quiet", parent.id)
         other = await tenant(s, "Other MSSP")
         theirs = await tenant(s, "Theirs", other.id)
         s.add_all(

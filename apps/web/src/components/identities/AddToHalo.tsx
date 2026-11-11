@@ -57,7 +57,7 @@ export function AddToHalo({ clientId, email, name, haloCheck }: { clientId: stri
       <button type="button" onClick={() => { setProblem(''); setAsking(true); }} className="rounded border border-gray-600 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800">
         Add to HaloPSA
       </button>
-      <p className="mt-1 text-[11px] text-gray-500">Creates a HaloPSA user for this person under the client's main site, carried out by CORE.</p>
+      <p className="mt-1 text-[11px] text-gray-500">Creates a HaloPSA user for this person under the client&apos;s main site, carried out by CORE.</p>
       {last && (
         <p className="mt-1 text-xs text-gray-300" data-testid="add-to-halo-status">
           <span className={(STATUS_TEXT[last.status] ?? STATUS_TEXT.pending!).className}>{(STATUS_TEXT[last.status] ?? STATUS_TEXT.pending!).text}</span>

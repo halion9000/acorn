@@ -39,10 +39,10 @@ from app.models.signin import (
 )
 from app.models.tenant import Tenant
 from app.services import fleet_cache, tool_exclusions
-from app.services.check_alerts import raises_alert
 from app.services.audit import emit_audit
-from app.services.fix_targets import standing
+from app.services.check_alerts import raises_alert
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
+from app.services.fix_targets import standing
 from app.services.fleet_posture import (
     BOARDS,
     MAX_WEIGHT,

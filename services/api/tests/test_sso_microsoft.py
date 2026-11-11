@@ -147,7 +147,7 @@ async def begin(world, next_="/alerts?x=1"):
 
 
 def user(db_tenant=HOME, **over):
-    base = dict(tenant_id=db_tenant, email="jane.doe@liveoak.example", account_name="jane.doe", username="Jane", hashed_password="x", role="soc_analyst", is_active=True)
+    base = {"tenant_id": db_tenant, "email": "jane.doe@liveoak.example", "account_name": "jane.doe", "username": "Jane", "hashed_password": "x", "role": "soc_analyst", "is_active": True}
     return User(**{**base, **over})
 
 

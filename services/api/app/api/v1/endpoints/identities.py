@@ -35,10 +35,10 @@ from app.services.identity_people import (
     add_alert_sources,
     attach_alerts,
     build_people,
-    filter_people,
     counts_as,
-    never_expires,
+    filter_people,
     is_active,
+    never_expires,
     normalize_email,
     sort_people,
 )

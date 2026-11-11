@@ -8,8 +8,8 @@ import pytest
 from app.api.v1 import deps
 from app.api.v1.endpoints import auth, rbac
 from app.core.security import get_password_hash
-from app.db.rls import get_tenant_db
 from app.db.database import Base
+from app.db.rls import get_tenant_db
 from app.models.login_failure import LoginFailure
 from app.models.rbac import Permission, Role, RolePermission, UserRole
 from app.models.responder import PasskeyCredential

@@ -5,9 +5,8 @@ It now requires the role AND the user to belong to the caller's tenant, like ass
 """
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock
-
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from app.api.v1.deps import CurrentUser

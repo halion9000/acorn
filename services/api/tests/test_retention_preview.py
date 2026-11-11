@@ -2,8 +2,8 @@
 
 import asyncio
 
-from app.api.v1.endpoints import data_lifecycle as ep
 import app.core.config as config
+from app.api.v1.endpoints import data_lifecycle as ep
 from app.core.security import has_permission
 from app.workers import retention_sweeper as rs
 

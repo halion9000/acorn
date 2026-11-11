@@ -16,8 +16,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.db.rls_scope import cross_tenant_reads
 from app.models.dmarc import DmarcReport, TlsReport
-from app.models.signin import IdentityMfaUser
 from app.models.identity_source import IdentitySource
+from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
 from app.services.dmarc_report import DmarcReport as ParsedReport
 from app.services.tls_report import TlsPolicy

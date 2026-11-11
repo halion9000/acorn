@@ -36,12 +36,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.mttr import summarize
 from app.models.alert import Alert
 from app.models.dmarc import DmarcReport
 from app.models.remediation import RemediationGateLog
 from app.services import case_metrics
 from app.services.alert_status import FINISHED_ALERT_STATUSES
+from app.services.mttr import summarize
 from app.services.source_labels import source_label
 
 # ---------------------------------------------------------------------------

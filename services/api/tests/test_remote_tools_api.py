@@ -167,7 +167,7 @@ def test_a_report_stores_each_tool_once_per_device_and_stamps_the_scan():
     inserts = [sql(w) for w in db.writes if "INSERT INTO device_remote_tools" in str(w)]
     assert {p["hostname_key"] for _, p in inserts} == {"pc-1", "pc-2"} and all(p["tenant_id"] == A for _, p in inserts)
     assert all("ON CONFLICT (tenant_id, hostname_key, tool_key, instance_id) DO UPDATE" in s for s, _ in inserts)
-    (scan_sql, scan_params), = [sql(w) for w in db.writes if "INSERT INTO remote_tool_scans" in str(w)]
+    (scan_sql, scan_params), = (sql(w) for w in db.writes if "INSERT INTO remote_tool_scans" in str(w))
     assert scan_params["devices_scanned"] == 10 and scan_params["tenant_id"] == A
 
 

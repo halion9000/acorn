@@ -11,7 +11,7 @@ TENANT = uuid.uuid4()
 
 
 def user(upn, **over):
-    base = dict(upn=upn, enabled=True, admin=True, user_type="Member", registered=False, capable=False, methods=None, per_user=None, ca_enforced=False, security_defaults=False, source="cipp")
+    base = {"upn": upn, "enabled": True, "admin": True, "user_type": "Member", "registered": False, "capable": False, "methods": None, "per_user": None, "ca_enforced": False, "security_defaults": False, "source": "cipp"}
     base.update(over)
     return NS(**base)
 
