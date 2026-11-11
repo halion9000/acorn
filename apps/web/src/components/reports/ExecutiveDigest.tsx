@@ -20,6 +20,7 @@ import { ClientSnapshot } from './ClientSnapshot';
 import { OrgSnapshot } from './OrgSnapshot';
 
 import { reportsApi, type ExecutiveDigest as ExecutiveDigestPayload } from '@/lib/api';
+import { dmarcHref } from '@/lib/dmarcLink';
 
 // The two short windows are for a shift handover: what happened since the last person was on.
 export const PERIOD_PRESETS: { label: string; days: number }[] = [
@@ -394,7 +395,11 @@ function DigestBody({ digest, clientId }: { digest: ExecutiveDigestPayload; clie
             <tbody>
               {digest.email_authentication.map((x) => (
                 <tr key={x.domain} className="border-t border-gray-800 text-gray-200">
-                  <td className="py-1.5 pr-3">{x.domain}</td>
+                  <td className="py-1.5 pr-3">
+                    <Link href={dmarcHref(x.domain)} className="text-blue-300 hover:underline">
+                      {x.domain}
+                    </Link>
+                  </td>
                   <td className="py-1.5 pr-3">{x.policy}</td>
                   <td className="py-1.5 pr-3 text-right">{x.total}</td>
                   <td className="py-1.5 text-right font-medium">{x.pass_rate === null ? 'none counted' : `${Math.round(x.pass_rate * 100)}%`}</td>

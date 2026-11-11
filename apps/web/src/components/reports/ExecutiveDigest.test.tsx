@@ -43,6 +43,7 @@ describe('ExecutiveDigest', () => {
     const first = renderIt();
     const table = await screen.findByTestId('digest-dmarc');
     expect(within(table).getByText('leaky.example')).toBeInTheDocument();
+    expect(within(table).getByRole('link', { name: 'leaky.example' })).toHaveAttribute('href', '/settings/dmarc?domain=leaky.example');
     expect(within(table).getByText('70%')).toBeInTheDocument();
     expect(within(table).getByText('none counted')).toBeInTheDocument();
     first.unmount();

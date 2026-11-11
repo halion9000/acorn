@@ -322,7 +322,7 @@ All of these were tested against test data and a scratch database and deployed, 
 - **Alerts > Undo a bulk assign.** The same ten-minute **Undo** after giving several alerts to a person (or taking them off whoever has them): each alert goes back to who had it before, and one that was reassigned, finished or edited since is left alone and counted.
 - **Case > Copy as ticket note.** Copies the case as plain text (what it is, where it stands, what happened, the resolution and the last eight timeline events, times in UTC) for pasting into a HaloPSA ticket.
 - **Bell: a finished BEC search opens the person.** The row goes to Identities already searching for the person the search was for.
-- **Executive Digest > Email authentication (DMARC).** When DMARC reports came in during the window, the digest (page, email and PDF) lists each domain's pass rate, lowest first, and recommends a look when fewer than 90% of a domain's messages passed.
+- **Executive Digest > Email authentication (DMARC).** When DMARC reports came in during the window, the digest (page, email and PDF) lists each domain's pass rate, lowest first, and recommends a look when fewer than 90% of a domain's messages passed. On the page, each domain opens its DMARC detail.
 - **SOC Insights > MTTR by severity.** The MTTR tile's detail line also says how long each severity took (median hours and how many alerts), when more than one severity has a figure.
 - **Client environment > Download drawing, and click a device.** The network map can be saved as an SVG file, and each box on the map opens that device on the Devices page.
 - **Platform health > Download health report** (platform administrators). Saves what the page shows as a file for a support ticket; no passwords, keys or tokens are in it.

@@ -413,6 +413,20 @@ describe('DMARC mail overview', () => {
   });
 });
 
+describe('DMARC opened on a domain from the address', () => {
+  it('shows the detail of the named domain at once when the address names a host, and ignores anything else', async () => {
+    window.history.pushState({}, '', '/settings/dmarc?domain=goliveoak.com');
+    const first = render(view());
+    expect(await screen.findByRole('region', { name: 'goliveoak.com detail' })).toBeInTheDocument();
+    first.unmount();
+    window.history.pushState({}, '', '/settings/dmarc?domain=<script>');
+    render(view());
+    await screen.findByTestId('delivery-passed');
+    expect(screen.queryByRole('region', { name: /detail$/ })).toBeNull();
+    window.history.pushState({}, '', '/');
+  });
+});
+
 describe('DMARC countries', () => {
   it('lists the countries busiest first with their failures, and says how much could not be placed', async () => {
     countries = { days: 30, emails: 100, countries: [{ code: 'US', emails: 70, passed: 60, failed: 10 }, { code: 'AU', emails: 20, passed: 20, failed: 0 }], unknown: 4, not_looked_up: 6 };

@@ -5,6 +5,7 @@
  * address to put in its DMARC record and the one DNS line, in your own zone, that lets receivers send its reports to the shared mailbox. Read only: nothing here sends mail or changes DNS.
  */
 import { useState } from 'react';
+import { domainFromSearch } from '@/lib/dmarcLink';
 import useSWR from 'swr';
 
 import { authFetch } from '@/lib/auth-session';
@@ -821,7 +822,8 @@ export function PolicyProgressPanel({ progress }: { progress: DmarcProgress[] | 
 
 function Results() {
   const [days, setDays] = useState(30);
-  const [open, setOpen] = useState<string | null>(null);
+  // A link from elsewhere (?domain=example.com, from the weekly digest) opens that domain's detail at once.
+  const [open, setOpen] = useState<string | null>(() => (typeof window === 'undefined' ? null : domainFromSearch(window.location.search)));
   const { data, error, isLoading } = useSWR<DmarcOverview>(`/api/v1/dmarc/overview?days=${days}`, fetcher, { shouldRetryOnError: false });
   return (
     <div className="space-y-4">
