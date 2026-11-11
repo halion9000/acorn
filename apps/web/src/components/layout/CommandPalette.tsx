@@ -20,6 +20,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 import { searchApi, type SearchHit } from '@/lib/api';
+import { useHiddenNav } from '@/hooks/useHiddenNav';
+import { paletteNavItems } from './paletteNav';
+import { shownSections } from './Sidebar';
 
 interface PaletteAction {
   id: string;
@@ -113,6 +116,9 @@ export function CommandPalette() {
   const [searchError, setSearchError] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const hidden = useHiddenNav();
+  // The curated pages plus every other sidebar page the person's role shows, so "billing" or "2fa" finds the page called something else.
+  const navItems = useMemo(() => paletteNavItems(NAV_ITEMS, shownSections(hidden)), [hidden]);
 
   // Hotkey: ⌘K / Ctrl+K toggles. Ignore when the user is typing in Monaco
   // (the inline detection rule editor) so we don't hijack the editor's own
@@ -196,7 +202,7 @@ export function CommandPalette() {
     const navGroup: PaletteGroup = {
       id: 'navigation',
       heading: 'Navigation',
-      items: NAV_ITEMS.map((item) => ({
+      items: navItems.map((item) => ({
         id: `nav:${item.href}`,
         label: item.label,
         hint: item.href,
@@ -260,7 +266,7 @@ export function CommandPalette() {
     const recentItems: PaletteAction[] = recent
       .filter((href) => href !== pathname)
       .map((href) => {
-        const match = NAV_ITEMS.find((item) => href.startsWith(item.href));
+        const match = navItems.filter((item) => href.startsWith(item.href)).sort((a, b) => b.href.length - a.href.length)[0];
         return {
           id: `recent:${href}`,
           label: match ? match.label : href,
@@ -273,7 +279,7 @@ export function CommandPalette() {
       : null;
 
     return recentGroup ? [navGroup, quickGroup, recentGroup] : [navGroup, quickGroup];
-  }, [recent, pathname, navigate, close]);
+  }, [recent, pathname, navigate, close, navItems]);
 
   return (
     <AnimatePresence>

@@ -230,3 +230,13 @@ describe('CommandPalette search', () => {
     expect(hitHref(hit({ kind: 'alert', id: 'a/b' }) as never)).toBe('/alerts/a%2Fb');
   });
 });
+
+describe('pages that are only in the sidebar', () => {
+  it('finds a page by another word people use for it (billing → Licences & Counts)', async () => {
+    openIt();
+    await userEvent.type(screen.getByPlaceholderText(/Search anything/), 'billing');
+    expect(await screen.findByText('Licences & Counts')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('Licences & Counts'));
+    expect(nav.push).toHaveBeenCalledWith('/settings/billing');
+  });
+});
