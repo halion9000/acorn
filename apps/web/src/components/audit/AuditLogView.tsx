@@ -7,6 +7,7 @@ import { EmptyState, EmptyStateIcons } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { auditApi, ApiError, type AuditExportFilters } from '@/lib/api';
 import { authFetch } from '@/lib/auth-session';
+import { auditKindOptions } from './auditKinds';
 
 interface AuditEvent {
   id: string;
@@ -71,6 +72,13 @@ export function AuditLogView() {
     fetcher,
     { refreshInterval: 30_000, shouldRetryOnError: false, errorRetryCount: 0, revalidateOnFocus: false }
   );
+  // The kinds of event this trail holds, so the filter offers only what exists; the usual kinds while that is loading or if it cannot be read.
+  const { data: kinds } = useSWR<{ kinds: { prefix: string; count: number }[] }>('/api/v1/audit/kinds', fetcher, {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+    errorRetryCount: 0,
+  });
+  const kindOptions = auditKindOptions(kinds?.kinds);
   const isValid = raw && Array.isArray(raw.items) && typeof raw.total === 'number';
 const data = isValid ? raw : null;
 
@@ -255,14 +263,11 @@ const data = isValid ? raw : null;
           className="rounded-md border border-gray-600 bg-gray-900 text-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           <option value="">All actions</option>
-          <option value="cases:">Cases</option>
-          <option value="alerts:">Alerts</option>
-          <option value="playbooks:">Playbooks</option>
-          <option value="detections:">Detections</option>
-          <option value="connectors:">Connectors</option>
-          <option value="role:">Roles</option>
-          <option value="tenant:">Members and access</option>
-          <option value="auth:">Auth</option>
+          {kindOptions.map((k) => (
+            <option key={k.value} value={k.value}>
+              {k.label}
+            </option>
+          ))}
         </select>
         <select
           value={resourceFilter}

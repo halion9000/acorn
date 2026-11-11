@@ -247,3 +247,20 @@ describe('AuditLogView export buttons', () => {
     expect(html).toBeDisabled();
   });
 });
+
+describe('the action filter offers the kinds the trail holds', () => {
+  it('lists exactly the kinds the server says exist, with counts, and sends the chosen prefix', async () => {
+    seedAuditPage([sampleEvent]);
+    swrCalls.set('/api/v1/audit/kinds', { kinds: [{ prefix: 'alerts:', count: 180 }, { prefix: 'role:', count: 3 }] });
+    swrCalls.set('/api/v1/audit?page=1&page_size=50&action=role%3A', { items: [sampleEvent], total: 1, page: 1, page_size: 50, total_pages: 1 });
+    exportCsvMock.mockResolvedValue({ body: 'id\n', filename: 'x.csv' });
+    render(<AuditLogView />);
+    const actionSelect = screen.getAllByRole('combobox')[0];
+    expect(screen.getByRole('option', { name: 'Alerts (180)' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Playbooks' })).toBeNull();
+    await userEvent.selectOptions(actionSelect, screen.getByRole('option', { name: 'Roles (3)' }));
+    await userEvent.click(screen.getByRole('button', { name: /export csv/i }));
+    await waitFor(() => expect(exportCsvMock).toHaveBeenLastCalledWith({ action: 'role:' }));
+    swrCalls.delete('/api/v1/audit/kinds');
+  });
+});

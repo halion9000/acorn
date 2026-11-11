@@ -2,6 +2,7 @@
 
 GET /api/v1/audit               — paginated, filterable audit trail
 GET /api/v1/audit/export        — full export of the (filtered) trail as CSV or HTML
+GET /api/v1/audit/kinds         — the kinds of event this tenant's trail holds (the action prefixes), for the filter box
 """
 
 import uuid
@@ -80,6 +81,37 @@ def _filtered_audit_query(
         term = f"%{escape_like(search)}%"
         q = q.where(AuditLog.action.ilike(term, escape=ESCAPE) | AuditLog.actor_email.ilike(term, escape=ESCAPE))
     return q
+
+
+class AuditKind(BaseModel):
+    prefix: str
+    count: int
+
+
+class AuditKindsResponse(BaseModel):
+    kinds: list[AuditKind]
+
+
+KINDS_SHOWN = 50
+
+
+@router.get("/kinds", response_model=AuditKindsResponse)
+async def audit_kinds(
+    current_user: Annotated[AuthUser, Depends(require_permission("audit_log:read"))],
+    db: TenantDBSession,
+) -> AuditKindsResponse:
+    """The kinds of event in this tenant's trail, as the action prefixes the filter takes (``role:``, ``alerts:``...), most frequent first. The filter offers only what exists, so it cannot ask for a prefix nothing is logged under."""
+    prefix = func.split_part(AuditLog.action, ":", 1)
+    rows = (
+        await db.execute(
+            select(prefix.label("kind"), func.count().label("n"))
+            .where(AuditLog.tenant_id == current_user.tenant_id, AuditLog.action.like("%:%"))
+            .group_by(prefix)
+            .order_by(func.count().desc(), prefix)
+            .limit(KINDS_SHOWN)
+        )
+    ).all()
+    return AuditKindsResponse(kinds=[AuditKind(prefix=f"{r.kind}:", count=int(r.n)) for r in rows if r.kind])
 
 
 @router.get("", response_model=AuditListResponse)

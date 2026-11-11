@@ -8935,6 +8935,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/audit/kinds:
+    get:
+      tags:
+      - audit
+      summary: Audit Kinds
+      description: The kinds of event in this tenant's trail, as the action prefixes
+        the filter takes (``role:``, ``alerts:``...), most frequent first. The filter
+        offers only what exists, so it cannot ask for a prefix nothing is logged under.
+      operationId: audit_kinds_api_v1_audit_kinds_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditKindsResponse'
+      security:
+      - HTTPBearer: []
   /api/v1/audit:
     get:
       tags:
@@ -27870,6 +27888,30 @@ components:
       - changes
       - created_at
       title: AuditEventOut
+    AuditKind:
+      properties:
+        prefix:
+          type: string
+          title: Prefix
+        count:
+          type: integer
+          title: Count
+      type: object
+      required:
+      - prefix
+      - count
+      title: AuditKind
+    AuditKindsResponse:
+      properties:
+        kinds:
+          items:
+            $ref: '#/components/schemas/AuditKind'
+          type: array
+          title: Kinds
+      type: object
+      required:
+      - kinds
+      title: AuditKindsResponse
     AuditListResponse:
       properties:
         items:
