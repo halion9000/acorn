@@ -342,6 +342,9 @@ All of these were tested against test data and a scratch database and deployed, 
 - **Compliance > old evidence.** Under a control whose newest accepted evidence is more than a year old the framework page says how many months old it is and asks for it to be refreshed, and a count above the list says how many controls that is.
 - **Platform health > Download health report keeps expiry dates.** The Microsoft secret's expiry date and the kind and age of old credentials stay readable in the file; any value, key or token is still blanked.
 - **Audit log: only the kinds that exist, and one row per bulk action.** The action filter lists the kinds of event the log really holds, each with a count. One bulk close or bulk assign shows as a single row with a count (for example x 180); press it to list every entry.
+- **Alerts > Export all.** When the filter matches more alerts than the page shows, an Export all button beside Export CSV saves every one of them (up to 5,000) and says if the cap stopped it.
+- **Members: accounts nobody uses.** An active account with no sign-in for over 90 days, or one older than 90 days that never signed in, is marked in amber in the members list.
+- **Search (Ctrl+K) also finds settings pages.** Audit log, Platform health, Data retention and the other settings screens are in the palette, by name or by a word of their description.
 
 ---
 
