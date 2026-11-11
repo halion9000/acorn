@@ -21,6 +21,7 @@ import toast from 'react-hot-toast';
 
 import { searchApi, type SearchHit } from '@/lib/api';
 import { useHiddenNav } from '@/hooks/useHiddenNav';
+import { MORE_SETTINGS } from '@/components/settings/moreSettings';
 import { paletteNavItems } from './paletteNav';
 import { shownSections } from './Sidebar';
 
@@ -118,7 +119,7 @@ export function CommandPalette() {
   const pathname = usePathname();
   const hidden = useHiddenNav();
   // The curated pages plus every other sidebar page the person's role shows, so "billing" or "2fa" finds the page called something else.
-  const navItems = useMemo(() => paletteNavItems(NAV_ITEMS, shownSections(hidden)), [hidden]);
+  const navItems = useMemo(() => paletteNavItems(NAV_ITEMS, shownSections(hidden), MORE_SETTINGS), [hidden]);
 
   // Hotkey: ⌘K / Ctrl+K toggles. Ignore when the user is typing in Monaco
   // (the inline detection rule editor) so we don't hijack the editor's own

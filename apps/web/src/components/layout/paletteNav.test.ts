@@ -27,3 +27,19 @@ describe('paletteNavItems', () => {
     for (const href of Object.keys(PAGE_WORDS)) expect(real.has(href), href).toBe(true);
   });
 });
+
+describe('settings pages in the palette', () => {
+  it('adds each settings page once after the sidebar pages, findable by a word of its description, and skips one already listed', () => {
+    const out = paletteNavItems(
+      [{ label: 'Audit Log', href: '/settings/audit', keywords: ['activity'] }],
+      [{ items: [{ label: 'Cases', href: '/cases' }] }],
+      [
+        { href: '/settings/audit', label: 'Audit log', description: 'Every administrative and security event' },
+        { href: '/settings/retention', label: 'Data retention', description: 'What is kept, for how long' },
+      ],
+    );
+    expect(out.map((o) => o.href)).toEqual(['/settings/audit', '/cases', '/settings/retention']);
+    expect(out[2].label).toBe('Data retention');
+    expect(out[2].keywords).toContain('what is kept, for how long');
+  });
+});

@@ -240,3 +240,12 @@ describe('pages that are only in the sidebar', () => {
     expect(nav.push).toHaveBeenCalledWith('/settings/billing');
   });
 });
+
+describe('settings pages', () => {
+  it('finds a settings page that is not in the sidebar (Data retention) and goes there', async () => {
+    openIt();
+    await userEvent.type(screen.getByPlaceholderText(/Search anything/), 'retention');
+    await userEvent.click(await screen.findByText('Data retention'));
+    expect(nav.push).toHaveBeenCalledWith('/settings/retention');
+  });
+});

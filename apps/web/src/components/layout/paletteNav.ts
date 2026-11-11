@@ -26,11 +26,12 @@ export interface PaletteNavItem {
 
 /**
  * The palette's page list: the curated entries as they are, then every other sidebar page (in sidebar order, once each) with its label and the extra words above. A page the person's role
- * hides is not in `sections` and so is not offered.
+ * hides is not in `sections` and so is not offered. Settings pages given in `settingsPages` follow, each once, unless already listed.
  */
 export function paletteNavItems(
   curated: PaletteNavItem[],
   sections: { items: { label: string; href: string }[] }[],
+  settingsPages: { label: string; href: string; description?: string }[] = [],
 ): PaletteNavItem[] {
   const seen = new Set(curated.map((c) => c.href));
   const extra: PaletteNavItem[] = [];
@@ -40,6 +41,12 @@ export function paletteNavItems(
       seen.add(item.href);
       extra.push({ label: item.label, href: item.href, keywords: PAGE_WORDS[item.href] ?? [] });
     }
+  }
+  // Settings pages that are their own screens (audit log, platform health, retention...): found by their name or by a word from their description.
+  for (const page of settingsPages) {
+    if (seen.has(page.href)) continue;
+    seen.add(page.href);
+    extra.push({ label: page.label, href: page.href, keywords: [...(PAGE_WORDS[page.href] ?? []), ...(page.description ? [page.description.toLowerCase()] : [])] });
   }
   const words = (c: PaletteNavItem): PaletteNavItem => ({ ...c, keywords: [...c.keywords, ...(PAGE_WORDS[c.href] ?? []).filter((w) => !c.keywords.includes(w))] });
   return [...curated.map(words), ...extra];
