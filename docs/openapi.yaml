@@ -313,6 +313,36 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/auth/totp/recovery:
+    post:
+      tags:
+      - auth
+      summary: New Recovery Codes
+      description: Replace the recovery codes (used up, or lost). Counted like a failed
+        sign-in when the password or code is wrong, so it cannot be used to guess
+        either.
+      operationId: new_recovery_codes_api_v1_auth_totp_recovery_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisableIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/api-keys:
     get:
       tags:
@@ -841,6 +871,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alerts/{alert_id}/earlier-outcomes:
+    get:
+      tags:
+      - alerts
+      summary: Earlier Outcomes
+      description: 'What usually happened to earlier alerts of the same kind (same
+        client, same exact title, last 180 days): how they ended, how often a ticket
+        was made, the median time. Counts only, and "too few" under three.'
+      operationId: earlier_outcomes_api_v1_alerts__alert_id__earlier_outcomes_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Earlier Outcomes Api V1 Alerts  Alert Id  Earlier
+                  Outcomes Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}:
     get:
       tags:
@@ -944,6 +1009,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BulkCloseResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/alerts/bulk-close/undo:
+    post:
+      tags:
+      - alerts
+      summary: Undo Bulk Close
+      description: 'Put alerts back the way they were before a bulk close made in
+        the last ten minutes (a slip of the hand on 200 alerts).
+
+
+        An alert is only put back when it is still exactly as the close left it: it
+        still has the status the close gave it and it was finished within the last
+        ten minutes. One that somebody has
+
+        changed since is left alone and counted, as is one closed longer ago. It can
+        only be put back to a status that is not itself finished. Each alert put back
+        is written to the audit log.'
+      operationId: undo_bulk_close_api_v1_alerts_bulk_close_undo_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkCloseUndoRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkCloseUndoResponse'
         '422':
           description: Validation Error
           content:
@@ -1672,6 +1775,802 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeployRuleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/standing-approvals:
+    get:
+      tags:
+      - autonomy-policy
+      summary: List Standing
+      operationId: list_standing_api_v1_standing_approvals_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandingList'
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - autonomy-policy
+      summary: Create Standing
+      operationId: create_standing_api_v1_standing_approvals_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StandingIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandingOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/standing-approvals/{standing_id}/revoke:
+    post:
+      tags:
+      - autonomy-policy
+      summary: Revoke Standing
+      operationId: revoke_standing_api_v1_standing_approvals__standing_id__revoke_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: standing_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Standing Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandingOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-status-links:
+    get:
+      tags:
+      - client-status
+      summary: List Links
+      operationId: list_links_api_v1_client_status_links_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinksOut'
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - client-status
+      summary: Create Link
+      operationId: create_link_api_v1_client_status_links_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkCreated'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/client-status-links/{link_id}/preview:
+    get:
+      tags:
+      - client-status
+      summary: Preview Link
+      description: Exactly what the client would see for this link (the same function
+        the public page uses), so the wording can be reviewed before the link is switched
+        on.
+      operationId: preview_link_api_v1_client_status_links__link_id__preview_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Link Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Preview Link Api V1 Client Status Links  Link Id  Preview
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-status-links/{link_id}/review:
+    post:
+      tags:
+      - client-status
+      summary: Review Link
+      description: 'A person has read the preview and is happy with what the client
+        will see: the link starts to work.'
+      operationId: review_link_api_v1_client_status_links__link_id__review_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Link Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-status-links/{link_id}/revoke:
+    post:
+      tags:
+      - client-status
+      summary: Revoke Link
+      operationId: revoke_link_api_v1_client_status_links__link_id__revoke_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Link Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-status-links/{link_id}:
+    delete:
+      tags:
+      - client-status
+      summary: Delete Link
+      description: 'Remove a link from the list for good. Only a link that is already
+        revoked or has run out can be deleted: a live link must be revoked first,
+        so a click cannot silently take a client''s page away.'
+      operationId: delete_link_api_v1_client_status_links__link_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Link Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/public/client-status/{token}:
+    get:
+      tags:
+      - client-status
+      summary: Public Status
+      description: 'The client''s page. No sign-in: the secret in the address is the
+        credential, and every failure is the same 404.'
+      operationId: public_status_api_v1_public_client_status__token__get
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Public Status Api V1 Public Client Status  Token  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/prices:
+    get:
+      tags:
+      - finance
+      summary: List Prices
+      operationId: list_prices_api_v1_finance_prices_get
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricesOut'
+    put:
+      tags:
+      - finance
+      summary: Save Price
+      operationId: save_price_api_v1_finance_prices_put
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PriceIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PriceOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - finance
+      summary: Delete Price
+      operationId: delete_price_api_v1_finance_prices_delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: invoice_item
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Invoice Item
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/margin:
+    get:
+      tags:
+      - finance
+      summary: Margin
+      description: Estimated revenue, cost and margin per client, lowest margin first,
+        and what each estimate is missing (invoice lines billed but not priced).
+      operationId: margin_api_v1_finance_margin_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Margin Api V1 Finance Margin Get
+      security:
+      - HTTPBearer: []
+  /api/v1/nist-coverage/{client_id}:
+    get:
+      tags:
+      - compliance
+      summary: NIST CSF 2.0 controls with how one client stands, from live checks
+      operationId: nist_for_client_api_v1_nist_coverage__client_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Nist For Client Api V1 Nist Coverage  Client Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/governance:
+    get:
+      tags:
+      - compliance
+      summary: List Items
+      operationId: list_items_api_v1_governance_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/app__api__v1__endpoints__governance__ItemOut'
+                type: array
+                title: Response List Items Api V1 Governance Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - compliance
+      summary: Create Item
+      operationId: create_item_api_v1_governance_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__governance__ItemIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__governance__ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/governance/{item_id}:
+    patch:
+      tags:
+      - compliance
+      summary: Update Item
+      operationId: update_item_api_v1_governance__item_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__governance__ItemPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__governance__ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - compliance
+      summary: Archive Item
+      description: 'Archive (hide), never delete: its versions and audit trail stay.'
+      operationId: archive_item_api_v1_governance__item_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/governance/{item_id}/reviewed:
+    post:
+      tags:
+      - compliance
+      summary: Mark Reviewed
+      description: 'Reviewed today: the last-reviewed date is today and the next one
+        is today plus the interval.'
+      operationId: mark_reviewed_api_v1_governance__item_id__reviewed_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__governance__ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/governance/{item_id}/versions:
+    get:
+      tags:
+      - compliance
+      summary: List Versions
+      operationId: list_versions_api_v1_governance__item_id__versions_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VersionOut'
+                title: Response List Versions Api V1 Governance  Item Id  Versions
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Add Version
+      description: Save a new numbered version of a policy's text. An old version
+        is never changed.
+      operationId: add_version_api_v1_governance__item_id__versions_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/agent-proposals:
+    get:
+      tags:
+      - autonomy
+      summary: List Proposals
+      operationId: list_proposals_api_v1_agent_proposals_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: agent
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Agent
+      - name: rung
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(shadow|suggest|ask|act_tell|act_quiet)$
+          - type: 'null'
+          title: Rung
+      - name: action_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          description: Only proposals of this kind of action (lower case, as logged).
+          title: Action Type
+        description: Only proposals of this kind of action (lower case, as logged).
+      - name: outcome
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(none|accepted|edited|rejected|expired)$
+          - type: 'null'
+          description: Only proposals a person judged this way; rejected with the
+            reason is the decision memory.
+          title: Outcome
+        description: Only proposals a person judged this way; rejected with the reason
+          is the decision memory.
+      - name: since_hours
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 720
+            minimum: 1
+          - type: 'null'
+          description: Only proposals logged in the last this many hours (24 for the
+            daily view).
+          title: Since Hours
+        description: Only proposals logged in the last this many hours (24 for the
+          daily view).
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 100
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - autonomy
+      summary: Record Proposal
+      operationId: record_proposal_api_v1_agent_proposals_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProposalIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__agent_proposals__ProposalOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/agent-proposals/{proposal_id}/outcome:
+    post:
+      tags:
+      - autonomy
+      summary: Set Outcome
+      operationId: set_outcome_api_v1_agent_proposals__proposal_id__outcome_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: proposal_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Proposal Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutcomeIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__agent_proposals__ProposalOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alerts/{alert_id}/notes:
+    get:
+      tags:
+      - alerts
+      summary: List Notes
+      operationId: list_notes_api_v1_alerts__alert_id__notes_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NoteOut'
+                title: Response List Notes Api V1 Alerts  Alert Id  Notes Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - alerts
+      summary: Add Note
+      operationId: add_note_api_v1_alerts__alert_id__notes_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__alert_notes__NoteIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteOut'
         '422':
           description: Validation Error
           content:
@@ -4688,9 +5587,9 @@ paths:
       tags:
       - tenants
       summary: Reset User Mfa
-      description: Remove every passkey this person has enrolled (a lost phone or
-        security key) and end their sessions. They sign in with their password and
-        can enrol a new passkey from Settings > Profile.
+      description: Remove every passkey and the authenticator app this person has
+        set up (a lost phone or security key) and end their sessions. They sign in
+        with their password and can set up a new second factor from Settings > Profile.
       operationId: reset_user_mfa_api_v1_tenants_me_users__user_id__reset_mfa_post
       security:
       - HTTPBearer: []
@@ -10202,6 +11101,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/approvals/agreement:
+    get:
+      tags:
+      - responder
+      - approvals
+      summary: Approval Agreement
+      description: 'For each kind of action an agent asked approval for in the last
+        90 days: how many, how many a person approved, denied or let expire, and the
+        agreement share, with a suggestion (promote, keep, demote, too few).
+
+
+        Only reports; it never changes an autonomy setting. See ``app.services.autonomy_agreement``
+        for the rules.'
+      operationId: approval_agreement_api_v1_approvals_agreement_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgreementResponse'
+      security:
+      - HTTPBearer: []
   /api/v1/approvals/{approval_id}:
     get:
       tags:
@@ -10209,6 +11131,36 @@ paths:
       - approvals
       summary: Get Approval
       operationId: get_approval_api_v1_approvals__approval_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: approval_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Approval Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/approvals/{approval_id}/undo:
+    post:
+      tags:
+      - responder
+      - approvals
+      summary: Undo Approval
+      operationId: undo_approval_api_v1_approvals__approval_id__undo_post
       security:
       - HTTPBearer: []
       parameters:
@@ -13505,14 +14457,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ItemIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__inventory__ItemIn'
       responses:
         '201':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ItemOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__inventory__ItemOut'
         '422':
           description: Validation Error
           content:
@@ -13540,14 +14492,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ItemPatch'
+              $ref: '#/components/schemas/app__api__v1__endpoints__inventory__ItemPatch'
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ItemOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__inventory__ItemOut'
         '422':
           description: Validation Error
           content:
@@ -13645,7 +14597,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ItemOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__inventory__ItemOut'
         '422':
           description: Validation Error
           content:
@@ -13680,7 +14632,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ItemOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__inventory__ItemOut'
         '422':
           description: Validation Error
           content:
@@ -15373,193 +16325,6 @@ paths:
                 $ref: '#/components/schemas/Setup'
       security:
       - HTTPBearer: []
-  /api/v1/nessus/scans:
-    post:
-      tags:
-      - nessus
-      summary: Upload a .nessus export for a client
-      operationId: upload_scan_api_v1_nessus_scans_post
-      security:
-      - HTTPBearer: []
-      parameters:
-      - name: client_id
-        in: query
-        required: true
-        schema:
-          type: string
-          format: uuid
-          title: Client Id
-      - name: name
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Name
-      - name: description
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-            maxLength: 300
-          - type: 'null'
-          title: Description
-      - name: notes
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-            maxLength: 4000
-          - type: 'null'
-          title: Notes
-      - name: scan_type
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-            pattern: ^(lan|wan|other)$
-          - type: 'null'
-          title: Scan Type
-      responses:
-        '201':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ScanOut'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-    get:
-      tags:
-      - nessus
-      summary: Uploaded scans, newest first
-      operationId: list_scans_api_v1_nessus_scans_get
-      security:
-      - HTTPBearer: []
-      parameters:
-      - name: client_id
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-            format: uuid
-          - type: 'null'
-          title: Client Id
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ScanOut'
-                title: Response List Scans Api V1 Nessus Scans Get
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-  /api/v1/nessus/scans/{scan_id}:
-    get:
-      tags:
-      - nessus
-      summary: One scan with its findings, worst first
-      operationId: scan_detail_api_v1_nessus_scans__scan_id__get
-      security:
-      - HTTPBearer: []
-      parameters:
-      - name: scan_id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-          title: Scan Id
-      - name: severity
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-            pattern: ^(critical|high|medium|low)$
-          - type: 'null'
-          title: Severity
-      - name: host
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-            maxLength: 255
-          - type: 'null'
-          title: Host
-      - name: page
-        in: query
-        required: false
-        schema:
-          type: integer
-          maximum: 100000
-          minimum: 1
-          default: 1
-          title: Page
-      - name: page_size
-        in: query
-        required: false
-        schema:
-          type: integer
-          maximum: 200
-          minimum: 1
-          default: 50
-          title: Page Size
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ScanDetail'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-    delete:
-      tags:
-      - nessus
-      summary: Delete an uploaded scan and its findings
-      operationId: delete_scan_api_v1_nessus_scans__scan_id__delete
-      security:
-      - HTTPBearer: []
-      parameters:
-      - name: scan_id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-          title: Scan Id
-      responses:
-        '204':
-          description: Successful Response
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/billing/licence-waste:
     get:
       tags:
@@ -15897,7 +16662,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/NoteIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__billing__NoteIn'
       responses:
         '204':
           description: Successful Response
@@ -16460,7 +17225,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProposalOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__vcio_proposals__ProposalOut'
         '422':
           description: Validation Error
           content:
@@ -16554,7 +17319,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProposalOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__vcio_proposals__ProposalOut'
         '422':
           description: Validation Error
           content:
@@ -16590,7 +17355,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProposalOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__vcio_proposals__ProposalOut'
         '422':
           description: Validation Error
           content:
@@ -18413,6 +19178,24 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/data-lifecycle/retention/preview:
+    get:
+      tags:
+      - data_lifecycle
+      summary: Retention Preview
+      description: 'How many rows the next retention sweep would delete, in every
+        client, by kind of data. A dry run: it counts and deletes nothing. It reads
+        across all clients, so only a platform administrator may ask.'
+      operationId: retention_preview_api_v1_data_lifecycle_retention_preview_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionPreviewOut'
+      security:
+      - HTTPBearer: []
   /api/v1/data-lifecycle/parsers:
     get:
       tags:
@@ -19593,6 +20376,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/saved-hunts/{hunt_id}/hits:
+    post:
+      tags:
+      - saved-hunts
+      summary: Record Saved Hunt Hits
+      description: Store the hit count of a manual run so the saved-hunt list can
+        show it beside "Last run".
+      operationId: record_saved_hunt_hits_api_v1_saved_hunts__hunt_id__hits_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: hunt_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Hunt Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordHitsRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                title: Response Record Saved Hunt Hits Api V1 Saved Hunts  Hunt Id  Hits
+                  Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/saved-hunts/{hunt_id}/run:
     post:
       tags:
@@ -20361,7 +21184,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/app__api__v1__endpoints__posture__FindingOut'
+                  $ref: '#/components/schemas/FindingOut'
                 title: Response List Findings Api V1 Posture Findings Get
         '422':
           description: Validation Error
@@ -20388,7 +21211,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/app__api__v1__endpoints__posture__FindingOut'
+                $ref: '#/components/schemas/FindingOut'
         '422':
           description: Validation Error
           content:
@@ -20417,7 +21240,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/app__api__v1__endpoints__posture__FindingOut'
+                $ref: '#/components/schemas/FindingOut'
         '422':
           description: Validation Error
           content:
@@ -20452,7 +21275,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/app__api__v1__endpoints__posture__FindingOut'
+                $ref: '#/components/schemas/FindingOut'
         '422':
           description: Validation Error
           content:
@@ -20481,7 +21304,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/app__api__v1__endpoints__posture__FindingOut'
+                $ref: '#/components/schemas/FindingOut'
         '422':
           description: Validation Error
           content:
@@ -24640,6 +25463,68 @@ components:
       - connector_count
       title: AgentToolsResponse
       description: Tenant-wide tool catalogue surfaced to the agent layer.
+    AgreementResponse:
+      properties:
+        window_days:
+          type: integer
+          title: Window Days
+        rows:
+          items:
+            $ref: '#/components/schemas/AgreementRowResponse'
+          type: array
+          title: Rows
+        rules:
+          type: string
+          title: Rules
+      type: object
+      required:
+      - window_days
+      - rows
+      - rules
+      title: AgreementResponse
+    AgreementRowResponse:
+      properties:
+        action:
+          type: string
+          title: Action
+        proposed:
+          type: integer
+          title: Proposed
+        approved:
+          type: integer
+          title: Approved
+        denied:
+          type: integer
+          title: Denied
+        expired:
+          type: integer
+          title: Expired
+        pending:
+          type: integer
+          title: Pending
+        decided:
+          type: integer
+          title: Decided
+        agreement:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Agreement
+        suggestion:
+          type: string
+          title: Suggestion
+      type: object
+      required:
+      - action
+      - proposed
+      - approved
+      - denied
+      - expired
+      - pending
+      - decided
+      - agreement
+      - suggestion
+      title: AgreementRowResponse
     AirgapStatus:
       properties:
         ready:
@@ -25005,6 +25890,11 @@ components:
           type: integer
           title: Consecutive Failures
           default: 0
+        waiting:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Waiting
         worker_enabled:
           type: boolean
           title: Worker Enabled
@@ -25922,6 +26812,12 @@ components:
           additionalProperties: true
           type: object
           title: Action
+        undo:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Undo
         expires_at:
           anyOf:
           - type: string
@@ -26082,6 +26978,24 @@ components:
             format: date-time
           - type: 'null'
           title: Expires At
+        standing_approval_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Standing Approval Id
+        undo:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Undo
+        undone_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Undone At
         created_at:
           type: string
           format: date-time
@@ -27605,6 +28519,12 @@ components:
         reason:
           type: string
           title: Reason
+        closed_items:
+          items:
+            $ref: '#/components/schemas/ClosedItem-Output'
+          type: array
+          title: Closed Items
+          default: []
       type: object
       required:
       - closed
@@ -27613,6 +28533,49 @@ components:
       - status
       - reason
       title: BulkCloseResponse
+    BulkCloseUndoRequest:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/UndoItem'
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Items
+        status:
+          type: string
+          enum:
+          - resolved
+          - false_positive
+          - closed
+          title: Status
+          description: The status the bulk close gave these alerts.
+      type: object
+      required:
+      - items
+      - status
+      title: BulkCloseUndoRequest
+    BulkCloseUndoResponse:
+      properties:
+        reopened:
+          type: integer
+          title: Reopened
+        changed_since:
+          type: integer
+          title: Changed Since
+        too_late:
+          type: integer
+          title: Too Late
+        not_found:
+          type: integer
+          title: Not Found
+      type: object
+      required:
+      - reopened
+      - changed_since
+      - too_late
+      - not_found
+      title: BulkCloseUndoResponse
     BulkError:
       properties:
         ioc:
@@ -28738,6 +29701,20 @@ components:
       - match_source
       - suggestions
       title: ClientAliasOut
+    ClientChoice:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+      type: object
+      required:
+      - id
+      - name
+      title: ClientChoice
     ClientCount:
       properties:
         client_id:
@@ -29135,7 +30112,7 @@ components:
       type: object
       title: CloseRequest
       description: Optional analyst note appended to the auto-generated summary.
-    ClosedItem:
+    ClosedItem-Input:
       properties:
         uid:
           type: string
@@ -29154,6 +30131,20 @@ components:
       required:
       - uid
       title: ClosedItem
+    ClosedItem-Output:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        status_from:
+          type: string
+          title: Status From
+      type: object
+      required:
+      - id
+      - status_from
+      title: ClosedItem
     ClosedReport:
       properties:
         vendor:
@@ -29162,7 +30153,7 @@ components:
           title: Vendor
         closed:
           items:
-            $ref: '#/components/schemas/ClosedItem'
+            $ref: '#/components/schemas/ClosedItem-Input'
           type: array
           maxItems: 500
           title: Closed
@@ -30368,6 +31359,23 @@ components:
       - unknown
       - not_looked_up
       title: Countries
+    CountryAddress:
+      properties:
+        ip:
+          type: string
+          title: Ip
+        emails:
+          type: integer
+          title: Emails
+        failed:
+          type: integer
+          title: Failed
+      type: object
+      required:
+      - ip
+      - emails
+      - failed
+      title: CountryAddress
     CountryRow:
       properties:
         code:
@@ -30382,6 +31390,12 @@ components:
         failed:
           type: integer
           title: Failed
+        addresses:
+          items:
+            $ref: '#/components/schemas/CountryAddress'
+          type: array
+          title: Addresses
+          default: []
       type: object
       required:
       - code
@@ -34461,6 +35475,112 @@ components:
       - rule_id
       - rule_title
       title: FindingCreate
+    FindingOut:
+      properties:
+        cloud_provider:
+          type: string
+          title: Cloud Provider
+        cloud_account:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cloud Account
+        cloud_region:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cloud Region
+        resource_type:
+          type: string
+          title: Resource Type
+        resource_id:
+          type: string
+          title: Resource Id
+        resource_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resource Name
+        rule_id:
+          type: string
+          title: Rule Id
+        rule_title:
+          type: string
+          title: Rule Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        severity:
+          type: string
+          title: Severity
+          default: medium
+        frameworks:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Frameworks
+        control_ids:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Control Ids
+        evidence:
+          additionalProperties: true
+          type: object
+          title: Evidence
+        remediation_guide:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Remediation Guide
+        id:
+          type: string
+          format: uuid
+          title: Id
+        tenant_id:
+          type: string
+          format: uuid
+          title: Tenant Id
+        status:
+          type: string
+          title: Status
+        auto_remediated:
+          type: boolean
+          title: Auto Remediated
+        first_detected_at:
+          type: string
+          format: date-time
+          title: First Detected At
+        last_evaluated_at:
+          type: string
+          format: date-time
+          title: Last Evaluated At
+        resolved_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Resolved At
+      type: object
+      required:
+      - cloud_provider
+      - resource_type
+      - resource_id
+      - rule_id
+      - rule_title
+      - id
+      - tenant_id
+      - status
+      - auto_remediated
+      - first_detected_at
+      - last_evaluated_at
+      title: FindingOut
     FinishRequest:
       properties:
         credential:
@@ -36692,166 +37812,11 @@ components:
       - key
       - events
       title: ItemHistoryOut
-    ItemIn:
-      properties:
-        kind:
-          type: string
-          enum:
-          - stock
-          - nuc
-          title: Kind
-          default: stock
-        client_id:
-          anyOf:
-          - type: string
-            format: uuid
-          - type: 'null'
-          title: Client Id
-        customer_name:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Customer Name
-        name:
-          type: string
-          maxLength: 300
-          minLength: 1
-          title: Name
-        category:
-          anyOf:
-          - type: string
-            maxLength: 80
-          - type: 'null'
-          title: Category
-        serial:
-          anyOf:
-          - type: string
-            maxLength: 100
-          - type: 'null'
-          title: Serial
-        model:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Model
-        manufacturer:
-          anyOf:
-          - type: string
-            maxLength: 100
-          - type: 'null'
-          title: Manufacturer
-        quantity:
-          type: integer
-          maximum: 100000.0
-          minimum: 0.0
-          title: Quantity
-          default: 1
-        status:
-          type: string
-          enum:
-          - checked_in
-          - checked_out
-          - offline
-          - retired
-          title: Status
-          default: checked_in
-        site:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Site
-        person:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Person
-        part_no:
-          anyOf:
-          - type: string
-            maxLength: 60
-          - type: 'null'
-          title: Part No
-        has_charger:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Has Charger
-        cpu:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Cpu
-        memory:
-          anyOf:
-          - type: string
-            maxLength: 60
-          - type: 'null'
-          title: Memory
-        storage:
-          anyOf:
-          - type: string
-            maxLength: 60
-          - type: 'null'
-          title: Storage
-        ninja_url:
-          anyOf:
-          - type: string
-            maxLength: 500
-            pattern: ^https?://
-          - type: 'null'
-          title: Ninja Url
-        accounting_treatment:
-          anyOf:
-          - type: string
-            maxLength: 120
-          - type: 'null'
-          title: Accounting Treatment
-        deployed_at:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Deployed At
-        redeployed_at:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Redeployed At
-        notes:
-          anyOf:
-          - type: string
-            maxLength: 4000
-          - type: 'null'
-          title: Notes
-        tags:
-          items:
-            type: string
-            maxLength: 40
-          type: array
-          maxItems: 12
-          title: Tags
-        ticket_url:
-          anyOf:
-          - type: string
-            maxLength: 500
-            pattern: ^https?://
-          - type: 'null'
-          title: Ticket Url
-      type: object
-      required:
-      - name
-      title: ItemIn
     ItemList:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/ItemOut'
+            $ref: '#/components/schemas/app__api__v1__endpoints__inventory__ItemOut'
           type: array
           title: Items
         total:
@@ -36873,356 +37838,6 @@ components:
       - pages
       - summary
       title: ItemList
-    ItemOut:
-      properties:
-        id:
-          type: string
-          format: uuid
-          title: Id
-        kind:
-          type: string
-          enum:
-          - stock
-          - nuc
-          title: Kind
-        client_id:
-          anyOf:
-          - type: string
-            format: uuid
-          - type: 'null'
-          title: Client Id
-          description: The client it is held for; None when it is Live Oak's own or
-            its customer has not been matched to a client yet.
-        client_name:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Client Name
-        customer_name:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Customer Name
-        name:
-          type: string
-          title: Name
-        category:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Category
-        serial:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Serial
-        model:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Model
-        manufacturer:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Manufacturer
-        quantity:
-          type: integer
-          title: Quantity
-        status:
-          type: string
-          enum:
-          - checked_in
-          - checked_out
-          - offline
-          - retired
-          title: Status
-        site:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Site
-        person:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Person
-        part_no:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Part No
-        has_charger:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Has Charger
-        cpu:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Cpu
-        memory:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Memory
-        storage:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Storage
-        ninja_url:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Ninja Url
-        accounting_treatment:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Accounting Treatment
-        deployed_at:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Deployed At
-        redeployed_at:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Redeployed At
-        checked_out_at:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Checked Out At
-        checked_in_at:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Checked In At
-        notes:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Notes
-        tags:
-          items:
-            type: string
-          type: array
-          title: Tags
-        ticket_url:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Ticket Url
-        source:
-          type: string
-          title: Source
-        updated_at:
-          type: string
-          format: date-time
-          title: Updated At
-        device:
-          anyOf:
-          - $ref: '#/components/schemas/DeviceLink'
-          - type: 'null'
-      type: object
-      required:
-      - id
-      - kind
-      - client_id
-      - client_name
-      - customer_name
-      - name
-      - category
-      - serial
-      - model
-      - manufacturer
-      - quantity
-      - status
-      - site
-      - person
-      - part_no
-      - has_charger
-      - cpu
-      - memory
-      - storage
-      - ninja_url
-      - accounting_treatment
-      - deployed_at
-      - redeployed_at
-      - checked_out_at
-      - checked_in_at
-      - notes
-      - tags
-      - ticket_url
-      - source
-      - updated_at
-      title: ItemOut
-    ItemPatch:
-      properties:
-        client_id:
-          anyOf:
-          - type: string
-            format: uuid
-          - type: 'null'
-          title: Client Id
-        move_to_own:
-          type: boolean
-          title: Move To Own
-          default: false
-        customer_name:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Customer Name
-        name:
-          anyOf:
-          - type: string
-            maxLength: 300
-            minLength: 1
-          - type: 'null'
-          title: Name
-        category:
-          anyOf:
-          - type: string
-            maxLength: 80
-          - type: 'null'
-          title: Category
-        serial:
-          anyOf:
-          - type: string
-            maxLength: 100
-          - type: 'null'
-          title: Serial
-        model:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Model
-        manufacturer:
-          anyOf:
-          - type: string
-            maxLength: 100
-          - type: 'null'
-          title: Manufacturer
-        quantity:
-          anyOf:
-          - type: integer
-            maximum: 100000.0
-            minimum: 0.0
-          - type: 'null'
-          title: Quantity
-        status:
-          anyOf:
-          - type: string
-            enum:
-            - checked_in
-            - checked_out
-            - offline
-            - retired
-          - type: 'null'
-          title: Status
-        site:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Site
-        person:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Person
-        part_no:
-          anyOf:
-          - type: string
-            maxLength: 60
-          - type: 'null'
-          title: Part No
-        has_charger:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Has Charger
-        cpu:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Cpu
-        memory:
-          anyOf:
-          - type: string
-            maxLength: 60
-          - type: 'null'
-          title: Memory
-        storage:
-          anyOf:
-          - type: string
-            maxLength: 60
-          - type: 'null'
-          title: Storage
-        ninja_url:
-          anyOf:
-          - type: string
-            maxLength: 500
-            pattern: ^https?://
-          - type: 'null'
-          title: Ninja Url
-        accounting_treatment:
-          anyOf:
-          - type: string
-            maxLength: 120
-          - type: 'null'
-          title: Accounting Treatment
-        deployed_at:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Deployed At
-        redeployed_at:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Redeployed At
-        notes:
-          anyOf:
-          - type: string
-            maxLength: 4000
-          - type: 'null'
-          title: Notes
-        tags:
-          anyOf:
-          - items:
-              type: string
-              maxLength: 40
-            type: array
-            maxItems: 12
-          - type: 'null'
-          title: Tags
-        ticket_url:
-          anyOf:
-          - type: string
-            maxLength: 500
-            pattern: ^https?://
-          - type: 'null'
-          title: Ticket Url
-      type: object
-      title: ItemPatch
-      description: Any of an item's fields; only those sent change. Moving it to another
-        client is ``client_id`` (``own`` is expressed by sending ``move_to_own``).
     KBChunk:
       properties:
         doc_id:
@@ -37680,6 +38295,151 @@ components:
       required:
       - accepted
       title: LicenseCountsResponse
+    LinkCreated:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        label:
+          type: string
+          title: Label
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+        reviewed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Reviewed At
+        revoked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Revoked At
+        last_opened_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Opened At
+        state:
+          type: string
+          title: State
+        token:
+          type: string
+          title: Token
+      type: object
+      required:
+      - id
+      - client_id
+      - client_name
+      - label
+      - created_at
+      - expires_at
+      - reviewed_at
+      - revoked_at
+      - last_opened_at
+      - state
+      - token
+      title: LinkCreated
+    LinkIn:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        label:
+          type: string
+          maxLength: 80
+          title: Label
+          default: ''
+        days:
+          type: integer
+          maximum: 365.0
+          minimum: 1.0
+          title: Days
+          default: 90
+      type: object
+      required:
+      - client_id
+      title: LinkIn
+    LinkOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        label:
+          type: string
+          title: Label
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+        reviewed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Reviewed At
+        revoked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Revoked At
+        last_opened_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Opened At
+        state:
+          type: string
+          title: State
+      type: object
+      required:
+      - id
+      - client_id
+      - client_name
+      - label
+      - created_at
+      - expires_at
+      - reviewed_at
+      - revoked_at
+      - last_opened_at
+      - state
+      title: LinkOut
     LinkedAlertOut:
       properties:
         id:
@@ -37765,6 +38525,27 @@ components:
       required:
       - id
       title: LinkedTicket
+    LinksOut:
+      properties:
+        links:
+          items:
+            $ref: '#/components/schemas/LinkOut'
+          type: array
+          title: Links
+        clients:
+          items:
+            $ref: '#/components/schemas/ClientChoice'
+          type: array
+          title: Clients
+        default_days:
+          type: integer
+          title: Default Days
+      type: object
+      required:
+      - links
+      - clients
+      - default_days
+      title: LinksOut
     ListResponse:
       properties:
         rules:
@@ -39938,32 +40719,29 @@ components:
       - false_positive_rate
       - suggest_hide
       title: NoisyRule
-    NoteIn:
+    NoteOut:
       properties:
-        client_id:
+        id:
           type: string
           format: uuid
-          title: Client Id
-        invoice_item:
+          title: Id
+        author:
           type: string
-          maxLength: 120
-          minLength: 1
-          title: Invoice Item
-        note:
+          title: Author
+        body:
           type: string
-          maxLength: 400
-          minLength: 1
-          title: Note
-        difference:
-          type: integer
-          title: Difference
+          title: Body
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
       type: object
       required:
-      - client_id
-      - invoice_item
-      - note
-      - difference
-      title: NoteIn
+      - id
+      - author
+      - body
+      - created_at
+      title: NoteOut
     NucSyncOut:
       properties:
         dry_run:
@@ -40290,6 +41068,26 @@ components:
       - next_step
       - first_data_at
       title: OnboardingRow
+    OutcomeIn:
+      properties:
+        outcome:
+          type: string
+          enum:
+          - accepted
+          - edited
+          - rejected
+          - expired
+          title: Outcome
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Note
+      type: object
+      required:
+      - outcome
+      title: OutcomeIn
     OverrideEntryModel:
       properties:
         key:
@@ -41350,6 +42148,15 @@ components:
           type: boolean
           title: Overdue
           default: false
+        target_hours:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Target Hours
+        over_target:
+          type: boolean
+          title: Over Target
+          default: false
         comments:
           type: integer
           title: Comments
@@ -41572,66 +42379,145 @@ components:
       - suppressed
       - changed
       title: PreviewRow
-    ProposalOut:
+    PriceIn:
       properties:
-        id:
+        invoice_item:
           type: string
-          format: uuid
-          title: Id
-        key:
-          type: string
-          title: Key
-        kind:
-          type: string
-          title: Kind
-        name:
-          type: string
-          title: Name
-        description:
-          type: string
-          title: Description
-        priority:
-          type: string
-          title: Priority
-        evidence:
-          type: string
-          title: Evidence
-        status:
-          type: string
-          title: Status
-        decided_at:
+          maxLength: 120
+          minLength: 1
+          title: Invoice Item
+        unit_price:
           anyOf:
+          - type: number
+            maximum: 1000000.0
+            minimum: 0.0
           - type: string
-            format: date-time
-          - type: 'null'
-          title: Decided At
-        sent_at:
+            pattern: ^(?!^[-+.]*$)[+-]?0*(?:\d{0,10}|(?=[\d.]{1,13}0*$)\d{0,10}\.\d{0,2}0*$)
+          title: Unit Price
+        unit_cost:
           anyOf:
+          - type: number
+            maximum: 1000000.0
+            minimum: 0.0
           - type: string
-            format: date-time
-          - type: 'null'
-          title: Sent At
-        result_message:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Result Message
+            pattern: ^(?!^[-+.]*$)[+-]?0*(?:\d{0,10}|(?=[\d.]{1,13}0*$)\d{0,10}\.\d{0,2}0*$)
+          title: Unit Cost
+      type: object
+      required:
+      - invoice_item
+      - unit_price
+      - unit_cost
+      title: PriceIn
+    PriceOut:
+      properties:
+        invoice_item:
+          type: string
+          title: Invoice Item
+        unit_price:
+          type: string
+          title: Unit Price
+        unit_cost:
+          type: string
+          title: Unit Cost
         updated_at:
           type: string
           format: date-time
           title: Updated At
       type: object
       required:
-      - id
-      - key
-      - kind
-      - name
-      - description
-      - priority
-      - evidence
-      - status
+      - invoice_item
+      - unit_price
+      - unit_cost
       - updated_at
-      title: ProposalOut
+      title: PriceOut
+    PricesOut:
+      properties:
+        prices:
+          items:
+            $ref: '#/components/schemas/PriceOut'
+          type: array
+          title: Prices
+        billed_items:
+          items:
+            type: string
+          type: array
+          title: Billed Items
+      type: object
+      required:
+      - prices
+      - billed_items
+      title: PricesOut
+    ProposalIn:
+      properties:
+        agent:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Agent
+        action_type:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Action Type
+        target:
+          type: string
+          maxLength: 300
+          title: Target
+          default: ''
+        summary:
+          type: string
+          maxLength: 4000
+          minLength: 1
+          title: Summary
+        rung:
+          type: string
+          enum:
+          - shadow
+          - suggest
+          - ask
+          - act_tell
+          - act_quiet
+          title: Rung
+        evidence:
+          items: {}
+          type: array
+          title: Evidence
+        confidence:
+          anyOf:
+          - type: number
+            maximum: 1.0
+            minimum: 0.0
+          - type: 'null'
+          title: Confidence
+        approval_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Approval Id
+      type: object
+      required:
+      - agent
+      - action_type
+      - summary
+      - rung
+      title: ProposalIn
+    ProposalList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__agent_proposals__ProposalOut'
+          type: array
+          title: Items
+        summary:
+          additionalProperties: true
+          type: object
+          title: Summary
+      type: object
+      required:
+      - items
+      - summary
+      title: ProposalList
     ProposalResponse:
       properties:
         id:
@@ -41796,7 +42682,7 @@ components:
           title: Mapped
         proposals:
           items:
-            $ref: '#/components/schemas/ProposalOut'
+            $ref: '#/components/schemas/app__api__v1__endpoints__vcio_proposals__ProposalOut'
           type: array
           title: Proposals
       type: object
@@ -42568,6 +43454,19 @@ components:
       - difference
       - parts
       title: ReconcileRow
+    RecordHitsRequest:
+      properties:
+        hits:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Hits
+      type: object
+      required:
+      - hits
+      title: RecordHitsRequest
+      description: How many hits a person's own run of the hunt found (the page runs
+        the search itself; the scheduler stores its own count).
     RedispositionApplyRequest:
       properties:
         alert_ids:
@@ -43108,6 +44007,31 @@ components:
       - alerts_days
       - audit_days
       title: RetentionOut
+    RetentionPreviewOut:
+      properties:
+        would_delete:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Would Delete
+        failed:
+          additionalProperties:
+            type: string
+          type: object
+          title: Failed
+        switched_on:
+          type: boolean
+          title: Switched On
+        note:
+          type: string
+          title: Note
+      type: object
+      required:
+      - would_delete
+      - failed
+      - switched_on
+      - note
+      title: RetentionPreviewOut
     RetentionUpdate:
       properties:
         raw_events_days:
@@ -44604,6 +45528,11 @@ components:
           - type: string
           - type: 'null'
           title: Last Run At
+        last_hit_count:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Last Hit Count
         created_at:
           type: string
           title: Created At
@@ -44718,172 +45647,6 @@ components:
       - updated_at
       title: SavedViewModel
       description: Wire format for a saved view row.
-    ScanDetail:
-      properties:
-        id:
-          type: string
-          format: uuid
-          title: Id
-        client_id:
-          type: string
-          format: uuid
-          title: Client Id
-        client_name:
-          type: string
-          title: Client Name
-        name:
-          type: string
-          title: Name
-        description:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Description
-        notes:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Notes
-        scan_type:
-          type: string
-          title: Scan Type
-        uploaded_by:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Uploaded By
-        uploaded_at:
-          type: string
-          format: date-time
-          title: Uploaded At
-        hosts:
-          type: integer
-          title: Hosts
-        matched_hosts:
-          type: integer
-          title: Matched Hosts
-        critical:
-          type: integer
-          title: Critical
-        high:
-          type: integer
-          title: High
-        medium:
-          type: integer
-          title: Medium
-        low:
-          type: integer
-          title: Low
-        findings:
-          items:
-            $ref: '#/components/schemas/app__api__v1__endpoints__nessus__FindingOut'
-          type: array
-          title: Findings
-        total_findings:
-          type: integer
-          title: Total Findings
-        page:
-          type: integer
-          title: Page
-        pages:
-          type: integer
-          title: Pages
-      type: object
-      required:
-      - id
-      - client_id
-      - client_name
-      - name
-      - description
-      - notes
-      - scan_type
-      - uploaded_by
-      - uploaded_at
-      - hosts
-      - matched_hosts
-      - critical
-      - high
-      - medium
-      - low
-      - findings
-      - total_findings
-      - page
-      - pages
-      title: ScanDetail
-    ScanOut:
-      properties:
-        id:
-          type: string
-          format: uuid
-          title: Id
-        client_id:
-          type: string
-          format: uuid
-          title: Client Id
-        client_name:
-          type: string
-          title: Client Name
-        name:
-          type: string
-          title: Name
-        description:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Description
-        notes:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Notes
-        scan_type:
-          type: string
-          title: Scan Type
-        uploaded_by:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Uploaded By
-        uploaded_at:
-          type: string
-          format: date-time
-          title: Uploaded At
-        hosts:
-          type: integer
-          title: Hosts
-        matched_hosts:
-          type: integer
-          title: Matched Hosts
-        critical:
-          type: integer
-          title: Critical
-        high:
-          type: integer
-          title: High
-        medium:
-          type: integer
-          title: Medium
-        low:
-          type: integer
-          title: Low
-      type: object
-      required:
-      - id
-      - client_id
-      - client_name
-      - name
-      - description
-      - notes
-      - scan_type
-      - uploaded_by
-      - uploaded_at
-      - hosts
-      - matched_hosts
-      - critical
-      - high
-      - medium
-      - low
-      title: ScanOut
     ScanRequest:
       properties:
         tenant_id:
@@ -46952,6 +47715,100 @@ components:
       - by_client
       - by_severity
       title: StaleSummary
+    StandingIn:
+      properties:
+        action_type:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Action Type
+        client_id:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Client Id
+        days:
+          type: integer
+          maximum: 365.0
+          minimum: 1.0
+          title: Days
+          default: 90
+        note:
+          type: string
+          maxLength: 300
+          title: Note
+          default: ''
+      type: object
+      required:
+      - action_type
+      title: StandingIn
+    StandingList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/StandingOut'
+          type: array
+          title: Items
+        allowed_types:
+          items:
+            type: string
+          type: array
+          title: Allowed Types
+        default_days:
+          type: integer
+          title: Default Days
+      type: object
+      required:
+      - items
+      - allowed_types
+      - default_days
+      title: StandingList
+    StandingOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        action_type:
+          type: string
+          title: Action Type
+        client_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Id
+        note:
+          type: string
+          title: Note
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+        revoked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Revoked At
+        state:
+          type: string
+          title: State
+      type: object
+      required:
+      - id
+      - action_type
+      - client_id
+      - note
+      - created_at
+      - expires_at
+      - revoked_at
+      - state
+      title: StandingOut
     StartBody:
       properties:
         client_id:
@@ -49731,6 +50588,23 @@ components:
       - stored
       - changed
       title: TunnelStored
+    UndoItem:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        status_from:
+          type: string
+          pattern: ^[a-z_]{1,32}$
+          title: Status From
+          description: The status the alert had before the bulk close, as the close
+            answered it.
+      type: object
+      required:
+      - id
+      - status_from
+      title: UndoItem
     UnmappedClient:
       properties:
         vendor_client_id:
@@ -50165,6 +51039,13 @@ components:
           type: array
           title: Log
           default: []
+        history:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: History
+          default: []
       type: object
       required:
       - available
@@ -50440,6 +51321,14 @@ components:
           type: array
           title: Custom Roles
           default: []
+        passkeys:
+          type: integer
+          title: Passkeys
+          default: 0
+        authenticator:
+          type: boolean
+          title: Authenticator
+          default: false
       type: object
       required:
       - id
@@ -50891,6 +51780,44 @@ components:
       - client_id
       - alerts_raised
       title: VerdictOut
+    VersionIn:
+      properties:
+        body:
+          type: string
+          maxLength: 100000
+          minLength: 1
+          title: Body
+        change_note:
+          type: string
+          maxLength: 300
+          title: Change Note
+          default: ''
+      type: object
+      required:
+      - body
+      title: VersionIn
+    VersionOut:
+      properties:
+        version:
+          type: integer
+          title: Version
+        body:
+          type: string
+          title: Body
+        change_note:
+          type: string
+          title: Change Note
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - version
+      - body
+      - change_note
+      - created_at
+      title: VersionOut
     ViewableTenant:
       properties:
         id:
@@ -51501,6 +52428,78 @@ components:
       required:
       - id
       title: _Remediation
+    app__api__v1__endpoints__agent_proposals__ProposalOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        agent:
+          type: string
+          title: Agent
+        action_type:
+          type: string
+          title: Action Type
+        target:
+          type: string
+          title: Target
+        summary:
+          type: string
+          title: Summary
+        rung:
+          type: string
+          title: Rung
+        evidence:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Evidence
+        confidence:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Confidence
+        approval_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Approval Id
+        outcome:
+          type: string
+          title: Outcome
+        outcome_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Outcome Note
+        outcome_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Outcome At
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - agent
+      - action_type
+      - target
+      - summary
+      - rung
+      - evidence
+      - confidence
+      - approval_id
+      - outcome
+      - outcome_note
+      - outcome_at
+      - created_at
+      title: ProposalOut
     app__api__v1__endpoints__alert_account__SigninRow:
       properties:
         at:
@@ -51545,6 +52544,17 @@ components:
       - at
       - success
       title: SigninRow
+    app__api__v1__endpoints__alert_notes__NoteIn:
+      properties:
+        body:
+          type: string
+          maxLength: 4000
+          minLength: 1
+          title: Body
+      type: object
+      required:
+      - body
+      title: NoteIn
     app__api__v1__endpoints__alert_vendor_actions__TicketsResponse:
       properties:
         tickets:
@@ -51602,6 +52612,32 @@ components:
       - previous_count
       - observed_at
       title: ChangeRow
+    app__api__v1__endpoints__billing__NoteIn:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        invoice_item:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Invoice Item
+        note:
+          type: string
+          maxLength: 400
+          minLength: 1
+          title: Note
+        difference:
+          type: integer
+          title: Difference
+      type: object
+      required:
+      - client_id
+      - invoice_item
+      - note
+      - difference
+      title: NoteIn
     app__api__v1__endpoints__business_context__UpdateRuleRequest:
       properties:
         yaml:
@@ -51898,6 +52934,138 @@ components:
       title: IndicatorOut
       description: The web console's ThreatIndicator (apps/web/src/lib/api.ts), plus
         the raw provider result.
+    app__api__v1__endpoints__governance__ItemIn:
+      properties:
+        kind:
+          type: string
+          enum:
+          - policy
+          - vendor
+          - evidence
+          - other
+          title: Kind
+        title:
+          type: string
+          maxLength: 160
+          minLength: 1
+          title: Title
+        owner:
+          type: string
+          maxLength: 120
+          title: Owner
+          default: ''
+        notes:
+          type: string
+          maxLength: 2000
+          title: Notes
+          default: ''
+        interval_days:
+          type: integer
+          maximum: 1095.0
+          minimum: 1.0
+          title: Interval Days
+          default: 365
+        next_due:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Next Due
+      type: object
+      required:
+      - kind
+      - title
+      title: ItemIn
+    app__api__v1__endpoints__governance__ItemOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        kind:
+          type: string
+          title: Kind
+        title:
+          type: string
+          title: Title
+        owner:
+          type: string
+          title: Owner
+        notes:
+          type: string
+          title: Notes
+        interval_days:
+          type: integer
+          title: Interval Days
+        next_due:
+          type: string
+          format: date
+          title: Next Due
+        last_reviewed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Last Reviewed At
+        state:
+          type: string
+          title: State
+        days_until:
+          type: integer
+          title: Days Until
+        versions:
+          type: integer
+          title: Versions
+      type: object
+      required:
+      - id
+      - kind
+      - title
+      - owner
+      - notes
+      - interval_days
+      - next_due
+      - last_reviewed_at
+      - state
+      - days_until
+      - versions
+      title: ItemOut
+    app__api__v1__endpoints__governance__ItemPatch:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 160
+            minLength: 1
+          - type: 'null'
+          title: Title
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Owner
+        notes:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Notes
+        interval_days:
+          anyOf:
+          - type: integer
+            maximum: 1095.0
+            minimum: 1.0
+          - type: 'null'
+          title: Interval Days
+        next_due:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Next Due
+      type: object
+      title: ItemPatch
     app__api__v1__endpoints__hunt_alert_search__HuntResponse:
       properties:
         total:
@@ -52450,6 +53618,511 @@ components:
       - problems
       - customers
       title: ImportOut
+    app__api__v1__endpoints__inventory__ItemIn:
+      properties:
+        kind:
+          type: string
+          enum:
+          - stock
+          - nuc
+          title: Kind
+          default: stock
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        customer_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Customer Name
+        name:
+          type: string
+          maxLength: 300
+          minLength: 1
+          title: Name
+        category:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Category
+        serial:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Serial
+        model:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Model
+        manufacturer:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Manufacturer
+        quantity:
+          type: integer
+          maximum: 100000.0
+          minimum: 0.0
+          title: Quantity
+          default: 1
+        status:
+          type: string
+          enum:
+          - checked_in
+          - checked_out
+          - offline
+          - retired
+          title: Status
+          default: checked_in
+        site:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Site
+        person:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Person
+        part_no:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Part No
+        has_charger:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Has Charger
+        cpu:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Cpu
+        memory:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Memory
+        storage:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Storage
+        ninja_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+            pattern: ^https?://
+          - type: 'null'
+          title: Ninja Url
+        accounting_treatment:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Accounting Treatment
+        deployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Deployed At
+        redeployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Redeployed At
+        notes:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Notes
+        tags:
+          items:
+            type: string
+            maxLength: 40
+          type: array
+          maxItems: 12
+          title: Tags
+        ticket_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+            pattern: ^https?://
+          - type: 'null'
+          title: Ticket Url
+      type: object
+      required:
+      - name
+      title: ItemIn
+    app__api__v1__endpoints__inventory__ItemOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        kind:
+          type: string
+          enum:
+          - stock
+          - nuc
+          title: Kind
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+          description: The client it is held for; None when it is Live Oak's own or
+            its customer has not been matched to a client yet.
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        customer_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Customer Name
+        name:
+          type: string
+          title: Name
+        category:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+        serial:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Serial
+        model:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model
+        manufacturer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Manufacturer
+        quantity:
+          type: integer
+          title: Quantity
+        status:
+          type: string
+          enum:
+          - checked_in
+          - checked_out
+          - offline
+          - retired
+          title: Status
+        site:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Site
+        person:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Person
+        part_no:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Part No
+        has_charger:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Has Charger
+        cpu:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cpu
+        memory:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Memory
+        storage:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Storage
+        ninja_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ninja Url
+        accounting_treatment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Accounting Treatment
+        deployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Deployed At
+        redeployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Redeployed At
+        checked_out_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Checked Out At
+        checked_in_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Checked In At
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+        tags:
+          items:
+            type: string
+          type: array
+          title: Tags
+        ticket_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ticket Url
+        source:
+          type: string
+          title: Source
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        device:
+          anyOf:
+          - $ref: '#/components/schemas/DeviceLink'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - kind
+      - client_id
+      - client_name
+      - customer_name
+      - name
+      - category
+      - serial
+      - model
+      - manufacturer
+      - quantity
+      - status
+      - site
+      - person
+      - part_no
+      - has_charger
+      - cpu
+      - memory
+      - storage
+      - ninja_url
+      - accounting_treatment
+      - deployed_at
+      - redeployed_at
+      - checked_out_at
+      - checked_in_at
+      - notes
+      - tags
+      - ticket_url
+      - source
+      - updated_at
+      title: ItemOut
+    app__api__v1__endpoints__inventory__ItemPatch:
+      properties:
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        move_to_own:
+          type: boolean
+          title: Move To Own
+          default: false
+        customer_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Customer Name
+        name:
+          anyOf:
+          - type: string
+            maxLength: 300
+            minLength: 1
+          - type: 'null'
+          title: Name
+        category:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Category
+        serial:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Serial
+        model:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Model
+        manufacturer:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Manufacturer
+        quantity:
+          anyOf:
+          - type: integer
+            maximum: 100000.0
+            minimum: 0.0
+          - type: 'null'
+          title: Quantity
+        status:
+          anyOf:
+          - type: string
+            enum:
+            - checked_in
+            - checked_out
+            - offline
+            - retired
+          - type: 'null'
+          title: Status
+        site:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Site
+        person:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Person
+        part_no:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Part No
+        has_charger:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Has Charger
+        cpu:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Cpu
+        memory:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Memory
+        storage:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Storage
+        ninja_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+            pattern: ^https?://
+          - type: 'null'
+          title: Ninja Url
+        accounting_treatment:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Accounting Treatment
+        deployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Deployed At
+        redeployed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Redeployed At
+        notes:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Notes
+        tags:
+          anyOf:
+          - items:
+              type: string
+              maxLength: 40
+            type: array
+            maxItems: 12
+          - type: 'null'
+          title: Tags
+        ticket_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+            pattern: ^https?://
+          - type: 'null'
+          title: Ticket Url
+      type: object
+      title: ItemPatch
+      description: Any of an item's fields; only those sent change. Moving it to another
+        client is ``client_id`` (``own`` is expressed by sending ``move_to_own``).
     app__api__v1__endpoints__investigations__EventOut:
       properties:
         id:
@@ -52585,188 +54258,66 @@ components:
       - target
       - remapped
       title: MergeOut
-    app__api__v1__endpoints__nessus__FindingOut:
+    app__api__v1__endpoints__vcio_proposals__ProposalOut:
       properties:
-        host_name:
-          type: string
-          title: Host Name
-        host_ip:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Host Ip
-        host_os:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Host Os
-        device_id:
-          anyOf:
-          - type: string
-            format: uuid
-          - type: 'null'
-          title: Device Id
-        plugin_id:
-          type: string
-          title: Plugin Id
-        name:
-          type: string
-          title: Name
-        severity:
-          type: string
-          title: Severity
-        port:
-          type: integer
-          title: Port
-        protocol:
-          type: string
-          title: Protocol
-        service:
-          type: string
-          title: Service
-        cvss:
-          anyOf:
-          - type: number
-          - type: 'null'
-          title: Cvss
-        cves:
-          items:
-            type: string
-          type: array
-          title: Cves
-        exploit:
-          type: boolean
-          title: Exploit
-        synopsis:
-          type: string
-          title: Synopsis
-        solution:
-          type: string
-          title: Solution
-      type: object
-      required:
-      - host_name
-      - host_ip
-      - host_os
-      - device_id
-      - plugin_id
-      - name
-      - severity
-      - port
-      - protocol
-      - service
-      - cvss
-      - cves
-      - exploit
-      - synopsis
-      - solution
-      title: FindingOut
-    app__api__v1__endpoints__posture__FindingOut:
-      properties:
-        cloud_provider:
-          type: string
-          title: Cloud Provider
-        cloud_account:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Cloud Account
-        cloud_region:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Cloud Region
-        resource_type:
-          type: string
-          title: Resource Type
-        resource_id:
-          type: string
-          title: Resource Id
-        resource_name:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Resource Name
-        rule_id:
-          type: string
-          title: Rule Id
-        rule_title:
-          type: string
-          title: Rule Title
-        description:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Description
-        severity:
-          type: string
-          title: Severity
-          default: medium
-        frameworks:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Frameworks
-        control_ids:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Control Ids
-        evidence:
-          additionalProperties: true
-          type: object
-          title: Evidence
-        remediation_guide:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Remediation Guide
         id:
           type: string
           format: uuid
           title: Id
-        tenant_id:
+        key:
           type: string
-          format: uuid
-          title: Tenant Id
+          title: Key
+        kind:
+          type: string
+          title: Kind
+        name:
+          type: string
+          title: Name
+        description:
+          type: string
+          title: Description
+        priority:
+          type: string
+          title: Priority
+        evidence:
+          type: string
+          title: Evidence
         status:
           type: string
           title: Status
-        auto_remediated:
-          type: boolean
-          title: Auto Remediated
-        first_detected_at:
-          type: string
-          format: date-time
-          title: First Detected At
-        last_evaluated_at:
-          type: string
-          format: date-time
-          title: Last Evaluated At
-        resolved_at:
+        decided_at:
           anyOf:
           - type: string
             format: date-time
           - type: 'null'
-          title: Resolved At
+          title: Decided At
+        sent_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Sent At
+        result_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result Message
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
       type: object
       required:
-      - cloud_provider
-      - resource_type
-      - resource_id
-      - rule_id
-      - rule_title
       - id
-      - tenant_id
+      - key
+      - kind
+      - name
+      - description
+      - priority
+      - evidence
       - status
-      - auto_remediated
-      - first_detected_at
-      - last_evaluated_at
-      title: FindingOut
+      - updated_at
+      title: ProposalOut
   securitySchemes:
     HTTPBearer:
       type: http
