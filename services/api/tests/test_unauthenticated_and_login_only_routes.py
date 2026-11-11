@@ -222,6 +222,7 @@ LOGIN_ONLY_NO_CHECK: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/auth/password"): OWN
     + " (changes only the caller's own password, and only with the current password; sign-in throttling applies to wrong guesses; needs a real session, not an API key)",
     ("GET", "/api/v1/auth/me"): OWN,
+    ("GET", "/api/v1/auth/me/signins"): OWN,
     ("GET", "/api/v1/auth/totp"): OWN + " (whether the caller's own authenticator app is on)",
     ("POST", "/api/v1/auth/totp/enrol"): OWN
     + " (starts the caller's own authenticator-app setup; changes nothing about signing in until confirmed; needs a real session)",

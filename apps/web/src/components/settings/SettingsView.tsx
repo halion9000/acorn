@@ -60,6 +60,7 @@ import { Field, PanelHeader, inputClass } from './panel-parts';
 import { AlertEmailPanel } from './AlertEmailPanel';
 import { PasskeysCard } from './PasskeysCard';
 import { TotpCard } from './TotpCard';
+import { SigninHistoryCard } from './SigninHistoryCard';
 import { ChangePasswordCard } from './ChangePasswordCard';
 import { APP_VERSION } from '@/lib/revisions';
 import { keyHealth } from './apiKeyHealth';
@@ -665,6 +666,7 @@ function ProfilePanel() {
 
         <ChangePasswordCard />
         <TotpCard />
+        <SigninHistoryCard />
 
         <div className="rounded-lg border border-gray-800 bg-gray-950/40 p-4 text-xs text-gray-500">
           Your display name, job title and timezone are saved to your user account and follow you across devices when you sign in.

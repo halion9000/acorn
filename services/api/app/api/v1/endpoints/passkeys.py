@@ -40,7 +40,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from sqlalchemy import and_, select, update
 
@@ -52,6 +52,7 @@ from app.db.rls_scope import cross_tenant_reads
 from app.db.rls_sessions import adopt_tenant
 from app.models.responder import PasskeyChallenge, PasskeyCredential
 from app.models.tenant import User
+from app.services import signin_history
 from app.services.user_lookup import find_user_by_login
 
 logger = logging.getLogger(__name__)
@@ -411,6 +412,7 @@ async def passkey_authenticate_begin(
 async def passkey_authenticate_finish(
     body: FinishRequest,
     db: DBSession,
+    http_request: Request = None,  # type: ignore[assignment]  # injected by FastAPI; None for a direct call
 ) -> AuthenticateFinishResponse:
     """Verify a passkey assertion and mint JWTs."""
     webauthn, _ = _import_webauthn()
@@ -472,6 +474,15 @@ async def passkey_authenticate_finish(
     cred_row.sign_count = int(verified.new_sign_count)
     cred_row.last_used_at = _now()
     await db.execute(update(User).where(User.id == user_row.id).values(last_login=_now()))
+    # One line for the person's own sign-in history (Profile). Never stops the sign-in.
+    await signin_history.record(
+        db,
+        user_id=user_row.id,
+        tenant_id=user_row.tenant_id,
+        label=user_row.email or user_row.account_name,
+        method="passkey",
+        request=http_request,
+    )
     await db.commit()
 
     token_data = {

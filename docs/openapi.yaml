@@ -194,6 +194,26 @@ paths:
                 $ref: '#/components/schemas/UserMeResponse'
       security:
       - HTTPBearer: []
+  /api/v1/auth/me/signins:
+    get:
+      tags:
+      - auth
+      summary: My Signins
+      description: 'The signed-in person''s own last twenty sign-ins, newest first:
+        when, how and from which address. Nobody else''s.'
+      operationId: my_signins_api_v1_auth_me_signins_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SigninOut'
+                type: array
+                title: Response My Signins Api V1 Auth Me Signins Get
+      security:
+      - HTTPBearer: []
   /api/v1/auth/me/preferences:
     patch:
       tags:
@@ -47758,6 +47778,27 @@ components:
           title: Last At
       type: object
       title: SigninBrief
+    SigninOut:
+      properties:
+        at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: At
+        method:
+          type: string
+          title: Method
+        ip:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ip
+      type: object
+      required:
+      - at
+      - method
+      - ip
+      title: SigninOut
     SigninSummary:
       properties:
         last_24h:

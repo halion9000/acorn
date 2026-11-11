@@ -39,8 +39,9 @@ from app.core.token_revocation import (
     spent_pair,
 )
 from app.core.trusted_proxy import resolve_client_ip
+from app.models.audit import AuditLog
 from app.models.tenant import User
-from app.services import login_throttle, totp_store
+from app.services import login_throttle, signin_history, totp_store
 from app.services.user_lookup import find_user_by_login
 
 logger = logging.getLogger(__name__)
@@ -204,6 +205,10 @@ async def login(
 
     # Update last login
     await db.execute(update(User).where(User.id == user.id).values(last_login=datetime.now(UTC)))
+    # One line for the person's own sign-in history (Profile). Never stops the sign-in.
+    await signin_history.record(
+        db, user_id=user.id, tenant_id=user.tenant_id, label=user.email or user.account_name, method="password", request=http_request
+    )
 
     token_data = {
         "sub": str(user.id),
@@ -412,6 +417,29 @@ async def get_me(current_user: AuthUser, db: DBSession) -> UserMeResponse:
     me = _me(user, await custom_role_grants(db, user))
     me.hidden_nav = await _hidden_nav(db, user)
     return me
+
+
+class SigninOut(BaseModel):
+    at: str | None
+    method: str
+    ip: str | None
+
+
+@router.get("/me/signins", response_model=list[SigninOut])
+async def my_signins(current_user: AuthUser, db: DBSession) -> list[SigninOut]:
+    """The signed-in person's own last twenty sign-ins, newest first: when, how and from which address. Nobody else's."""
+    result = await db.execute(
+        select(AuditLog.created_at, AuditLog.action, AuditLog.changes, AuditLog.actor_ip)
+        .where(
+            AuditLog.tenant_id == current_user.tenant_id,
+            AuditLog.actor_id == current_user.user_id,
+            AuditLog.action.in_(signin_history.SIGNIN_ACTIONS),
+        )
+        .order_by(AuditLog.created_at.desc())
+        .limit(signin_history.SHOWN)
+    )
+    entries = [{"created_at": r[0], "action": r[1], "changes": r[2], "actor_ip": r[3]} for r in result.all()]
+    return [SigninOut(**row) for row in signin_history.rows(entries)]
 
 
 @router.patch("/me/preferences", response_model=UserMeResponse)
