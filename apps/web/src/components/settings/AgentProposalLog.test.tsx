@@ -18,6 +18,40 @@ const list = (items: unknown[], unreviewed = 0) => ({ items, summary: { total: i
 beforeEach(() => { api.list.mockReset(); api.setOutcome.mockReset(); });
 
 describe('AgentProposalLog', () => {
+  it('asks the server for one agent or one outcome when chosen, keeps every agent in the choice, and says what it asked', async () => {
+    const withAgents = (items: unknown[]) => ({ items, summary: { total: items.length, by_rung: {}, by_outcome: {}, shadow_unreviewed: 0, by_agent: { cipher: { total: 2 }, iris: { total: 1 } } } });
+    api.list.mockResolvedValue(withAgents([row(), row({ id: 'p2', agent: 'iris' })]));
+    const user = userEvent.setup();
+    show();
+    await screen.findByTestId('proposal-p1');
+    expect(api.list).toHaveBeenLastCalledWith(undefined, { agent: '', outcome: '' });
+    api.list.mockResolvedValue({ items: [row()], summary: { total: 1, by_rung: {}, by_outcome: {}, shadow_unreviewed: 0, by_agent: { cipher: { total: 1 } } } });
+    await user.selectOptions(screen.getByLabelText('Agent'), 'cipher');
+    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith(undefined, { agent: 'cipher', outcome: '' }));
+    expect(screen.getByRole('option', { name: 'iris' })).toBeInTheDocument(); // still offered although the filtered answer no longer names it
+    await user.selectOptions(screen.getByLabelText('Outcome'), 'rejected');
+    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith(undefined, { agent: 'cipher', outcome: 'rejected' }));
+  });
+
+  it('saves the rows shown as a CSV file, and the button is off when there is nothing to save', async () => {
+    const blobs: Blob[] = [];
+    Object.assign(URL, { createObjectURL: vi.fn((b: Blob) => { blobs.push(b); return 'blob:p'; }), revokeObjectURL: vi.fn() });
+    const names: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { names.push(this.download); });
+    api.list.mockResolvedValue(list([row()]));
+    const user = userEvent.setup();
+    const first = show();
+    await user.click(await screen.findByRole('button', { name: 'Export CSV' }));
+    expect(names[0]).toMatch(/^agent-proposals-\d{4}-\d{2}-\d{2}\.csv$/);
+    const text = await blobs[0].text();
+    expect(text).toContain('cipher,close-as-false-positive,alert 42,Looks benign,Would have done (shadow)');
+    first.unmount();
+    api.list.mockResolvedValue(list([]));
+    show();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled());
+    click.mockRestore();
+  });
+
   it('shows what the agent proposed, that a shadow row did nothing, its evidence as links, and how many await a verdict', async () => {
     api.list.mockResolvedValue(list([row()], 1));
     show();
@@ -43,10 +77,10 @@ describe('AgentProposalLog', () => {
     api.list.mockResolvedValue({ items: [row()], summary: { total: 4, by_rung: { shadow: 1, suggest: 0, ask: 1, act_tell: 1, act_quiet: 1 }, by_outcome: {}, shadow_unreviewed: 1 } });
     show();
     await screen.findByTestId('proposal-p1');
-    expect(api.list).toHaveBeenLastCalledWith(undefined);
+    expect(api.list).toHaveBeenLastCalledWith(undefined, { agent: '', outcome: '' });
     await userEvent.setup().click(screen.getByRole('button', { name: 'Last 24 hours' }));
     expect(await screen.findByTestId('proposals-daily')).toHaveTextContent('In the last 24 hours: 2 done on their own, 1 recorded as would-have-done, 1 asked for approval, 0 suggested.');
-    expect(api.list).toHaveBeenLastCalledWith(24);
+    expect(api.list).toHaveBeenLastCalledWith(24, { agent: '', outcome: '' });
   });
 
   it('shows a scorecard row for each agent: what it logged, did on its own, only recorded, and how people judged it', async () => {

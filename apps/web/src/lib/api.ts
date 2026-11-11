@@ -6391,7 +6391,10 @@ export interface AgentProposalList {
 
 export const agentProposalsApi = {
   /** Every action an agent proposed or took, newest first, with the header counts. */
-  list: (sinceHours?: number) => request<AgentProposalList>(`/api/v1/agent-proposals?limit=50${sinceHours ? `&since_hours=${sinceHours}` : ''}`),
+  list: (sinceHours?: number, filter: { agent?: string; outcome?: string } = {}) =>
+    request<AgentProposalList>(
+      `/api/v1/agent-proposals?limit=50${sinceHours ? `&since_hours=${sinceHours}` : ''}${filter.agent ? `&agent=${encodeURIComponent(filter.agent)}` : ''}${filter.outcome ? `&outcome=${encodeURIComponent(filter.outcome)}` : ''}`,
+    ),
   /** A person records what they made of a proposal (a signed-in session is required). */
   setOutcome: (id: string, outcome: 'accepted' | 'edited' | 'rejected' | 'expired', note?: string) =>
     request<AgentProposal>(`/api/v1/agent-proposals/${id}/outcome`, { method: 'POST', body: JSON.stringify({ outcome, note: note || null }) }),

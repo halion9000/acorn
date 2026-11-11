@@ -6,6 +6,8 @@
  */
 
 import { useState } from 'react';
+import { downloadCsv } from '@/lib/csv';
+import { proposalsCsvText } from './proposalsCsv';
 import useSWR from 'swr';
 import { agentProposalsApi, type AgentProposal } from '@/lib/api';
 
@@ -27,7 +29,18 @@ const OUTCOME: Record<AgentProposal['outcome'], string> = {
 
 export function AgentProposalLog() {
   const [daily, setDaily] = useState(false);
-  const { data, error, mutate } = useSWR(['agent-proposals', daily], () => agentProposalsApi.list(daily ? 24 : undefined), { revalidateOnFocus: false, shouldRetryOnError: false });
+  const [agent, setAgent] = useState('');
+  const [outcome, setOutcome] = useState('');
+  // The agents seen so far, so the choice does not shrink to the one picked when the list is filtered to it.
+  const [agentsSeen, setAgentsSeen] = useState<string[]>([]);
+  const { data, error, mutate } = useSWR(['agent-proposals', daily, agent, outcome], () => agentProposalsApi.list(daily ? 24 : undefined, { agent, outcome }), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+    onSuccess: (d) => {
+      const names = Object.keys(d.summary.by_agent ?? {});
+      if (names.length > 0) setAgentsSeen((seen) => Array.from(new Set([...seen, ...names])).sort());
+    },
+  });
   const [failed, setFailed] = useState<string | null>(null);
 
   if (error) return <p className="mb-4 text-sm text-gray-500" data-testid="proposals-error">The proposal log could not be loaded.</p>;
@@ -47,6 +60,32 @@ export function AgentProposalLog() {
     <section className="mb-6 rounded-lg border border-gray-800 bg-gray-900/60 p-4" data-testid="proposals">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-gray-100">What the agents proposed or did</h3>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <select aria-label="Agent" value={agent} onChange={(e) => setAgent(e.target.value)} className="rounded border border-gray-700 bg-gray-900 px-1.5 py-0.5 text-gray-200">
+            <option value="">All agents</option>
+            {agentsSeen.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+          <select aria-label="Outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)} className="rounded border border-gray-700 bg-gray-900 px-1.5 py-0.5 text-gray-200">
+            <option value="">Any outcome</option>
+            {(Object.keys(OUTCOME) as AgentProposal['outcome'][]).map((o) => (
+              <option key={o} value={o}>
+                {OUTCOME[o]}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={data.items.length === 0}
+            onClick={() => downloadCsv(`agent-proposals-${new Date().toISOString().slice(0, 10)}.csv`, proposalsCsvText(data.items))}
+            className="rounded border border-gray-700 px-2 py-0.5 text-gray-200 hover:bg-gray-800 disabled:opacity-40"
+          >
+            Export CSV
+          </button>
+        </div>
         <div className="flex gap-1 text-xs" role="group" aria-label="Period">
           <button type="button" aria-pressed={daily} onClick={() => setDaily(true)} className={`rounded border px-2 py-0.5 ${daily ? 'border-sky-500/60 text-sky-200' : 'border-gray-700 text-gray-400'}`}>Last 24 hours</button>
           <button type="button" aria-pressed={!daily} onClick={() => setDaily(false)} className={`rounded border px-2 py-0.5 ${!daily ? 'border-sky-500/60 text-sky-200' : 'border-gray-700 text-gray-400'}`}>Everything</button>
