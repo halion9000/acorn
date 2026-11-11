@@ -2142,6 +2142,8 @@ export const alertsApi = {
   notes: (alertId: string) => request<AlertNote[]>(`/api/v1/alerts/${encodeURIComponent(alertId)}/notes`),
   addNote: (alertId: string, body: string) => request<AlertNote>(`/api/v1/alerts/${encodeURIComponent(alertId)}/notes`, { method: 'POST', body: JSON.stringify({ body }) }),
   earlierOutcomes: (alertId: string) => request<EarlierOutcomes>(`/api/v1/alerts/${encodeURIComponent(alertId)}/earlier-outcomes`),
+  /** The same alert (same title) at the organization's other clients in the last day. Empty for a client's own users. */
+  otherClients: (alertId: string) => request<AlertAtOtherClients>(`/api/v1/alerts/${encodeURIComponent(alertId)}/other-clients`),
   /** Stop hiding an alert type: its alerts come back as they were. */
   liftSuppression: (id: string) => request<AlertSuppression>(`/api/v1/alert-suppressions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   /** Enter one alert by hand (the same endpoint `aisoc submit` uses). */
@@ -6342,6 +6344,14 @@ export interface AlertNote {
   author: string;
   body: string;
   created_at: string;
+}
+
+export interface AlertAtOtherClients {
+  window_hours: number;
+  /** How many alerts with the same title the other clients have in the window. */
+  total: number;
+  client_count: number;
+  clients: { client_id: string; name: string; count: number; newest_at: string | null; newest_alert_id: string | null }[];
 }
 
 export interface EarlierOutcomes {

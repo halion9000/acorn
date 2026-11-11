@@ -34,6 +34,7 @@ import { CreateCaseModal } from '@/components/alerts/CreateCaseModal';
 import { HideAlertTypeModal } from '@/components/alerts/HideAlertTypeModal';
 import { HideSuggestionBanner } from '@/components/alerts/HideSuggestionBanner';
 import { EarlierOutcomes } from '@/components/alerts/EarlierOutcomes';
+import { OtherClients } from '@/components/alerts/OtherClients';
 import { AlertNotes } from '@/components/alerts/AlertNotes';
 import { AssignAlert } from '@/components/alerts/AssignAlert';
 import BulkCloseBar, { needsCloseReason, type CloseStatus } from '@/components/alerts/BulkCloseBar';
@@ -982,6 +983,7 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
             <WhyRaised alertId={alert.id} />
 
             <EarlierOutcomes alertId={alert.id} />
+            <OtherClients alertId={alert.id} />
 
             <AlertNotes alertId={alert.id} />
 

@@ -17,7 +17,7 @@ from app.db.rls import TenantDBSession
 from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.models.alert import Alert
 from app.models.tenant import Tenant, User
-from app.services import alert_outcomes
+from app.services import alert_other_clients, alert_outcomes
 from app.services.alert_queue import (
     AlertAlreadyClaimedError,
     AlertNotFoundError,
@@ -1129,6 +1129,47 @@ async def earlier_outcomes(
             for r in found
         ]
     )
+
+
+@router.get("/{alert_id}/other-clients")
+async def same_alert_at_other_clients(
+    alert_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
+) -> dict[str, Any]:
+    """The same alert (same exact title) raised in the last 24 hours at the caller's other tenants: per client, how many and the newest one. Empty for an organization with no clients."""
+    async with alert_scope(db, current_user.tenant_id, alert_id) as tid:
+        this = (await db.execute(select(Alert.title).where(Alert.id == alert_id, Alert.tenant_id == tid))).first()
+        if this is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+    # Only the caller's own organization and the clients it owns, never anything else; the tenant holding this alert is left out.
+    names = {
+        row.id: row.name
+        for row in (
+            await db.execute(
+                select(Tenant.id, Tenant.name).where(
+                    or_(Tenant.parent_tenant_id == current_user.tenant_id, Tenant.id == current_user.tenant_id)
+                )
+            )
+        ).all()
+    }
+    others = [t for t in names if t != tid]
+    if not others or not this[0]:
+        return alert_other_clients.nothing()
+    since = datetime.now(UTC) - timedelta(hours=alert_other_clients.WINDOW_HOURS)
+    async with cross_tenant_reads(db):
+        found = (
+            await db.execute(
+                select(Alert.tenant_id, Alert.id, Alert.created_at)
+                .where(
+                    Alert.tenant_id.in_(others),
+                    Alert.title == this[0],
+                    Alert.created_at >= since,
+                    Alert.status.notin_(("suppressed", "stale")),
+                )
+                .order_by(Alert.created_at.desc())
+                .limit(alert_other_clients.ROW_CAP)
+            )
+        ).all()
+    return alert_other_clients.summarize([{"tenant_id": r[0], "id": r[1], "created_at": r[2]} for r in found], names)
 
 
 @router.get("/{alert_id}", response_model=AlertDetailResponse)

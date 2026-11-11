@@ -906,6 +906,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alerts/{alert_id}/other-clients:
+    get:
+      tags:
+      - alerts
+      summary: Same Alert At Other Clients
+      description: 'The same alert (same exact title) raised in the last 24 hours
+        at the caller''s other tenants: per client, how many and the newest one. Empty
+        for an organization with no clients.'
+      operationId: same_alert_at_other_clients_api_v1_alerts__alert_id__other_clients_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Same Alert At Other Clients Api V1 Alerts  Alert Id  Other
+                  Clients Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}:
     get:
       tags:
