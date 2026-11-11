@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
+import { CHECK_HELP } from "./checkHelp";
 
 type Status = "met" | "partly" | "not_met" | "no_evidence";
 interface Control {
@@ -87,6 +88,11 @@ export function NistCoverage({ clientId }: { clientId: string }) {
                   {c.checks.map((k) => (
                     <li key={k.key}>
                       <span className={k.status === "met" ? "text-emerald-300" : k.status === "partly" ? "text-amber-300" : "text-red-300"}>{k.status.replace("_", " ")}</span> · {k.key.replace(/_/g, " ")}: {k.evidence}
+                      {k.status !== "met" && CHECK_HELP[k.key] ? (
+                        <p className="pl-3 text-gray-300" data-testid={`nist-fix-${k.key}`}>
+                          To fix: {CHECK_HELP[k.key].fix}
+                        </p>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

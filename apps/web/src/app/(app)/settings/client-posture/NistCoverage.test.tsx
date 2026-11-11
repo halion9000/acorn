@@ -61,3 +61,37 @@ describe("daysMet", () => {
     expect(daysMet("2027-01-01T00:00:00Z", now)).toBeNull();
   });
 });
+
+describe('NistCoverage: what to do about a check that is not met', () => {
+  it('shows the fix under a not-met or partly-met check that has advice, and none under a met check or one with no advice', async () => {
+    const { CHECK_HELP } = await import('./checkHelp');
+    const known = Object.keys(CHECK_HELP)[0];
+    authFetch.mockImplementation(() =>
+      json({
+        controls: [
+          {
+            control_id: 'PR.PS-02',
+            category: 'Protect',
+            title: 'Software maintained',
+            status: 'not_met',
+            met_since: null,
+            checks: [
+              { key: known, status: 'not_met', evidence: 'behind' },
+              { key: 'no_advice_for_this_one', status: 'not_met', evidence: 'x' },
+            ],
+          },
+          { control_id: 'DE.CM-01', category: 'Detect', title: 'Monitored', status: 'met', met_since: '2026-10-01T00:00:00Z', checks: [{ key: known, status: 'met', evidence: 'fine' }] },
+        ],
+        totals: { met: 1, partly: 0, not_met: 1, no_evidence: 0 },
+      }),
+    );
+    const user = userEvent.setup();
+    render(<NistCoverage clientId="c1" />);
+    await user.click(await screen.findByRole('button', { name: /PR\.PS-02/ }));
+    expect(screen.getByTestId(`nist-fix-${known}`)).toHaveTextContent(`To fix: ${CHECK_HELP[known].fix}`);
+    expect(screen.queryByTestId('nist-fix-no_advice_for_this_one')).toBeNull();
+    await user.click(screen.getByRole('button', { name: /DE\.CM-01/ }));
+    expect(screen.getByTestId('nist-DE.CM-01')).toHaveTextContent('fine');
+    expect(screen.queryByTestId(`nist-fix-${known}`)).toBeNull(); // the met check has no "To fix" line
+  });
+});
