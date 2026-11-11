@@ -1,6 +1,7 @@
 'use client';
 
 import { csvText, downloadCsv } from '@/lib/csv';
+import { collectAllAlerts } from './collectAlerts';
 import { useState, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
@@ -535,6 +536,8 @@ export function AlertsView() {
   // workflows or when triaging a specific alert ID.
   const [viewMode, setViewMode] = useState<ViewMode>('alerts');
   const [createOpen, setCreateOpen] = useState(false);
+  const [exportingAll, setExportingAll] = useState(false);
+  const [exportNote, setExportNote] = useState<string | null>(null);
 
   const { data, error, isLoading, mutate } = useSWR(
     ['alerts', filters],
@@ -586,6 +589,32 @@ export function AlertsView() {
           >
             Export CSV
           </button>
+          {total > alerts.length ? (
+            <button
+              type="button"
+              disabled={exportingAll}
+              title="Save every alert the filter matches, not only this page, as a spreadsheet file"
+              onClick={() => {
+                setExportingAll(true);
+                setExportNote(null);
+                collectAllAlerts((f) => alertsApi.list(f), filters)
+                  .then((all) => {
+                    downloadCsv('alerts-all.csv', alertsCsvText(all.alerts));
+                    setExportNote(all.capped ? `Saved the first ${all.alerts.length} of ${all.total}: narrow the filter for the rest.` : `Saved ${all.alerts.length} alerts.`);
+                  })
+                  .catch((e) => setExportNote(`Could not export: ${e instanceof Error ? e.message : String(e)}`))
+                  .finally(() => setExportingAll(false));
+              }}
+              className="text-xs text-gray-400 hover:text-gray-200 underline disabled:opacity-40"
+            >
+              {exportingAll ? 'Exporting…' : `Export all ${total}`}
+            </button>
+          ) : null}
+          {exportNote ? (
+            <span className="text-xs text-gray-400" role="status" data-testid="export-all-note">
+              {exportNote}
+            </span>
+          ) : null}
           <div
             role="tablist"
             aria-label="View mode"
