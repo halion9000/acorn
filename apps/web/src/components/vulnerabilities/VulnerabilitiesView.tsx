@@ -14,7 +14,9 @@ import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { alertsApi, type Alert } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { safeDistance } from '@/lib/safe-date';
+import { targetWords } from '@/app/(app)/settings/client-posture/ToolChecks';
 import { vulnerabilitiesCsvText } from './vulnerabilitiesCsv';
+import { overTargetCount, targetStanding } from './vulnTarget';
 
 const SEVERITY_TEXT: Record<string, string> = {
   critical: 'text-red-300 border-red-500/40 bg-red-500/10',
@@ -50,14 +52,30 @@ export function sortFindings(alerts: Alert[]): Alert[] {
   return [...alerts].sort((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9) || (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
 }
 
+/** "Fix within 24 hours" under a finding, or "Past its 24 hours target" in red once it has been open longer; nothing for a severity with no target. */
+export function TargetLine({ id, severity, since }: { id: string; severity: string; since?: string | null }) {
+  const t = targetStanding(severity, since);
+  if (!t) return null;
+  return (
+    <p className={`mt-0.5 text-[11px] ${t.over ? 'text-red-300' : 'text-gray-500'}`} data-testid={`vuln-target-${id}`}>
+      {t.over ? 'Past its ' : 'Fix within '}
+      {targetWords(t.hours)}
+      {t.over ? ' target' : ''}
+    </p>
+  );
+}
+
 export function VulnerabilitiesView() {
   const [clientId, setClientId] = useState('');
+  const [lateOnly, setLateOnly] = useState(false);
   const { data, error, isLoading } = useSWR(
     ['vulnerability-alerts', clientId],
     () => alertsApi.list({ category: 'vulnerability', status: 'open', pageSize: 200, ...(clientId ? { clientId } : {}) }),
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
-  const findings = sortFindings(data?.alerts ?? []);
+  const all = sortFindings(data?.alerts ?? []);
+  const late = overTargetCount(all);
+  const findings = lateOnly ? all.filter((a) => targetStanding(a.severity, a.createdAt)?.over) : all;
   const clients = byClient(findings);
   const counts = findings.reduce<Record<string, number>>((m, a) => ({ ...m, [a.severity]: (m[a.severity] ?? 0) + 1 }), {});
 
@@ -94,7 +112,13 @@ export function VulnerabilitiesView() {
                 .filter((s) => counts[s])
                 .map((s) => `${counts[s]} ${s}`)
                 .join(' · ')}
+              {late > 0 ? <span className="text-red-300" data-testid="vulnerabilities-late"> · {late} past their fix target</span> : null}
             </p>
+            {late > 0 ? (
+              <label className="flex items-center gap-1 text-xs text-gray-300">
+                <input type="checkbox" checked={lateOnly} onChange={(e) => setLateOnly(e.target.checked)} /> Past target only
+              </label>
+            ) : null}
             <button
               type="button"
               onClick={() => downloadCsv(`vulnerabilities-${new Date().toISOString().slice(0, 10)}.csv`, vulnerabilitiesCsvText(findings, toolOf))}
@@ -140,6 +164,7 @@ export function VulnerabilitiesView() {
                       <td className="px-3 py-2">
                         <p className="text-gray-100">{a.title}</p>
                         {a.description ? <p className="mt-0.5 text-xs text-gray-400">{a.description}</p> : null}
+                        <TargetLine id={a.id} severity={a.severity} since={a.createdAt} />
                       </td>
                       <td className="px-3 py-2 text-gray-300">{toolOf(a)}</td>
                       <td className="px-3 py-2 text-xs text-gray-400" suppressHydrationWarning>{safeDistance(a.createdAt, { addSuffix: true })}</td>

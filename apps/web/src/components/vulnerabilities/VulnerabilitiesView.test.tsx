@@ -78,3 +78,34 @@ describe('VulnerabilitiesView', () => {
     expect(toolOf(alert() as never)).toBe('ThreatMate');
   });
 });
+
+describe('fix-time targets', () => {
+  const old = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+
+  it('says how long each finding has to be fixed, marks the late ones, counts them, and can show only those', async () => {
+    api.list.mockResolvedValue({
+      alerts: [
+        alert({ id: 'late', severity: 'critical', title: 'Late one', createdAt: old(10) }),
+        alert({ id: 'fresh', severity: 'high', title: 'Fresh one', createdAt: old(1) }),
+        alert({ id: 'none', severity: 'info', title: 'No clock', createdAt: old(900) }),
+      ],
+      total: 3,
+    });
+    show();
+    expect(await screen.findByTestId('vuln-target-late')).toHaveTextContent('Past its 4 hours target');
+    expect(screen.getByTestId('vuln-target-fresh')).toHaveTextContent('Fix within 1 day');
+    expect(screen.queryByTestId('vuln-target-none')).toBeNull();
+    expect(screen.getByTestId('vulnerabilities-late')).toHaveTextContent('1 past their fix target');
+    await userEvent.click(screen.getByRole('checkbox', { name: /past target only/i }));
+    expect(screen.getByTestId('vuln-late')).toBeInTheDocument();
+    expect(screen.queryByTestId('vuln-fresh')).toBeNull();
+  });
+
+  it('shows no late count or toggle when nothing is past its target', async () => {
+    api.list.mockResolvedValue({ alerts: [alert({ severity: 'high', createdAt: old(1) })], total: 1 });
+    show();
+    await screen.findByTestId('vuln-a1');
+    expect(screen.queryByTestId('vulnerabilities-late')).toBeNull();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+});
