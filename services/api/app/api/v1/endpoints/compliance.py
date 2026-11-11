@@ -32,6 +32,7 @@ from sqlalchemy import select, text
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.db.rls_scope import acting_as_tenant
 from app.models.tenant import Tenant
+from app.services import evidence_age
 from app.services.alert_status import HANDLED_ALERT_STATUSES, sql_in
 from app.services.compliance_catalog import CATALOGS
 
@@ -150,6 +151,9 @@ class CompliancePosture(BaseModel):
     coverage_pct: float  # accepted / known controls * 100
     controls_covered: list[str]
     controls_missing: list[str]
+    # Controls whose newest accepted evidence is more than a year old, and the age in days of the oldest of those newest dates (None with no accepted evidence).
+    controls_stale: list[str] = Field(default_factory=list)
+    oldest_evidence_days: int | None = None
     generated_at: datetime
 
 
@@ -569,7 +573,8 @@ async def compliance_report(
                COUNT(*) AS total,
                COUNT(*) FILTER (WHERE status = 'accepted') AS accepted,
                COUNT(*) FILTER (WHERE status = 'pending')  AS pending,
-               COUNT(*) FILTER (WHERE status = 'rejected') AS rejected
+               COUNT(*) FILTER (WHERE status = 'rejected') AS rejected,
+               MAX(collected_at) FILTER (WHERE status = 'accepted') AS newest_accepted
         FROM aisoc_compliance_evidence
         WHERE {" AND ".join(wheres)}
         GROUP BY framework, control_id
@@ -587,19 +592,22 @@ async def compliance_report(
     for r in rows:
         fw = r.framework
         if fw not in by_fw:
-            by_fw[fw] = {"total": 0, "accepted": 0, "pending": 0, "rejected": 0, "covered": set()}
+            by_fw[fw] = {"total": 0, "accepted": 0, "pending": 0, "rejected": 0, "covered": set(), "newest": {}}
         by_fw[fw]["total"] += r.total
         by_fw[fw]["accepted"] += r.accepted
         by_fw[fw]["pending"] += r.pending
         by_fw[fw]["rejected"] += r.rejected
         if r.accepted > 0:
             by_fw[fw]["covered"].add(r.control_id)
+            by_fw[fw]["newest"][r.control_id] = getattr(r, "newest_accepted", None)
 
     report = []
+    now = datetime.now(UTC)
     target_fws = [framework] if framework else list(by_fw.keys()) + [f for f in FRAMEWORKS if f not in by_fw]
     for fw in dict.fromkeys(target_fws):
         known = FRAMEWORKS.get(fw, {})
-        data = by_fw.get(fw, {"total": 0, "accepted": 0, "pending": 0, "rejected": 0, "covered": set()})
+        data = by_fw.get(fw, {"total": 0, "accepted": 0, "pending": 0, "rejected": 0, "covered": set(), "newest": {}})
+        age = evidence_age.summarize(data["newest"], now)
         covered = data["covered"]
         missing = [c for c in known if c not in covered]
         pct = (len(covered) / len(known) * 100) if known else 0.0
@@ -613,7 +621,9 @@ async def compliance_report(
                 coverage_pct=round(pct, 1),
                 controls_covered=sorted(covered),
                 controls_missing=sorted(missing),
-                generated_at=datetime.now(UTC),
+                controls_stale=age["stale"],
+                oldest_evidence_days=age["oldest_days"],
+                generated_at=now,
             )
         )
     return report

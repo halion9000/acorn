@@ -30754,6 +30754,16 @@ components:
             type: string
           type: array
           title: Controls Missing
+        controls_stale:
+          items:
+            type: string
+          type: array
+          title: Controls Stale
+        oldest_evidence_days:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Oldest Evidence Days
         generated_at:
           type: string
           format: date-time

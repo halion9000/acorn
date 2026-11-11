@@ -30,17 +30,28 @@ interface PostureRow {
   framework: string;
   controls_covered: string[];
   controls_missing: string[];
+  /** Controls whose newest accepted evidence is more than a year old (an older API does not send it). */
+  controls_stale?: string[];
+}
+
+interface Completion {
+  pct: number;
+  covered: number;
+  total: number;
+  /** How many covered controls have evidence past a year; absent when none do. */
+  stale?: number;
 }
 
 /** How far along a framework is: the controls with accepted evidence over all its controls. Null when the API listed no controls. */
-export function completion(row: Pick<PostureRow, 'controls_covered' | 'controls_missing'> | undefined): { pct: number; covered: number; total: number } | null {
+export function completion(row: Pick<PostureRow, 'controls_covered' | 'controls_missing' | 'controls_stale'> | undefined): Completion | null {
   if (!row) return null;
   const covered = row.controls_covered.length;
   const total = covered + row.controls_missing.length;
-  return total === 0 ? null : { pct: Math.round((covered / total) * 100), covered, total };
+  const stale = Array.isArray(row.controls_stale) ? row.controls_stale.length : 0;
+  return total === 0 ? null : { pct: Math.round((covered / total) * 100), covered, total, ...(stale > 0 ? { stale } : {}) };
 }
 
-function Progress({ value }: { value: { pct: number; covered: number; total: number } | null | undefined }) {
+function Progress({ value }: { value: Completion | null | undefined }) {
   if (value === undefined) return <p className="mt-4 text-xs text-gray-500">Reading progress…</p>;
   if (value === null) return <p className="mt-4 text-xs text-gray-500">Progress is not available.</p>;
   return (
@@ -54,6 +65,11 @@ function Progress({ value }: { value: { pct: number; covered: number; total: num
       <div role="progressbar" aria-label="Controls with accepted evidence" aria-valuemin={0} aria-valuemax={100} aria-valuenow={value.pct} className="h-1.5 overflow-hidden rounded-full bg-gray-700">
         <div className="h-full rounded-full bg-emerald-500" style={{ width: `${value.pct}%` }} />
       </div>
+      {value.stale ? (
+        <p className="mt-1 text-xs text-amber-300" data-testid="framework-stale">
+          {value.stale} {value.stale === 1 ? 'control has' : 'controls have'} evidence more than a year old
+        </p>
+      ) : null}
     </div>
   );
 }

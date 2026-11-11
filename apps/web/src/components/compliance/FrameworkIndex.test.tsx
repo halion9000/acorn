@@ -84,6 +84,27 @@ describe('how far along each framework is', () => {
     expect(completion(undefined)).toBeNull();
   });
 
+  it('counts the controls whose evidence is past a year, and says nothing when there are none or the API is older', () => {
+    expect(completion({ controls_covered: ['a', 'b'], controls_missing: [], controls_stale: ['a'] })?.stale).toBe(1);
+    expect(completion({ controls_covered: ['a'], controls_missing: [], controls_stale: [] })).not.toHaveProperty('stale');
+    expect(completion({ controls_covered: ['a'], controls_missing: [] })).not.toHaveProperty('stale');
+  });
+
+  it('a card says how many controls have evidence more than a year old, and no such line when none do', async () => {
+    listChildren.mockResolvedValue([]);
+    authFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve([
+          { framework: 'SOC2', controls_covered: ['CC1', 'CC2', 'CC3'], controls_missing: ['CC4'], controls_stale: ['CC1', 'CC2'] },
+          { framework: 'ISO27001', controls_covered: ['A.5.1'], controls_missing: [], controls_stale: [] },
+        ]),
+    });
+    renderIndex();
+    expect(await screen.findByTestId('framework-stale')).toHaveTextContent('2 controls have evidence more than a year old');
+    expect(screen.getAllByTestId('framework-stale')).toHaveLength(1);
+  });
+
   it('shows a percentage complete bar on each card, for the framework the API names, and says when it cannot be read', async () => {
     listChildren.mockResolvedValue([]);
     authFetch.mockResolvedValue({
