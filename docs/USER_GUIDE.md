@@ -339,6 +339,8 @@ All of these were tested against test data and a scratch database and deployed, 
 - **Settings > Roles & permissions > Recent changes.** Opening a custom role to edit it lists its last ten changes in words (created, renamed, permissions gained or lost, given to or taken from a person), with who made them and when (UTC).
 - **Search (Ctrl+K) finds every sidebar page.** The palette used to list fourteen pages; it now lists every page your role shows, and knows other words for some (billing, invoice, 2fa, cve, qbr, network map).
 - **Vulnerabilities > Export CSV, and fix-time targets.** Export CSV saves the findings shown. Each finding says how long it has to be fixed (critical 4 hours, high 24 hours, medium 5 days, low 14 days, from when it was raised) and turns red when it is past that; a count says how many, and Past target only shows just those.
+- **Compliance > old evidence.** Under a control whose newest accepted evidence is more than a year old the framework page says how many months old it is and asks for it to be refreshed, and a count above the list says how many controls that is.
+- **Platform health > Download health report keeps expiry dates.** The Microsoft secret's expiry date and the kind and age of old credentials stay readable in the file; any value, key or token is still blanked.
 
 ---
 
