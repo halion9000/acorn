@@ -9,6 +9,7 @@ import { auditApi, ApiError, type AuditExportFilters } from '@/lib/api';
 import { authFetch } from '@/lib/auth-session';
 import { foldBatches } from './auditBatches';
 import { auditKindOptions } from './auditKinds';
+import { csvRowCount, withRowCount } from './auditFileName';
 
 interface AuditEvent {
   id: string;
@@ -116,12 +117,13 @@ const data = isValid ? raw : null;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename;
+      const name = withRowCount(filename, csvRowCount(body));
+      a.download = name;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success(`Exported ${filename}`);
+      toast.success(`Exported ${name}`);
     } catch (e) {
       const msg = e instanceof ApiError
         ? `Couldn't export audit log (HTTP ${e.status}). ${e.status === 403 ? 'Your role lacks audit_log:read.' : 'Try again.'}`

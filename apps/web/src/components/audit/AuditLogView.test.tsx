@@ -144,7 +144,8 @@ describe('AuditLogView export buttons', () => {
     expect(exportCsvMock).toHaveBeenCalledWith({});
     await waitFor(() =>
       expect(toastSuccess).toHaveBeenCalledWith(
-        expect.stringContaining('aisoc-audit-20260501T120000Z.csv'),
+        // The name says how many rows the file holds (one data row here).
+        expect.stringContaining('aisoc-audit-20260501T120000Z-1-row.csv'),
       ),
     );
   });
