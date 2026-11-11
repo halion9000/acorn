@@ -34,6 +34,23 @@ describe('FrameworkView', () => {
     expect(screen.getByText('No evidence')).toBeTruthy(); // CC1.1 is never filled in for anyone
   });
 
+  it('says which controls rest on accepted evidence over a year old, and says nothing for recent evidence', async () => {
+    const old = new Date(Date.now() - 500 * 86_400_000).toISOString();
+    const recent = new Date(Date.now() - 10 * 86_400_000).toISOString();
+    authFetch.mockImplementation((url: string) => {
+      if (url.includes('/controls')) return json({ controls: [{ control_id: 'CC6.1', title: 'Access' }, { control_id: 'CC7.2', title: 'Monitoring' }] });
+      if (url.includes('/report')) return json([{ total_evidence: 2, accepted: 2, pending: 0, rejected: 0, coverage_pct: 100, controls_covered: ['CC6.1', 'CC7.2'], controls_missing: [] }]);
+      return json([
+        { id: 'e1', control_id: 'CC6.1', summary: 'Access review', status: 'accepted', collected_at: old, reviewed_by: 'a@x.test' },
+        { id: 'e2', control_id: 'CC7.2', summary: 'Monitoring', status: 'accepted', collected_at: recent, reviewed_by: 'a@x.test' },
+      ]);
+    });
+    render(<FrameworkView framework="soc2" />);
+    expect((await screen.findByTestId('stale-CC6.1')).textContent).toMatch(/16 months old: refresh it/);
+    expect(screen.queryByTestId('stale-CC7.2')).toBeNull();
+    expect(screen.getByTestId('stale-evidence').textContent).toContain('1 control with accepted evidence over a year old');
+  });
+
   it('says plainly when the framework has no control list in this build', () => {
     render(<FrameworkView framework="some-future-framework" />);
     expect(screen.getByText(/no control list in this A.C.O.R.N build/)).toBeTruthy();

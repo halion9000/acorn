@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
+import { evidenceAgeNote, staleControlCount } from './evidenceAge';
 
 interface Props {
   framework: string;
@@ -250,6 +251,8 @@ export function FrameworkView({ framework }: Props) {
     return 'none';
   };
 
+  const staleControls = staleControlCount(controls.map((c) => evidenceFor(c.control_id)));
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -270,6 +273,11 @@ export function FrameworkView({ framework }: Props) {
           {posture && (
             <p className="text-sm text-gray-400 mt-1" data-testid="coverage">
               {posture.coverage_pct.toFixed(0)}% of controls have accepted evidence ({posture.accepted} accepted, {posture.pending} waiting for review, {posture.rejected} rejected)
+            </p>
+          )}
+          {staleControls > 0 && (
+            <p className="text-sm text-amber-300 mt-1" data-testid="stale-evidence">
+              {staleControls} control{staleControls === 1 ? '' : 's'} with accepted evidence over a year old: refresh {staleControls === 1 ? 'it' : 'them'} before an audit.
             </p>
           )}
         </div>
@@ -335,6 +343,11 @@ export function FrameworkView({ framework }: Props) {
                   <span className={`text-xs ${STATUS_TEXT[state] ?? 'text-gray-500'}`}>{state === 'none' ? 'No evidence' : state}</span>
                 </span>
               </div>
+              {evidenceAgeNote(evidenceFor(c.control_id)) ? (
+                <p className="mt-1 text-xs text-amber-300" data-testid={`stale-${c.control_id}`}>
+                  {evidenceAgeNote(evidenceFor(c.control_id))}
+                </p>
+              ) : null}
               {(sf?.requirements[c.control_id]?.controls ?? []).length > 0 && (
                 <p className="mt-2 text-xs text-gray-400" data-testid={`sf-controls-${c.control_id}`}>
                   Secureframe controls:{' '}
