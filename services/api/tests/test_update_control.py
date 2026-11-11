@@ -135,6 +135,7 @@ def test_history_is_read_newest_first_with_ok_only_for_the_statuses_that_mean_it
         "commit": "aaa1111",
         "mode": "rollback",
         "seconds": None,
+        "asked_by": None,
     }
 
 

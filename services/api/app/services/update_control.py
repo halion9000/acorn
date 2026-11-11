@@ -17,6 +17,11 @@ RUNNING_FILE = "running"
 RUN_LOG = "last-run.log"
 HISTORY_FILE = "history.log"
 HISTORY_SHOWN = 20
+# Who pressed Update and when, one JSON line each, written by the API only (the update script never reads it). The latest ASKED_KEPT are kept.
+ASKED_FILE = "asked.log"
+ASKED_KEPT = 50
+# A run is put down to a request made at most this long before the run was recorded, plus however long the run itself took.
+ASKED_WINDOW_SECONDS = 30 * 60
 _HISTORY_OK = {"ok", "verify_ok", "rollback_ok"}
 _SAFE = re.compile(r"^[A-Za-z0-9_.:-]{1,40}$")
 TAIL_LINES = 40
@@ -107,7 +112,9 @@ def read_state(directory: Path | None) -> UpdateState:
         except (OSError, ValueError):
             pass
     try:
-        out.history = parse_history((directory / HISTORY_FILE).read_text(encoding="utf-8", errors="replace"))
+        out.history = attach_askers(
+            parse_history((directory / HISTORY_FILE).read_text(encoding="utf-8", errors="replace")), read_asked(directory)
+        )
     except OSError:
         pass  # no history yet
     log = directory / RUN_LOG
@@ -135,3 +142,53 @@ def request_update(directory: Path | None, requested_by: str, now: datetime | No
     tmp = directory / (REQUEST_FILE + ".tmp")
     tmp.write_text(json.dumps(body), encoding="utf-8")
     os.replace(tmp, directory / REQUEST_FILE)
+    _note_asked(directory, requested_by, body["requested_at"])
+
+
+def _note_asked(directory: Path, requested_by: str, at: str) -> None:
+    """Remember who asked, for the history list. Never fails a request: the update matters more than the note."""
+    try:
+        file = directory / ASKED_FILE
+        old = file.read_text(encoding="utf-8", errors="replace").splitlines() if file.exists() else []
+        lines = [*old, json.dumps({"by": requested_by[:200], "at": at})][-ASKED_KEPT:]
+        file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def read_asked(directory: Path) -> list[tuple[datetime, str]]:
+    """Who asked for an update and when, oldest first; a line that cannot be read is skipped."""
+    out: list[tuple[datetime, str]] = []
+    try:
+        lines = (directory / ASKED_FILE).read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return out
+    for line in lines:
+        try:
+            data = json.loads(line)
+            at = datetime.fromisoformat(str(data["at"]))
+            by = str(data["by"])[:200]
+        except (ValueError, KeyError, TypeError):
+            continue
+        if by:
+            out.append((at if at.tzinfo else at.replace(tzinfo=UTC), by))
+    return sorted(out, key=lambda x: x[0])
+
+
+def attach_askers(rows: list[dict], asked: list[tuple[datetime, str]]) -> list[dict]:
+    """Each history row with ``asked_by``: the person whose request came before the run was recorded, within the window (plus the run's own length); None for a run nobody asked for from the
+    page (one started on the server). A request is put down to one run only: the first recorded after it. Pure."""
+    left = list(asked)
+    by_row: dict[int, str | None] = {}
+    order = sorted(range(len(rows)), key=lambda i: rows[i]["at"])  # oldest run first, so an early request is not taken by a later run
+    for i in order:
+        row = rows[i]
+        try:
+            done = datetime.strptime(row["at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        except (ValueError, KeyError):
+            by_row[i] = None
+            continue
+        allowed = ASKED_WINDOW_SECONDS + int(row.get("seconds") or 0)
+        match = next((k for k, (at, _) in enumerate(left) if at <= done and (done - at).total_seconds() <= allowed), None)
+        by_row[i] = left.pop(match)[1] if match is not None else None
+    return [{**row, "asked_by": by_row.get(i)} for i, row in enumerate(rows)]

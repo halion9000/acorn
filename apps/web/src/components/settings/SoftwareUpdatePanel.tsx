@@ -140,6 +140,7 @@ function Inner() {
                 <th scope="col">Result</th>
                 <th scope="col">Version</th>
                 <th scope="col">Took</th>
+                <th scope="col">Asked by</th>
               </tr>
             </thead>
             <tbody>
@@ -150,6 +151,7 @@ function Inner() {
                   <td className={h.ok ? 'text-emerald-300' : 'text-red-300'}>{HISTORY_STATUS[h.status] ?? h.status}</td>
                   <td className="font-mono">{h.commit ?? 'unknown'}</td>
                   <td>{tookLabel(h.seconds)}</td>
+                  <td>{h.asked_by ?? 'on the server'}</td>
                 </tr>
               ))}
             </tbody>

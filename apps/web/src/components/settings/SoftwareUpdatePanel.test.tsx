@@ -81,7 +81,7 @@ describe('SoftwareUpdatePanel', () => {
     platformUpdateApi.get.mockResolvedValue(
       status({
         history: [
-          { at: '2026-11-10T12:00:00Z', status: 'rolled_back', ok: false, commit: 'aaa1111', mode: 'update', seconds: 245 },
+          { at: '2026-11-10T12:00:00Z', status: 'rolled_back', ok: false, commit: 'aaa1111', mode: 'update', seconds: 245, asked_by: 'hal@example.com' },
           { at: '2026-11-09T10:00:00Z', status: 'ok', ok: true, commit: null, mode: 'force' },
         ],
       }),
@@ -93,6 +93,8 @@ describe('SoftwareUpdatePanel', () => {
     expect(rows[0]).toHaveTextContent('Failed and went back to the earlier version');
     expect(rows[0]).toHaveTextContent('aaa1111');
     expect(rows[0]).toHaveTextContent('4 min 5 s');
+    expect(rows[0]).toHaveTextContent('hal@example.com');
+    expect(rows[1]).toHaveTextContent('on the server');
     expect(rows[1]).toHaveTextContent('–');
     expect(rows[1]).toHaveTextContent('Rebuild');
     expect(rows[1]).toHaveTextContent('Updated');
