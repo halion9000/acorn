@@ -497,6 +497,8 @@ class CountryAddress(BaseModel):
     ip: str
     emails: int
     failed: int
+    # The service the address belongs to (Microsoft 365, Google Workspace...) when the domains it authenticated with name a known one; None otherwise.
+    name: str | None = None
 
 
 ADDRESSES_PER_COUNTRY = 5
@@ -534,12 +536,18 @@ async def countries(
     """Country of each sending address, looked up for the busiest addresses only (a quiet tail is reported as not looked up rather than guessed or fetched one by one)."""
     reports, _ = await _scoped_reports(current_user, db, days, domain, client_id)
     by_ip: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+    names: dict[str, str] = {}
     total = 0
     for r in reports:
         for row in r.rows or []:
             count = int(row.get("count", 0))
             total += count
-            by_ip[str(row.get("ip") or "")][0 if row.get("pass") else 1] += count
+            ip = str(row.get("ip") or "")
+            by_ip[ip][0 if row.get("pass") else 1] += count
+            if ip not in names:
+                known = identify_sender(list(row.get("spf_domains") or []), list(row.get("dkim_domains") or []))
+                if known:
+                    names[ip] = known
     busiest = sorted(by_ip.items(), key=lambda kv: -(kv[1][0] + kv[1][1]))[:MAX_LOOKUPS]
     found = await asyncio.gather(*(country_of(ip, resolver) for ip, _ in busiest))
     per: dict[str, list[int]] = defaultdict(lambda: [0, 0])
@@ -551,7 +559,7 @@ async def countries(
         else:
             per[code][0] += p
             per[code][1] += f
-            senders[code].append(CountryAddress(ip=ip, emails=p + f, failed=f))  # `busiest` is already busiest first
+            senders[code].append(CountryAddress(ip=ip, emails=p + f, failed=f, name=names.get(ip)))  # `busiest` is already busiest first
     looked = sum(p + f for _, (p, f) in busiest)
     return Countries(
         days=days,

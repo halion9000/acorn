@@ -495,9 +495,9 @@ def test_mail_is_grouped_by_the_country_of_the_sending_address_and_what_cannot_b
 
     ip_country._CACHE.clear()
     rows = [
-        line_row("8.8.8.8", 30),
+        line_row("8.8.8.8", 30, spf_domains=("_spf.google.com",)),
         line_row("8.8.4.4", 10, ok=False),
-        line_row("1.1.1.1", 5),
+        line_row("1.1.1.1", 5, dkim_domains=("contoso.onmicrosoft.com",)),
         line_row("10.0.0.5", 4),  # private: never asked about
         line_row("9.9.9.9", 2),  # the lookup does not know it
     ]
@@ -515,6 +515,9 @@ def test_mail_is_grouped_by_the_country_of_the_sending_address_and_what_cannot_b
     # Each country names its busiest sending addresses, busiest first, with how many of their messages failed.
     assert [(a.ip, a.emails, a.failed) for a in out.countries[0].addresses] == [("8.8.8.8", 30, 0), ("8.8.4.4", 10, 10)]
     assert [(a.ip, a.emails, a.failed) for a in out.countries[1].addresses] == [("1.1.1.1", 5, 0)]
+    # An address is named when the domains it authenticated with belong to a known service, and left unnamed otherwise.
+    assert [a.name for a in out.countries[0].addresses] == ["Google Workspace", None]
+    assert [a.name for a in out.countries[1].addresses] == ["Microsoft 365"]
     listed = {a.ip for c in out.countries for a in c.addresses}
     assert "10.0.0.5" not in listed and "9.9.9.9" not in listed, "an address that could not be placed is in no country"
     assert len(r.calls) == 4  # the private address was not sent to anyone

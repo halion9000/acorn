@@ -444,7 +444,7 @@ describe('DMARC countries', () => {
       days: 30,
       emails: 100,
       countries: [
-        { code: 'US', emails: 70, passed: 60, failed: 10, addresses: [{ ip: '8.8.8.8', emails: 60, failed: 0 }, { ip: '8.8.4.4', emails: 10, failed: 10 }] },
+        { code: 'US', emails: 70, passed: 60, failed: 10, addresses: [{ ip: '8.8.8.8', emails: 60, failed: 0, name: 'Google Workspace' }, { ip: '8.8.4.4', emails: 10, failed: 10 }] },
         { code: 'AU', emails: 20, passed: 20, failed: 0 },
       ],
       unknown: 0,
@@ -456,6 +456,7 @@ describe('DMARC countries', () => {
     expect(screen.queryByTestId('country-addresses')).toBeNull();
     await user.click(within(rows[0]).getByRole('button'));
     const box = screen.getByTestId('country-addresses');
+    expect(box).toHaveTextContent('Google Workspace'); // the service a known address belongs to is named beside it
     expect(box).toHaveTextContent('8.8.8.8');
     expect(box).toHaveTextContent('60 messages');
     expect(box).toHaveTextContent('8.8.4.4');

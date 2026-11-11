@@ -75,7 +75,7 @@ export interface DmarcInsights {
 export interface DmarcCountries {
   days: number;
   emails: number;
-  countries: { code: string; emails: number; passed: number; failed: number; addresses?: { ip: string; emails: number; failed: number }[] }[];
+  countries: { code: string; emails: number; passed: number; failed: number; addresses?: { ip: string; emails: number; failed: number; name?: string | null }[] }[];
   unknown: number;
   not_looked_up: number;
 }
@@ -642,6 +642,7 @@ function Countries({ days }: { days: number }) {
                       {(c.addresses ?? []).map((a) => (
                         <li key={a.ip} className="flex gap-3">
                           <span className="w-40 shrink-0 font-mono">{a.ip}</span>
+                          {a.name ? <span className="shrink-0 text-gray-400">{a.name}</span> : null}
                           <span className="w-24 text-right">{a.emails.toLocaleString()} messages</span>
                           <span className={a.failed > 0 ? 'text-amber-300' : 'text-emerald-300'}>{a.failed > 0 ? `${a.failed.toLocaleString()} failed` : 'all pass'}</span>
                         </li>
