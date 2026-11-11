@@ -7,6 +7,7 @@ import { EmptyState, EmptyStateIcons } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { auditApi, ApiError, type AuditExportFilters } from '@/lib/api';
 import { authFetch } from '@/lib/auth-session';
+import { foldBatches } from './auditBatches';
 import { auditKindOptions } from './auditKinds';
 
 interface AuditEvent {
@@ -57,6 +58,8 @@ export function AuditLogView() {
   const [actionFilter, setActionFilter] = useState('');
   const [resourceFilter, setResourceFilter] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Bulk actions the person has unfolded: every entry of that batch is then listed on its own.
+  const [openBatches, setOpenBatches] = useState<Set<string>>(new Set());
   // WS-H3 — export-bundle UX state. We model the two formats as a single
   // exclusive lock so the analyst can't double-fire CSV + HTML and end up
   // with two browser save dialogs racing each other.
@@ -362,7 +365,7 @@ const data = isValid ? raw : null;
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700/50">
-              {data.items.map((event) => (
+              {foldBatches(data.items, openBatches).map(({ event, count, batch }) => (
                 <>
                   <tr
                     key={event.id}
@@ -387,6 +390,20 @@ const data = isValid ? raw : null;
                       >
                         {event.action}
                       </span>
+                      {batch && count > 1 ? (
+                        <button
+                          type="button"
+                          data-testid={`batch-${batch}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenBatches((prev) => new Set(prev).add(batch));
+                          }}
+                          className="ml-2 rounded border border-gray-600 px-1.5 py-0.5 text-xs text-gray-300 hover:bg-gray-700"
+                          title="One bulk action. Click to list every entry."
+                        >
+                          × {count} · show all
+                        </button>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-gray-300">
                       {event.resource ?? '—'}

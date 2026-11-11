@@ -264,3 +264,17 @@ describe('the action filter offers the kinds the trail holds', () => {
     swrCalls.delete('/api/v1/audit/kinds');
   });
 });
+
+describe('a bulk action is one row', () => {
+  it('folds the entries of one bulk action into a row with a count, and lists them all when asked', async () => {
+    const bulk = (id: string) => ({ ...sampleEvent, id, action: 'alerts:bulk_close', resource_id: `${id}-0000-0000`, changes: { batch: 'b1', reason: 'duplicates' } });
+    seedAuditPage([bulk('e1'), bulk('e2'), bulk('e3'), { ...sampleEvent, id: 'e4', action: 'role:created' }]);
+    render(<AuditLogView />);
+    expect(screen.getAllByText('alerts:bulk_close')).toHaveLength(1);
+    const badge = screen.getByTestId('batch-b1');
+    expect(badge).toHaveTextContent('× 3 · show all');
+    await userEvent.click(badge);
+    expect(screen.getAllByText('alerts:bulk_close')).toHaveLength(3);
+    expect(screen.queryByTestId('batch-b1')).toBeNull();
+  });
+});

@@ -345,6 +345,7 @@ All of these were tested against test data and a scratch database and deployed, 
 - **Vulnerabilities > Export CSV, and fix-time targets.** Export CSV saves the findings shown. Each finding says how long it has to be fixed (critical 4 hours, high 24 hours, medium 5 days, low 14 days, from when it was raised) and turns red when it is past that; a count says how many, and Past target only shows just those.
 - **Compliance > old evidence.** Under a control whose newest accepted evidence is more than a year old the framework page says how many months old it is and asks for it to be refreshed, and a count above the list says how many controls that is.
 - **Platform health > Download health report keeps expiry dates.** The Microsoft secret's expiry date and the kind and age of old credentials stay readable in the file; any value, key or token is still blanked.
+- **Audit log: only the kinds that exist, and one row per bulk action.** The action filter lists the kinds of event the log really holds, each with a count. One bulk close or bulk assign shows as a single row with a count (for example x 180); press it to list every entry.
 
 ---
 
