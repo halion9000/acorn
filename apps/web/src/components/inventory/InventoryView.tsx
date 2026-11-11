@@ -11,6 +11,7 @@ import useSWR from 'swr';
 import { apiErrorDetail, inventoryApi, msspApi, type InventoryImportResult, type InventorySyncResult, type InventoryNucSyncResult, type InventoryItem, type InventoryKind, type InventoryQuery, type InventoryStatus } from '@/lib/api';
 import { safeDistance } from '@/lib/safe-date';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { longOutNote } from './longOut';
 
 export const STATUS_LABEL: Record<InventoryStatus, string> = { checked_in: 'Checked in', checked_out: 'Checked out', offline: 'Offline', retired: 'Retired' };
 const STATUS_STYLE: Record<InventoryStatus, string> = {
@@ -902,7 +903,13 @@ export function InventoryView() {
                   <span className={`rounded px-1.5 py-0.5 text-xs ${STATUS_STYLE[i.status]}`}>{STATUS_LABEL[i.status]}</span>
                 </td>
                 <td className="px-3 py-2 text-gray-300">{kind === 'nuc' ? [i.site, i.person].filter(Boolean).join(' · ') || '—' : [i.person, i.site].filter(Boolean).join(' · ') || '—'}</td>
-                <td className="px-3 py-2 text-xs text-gray-400">{kind === 'nuc' ? dateText(i.redeployed_at ?? i.deployed_at) : dateText(i.status === 'checked_out' ? i.checked_out_at : i.checked_in_at)}</td>
+                <td className="px-3 py-2 text-xs text-gray-400">{kind === 'nuc' ? dateText(i.redeployed_at ?? i.deployed_at) : dateText(i.status === 'checked_out' ? i.checked_out_at : i.checked_in_at)}
+                  {kind !== 'nuc' && longOutNote(i) ? (
+                    <span className="ml-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-300" data-testid={`long-out-${i.id}`} title="Checked out for more than 30 days. Nothing in the stock has a due date, so this is the nearest thing to overdue.">
+                      {longOutNote(i)}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="whitespace-nowrap px-3 py-2 text-right text-xs">
                   {(i.status === 'checked_in' || i.status === 'offline') && (
                     <button type="button" onClick={() => setDialog({ type: 'out', item: i })} className="mr-2 text-sky-300 hover:underline">

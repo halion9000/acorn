@@ -418,3 +418,20 @@ describe('deleting an item', () => {
     expect(api.list.mock.calls).toHaveLength(1); // not reloaded: nothing changed
   });
 });
+
+describe('items out a long time', () => {
+  it('marks an item checked out for more than 30 days and no other', async () => {
+    const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+    api.list.mockResolvedValue(
+      list([
+        item({ id: 'long', name: 'Loaner laptop', status: 'checked_out', person: 'Pat', checked_out_at: daysAgo(45) }),
+        item({ id: 'short', name: 'Dock', status: 'checked_out', person: 'Sam', checked_out_at: daysAgo(3) }),
+        item({ id: 'in', name: 'Monitor' }),
+      ]),
+    );
+    view();
+    expect(await screen.findByTestId('long-out-long')).toHaveTextContent('Out 45 days');
+    expect(screen.queryByTestId('long-out-short')).toBeNull();
+    expect(screen.queryByTestId('long-out-in')).toBeNull();
+  });
+});
