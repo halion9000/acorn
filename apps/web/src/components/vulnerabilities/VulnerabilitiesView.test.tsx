@@ -31,6 +31,21 @@ describe('VulnerabilitiesView', () => {
     expect(screen.getByTestId('vulnerabilities-summary')).toHaveTextContent('2 open: 1 critical · 1 high');
   });
 
+  it('Export CSV saves the findings shown, worst first, under a dated file name', async () => {
+    const blobs: Blob[] = [];
+    Object.assign(URL, { createObjectURL: vi.fn((b: Blob) => { blobs.push(b); return 'blob:v'; }), revokeObjectURL: vi.fn() });
+    const names: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { names.push(this.download); });
+    api.list.mockResolvedValue({ alerts: [alert(), alert({ id: 'a2', severity: 'critical', title: 'Past end of life', clientName: 'Beta' })], total: 2 });
+    show();
+    await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
+    expect(names[0]).toMatch(/^vulnerabilities-\d{4}-\d{2}-\d{2}\.csv$/);
+    const lines = (await blobs[0].text()).replace('\uFEFF', '').split('\r\n');
+    expect(lines[1]).toContain('critical,Beta,Past end of life');
+    expect(lines[2]).toContain('high,Acme,Many machines at this client are missing patches');
+    click.mockRestore();
+  });
+
   it('lists the worst first, and says so when there are none or the list cannot load', async () => {
     api.list.mockResolvedValue({ alerts: [], total: 0 });
     const { unmount } = show();

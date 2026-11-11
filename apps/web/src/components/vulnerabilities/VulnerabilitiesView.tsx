@@ -12,7 +12,9 @@ import useSWR from 'swr';
 import { ClientPicker } from '@/components/mssp/ClientPicker';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { alertsApi, type Alert } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
 import { safeDistance } from '@/lib/safe-date';
+import { vulnerabilitiesCsvText } from './vulnerabilitiesCsv';
 
 const SEVERITY_TEXT: Record<string, string> = {
   critical: 'text-red-300 border-red-500/40 bg-red-500/10',
@@ -85,6 +87,7 @@ export function VulnerabilitiesView() {
           </p>
         ) : (
           <>
+            <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-gray-300" data-testid="vulnerabilities-summary">
               {findings.length} open:{' '}
               {(['critical', 'high', 'medium', 'low'] as const)
@@ -92,6 +95,14 @@ export function VulnerabilitiesView() {
                 .map((s) => `${counts[s]} ${s}`)
                 .join(' · ')}
             </p>
+            <button
+              type="button"
+              onClick={() => downloadCsv(`vulnerabilities-${new Date().toISOString().slice(0, 10)}.csv`, vulnerabilitiesCsvText(findings, toolOf))}
+              className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800"
+            >
+              Export CSV
+            </button>
+            </div>
             {!clientId && clients.length > 1 ? (
               <div className="flex flex-wrap gap-2" data-testid="vulnerabilities-by-client">
                 {clients.map((c) => (
