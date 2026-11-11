@@ -276,7 +276,7 @@ export function FrameworkView({ framework }: Props) {
             </p>
           )}
           {staleControls > 0 && (
-            <p className="text-sm text-amber-300 mt-1" data-testid="stale-evidence">
+            <p className="text-sm text-amber-300 mt-1" data-testid="stale-evidence" title="Evidence counts as old when the newest accepted item for a control was collected more than 365 days ago.">
               {staleControls} control{staleControls === 1 ? '' : 's'} with accepted evidence over a year old: refresh {staleControls === 1 ? 'it' : 'them'} before an audit.
             </p>
           )}

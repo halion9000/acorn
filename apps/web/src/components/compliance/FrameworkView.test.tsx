@@ -49,6 +49,7 @@ describe('FrameworkView', () => {
     expect((await screen.findByTestId('stale-CC6.1')).textContent).toMatch(/16 months old: refresh it/);
     expect(screen.queryByTestId('stale-CC7.2')).toBeNull();
     expect(screen.getByTestId('stale-evidence').textContent).toContain('1 control with accepted evidence over a year old');
+    expect(screen.getByTestId('stale-evidence').getAttribute('title')).toMatch(/more than 365 days ago/);
   });
 
   it('says plainly when the framework has no control list in this build', () => {

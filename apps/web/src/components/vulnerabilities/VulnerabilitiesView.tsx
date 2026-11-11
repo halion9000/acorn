@@ -112,7 +112,7 @@ export function VulnerabilitiesView() {
                 .filter((s) => counts[s])
                 .map((s) => `${counts[s]} ${s}`)
                 .join(' · ')}
-              {late > 0 ? <span className="text-red-300" data-testid="vulnerabilities-late"> · {late} past their fix target</span> : null}
+              {late > 0 ? <span className="text-red-300" data-testid="vulnerabilities-late" title="Fix-time targets, from when the alert was raised: critical 4 hours, high 24 hours, medium 5 days, low 14 days."> · {late} past their fix target</span> : null}
             </p>
             {late > 0 ? (
               <label className="flex items-center gap-1 text-xs text-gray-300">

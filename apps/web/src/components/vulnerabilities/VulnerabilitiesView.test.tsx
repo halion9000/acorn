@@ -96,6 +96,7 @@ describe('fix-time targets', () => {
     expect(screen.getByTestId('vuln-target-fresh')).toHaveTextContent('Fix within 1 day');
     expect(screen.queryByTestId('vuln-target-none')).toBeNull();
     expect(screen.getByTestId('vulnerabilities-late')).toHaveTextContent('1 past their fix target');
+    expect(screen.getByTestId('vulnerabilities-late').getAttribute('title')).toMatch(/critical 4 hours, high 24 hours, medium 5 days, low 14 days/);
     await userEvent.click(screen.getByRole('checkbox', { name: /past target only/i }));
     expect(screen.getByTestId('vuln-late')).toBeInTheDocument();
     expect(screen.queryByTestId('vuln-fresh')).toBeNull();
