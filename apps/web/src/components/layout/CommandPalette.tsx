@@ -22,7 +22,7 @@ import toast from 'react-hot-toast';
 import { searchApi, type SearchHit } from '@/lib/api';
 import { useHiddenNav } from '@/hooks/useHiddenNav';
 import { MORE_SETTINGS } from '@/components/settings/moreSettings';
-import { paletteNavItems, rememberSearch } from './paletteNav';
+import { CURATED_PAGES, paletteNavItems, rememberSearch } from './paletteNav';
 import { shownSections } from './Sidebar';
 
 interface PaletteAction {
@@ -112,23 +112,6 @@ function writeRecent(path: string) {
   }
 }
 
-const NAV_ITEMS: { label: string; href: string; keywords: string[] }[] = [
-  { label: 'SOC Dashboard',   href: '/dashboard',    keywords: ['home', 'overview', 'metrics', 'dashboard'] },
-  { label: 'Alerts',          href: '/alerts',       keywords: ['notifications', 'incidents'] },
-  { label: 'Cases',           href: '/cases',        keywords: ['investigations', 'tickets'] },
-  { label: 'Hunt',            href: '/hunt',         keywords: ['threat hunting', 'search', 'kql', 'esql'] },
-  { label: 'Explore',         href: '/explore',      keywords: ['data explorer', 'lake', 'sql', 'bi', 'query', 'identity', 'intel'] },
-  { label: 'Detection Rules', href: '/detection',    keywords: ['rules', 'detections', 'sigma'] },
-  { label: 'Threat Intel',    href: '/threat-intel', keywords: ['ioc', 'feeds', 'cti'] },
-  { label: 'Attack Graph',    href: '/graph',        keywords: ['graph', 'paths', 'cytoscape'] },
-  { label: 'Leafy',           href: '/copilot',      keywords: ['copilot', 'assistant', 'chat', 'ai'] },
-  { label: 'Connectors',      href: '/settings/connectors', keywords: ['integrations', 'sources'] },
-  { label: 'Client mapping',  href: '/settings/client-mapping', keywords: ['map', 'unmapped', 'clients', 'tools'] },
-  { label: 'Audit Log',       href: '/settings/audit', keywords: ['activity', 'events'] },
-  { label: 'Settings',        href: '/settings',     keywords: ['preferences', 'profile', 'tenant'] },
-  { label: 'ACORN Setup Guide', href: '/settings/guide', keywords: ['help', 'how to', 'docs', 'documentation', 'manual', 'user guide', 'setup'] },
-];
-
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
@@ -141,7 +124,7 @@ export function CommandPalette() {
   const pathname = usePathname();
   const hidden = useHiddenNav();
   // The curated pages plus every other sidebar page the person's role shows, so "billing" or "2fa" finds the page called something else.
-  const navItems = useMemo(() => paletteNavItems(NAV_ITEMS, shownSections(hidden), MORE_SETTINGS), [hidden]);
+  const navItems = useMemo(() => paletteNavItems(CURATED_PAGES, shownSections(hidden), MORE_SETTINGS), [hidden]);
 
   // Hotkey: ⌘K / Ctrl+K toggles. Ignore when the user is typing in Monaco
   // (the inline detection rule editor) so we don't hijack the editor's own

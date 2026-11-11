@@ -59,3 +59,19 @@ describe('rememberSearch', () => {
     expect(list).toEqual(['mfa']);
   });
 });
+
+describe('every page can be found by more than its one name', () => {
+  it('searchWords gives each distinct word of the name and the other words, in lower case, without one-letter words', async () => {
+    const { searchWords } = await import('./paletteNav');
+    expect(searchWords({ label: 'Licences & Counts', href: '/x', keywords: ['billing', 'Counts', 'a b'] })).toEqual(['licences', 'counts', 'billing']);
+  });
+
+  it('every page the palette lists (curated, sidebar and settings pages) answers to at least two words', async () => {
+    const { CURATED_PAGES, searchWords } = await import('./paletteNav');
+    const { MORE_SETTINGS } = await import('@/components/settings/moreSettings');
+    const thin = paletteNavItems(CURATED_PAGES, NAV_CATALOG, MORE_SETTINGS)
+      .filter((item) => searchWords(item).length < 2)
+      .map((item) => `${item.label} (${item.href})`);
+    expect(thin).toEqual([]);
+  });
+});

@@ -16,6 +16,12 @@ export const PAGE_WORDS: Record<string, string[]> = {
   '/fim': ['file integrity', 'file changes'],
   '/devices/environment': ['network map', 'drawing', 'diagram', 'topology'],
   '/remote-tools': ['remote access', 'screen share', 'rmm'],
+  '/devices': ['machines', 'computers', 'endpoints', 'laptops', 'servers', 'assets'],
+  '/identities': ['users', 'people', 'accounts', 'mailboxes'],
+  '/shifts': ['handover', 'on call', 'rota', 'schedule'],
+  '/easm': ['attack surface', 'external', 'exposed', 'internet facing'],
+  '/playbooks': ['automation', 'response', 'runbooks', 'workflows'],
+  '/compliance': ['frameworks', 'controls', 'audit', 'cis', 'nist', 'secureframe'],
 };
 
 export interface PaletteNavItem {
@@ -63,4 +69,28 @@ export function rememberSearch(list: readonly string[], text: string): string[] 
   const t = text.trim();
   if (t.length < 2) return [...list];
   return [t, ...list.filter((s) => s.toLowerCase() !== t.toLowerCase())].slice(0, SEARCHES_KEPT);
+}
+
+/** The pages the palette has always listed, each with the other words people type for it. */
+export const CURATED_PAGES: PaletteNavItem[] = [
+  { label: 'SOC Dashboard',   href: '/dashboard',    keywords: ['home', 'overview', 'metrics', 'dashboard'] },
+  { label: 'Alerts',          href: '/alerts',       keywords: ['notifications', 'incidents'] },
+  { label: 'Cases',           href: '/cases',        keywords: ['investigations', 'tickets'] },
+  { label: 'Hunt',            href: '/hunt',         keywords: ['threat hunting', 'search', 'kql', 'esql'] },
+  { label: 'Explore',         href: '/explore',      keywords: ['data explorer', 'lake', 'sql', 'bi', 'query', 'identity', 'intel'] },
+  { label: 'Detection Rules', href: '/detection',    keywords: ['rules', 'detections', 'sigma'] },
+  { label: 'Threat Intel',    href: '/threat-intel', keywords: ['ioc', 'feeds', 'cti'] },
+  { label: 'Attack Graph',    href: '/graph',        keywords: ['graph', 'paths', 'cytoscape'] },
+  { label: 'Leafy',           href: '/copilot',      keywords: ['copilot', 'assistant', 'chat', 'ai'] },
+  { label: 'Connectors',      href: '/settings/connectors', keywords: ['integrations', 'sources'] },
+  { label: 'Client mapping',  href: '/settings/client-mapping', keywords: ['map', 'unmapped', 'clients', 'tools'] },
+  { label: 'Audit Log',       href: '/settings/audit', keywords: ['activity', 'events'] },
+  { label: 'Settings',        href: '/settings',     keywords: ['preferences', 'profile', 'tenant'] },
+  { label: 'ACORN Setup Guide', href: '/settings/guide', keywords: ['help', 'how to', 'docs', 'documentation', 'manual', 'user guide', 'setup'] },
+];
+
+/** Every distinct word that finds a page in the palette: the words of its name and of its other words, in lower case. */
+export function searchWords(item: PaletteNavItem): string[] {
+  const words = [item.label, ...item.keywords].flatMap((s) => s.toLowerCase().split(/[^a-z0-9]+/)).filter((w) => w.length > 1);
+  return [...new Set(words)];
 }
