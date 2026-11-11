@@ -61,3 +61,21 @@ def rows(entries: list[dict[str, Any]], shown: int = SHOWN) -> list[dict[str, st
             }
         )
     return out
+
+
+def holders(found: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Who holds the role now, as {user_id, name, email, since, active}: the one who has held it longest first, then by name. ``found`` are dicts with user_id, username, account_name, email,
+    is_active and assigned_at. The name is the first of username, account name and email that is not empty."""
+    out: list[dict[str, Any]] = []
+    for f in found:
+        since = f.get("assigned_at")
+        out.append(
+            {
+                "user_id": str(f.get("user_id")),
+                "name": str(f.get("username") or f.get("account_name") or f.get("email") or "Unknown user"),
+                "email": f.get("email") or None,
+                "since": since.isoformat() if hasattr(since, "isoformat") else (str(since) if since else None),
+                "active": f.get("is_active") is not False,
+            }
+        )
+    return sorted(out, key=lambda h: (h["since"] is None, h["since"] or "", h["name"].lower()))

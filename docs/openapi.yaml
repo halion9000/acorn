@@ -8859,6 +8859,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/rbac/roles/{role_id}/holders:
+    get:
+      tags:
+      - rbac
+      summary: Role Holders
+      description: 'Who holds this role now, the longest holder first: only this organization''s
+        own users, with since when and whether the account is still active.'
+      operationId: role_holders_api_v1_rbac_roles__role_id__holders_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: role_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Role Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoleHolderOut'
+                title: Response Role Holders Api V1 Rbac Roles  Role Id  Holders Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/rbac/users/{user_id}/roles:
     get:
       tags:
@@ -44591,6 +44625,35 @@ components:
       - action
       - summary
       title: RoleChangeOut
+    RoleHolderOut:
+      properties:
+        user_id:
+          type: string
+          title: User Id
+        name:
+          type: string
+          title: Name
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Email
+        since:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Since
+        active:
+          type: boolean
+          title: Active
+      type: object
+      required:
+      - user_id
+      - name
+      - email
+      - since
+      - active
+      title: RoleHolderOut
     RoleIn:
       properties:
         name:

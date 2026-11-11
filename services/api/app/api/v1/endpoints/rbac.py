@@ -363,6 +363,35 @@ async def role_history_list(
     return [RoleChangeOut(**row) for row in role_history.rows(entries)]
 
 
+class RoleHolderOut(BaseModel):
+    user_id: str
+    name: str
+    email: str | None
+    since: str | None
+    active: bool
+
+
+@router.get("/roles/{role_id}/holders", response_model=list[RoleHolderOut])
+async def role_holders(
+    role_id: uuid.UUID,
+    current_user: Annotated[AuthUser, Depends(require_permission("roles:read"))],
+    db: TenantDBSession,
+) -> list[RoleHolderOut]:
+    """Who holds this role now, the longest holder first: only this organization's own users, with since when and whether the account is still active."""
+    await _get_role_or_404(db, role_id, current_user.tenant_id)
+    result = await db.execute(
+        select(User.id, User.username, User.account_name, User.email, User.is_active, UserRole.assigned_at)
+        .join(UserRole, UserRole.user_id == User.id)
+        .where(UserRole.role_id == role_id, User.tenant_id == current_user.tenant_id)
+        .limit(500)
+    )
+    found = [
+        {"user_id": r[0], "username": r[1], "account_name": r[2], "email": r[3], "is_active": r[4], "assigned_at": r[5]}
+        for r in result.all()
+    ]
+    return [RoleHolderOut(**h) for h in role_history.holders(found)]
+
+
 @router.patch("/roles/{role_id}", response_model=RoleOut)
 async def update_role(
     role_id: uuid.UUID,
