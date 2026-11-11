@@ -16,6 +16,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
+import { CarryOver } from './CarryOver';
 import { ClientSnapshot } from './ClientSnapshot';
 import { OrgSnapshot } from './OrgSnapshot';
 
@@ -209,6 +210,8 @@ export function ExecutiveDigest() {
         </div>
       )}
 
+      {/* A handover window (12 or 24 hours) also offers what is still open, which no window of time shows. */}
+      {days <= 1 && <CarryOver clientId={clientId} />}
       <ClientSnapshot clientId={clientId} />
       {!clientId && <OrgSnapshot />}
 
