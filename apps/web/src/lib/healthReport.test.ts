@@ -19,12 +19,24 @@ describe('healthReport', () => {
       plain: 'kept',
       password: '',
     }) as Record<string, unknown>;
-    expect(out.microsoft_secret).toEqual({ expires: '[removed]', days_left: 52, value: '[removed]' });
-    expect(out.old_credentials).toEqual([{ name: '[removed]', age_days: 400 }]);
+    expect(out.microsoft_secret).toEqual({ expires: '2027-01-01', days_left: 52, value: '[removed]' });
+    expect(out.old_credentials).toEqual([{ name: 'Graph app', age_days: 400 }]);
     expect(out.services).toEqual([{ service: 'api', api_key: '[removed]', healthy: true }]);
     expect(out.plain).toBe('kept');
     expect(out.password).toBe('');
     expect(JSON.stringify(out)).not.toContain('sk-live-1');
+  });
+
+  it('keeps the expiry date, kind and name of a credential readable but never its value, key or token', () => {
+    const out = scrubbed({
+      old_credentials: [{ kind: 'API key Reports', age_days: 400, key: 'sk-live-9', token: 'tok-9' }],
+      microsoft_secret: { expires_on: '2026-12-01', days_left: 20, secret: 'hunter2' },
+    });
+    expect(out).toEqual({
+      old_credentials: [{ kind: 'API key Reports', age_days: 400, key: '[removed]', token: '[removed]' }],
+      microsoft_secret: { expires_on: '2026-12-01', days_left: 20, secret: '[removed]' },
+    });
+    expect(JSON.stringify(out)).not.toMatch(/sk-live-9|tok-9|hunter2/);
   });
 
   it('names the file by the minute it was made', () => {
