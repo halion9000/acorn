@@ -19,7 +19,9 @@ const open = () => {
   fireEvent(box, new Event('toggle'));
 };
 
-beforeEach(() => api.why.mockReset());
+beforeEach(() => {
+  api.why.mockReset();
+});
 
 describe('WhyRaised', () => {
   it('reads nothing until it is opened, then lists each fact', async () => {

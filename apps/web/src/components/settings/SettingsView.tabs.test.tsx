@@ -38,7 +38,9 @@ import { SettingsView } from './SettingsView';
 const person = (capabilities?: string[]) => ({ id: 'u1', email: 'a@b.com', account_name: 'a', role: 'admin', tenant_id: 't1', ...(capabilities ? { capabilities } : {}) });
 const tab = (name: RegExp) => screen.queryByRole('button', { name });
 
-beforeEach(() => currentUser.mockReset());
+beforeEach(() => {
+  currentUser.mockReset();
+});
 
 describe('Settings tabs by capability', () => {
   it('offers neither new tab to someone with no capabilities, or when nobody is signed in', async () => {

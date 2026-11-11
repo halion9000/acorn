@@ -9,7 +9,9 @@ import { QuestionHistory, entryText, type HistoryEntry } from './QuestionHistory
 
 const entry = (over: Partial<HistoryEntry> = {}): HistoryEntry => ({ at: '2026-10-29T12:00:00Z', source: 'automatic', status: 'partly', detail: '17 of 20 machines report Huntress.', note: null, actor: null, ...over });
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 afterEach(() => cleanup());
 
 describe('entryText', () => {

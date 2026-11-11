@@ -7,7 +7,9 @@ vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/
 
 import { ChangePasswordCard } from './ChangePasswordCard';
 
-beforeEach(() => api.change.mockReset());
+beforeEach(() => {
+  api.change.mockReset();
+});
 
 describe('ChangePasswordCard', () => {
   it('only lets you press the button when the current password is typed and the new one matches twice', async () => {

@@ -9,7 +9,9 @@ import { EarlierOutcomes, outcomesText } from './EarlierOutcomes';
 
 const show = () => render(<SWRConfig value={{ provider: () => new Map() }}><EarlierOutcomes alertId="a1" /></SWRConfig>);
 
-beforeEach(() => api.earlierOutcomes.mockReset());
+beforeEach(() => {
+  api.earlierOutcomes.mockReset();
+});
 
 describe('outcomesText', () => {
   it('says too few under the minimum and never reads a pattern into it', () => {

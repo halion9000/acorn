@@ -25,7 +25,9 @@ const row = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 
 describe('regionLabel', () => {
   it('says US, Outside US or Unknown, whatever the case or spelling of the country', () => {

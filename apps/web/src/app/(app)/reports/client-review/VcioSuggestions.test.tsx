@@ -20,7 +20,9 @@ const proposal = (over: Partial<Proposal> = {}): Proposal => ({
   ...over,
 });
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 
 describe('ordering', () => {
   it('puts what needs a person first, then what is waiting on CORE, then what is done', () => {

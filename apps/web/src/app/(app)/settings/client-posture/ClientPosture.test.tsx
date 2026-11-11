@@ -26,7 +26,9 @@ function serve(p: unknown) {
   );
 }
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 
 describe('coverage', () => {
   it('is the share of people covered, or a dash when there are none', () => {

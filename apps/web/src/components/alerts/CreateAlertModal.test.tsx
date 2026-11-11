@@ -8,7 +8,9 @@ vi.mock('@/lib/api', () => ({ alertsApi: { create: (...a: unknown[]) => createMo
 
 import { CreateAlertModal, buildManualAlert } from './CreateAlertModal';
 
-beforeEach(() => createMock.mockReset());
+beforeEach(() => {
+  createMock.mockReset();
+});
 
 describe('buildManualAlert', () => {
   it('builds one event with the entered details and leaves blank optional fields out', () => {

@@ -10,7 +10,9 @@ import { SourceHealth, failureKind, sortRuns, type SweepRun } from './SourceHeal
 
 const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 afterEach(() => vi.restoreAllMocks());
 
 describe('ToolChecks with history and accepted risks', () => {

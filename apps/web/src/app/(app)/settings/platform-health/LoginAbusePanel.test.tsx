@@ -9,7 +9,9 @@ import { LoginAbusePanel, isLoginAbuse } from './LoginAbusePanel';
 const body = (over: Record<string, unknown> = {}) => ({ window_minutes: 15, failures: 12, addresses_tried: 3, clients: 2, locked_addresses: 0, locked_clients: 0, busiest_clients: [{ client: '203.0.113.x', failures: 9 }], ...over });
 const answer = (b: unknown, ok = true) => authFetch.mockResolvedValue({ ok, json: () => Promise.resolve(b) });
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 
 describe('LoginAbusePanel', () => {
   it('says how many failed, from how many places, and the busiest masked clients', async () => {

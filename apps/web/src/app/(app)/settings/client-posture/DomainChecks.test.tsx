@@ -9,7 +9,9 @@ import { DomainChecks } from './DomainChecks';
 const reply = (body: unknown, ok = true) => ({ ok, status: ok ? 200 : 500, json: () => Promise.resolve(body) });
 const finding = (status: string, summary: string, record: string | null = null) => ({ status, summary, record });
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 
 describe('DomainChecks', () => {
   it('shows each domain with its SPF, DMARC and DKIM verdicts and where its mail goes', async () => {

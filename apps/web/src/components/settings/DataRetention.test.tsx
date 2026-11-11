@@ -14,7 +14,9 @@ const show = () =>
     </SWRConfig>,
   );
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 
 describe('DataRetention', () => {
   it('shows each kind of data with how long it is kept and what ends it', async () => {

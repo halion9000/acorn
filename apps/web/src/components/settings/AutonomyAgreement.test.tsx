@@ -9,7 +9,9 @@ import { AutonomyAgreement } from './AutonomyAgreement';
 
 const show = () => render(<SWRConfig value={{ provider: () => new Map() }}><AutonomyAgreement /></SWRConfig>);
 
-beforeEach(() => api.get.mockReset());
+beforeEach(() => {
+  api.get.mockReset();
+});
 
 describe('AutonomyAgreement', () => {
   it('lists each kind of action with its counts, agreement share and suggestion in words', async () => {

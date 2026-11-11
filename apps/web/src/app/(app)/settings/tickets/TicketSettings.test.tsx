@@ -9,7 +9,9 @@ import { TicketSettings } from "./TicketSettings";
 
 const reply = (body: unknown, status = 200) => ({ ok: status < 400, status, json: () => Promise.resolve(body), text: () => Promise.resolve(JSON.stringify(body)) });
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 afterEach(() => cleanup());
 
 describe("TicketSettings", () => {

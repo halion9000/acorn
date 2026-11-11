@@ -16,7 +16,9 @@ const show = () =>
     </SWRConfig>,
   );
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 
 describe('ClientOnboarding', () => {
   it('shows each client with each step done or to do and the next thing to do', async () => {

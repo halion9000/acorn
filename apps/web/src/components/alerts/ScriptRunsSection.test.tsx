@@ -15,7 +15,9 @@ const show = () =>
   );
 const run = (over: Record<string, unknown> = {}) => ({ id: 'r1', script_name: 'Disk Space Scan', device: 'PC-01', ticket_id: '553688', new_ticket: false, status: 'done', result_message: 'Started.', created_at: new Date().toISOString(), finished_at: null, ...over });
 
-beforeEach(() => scriptRuns.mockReset());
+beforeEach(() => {
+  scriptRuns.mockReset();
+});
 
 describe('ScriptRunsSection', () => {
   it('lists each script asked for, with the machine, ticket and what CORE said', async () => {

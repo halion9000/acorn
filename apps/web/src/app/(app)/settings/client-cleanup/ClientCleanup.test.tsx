@@ -10,7 +10,9 @@ import { ClientCleanup } from './ClientCleanup';
 const reply = (body: unknown, ok = true) => ({ ok, status: ok ? 200 : 500, json: () => Promise.resolve(body) });
 const empty = (id: string, name: string) => ({ id, name, devices: 0, alerts: 0, cases: 0, tool_clients: 0 });
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 
 describe('ClientCleanup suspect mappings', () => {
   it('lists mapped tool clients whose names look unrelated, and shows nothing when there are none or the check fails', async () => {

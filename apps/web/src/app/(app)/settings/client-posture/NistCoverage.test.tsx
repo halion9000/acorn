@@ -18,7 +18,9 @@ const data = {
   totals: { met: 1, partly: 0, not_met: 1, no_evidence: 1 },
 };
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 
 describe('NistCoverage', () => {
   it('shows each control with its standing, the totals, and "met since" only for a met one', async () => {

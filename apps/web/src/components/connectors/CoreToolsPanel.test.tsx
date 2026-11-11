@@ -18,7 +18,9 @@ function renderPanel() {
 }
 
 describe('CoreToolsPanel', () => {
-  beforeEach(() => api.coreTools.mockReset());
+  beforeEach(() => {
+    api.coreTools.mockReset();
+  });
 
   it('lists each tool connected in CORE as connected, with its line, and says nothing is set up here', async () => {
     api.coreTools.mockResolvedValue([tool('huntress', 'Huntress', true, 'Managed EDR'), tool('petra-mdr', 'Petra MDR', true)]);

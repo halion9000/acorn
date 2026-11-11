@@ -9,7 +9,9 @@ vi.mock('./ReplayPlayer', () => ({ ReplayPlayer: () => null }));
 
 import { generateMetadata } from './page';
 
-beforeEach(() => fetchPublicReplay.mockReset());
+beforeEach(() => {
+  fetchPublicReplay.mockReset();
+});
 
 describe('a public replay page', () => {
   it('is titled with the A.C.O.R.N name, with the verdict, time and steps in its description', async () => {

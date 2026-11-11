@@ -29,7 +29,9 @@ const view = () =>
     </SWRConfig>,
   );
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 afterEach(() => cleanup());
 
 describe('failingDays', () => {

@@ -15,7 +15,9 @@ const show = () =>
     </SWRConfig>,
   );
 
-beforeEach(() => devices.mockReset());
+beforeEach(() => {
+  devices.mockReset();
+});
 
 describe('CaseDevices', () => {
   it('lists each machine with an Open in <tool> link for every tool that has one', async () => {

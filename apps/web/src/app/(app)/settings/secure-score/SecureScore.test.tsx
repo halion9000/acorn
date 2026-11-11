@@ -28,7 +28,9 @@ const client = (over: Partial<ScoreClient> = {}): ScoreClient => ({
   ...over,
 });
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 
 describe('the small helpers', () => {
   it('draws the trend scaled into the box, lowest point at the bottom, and nothing for fewer than two points', () => {

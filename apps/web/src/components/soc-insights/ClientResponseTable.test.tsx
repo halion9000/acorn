@@ -17,7 +17,9 @@ const show = (onPick = vi.fn()) => {
   return onPick;
 };
 
-beforeEach(() => api.getResponseTimes.mockReset());
+beforeEach(() => {
+  api.getResponseTimes.mockReset();
+});
 
 describe('hoursLabel', () => {
   it('reads in minutes under an hour, hours up to two days, then days', () => {

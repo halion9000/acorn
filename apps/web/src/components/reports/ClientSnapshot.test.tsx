@@ -35,7 +35,9 @@ const review = (over: Partial<Review> = {}): Review =>
     ...over,
   }) as Review;
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 afterEach(() => cleanup());
 
 describe('snapshotLines', () => {

@@ -8,7 +8,9 @@ import { RetentionPreview } from './RetentionPreview';
 
 const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
 
-beforeEach(() => authFetch.mockReset());
+beforeEach(() => {
+  authFetch.mockReset();
+});
 
 describe('RetentionPreview', () => {
   it('lists what would be deleted by kind with the note, and what could not be counted', async () => {
