@@ -53,6 +53,8 @@ def test_the_organization_and_its_clients_alerts_are_closed_with_the_reason_in_t
         }
         assert all(after[t].resolved_at is not None for t in ("own", "setpoint-new", "tecovas"))
         assert after["setpoint-old"].status == "new", "an alert that was not asked for is untouched"
+        batches = {e["changes"].pop("batch") for e in audit}
+        assert len(batches) == 1 and len(next(iter(batches))) == 12, "one batch id on every entry of the one call"
         assert [(e["action"], e["resource_id"], e["changes"]) for e in audit] == [
             ("alerts:bulk_close", str(i), {"status_from": "new", "status_to": "resolved", "reason": "duplicates of the ticket"})
             for i in ids

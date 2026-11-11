@@ -257,3 +257,18 @@ def test_the_undo_request_is_bounded_and_is_a_post_route():
         ep.BulkAssignUndoRequest(items=[], assignee_id=None)
     route = next(r for r in ep.router.routes if getattr(r, "path", "").endswith("/bulk-assign/undo"))
     assert "POST" in route.methods
+
+
+def test_every_audit_entry_of_one_bulk_assign_carries_the_same_batch_id_and_another_call_a_different_one(audit):
+    async def go(s):
+        parent, a, other, amy, *_ = await seed(s)
+        rows = await alerts(s)
+        audit.clear()
+        await assign(s, parent.id, [rows["own"].id, rows["client-alert"].id], amy.id)
+        first = {e["changes"]["batch"] for e in audit}
+        assert len(audit) == 2 and len(first) == 1 and len(next(iter(first))) == 12
+        audit.clear()
+        await assign(s, parent.id, [rows["own"].id], None)
+        assert {e["changes"]["batch"] for e in audit}.isdisjoint(first)
+
+    run(go)

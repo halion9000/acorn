@@ -1314,6 +1314,7 @@ async def bulk_close_alerts(
     if len(reason) < 3:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Give a reason of at least three characters.")
     closed = already = missing = 0
+    batch = uuid.uuid4().hex[:12]  # one id on every audit entry of this call, so one close of 180 alerts can be found as one thing
     closed_items: list[ClosedItem] = []
     for alert_id in dict.fromkeys(body.alert_ids):
         try:
@@ -1340,7 +1341,7 @@ async def bulk_close_alerts(
                     action="alerts:bulk_close",
                     resource="alert",
                     resource_id=str(alert_id),
-                    changes={"status_from": before, "status_to": body.status, "reason": reason},
+                    changes={"status_from": before, "status_to": body.status, "reason": reason, "batch": batch},
                     request=request,
                 )
                 closed += 1
@@ -1466,6 +1467,7 @@ async def bulk_assign_alerts(
     """Assign (or, with no assignee, unassign) up to 200 alerts at once, with an optional note. The assignee must be someone in the caller's own workspace. A finished alert is left as it is (and counted); one
     the caller cannot see is counted as not found. Who, from whom and the note are written to the audit log for each alert."""
     note = " ".join((body.note or "").split()) or None
+    batch = uuid.uuid4().hex[:12]  # one id on every audit entry of this call
     name: str | None = None
     if body.assignee_id is not None:
         person = (
@@ -1506,6 +1508,7 @@ async def bulk_assign_alerts(
                         "assignee_from": str(before) if before else None,
                         "assignee_to": str(body.assignee_id) if body.assignee_id else None,
                         "note": note,
+                        "batch": batch,
                     },
                     request=request,
                 )
