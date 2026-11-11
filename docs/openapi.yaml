@@ -1088,6 +1088,43 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/alerts/bulk-assign/undo:
+    post:
+      tags:
+      - alerts
+      summary: Undo Bulk Assign
+      description: 'Give alerts back to whoever had them before a bulk assign made
+        in the last ten minutes.
+
+
+        An alert is only put back when it is still with the person the assign gave
+        it to (or still unassigned, if the assign unassigned it), was changed by it
+        in the last ten minutes, and is not
+
+        finished. One that somebody has reassigned, finished or edited since is left
+        alone and counted. Each alert put back is written to the audit log.'
+      operationId: undo_bulk_assign_api_v1_alerts_bulk_assign_undo_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkAssignUndoRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkAssignUndoResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/alerts/{alert_id}/escalate:
     post:
       tags:
@@ -27561,6 +27598,28 @@ components:
       description: 'What a PATCH may change. Every field is optional and only the
         ones sent are applied: this used to be the create model, whose defaults ("host",
         "medium", an empty metadata) overwrote whatever the caller left out.'
+    AssignedItem:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        assignee_from:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Assignee From
+        assigned_at_from:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Assigned At From
+      type: object
+      required:
+      - id
+      title: AssignedItem
     AttackHeatmapCell:
       properties:
         tactic:
@@ -28464,6 +28523,12 @@ components:
           - type: string
           - type: 'null'
           title: Assignee Name
+        assigned_items:
+          items:
+            $ref: '#/components/schemas/AssignedItem'
+          type: array
+          title: Assigned Items
+          default: []
       type: object
       required:
       - assigned
@@ -28472,6 +28537,49 @@ components:
       - assignee_id
       - assignee_name
       title: BulkAssignResponse
+    BulkAssignUndoRequest:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/AssignedItem'
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Items
+        assignee_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Assignee Id
+          description: Who the bulk assign gave these alerts to (none when it unassigned
+            them).
+      type: object
+      required:
+      - items
+      - assignee_id
+      title: BulkAssignUndoRequest
+    BulkAssignUndoResponse:
+      properties:
+        restored:
+          type: integer
+          title: Restored
+        changed_since:
+          type: integer
+          title: Changed Since
+        too_late:
+          type: integer
+          title: Too Late
+        not_found:
+          type: integer
+          title: Not Found
+      type: object
+      required:
+      - restored
+      - changed_since
+      - too_late
+      - not_found
+      title: BulkAssignUndoResponse
     BulkCloseRequest:
       properties:
         alert_ids:

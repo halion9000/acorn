@@ -1976,6 +1976,15 @@ export interface BulkAssignResult {
   not_found: number;
   assignee_id: string | null;
   assignee_name: string | null;
+  /** What was changed and who each alert had before, so the assign can be undone for ten minutes; absent from an older server. */
+  assigned_items?: { id: string; assignee_from: string | null; assigned_at_from: string | null }[];
+}
+
+export interface BulkAssignUndoResult {
+  restored: number;
+  changed_since: number;
+  too_late: number;
+  not_found: number;
 }
 
 export interface NoisyRule {
@@ -2207,6 +2216,9 @@ export const alertsApi = {
   /** Assign (or unassign: no assignee) up to 200 alerts at once, with an optional note kept in the audit log. */
   bulkAssign: (body: { alert_ids: string[]; assignee_id: string | null; note?: string }) =>
     request<BulkAssignResult>('/api/v1/alerts/bulk-assign', { method: 'POST', body: JSON.stringify(body) }),
+  /** Give alerts back to who had them before a bulk assign made in the last ten minutes; one changed since, or assigned longer ago, is left alone and counted. */
+  bulkAssignUndo: (body: { items: { id: string; assignee_from: string | null; assigned_at_from: string | null }[]; assignee_id: string | null }) =>
+    request<BulkAssignUndoResult>('/api/v1/alerts/bulk-assign/undo', { method: 'POST', body: JSON.stringify(body) }),
   bulkClose: (body: { alert_ids: string[]; status: 'resolved' | 'false_positive' | 'closed'; reason: string }) =>
     request<BulkCloseResult>('/api/v1/alerts/bulk-close', { method: 'POST', body: JSON.stringify(body) }),
   /** Put back alerts a bulk close finished in the last ten minutes; one changed since, or closed longer ago, is left alone and counted. */

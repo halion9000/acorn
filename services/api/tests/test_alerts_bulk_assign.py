@@ -159,3 +159,101 @@ def test_the_request_is_bounded_and_the_route_needs_alerts_write():
 
     found = {(m, p.replace("/api/v1", "", 1)): r for p, r in walk_routes(app.routes) for m in r.methods}
     assert set(required_permissions(found[("POST", "/alerts/bulk-assign")])) == {"alerts:write"}
+
+
+# ---------------------------------------------------------------- undoing a bulk assign
+
+
+def undo(s, caller, items, assignee):
+    body = ep.BulkAssignUndoRequest(
+        items=[ep.AssignedItem(id=i, assignee_from=f, assigned_at_from=at) for i, f, at in items], assignee_id=assignee
+    )
+    return ep.undo_bulk_assign(body, SimpleNamespace(headers={}, client=None), SimpleNamespace(tenant_id=caller, user_id=uuid.uuid4()), s)
+
+
+def test_the_assign_says_who_each_alert_had_and_undoing_gives_it_back_exactly(audit):
+    from datetime import UTC, datetime
+
+    async def go(s):
+        parent, a, other, amy, *_ = await seed(s)
+        pid, amy_id = parent.id, amy.id
+        bob = person(parent, "bob")
+        s.add(bob)
+        await s.commit()
+        bob_id = bob.id  # read now: the session is expired below
+        rows = await alerts(s)
+        earlier = datetime(2026, 11, 1, 9, 0, tzinfo=UTC)
+        rows["own"].assigned_to_id, rows["own"].assigned_at = bob_id, earlier
+        await s.commit()
+        ids = [rows["own"].id, rows["client-alert"].id]
+        out = await assign(s, pid, ids, amy_id)
+        assert [(i.id, i.assignee_from) for i in out.assigned_items] == [(ids[0], bob_id), (ids[1], None)]
+        audit.clear()
+        back = await undo(s, pid, [(i.id, i.assignee_from, i.assigned_at_from) for i in out.assigned_items], amy_id)
+        assert (back.restored, back.changed_since, back.too_late, back.not_found) == (2, 0, 0, 0)
+        s.expire_all()
+        after = await alerts(s)
+        assert after["own"].assigned_to_id == bob_id and after["own"].assigned_at.replace(tzinfo=UTC) == earlier
+        assert after["client-alert"].assigned_to_id is None and after["client-alert"].assigned_at is None
+        assert [(e["action"], e["changes"]) for e in audit] == [
+            ("alerts:bulk_assign_undone", {"assignee_from": str(amy_id), "assignee_to": str(bob_id)}),
+            ("alerts:bulk_assign_undone", {"assignee_from": str(amy_id), "assignee_to": None}),
+        ]
+
+    run(go)
+
+
+def test_undo_leaves_alone_what_was_reassigned_finished_or_assigned_longer_ago_and_what_is_not_the_callers(audit):
+    from datetime import UTC, datetime, timedelta
+
+    async def go(s):
+        parent, a, other, amy, *_ = await seed(s)
+        pid, amy_id = parent.id, amy.id
+        carl = person(parent, "carl")
+        s.add_all([carl, alert(parent, "third"), alert(parent, "fourth")])
+        await s.commit()
+        carl_id = carl.id
+        rows = await alerts(s)
+        ids = [rows[t].id for t in ("own", "client-alert", "third", "fourth")]
+        out = await assign(s, pid, ids, amy_id)
+        s.expire_all()
+        now = await alerts(s)
+        now["own"].assigned_to_id = carl_id  # somebody reassigned it
+        now["client-alert"].status = "closed"  # somebody finished it
+        now["third"].assigned_at = datetime.now(UTC) - timedelta(minutes=11)  # assigned too long ago
+        secret_id = now["secret"].id
+        await s.commit()
+        items = [(i.id, i.assignee_from, i.assigned_at_from) for i in out.assigned_items] + [
+            (secret_id, None, None),
+            (uuid.uuid4(), None, None),
+        ]
+        back = await undo(s, pid, items, amy_id)
+        assert (back.restored, back.changed_since, back.too_late, back.not_found) == (1, 2, 1, 2)
+        s.expire_all()
+        after = await alerts(s)
+        assert after["own"].assigned_to_id == carl_id and after["client-alert"].assigned_to_id == amy_id
+        assert after["third"].assigned_to_id == amy_id and after["fourth"].assigned_to_id is None
+
+    run(go)
+
+
+def test_undoing_an_unassign_gives_the_alerts_back_to_who_had_them(audit):
+    async def go(s):
+        parent, a, other, amy, *_ = await seed(s)
+        pid, amy_id = parent.id, amy.id
+        rows = await alerts(s)
+        await assign(s, pid, [rows["own"].id], amy_id)
+        out = await assign(s, pid, [rows["own"].id], None)
+        back = await undo(s, pid, [(i.id, i.assignee_from, i.assigned_at_from) for i in out.assigned_items], None)
+        assert back.restored == 1
+        s.expire_all()
+        assert (await alerts(s))["own"].assigned_to_id == amy_id
+
+    run(go)
+
+
+def test_the_undo_request_is_bounded_and_is_a_post_route():
+    with pytest.raises(ValidationError):
+        ep.BulkAssignUndoRequest(items=[], assignee_id=None)
+    route = next(r for r in ep.router.routes if getattr(r, "path", "").endswith("/bulk-assign/undo"))
+    assert "POST" in route.methods

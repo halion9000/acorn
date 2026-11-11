@@ -1440,12 +1440,20 @@ class BulkAssignRequest(BaseModel):
     note: str | None = Field(default=None, max_length=500, description="Why, kept in the audit log against each alert.")
 
 
+class AssignedItem(BaseModel):
+    id: uuid.UUID
+    assignee_from: uuid.UUID | None = None
+    assigned_at_from: datetime | None = None
+
+
 class BulkAssignResponse(BaseModel):
     assigned: int
     already_finished: int
     not_found: int
     assignee_id: uuid.UUID | None
     assignee_name: str | None
+    # What was changed and who each alert belonged to before, so the assignment can be undone for a few minutes (POST /alerts/bulk-assign/undo).
+    assigned_items: list[AssignedItem] = []
 
 
 @router.post("/bulk-assign", response_model=BulkAssignResponse)
@@ -1469,6 +1477,7 @@ async def bulk_assign_alerts(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That person is not in this workspace, or is switched off.")
         name = person.email or person.account_name
     assigned = already = missing = 0
+    assigned_items: list[AssignedItem] = []
     for alert_id in dict.fromkeys(body.alert_ids):
         try:
             async with alert_scope(db, current_user.tenant_id, alert_id) as tid:
@@ -1480,6 +1489,7 @@ async def bulk_assign_alerts(
                     already += 1
                     continue
                 before = alert.assigned_to_id
+                before_at = alert.assigned_at
                 now = datetime.now(UTC)
                 values: dict = {"assigned_to_id": body.assignee_id, "assigned_at": now if body.assignee_id else None, "updated_at": now}
                 if body.assignee_id is not None and alert.first_seen_at is None:
@@ -1500,14 +1510,90 @@ async def bulk_assign_alerts(
                     request=request,
                 )
                 assigned += 1
+                assigned_items.append(AssignedItem(id=alert_id, assignee_from=before, assigned_at_from=before_at))
         except HTTPException as exc:
             if exc.status_code != status.HTTP_404_NOT_FOUND:
                 raise
             missing += 1
     await db.commit()
     return BulkAssignResponse(
-        assigned=assigned, already_finished=already, not_found=missing, assignee_id=body.assignee_id, assignee_name=name
+        assigned=assigned,
+        already_finished=already,
+        not_found=missing,
+        assignee_id=body.assignee_id,
+        assignee_name=name,
+        assigned_items=assigned_items,
     )
+
+
+class BulkAssignUndoRequest(BaseModel):
+    items: list[AssignedItem] = Field(min_length=1, max_length=200)
+    assignee_id: uuid.UUID | None = Field(description="Who the bulk assign gave these alerts to (none when it unassigned them).")
+
+
+class BulkAssignUndoResponse(BaseModel):
+    restored: int
+    changed_since: int
+    too_late: int
+    not_found: int
+
+
+@router.post("/bulk-assign/undo", response_model=BulkAssignUndoResponse)
+async def undo_bulk_assign(
+    body: BulkAssignUndoRequest,
+    request: Request,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:write"))],
+    db: DBSession,
+) -> BulkAssignUndoResponse:
+    """Give alerts back to whoever had them before a bulk assign made in the last ten minutes.
+
+    An alert is only put back when it is still with the person the assign gave it to (or still unassigned, if the assign unassigned it), was changed by it in the last ten minutes, and is not
+    finished. One that somebody has reassigned, finished or edited since is left alone and counted. Each alert put back is written to the audit log.
+    """
+    restored = changed = late = missing = 0
+    now = datetime.now(UTC)
+    for item in {i.id: i for i in body.items}.values():
+        try:
+            async with alert_scope(db, current_user.tenant_id, item.id) as tid:
+                alert = (await db.execute(select(Alert).where(Alert.id == item.id, Alert.tenant_id == tid))).scalar_one_or_none()
+                if alert is None:
+                    missing += 1
+                    continue
+                if alert.status in FINISHED_STATUSES or alert.assigned_to_id != body.assignee_id:
+                    changed += 1
+                    continue
+                # When the assign happened: the time it set, or (an unassign sets none) the last change.
+                moment = alert.assigned_at if body.assignee_id is not None else alert.updated_at
+                if moment is not None and moment.tzinfo is None:
+                    moment = moment.replace(tzinfo=UTC)
+                if moment is None or now - moment > timedelta(minutes=BULK_CLOSE_UNDO_MINUTES):
+                    late += 1
+                    continue
+                await db.execute(
+                    update(Alert)
+                    .where(Alert.id == item.id)
+                    .values(assigned_to_id=item.assignee_from, assigned_at=item.assigned_at_from, updated_at=now)
+                )
+                await emit_audit(
+                    db=db,
+                    tenant_id=tid,
+                    actor_id=current_user.user_id,
+                    action="alerts:bulk_assign_undone",
+                    resource="alert",
+                    resource_id=str(item.id),
+                    changes={
+                        "assignee_from": str(body.assignee_id) if body.assignee_id else None,
+                        "assignee_to": str(item.assignee_from) if item.assignee_from else None,
+                    },
+                    request=request,
+                )
+                restored += 1
+        except HTTPException as exc:
+            if exc.status_code != status.HTTP_404_NOT_FOUND:
+                raise
+            missing += 1
+    await db.commit()
+    return BulkAssignUndoResponse(restored=restored, changed_since=changed, too_late=late, not_found=missing)
 
 
 @router.patch("/{alert_id}", response_model=AlertResponse)
