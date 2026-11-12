@@ -24,6 +24,7 @@ import { useHiddenNav } from '@/hooks/useHiddenNav';
 import { MORE_SETTINGS } from '@/components/settings/moreSettings';
 import { CURATED_PAGES, paletteNavItems, rememberSearch } from './paletteNav';
 import { shownSections } from './Sidebar';
+import { NEW_EVENTS, type NewKind } from '@/lib/openNew';
 
 interface PaletteAction {
   id: string;
@@ -220,6 +221,15 @@ export function CommandPalette() {
       })),
     };
 
+    // On the list page itself the form is asked for with an event (the page is already open); from anywhere else the page is opened with ?new=1.
+    const openNew = (kind: NewKind, page: string) => {
+      if (pathname === page) {
+        window.dispatchEvent(new Event(NEW_EVENTS[kind]));
+        close();
+      } else {
+        navigate(`${page}?new=1`);
+      }
+    };
     const quickGroup: PaletteGroup = {
       id: 'actions',
       heading: 'Quick actions',
@@ -242,6 +252,20 @@ export function CommandPalette() {
           hint: 'Full conversation view',
           keywords: ['copilot', 'ai', 'chat'],
           perform: () => navigate('/copilot'),
+        },
+        {
+          id: 'action:new-case',
+          label: 'New case',
+          hint: 'Open the new case form',
+          keywords: ['create', 'case', 'investigation', 'open a case'],
+          perform: () => openNew('case', '/cases'),
+        },
+        {
+          id: 'action:new-alert',
+          label: 'Enter an alert by hand',
+          hint: 'Open the new alert form',
+          keywords: ['create', 'new alert', 'manual', 'report'],
+          perform: () => openNew('alert', '/alerts'),
         },
         {
           id: 'action:refresh',

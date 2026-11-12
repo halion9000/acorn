@@ -264,3 +264,34 @@ describe('recent searches', () => {
     window.localStorage.removeItem('aisoc.palette.searches');
   });
 });
+
+describe('CommandPalette: new case and new alert', () => {
+  it('from another page, New case opens the cases page asking for the form', async () => {
+    nav.pathname = '/dashboard';
+    openIt();
+    await userEvent.click(screen.getByText('New case'));
+    expect(nav.push).toHaveBeenCalledWith('/cases?new=1');
+  });
+
+  it('on the cases page itself, New case asks the open page for the form and goes nowhere', async () => {
+    nav.pathname = '/cases';
+    const heard = vi.fn();
+    window.addEventListener('aisoc:new-case', heard);
+    openIt();
+    await userEvent.click(screen.getByText('New case'));
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(nav.push).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    window.removeEventListener('aisoc:new-case', heard);
+  });
+
+  it('Enter an alert by hand does the same for alerts: an event on the alerts page, the page with ?new=1 from elsewhere', async () => {
+    const heard = vi.fn();
+    window.addEventListener('aisoc:new-alert', heard);
+    openIt(); // the default page in these tests is /alerts
+    await userEvent.click(screen.getByText('Enter an alert by hand'));
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(nav.push).not.toHaveBeenCalled();
+    window.removeEventListener('aisoc:new-alert', heard);
+  });
+});

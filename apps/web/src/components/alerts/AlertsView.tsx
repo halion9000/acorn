@@ -25,6 +25,7 @@ import { DATE_PRESETS, dateRangeError, isDateLimited, type DatePreset } from '@/
 import { sourceLink } from './AlertContext';
 import { StaleReview } from './StaleReview';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
+import { useOpenOnNew } from '@/lib/openNew';
 
 // Wave 1 of the A.C.O.R.N v6 capability roadmap. The "entities" tab renders the
 // rolled-up Risk-Based Alerting queue — alerts contribute time-decayed risk
@@ -536,6 +537,8 @@ export function AlertsView() {
   // workflows or when triaging a specific alert ID.
   const [viewMode, setViewMode] = useState<ViewMode>('alerts');
   const [createOpen, setCreateOpen] = useState(false);
+  // The palette's "Enter an alert by hand" lands here with ?new=1, or asks while this page is already open.
+  useOpenOnNew('alert', () => setCreateOpen(true));
   const [exportingAll, setExportingAll] = useState(false);
   const [exportNote, setExportNote] = useState<string | null>(null);
 

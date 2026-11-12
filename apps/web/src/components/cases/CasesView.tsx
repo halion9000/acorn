@@ -14,6 +14,7 @@ import { EmptyState, EmptyStateIcons } from '@/components/ui/EmptyState';
 import { SavedViewsBar } from '@/components/saved-views/SavedViewsBar';
 import { CreateCaseModal } from './CreateCaseModal';
 import { ActNowBoard } from './ActNowBoard';
+import { useOpenOnNew } from '@/lib/openNew';
 
 // WS-F3 — the saved-views API stores an opaque filter blob per view, so we
 // flatten the three filter slices Cases tracks today into a single shape the
@@ -146,6 +147,8 @@ export function CasesView({ initialCases }: CasesViewProps = {}) {
   const [severityFilter, setSeverityFilter] = useState<Case['severity'] | 'all'>('all');
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
+  // The palette's "New case" lands here with ?new=1, or asks while this page is already open.
+  useOpenOnNew('case', () => setCreating(true));
 
   // An organization with clients can look at all their cases at once. The choice is remembered in this browser.
   // A link (from a client's posture page, say) can open the list for one client: ?scope=all&client=<id>. That wins over what was remembered and leaves it alone.
