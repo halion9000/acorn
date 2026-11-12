@@ -8,7 +8,7 @@ const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), alertsApi: { list: api.list }, msspApi: mssp }));
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a> }));
 
-import { VulnerabilitiesView, byClient, sortFindings, toolOf } from './VulnerabilitiesView';
+import { VulnerabilitiesView, sortFindings, toolOf } from './VulnerabilitiesView';
 
 const alert = (over: Record<string, unknown> = {}) => ({
   id: 'a1', title: 'Many machines at this client are missing patches', description: '10 of 40 devices are patch-compliant in ThreatMate (25%)', severity: 'high', status: 'new', source: 'aisoc-checks', tenantId: 't', clientName: 'Acme', tags: ['posture-change', 'threatmate', 'threatmate_patching'],
@@ -56,20 +56,14 @@ describe('VulnerabilitiesView', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be loaded: 503');
   });
 
-  it('opens on all clients with a count for each, and pressing a client narrows the list to that client', async () => {
+  it('opens on all clients as one list, with no wall of per-client counts above it', async () => {
     api.list.mockResolvedValue({ alerts: [alert({ tenantId: 't1', clientName: 'Acme' }), alert({ id: 'a2', tenantId: 't2', clientName: 'Beta', severity: 'critical' }), alert({ id: 'a3', tenantId: 't1', clientName: 'Acme' })], total: 3 });
     show();
-    const chips = await screen.findByTestId('vulnerabilities-by-client');
-    expect(chips).toHaveTextContent('Beta: 1');
-    expect(chips).toHaveTextContent('Acme: 2');
+    expect(await screen.findByTestId('vulnerabilities-summary')).toHaveTextContent('3 open');
     expect(api.list).toHaveBeenCalledWith(expect.not.objectContaining({ clientId: expect.anything() }));
-    await userEvent.setup().click(screen.getByRole('button', { name: /Acme: 2/ }));
-    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ clientId: 't1' })));
-  });
-
-  it('byClient counts per client, worst client first', () => {
-    const rows = byClient([alert({ tenantId: 'a', clientName: 'A' }), alert({ tenantId: 'b', clientName: 'B', severity: 'critical' }), alert({ tenantId: 'a', clientName: 'A' })] as never);
-    expect(rows.map((r) => [r.name, r.count, r.worst])).toEqual([['B', 1, 'critical'], ['A', 2, 'high']]);
+    expect(screen.queryByTestId('vulnerabilities-by-client')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Acme: 2/ })).toBeNull();
+    expect(screen.getByTestId('vulnerabilities')).toHaveTextContent('pick one above to narrow it');
   });
 
   it('sortFindings puts critical before high and newer before older; toolOf reads the tool from the tags', () => {
