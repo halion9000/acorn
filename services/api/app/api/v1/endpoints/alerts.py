@@ -40,6 +40,7 @@ from app.services.event_sanitiser import (
 )
 from app.services.narrative_loader import build_narrative
 from app.services.narrative_projection import project_alert_to_narrative_inputs
+from app.services.source_labels import narrative_names_the_inbox
 from app.services.timestamp_bounds import coerce_with_bounds, now_utc
 from app.services.timeutil import as_utc
 
@@ -1203,7 +1204,8 @@ async def get_alert(
         # New alerts get a narrative at fusion time. Older rows predate that
         # column being populated; the first detail-view read materialises
         # and persists one so we only pay the cost once per row.
-        if not alert.narrative:
+        # A narrative stored with the inbox's name where the tool's belongs ("from `Generic Generic JSON`") is written again the same way, once.
+        if not alert.narrative or narrative_names_the_inbox(alert.narrative):
             try:
                 inputs = project_alert_to_narrative_inputs(alert)
                 narrative_text = build_narrative(inputs)

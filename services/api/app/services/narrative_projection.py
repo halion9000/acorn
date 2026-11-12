@@ -33,6 +33,7 @@ from typing import Any
 
 from app.models.alert import Alert
 from app.services.narrative_loader import NarrativeFactor, NarrativeInputs
+from app.services.source_labels import alert_tool_name, is_generic_inbox
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -231,7 +232,12 @@ def project_alert_to_narrative_inputs(alert: Alert) -> NarrativeInputs:
     domain = _from_blob(raw_event, ("domain", "target_domain", "host_domain"))
     url = _from_blob(raw_event, ("url", "request_url", "uri"))
 
-    source = alert.connector_type or _from_blob(raw_event, ("source", "connector", "vendor"))
+    # The tool that raised it: for an alert that came through the generic inbox that is the sender's own name, not the inbox's.
+    source = (
+        alert_tool_name(alert.connector_type, raw_event)
+        if is_generic_inbox(alert.connector_type)
+        else (alert.connector_type or _from_blob(raw_event, ("source", "connector", "vendor")))
+    )
 
     rba_entity, rba_score = _rba_promotion(enrichment)
 

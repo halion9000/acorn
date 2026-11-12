@@ -48,3 +48,26 @@ def source_label(key: str | None) -> str:
     words = raw.replace("_", " ").replace("-", " ").split()
     deduped = [w for i, w in enumerate(words) if i == 0 or w.lower() != words[i - 1].lower()]
     return " ".join(w if w.isupper() else w[:1].upper() + w[1:] for w in deduped)
+
+
+def is_generic_inbox(connector_type: str | None) -> bool:
+    """Whether a stored connector type is the generic JSON inbox, however it was written ("Generic Generic JSON", "generic_json", "Generic JSON"). Everything CORE forwards arrives through
+    it, so it says nothing about which tool raised the alert."""
+    words = (connector_type or "").replace("_", " ").replace("-", " ").lower().split()
+    deduped = [w for i, w in enumerate(words) if i == 0 or w != words[i - 1]]
+    return deduped == ["generic", "json"]
+
+
+def alert_tool_name(connector_type: str | None, raw_event: object) -> str:
+    """The tool an alert came from, as a readable name. An alert that came through the generic inbox is named by the sender's own ``source`` (kept at ``raw_event.source``); with no sender
+    named it is "Generic JSON". Any other connector keeps its own name."""
+    sender = raw_event.get("source") if isinstance(raw_event, dict) else None
+    sender = sender.strip() if isinstance(sender, str) else ""
+    if is_generic_inbox(connector_type) or not (connector_type or "").strip():
+        return source_label(sender) if sender else ("Generic JSON" if (connector_type or "").strip() else "Unknown")
+    return source_label(connector_type)
+
+
+def narrative_names_the_inbox(narrative: str | None) -> bool:
+    """Whether a stored narrative was written with the inbox's name where the tool's belongs (narratives written before the tool was looked up): one to write again."""
+    return bool(narrative) and "`Generic Generic JSON`" in narrative  # type: ignore[operator]

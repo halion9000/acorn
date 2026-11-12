@@ -43,6 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import Alert
 from app.models.audit import AuditLog
+from app.services.source_labels import alert_tool_name, is_generic_inbox
 
 # ─── Tunables ────────────────────────────────────────────────────────────────
 
@@ -252,7 +253,10 @@ def build_related_entities(alert: Alert) -> list[RelatedEntity]:
     # The "what" of the alert — rule name, MITRE coverage, tags that
     # describe the detection logic. These pivot into detection
     # tuning / coverage explorers rather than the entity graph.
-    rule_name = _from_blob(raw_event, ("rule_name", "rule", "detection")) or alert.connector_type
+    # With no rule named, a real connector's name stands in; the generic inbox's name does not (it is not a detection, and every forwarded alert would show the same one).
+    rule_name = _from_blob(raw_event, ("rule_name", "rule", "detection")) or (
+        None if is_generic_inbox(alert.connector_type) else alert.connector_type
+    )
     if rule_name:
         bucket.add(group="workflow", kind="rule", value=rule_name)
     for tactic_obj in alert.mitre_tactics or ():
@@ -294,7 +298,11 @@ def build_related_entities(alert: Alert) -> list[RelatedEntity]:
     # because "which data source did this fire on" is an
     # organisational question, not a workflow one.
     if alert.connector_type:
-        bucket.add(group="tenant", kind="connector", value=alert.connector_type)
+        bucket.add(
+            group="tenant",
+            kind="connector",
+            value=alert_tool_name(alert.connector_type, raw_event) if is_generic_inbox(alert.connector_type) else alert.connector_type,
+        )
     if alert.case_id is not None:
         bucket.add(
             group="tenant",
