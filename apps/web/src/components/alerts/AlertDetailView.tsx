@@ -829,9 +829,9 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
         <span className="text-gray-300">{alert.id}</span>
       </div>
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      {/* Header: the title has the full width; the actions sit on their own row under it and wrap, so a long title is never squeezed into a narrow column beside them. */}
+      <div className="flex flex-col gap-3" data-testid="alert-header">
+        <div className="min-w-0">
           <div className="flex items-center gap-3 mb-1 flex-wrap">
             <span className={clsx('inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded ring-1 ring-inset', sevCfg.badge)}>
               <span className={clsx('w-2 h-2 rounded-full', sevCfg.dot)} />
@@ -848,10 +848,10 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
             )}
             <span className="text-xs text-gray-500">Risk Score: <span className="text-white font-bold">{alert.riskScore}</span></span>
           </div>
-          <h1 className="text-lg font-semibold text-gray-100">{alert.title}</h1>
+          <h1 className="text-lg font-semibold text-gray-100 break-words">{alert.title}</h1>
           <p className="text-sm text-gray-500 mt-1" suppressHydrationWarning>{vendorLabel(alert.source)} · {safeFormat(alert.createdAt, 'MMM d, yyyy HH:mm:ss')}</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2" data-testid="alert-actions">
           <select
             value={alert.status}
             onChange={(e) => handleStatusChange(e.target.value as Alert['status'])}
