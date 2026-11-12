@@ -16,6 +16,7 @@ from sqlalchemy.pool import NullPool
 PG_URL = os.environ.get("AISOC_TEST_PG_URL", "")
 NOW = datetime.now(UTC)
 TITLE = "Phishing link clicked"
+CHECK_TITLE = "Microsoft Defender finds vulnerabilities with a known exploit on this client's devices"
 pytestmark = [
     pytest.mark.asyncio,
     pytest.mark.skipif(not PG_URL, reason="set AISOC_TEST_PG_URL to a DISPOSABLE, fully migrated API database"),
@@ -41,15 +42,15 @@ async def world():
             )
         ids: dict[str, uuid.UUID] = {}
 
-        async def alert(key, tenant, title=TITLE, status="new", hours_ago=2.0):
+        async def alert(key, tenant, title=TITLE, status="new", hours_ago=2.0, raw="{}"):
             ids[key] = uuid.uuid4()
             created = NOW - timedelta(hours=hours_ago)
             await s.execute(
                 text(
                     "insert into alerts (id, tenant_id, title, severity, status, priority, affected_hosts, raw_event, enrichment_data, created_at, updated_at) "
-                    "values (:i, :t, :title, 'high', :st, 50, '[]'::jsonb, '{}'::jsonb, '{}'::jsonb, :c, :c)"
+                    "values (:i, :t, :title, 'high', :st, 50, '[]'::jsonb, cast(:raw as jsonb), '{}'::jsonb, :c, :c)"
                 ),
-                {"i": ids[key], "t": t[tenant], "title": title, "st": status, "c": created},
+                {"i": ids[key], "t": t[tenant], "title": title, "st": status, "c": created, "raw": raw},
             )
 
         await alert("this", "acme", hours_ago=1)
@@ -61,6 +62,9 @@ async def world():
         await alert("birch_other_title", "birch", title="Something else")
         await alert("parent_one", "parent", hours_ago=4)
         await alert("stranger_one", "stranger")
+        check = '{"source": "aisoc-checks", "check": "cipp_defender_vulnerabilities"}'
+        await alert("check_acme", "acme", title=CHECK_TITLE, raw=check)
+        await alert("check_birch", "birch", title=CHECK_TITLE, raw=check)
         await s.commit()
         s.info.update(t=t, ids=ids)
         yield s
@@ -85,6 +89,13 @@ async def test_the_parent_sees_the_same_title_at_its_other_tenants_in_the_last_d
     birch, own = out["clients"]
     assert birch["name"] == "birch" and birch["count"] == 2 and birch["newest_alert_id"] == str(s.info["ids"]["birch_new"])
     assert own["name"] == "parent" and own["count"] == 1 and own["newest_alert_id"] == str(s.info["ids"]["parent_one"])
+
+
+async def test_a_posture_check_alert_is_never_called_a_campaign_though_the_same_check_failed_at_another_client(world):
+    s = world
+    await off(s)
+    out = await same_alert_at_other_clients(s.info["ids"]["check_acme"], SimpleNamespace(tenant_id=s.info["t"]["parent"]), s)
+    assert (out["total"], out["client_count"], out["clients"]) == (0, 0, [])
 
 
 async def test_a_client_looking_at_its_own_alert_is_told_nothing_about_anyone_else(world):

@@ -1138,9 +1138,12 @@ async def same_alert_at_other_clients(
 ) -> dict[str, Any]:
     """The same alert (same exact title) raised in the last 24 hours at the caller's other tenants: per client, how many and the newest one. Empty for an organization with no clients."""
     async with alert_scope(db, current_user.tenant_id, alert_id) as tid:
-        this = (await db.execute(select(Alert.title).where(Alert.id == alert_id, Alert.tenant_id == tid))).first()
+        this = (await db.execute(select(Alert.title, Alert.raw_event).where(Alert.id == alert_id, Alert.tenant_id == tid))).first()
         if this is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+    # A posture check fails at many clients for ordinary reasons: the same title elsewhere is not a campaign, so nothing is said.
+    if alert_other_clients.is_posture_check(this[1]):
+        return alert_other_clients.nothing()
     # Only the caller's own organization and the clients it owns, never anything else; the tenant holding this alert is left out.
     names = {
         row.id: row.name

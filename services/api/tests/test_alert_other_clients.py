@@ -45,3 +45,11 @@ def test_the_list_is_capped_and_the_count_still_says_how_many_clients():
 
 def test_nothing_is_an_empty_answer_of_the_same_shape():
     assert oc.nothing() == oc.summarize([], {})
+
+
+def test_only_an_alert_from_the_posture_checks_counts_as_one():
+    from app.services.alert_other_clients import is_posture_check
+
+    assert is_posture_check({"source": "aisoc-checks", "check": "cipp_defender_vulnerabilities", "tool": "cipp-health"})
+    for other in ({"source": "huntress"}, {}, None, "aisoc-checks", {"source": None}):
+        assert not is_posture_check(other), other

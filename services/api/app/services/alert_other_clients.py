@@ -41,6 +41,12 @@ def summarize(rows: list[dict[str, Any]], names: dict[Any, str]) -> dict[str, An
     }
 
 
+def is_posture_check(raw_event: Any) -> bool:
+    """Whether an alert was raised by A.C.O.R.N's own daily posture checks. The same check is run for every client and fails at many of them for ordinary reasons (missing patches, known
+    vulnerabilities), so the same title at several clients is expected and says nothing about a campaign."""
+    return isinstance(raw_event, dict) and raw_event.get("source") == "aisoc-checks"
+
+
 def nothing() -> dict[str, Any]:
     """The answer for an organization with no other tenant to look at."""
     return {"window_hours": WINDOW_HOURS, "total": 0, "client_count": 0, "clients": []}
