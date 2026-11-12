@@ -32,6 +32,8 @@ from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 WAIT_SECONDS = 3
+# A lookup that needs the database fails only when the connection attempt gives up, which takes several seconds where nothing answers on the port (Windows).
+DATABASE_WAIT_SECONDS = 20
 
 WEBSOCKET_ROUTES = {
     "/api/v1/graph_ws/stream": (
@@ -55,7 +57,7 @@ def walk_ws(routes, prefix=""):
             yield from walk_ws(route.original_router.routes, prefix + (getattr(context, "prefix", "") or ""))
 
 
-def outcome(application, path, **connect) -> str:
+def outcome(application, path, wait: float = WAIT_SECONDS, **connect) -> str:
     """What an anonymous client gets: 'refused:<code>', 'closed:<code>' (accepted, then closed, sent nothing), 'error' (the server raised:
     fails
     closed), 'SENT:<first message>', or 'OPEN' (accepted and then SILENT: the server is waiting for the client to speak).
@@ -71,7 +73,7 @@ def outcome(application, path, **connect) -> str:
         with client.websocket_connect(url, **connect) as ws:
             future = pool.submit(ws.receive_text)
             try:
-                result = f"SENT:{future.result(timeout=WAIT_SECONDS)[:60]}"
+                result = f"SENT:{future.result(timeout=wait)[:60]}"
             except WebSocketDisconnect as closed:
                 result = f"closed:{refusal_code(closed)}"
             except FutureTimeout:
@@ -153,7 +155,7 @@ def test_an_api_key_shaped_token_is_refused_or_fails_closed_but_never_gets_past_
     connection fails closed ('error') instead of the handler's own 1008. Either is a refusal. What it must never be is 1011 ('upstream
     error': the
     client got past authentication and the proxy tried the upstream feed) or any data."""
-    assert outcome(app, GRAPH + "?token=aisoc_not-a-real-key") in {REFUSED_AT_AUTHENTICATION, "error"}
+    assert outcome(app, GRAPH + "?token=aisoc_not-a-real-key", wait=DATABASE_WAIT_SECONDS) in {REFUSED_AT_AUTHENTICATION, "error"}
 
 
 @pytest.mark.parametrize(

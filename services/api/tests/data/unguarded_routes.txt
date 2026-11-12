@@ -9,6 +9,7 @@
 DELETE /passkeys/credentials/{credential_id} [passkeys.py::revoke_credential]
 DELETE /saved-views/{view_id} [saved_views.py::delete_saved_view]
 GET /auth/me [auth.py::get_me]
+GET /auth/me/signins [auth.py::my_signins]
 GET /auth/sso/microsoft/login [sso_microsoft.py::microsoft_login]
 GET /auth/sso/status [sso_microsoft.py::sso_status]
 GET /auth/totp [totp.py::totp_status]
