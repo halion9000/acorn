@@ -26,6 +26,7 @@ matrix without spinning up Postgres, and we can later swap the data layer
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections import Counter
 from dataclasses import dataclass, field
@@ -33,16 +34,18 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import Alert
 from app.models.dmarc import DmarcReport
 from app.models.remediation import RemediationGateLog
-from app.services import case_metrics
+from app.services import case_metrics, evidence_age
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.mttr import summarize
 from app.services.source_labels import source_label
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Output schemas (Pydantic) — what the endpoint actually returns.
@@ -121,6 +124,15 @@ class DigestRecommendation(BaseModel):
     body: str
 
 
+class OldEvidenceLine(BaseModel):
+    """One framework's controls that rest on accepted evidence more than a year old."""
+
+    framework: str
+    controls: int
+    # The age in days of the oldest of those controls' newest accepted evidence.
+    oldest_days: int
+
+
 class EmailAuthLine(BaseModel):
     """How one domain's mail did in the DMARC reports received during the window."""
 
@@ -149,6 +161,8 @@ class ExecutiveDigest(BaseModel):
     high_risk_alerts: list[HighRiskAlertHighlight] = Field(default_factory=list)
     automation: AutomationSummary
     recommendations: list[DigestRecommendation] = Field(default_factory=list)
+    # Frameworks with controls whose newest accepted evidence is more than a year old (empty when there are none).
+    old_evidence: list[OldEvidenceLine] = Field(default_factory=list)
     # DMARC pass rate per domain, worst first; empty when no reports came in (the section is then left out).
     email_authentication: list[EmailAuthLine] = Field(default_factory=list)
 
@@ -217,6 +231,8 @@ class DigestInputs:
     open_alerts_at_period_end: int = 0
     open_cases_at_period_end: int = 0
     dmarc_reports: list[DmarcRow] = field(default_factory=list)
+    # {framework: {control id: when its newest ACCEPTED evidence was collected}}.
+    evidence_newest: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -440,6 +456,16 @@ def _email_authentication(reports: list[DmarcRow], *, limit: int = 8) -> list[Em
     return lines[:limit]
 
 
+def _old_evidence(newest_by_framework: dict[str, dict[str, Any]], now: datetime) -> list[OldEvidenceLine]:
+    """One line per framework that has controls with accepted evidence past a year: how many, and the age of the oldest. The framework with the most such controls first."""
+    lines: list[OldEvidenceLine] = []
+    for framework, newest in newest_by_framework.items():
+        age = evidence_age.summarize(newest, now)
+        if age["stale"]:
+            lines.append(OldEvidenceLine(framework=framework, controls=len(age["stale"]), oldest_days=int(age["oldest_days"] or 0)))
+    return sorted(lines, key=lambda line: (-line.controls, line.framework))
+
+
 def _build_recommendations(
     alerts: AlertSummary,
     cases: CaseSummary,
@@ -447,6 +473,7 @@ def _build_recommendations(
     automation: AutomationSummary,
     top_tactics: list[TacticHighlight],
     email_authentication: list[EmailAuthLine] | None = None,
+    old_evidence: list[OldEvidenceLine] | None = None,
 ) -> list[DigestRecommendation]:
     """Heuristic, deterministic CISO-facing call-to-actions.
 
@@ -526,6 +553,17 @@ def _build_recommendations(
             )
         )
 
+    if old_evidence:
+        named = ", ".join(f"{line.framework} ({line.controls})" for line in old_evidence[:4])
+        total = sum(line.controls for line in old_evidence)
+        recs.append(
+            DigestRecommendation(
+                severity="warning",
+                title="Compliance evidence is more than a year old",
+                body=f"{total} {'control rests' if total == 1 else 'controls rest'} on accepted evidence older than a year: {named}. Collect fresh evidence before the next audit.",
+            )
+        )
+
     if not recs:
         recs.append(
             DigestRecommendation(
@@ -570,7 +608,8 @@ def build_digest_from_rows(inputs: DigestInputs) -> ExecutiveDigest:
     automation = _automation_summary(inputs.gate_log)
     headline = _build_headline(alerts, mtt, automation)
     email_auth = _email_authentication(inputs.dmarc_reports)
-    recommendations = _build_recommendations(alerts, cases, mtt, automation, top_tactics, email_auth)
+    old_evidence = _old_evidence(inputs.evidence_newest, inputs.period_end)
+    recommendations = _build_recommendations(alerts, cases, mtt, automation, top_tactics, email_auth, old_evidence)
 
     return ExecutiveDigest(
         tenant_id=inputs.tenant_id,
@@ -585,6 +624,7 @@ def build_digest_from_rows(inputs: DigestInputs) -> ExecutiveDigest:
         automation=automation,
         recommendations=recommendations,
         email_authentication=email_auth,
+        old_evidence=old_evidence,
     )
 
 
@@ -690,6 +730,25 @@ async def _fetch_dmarc(db: AsyncSession, tenant_id: uuid.UUID, start: datetime, 
     return [DmarcRow(domain=r.domain, policy=r.policy, total=r.total, passed=r.passed, failed=r.failed) for r in result.all()]
 
 
+async def _fetch_evidence_newest(db: AsyncSession, tenant_id: uuid.UUID) -> dict[str, dict[str, Any]]:
+    """For each framework and control of this tenant, when its newest ACCEPTED evidence was collected. Empty when it cannot be read: the digest is still made."""
+    try:
+        result = await db.execute(
+            text(
+                "SELECT framework, control_id, MAX(collected_at) AS newest FROM aisoc_compliance_evidence "
+                "WHERE tenant_id = :tenant_id AND status = 'accepted' GROUP BY framework, control_id"
+            ),
+            {"tenant_id": tenant_id},
+        )
+        newest: dict[str, dict[str, Any]] = {}
+        for row in result.all():
+            newest.setdefault(str(row[0]), {})[str(row[1])] = row[2]
+        return newest
+    except Exception:  # noqa: BLE001  # the digest must not fail because the evidence table could not be read
+        logger.warning("digest: compliance evidence ages could not be read", exc_info=True)
+        return {}
+
+
 async def _count_open_alerts(db: AsyncSession, tenant_id: uuid.UUID, at: datetime) -> int:
     """Open == not resolved as of `at`."""
     val = await db.scalar(
@@ -734,6 +793,7 @@ async def build_weekly_digest(
     open_alerts = await _count_open_alerts(db, tenant_id, end)
     open_cases = await _count_open_cases(db, tenant_id, end)
     dmarc = await _fetch_dmarc(db, tenant_id, start, end)
+    evidence_newest = await _fetch_evidence_newest(db, tenant_id)
 
     inputs = DigestInputs(
         tenant_id=tenant_id,
@@ -746,6 +806,7 @@ async def build_weekly_digest(
         open_alerts_at_period_end=open_alerts,
         open_cases_at_period_end=open_cases,
         dmarc_reports=dmarc,
+        evidence_newest=evidence_newest,
     )
     return build_digest_from_rows(inputs)
 
@@ -788,4 +849,5 @@ _internal_helpers: dict[str, Any] = {
     "_alert_summary": _alert_summary,
     "_build_headline": _build_headline,
     "_build_recommendations": _build_recommendations,
+    "_old_evidence": _old_evidence,
 }
