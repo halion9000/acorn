@@ -107,6 +107,9 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/person-tickets"): (
         "CORE's list of each person's recent HaloPSA tickets: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only add or update tickets under that feed's own client tenants, and only for clients already mapped (the 422 here is the empty body)"
     ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/vulnerabilities"): (
+        "CORE's list of each client's vulnerabilities, one line each: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only write under that feed's own client tenants, and only for accounts already mapped to a client."
+    ),
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/mfa-users"): (
         "CORE's multi-factor status per person read through CIPP: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it can only write under that feed's own client tenants, and only for clients already mapped (the 422 here is the empty body)"
     ),

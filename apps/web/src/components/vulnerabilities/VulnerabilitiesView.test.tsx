@@ -8,6 +8,9 @@ const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), alertsApi: { list: api.list }, msspApi: mssp }));
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a> }));
 
+// The per-vulnerability list has its own tests; here it is a marker that shows which client it was given.
+vi.mock('./VulnerabilityLines', () => ({ VulnerabilityLines: ({ clientId }: { clientId: string }) => <div data-testid="lines-stub" data-client={clientId} /> }));
+
 import { VulnerabilitiesView, sortFindings, toolOf } from './VulnerabilitiesView';
 
 const alert = (over: Record<string, unknown> = {}) => ({
@@ -64,6 +67,16 @@ describe('VulnerabilitiesView', () => {
     expect(screen.queryByTestId('vulnerabilities-by-client')).toBeNull();
     expect(screen.queryByRole('button', { name: /Acme: 2/ })).toBeNull();
     expect(screen.getByTestId('vulnerabilities')).toHaveTextContent('pick one above to narrow it');
+  });
+
+  it('puts the line-per-vulnerability list above the alerts, for all clients until one is picked', async () => {
+    api.list.mockResolvedValue({ alerts: [alert()], total: 1 });
+    show();
+    const row = await screen.findByTestId('vuln-a1');
+    const lines = screen.getByTestId('lines-stub');
+    expect(lines).toHaveAttribute('data-client', '');
+    expect(lines.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'Alerts raised' })).toBeInTheDocument();
   });
 
   it('sortFindings puts critical before high and newer before older; toolOf reads the tool from the tags', () => {

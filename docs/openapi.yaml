@@ -2669,6 +2669,124 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/vulnerabilities:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Vulnerabilities
+      description: 'Record one client''s vulnerabilities (a list, in chunks): what
+        is missing from the final chunk is removed.'
+      operationId: report_core_feed_vulnerabilities_api_v1_inbox_core_feed__tenant_token__vulnerabilities_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VulnerabilitiesReport'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VulnerabilitiesResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-vulnerabilities:
+    get:
+      tags:
+      - client-vulnerabilities
+      summary: The vulnerabilities found at one client, or at all the caller's clients,
+        one line each, worst first
+      operationId: list_client_vulnerabilities_api_v1_client_vulnerabilities_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One client (or the caller's own organisation); left out, every
+            client together.
+          title: Client Id
+        description: One client (or the caller's own organisation); left out, every
+          client together.
+      - name: severity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(critical|high|medium|low)$
+          - type: 'null'
+          title: Severity
+      - name: exploited
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: 'True: only those with a known exploit.'
+          title: Exploited
+        description: 'True: only those with a known exploit.'
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          description: Part of a CVE id, a program name or a machine name.
+          title: Q
+        description: Part of a CVE id, a program name or a machine name.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 200
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VulnerabilityList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alert-suppressions:
     post:
       tags:
@@ -11904,7 +12022,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/VulnerabilityOut'
+                  $ref: '#/components/schemas/app__api__v1__endpoints__assets__VulnerabilityOut'
                 title: Response List Vulnerabilities Api V1 Assets Vulnerabilities
                   Get
         '422':
@@ -11932,7 +12050,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VulnerabilityOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__assets__VulnerabilityOut'
         '422':
           description: Validation Error
           content:
@@ -12059,7 +12177,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/VulnerabilityOut'
+                  $ref: '#/components/schemas/app__api__v1__endpoints__assets__VulnerabilityOut'
                 title: Response List Asset Vulnerabilities Api V1 Assets  Asset Id  Vulnerabilities
                   Get
         '422':
@@ -52313,6 +52431,67 @@ components:
       - home_tenant_id
       - tenants
       title: ViewableTenantsResponse
+    VulnerabilitiesReport:
+      properties:
+        vendor:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          title: Vendor
+        vendor_client_id:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Vendor Client Id
+        snapshot_id:
+          type: string
+          format: uuid
+          title: Snapshot Id
+          description: One id for every chunk of one client's list.
+        last:
+          type: boolean
+          title: Last
+          description: 'True on the final chunk: vulnerabilities not in this list
+            are then removed.'
+          default: true
+        items:
+          items:
+            $ref: '#/components/schemas/VulnerabilityIn'
+          type: array
+          maxItems: 1000
+          title: Items
+      type: object
+      required:
+      - vendor
+      - vendor_client_id
+      - snapshot_id
+      - items
+      title: VulnerabilitiesReport
+    VulnerabilitiesResponse:
+      properties:
+        accepted:
+          type: integer
+          title: Accepted
+        unmapped:
+          type: integer
+          title: Unmapped
+          default: 0
+        ignored:
+          type: integer
+          title: Ignored
+          default: 0
+        removed:
+          type: integer
+          title: Removed
+          default: 0
+        unmapped_clients:
+          items:
+            $ref: '#/components/schemas/UnmappedClient'
+          type: array
+          title: Unmapped Clients
+      type: object
+      required:
+      - accepted
+      title: VulnerabilitiesResponse
     VulnerabilityCreate:
       properties:
         asset_id:
@@ -52391,94 +52570,86 @@ components:
       - title
       - source
       title: VulnerabilityCreate
-    VulnerabilityOut:
+    VulnerabilityIn:
       properties:
-        asset_id:
+        cve:
           type: string
-          format: uuid
-          title: Asset Id
-        cve_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Cve Id
-        title:
+          maxLength: 60
+          minLength: 1
+          title: Cve
+        software:
           type: string
-          title: Title
-        description:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Description
+          maxLength: 200
+          minLength: 1
+          title: Software
+        version:
+          type: string
+          maxLength: 100
+          title: Version
+          default: ''
         severity:
           type: string
+          pattern: ^(critical|high|medium|low)$
           title: Severity
-          default: medium
-        cvss_score:
+        cvss:
           anyOf:
           - type: number
+            maximum: 10.0
+            minimum: 0.0
           - type: 'null'
-          title: Cvss Score
-        cvss_vector:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Cvss Vector
-        epss_score:
-          anyOf:
-          - type: number
-          - type: 'null'
-          title: Epss Score
-        is_exploited:
+          title: Cvss
+        exploited:
           type: boolean
-          title: Is Exploited
+          title: Exploited
           default: false
-        source:
-          type: string
-          title: Source
-        external_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: External Id
-        id:
-          type: string
-          format: uuid
-          title: Id
-        tenant_id:
-          type: string
-          format: uuid
-          title: Tenant Id
-        first_found:
-          type: string
-          format: date-time
-          title: First Found
-        last_found:
-          type: string
-          format: date-time
-          title: Last Found
-        remediated_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Remediated At
-        metadata:
-          additionalProperties: true
-          type: object
-          title: Metadata
+        devices:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: Devices
+          default: 0
+        device_names:
+          items:
+            type: string
+            maxLength: 120
+          type: array
+          maxItems: 25
+          title: Device Names
       type: object
       required:
-      - asset_id
-      - title
-      - source
-      - id
-      - tenant_id
-      - first_found
-      - last_found
-      - remediated_at
-      title: VulnerabilityOut
-      description: 'What the API returns: the stored values as they are.'
+      - cve
+      - software
+      - severity
+      title: VulnerabilityIn
+    VulnerabilityList:
+      properties:
+        total:
+          type: integer
+          title: Total
+        exploited:
+          type: integer
+          title: Exploited
+        by_severity:
+          additionalProperties:
+            type: integer
+          type: object
+          title: By Severity
+        clients:
+          type: integer
+          title: Clients
+        rows:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__client_vulnerabilities__VulnerabilityOut'
+          type: array
+          title: Rows
+      type: object
+      required:
+      - total
+      - exploited
+      - by_severity
+      - clients
+      - rows
+      title: VulnerabilityList
     WaitlistEntriesResponse:
       properties:
         entries:
@@ -53013,6 +53184,94 @@ components:
       required:
       - tickets
       title: TicketsResponse
+    app__api__v1__endpoints__assets__VulnerabilityOut:
+      properties:
+        asset_id:
+          type: string
+          format: uuid
+          title: Asset Id
+        cve_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cve Id
+        title:
+          type: string
+          title: Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        severity:
+          type: string
+          title: Severity
+          default: medium
+        cvss_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Cvss Score
+        cvss_vector:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cvss Vector
+        epss_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Epss Score
+        is_exploited:
+          type: boolean
+          title: Is Exploited
+          default: false
+        source:
+          type: string
+          title: Source
+        external_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: External Id
+        id:
+          type: string
+          format: uuid
+          title: Id
+        tenant_id:
+          type: string
+          format: uuid
+          title: Tenant Id
+        first_found:
+          type: string
+          format: date-time
+          title: First Found
+        last_found:
+          type: string
+          format: date-time
+          title: Last Found
+        remediated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Remediated At
+        metadata:
+          additionalProperties: true
+          type: object
+          title: Metadata
+      type: object
+      required:
+      - asset_id
+      - title
+      - source
+      - id
+      - tenant_id
+      - first_found
+      - last_found
+      - remediated_at
+      title: VulnerabilityOut
+      description: 'What the API returns: the stored values as they are.'
     app__api__v1__endpoints__billing__ChangeRow:
       properties:
         client_id:
@@ -53137,6 +53396,72 @@ components:
       required:
       - events
       title: TimelineResponse
+    app__api__v1__endpoints__client_vulnerabilities__VulnerabilityOut:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        source:
+          type: string
+          title: Source
+        cve:
+          type: string
+          title: Cve
+        software:
+          type: string
+          title: Software
+        version:
+          type: string
+          title: Version
+        severity:
+          type: string
+          title: Severity
+        cvss:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Cvss
+        exploited:
+          type: boolean
+          title: Exploited
+        devices:
+          type: integer
+          title: Devices
+        device_names:
+          items:
+            type: string
+          type: array
+          title: Device Names
+        first_seen:
+          type: string
+          format: date-time
+          title: First Seen
+        last_seen:
+          type: string
+          format: date-time
+          title: Last Seen
+      type: object
+      required:
+      - client_id
+      - client_name
+      - source
+      - cve
+      - software
+      - version
+      - severity
+      - cvss
+      - exploited
+      - devices
+      - device_names
+      - first_seen
+      - last_seen
+      title: VulnerabilityOut
     app__api__v1__endpoints__detection_rules__HuntResponse:
       properties:
         hunt_id:

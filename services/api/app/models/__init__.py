@@ -7,6 +7,7 @@ from app.models.asset import AlertAssetCorrelation, Asset, AssetVulnerability
 from app.models.business_context_rule_set import BusinessContextRuleSet
 from app.models.case import Case, CaseTask, CaseTimeline
 from app.models.client_alias import ClientAlias
+from app.models.client_vulnerability import ClientVulnerability
 from app.models.connector import Connector
 from app.models.connector_run_log import ConnectorRunLog
 from app.models.copilot_conversation import CopilotConversation
@@ -65,6 +66,7 @@ __all__ = [
     "DeviceSource",
     "SigninEvent",
     "DirectoryAuditEvent",
+    "ClientVulnerability",
     "IdentityMfaUser",
     "IdentitySecureScore",
     "ClientVcioReview",

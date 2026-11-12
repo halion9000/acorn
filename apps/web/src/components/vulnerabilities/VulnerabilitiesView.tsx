@@ -16,6 +16,7 @@ import { downloadCsv } from '@/lib/csv';
 import { safeDistance } from '@/lib/safe-date';
 import { targetWords } from '@/app/(app)/settings/client-posture/ToolChecks';
 import { vulnerabilitiesCsvText } from './vulnerabilitiesCsv';
+import { VulnerabilityLines } from './VulnerabilityLines';
 import { collectAllAlerts } from '@/components/alerts/collectAlerts';
 import { overTargetCount, targetStanding } from './vulnTarget';
 import { trendSentence, weeklyTrend, type TrendWeek } from './vulnTrend';
@@ -97,6 +98,13 @@ export function VulnerabilitiesView() {
         </p>
       ) : null}
       {isLoading && !data ? <p className="text-sm text-gray-400">Loading…</p> : null}
+
+      <VulnerabilityLines clientId={clientId} />
+
+      <div>
+        <h2 className="text-lg font-semibold text-white">Alerts raised</h2>
+        <p className="text-xs text-gray-500">The alerts the tools&apos; checks raised about vulnerabilities, one per client and check. Each says how many there are; the lines above say which.</p>
+      </div>
 
       <div className="rounded-lg border border-gray-800 bg-gray-900/40 p-3" data-testid="vulnerabilities-trend">
         <div className="flex flex-wrap items-center gap-3">

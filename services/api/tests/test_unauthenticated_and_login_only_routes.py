@@ -117,6 +117,10 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's recent HaloPSA tickets per person: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only write under that feed's own mapped client tenants",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/vulnerabilities",
+    ): "CORE's list of each client's vulnerabilities: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only write under that feed's own mapped clients.",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/mfa-users",
     ): "CORE's multi-factor status (CIPP): authenticated by the core-feed token in the path, checked in the handler (401 without it); can only write under that feed's own mapped client tenants",
     (
