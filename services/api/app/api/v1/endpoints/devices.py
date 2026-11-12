@@ -114,6 +114,26 @@ _COMPUTER_TOOLS = {
 }
 
 
+def _addigy_field(sources: list[Any], name: str, kind: type) -> Any:
+    """A field of the device's Addigy record, when it is of the kind expected; None otherwise. Only Addigy's word counts: another tool's field of the same name means something else."""
+    for s in sources:
+        if s.vendor == "addigy":
+            value = (s.details or {}).get(name)
+            if isinstance(value, kind):
+                return value
+    return None
+
+
+def mdm_counts(devices: list[Any]) -> dict[str, int]:
+    """The numbers behind the two MDM tiles: devices Addigy shows with MDM disabled, devices not enrolled through ADE, and how many devices Addigy gives each reading for."""
+    return {
+        "mdm_disabled": sum(1 for d in devices if d.mdm_enabled is False),
+        "mdm_known": sum(1 for d in devices if d.mdm_enabled is not None),
+        "not_ade": sum(1 for d in devices if d.enrollment == "Manual"),
+        "enrollment_known": sum(1 for d in devices if d.enrollment is not None),
+    }
+
+
 def device_kind(sources: list[Any]) -> str:
     """What sort of device this is, from what the tools say: ``camera``, ``network`` (switches, routers, firewalls, access points...), ``computer`` (workstations, servers, laptops, phones and tablets), or ``other`` (printers, UPSes and the like, or nothing says). A camera or network signal from any tool wins; then a computer signal."""
     camera = network = computer = False
@@ -197,6 +217,19 @@ class DeviceOut(BaseModel):
         """Whether every fixed drive is BitLocker-encrypted, from the tools that report it (NinjaOne, Liongard); None when none does, which is not the same as "no" (see ``encryption_state``)."""
         return encryption_state(self)
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def mdm_enabled(self) -> bool | None:
+        """Whether Addigy has a working MDM enrollment for the device (its page shows "MDM: Enabled" or "Disabled"); None when Addigy does not report the device or does not say."""
+        return _addigy_field(self.sources, "mdm_enabled", bool)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def enrollment(self) -> str | None:
+        """How Addigy says the device was enrolled: "ADE" (Apple's automated enrollment) or "Manual"; None when it does not say (iPhones and iPads, and devices Addigy does not report)."""
+        value = _addigy_field(self.sources, "enrollment", str)
+        return value if value in ("ADE", "Manual") else None
+
 
 class DeviceSummary(BaseModel):
     total: int
@@ -214,6 +247,11 @@ class DeviceSummary(BaseModel):
     # Windows machines a tool reports are not fully BitLocker-encrypted, and how many have any reading (a tool reports it for some machines only). Servers carry no reading.
     not_encrypted: int = 0
     encryption_known: int = 0
+    # What Addigy says about MDM: devices it shows with MDM disabled, devices enrolled by hand rather than through ADE, and how many devices it gives each reading for.
+    mdm_disabled: int = 0
+    mdm_known: int = 0
+    not_ade: int = 0
+    enrollment_known: int = 0
     # Tools that report at least one device here. A "not in <tool>" tile only means something once the tool feeds devices, so the page shows it only then.
     reporting_tools: list[str] = Field(default_factory=list)
     # Devices a tool reports a problem with (Huntress: agent not checking in, Defender or firewall unhealthy, tamper protection not in force).
@@ -707,11 +745,12 @@ def filter_devices(
     os: str | None = None,
     kind: str | None = None,
     encryption: str | None = None,
+    mdm: str | None = None,
 ) -> list[DeviceOut]:
     """The devices a page (or an export) asked for: every filter given must hold. ``search`` matches the name, serial number, client name or any IP address, ignoring case. Sorted by client, then name."""
     rows = [d for d in everything if (d.hidden_since is not None) == hidden]
     # The problem filters agree with the problem counts: a device offline for a month is not in them (the Offline filter still shows it).
-    if not_in_master or missing or has_alerts or attention or stale or encryption:
+    if not_in_master or missing or has_alerts or attention or stale or encryption or mdm:
         rows = [d for d in rows if not long_offline(d)]
     if search:
         needle = search.strip().lower()
@@ -745,6 +784,10 @@ def filter_devices(
         rows = [d for d in rows if d.encrypted is False]
     elif encryption == "encrypted":
         rows = [d for d in rows if d.encrypted is True]
+    if mdm == "disabled":
+        rows = [d for d in rows if d.mdm_enabled is False]
+    elif mdm == "not_ade":
+        rows = [d for d in rows if d.enrollment == "Manual"]
     return sorted(rows, key=lambda d: (d.client_name or "", d.hostname.lower()))
 
 
@@ -817,6 +860,11 @@ async def list_devices(
         pattern="^(not_encrypted|encrypted)$",
         description="Only Windows workstations a tool reports are not (or are) fully BitLocker-encrypted.",
     ),
+    mdm: str | None = Query(
+        default=None,
+        pattern="^(disabled|not_ade)$",
+        description="Only devices Addigy shows with MDM disabled, or only devices enrolled by hand rather than through ADE.",
+    ),
 ) -> DeviceListOut:
     owner = current_user.tenant_id
     scope, clients = await _scope(db, owner, client_id)
@@ -839,6 +887,7 @@ async def list_devices(
         not_in_autoelevate=sum(1 for d in counted if is_missing_from(d, "autoelevate")),
         not_encrypted=sum(1 for d in counted if d.encrypted is False),
         encryption_known=sum(1 for d in counted if d.encrypted is not None),
+        **mdm_counts(counted),
         reporting_tools=sorted({s.vendor for d in loaded for s in d.sources}),
         needs_attention=sum(1 for d in counted if attention_of(d)),
         stale_agents=sum(1 for d in counted if stale_days_of(d) is not None),
@@ -861,6 +910,7 @@ async def list_devices(
         os=os,
         kind=kind,
         encryption=encryption,
+        mdm=mdm,
     )
     total = len(rows)
     start = (page - 1) * page_size
@@ -917,6 +967,7 @@ async def export_devices(
     os: str | None = Query(default=None, pattern="^(windows|mac|ios|linux)$"),
     kind: str | None = Query(default=None, pattern="^(computer|network|camera|other)$"),
     encryption: str | None = Query(default=None, pattern="^(not_encrypted|encrypted)$"),
+    mdm: str | None = Query(default=None, pattern="^(disabled|not_ade)$"),
 ) -> Response:
     owner = current_user.tenant_id
     scope, clients = await _scope(db, owner, client_id)
@@ -936,6 +987,7 @@ async def export_devices(
         os=os,
         kind=kind,
         encryption=encryption,
+        mdm=mdm,
     )
     body = devices_csv(rows)
     return Response(

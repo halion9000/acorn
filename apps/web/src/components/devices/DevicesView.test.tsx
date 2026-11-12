@@ -802,3 +802,54 @@ describe('flatDetails', () => {
     expect(detailRows({ vendor: 'addigy', name: 'x', last_seen: NOW })).toEqual([]);
   });
 });
+
+describe('Addigy MDM state and enrollment', () => {
+  const summary = (over: Record<string, unknown> = {}) => ({ total: 4, not_in_master: 0, mdm_disabled: 3, mdm_known: 40, not_ade: 12, enrollment_known: 30, ...over });
+
+  it('marks a device with MDM disabled, and says how each Mac was enrolled, and nothing for a device Addigy says nothing about', async () => {
+    listMock.mockResolvedValue(
+      list(
+        [device({ hostname: 'OFF-1', mdm_enabled: false, enrollment: 'Manual' }), device({ hostname: 'ADE-1', mdm_enabled: true, enrollment: 'ADE' }), device({ hostname: 'PHONE-1', mdm_enabled: true, enrollment: null }), device({ hostname: 'PC-1' })],
+        { summary: summary() },
+      ),
+    );
+    render(<DevicesView />);
+    const row = async (name: string) => (await screen.findByText(name)).closest('tr') as HTMLElement;
+    expect(within(await row('OFF-1')).getByTestId('mdm-disabled-badge')).toHaveTextContent('MDM disabled');
+    expect(within(await row('OFF-1')).getByTestId('enrollment-badge')).toHaveTextContent('Manual enrollment');
+    expect(within(await row('ADE-1')).getByTestId('enrollment-badge')).toHaveTextContent('ADE');
+    expect(within(await row('ADE-1')).queryByTestId('mdm-disabled-badge')).not.toBeInTheDocument();
+    expect(within(await row('PHONE-1')).queryByTestId('enrollment-badge')).not.toBeInTheDocument();
+    expect(within(await row('PC-1')).queryByTestId('enrollment-badge')).not.toBeInTheDocument();
+    expect(within(await row('PC-1')).queryByTestId('mdm-disabled-badge')).not.toBeInTheDocument();
+  });
+
+  it('each tile shows its count and filters the list; pressing it again takes the filter off, and the two never apply together', async () => {
+    listMock.mockResolvedValue(list([device({ hostname: 'OFF-1', mdm_enabled: false })], { summary: summary() }));
+    render(<DevicesView />);
+    await screen.findByText('OFF-1');
+    expect(screen.getByTestId('devices-mdm-disabled')).toHaveTextContent('3');
+    expect(screen.getByTestId('devices-not-ade')).toHaveTextContent('12');
+    await userEvent.click(screen.getByRole('button', { name: /MDM disabled \(Addigy\)/ }));
+    await waitFor(() => expect(listMock.mock.calls.at(-1)![0]).toMatchObject({ mdm: 'disabled' }));
+    await userEvent.click(screen.getByRole('button', { name: /Not enrolled by ADE/ }));
+    await waitFor(() => expect(listMock.mock.calls.at(-1)![0]).toMatchObject({ mdm: 'not_ade' }));
+    expect(screen.getByRole('button', { name: /MDM disabled \(Addigy\)/ })).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(screen.getByRole('button', { name: /Not enrolled by ADE/ }));
+    await waitFor(() => expect(listMock.mock.calls.at(-1)![0].mdm).toBeUndefined());
+  });
+
+  it('has neither tile until Addigy has given a reading for some device', async () => {
+    listMock.mockResolvedValue(list([device({ hostname: 'A-1' })], { summary: summary({ mdm_disabled: 0, mdm_known: 0, not_ade: 0, enrollment_known: 0 }) }));
+    render(<DevicesView />);
+    await screen.findByText('A-1');
+    expect(screen.queryByTestId('devices-mdm-disabled')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('devices-not-ade')).not.toBeInTheDocument();
+  });
+
+  it('a link can ask for either list, and nothing else is taken as one', () => {
+    expect(filtersFromParams(new URLSearchParams('mdm=disabled'))?.mdm).toBe('disabled');
+    expect(filtersFromParams(new URLSearchParams('mdm=not_ade'))?.mdm).toBe('not_ade');
+    expect(filtersFromParams(new URLSearchParams('mdm=anything'))).toBeNull();
+  });
+});

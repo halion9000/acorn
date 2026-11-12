@@ -12456,6 +12456,19 @@ paths:
           title: Encryption
         description: Only Windows workstations a tool reports are not (or are) fully
           BitLocker-encrypted.
+      - name: mdm
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(disabled|not_ade)$
+          - type: 'null'
+          description: Only devices Addigy shows with MDM disabled, or only devices
+            enrolled by hand rather than through ADE.
+          title: Mdm
+        description: Only devices Addigy shows with MDM disabled, or only devices
+          enrolled by hand rather than through ADE.
       responses:
         '200':
           description: Successful Response
@@ -12583,6 +12596,15 @@ paths:
             pattern: ^(not_encrypted|encrypted)$
           - type: 'null'
           title: Encryption
+      - name: mdm
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(disabled|not_ade)$
+          - type: 'null'
+          title: Mdm
       responses:
         '200':
           description: Successful Response
@@ -33775,6 +33797,24 @@ components:
             tools that report it (NinjaOne, Liongard); None when none does, which
             is not the same as "no" (see ``encryption_state``).
           readOnly: true
+        mdm_enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Mdm Enabled
+          description: 'Whether Addigy has a working MDM enrollment for the device
+            (its page shows "MDM: Enabled" or "Disabled"); None when Addigy does not
+            report the device or does not say.'
+          readOnly: true
+        enrollment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Enrollment
+          description: 'How Addigy says the device was enrolled: "ADE" (Apple''s automated
+            enrollment) or "Manual"; None when it does not say (iPhones and iPads,
+            and devices Addigy does not report).'
+          readOnly: true
       type: object
       required:
       - id
@@ -33784,6 +33824,8 @@ components:
       - first_seen
       - kind
       - encrypted
+      - mdm_enabled
+      - enrollment
       title: DeviceOut
     DeviceRow:
       properties:
@@ -33933,6 +33975,22 @@ components:
         encryption_known:
           type: integer
           title: Encryption Known
+          default: 0
+        mdm_disabled:
+          type: integer
+          title: Mdm Disabled
+          default: 0
+        mdm_known:
+          type: integer
+          title: Mdm Known
+          default: 0
+        not_ade:
+          type: integer
+          title: Not Ade
+          default: 0
+        enrollment_known:
+          type: integer
+          title: Enrollment Known
           default: 0
         reporting_tools:
           items:
