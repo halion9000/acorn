@@ -12,6 +12,7 @@ import { apiErrorDetail, inventoryApi, msspApi, type InventoryImportResult, type
 import { safeDistance } from '@/lib/safe-date';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { longOutNote } from './longOut';
+import { InventoryLabel } from './InventoryLabel';
 
 export const STATUS_LABEL: Record<InventoryStatus, string> = { checked_in: 'Checked in', checked_out: 'Checked out', offline: 'Offline', retired: 'Retired' };
 const STATUS_STYLE: Record<InventoryStatus, string> = {
@@ -650,7 +651,7 @@ function DeleteItem({ item, onDone, onClose }: { item: InventoryItem; onDone: ()
   );
 }
 
-type Dialog = { type: 'add' } | { type: 'edit'; item: InventoryItem } | { type: 'out' | 'in'; item: InventoryItem } | { type: 'history'; item: InventoryItem } | { type: 'delete'; item: InventoryItem } | { type: 'import' } | { type: 'bulk' } | { type: 'sync' } | { type: 'nucsync' } | null;
+type Dialog = { type: 'add' } | { type: 'edit'; item: InventoryItem } | { type: 'out' | 'in'; item: InventoryItem } | { type: 'history'; item: InventoryItem } | { type: 'label'; item: InventoryItem } | { type: 'delete'; item: InventoryItem } | { type: 'import' } | { type: 'bulk' } | { type: 'sync' } | { type: 'nucsync' } | null;
 
 /** A link from the search box (/inventory?search=PC-1&kind=nuc&client=<id>) opens the page already showing that. Anything else in the address is ignored. */
 export function inventoryUrlState(params: { get(name: string): string | null } | null): { search: string; kind: InventoryKind; client: string } {
@@ -924,6 +925,9 @@ export function InventoryView() {
                   <button type="button" onClick={() => setDialog({ type: 'edit', item: i })} className="mr-2 text-gray-300 hover:underline">
                     Edit
                   </button>
+                  <button type="button" aria-label={`Label for ${i.name}`} onClick={() => setDialog({ type: 'label', item: i })} className="mr-2 text-gray-400 hover:underline">
+                    Label
+                  </button>
                   <button type="button" onClick={() => setDialog({ type: 'history', item: i })} className="mr-2 text-gray-400 hover:underline">
                     History
                   </button>
@@ -965,6 +969,7 @@ export function InventoryView() {
       {dialog?.type === 'sync' && <SyncForm onDone={() => void mutate()} onClose={() => setDialog(null)} />}
       {dialog?.type === 'nucsync' && <NucSyncForm onDone={() => void mutate()} onClose={() => setDialog(null)} />}
       {dialog?.type === 'history' && <History item={dialog.item} onClose={() => setDialog(null)} />}
+      {dialog?.type === 'label' && <InventoryLabel item={dialog.item} origin={window.location.origin} onClose={() => setDialog(null)} />}
       {dialog?.type === 'delete' && <DeleteItem item={dialog.item} onDone={changed} onClose={() => setDialog(null)} />}
       {dialog?.type === 'import' && <ImportForm kind={kind} clients={clients} onDone={() => void mutate()} onClose={() => setDialog(null)} />}
     </div>
