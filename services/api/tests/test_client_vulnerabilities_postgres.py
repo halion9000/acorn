@@ -159,3 +159,20 @@ async def test_another_organisation_sees_none_of_it_and_cannot_ask_for_a_client_
     assert [r.cve for r in (await read(world, "other_msp")).rows] == ["CVE-X"]
     stolen = await read(world, "other_msp", client_id=world["acme"])
     assert (stolen.total, stolen.rows) == (0, [])
+
+
+async def test_the_sentence_saying_what_a_vulnerability_is_is_kept_shown_updated_and_can_be_searched(world):
+    await send(
+        world,
+        "msp",
+        "cust-acme",
+        [vuln("CVE-9", "Not named by ThreatMate", "", summary="  Windows Kernel   elevation of privilege vulnerability. "), vuln("CVE-8")],
+    )
+    rows = {r.cve: r for r in (await read(world)).rows}
+    assert rows["CVE-9"].summary == "Windows Kernel elevation of privilege vulnerability.", "kept, with its spaces tidied"
+    assert rows["CVE-8"].summary == "", "a tool that gives none leaves it empty"
+    assert [r.cve for r in (await read(world, q="kernel elevation")).rows] == ["CVE-9"]
+    await send(world, "msp", "cust-acme", [vuln("CVE-9", "Not named by ThreatMate", "", summary="A newer sentence.")])
+    assert [(r.cve, r.summary) for r in (await read(world)).rows] == [("CVE-9", "A newer sentence.")]
+    with pytest.raises(ValueError):
+        vuln("CVE-7", summary="x" * (ep.SUMMARY_MAX + 1))

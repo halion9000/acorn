@@ -52615,6 +52615,13 @@ components:
           type: array
           maxItems: 25
           title: Device Names
+        summary:
+          type: string
+          maxLength: 300
+          title: Summary
+          description: What the vulnerability is, in a sentence, when the tool gives
+            one.
+          default: ''
       type: object
       required:
       - cve
@@ -53438,6 +53445,10 @@ components:
             type: string
           type: array
           title: Device Names
+        summary:
+          type: string
+          title: Summary
+          default: ''
         first_seen:
           type: string
           format: date-time

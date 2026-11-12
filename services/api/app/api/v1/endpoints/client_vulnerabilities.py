@@ -36,6 +36,7 @@ SEVERITIES = ("critical", "high", "medium", "low")
 MAX_ITEMS = 1000
 DEVICE_NAMES_KEPT = 25
 PAGE_MAX = 500
+SUMMARY_MAX = 300
 
 
 class VulnerabilityIn(BaseModel):
@@ -47,6 +48,9 @@ class VulnerabilityIn(BaseModel):
     exploited: bool = False
     devices: int = Field(default=0, ge=0, le=1_000_000)
     device_names: list[Annotated[str, Field(max_length=120)]] = Field(default_factory=list, max_length=DEVICE_NAMES_KEPT)
+    summary: str = Field(
+        default="", max_length=SUMMARY_MAX, description="What the vulnerability is, in a sentence, when the tool gives one."
+    )
 
 
 class VulnerabilitiesReport(BaseModel):
@@ -86,6 +90,7 @@ def _row(tid: uuid.UUID, source: str, v: VulnerabilityIn, snapshot: uuid.UUID, n
         "exploited": v.exploited,
         "devices": max(v.devices, len(names)),
         "device_names": "\n".join(names),
+        "summary": " ".join(v.summary.split()),
         "last_seen": now,
         "snapshot_id": snapshot,
     }
@@ -153,6 +158,7 @@ class VulnerabilityOut(BaseModel):
     exploited: bool
     devices: int
     device_names: list[str]
+    summary: str = ""
     first_seen: datetime
     last_seen: datetime
 
@@ -216,6 +222,7 @@ async def list_client_vulnerabilities(
                 ClientVulnerability.cve_id.ilike(like),
                 ClientVulnerability.software.ilike(like),
                 ClientVulnerability.device_names.ilike(like),
+                ClientVulnerability.summary.ilike(like),
             )
         )
 
@@ -273,6 +280,7 @@ async def list_client_vulnerabilities(
                     exploited=v.exploited,
                     devices=v.devices,
                     device_names=[n for n in v.device_names.split("\n") if n],
+                    summary=v.summary or "",
                     first_seen=v.first_seen,
                     last_seen=v.last_seen,
                 )
