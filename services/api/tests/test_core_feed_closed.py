@@ -92,3 +92,33 @@ async def test_huntress_escalations_and_signals_are_closed_too_but_another_vendo
         "huntress-signal:3",
         "huntress:1",
     ], "another vendor's uid, and a lookalike prefix, are left out"
+
+
+def test_a_released_quarantine_message_id_is_accepted_with_its_backslashes_and_a_message_id_with_its_brackets():
+    # Exchange names a quarantined message ``guid\guid``, and a message id is ``<text@host>``: both are ids CORE stored the alert under, so the closure must be able to name them.
+    identity = (
+        "quarantine-release:9f3c1a2b-0000-4000-8000-123456789abc:c14401cf-aa9a-465b-cfd5-08d0f0ca37c5\\4c2ca98e-94ea-db3a-7eb8-3b63657d4db7"
+    )
+    assert ClosedItem(uid=identity).uid == identity
+    assert ClosedItem(uid="quarantine-release:t1:<CAF+abc=def/9~x@mail.example.com>").uid.endswith("@mail.example.com>")
+    assert len(ClosedItem(uid="quarantine-release:t:" + "a" * 360).uid) == 381
+    for bad in (
+        "quarantine-release:t:a b",
+        "quarantine-release:t:a'b",
+        "quarantine-release:t:a;b",
+        "quarantine-release:t:a%b",
+        "quarantine-release:t:" + "a" * 500,
+        "\\leading",
+    ):
+        with pytest.raises(ValidationError):
+            ClosedItem(uid=bad)
+
+
+@pytest.mark.asyncio
+async def test_an_id_with_backslashes_reaches_the_query_as_a_bound_value_never_as_part_of_the_sql():
+    uid = "quarantine-release:t1:aaa\\bbb"
+    db = _db([1, 0, 0, 0])
+    await apply_closed(db, TENANT, ClosedReport(vendor="cipp", closed=[ClosedItem(uid=uid, state="released")]))
+    sql, params = _sql(db.executed[0])
+    assert "aaa" not in sql
+    assert any(uid in v for v in params.values() if isinstance(v, list))

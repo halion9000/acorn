@@ -1,0 +1,37 @@
+{
+  "route": "vulnerabilities",
+  "method": "POST",
+  "body": {
+    "vendor": "threatmate",
+    "vendor_client_id": "10",
+    "snapshot_id": "00000000-0000-4000-8000-000000000001",
+    "last": true,
+    "items": [
+      {
+        "cve": "CVE-2024-0001",
+        "software": "7-Zip",
+        "version": "22.0",
+        "severity": "critical",
+        "cvss": 9.8,
+        "exploited": true,
+        "devices": 2,
+        "device_names": [
+          "PC-01",
+          "PC-02"
+        ],
+        "summary": "An archive opened by the program can run code."
+      },
+      {
+        "cve": "CVE-2024-0002",
+        "software": "Not named by ThreatMate",
+        "version": "",
+        "severity": "high",
+        "exploited": false,
+        "devices": 1,
+        "device_names": [
+          "SRV-01"
+        ]
+      }
+    ]
+  }
+}

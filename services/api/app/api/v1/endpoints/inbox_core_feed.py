@@ -320,11 +320,15 @@ async def claim_core_feed_sync_requests(tenant_token: str, db: DBSession) -> Syn
 
 
 _UID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9:_.-]{0,120}$"
+# A closure names the id the alert was stored under, and some of those are a vendor's own text: Exchange names a quarantined message ``guid\guid`` and a message id is ``<text@host>``. Refusing
+# one refused the whole report, so every other CIPP closure sent with it (Defender, risky sign-ins, phishing reports) was turned away with it, every round. The id is only ever a bound value
+# in a query (never part of the SQL or of a pattern), so these characters are safe; spaces, quotes, semicolons and wildcards are still refused.
+_CLOSED_UID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9:_.\-\\@<>+=/~]{0,399}$"
 _CLOSED_CHUNK = 100
 
 
 class ClosedItem(BaseModel):
-    uid: str = Field(pattern=_UID_PATTERN, description="The incident's ``finding.uid`` as CORE sent it, e.g. ``huntress:4821``.")
+    uid: str = Field(pattern=_CLOSED_UID_PATTERN, description="The incident's ``finding.uid`` as CORE sent it, e.g. ``huntress:4821``.")
     state: str | None = Field(
         default=None, max_length=60, description="The vendor's own word for it, e.g. ``resolved`` or ``REMEDIATED``; shown on the alert."
     )

@@ -18,6 +18,7 @@ from app.api.v1.endpoints import canary_tunnel as tunnel_ep
 from app.api.v1.endpoints import cipp_actions as cipp_act
 from app.api.v1.endpoints import client_documents as cdocs
 from app.api.v1.endpoints import client_review as cr
+from app.api.v1.endpoints import client_vulnerabilities as cvuln
 from app.api.v1.endpoints import devices as dev
 from app.api.v1.endpoints import identities as idn
 from app.api.v1.endpoints import identity as ident
@@ -66,6 +67,7 @@ MODELS = {
     "sweep-runs": cr.SweepRunsReport,
     "tools": cr.CoreToolsReport,
     "license-counts": billing.LicenseCountsReport,
+    "vulnerabilities": cvuln.VulnerabilitiesReport,
     "identities": idn.IdentitiesReport,
 }
 

@@ -2,15 +2,15 @@
   "route": "closed",
   "method": "POST",
   "body": {
-    "vendor": "huntress",
+    "vendor": "cipp",
     "closed": [
       {
-        "uid": "huntress:4821",
-        "state": "closed"
+        "uid": "defender:9f3c1a2b-0000-4000-8000-123456789abc:da637551227677560813_-961444813",
+        "state": "resolved"
       },
       {
-        "uid": "huntress:4822",
-        "state": "resolved"
+        "uid": "quarantine-release:9f3c1a2b-0000-4000-8000-123456789abc:c14401cf-aa9a-465b-cfd5-08d0f0ca37c5\\4c2ca98e-94ea-db3a-7eb8-3b63657d4db7",
+        "state": "released"
       }
     ]
   }

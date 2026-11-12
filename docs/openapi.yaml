@@ -30592,7 +30592,7 @@ components:
       properties:
         uid:
           type: string
-          pattern: ^[A-Za-z0-9][A-Za-z0-9:_.-]{0,120}$
+          pattern: ^[A-Za-z0-9][A-Za-z0-9:_.\-\\@<>+=/~]{0,399}$
           title: Uid
           description: The incident's ``finding.uid`` as CORE sent it, e.g. ``huntress:4821``.
         state:
