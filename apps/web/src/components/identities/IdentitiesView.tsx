@@ -14,7 +14,7 @@ import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { safeDistance } from '@/lib/safe-date';
 import { daysAgo } from '@/lib/ago';
 import { clientFromAddress } from '@/components/mssp/ClientPicker';
-import { AccountActions } from './AccountActions';
+import { AccountActions, RowAccountAction } from './AccountActions';
 import { AddToHalo } from './AddToHalo';
 import { MergePanel } from './MergePanel';
 import { PossibleDuplicates } from './PossibleDuplicates';
@@ -594,19 +594,20 @@ export function IdentitiesView() {
                 <SortHeader col="exposure" label="Breaches" sort={sort} onSort={(s) => reset(() => setSort(s))} />
                 <SortHeader col="alerts" label="Open alerts" sort={sort} onSort={(s) => reset(() => setSort(s))} />
                 <th scope="col" className="px-3 py-2" title="HaloPSA tickets from the last 60 days that name this person">Halo tickets (60 d)</th>
+                <th scope="col" className="px-3 py-2" title="Block or allow a Microsoft 365 sign-in. Only for accounts CORE reaches through CIPP.">Sign-in</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
               {isLoading && !data && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-gray-400">
+                  <td colSpan={9} className="px-3 py-8 text-center text-gray-400">
                     Loading people…
                   </td>
                 </tr>
               )}
               {data && data.items.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-gray-400">
+                  <td colSpan={9} className="px-3 py-8 text-center text-gray-400">
                     No people match.
                   </td>
                 </tr>
@@ -700,10 +701,13 @@ export function IdentitiesView() {
                           <span className="text-gray-600">—</span>
                         )}
                       </td>
+                      <td className="px-3 py-2" data-testid="signin-cell" onClick={(e) => e.stopPropagation()}>
+                        <RowAccountAction clientId={p.client_id} email={p.email} knownTo={p.tools} enabled={p.enabled} />
+                      </td>
                     </tr>
                     {isOpen && (
                       <tr className="bg-gray-900/30">
-                        <td colSpan={8} className="px-4 py-3">
+                        <td colSpan={9} className="px-4 py-3">
                           <Detail person={p} />
                         </td>
                       </tr>

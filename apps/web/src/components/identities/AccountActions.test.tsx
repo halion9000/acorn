@@ -9,7 +9,7 @@ vi.mock('@/lib/api', () => ({
   identitiesApi: { accountActions: api.accountActions, requestAccountAction: api.requestAccountAction },
 }));
 
-import { AccountActions, canOfferAccountActions } from './AccountActions';
+import { AccountActions, RowAccountAction, canOfferAccountActions, rowActionFor } from './AccountActions';
 
 const item = (over: Record<string, unknown> = {}) => ({ id: 'a1', action: 'disable_user', label: 'Block sign-in', email: 'amy@acme.com', status: 'pending', message: null, requested_by: 'Hal', created_at: new Date().toISOString(), finished_at: null, ...over });
 const renderIt = (knownTo = ['cipp', 'huntress']) =>
@@ -54,9 +54,63 @@ describe('who sees the buttons', () => {
     expect(api.accountActions).not.toHaveBeenCalled();
   });
 
-  it('shows nothing for a person Microsoft 365 does not know', () => {
-    const { container } = renderIt(['huntress']);
+  it('for a person Microsoft 365 does not know it says why there are no buttons, and asks for no history', () => {
+    renderIt(['huntress']);
+    expect(screen.getByTestId('account-actions-unavailable')).toHaveTextContent('CIPP does not list this one');
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(api.accountActions).not.toHaveBeenCalled();
+  });
+});
+
+describe('the button on the line', () => {
+  const row = (over: { knownTo?: string[]; enabled?: boolean | null } = {}) =>
+    render(
+      <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+        <RowAccountAction clientId="c1" email="amy@acme.com" knownTo={over.knownTo ?? ['cipp']} enabled={over.enabled === undefined ? true : over.enabled} />
+      </SWRConfig>,
+    );
+
+  it('offers Block for an account that can sign in and Allow for one that is blocked', () => {
+    expect(rowActionFor(true)).toBe('disable_user');
+    expect(rowActionFor(null)).toBe('disable_user');
+    expect(rowActionFor(false)).toBe('enable_user');
+    const first = row();
+    expect(screen.getByRole('button', { name: 'Block sign-in' })).toBeInTheDocument();
+    first.unmount();
+    row({ enabled: false });
+    expect(screen.getByRole('button', { name: 'Allow sign-in' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Block sign-in' })).toBeNull();
+  });
+
+  it('shows nothing without the permission or for a person Microsoft 365 does not know', () => {
+    const { container, unmount } = row({ knownTo: ['threatmate'] });
     expect(container.textContent).toBe('');
+    unmount();
+    api.caps = [];
+    expect(row().container.textContent).toBe('');
+  });
+
+  it('asks first, sends only on Yes, then says CORE was asked instead of claiming it is done', async () => {
+    row({ enabled: false });
+    await userEvent.click(screen.getByRole('button', { name: 'Allow sign-in' }));
+    expect(screen.getByRole('dialog', { name: 'Are you sure?' })).toHaveTextContent('lets amy@acme.com sign in');
+    expect(api.requestAccountAction).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, allow sign-in' }));
+    await waitFor(() => expect(api.requestAccountAction).toHaveBeenCalledWith({ client_id: 'c1', email: 'amy@acme.com', action: 'enable_user', confirm: true }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Allow sign-in: asked CORE');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('No sends nothing, and a refusal stays in the window', async () => {
+    row();
+    await userEvent.click(screen.getByRole('button', { name: 'Block sign-in' }));
+    await userEvent.click(screen.getByRole('button', { name: 'No, cancel' }));
+    expect(api.requestAccountAction).not.toHaveBeenCalled();
+    api.requestAccountAction.mockRejectedValueOnce(new Error('This account is protected'));
+    await userEvent.click(screen.getByRole('button', { name: 'Block sign-in' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, block sign-in' }));
+    expect(await screen.findByText('This account is protected')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
 

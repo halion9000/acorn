@@ -3,8 +3,9 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), listChildren: vi.fn(), exportCsv: vi.fn(), duplicates: vi.fn(), mergePeople: vi.fn(), separatePeople: vi.fn() }));
-vi.mock('@/lib/api', () => ({ identitiesApi: { list: api.list, detail: api.detail, exportCsv: api.exportCsv, duplicates: api.duplicates, mergePeople: api.mergePeople, separatePeople: api.separatePeople, decisions: () => Promise.resolve({ items: [] }) }, msspApi: { listChildren: api.listChildren }, authApi: { currentUser: () => ({ capabilities: [] }) } }));
+const api = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), listChildren: vi.fn(), exportCsv: vi.fn(), duplicates: vi.fn(), mergePeople: vi.fn(), separatePeople: vi.fn(), requestAccountAction: vi.fn() }));
+const me = vi.hoisted(() => ({ caps: [] as string[] }));
+vi.mock('@/lib/api', () => ({ identitiesApi: { list: api.list, detail: api.detail, exportCsv: api.exportCsv, duplicates: api.duplicates, mergePeople: api.mergePeople, separatePeople: api.separatePeople, requestAccountAction: api.requestAccountAction, decisions: () => Promise.resolve({ items: [] }) }, msspApi: { listChildren: api.listChildren }, authApi: { currentUser: () => ({ capabilities: me.caps }) } }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
 import { IdentitiesView, ticketAge } from './IdentitiesView';
@@ -657,5 +658,31 @@ describe('the extra identity tiles', () => {
     await waitFor(() => expect(lastQuery().haloCheck).toBe('halo_inactive_cloud_enabled'));
     await userEvent.click(screen.getByRole('button', { name: /Gone in Halo, still enabled/ }));
     await waitFor(() => expect(lastQuery().haloCheck).toBeUndefined());
+  });
+});
+
+describe('the sign-in button on a line', () => {
+  it('a person CIPP knows has Block or Allow on their line, others have none, and pressing it does not open the line', async () => {
+    me.caps = ['respond_identities'];
+    try {
+      api.list.mockResolvedValue(
+        list([
+          person(),
+          person({ key: 'c1:b@acme.com', email: 'b@acme.com', enabled: false }),
+          person({ key: 'c1:g@acme.com', email: 'g@acme.com', tools: ['threatmate'] }),
+        ]),
+      );
+      show();
+      const rows = await screen.findAllByTestId('identity-row');
+      expect(screen.getByRole('columnheader', { name: 'Sign-in' })).toBeInTheDocument();
+      expect(within(rows[0]!).getByRole('button', { name: 'Block sign-in' })).toBeInTheDocument();
+      expect(within(rows[1]!).getByRole('button', { name: 'Allow sign-in' })).toBeInTheDocument();
+      expect(within(rows[2]!).getByTestId('signin-cell')).toBeEmptyDOMElement();
+      await userEvent.click(within(rows[0]!).getByRole('button', { name: 'Block sign-in' }));
+      expect(screen.getByRole('dialog', { name: 'Are you sure?' })).toHaveTextContent('amy@acme.com');
+      expect(api.detail).not.toHaveBeenCalled();
+    } finally {
+      me.caps = [];
+    }
   });
 });
