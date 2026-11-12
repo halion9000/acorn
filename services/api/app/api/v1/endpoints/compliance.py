@@ -35,6 +35,7 @@ from app.models.tenant import Tenant
 from app.services import evidence_age
 from app.services.alert_status import HANDLED_ALERT_STATUSES, sql_in
 from app.services.compliance_catalog import CATALOGS
+from app.services.compliance_guidance import guidance_for
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +122,10 @@ class ControlItem(BaseModel):
     group: str | None = None
     control_id: str
     title: str
+    # What the control means in plain words, what has to be in place to meet it and what to attach as evidence (``compliance_guidance``). None and empty for a framework with no guidance yet.
+    meaning: str | None = None
+    to_meet: list[str] = Field(default_factory=list)
+    evidence_examples: list[str] = Field(default_factory=list)
 
 
 class ControlsResponse(BaseModel):
@@ -221,15 +226,25 @@ async def list_frameworks() -> FrameworksResponse:
     summary="List controls for a framework",
     dependencies=[Depends(require_permission("reports:read"))],
 )
+def _control_item(framework_id: str, control_id: str, title: str) -> ControlItem:
+    g = guidance_for(framework_id, control_id)
+    return ControlItem(
+        control_id=control_id,
+        title=title,
+        group=FRAMEWORK_GROUPS[framework_id].get(control_id),
+        meaning=g.meaning if g else None,
+        to_meet=list(g.to_meet) if g else [],
+        evidence_examples=list(g.evidence) if g else [],
+    )
+
+
 async def list_framework_controls(framework_id: str) -> ControlsResponse:
     controls = FRAMEWORKS.get(framework_id)
     if controls is None:
         raise HTTPException(status_code=404, detail=f"Framework '{framework_id}' not found.")
     return ControlsResponse(
         framework_id=framework_id,
-        controls=[
-            ControlItem(control_id=cid, title=title, group=FRAMEWORK_GROUPS[framework_id].get(cid)) for cid, title in controls.items()
-        ],
+        controls=[_control_item(framework_id, cid, title) for cid, title in controls.items()],
     )
 
 

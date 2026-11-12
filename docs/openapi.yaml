@@ -9344,7 +9344,7 @@ paths:
       tags:
       - compliance
       summary: List controls for a framework
-      operationId: list_framework_controls_api_v1_compliance_frameworks__framework_id__controls_get
+      operationId: _control_item_api_v1_compliance_frameworks__framework_id__controls_get
       security:
       - HTTPBearer: []
       parameters:
@@ -9354,6 +9354,18 @@ paths:
         schema:
           type: string
           title: Framework Id
+      - name: control_id
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Control Id
+      - name: title
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Title
       responses:
         '200':
           description: Successful Response
@@ -31911,6 +31923,21 @@ components:
         title:
           type: string
           title: Title
+        meaning:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Meaning
+        to_meet:
+          items:
+            type: string
+          type: array
+          title: To Meet
+        evidence_examples:
+          items:
+            type: string
+          type: array
+          title: Evidence Examples
       type: object
       required:
       - control_id

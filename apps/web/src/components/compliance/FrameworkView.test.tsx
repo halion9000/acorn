@@ -249,3 +249,41 @@ describe('Secureframe on a framework page', () => {
     expect(screen.queryByTestId('sf-GV.OC-01')).toBeNull();
   });
 });
+
+describe('what a control means and what it takes', () => {
+  const guided = { control_id: 'CC1.1', title: 'Commitment to integrity and ethical values', group: 'CC1 Control environment', meaning: 'The company says how its people are expected to behave, and acts when they do not.', to_meet: ['A code of conduct that every employee signs', 'Background checks before a new hire gets access'], evidence_examples: ['The code of conduct with its approval date'] };
+  const plain = { control_id: 'A.5.1', title: 'Policies for information security', group: 'Organizational' };
+  const serve = (controls: unknown[]) =>
+    authFetch.mockImplementation((url: string) => {
+      if (url.includes('/controls')) return json({ controls });
+      if (url.includes('/report')) return json([{ total_evidence: 0, accepted: 0, pending: 0, rejected: 0, coverage_pct: 0, controls_covered: [], controls_missing: [] }]);
+      return json([]);
+    });
+
+  it('shows under a control what it means, what it takes to meet it and what to attach', async () => {
+    serve([guided]);
+    render(<FrameworkView framework="soc2" />);
+    const box = await screen.findByTestId('guidance-CC1.1');
+    expect(box.textContent).toContain('The company says how its people are expected to behave');
+    expect(box.textContent).toContain('What it takes to meet it');
+    expect([...box.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['A code of conduct that every employee signs', 'Background checks before a new hire gets access', 'The code of conduct with its approval date']);
+    expect(box.textContent).toContain('Evidence to attach');
+  });
+
+  it('shows nothing extra for a control of a framework that has no guidance yet', async () => {
+    serve([plain]);
+    render(<FrameworkView framework="iso27001" />);
+    await screen.findByText('Policies for information security');
+    expect(screen.queryByTestId('guidance-A.5.1')).toBeNull();
+    expect(screen.queryByText('What it takes to meet it')).toBeNull();
+  });
+
+  it('the filter also finds a control by what it takes to meet it', async () => {
+    const many = [guided, ...Array.from({ length: 13 }, (_, i) => ({ control_id: `CC9.${i}`, title: `Other ${i}`, group: 'CC9' }))];
+    serve(many);
+    render(<FrameworkView framework="soc2" />);
+    fireEvent.change(await screen.findByLabelText('Filter controls'), { target: { value: 'background checks' } });
+    await waitFor(() => expect(screen.getByTestId('guidance-CC1.1')).toBeTruthy());
+    expect(screen.queryByText('Other 3')).toBeNull();
+  });
+});

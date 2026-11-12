@@ -65,6 +65,12 @@ interface Control {
   control_id: string;
   title: string;
   group?: string | null;
+  /** What the control means in plain words; absent for a framework with no guidance yet. */
+  meaning?: string | null;
+  /** What has to be in place to meet it. */
+  to_meet?: string[];
+  /** What to attach as evidence. */
+  evidence_examples?: string[];
 }
 
 /** The controls under the headings the framework itself uses (SOC 2 criteria, ISO Annex A themes, NIST functions, PCI requirements, HIPAA safeguards), in the order the API sent them. A control with no heading goes under "Controls". */
@@ -83,7 +89,7 @@ export function groupControls(controls: Control[]): { name: string; controls: Co
 export function matchControls(controls: Control[], text: string): Control[] {
   const needle = text.trim().toLowerCase();
   if (!needle) return controls;
-  return controls.filter((c) => `${c.control_id} ${c.title} ${c.group ?? ''}`.toLowerCase().includes(needle));
+  return controls.filter((c) => `${c.control_id} ${c.title} ${c.group ?? ''} ${c.meaning ?? ''} ${(c.to_meet ?? []).join(' ')}`.toLowerCase().includes(needle));
 }
 interface Posture {
   total_evidence: number;
@@ -343,6 +349,31 @@ export function FrameworkView({ framework }: Props) {
                   <span className={`text-xs ${STATUS_TEXT[state] ?? 'text-gray-500'}`}>{state === 'none' ? 'No evidence' : state}</span>
                 </span>
               </div>
+              {c.meaning ? (
+                <div className="mt-2 space-y-2" data-testid={`guidance-${c.control_id}`}>
+                  <p className="text-sm text-gray-200">{c.meaning}</p>
+                  {(c.to_meet ?? []).length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-gray-500">What it takes to meet it</p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-gray-300">
+                        {c.to_meet!.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {(c.evidence_examples ?? []).length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-gray-500">Evidence to attach</p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-gray-400">
+                        {c.evidence_examples!.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : null}
               {evidenceAgeNote(evidenceFor(c.control_id)) ? (
                 <p className="mt-1 text-xs text-amber-300" data-testid={`stale-${c.control_id}`}>
                   {evidenceAgeNote(evidenceFor(c.control_id))}
