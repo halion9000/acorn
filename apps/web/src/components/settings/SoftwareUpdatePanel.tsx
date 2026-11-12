@@ -149,7 +149,19 @@ function Inner() {
                   <td>{h.at.replace('T', ' ').replace('Z', '')}</td>
                   <td>{HISTORY_MODE[h.mode] ?? h.mode}</td>
                   <td className={h.ok ? 'text-emerald-300' : 'text-red-300'}>{HISTORY_STATUS[h.status] ?? h.status}</td>
-                  <td className="font-mono">{h.commit ?? 'unknown'}</td>
+                  <td>
+                    <span className="font-mono">{h.commit ?? 'unknown'}</span>
+                    {h.changes && h.changes.length > 0 ? (
+                      <details className="mt-0.5" data-testid="update-changes">
+                        <summary className="cursor-pointer text-sky-300">{changesLabel(h.changes.length)}</summary>
+                        <ul className="ml-4 list-disc text-gray-400">
+                          {h.changes.map((c, i) => (
+                            <li key={`${i}-${c}`}>{c}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
+                  </td>
                   <td>{tookLabel(h.seconds)}</td>
                   <td>{h.asked_by ?? 'on the server'}</td>
                 </tr>
@@ -175,6 +187,12 @@ function Inner() {
 }
 
 /** "4 min 5 s" / "45 s" for the seconds a run took; a dash for a run recorded before the time was kept. */
+/** "What it brought: 1 change" / "What it brought: 7 changes"; the script keeps at most twenty titles, so twenty reads "20 or more". */
+export function changesLabel(count: number): string {
+  if (count >= 20) return 'What it brought: 20 or more changes';
+  return `What it brought: ${count} change${count === 1 ? '' : 's'}`;
+}
+
 export function tookLabel(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined) return '–';
   if (seconds < 60) return `${seconds} s`;

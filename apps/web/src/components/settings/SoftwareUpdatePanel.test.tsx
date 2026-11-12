@@ -10,7 +10,15 @@ vi.mock('@/components/layout/TenantProvider', () => ({ useTenant: () => tenantSt
 vi.mock('react-hot-toast', () => ({ __esModule: true, default: { success: vi.fn(), error: vi.fn() } }));
 
 import { ApiError } from '@/lib/api';
-import { SoftwareUpdatePanel, tookLabel } from './SoftwareUpdatePanel';
+import { SoftwareUpdatePanel, changesLabel, tookLabel } from './SoftwareUpdatePanel';
+
+describe('changesLabel', () => {
+  it('counts the changes, in the singular for one, and says "or more" at the most the script keeps', () => {
+    expect(changesLabel(1)).toBe('What it brought: 1 change');
+    expect(changesLabel(7)).toBe('What it brought: 7 changes');
+    expect(changesLabel(20)).toBe('What it brought: 20 or more changes');
+  });
+});
 
 describe('tookLabel', () => {
   it('says seconds under a minute, minutes and seconds above it, and a dash when it was not kept', () => {
@@ -81,7 +89,7 @@ describe('SoftwareUpdatePanel', () => {
     platformUpdateApi.get.mockResolvedValue(
       status({
         history: [
-          { at: '2026-11-10T12:00:00Z', status: 'rolled_back', ok: false, commit: 'aaa1111', mode: 'update', seconds: 245, asked_by: 'hal@example.com' },
+          { at: '2026-11-10T12:00:00Z', status: 'rolled_back', ok: false, commit: 'aaa1111', mode: 'update', seconds: 245, asked_by: 'hal@example.com', changes: ['Add the label', 'Fix the digest'] },
           { at: '2026-11-09T10:00:00Z', status: 'ok', ok: true, commit: null, mode: 'force' },
         ],
       }),
@@ -94,6 +102,10 @@ describe('SoftwareUpdatePanel', () => {
     expect(rows[0]).toHaveTextContent('aaa1111');
     expect(rows[0]).toHaveTextContent('4 min 5 s');
     expect(rows[0]).toHaveTextContent('hal@example.com');
+    expect(rows[0]).toHaveTextContent('What it brought: 2 changes');
+    expect(rows[0]).toHaveTextContent('Add the label');
+    expect(rows[0]).toHaveTextContent('Fix the digest');
+    expect(rows[1]).not.toHaveTextContent('What it brought');
     expect(rows[1]).toHaveTextContent('on the server');
     expect(rows[1]).toHaveTextContent('–');
     expect(rows[1]).toHaveTextContent('Rebuild');

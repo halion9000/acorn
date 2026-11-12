@@ -52,6 +52,19 @@ record_history() {
   return 0
 }
 trap 'record_history; emit_result' EXIT
+# What an update brought, for the Update panel: the titles of the commits between the version that was running ($1) and the new one, one a line, at most 20, in a file named after the
+# new commit ($2). Writes only into the hand-off folder and only when it exists; it can never fail a run. The latest 50 files are kept.
+record_changes() {
+  local dir=${ACORN_UPDATE_CTL:-/srv/acorn/update-ctl} before=$1 target=$2 old
+  [ -d "$dir" ] || return 0
+  case "$target" in ''|*[!0-9a-f]*) return 0 ;; esac
+  {
+    mkdir -p "$dir/changes" &&
+      git -C "$REPO" log --format=%s "$before..FETCH_HEAD" | head -n 20 > "$dir/changes/$target.txt" &&
+      ls -1t "$dir/changes" | tail -n +51 | while read -r old; do rm -f "$dir/changes/$old"; done
+  } 2>/dev/null || true
+  return 0
+}
 
 exec 9>"$STATE/update.lock"
 flock -n 9 || { echo "Another update is already running."; STATUS=busy; exit 3; }
@@ -238,6 +251,7 @@ fi
 [ "$before" != none ] && git rev-parse --verify -q "$before" >/dev/null && echo "$before" > "$STATE/previous-commit"
 say "updating $before -> $target"
 git log --oneline "$before..FETCH_HEAD" 2>/dev/null | head -20
+record_changes "$before" "$target"
 git reset --hard FETCH_HEAD >/dev/null
 
 if deploy && ai_test; then

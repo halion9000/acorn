@@ -19,6 +19,10 @@ HISTORY_FILE = "history.log"
 HISTORY_SHOWN = 20
 # Who pressed Update and when, one JSON line each, written by the API only (the update script never reads it). The latest ASKED_KEPT are kept.
 ASKED_FILE = "asked.log"
+# What each update brought: one file per new commit, written by the update script, holding the titles of the commits it installed.
+CHANGES_DIR = "changes"
+CHANGES_SHOWN = 20
+CHANGE_MAX = 200
 ASKED_KEPT = 50
 # A run is put down to a request made at most this long before the run was recorded, plus however long the run itself took.
 ASKED_WINDOW_SECONDS = 30 * 60
@@ -112,8 +116,9 @@ def read_state(directory: Path | None) -> UpdateState:
         except (OSError, ValueError):
             pass
     try:
-        out.history = attach_askers(
-            parse_history((directory / HISTORY_FILE).read_text(encoding="utf-8", errors="replace")), read_asked(directory)
+        out.history = attach_changes(
+            attach_askers(parse_history((directory / HISTORY_FILE).read_text(encoding="utf-8", errors="replace")), read_asked(directory)),
+            directory,
         )
     except OSError:
         pass  # no history yet
@@ -192,3 +197,32 @@ def attach_askers(rows: list[dict], asked: list[tuple[datetime, str]]) -> list[d
         match = next((k for k, (at, _) in enumerate(left) if at <= done and (done - at).total_seconds() <= allowed), None)
         by_row[i] = left.pop(match)[1] if match is not None else None
     return [{**row, "asked_by": by_row.get(i)} for i, row in enumerate(rows)]
+
+
+_COMMIT = re.compile(r"^[0-9a-f]{7,40}$")
+
+
+def read_changes(directory: Path, commit: str | None) -> list[str]:
+    """The titles of the commits an update to ``commit`` installed, as the update script wrote them: at most twenty, each one line of printable text cut to 200 characters. Nothing when the
+    commit is not a plain hash (it becomes a file name), when there is no such file, or when it cannot be read."""
+    if not commit or not _COMMIT.match(commit):
+        return []
+    try:
+        lines = (directory / CHANGES_DIR / f"{commit}.txt").read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+    out: list[str] = []
+    for line in lines:
+        clean = "".join(ch for ch in line if ch.isprintable()).strip()[:CHANGE_MAX]
+        if clean:
+            out.append(clean)
+        if len(out) == CHANGES_SHOWN:
+            break
+    return out
+
+
+def attach_changes(rows: list[dict], directory: Path) -> list[dict]:
+    """Each history row gains ``changes``: what that run installed. Only a run that updated and passed (status ok) brought something; a health check, a roll back or a failed run lists nothing."""
+    for row in rows:
+        row["changes"] = read_changes(directory, row.get("commit")) if row.get("status") == "ok" else []
+    return rows

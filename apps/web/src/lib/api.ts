@@ -7429,7 +7429,7 @@ export interface PlatformUpdateStatus {
   summary: string | null;
   log: string[];
   /** Past runs that did something, newest first; absent from an older server. */
-  history?: { at: string; status: string; ok: boolean; commit: string | null; mode: string; seconds?: number | null; asked_by?: string | null }[];
+  history?: { at: string; status: string; ok: boolean; commit: string | null; mode: string; seconds?: number | null; asked_by?: string | null; changes?: string[] }[];
 }
 
 export const platformUpdateApi = {
