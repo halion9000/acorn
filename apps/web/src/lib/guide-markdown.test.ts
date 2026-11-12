@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { USER_GUIDE } from '@/content/user-guide';
-import { blockText, parseGuide, parseInline, searchSections, slugOf } from './guide-markdown';
+import { ageNewTags, blockText, parseGuide, parseInline, searchSections, slugOf } from './guide-markdown';
 
 describe('slugOf', () => {
   it('drops the number and joins the words', () => {
@@ -126,5 +126,47 @@ describe('the real user guide', () => {
 
   it('can be searched for a feature', () => {
     expect(searchSections(g.sections, 'Hidden until online').map((s) => s.title.split('.')[0])).toContain('8');
+  });
+});
+
+describe('dated (new) tags', () => {
+  const line = '- **Sign-in history (new, 2026-11-01).** Text. Also **Labels (new, API only, 2026-11-10)** and an undated (new) one.';
+
+  it('show as plain (new) for a month from their date, keeping any words between', () => {
+    expect(ageNewTags(line, '2026-11-12')).toBe('- **Sign-in history (new).** Text. Also **Labels (new, API only)** and an undated (new) one.');
+    expect(ageNewTags('X (new, 2026-11-01).', '2026-12-01')).toBe('X (new).');
+  });
+
+  it('are taken out, with the space before them, once the month has passed', () => {
+    expect(ageNewTags(line, '2026-12-02')).toBe('- **Sign-in history.** Text. Also **Labels (new, API only)** and an undated (new) one.');
+    expect(ageNewTags(line, '2027-01-15')).toBe('- **Sign-in history.** Text. Also **Labels** and an undated (new) one.');
+  });
+
+  it('leave an undated tag, a heading, and a date that is not one alone', () => {
+    expect(ageNewTags('## 10. Client posture (new)', '2030-01-01')).toBe('## 10. Client posture (new)');
+    expect(ageNewTags('### Additions (new, 2026-01-01)', '2030-01-01')).toBe('### Additions (new, 2026-01-01)');
+    expect(ageNewTags('X (new, 2026-13-45) y', '2030-01-01')).toBe('X (new, 2026-13-45) y');
+    expect(ageNewTags(line, 'not a date')).toBe(line);
+  });
+
+  it('the aged text parses into the same pieces as a hand-written (new)', () => {
+    expect(parseInline(ageNewTags('**Labels (new, 2026-11-10).** Text', '2026-11-12'))).toEqual(parseInline('**Labels (new).** Text'));
+  });
+});
+
+describe('the guide itself', () => {
+  it('dates every (new) tag outside a heading, so each one drops off by itself', () => {
+    const undated = USER_GUIDE.split('\n')
+      .filter((line) => !line.startsWith('#'))
+      .flatMap((line) => line.match(/\(new(?:,[^)]*)?\)/g) ?? [])
+      .filter((tag) => !/, \d{4}-\d{2}-\d{2}\)$/.test(tag));
+    expect(undated).toEqual([]);
+  });
+
+  it('shows no new badge outside headings once every date is more than a month old', () => {
+    const later = ageNewTags(USER_GUIDE, '2030-01-01');
+    const left = later.split('\n').filter((line) => !line.startsWith('#') && /\(new[,)]/.test(line));
+    expect(left).toEqual([]);
+    expect(later.length).toBeLessThan(USER_GUIDE.length);
   });
 });

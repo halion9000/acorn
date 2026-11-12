@@ -41,13 +41,13 @@ describe('the two copies of the user guide', () => {
   });
 
   it('describe this month\'s pages: Client Docs, CIPP actions, the run history and closing several alerts at once', () => {
-    for (const heading of ['Client Docs (new)', 'CIPP actions (new)', 'Playbooks > Run History (new)', 'Close several at once (new)', 'Every alert for one person (new)']) {
+    for (const heading of ['Client Docs (new', 'CIPP actions (new', 'Playbooks > Run History (new', 'Close several at once (new', 'Every alert for one person (new']) {
       expect(USER_GUIDE).toContain(heading);
     }
   });
 
   it('describe the October 31 additions: Search anything, the alerts date range, the Update and Azure spend pages, and the Azure move', () => {
-    for (const text of ['"Search anything" (new)', 'Date range (new)', 'Settings > Update A.C.O.R.N (new', 'Settings > Azure spend (new', 'One place for connected tools (new)', 'Dashboard counts (new)', 'Add a member (new', 'Profile > photo (new)', 'Running on Azure (2026-10-31)', 'AISOC_INGEST_URL']) {
+    for (const text of ['"Search anything" (new', 'Date range (new', 'Settings > Update A.C.O.R.N (new', 'Settings > Azure spend (new', 'One place for connected tools (new', 'Dashboard counts (new', 'Add a member (new', 'Profile > photo (new', 'Running on Azure (2026-10-31)', 'AISOC_INGEST_URL']) {
       expect(USER_GUIDE, text).toContain(text);
     }
   });

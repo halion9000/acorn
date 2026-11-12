@@ -15,12 +15,23 @@ describe('GuideView', () => {
   });
 
   it('renders tables as tables and the (new) tags as badges, not as raw text', () => {
-    const { container } = render(<GuideView />);
+    const { container } = render(<GuideView today="2026-11-12" />);
     expect(container.querySelectorAll('table')).toHaveLength(2);
     const badges = [...container.querySelectorAll('span')].filter((s) => /^new\b/.test(s.textContent ?? '') && s.className.includes('emerald'));
     expect(badges.length).toBeGreaterThan(5);
     expect(container.textContent).not.toContain('**');
     expect(container.textContent).not.toContain('|---');
+    expect(container.textContent).not.toMatch(/\(new, 20/);
+  });
+
+  it('stops calling an entry new a month after the date in its tag', () => {
+    const plainNew = (c: HTMLElement) => [...c.querySelectorAll('span')].filter((s) => s.textContent === 'new' && s.className.includes('emerald')).length;
+    const now = render(<GuideView today="2026-11-12" />);
+    expect(plainNew(now.container)).toBeGreaterThan(5);
+    now.unmount();
+    const later = render(<GuideView today="2030-01-01" />);
+    expect(plainNew(later.container)).toBe(0);
+    expect(later.container.textContent).toContain('Close several at once.');
   });
 
   it('narrows the sections as you search, and says so when nothing matches', async () => {

@@ -37,6 +37,33 @@ export function slugOf(title: string): string {
 /** The "(new)" and "(new, API only)" tags the guide puts beside features not yet checked on the live system. */
 const NEW_TAG = /\(new(?:[^)]*)\)/g;
 
+/** How long an entry stays marked as new after the date in its tag. */
+export const NEW_FOR_DAYS = 30;
+
+const DATED_TAG = /( ?)\(new((?:,[^),]*)*), (\d{4}-\d{2}-\d{2})\)/g;
+
+/**
+ * The guide's text with its dated tags aged: "(new, 2026-11-12)" is shown as "(new)" for NEW_FOR_DAYS days from that date and is then taken out (with the space before it), so an entry
+ * stops calling itself new without anyone editing it. Words between "new" and the date are kept ("(new, API only, 2026-11-12)" shows "(new, API only)"). A tag with no date is left as it
+ * is, and so is a heading line, whose text makes the section's address. ``today`` is a date as YYYY-MM-DD.
+ */
+export function ageNewTags(text: string, today: string): string {
+  const now = Date.parse(`${today}T00:00:00Z`);
+  if (!Number.isFinite(now)) return text;
+  return text
+    .split('\n')
+    .map((line) =>
+      line.startsWith('#')
+        ? line
+        : line.replace(DATED_TAG, (whole: string, space: string, words: string, date: string) => {
+            const from = Date.parse(`${date}T00:00:00Z`);
+            if (!Number.isFinite(from)) return whole;
+            return (now - from) / 86_400_000 > NEW_FOR_DAYS ? '' : `${space}(new${words})`;
+          }),
+    )
+    .join('\n');
+}
+
 function splitNew(text: string, kind: Inline['kind']): Inline[] {
   const out: Inline[] = [];
   let last = 0;

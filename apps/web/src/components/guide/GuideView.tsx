@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { USER_GUIDE } from '@/content/user-guide';
-import { parseGuide, parseInline, searchSections, type Block, type GuideSection } from '@/lib/guide-markdown';
+import { ageNewTags, parseGuide, parseInline, searchSections, type Block, type GuideSection } from '@/lib/guide-markdown';
 
 function Inline({ text }: { text: string }) {
   return (
@@ -137,8 +137,10 @@ function SectionCard({ s }: { s: GuideSection }) {
   );
 }
 
-export function GuideView() {
-  const guide = useMemo(() => parseGuide(USER_GUIDE), []);
+/** ``today`` (YYYY-MM-DD) is the date the "(new)" tags are aged against; left out, it is the real date. Tests pass one so they do not change with the calendar. */
+export function GuideView({ today }: { today?: string } = {}) {
+  // Dated "(new, ...)" tags show as new for a month and then drop off by themselves.
+  const guide = useMemo(() => parseGuide(ageNewTags(USER_GUIDE, today ?? new Date().toISOString().slice(0, 10))), [today]);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<string | null>(null);
   const shown = useMemo(() => searchSections(guide.sections, query), [guide, query]);
