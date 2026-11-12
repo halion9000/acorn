@@ -14891,7 +14891,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DeletedOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__inventory__DeletedOut'
         '422':
           description: Validation Error
           content:
@@ -17489,14 +17489,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AnswerIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__client_review__AnswerIn'
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AnswerOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__client_review__AnswerOut'
         '422':
           description: Validation Error
           content:
@@ -17775,6 +17775,209 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/app__api__v1__endpoints__vcio_proposals__ProposalOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/vcio-risk-scoring/library:
+    get:
+      tags:
+      - vcio
+      summary: The vCIO Risk Scoring questions and the default scoring settings
+      operationId: get_library_api_v1_vcio_risk_scoring_library_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryOut'
+      security:
+      - HTTPBearer: []
+  /api/v1/vcio-risk-scoring/assessments:
+    get:
+      tags:
+      - vcio
+      summary: The risk-scored reviews of one client, or of every client, newest first
+      operationId: list_assessments_api_v1_vcio_risk_scoring_assessments_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One client (or the caller's own organisation); left out, every
+            client.
+          title: Client Id
+        description: One client (or the caller's own organisation); left out, every
+          client.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - vcio
+      summary: Start a risk-scored review for a client
+      operationId: create_assessment_api_v1_vcio_risk_scoring_assessments_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/vcio-risk-scoring/assessments/{assessment_id}:
+    get:
+      tags:
+      - vcio
+      summary: 'One risk-scored review: its answers and its scorecard'
+      operationId: get_assessment_api_v1_vcio_risk_scoring_assessments__assessment_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Assessment Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - vcio
+      summary: Change a review's date, platform, assessor, scoring settings or a question's
+        severity
+      operationId: update_assessment_api_v1_vcio_risk_scoring_assessments__assessment_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Assessment Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - vcio
+      summary: Delete a risk-scored review for good
+      operationId: delete_assessment_api_v1_vcio_risk_scoring_assessments__assessment_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Assessment Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__vcio_risk_scoring__DeletedOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/vcio-risk-scoring/assessments/{assessment_id}/answers:
+    put:
+      tags:
+      - vcio
+      summary: Answer questions of a review, or clear their answers
+      operationId: put_answers_api_v1_vcio_risk_scoring_assessments__assessment_id__answers_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Assessment Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnswersIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentOut'
         '422':
           description: Validation Error
           content:
@@ -27026,75 +27229,19 @@ components:
           default: false
       type: object
       title: AllowRequest
-    AnswerIn:
+    AnswersIn:
       properties:
-        section:
-          type: string
-          title: Section
-        key:
-          type: string
-          maxLength: 400
-          title: Key
-        status:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Status
-        answer:
-          anyOf:
-          - type: string
-            maxLength: 300
-          - type: 'null'
-          title: Answer
-        note:
-          anyOf:
-          - type: string
-            maxLength: 4000
-          - type: 'null'
-          title: Note
+        items:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__vcio_risk_scoring__AnswerIn'
+          type: array
+          maxItems: 400
+          minItems: 1
+          title: Items
       type: object
       required:
-      - section
-      - key
-      title: AnswerIn
-    AnswerOut:
-      properties:
-        section:
-          type: string
-          title: Section
-        key:
-          type: string
-          title: Key
-        status:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Status
-        answer:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Answer
-        note:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Note
-        updated_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Updated At
-        cleared:
-          type: boolean
-          title: Cleared
-          default: false
-      type: object
-      required:
-      - section
-      - key
-      title: AnswerOut
+      - items
+      title: AnswersIn
     ApiKeyOut:
       properties:
         id:
@@ -27704,6 +27851,226 @@ components:
       - question
       - status
       title: AssessAnswer
+    AssessmentIn:
+      properties:
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+          description: The client assessed; left out, the caller's own organisation.
+        review_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Review Date
+        platform:
+          type: string
+          enum:
+          - m365
+          - google
+          - both
+          title: Platform
+          default: m365
+        assessor:
+          type: string
+          maxLength: 200
+          title: Assessor
+          default: ''
+      type: object
+      title: AssessmentIn
+    AssessmentList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/AssessmentSummary'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: AssessmentList
+    AssessmentOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        review_date:
+          type: string
+          format: date
+          title: Review Date
+        platform:
+          type: string
+          title: Platform
+        assessor:
+          type: string
+          title: Assessor
+        score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Score
+        rating:
+          type: string
+          title: Rating
+        answered:
+          type: integer
+          title: Answered
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        updated_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated By
+        answers:
+          additionalProperties:
+            $ref: '#/components/schemas/app__api__v1__endpoints__vcio_risk_scoring__AnswerOut'
+          type: object
+          title: Answers
+        severity:
+          additionalProperties:
+            type: string
+          type: object
+          title: Severity
+        scorecard:
+          additionalProperties: true
+          type: object
+          title: Scorecard
+      type: object
+      required:
+      - id
+      - client_id
+      - client_name
+      - review_date
+      - platform
+      - assessor
+      - score
+      - rating
+      - answered
+      - updated_at
+      - updated_by
+      - answers
+      - severity
+      - scorecard
+      title: AssessmentOut
+    AssessmentPatch:
+      properties:
+        review_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Review Date
+        platform:
+          anyOf:
+          - type: string
+            enum:
+            - m365
+            - google
+            - both
+          - type: 'null'
+          title: Platform
+        assessor:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Assessor
+        settings:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Settings
+          description: Scoring settings to use instead of the defaults; an empty object
+            goes back to the defaults.
+        severity:
+          anyOf:
+          - additionalProperties:
+              anyOf:
+              - type: string
+              - type: 'null'
+            type: object
+          - type: 'null'
+          title: Severity
+          description: Question id -> the severity to use for it; null puts the library's
+            back.
+      type: object
+      title: AssessmentPatch
+    AssessmentSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        review_date:
+          type: string
+          format: date
+          title: Review Date
+        platform:
+          type: string
+          title: Platform
+        assessor:
+          type: string
+          title: Assessor
+        score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Score
+        rating:
+          type: string
+          title: Rating
+        answered:
+          type: integer
+          title: Answered
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        updated_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated By
+      type: object
+      required:
+      - id
+      - client_id
+      - client_name
+      - review_date
+      - platform
+      - assessor
+      - score
+      - rating
+      - answered
+      - updated_at
+      - updated_by
+      title: AssessmentSummary
     AssetCreate:
       properties:
         asset_type:
@@ -33142,19 +33509,6 @@ components:
       - revoked_at
       - created_at
       title: DelegationOut
-    DeletedOut:
-      properties:
-        deleted:
-          type: boolean
-          title: Deleted
-        name:
-          type: string
-          title: Name
-      type: object
-      required:
-      - deleted
-      - name
-      title: DeletedOut
     Delivery:
       properties:
         passed:
@@ -38949,6 +39303,53 @@ components:
       - days_ago
       - silent
       title: LastReportedRow
+    LibraryOut:
+      properties:
+        questions:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Questions
+        categories:
+          items:
+            type: string
+          type: array
+          title: Categories
+        csf_functions:
+          items:
+            type: string
+          type: array
+          title: Csf Functions
+        severities:
+          items:
+            type: string
+          type: array
+          title: Severities
+        yesno_answers:
+          items:
+            type: string
+          type: array
+          title: Yesno Answers
+        vendor_answers:
+          items:
+            type: string
+          type: array
+          title: Vendor Answers
+        defaults:
+          additionalProperties: true
+          type: object
+          title: Defaults
+      type: object
+      required:
+      - questions
+      - categories
+      - csf_functions
+      - severities
+      - yesno_answers
+      - vendor_answers
+      - defaults
+      title: LibraryOut
     LicenseCountIn:
       properties:
         item:
@@ -53643,6 +54044,75 @@ components:
       required:
       - events
       title: TimelineResponse
+    app__api__v1__endpoints__client_review__AnswerIn:
+      properties:
+        section:
+          type: string
+          title: Section
+        key:
+          type: string
+          maxLength: 400
+          title: Key
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+        answer:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Answer
+        note:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Note
+      type: object
+      required:
+      - section
+      - key
+      title: AnswerIn
+    app__api__v1__endpoints__client_review__AnswerOut:
+      properties:
+        section:
+          type: string
+          title: Section
+        key:
+          type: string
+          title: Key
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+        answer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Answer
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Updated At
+        cleared:
+          type: boolean
+          title: Cleared
+          default: false
+      type: object
+      required:
+      - section
+      - key
+      title: AnswerOut
     app__api__v1__endpoints__client_vulnerabilities__VulnerabilityOut:
       properties:
         client_id:
@@ -54560,6 +55030,19 @@ components:
       - occurred_at
       - acknowledged_at
       title: IndicatorOut
+    app__api__v1__endpoints__inventory__DeletedOut:
+      properties:
+        deleted:
+          type: boolean
+          title: Deleted
+        name:
+          type: string
+          title: Name
+      type: object
+      required:
+      - deleted
+      - name
+      title: DeletedOut
     app__api__v1__endpoints__inventory__EventOut:
       properties:
         id:
@@ -55340,6 +55823,64 @@ components:
       - status
       - updated_at
       title: ProposalOut
+    app__api__v1__endpoints__vcio_risk_scoring__AnswerIn:
+      properties:
+        id:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Id
+        answer:
+          anyOf:
+          - type: string
+            maxLength: 20
+          - type: 'null'
+          title: Answer
+          description: Null clears the answer.
+        vendor:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Vendor
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Note
+      type: object
+      required:
+      - id
+      title: AnswerIn
+    app__api__v1__endpoints__vcio_risk_scoring__AnswerOut:
+      properties:
+        answer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Answer
+        vendor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Vendor
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+      type: object
+      title: AnswerOut
+    app__api__v1__endpoints__vcio_risk_scoring__DeletedOut:
+      properties:
+        deleted:
+          type: boolean
+          title: Deleted
+      type: object
+      required:
+      - deleted
+      title: DeletedOut
   securitySchemes:
     HTTPBearer:
       type: http

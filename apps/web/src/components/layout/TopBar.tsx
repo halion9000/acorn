@@ -32,6 +32,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/settings/client-docs': { title: 'Client Docs', description: 'Search the IT Glue documentation, runbooks, configurations and password entries of every client (links only)' },
   '/settings/mfa': { title: 'Multi-Factor', description: 'Who has Multi-Factor sign-in, per client' },
   '/reports/client-review': { title: 'Client Review', description: 'Coverage, identity, alerts and insurance readiness for one client' },
+  '/vcio-risk-scoring': { title: 'vCIO Risk Scoring', description: 'A client’s Business Review scored by risk, with a NIST CSF 2.0 reading' },
   '/settings/secure-score': { title: 'Secure Score', description: 'Microsoft Secure Score per client, and what would raise it' },
   '/settings/signin-scores': { title: 'Sign-in Scores', description: 'The most unusual sign-ins, across clients' },
   '/settings/client-cleanup': { title: 'Client Cleanup', description: 'Clients with nothing in them' },

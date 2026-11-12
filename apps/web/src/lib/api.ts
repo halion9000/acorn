@@ -194,6 +194,11 @@ function detailOf(body: string): string | null {
   }
 }
 
+/** The same call every ``...Api`` object here makes, for a feature that keeps its own calls in its own file (lib/vcioRisk.ts). */
+export function apiRequest<T>(path: string, options: FetchOptions = {}): Promise<T> {
+  return request<T>(path, options);
+}
+
 async function request<T>(path: string, options: FetchOptions = {}): Promise<T> {
   const { params, baseUrl, ...fetchOptions } = options;
 

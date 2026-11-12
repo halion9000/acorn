@@ -57,6 +57,7 @@ from app.models.stix_object import StixObject
 from app.models.tenant import ApiKey, Tenant, User
 from app.models.tenant_access import AllTenantAccessGrant, TenantAccessGrant
 from app.models.threat_intel import ThreatActor, ThreatIntelFeed, ThreatIntelIOC
+from app.models.vcio_risk_assessment import VcioRiskAssessment
 from app.models.vendor_action import VendorAction
 
 __all__ = [
@@ -140,4 +141,5 @@ __all__ = [
     "BusinessContextRuleSet",
     "OutcomeSuppression",
     "Shift",
+    "VcioRiskAssessment",
 ]

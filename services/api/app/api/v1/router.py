@@ -136,6 +136,7 @@ from app.api.v1.endpoints import (
     totp,
     translation,
     vcio_proposals,
+    vcio_risk_scoring,
     waitlist,
 )
 
@@ -296,6 +297,7 @@ api_router.include_router(client_review.ingest_router)
 api_router.include_router(client_review.router)
 api_router.include_router(vcio_proposals.ingest_router)
 api_router.include_router(vcio_proposals.router)
+api_router.include_router(vcio_risk_scoring.router)
 api_router.include_router(mssp.router)
 api_router.include_router(mssp_clients.router)
 api_router.include_router(insider_threat.router)

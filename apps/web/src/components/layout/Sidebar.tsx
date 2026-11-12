@@ -389,6 +389,11 @@ const navSections: NavSection[] = [
         href: '/reports/client-review',
         icon: <DocumentReportIcon />,
       },
+      {
+        label: 'vCIO Risk Scoring',
+        href: '/vcio-risk-scoring',
+        icon: <DocumentReportIcon />,
+      },
     ],
   },
   {
