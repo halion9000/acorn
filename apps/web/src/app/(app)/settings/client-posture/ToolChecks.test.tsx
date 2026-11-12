@@ -87,6 +87,41 @@ describe('ToolChecks', () => {
     expect(within(screen.getByTestId('check-itglue_domain_expiry')).getByText('Problem')).toBeInTheDocument();
     expect(within(screen.getByTestId('check-itglue_certificate_expiry')).getByText('SSL certificates')).toBeInTheDocument();
   });
+
+  it('names the two Google super administrator count checks in plain words', async () => {
+    render(
+      <ToolChecks
+        tool="threatmate-google"
+        label="Google Workspace"
+        checks={[
+          { key: 'threatmate_google_super_admin_min', status: 'not_met', evidence: '1 Google super administrator; the template wants at least 2' },
+          { key: 'threatmate_google_super_admin_max', status: 'met', evidence: '1 Google super administrator; the template wants no more than 4.' },
+        ]}
+      />,
+    );
+    expect(within(screen.getByTestId('check-threatmate_google_super_admin_min')).getByText('At least two Google super administrators')).toBeInTheDocument();
+    expect(within(screen.getByTestId('check-threatmate_google_super_admin_max')).getByText('No more than four Google super administrators')).toBeInTheDocument();
+    const { CHECK_HELP } = await import('./checkHelp');
+    expect(CHECK_HELP.threatmate_google_super_admin_min.fix).toMatch(/second trusted person/);
+    expect(CHECK_HELP.threatmate_google_super_admin_max.fix).toMatch(/two to four/);
+  });
+
+  it('names the servers-only update check in plain words, apart from the all-machines one', async () => {
+    render(
+      <ToolChecks
+        tool="ninjaone"
+        label="NinjaOne"
+        checks={[
+          { key: 'ninjaone_patching', status: 'partly', evidence: '1 of 22 Windows machines behind' },
+          { key: 'ninjaone_server_patching', status: 'not_met', evidence: '1 of 2 Windows servers behind' },
+        ]}
+      />,
+    );
+    expect(within(screen.getByTestId('check-ninjaone_patching')).getByText('Windows updates')).toBeInTheDocument();
+    expect(within(screen.getByTestId('check-ninjaone_server_patching')).getByText('Windows updates on servers')).toBeInTheDocument();
+    const { CHECK_HELP } = await import('./checkHelp');
+    expect(CHECK_HELP.ninjaone_server_patching.fix).toMatch(/servers listed/);
+  });
 });
 
 describe('the time-to-fix target', () => {

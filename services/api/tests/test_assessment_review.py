@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from types import SimpleNamespace as NS
 
 import pytest
 from app.services.assessment_questions import QUESTIONS
-from app.services.assessment_review import CHECK_ANSWERS, assessment_answers
+from app.services.assessment_review import CHECK_ANSWERS, GOOGLE_PEOPLE_FRESH_DAYS, assessment_answers, google_two_step_answer
 from app.services.review_overrides import clean_answer, merge_assess
 from fastapi import HTTPException
 
@@ -59,6 +61,56 @@ def test_a_check_the_client_has_answers_the_question_it_speaks_to_and_says_which
     assert out["Are all users up to date on their training?"].status == "met"
     assert out["Are all firm-issued Windows Laptops encrypted?"].status == "not_met"
     assert out["Are users clicking on phishing emails?"].status == "needs_person", "no phishing-simulation check, no answer"
+
+
+def test_the_servers_question_is_answered_by_the_servers_own_patching_check_and_never_by_the_all_machines_one():
+    servers = "Are all Windows Server Operating Systems up to the latest service pack for their respective OS?"
+    workstations = "Are all workstations up to the latest service pack and updates for their respective OS?"
+    all_machines = {"key": "ninjaone_patching", "status": "partly", "evidence": "1 of 22 Windows machines behind"}
+    only_all = by_question(assessment_answers({"ninjaone_patching": all_machines}))
+    assert only_all[servers].status == "needs_person", "a client with no server check gets no answer about its servers"
+    assert only_all[workstations].status == "partly"
+    late = {
+        "key": "ninjaone_server_patching",
+        "status": "not_met",
+        "evidence": "1 of 2 Windows servers have a critical or important update",
+    }
+    both = by_question(assessment_answers({"ninjaone_patching": all_machines, "ninjaone_server_patching": late}))
+    assert both[servers].status == "not_met"
+    assert "From ninjaone_server_patching" in both[servers].evidence and "1 of 2 Windows servers" in both[servers].evidence
+    assert both[workstations].status == "partly", "the workstation question keeps its own check"
+
+
+def test_the_two_super_administrator_questions_each_read_their_own_google_check():
+    at_least_two = "Does more than one Super Admin account exist"
+    over_four = "Is there more than 4 Super Admin accounts existing in the account"
+    nothing = by_question(
+        assessment_answers(
+            {"threatmate_google_admins": {"key": "threatmate_google_admins", "status": "met", "evidence": "All 3 have 2-Step"}}
+        )
+    )
+    assert (
+        nothing[at_least_two].status == nothing[over_four].status == "needs_person"
+    ), "the 2-Step check says nothing about how many there are"
+    one_admin = by_question(
+        assessment_answers(
+            {
+                "threatmate_google_super_admin_min": {
+                    "key": "threatmate_google_super_admin_min",
+                    "status": "not_met",
+                    "evidence": "1 Google super administrator",
+                },
+                "threatmate_google_super_admin_max": {
+                    "key": "threatmate_google_super_admin_max",
+                    "status": "met",
+                    "evidence": "1 Google super administrator; no more than 4",
+                },
+            }
+        )
+    )
+    assert one_admin[at_least_two].status == "not_met" and "From threatmate_google_super_admin_min" in one_admin[at_least_two].evidence
+    assert one_admin[over_four].status == "met", "one administrator fails the first question and passes the second"
+    assert "no more than 4" in one_admin[over_four].evidence, "Met beside a question worded 'more than 4' must say what it means"
 
 
 def test_the_first_check_the_client_has_wins_and_an_unusable_status_is_ignored():
@@ -118,3 +170,61 @@ def test_the_assess_section_accepts_its_statuses_and_refuses_others():
         clean_answer("assess", "Is there UPS onsite?", "seen", None, None)
     with pytest.raises(HTTPException):
         clean_answer("assess", "Is there UPS onsite?", "met", "a typed answer", None)  # only the technology questions take one
+
+
+# ---- Google 2-Step enforcement, from the stored people ---------------------------------------------------------------------------------------------------
+
+TWO_STEP = "Do you ensure 2-Step Verification (Multi-Factor Authentication) is enforced for all users"
+T0 = datetime(2026, 11, 12, 12, 0, tzinfo=UTC)
+
+
+def person(per_user=None, *, source="threatmate", enabled=True, registered=False, days_old=1):
+    return SimpleNamespace(
+        source=source, enabled=enabled, per_user=per_user, registered=registered, refreshed_at=T0 - timedelta(days=days_old)
+    )
+
+
+def two_step(people):
+    return by_question(assessment_answers({}, people=people, now=T0))[TWO_STEP]
+
+
+def test_the_question_is_in_the_template_exactly_once():
+    assert [q for _, _, q in QUESTIONS].count(TWO_STEP) == 1
+
+
+def test_two_step_enforced_for_every_google_account_is_met_some_is_partly_and_none_is_not_met():
+    everyone = two_step([person("enforced"), person("enforced")])
+    assert everyone.status == "met" and "enforced for 2 of 2 Google accounts." in everyone.evidence
+    some = two_step([person("enforced"), person(registered=True), person()])
+    assert some.status == "partly"
+    assert "enforced for 1 of 3 Google accounts; 1 of the other 2 have signed up for it without it being required." in some.evidence
+    nobody = two_step([person(registered=True), person(registered=True)])
+    assert nobody.status == "not_met", "everyone signed up is still not enforcement"
+    assert "enforced for 0 of 2" in nobody.evidence
+
+
+def test_only_live_google_people_count_and_an_empty_list_never_answers():
+    assert two_step([]).status == "needs_person"
+    assert by_question(assessment_answers({}))[TWO_STEP].status == "needs_person", "called the old way, with checks only"
+    microsoft = person("enforced", source="cipp")
+    suspended = person(enabled=False)
+    old = person(days_old=GOOGLE_PEOPLE_FRESH_DAYS + 1)
+    assert (
+        two_step([microsoft, suspended, old]).status == "needs_person"
+    ), "Microsoft people, suspended accounts and a list not refreshed for over a week say nothing"
+    mixed = two_step([person("enforced"), microsoft, suspended, old])
+    assert mixed.status == "met" and "1 of 1 Google accounts" in mixed.evidence
+    assert (
+        google_two_step_answer([person("enforced", days_old=GOOGLE_PEOPLE_FRESH_DAYS)], T0) is not None
+    ), "exactly a week old still counts"
+
+
+def test_the_google_admin_two_step_check_does_not_answer_the_all_users_question():
+    checks = {
+        "threatmate_google_admins": {
+            "key": "threatmate_google_admins",
+            "status": "met",
+            "evidence": "All 3 super administrators have 2-Step",
+        }
+    }
+    assert by_question(assessment_answers(checks))[TWO_STEP].status == "needs_person"

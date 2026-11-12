@@ -1173,3 +1173,36 @@ async def test_machines_joining_and_leaving_a_checks_list_are_kept_and_the_first
     with pytest.raises(HTTPException) as e:
         await run(world["msp"], lambda db: cp.check_item_history(world["stranger"], "ninjaone_antivirus", NS(tenant_id=world["msp"]), db))
     assert e.value.status_code == 404
+
+
+async def test_the_review_answers_the_google_two_step_question_from_the_clients_stored_google_people(world):
+    question = "Do you ensure 2-Step Verification (Multi-Factor Authentication) is enforced for all users"
+
+    async def seed(db):
+        async with acting_as_tenant(db, world["client"]):
+            snap = uuid.uuid4()
+            for source, uid, per_user in (("threatmate", "g-1", "enforced"), ("threatmate", "g-2", None), ("cipp", "m-1", "enforced")):
+                db.add(
+                    IdentityMfaUser(
+                        tenant_id=world["client"],
+                        source=source,
+                        user_id=uid,
+                        upn=f"{uid}@x.com",
+                        enabled=True,
+                        user_type="Member",
+                        admin=False,
+                        licensed=True,
+                        registered=True,
+                        per_user=per_user,
+                        snapshot_id=snap,
+                    )
+                )
+            await db.flush()
+
+    before = await run(world["msp"], lambda db: ep.client_review(world["client"], NS(tenant_id=world["msp"]), db))
+    assert {a.question: a.status for a in before.assess}[question] == "needs_person", "no Google people yet"
+    await run(world["msp"], seed)
+    r = await run(world["msp"], lambda db: ep.client_review(world["client"], NS(tenant_id=world["msp"]), db))
+    answer = {a.question: a for a in r.assess}[question]
+    assert answer.status == "partly"
+    assert "enforced for 1 of 2 Google accounts" in answer.evidence, "the Microsoft person is not counted"

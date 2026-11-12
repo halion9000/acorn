@@ -2,6 +2,13 @@
 
 Written 2026-11-11. A plan, not a change: nothing in the product was altered to produce it.
 
+## Built so far
+
+- 2026-11-12, build item 5 (1 question, A038): CORE sends `ninjaone_server_patching`, the patching rule over the Windows servers alone; the assessment's server service-pack question reads it.
+- 2026-11-12, build item 4 (2 questions, A070 and A071): CORE sends `threatmate_google_super_admin_min` and `threatmate_google_super_admin_max`, counted per workspace; the two super administrator questions read them.
+- 2026-11-12, part of build item 2 (2 questions, T-encryption and A112): the tech-stack encryption question is answered from the BitLocker readings (NinjaOne, Liongard) and the FileVault fact (Addigy) already held, and says it is about workstations, not only laptops. The Google "2-Step enforced for all users" question is answered from the Google people ThreatMate lists (switched-on accounts refreshed within a week). The other two rules in item 2 (A124, A051) wait on the decisions named there.
+- Items 4 and 5 were the ones that needed nothing decided. The three new checks show on the Client posture page with a label and a fix line, and count in the posture score like any other check. Not yet seen with live data: the first NinjaOne and Google passes after CORE is updated will show them.
+
 ## Where it stands
 
 The client review has four lists of questions. 164 of them have no automatic answer today:

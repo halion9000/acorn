@@ -571,7 +571,9 @@ async def client_review(
     m365_worked = m365_answers(
         [c for c in (m365_row.checks if m365_row is not None else []) if isinstance(c, dict)], microsoft_rows(list(users))
     )
-    assess_worked = assessment_answers({**tool_checks, **{c["key"]: c for c in sat_checks if isinstance(c.get("key"), str)}})
+    assess_worked = assessment_answers(
+        {**tool_checks, **{c["key"]: c for c in sat_checks if isinstance(c.get("key"), str)}}, people=list(users), now=now
+    )
     # What A.C.O.R.N worked out, before a person's typed answers are laid over it (the merge changes these objects): kept so each question has a history.
     readings = review_history.snapshot(ready.items, tech_answers, m365_worked, assess_worked)
     try:

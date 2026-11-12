@@ -18,6 +18,7 @@ from app.services.infra_review import (
     EDR_TOOLS,
     backup_answer,
     edr_answer,
+    encryption_answer,
     network_answer,
     saas_backup,
     saas_tools,
@@ -129,7 +130,7 @@ def tech_stack(
     put("server_brand", *server_brand_answer(devices))
     put("virtualization", *virtualization_answer(devices))
     put("edr_pc", *edr_answer(devices, "windows", "Windows computers", {t: cov[t].enrolled for t in EDR_TOOLS if t in cov}))
-    put("encryption", "unknown", None, _UNKNOWN)
+    put("encryption", *encryption_answer(devices))
     for key in ("spam_filter", "anti_phishing", "password_manager", "external_email_banner"):
         put(key, "unknown", None, _UNKNOWN)
     by_tool("pam", "autoelevate", "windows", "Windows computers")

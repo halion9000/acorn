@@ -7,12 +7,13 @@ answer is laid over these (``review_overrides.merge_assess``). Nothing here is s
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pydantic import BaseModel
 
 from app.services.assessment_questions import QUESTIONS
+from app.services.mfa_registration import GOOGLE_SOURCES
 
 _STATUSES = {"met", "partly", "not_met"}
 
@@ -44,6 +45,21 @@ CHECK_ANSWERS: tuple[tuple[str, tuple[str, ...], str], ...] = (
         "Windows machines, servers and workstations together",
     ),
     ("Are Windows Updates for security patches configured and enabled?", ("ninjaone_patching",), "Windows machines"),
+    (
+        "Are all Windows Server Operating Systems up to the latest service pack for their respective OS?",
+        ("ninjaone_server_patching",),
+        "Windows servers in NinjaOne; read as no critical or important update waiting over 30 days",
+    ),
+    (
+        "Does more than one Super Admin account exist",
+        ("threatmate_google_super_admin_min",),
+        "Google workspaces connected in ThreatMate, each counted by itself",
+    ),
+    (
+        "Is there more than 4 Super Admin accounts existing in the account",
+        ("threatmate_google_super_admin_max",),
+        "Google workspaces connected in ThreatMate, each counted by itself; Met means no more than 4",
+    ),
     (
         "Are all workstations up to the latest service pack and updates for their respective OS?",
         ("ninjaone_patching",),
@@ -87,8 +103,41 @@ def _usable(check: dict[str, Any] | None) -> bool:
     return isinstance(check, dict) and check.get("status") in _STATUSES
 
 
-def assessment_answers(checks: dict[str, dict[str, Any]]) -> list[AssessAnswer]:
-    """One answer per template question, in the template's order. ``checks`` maps a check key to the check the client has (its ``status`` and ``evidence``)."""
+_TWO_STEP_QUESTION = "Do you ensure 2-Step Verification (Multi-Factor Authentication) is enforced for all users"
+# People are only removed by a later list from the tool, so a workspace that was disconnected would answer for ever: a row not refreshed for this long is not counted.
+GOOGLE_PEOPLE_FRESH_DAYS = 7
+
+
+def google_two_step_answer(people: list[Any], now: datetime) -> tuple[str, str] | None:
+    """Whether 2-Step Verification is enforced for every Google account, from the client's stored Google people (``source`` in GOOGLE_SOURCES): switched-on accounts refreshed within
+    GOOGLE_PEOPLE_FRESH_DAYS. All enforced is met, some partly, none not met. None when there is no such person: an empty list never answers. Enrolment alone is not enforcement, so the
+    people who have signed up without it being required are said, not counted."""
+    cut = now - timedelta(days=GOOGLE_PEOPLE_FRESH_DAYS)
+    live = [
+        p
+        for p in people
+        if (getattr(p, "source", None) or "") in GOOGLE_SOURCES
+        and getattr(p, "enabled", False)
+        and (r := getattr(p, "refreshed_at", None)) is not None
+        and r >= cut
+    ]
+    if not live:
+        return None
+    enforced = sum(1 for p in live if getattr(p, "per_user", None) == "enforced")
+    rest = len(live) - enforced
+    signed_up = sum(1 for p in live if getattr(p, "per_user", None) != "enforced" and getattr(p, "registered", False))
+    text = f"From the Google people ThreatMate lists. 2-Step Verification is enforced for {enforced} of {len(live)} Google accounts"
+    if rest:
+        text += f"; {signed_up} of the other {rest} have signed up for it without it being required"
+    status = "met" if rest == 0 else "partly" if enforced else "not_met"
+    return status, (text + ".")[:300]
+
+
+def assessment_answers(
+    checks: dict[str, dict[str, Any]], people: list[Any] | None = None, now: datetime | None = None
+) -> list[AssessAnswer]:
+    """One answer per template question, in the template's order. ``checks`` maps a check key to the check the client has (its ``status`` and ``evidence``). ``people`` is the client's
+    stored Multi-Factor people, for the one question answered from them (Google 2-Step enforcement)."""
     suggested: dict[str, tuple[str, str]] = {}
     for prefix, keys, scope in CHECK_ANSWERS:
         for key in keys:
@@ -106,6 +155,9 @@ def assessment_answers(checks: dict[str, dict[str, Any]]) -> list[AssessAnswer]:
             suggested[_RDP_QUESTION] = ("met", f"From {_EXPOSURE_CHECK}. {saw}"[:300])
         elif "3389" in saw or "rdp" in saw.lower() or "remote desktop" in saw.lower():
             suggested[_RDP_QUESTION] = ("not_met", f"From {_EXPOSURE_CHECK}. {saw}"[:300])
+    two_step = google_two_step_answer(people or [], now or datetime.now(UTC))
+    if two_step is not None:
+        suggested[_TWO_STEP_QUESTION] = two_step
     out: list[AssessAnswer] = []
     for sheet, group, question in QUESTIONS:
         status, evidence = suggested.get(question, ("needs_person", ""))

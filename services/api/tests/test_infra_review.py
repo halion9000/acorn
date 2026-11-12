@@ -475,3 +475,69 @@ def test_the_readiness_checklist_has_the_encryption_question_when_the_client_has
     item = {i.key: i for i in readiness(device_facts(ws, 0, 0), None, None, devices=ws).items}["disk_encryption"]
     assert item.question == "Are workstations' disks encrypted (BitLocker)?" and item.status == "met"
     assert "disk_encryption" not in {i.key for i in readiness(device_facts([], 0, 0), None, None, devices=[]).items}
+
+
+# ---- the tech-stack question "are laptops encrypted" ----------------------------------------------------------------------------------------------------
+
+
+def _pc(name, *sources):
+    return dev(list(sources), os="Windows 11 Pro", hostname=name)
+
+
+def _mac(name, filevault):
+    return dev([src("addigy", facts={} if filevault is None else {"filevault_enabled": filevault})], os="macOS 14", hostname=name)
+
+
+def _bl(on):
+    return src("ninjaone", bitlocker_encrypted=on)
+
+
+def test_the_encryption_question_names_bitlocker_when_the_workstations_with_a_reading_are_encrypted():
+    a = answers([_pc(f"p{i}", _bl(True)) for i in range(10)])["encryption"]
+    assert (a.status, a.suggested) == ("seen", "BitLocker")
+    assert "10 of 10 Windows workstations with a BitLocker reading" in a.evidence
+    assert "workstations, not only laptops" in a.evidence, "the inventory cannot tell a laptop from a desktop, and says so"
+    most = answers([_pc(f"p{i}", _bl(i < 8)) for i in range(10)])["encryption"]
+    assert (most.status, most.suggested) == ("seen", "BitLocker"), "80% is 'partly' for readiness and still an encryption tool in use"
+
+
+def test_a_few_encrypted_machines_is_some_and_none_is_none_seen():
+    some = answers([_pc(f"p{i}", _bl(i < 2)) for i in range(10)])["encryption"]
+    assert (some.status, some.suggested) == ("seen", "BitLocker (some machines)")
+    assert "2 of 10" in some.evidence
+    none = answers([_pc(f"p{i}", _bl(False)) for i in range(10)])["encryption"]
+    assert (none.status, none.suggested) == ("not_seen", "None seen")
+    assert "0 of 10" in none.evidence
+
+
+def test_with_no_reading_and_no_macs_the_encryption_question_stays_unknown():
+    no_reading = answers([_pc("p1", src("ninjaone")), _pc("p2", src("huntress"))])["encryption"]
+    assert (no_reading.status, no_reading.suggested) == ("unknown", None)
+    assert "BitLocker reading" in no_reading.evidence
+    nothing = answers([])["encryption"]
+    assert (nothing.status, nothing.suggested) == ("unknown", None)
+    macs_silent = answers([_mac("m1", None), _mac("m2", False)])["encryption"]
+    assert (macs_silent.status, macs_silent.suggested) == (
+        "unknown",
+        None,
+    ), "FileVault off or not reported is not an answer for the whole client"
+
+
+def test_macs_reporting_filevault_answer_it_when_windows_cannot_and_are_named_beside_bitlocker_when_it_can():
+    only_macs = answers([_mac("m1", True), _mac("m2", "true"), _mac("m3", False), _mac("m4", None)])["encryption"]
+    assert (only_macs.status, only_macs.suggested) == ("seen", "FileVault")
+    assert (
+        "2 of 3 Macs that report it to Addigy have FileVault on" in only_macs.evidence
+    ), "true as text counts; a Mac with no reading is not counted"
+    unread_pcs = answers([_pc("p1", src("ninjaone")), _mac("m1", True)])["encryption"]
+    assert (unread_pcs.status, unread_pcs.suggested) == ("seen", "FileVault")
+    assert "BitLocker reading" in unread_pcs.evidence, "it still says the Windows machines have no reading"
+    both = answers([_pc(f"p{i}", _bl(True)) for i in range(5)] + [_mac("m1", True)])["encryption"]
+    assert (both.status, both.suggested) == ("seen", "BitLocker, FileVault")
+    assert "1 of 1 Macs" in both.evidence
+    pcs_bare = answers([_pc(f"p{i}", _bl(False)) for i in range(5)] + [_mac("m1", True)])["encryption"]
+    assert (pcs_bare.status, pcs_bare.suggested) == (
+        "seen",
+        "FileVault (Macs only)",
+    ), "the Macs are encrypted and the Windows machines are not: never a plain yes"
+    assert "0 of 5" in pcs_bare.evidence

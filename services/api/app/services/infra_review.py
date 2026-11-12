@@ -466,3 +466,43 @@ def encryption_readiness(devices: list[Any]) -> tuple[str, str] | None:
         status,
         f"{encrypted} of {len(known)} Windows workstations with a BitLocker reading ({', '.join(tools)}) have every fixed drive fully encrypted and protected ({percent:.0f}%){tail}.",
     )
+
+
+def _filevault(device: Any) -> bool | None:
+    """Whether a Mac has FileVault on, from Addigy's own fact (``details.facts.filevault_enabled``, which arrives as a boolean or as the text "true"/"false"). None when Addigy says nothing."""
+    for s in getattr(device, "sources", []):
+        details = getattr(s, "details", None)
+        facts = details.get("facts") if isinstance(details, dict) else None
+        value = facts.get("filevault_enabled") if isinstance(facts, dict) else None
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str) and value.strip().lower() in ("true", "false"):
+            return value.strip().lower() == "true"
+    return None
+
+
+_NOT_LAPTOPS = " The inventory cannot tell a laptop from a desktop, so this is about workstations, not only laptops."
+
+
+def encryption_answer(devices: list[Any]) -> tuple[str, str | None, str]:
+    """The tech-stack answer to "are laptops encrypted", from the readings already held: BitLocker on Windows workstations (``encryption_readiness``) and FileVault on Macs (Addigy). Mostly
+    encrypted names BitLocker; a few encrypted says "some machines"; readings that all say no is "None seen". With no Windows reading the Macs answer it when any reports FileVault on.
+    Macs encrypted beside Windows machines that are not is never a plain yes. No reading at all stays unknown."""
+    macs = [f for d in devices if os_kind(getattr(d, "os", None)) == "mac" and (f := _filevault(d)) is not None]
+    macs_on = sum(1 for f in macs if f)
+    mac_text = f" {macs_on} of {len(macs)} Macs that report it to Addigy have FileVault on." if macs else ""
+    windows = encryption_readiness(devices)
+    if windows is None or windows[0] == "unknown":
+        lead = windows[1] if windows else "The client has no Windows workstation in the inventory."
+        if macs_on:
+            return "seen", "FileVault", lead + mac_text
+        return "unknown", None, lead + mac_text + " Ask the client."
+    status, sentence = windows
+    evidence = sentence + mac_text + _NOT_LAPTOPS
+    if status in ("met", "partly"):
+        return "seen", "BitLocker, FileVault" if macs_on else "BitLocker", evidence
+    if any(encryption_state(d) for d in devices if _windows_workstation(d)):
+        return "seen", "BitLocker (some machines)", evidence
+    if macs_on:
+        return "seen", "FileVault (Macs only)", evidence
+    return "not_seen", "None seen", evidence
