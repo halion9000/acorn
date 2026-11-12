@@ -1157,6 +1157,22 @@ export interface InventoryNucSyncResult {
   names: string[];
 }
 
+export interface InventoryBulkRefused {
+  id: string;
+  name: string;
+  reason: string;
+}
+export interface InventoryBulkMoveResult {
+  moved: number;
+  skipped: InventoryBulkRefused[];
+  not_found: number;
+}
+export interface InventoryBulkDeleteResult {
+  deleted: number;
+  refused: InventoryBulkRefused[];
+  not_found: number;
+}
+
 export const inventoryApi = {
   list: (q: InventoryQuery = {}) => request<InventoryList>('/api/v1/inventory', { params: { ...inventoryParams(q), page: q.page ?? 1, page_size: q.pageSize ?? 50, sort: q.sort, direction: q.direction } }),
   create: (body: InventoryInput) => request<InventoryItem>('/api/v1/inventory', { method: 'POST', body: JSON.stringify(body) }),
@@ -1165,7 +1181,13 @@ export const inventoryApi = {
   remove: (id: string) => request<{ deleted: boolean; name: string }>(`/api/v1/inventory/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   checkOut: (id: string, body: { person?: string; site?: string; ticket_url?: string; note?: string }) =>
     request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}/check-out`, { method: 'POST', body: JSON.stringify(body) }),
-  checkIn: (id: string, body: { note?: string; ticket_url?: string } = {}) => request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}/check-in`, { method: 'POST', body: JSON.stringify(body) }),
+  /** Asks the same questions as a check-out: who has it now and the site it is at; one left out changes nothing. */
+  checkIn: (id: string, body: { person?: string; site?: string; note?: string; ticket_url?: string } = {}) => request<InventoryItem>(`/api/v1/inventory/${encodeURIComponent(id)}/check-in`, { method: 'POST', body: JSON.stringify(body) }),
+  /** Check many items out or in with the same answers. The ones that cannot be moved that way come back named, with the reason. */
+  bulkMove: (body: { ids: string[]; to: 'checked_out' | 'checked_in'; person?: string; site?: string; ticket_url?: string; note?: string }) =>
+    request<InventoryBulkMoveResult>('/api/v1/inventory/bulk-move', { method: 'POST', body: JSON.stringify(body) }),
+  /** Delete many items for good. The ones that are checked out or kept in step with a tool are left, and come back named with the reason. */
+  bulkRemove: (ids: string[]) => request<InventoryBulkDeleteResult>('/api/v1/inventory/bulk-delete', { method: 'POST', body: JSON.stringify({ ids, confirm: true }) }),
   events: (id: string) => request<InventoryEvent[]>(`/api/v1/inventory/${encodeURIComponent(id)}/events`),
   /** The Windows computers, Macs, iPads and iPhones NinjaOne and Addigy report: a dry run says what would be added; the real one adds them as checked out. */
   syncDevices: (dry_run: boolean) => request<InventorySyncResult>('/api/v1/inventory/sync-devices', { method: 'POST', body: JSON.stringify({ dry_run }) }),

@@ -485,15 +485,28 @@ async def delete_item(
 ) -> DeletedOut:
     """Remove an item and its history. Refused for an item that is checked out (check it in first, so nothing is lost track of) and for one a tool keeps in step (a NinjaOne device
     would come back at the next sync: mark it Retired instead). The deletion is written to the audit log with what the item was, since its own history goes with it."""
-    owner = user.tenant_id
     item, names = await _find(db, user, item_id)
+    refusal = delete_refusal(item)
+    if refusal:
+        raise HTTPException(status_code=409, detail=refusal)
+    name = item.name
+    await _delete(db, user, item, names)
+    await db.commit()
+    return DeletedOut(deleted=True, name=name)
+
+
+def delete_refusal(item: Any) -> str | None:
+    """Why an item may not be deleted, or None when it may."""
     if item.status == "checked_out":
-        raise HTTPException(status_code=409, detail="This item is checked out. Check it in first, then delete it.")
+        return "This item is checked out. Check it in first, then delete it."
     if item.source == "device":
-        raise HTTPException(
-            status_code=409,
-            detail="This item is kept in step with a tool (it comes from a synced device), so it would come back at the next sync. Mark it Retired instead.",
-        )
+        return "This item is kept in step with a tool (it comes from a synced device), so it would come back at the next sync. Mark it Retired instead."
+    return None
+
+
+async def _delete(db: Any, user: AuthUser, item: Any, names: dict[uuid.UUID, str]) -> None:
+    """Remove one item and write what it was to the audit log. The caller commits."""
+    owner = user.tenant_id
     summary = {
         "kind": item.kind,
         "name": item.name,
@@ -504,7 +517,6 @@ async def delete_item(
         "client_name": names.get(item.tenant_id),
         "source": item.source,
     }
-    name = item.name
     async with _acting(db, owner, item.tenant_id):
         await db.execute(InventoryItem.__table__.delete().where(InventoryItem.id == item.id))  # its events go with it (ON DELETE CASCADE)
         await emit_audit(
@@ -514,11 +526,63 @@ async def delete_item(
             actor_email=user.email,
             action="inventory:item_deleted",
             resource="inventory_item",
-            resource_id=str(item_id),
+            resource_id=str(item.id),
             changes=summary,
         )
-        await db.commit()
-    return DeletedOut(deleted=True, name=name)
+
+
+class BulkDeleteIn(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    confirm: bool = Field(default=False, description="True only when the person pressed Delete in the confirmation window.")
+
+
+class BulkRefused(BaseModel):
+    id: uuid.UUID
+    name: str
+    reason: str
+
+
+class BulkDeleteOut(BaseModel):
+    deleted: int
+    refused: list[BulkRefused] = Field(default_factory=list)
+    not_found: int = 0
+
+
+@router.post(
+    "/bulk-delete", response_model=BulkDeleteOut, summary="Delete many items from the stock for good (their history goes with them)"
+)
+async def bulk_delete(
+    body: BulkDeleteIn, user: Annotated[AuthUser, Depends(require_permission("inventory:write"))], db: DBSession
+) -> BulkDeleteOut:
+    """The same as deleting each one: an item that is checked out or kept in step with a tool is left and named with the reason, the rest are removed, and each removal is written to the audit log."""
+    if not body.confirm:
+        raise HTTPException(status_code=422, detail="Confirm the deletion first: it cannot be undone.")
+    owner = user.tenant_id
+    names = await _tenants(db, owner)
+    ids = list(dict.fromkeys(body.ids))
+    async with cross_tenant_reads(db):
+        found = (
+            (
+                await db.execute(
+                    select(InventoryItem)
+                    .where(InventoryItem.id.in_(ids), InventoryItem.tenant_id.in_([owner, *names]))
+                    .order_by(InventoryItem.name, InventoryItem.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    deleted = 0
+    refused: list[BulkRefused] = []
+    for item in found:
+        reason = delete_refusal(item)
+        if reason:
+            refused.append(BulkRefused(id=item.id, name=item.name, reason=reason))
+            continue
+        await _delete(db, user, item, names)
+        deleted += 1
+    await db.commit()
+    return BulkDeleteOut(deleted=deleted, refused=refused, not_found=len(ids) - len(found))
 
 
 class BulkIn(BaseModel):
@@ -595,20 +659,79 @@ async def _move(item_id: uuid.UUID, body: MoveIn, user: AuthUser, db: Any, to: s
     today = datetime.now(UTC).date()
     async with _acting(db, owner, item.tenant_id):
         row = (await db.execute(select(InventoryItem).where(InventoryItem.id == item.id))).scalar_one()
-        row.status = to
-        if to == "checked_out":
-            row.checked_out_at = today
-            row.person = body.person or row.person
-            if body.site:
-                row.site = body.site
-        else:
-            row.checked_in_at = today
-        if body.ticket_url:
-            row.ticket_url = body.ticket_url
-        db.add(_event(row, to, user.email, person=body.person or row.person, ticket_url=body.ticket_url, note=body.note))
+        _apply_move(db, row, body, to, user.email, today)
         await db.commit()
         await db.refresh(row)
     return _out(row, owner, names)
+
+
+def _apply_move(db: Any, row: InventoryItem, body: MoveIn, to: str, actor: str | None, today: date) -> None:
+    """Check one item out or in and add the line to its history. Both ask the same questions: who has it, the site, a ticket and a note; one left unanswered changes nothing."""
+    row.status = to
+    if to == "checked_out":
+        row.checked_out_at = today
+    else:
+        row.checked_in_at = today
+    if body.person:
+        row.person = body.person
+    if body.site:
+        row.site = body.site
+    if body.ticket_url:
+        row.ticket_url = body.ticket_url
+    db.add(_event(row, to, actor, person=body.person or row.person, ticket_url=body.ticket_url, note=body.note))
+
+
+class BulkMoveIn(MoveIn):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    to: Literal["checked_out", "checked_in"]
+
+
+class BulkMoveOut(BaseModel):
+    moved: int
+    skipped: list[BulkRefused] = Field(default_factory=list)
+    not_found: int = 0
+
+
+@router.post("/bulk-move", response_model=BulkMoveOut, summary="Check many items out or in at once, with the same answers for all of them")
+async def bulk_move(
+    body: BulkMoveIn, user: Annotated[AuthUser, Depends(require_permission("inventory:checkout"))], db: DBSession
+) -> BulkMoveOut:
+    """An item that cannot be moved that way (already out, already in, retired) is left as it is and named with the reason; the rest are moved, each with its own history line."""
+    owner = user.tenant_id
+    names = await _tenants(db, owner)
+    ids = list(dict.fromkeys(body.ids))
+    async with cross_tenant_reads(db):
+        found = (
+            (
+                await db.execute(
+                    select(InventoryItem)
+                    .where(InventoryItem.id.in_(ids), InventoryItem.tenant_id.in_([owner, *names]))
+                    .order_by(InventoryItem.name, InventoryItem.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    out = body.to == "checked_out"
+    today = datetime.now(UTC).date()
+    moved = 0
+    skipped: list[BulkRefused] = []
+    for seen in found:
+        if not (inv.can_check_out(seen.status) if out else inv.can_check_in(seen.status)):
+            skipped.append(
+                BulkRefused(
+                    id=seen.id,
+                    name=seen.name,
+                    reason=f"it is {'already ' if seen.status == body.to else ''}{seen.status.replace('_', ' ')}",
+                )
+            )
+            continue
+        async with _acting(db, owner, seen.tenant_id):
+            row = (await db.execute(select(InventoryItem).where(InventoryItem.id == seen.id))).scalar_one()
+            _apply_move(db, row, body, body.to, user.email, today)
+        moved += 1
+    await db.commit()
+    return BulkMoveOut(moved=moved, skipped=skipped, not_found=len(ids) - len(found))
 
 
 @router.post("/{item_id}/check-out", response_model=ItemOut, summary="Check an item out to a person or a site")

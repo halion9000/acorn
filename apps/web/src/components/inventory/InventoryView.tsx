@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 
-import { apiErrorDetail, inventoryApi, msspApi, type InventoryImportResult, type InventorySyncResult, type InventoryNucSyncResult, type InventoryItem, type InventoryKind, type InventoryQuery, type InventoryStatus } from '@/lib/api';
+import { apiErrorDetail, inventoryApi, msspApi, type InventoryImportResult, type InventorySyncResult, type InventoryNucSyncResult, type InventoryBulkRefused, type InventoryItem, type InventoryKind, type InventoryQuery, type InventoryStatus } from '@/lib/api';
 import { safeDistance } from '@/lib/safe-date';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { longOutNote } from './longOut';
@@ -176,9 +176,32 @@ function ItemForm({ kind, item, clients, onDone, onClose }: { kind: InventoryKin
   );
 }
 
-function MoveForm({ item, mode, onDone, onClose }: { item: InventoryItem; mode: 'out' | 'in'; onDone: () => void; onClose: () => void }) {
-  const [person, setPerson] = useState(item.person && item.person.toLowerCase() !== 'spare' ? item.person : '');
-  const [site, setSite] = useState(item.site ?? '');
+/** What a bulk action left alone, each with the reason, so nothing is skipped silently. */
+function LeftAlone({ lead, rows }: { lead: string; rows: InventoryBulkRefused[] }) {
+  return (
+    <div data-testid="bulk-left-alone" className="space-y-2 text-sm text-gray-200">
+      <p>{lead}</p>
+      <ul className="max-h-60 list-disc space-y-1 overflow-y-auto pl-5 text-gray-300">
+        {rows.map((r) => (
+          <li key={r.id}>
+            <span className="text-white">{r.name}</span>: {r.reason}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Check one item out or in, or many at once (``ids``). Both directions ask the same four questions: who has it, the site, a ticket link and a note. For many items the answers apply to all
+ * of them, a blank answer leaves each item's own value, and the items that could not be moved are listed with the reason before the window closes.
+ */
+function MoveForm({ item, ids, mode, onDone, onClose }: { item?: InventoryItem; ids?: string[]; mode: 'out' | 'in'; onDone: () => void; onClose: () => void }) {
+  const many = ids !== undefined;
+  // Checking in starts with no name: the person who had it stays on the item unless someone else (or the storeroom) is typed.
+  const [person, setPerson] = useState(mode === 'out' && item?.person && item.person.toLowerCase() !== 'spare' ? item.person : '');
+  const [site, setSite] = useState(item?.site ?? '');
+  const [left, setLeft] = useState<{ moved: number; rows: InventoryBulkRefused[] } | null>(null);
   const [ticket, setTicket] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -187,8 +210,16 @@ function MoveForm({ item, mode, onDone, onClose }: { item: InventoryItem; mode: 
     setBusy(true);
     setError(null);
     try {
-      if (mode === 'out') await inventoryApi.checkOut(item.id, { person: person.trim() || undefined, site: site.trim() || undefined, ticket_url: ticket.trim() || undefined, note: note.trim() || undefined });
-      else await inventoryApi.checkIn(item.id, { note: note.trim() || undefined, ticket_url: ticket.trim() || undefined });
+      const answers = { person: person.trim() || undefined, site: site.trim() || undefined, ticket_url: ticket.trim() || undefined, note: note.trim() || undefined };
+      if (many) {
+        const res = await inventoryApi.bulkMove({ ids, to: mode === 'out' ? 'checked_out' : 'checked_in', ...answers });
+        if (res.skipped.length > 0) {
+          setLeft({ moved: res.moved, rows: res.skipped });
+          setBusy(false);
+          return;
+        }
+      } else if (mode === 'out') await inventoryApi.checkOut(item!.id, answers);
+      else await inventoryApi.checkIn(item!.id, answers);
       onDone();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record that.');
@@ -196,18 +227,26 @@ function MoveForm({ item, mode, onDone, onClose }: { item: InventoryItem; mode: 
     }
   };
   return (
-    <Modal title={`${mode === 'out' ? 'Check out' : 'Check in'} ${item.name}`} onClose={onClose}>
+    <Modal title={`${mode === 'out' ? 'Check out' : 'Check in'} ${many ? `${ids.length} item${ids.length === 1 ? '' : 's'}` : item!.name}`} onClose={left ? onDone : onClose}>
+      {left ? (
+        <>
+          <LeftAlone lead={`${left.moved} checked ${mode === 'out' ? 'out' : 'in'}. ${left.rows.length} left as ${left.rows.length === 1 ? 'it was' : 'they were'}:`} rows={left.rows} />
+          <div className="mt-4 flex justify-end">
+            <button type="button" onClick={onDone} className="rounded-md bg-sky-600 px-3 py-1.5 text-sm text-white">
+              Close
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
       <div className="space-y-3">
-        {mode === 'out' && (
-          <>
-            <Field label="Who has it">
-              <input aria-label="Who has it" value={person} onChange={(e) => setPerson(e.target.value)} className={`${input} w-full`} />
-            </Field>
-            <Field label="Site">
-              <input aria-label="Site" value={site} onChange={(e) => setSite(e.target.value)} className={`${input} w-full`} />
-            </Field>
-          </>
-        )}
+        {many && <p className="text-xs text-gray-400">The answers apply to every selected item. One left blank keeps each item&apos;s own.</p>}
+        <Field label={mode === 'out' ? 'Who has it' : 'Who has it now (optional)'}>
+          <input aria-label="Who has it" value={person} onChange={(e) => setPerson(e.target.value)} className={`${input} w-full`} />
+        </Field>
+        <Field label="Site">
+          <input aria-label="Site" value={site} onChange={(e) => setSite(e.target.value)} className={`${input} w-full`} />
+        </Field>
         <Field label="HaloPSA ticket link (optional)">
           <input aria-label="Ticket link" value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="https://..." className={`${input} w-full`} />
         </Field>
@@ -228,7 +267,53 @@ function MoveForm({ item, mode, onDone, onClose }: { item: InventoryItem; mode: 
           {mode === 'out' ? 'Check out' : 'Check in'}
         </button>
       </div>
+        </>
+      )}
     </Modal>
+  );
+}
+
+/** Delete many items after one "are you sure". The ones the server would not delete (checked out, or kept in step with a tool) are listed with the reason. */
+function BulkDelete({ ids, onDone, onClose }: { ids: string[]; onDone: () => void; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [left, setLeft] = useState<{ deleted: number; rows: InventoryBulkRefused[] } | null>(null);
+  const confirm = async () => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const res = await inventoryApi.bulkRemove(ids);
+      if (res.refused.length > 0) setLeft({ deleted: res.deleted, rows: res.refused });
+      else onDone();
+    } catch (err) {
+      setProblem(apiErrorDetail(err) ?? 'The items could not be deleted. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (left) {
+    return (
+      <Modal title="Some items were not deleted" onClose={onDone}>
+        <LeftAlone lead={`${left.deleted} deleted. ${left.rows.length} kept:`} rows={left.rows} />
+        <div className="mt-4 flex justify-end">
+          <button type="button" onClick={onDone} className="rounded-md bg-sky-600 px-3 py-1.5 text-sm text-white">
+            Close
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+  return (
+    <ConfirmDialog
+      open
+      title={`Delete ${ids.length} item${ids.length === 1 ? '' : 's'}?`}
+      message={problem ? problem : `${ids.length === 1 ? 'The selected item is' : `The ${ids.length} selected items are`} removed from the stock, and so is their history. This cannot be undone. Each one is written to the audit log. An item that is checked out, or kept in step with a tool, is not deleted.`}
+      confirmLabel={problem ? 'Close' : `Delete ${ids.length}`}
+      destructive={!problem}
+      busy={busy}
+      onConfirm={() => (problem ? onClose() : void confirm())}
+      onCancel={onClose}
+    />
   );
 }
 
@@ -651,7 +736,7 @@ function DeleteItem({ item, onDone, onClose }: { item: InventoryItem; onDone: ()
   );
 }
 
-type Dialog = { type: 'add' } | { type: 'edit'; item: InventoryItem } | { type: 'out' | 'in'; item: InventoryItem } | { type: 'history'; item: InventoryItem } | { type: 'label'; item: InventoryItem } | { type: 'delete'; item: InventoryItem } | { type: 'import' } | { type: 'bulk' } | { type: 'sync' } | { type: 'nucsync' } | null;
+type Dialog = { type: 'add' } | { type: 'edit'; item: InventoryItem } | { type: 'out' | 'in'; item: InventoryItem } | { type: 'history'; item: InventoryItem } | { type: 'label'; item: InventoryItem } | { type: 'delete'; item: InventoryItem } | { type: 'import' } | { type: 'bulk' } | { type: 'bulk-out' } | { type: 'bulk-in' } | { type: 'bulk-delete' } | { type: 'sync' } | { type: 'nucsync' } | null;
 
 /** A link from the search box (/inventory?search=PC-1&kind=nuc&client=<id>) opens the page already showing that. Anything else in the address is ignored. */
 export function inventoryUrlState(params: { get(name: string): string | null } | null): { search: string; kind: InventoryKind; client: string } {
@@ -832,10 +917,19 @@ export function InventoryView() {
       )}
 
       {picked.size > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm text-white" data-testid="bulk-bar">
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm text-white" data-testid="bulk-bar">
           <span>{picked.size} selected</span>
           <button type="button" onClick={() => setDialog({ type: 'bulk' })} className="rounded-md bg-sky-600 px-3 py-1 text-sm text-white hover:bg-sky-500">
             Edit selected
+          </button>
+          <button type="button" onClick={() => setDialog({ type: 'bulk-out' })} className="rounded-md border border-sky-500/50 px-3 py-1 text-sm text-white hover:bg-sky-500/20">
+            Check out selected
+          </button>
+          <button type="button" onClick={() => setDialog({ type: 'bulk-in' })} className="rounded-md border border-sky-500/50 px-3 py-1 text-sm text-white hover:bg-sky-500/20">
+            Check in selected
+          </button>
+          <button type="button" onClick={() => setDialog({ type: 'bulk-delete' })} className="rounded-md border border-red-500/50 px-3 py-1 text-sm text-red-200 hover:bg-red-500/20">
+            Delete selected
           </button>
           <button type="button" onClick={() => setPicked(new Set())} className="text-gray-300 hover:underline">
             Clear
@@ -966,6 +1060,8 @@ export function InventoryView() {
       {dialog?.type === 'edit' && <ItemForm kind={dialog.item.kind} item={dialog.item} clients={clients} onDone={changed} onClose={() => setDialog(null)} />}
       {(dialog?.type === 'out' || dialog?.type === 'in') && <MoveForm item={dialog.item} mode={dialog.type} onDone={changed} onClose={() => setDialog(null)} />}
       {dialog?.type === 'bulk' && <BulkForm ids={[...picked]} clients={clients} onDone={changed} onClose={() => setDialog(null)} />}
+      {(dialog?.type === 'bulk-out' || dialog?.type === 'bulk-in') && <MoveForm ids={[...picked]} mode={dialog.type === 'bulk-out' ? 'out' : 'in'} onDone={changed} onClose={() => setDialog(null)} />}
+      {dialog?.type === 'bulk-delete' && <BulkDelete ids={[...picked]} onDone={changed} onClose={() => setDialog(null)} />}
       {dialog?.type === 'sync' && <SyncForm onDone={() => void mutate()} onClose={() => setDialog(null)} />}
       {dialog?.type === 'nucsync' && <NucSyncForm onDone={() => void mutate()} onClose={() => setDialog(null)} />}
       {dialog?.type === 'history' && <History item={dialog.item} onClose={() => setDialog(null)} />}

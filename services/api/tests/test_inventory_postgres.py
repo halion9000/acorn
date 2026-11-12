@@ -600,3 +600,93 @@ async def test_the_nuc_sync_adds_ninja_devices_named_nuc_that_are_not_on_the_lis
             assert linked["BIRCH-NUC-OLD"] is not None, "an added NUC links straight to its machine"
     finally:
         await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])
+
+
+async def test_checking_in_can_say_who_has_it_and_where_it_is_now_just_like_checking_out():
+    engine, user, w = await world()
+    try:
+        async with AsyncSession(engine) as db:
+            made = await ep.create_item(item(client_id=w.birch, site="Austin"), user, db)
+            await ep.check_out(made.id, ep.MoveIn(person="Pat Jones", site="Pat's home"), user, db)
+            back = await ep.check_in(made.id, ep.MoveIn(person="IT storeroom", site="Live Oak Office", note="wiped"), user, db)
+            assert (back.status, back.person, back.site) == ("checked_in", "IT storeroom", "Live Oak Office")
+            assert (await ep.item_events(made.id, user, db))[0].person == "IT storeroom"
+            await ep.check_out(made.id, ep.MoveIn(person="Sam Lee"), user, db)
+            plain = await ep.check_in(made.id, ep.MoveIn(), user, db)
+            assert (plain.person, plain.site) == ("Sam Lee", "Live Oak Office"), "a check-in that answers neither question changes neither"
+    finally:
+        await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])
+
+
+async def test_many_items_are_checked_out_or_in_at_once_and_the_ones_that_cannot_be_are_named_with_the_reason():
+    engine, user, w = await world()
+    try:
+        async with AsyncSession(engine) as db:
+            a = await ep.create_item(item(name="A1", serial="S-A1"), user, db)
+            b = await ep.create_item(item(name="B1", serial="S-B1", client_id=w.birch), user, db)
+            c = await ep.create_item(item(name="C1", serial="S-C1"), user, db)
+            await ep.check_out(c.id, ep.MoveIn(person="Already Out"), user, db)
+            ticket = "https://liveoakit.halopsa.com/tickets?id=7"
+            out = await ep.bulk_move(
+                ep.BulkMoveIn(
+                    ids=[a.id, b.id, c.id, uuid.uuid4()],
+                    to="checked_out",
+                    person="Pat Jones",
+                    site="Client office",
+                    ticket_url=ticket,
+                    note="new hires",
+                ),
+                user,
+                db,
+            )
+            assert (out.moved, out.not_found) == (2, 1)
+            assert [(s.name, s.reason) for s in out.skipped] == [("C1", "it is already checked out")]
+            rows = {i.name: i for i in (await ls(user, db)).items}
+            assert (rows["A1"].status, rows["A1"].person, rows["A1"].site, rows["A1"].ticket_url) == (
+                "checked_out",
+                "Pat Jones",
+                "Client office",
+                ticket,
+            )
+            assert rows["B1"].status == "checked_out" and rows["B1"].client_id == w.birch, "an item of a client is moved under that client"
+            assert rows["C1"].person == "Already Out", "an item that was skipped is untouched"
+            history = await ep.item_events(a.id, user, db)
+            assert (history[0].event, history[0].person, history[0].note) == ("checked_out", "Pat Jones", "new hires")
+            back = await ep.bulk_move(ep.BulkMoveIn(ids=[a.id, b.id, c.id], to="checked_in", site="Live Oak Office"), user, db)
+            assert (back.moved, back.skipped, back.not_found) == (3, [], 0)
+            rows = {i.name: i for i in (await ls(user, db)).items}
+            assert {r.status for r in rows.values()} == {"checked_in"} and {r.site for r in rows.values()} == {"Live Oak Office"}
+            assert rows["A1"].person == "Pat Jones", "who had it stays on the item when the check-in does not say"
+            again = await ep.bulk_move(ep.BulkMoveIn(ids=[a.id], to="checked_in"), user, db)
+            assert (again.moved, [s.reason for s in again.skipped]) == (0, ["it is already checked in"])
+    finally:
+        await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])
+
+
+async def test_many_items_are_deleted_at_once_only_after_a_yes_and_never_one_that_is_out_synced_or_someone_elses():
+    engine, user, w = await world()
+    stranger = SimpleNamespace(tenant_id=w.stranger, user_id=None, email="x@other.example")
+    try:
+        async with AsyncSession(engine) as db:
+            a = await ep.create_item(item(name="A1", serial="S-A1"), user, db)
+            b = await ep.create_item(item(name="B1", serial="S-B1", client_id=w.birch), user, db)
+            c = await ep.create_item(item(name="C1", serial="S-C1"), user, db)
+            await ep.check_out(c.id, ep.MoveIn(person="Pat"), user, db)
+            theirs = await ep.create_item(item(name="T1", serial="S-T1"), stranger, db)
+            with pytest.raises(HTTPException) as unsure:
+                await ep.bulk_delete(ep.BulkDeleteIn(ids=[a.id]), user, db)
+            assert unsure.value.status_code == 422
+            assert (await ls(user, db)).total == 3, "nothing is deleted without the yes"
+            out = await ep.bulk_delete(ep.BulkDeleteIn(ids=[a.id, b.id, c.id, theirs.id], confirm=True), user, db)
+            assert (out.deleted, out.not_found) == (2, 1), "another organization's item is simply not found"
+            assert [(r.name, r.reason) for r in out.refused] == [("C1", "This item is checked out. Check it in first, then delete it.")]
+            assert [i.name for i in (await ls(user, db)).items] == ["C1"]
+            assert [i.name for i in (await ls(stranger, db)).items] == ["T1"]
+            logged = (
+                await db.execute(
+                    text("select count(*) from audit_log where tenant_id = :t and action = 'inventory:item_deleted'"), {"t": w.owner}
+                )
+            ).scalar_one()
+            assert logged == 2, "each deletion is written to the audit log"
+    finally:
+        await cleanup(engine, [w.owner, w.acme, w.birch, w.stranger, w.stranger_client])

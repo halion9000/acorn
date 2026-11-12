@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), checkOut: vi.fn(), checkIn: vi.fn(), events: vi.fn(), import: vi.fn(), exportCsv: vi.fn(), bulk: vi.fn(), syncDevices: vi.fn(), syncNucs: vi.fn() }));
+const api = vi.hoisted(() => ({ list: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), checkOut: vi.fn(), checkIn: vi.fn(), events: vi.fn(), import: vi.fn(), exportCsv: vi.fn(), bulk: vi.fn(), bulkMove: vi.fn(), bulkRemove: vi.fn(), syncDevices: vi.fn(), syncNucs: vi.fn() }));
 const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), inventoryApi: api, msspApi: mssp }));
 
@@ -433,5 +433,86 @@ describe('items out a long time', () => {
     expect(await screen.findByTestId('long-out-long')).toHaveTextContent('Out 45 days');
     expect(screen.queryByTestId('long-out-short')).toBeNull();
     expect(screen.queryByTestId('long-out-in')).toBeNull();
+  });
+});
+
+describe('InventoryView: check-in asks what check-out asks', () => {
+  it('asks who has it and the site on a check-in too, starts the name empty, and sends what was typed', async () => {
+    api.list.mockResolvedValue(list([item({ status: 'checked_out', person: 'Pat', site: "Pat's home" })]));
+    api.checkIn.mockResolvedValue(item());
+    view();
+    await userEvent.click(await screen.findByRole('button', { name: 'Check in' }));
+    const dialog = within(screen.getByRole('dialog'));
+    expect(dialog.getByLabelText('Who has it')).toHaveValue('');
+    expect(dialog.getByLabelText('Site')).toHaveValue("Pat's home");
+    await userEvent.type(dialog.getByLabelText('Who has it'), 'IT storeroom');
+    await userEvent.clear(dialog.getByLabelText('Site'));
+    await userEvent.type(dialog.getByLabelText('Site'), 'Live Oak Office');
+    await userEvent.type(dialog.getByLabelText('Note'), 'wiped');
+    await userEvent.click(dialog.getByRole('button', { name: 'Check in' }));
+    await waitFor(() => expect(api.checkIn).toHaveBeenCalledWith('i1', { person: 'IT storeroom', site: 'Live Oak Office', ticket_url: undefined, note: 'wiped' }));
+  });
+});
+
+describe('InventoryView: many at once', () => {
+  const two = () => list([item({ id: 'a', name: 'A1' }), item({ id: 'b', name: 'B1', status: 'checked_out', person: 'Pat' })]);
+  const pickBoth = async () => {
+    await userEvent.click(await screen.findByLabelText('Select A1'));
+    await userEvent.click(screen.getByLabelText('Select B1'));
+  };
+
+  it('checks the selected items out with one set of answers, and lists the ones left alone with the reason', async () => {
+    api.list.mockResolvedValue(two());
+    api.bulkMove.mockResolvedValue({ moved: 1, skipped: [{ id: 'b', name: 'B1', reason: 'it is already checked out' }], not_found: 0 });
+    view();
+    await pickBoth();
+    await userEvent.click(within(screen.getByTestId('bulk-bar')).getByRole('button', { name: 'Check out selected' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Check out 2 items' }));
+    await userEvent.type(dialog.getByLabelText('Who has it'), 'Pat Jones');
+    await userEvent.type(dialog.getByLabelText('Site'), 'Client office');
+    await userEvent.click(dialog.getByRole('button', { name: 'Check out' }));
+    await waitFor(() => expect(api.bulkMove).toHaveBeenCalledWith({ ids: ['a', 'b'], to: 'checked_out', person: 'Pat Jones', site: 'Client office', ticket_url: undefined, note: undefined }));
+    expect(await screen.findByTestId('bulk-left-alone')).toHaveTextContent('1 checked out. 1 left as it was:B1: it is already checked out');
+    expect(screen.getByTestId('bulk-bar')).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'Close' }).at(-1)!);
+    await waitFor(() => expect(screen.queryByTestId('bulk-bar')).toBeNull());
+  });
+
+  it('checks the selected items in, and closes at once when every one was moved', async () => {
+    api.list.mockResolvedValue(two());
+    api.bulkMove.mockResolvedValue({ moved: 2, skipped: [], not_found: 0 });
+    view();
+    await pickBoth();
+    await userEvent.click(screen.getByRole('button', { name: 'Check in selected' }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Check in 2 items' })).getByRole('button', { name: 'Check in' }));
+    await waitFor(() => expect(api.bulkMove).toHaveBeenCalledWith({ ids: ['a', 'b'], to: 'checked_in', person: undefined, site: undefined, ticket_url: undefined, note: undefined }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByTestId('bulk-bar')).toBeNull();
+  });
+
+  it('deletes the selected items only after a yes, and says which were kept and why', async () => {
+    api.list.mockResolvedValue(two());
+    api.bulkRemove.mockResolvedValue({ deleted: 1, refused: [{ id: 'b', name: 'B1', reason: 'This item is checked out. Check it in first, then delete it.' }], not_found: 0 });
+    view();
+    await pickBoth();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
+    expect(screen.getByText('Delete 2 items?')).toBeInTheDocument();
+    expect(api.bulkRemove).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(api.bulkRemove).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete 2' }));
+    await waitFor(() => expect(api.bulkRemove).toHaveBeenCalledWith(['a', 'b']));
+    expect(await screen.findByTestId('bulk-left-alone')).toHaveTextContent('1 deleted. 1 kept:B1: This item is checked out.');
+  });
+
+  it('shows the reason when the server refuses the whole deletion', async () => {
+    api.list.mockResolvedValue(two());
+    api.bulkRemove.mockRejectedValue(new ApiError('403', 403, JSON.stringify({ detail: 'You do not have permission to delete inventory.' })));
+    view();
+    await pickBoth();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete 2' }));
+    expect(await screen.findByText('You do not have permission to delete inventory.')).toBeInTheDocument();
   });
 });

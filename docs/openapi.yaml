@@ -14876,6 +14876,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inventory/bulk-delete:
+    post:
+      tags:
+      - inventory
+      summary: Delete many items from the stock for good (their history goes with
+        them)
+      description: 'The same as deleting each one: an item that is checked out or
+        kept in step with a tool is left and named with the reason, the rest are removed,
+        and each removal is written to the audit log.'
+      operationId: bulk_delete_api_v1_inventory_bulk_delete_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkDeleteIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkDeleteOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/inventory/bulk:
     post:
       tags:
@@ -14896,6 +14927,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BulkOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/inventory/bulk-move:
+    post:
+      tags:
+      - inventory
+      summary: Check many items out or in at once, with the same answers for all of
+        them
+      description: An item that cannot be moved that way (already out, already in,
+        retired) is left as it is and named with the reason; the rest are moved, each
+        with its own history line.
+      operationId: bulk_move_api_v1_inventory_bulk_move_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkMoveIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkMoveOut'
         '422':
           description: Validation Error
           content:
@@ -29011,6 +29073,44 @@ components:
       - too_late
       - not_found
       title: BulkCloseUndoResponse
+    BulkDeleteIn:
+      properties:
+        ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 500
+          minItems: 1
+          title: Ids
+        confirm:
+          type: boolean
+          title: Confirm
+          description: True only when the person pressed Delete in the confirmation
+            window.
+          default: false
+      type: object
+      required:
+      - ids
+      title: BulkDeleteIn
+    BulkDeleteOut:
+      properties:
+        deleted:
+          type: integer
+          title: Deleted
+        refused:
+          items:
+            $ref: '#/components/schemas/BulkRefused'
+          type: array
+          title: Refused
+        not_found:
+          type: integer
+          title: Not Found
+          default: 0
+      type: object
+      required:
+      - deleted
+      title: BulkDeleteOut
     BulkError:
       properties:
         ioc:
@@ -29070,6 +29170,70 @@ components:
       title: BulkIn
       description: 'The same change for many items: move them to a client (or to Live
         Oak''s own), and/or set a category or site, and/or add tags.'
+    BulkMoveIn:
+      properties:
+        person:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Person
+        site:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Site
+        ticket_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+            pattern: ^https?://
+          - type: 'null'
+          title: Ticket Url
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Note
+        ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 500
+          minItems: 1
+          title: Ids
+        to:
+          type: string
+          enum:
+          - checked_out
+          - checked_in
+          title: To
+      type: object
+      required:
+      - ids
+      - to
+      title: BulkMoveIn
+    BulkMoveOut:
+      properties:
+        moved:
+          type: integer
+          title: Moved
+        skipped:
+          items:
+            $ref: '#/components/schemas/BulkRefused'
+          type: array
+          title: Skipped
+        not_found:
+          type: integer
+          title: Not Found
+          default: 0
+      type: object
+      required:
+      - moved
+      title: BulkMoveOut
     BulkOut:
       properties:
         changed:
@@ -29087,6 +29251,24 @@ components:
       - unchanged
       - not_found
       title: BulkOut
+    BulkRefused:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        reason:
+          type: string
+          title: Reason
+      type: object
+      required:
+      - id
+      - name
+      - reason
+      title: BulkRefused
     BulkRequest:
       properties:
         iocs:

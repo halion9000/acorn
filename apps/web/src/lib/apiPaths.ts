@@ -1,5 +1,5 @@
 /**
- * Which API paths the web application calls, and whether each one exists. A path typed wrong does not fail anything: the page shows an empty list. This compares every "/api/v1/..." the
+ * Which API paths the web application calls, and whether each one exists. A path typed wrong does not fail anything: the page shows an empty list. This compares every path under /api/v1 the
  * source writes with the paths in docs/openapi.yaml, and with the paths next.config sends to another service (those are not in the API's description). Pure, so it is tested without a disk.
  */
 
@@ -26,7 +26,7 @@ export function normalisePath(raw: string): string | null {
   return out;
 }
 
-/** Every "/api/v1/..." a source text writes in quotes or a template, normalised, in order, each once. */
+/** Every path under /api/v1 that a source text writes in quotes or a template, normalised, in order, each once. */
 export function calledApiPaths(text: string): string[] {
   const out = new Set<string>();
   for (const m of text.matchAll(/(['"`])(\/api\/v1\/(?:\$\{(?:[^{}]|\{[^{}]*\})*\}|(?!\1)[^\n\\])*)\1/g)) {
