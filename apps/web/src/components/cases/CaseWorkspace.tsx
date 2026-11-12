@@ -26,7 +26,8 @@ import useSWR from 'swr';
 import { clsx } from 'clsx';
 import { safeDistance, safeFormat } from '@/lib/safe-date';
 import toast from 'react-hot-toast';
-import { caseTicketNote } from './ticketNote';
+import { caseTicketNote, loadNoteAlerts } from './ticketNote';
+import { alertsApi } from '@/lib/api';
 import {
   apiErrorDetail,
   casesApi,
@@ -655,7 +656,11 @@ export function CaseWorkspace({ caseId }: { caseId: string }) {
               type="button"
               onClick={() => {
                 if (!caseRecord) return;
-                navigator.clipboard.writeText(caseTicketNote(caseRecord)).then(
+                // The first few alerts are read so the note can name them; if that fails the note is still copied, with the count alone.
+                void loadNoteAlerts(caseRecord.alertIds, alertsApi.get)
+                  .catch(() => [])
+                  .then((named) => navigator.clipboard.writeText(caseTicketNote(caseRecord, named)))
+                  .then(
                   () => toast.success('Copied. Paste it into the ticket.'),
                   () => toast.error('The browser would not copy it. Use Summary instead.'),
                 );
