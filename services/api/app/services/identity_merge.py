@@ -6,7 +6,9 @@ an address a tool reports only as a display name. This module finds those pairs 
 Automatic rules, all inside ONE client (a person at another client is never joined) and none for a shared mailbox:
 
 * ``display_name``: a person's display name is itself another address, on the SAME domain, that exists for the client, and that address is the display name of no one else (a tool that names the account by its
-  primary address). A name shared by several accounts, or an address on another domain, joins nothing.
+  primary address). A name shared by several accounts, or an address on another domain, joins nothing, with one exception: the client's ``.onmicrosoft.com`` address named by the real address with
+  the SAME name before the ``@`` (``julio@acme.onmicrosoft.com`` named "julio@acme.com"). The directory itself says whose account it is, so this pair is joined even when each address counts a licence
+  (one human seen by two directories) and whoever else shares the name before the ``@``.
 * ``guest``: ``name_domain.com#EXT#@client.onmicrosoft.com`` is how Microsoft writes the guest sign-in name of ``name@domain.com``; when that address exists, they are one person.
 * ``hash``: a 32-character hexadecimal prefix on an ``.onmicrosoft.com`` address is a system prefix on the same address without it.
 * ``same_person``: two accounts of the client with the SAME display name (two or more words, a tag such as "@ PPP" ignored) AND the same name before the ``@`` on different domains, and nobody else
@@ -75,6 +77,8 @@ class Link:
     a: str  # person key
     b: str
     reason: str
+    # The tool itself names one address by the other across the client's Microsoft and real domains: joined even when both count a licence.
+    named: bool = False
 
 
 def find_links(people: dict[str, Any]) -> list[Link]:
@@ -87,16 +91,19 @@ def find_links(people: dict[str, Any]) -> list[Link]:
         if "@" in n:
             named_by[(p.tenant_id, n)] = named_by.get((p.tenant_id, n), 0) + 1
 
-    def link(p: Any, q: Any, reason: str) -> None:
+    def link(p: Any, q: Any, reason: str, named: bool = False) -> None:
         if q is None or q is p or p.kind == "shared" or q.kind == "shared":
             return
-        links.append(Link(p.key, q.key, reason))
+        links.append(Link(p.key, q.key, reason, named))
 
     for p in people.values():
         t, e = p.tenant_id, p.email
         name = (p.display_name or "").strip().lower()
-        if "@" in name and name != e and name.partition("@")[2] == e.partition("@")[2] and named_by.get((t, name)) == 1:
-            link(p, by_addr.get((t, name)), "display_name")
+        if "@" in name and name != e and named_by.get((t, name)) == 1:
+            # The Microsoft address and the real one, the same name before the @: one account under its two names.
+            microsoft_pair = name.partition("@")[0] == e.partition("@")[0] and is_onmicrosoft(name) != is_onmicrosoft(e)
+            if microsoft_pair or name.partition("@")[2] == e.partition("@")[2]:
+                link(p, by_addr.get((t, name)), "display_name", named=microsoft_pair)
         m = _EXT.match(e)
         if m:
             link(p, by_addr.get((t, f"{m.group(1)}@{m.group(2)}")), "guest")
@@ -225,12 +232,14 @@ def merge_people(
     licensed = {k: (1 if people[k].licensed is True and not echo_only(people[k]) else 0) for k in people}
     size = {k: 1 for k in people}
 
-    def union(a: str, b: str, reason: str, respect_blocked: bool) -> None:
+    def union(a: str, b: str, reason: str, respect_blocked: bool, named: bool = False) -> None:
         ra, rb = find(a), find(b)
         if ra == rb:
             return
         if respect_blocked and (
-            any({find(x), find(y)} == {ra, rb} for x, y in blocked) or licensed[ra] + licensed[rb] > 1 or size[ra] + size[rb] > MAX_GROUP
+            any({find(x), find(y)} == {ra, rb} for x, y in blocked)
+            or (licensed[ra] + licensed[rb] > 1 and not named)
+            or size[ra] + size[rb] > MAX_GROUP
         ):
             return
         parent[ra] = rb
@@ -244,7 +253,7 @@ def merge_people(
         if ka and kb:
             union(ka, kb, "manual", False)
     for lk in find_links(people):
-        union(lk.a, lk.b, lk.reason, True)
+        union(lk.a, lk.b, lk.reason, True, lk.named)
 
     groups: dict[str, list[Any]] = {}
     for k, p in people.items():

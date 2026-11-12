@@ -525,3 +525,67 @@ def test_two_accounts_cipp_lists_that_both_hold_a_licence_are_never_joined_by_a_
         ]
     )
     assert len(people) == 2
+
+
+# ---- an account named by its real address, held under the client's Microsoft address ------------------------------------------------------------------------
+
+
+def _julio(**over):
+    """What two directories hold for one human: the real address with his name, and the Microsoft address whose name IS the real address."""
+    return [
+        src(
+            A,
+            "threatmate",
+            "julio@goliveoak.com",
+            display_name="Julio Rivera",
+            details={"directory": "google", "licensed": True, "mfa_enrolled": True},
+        ),
+        src(
+            A,
+            "threatmate",
+            "julio@goliveoak.onmicrosoft.com",
+            display_name="julio@goliveoak.com",
+            details={"directory": "microsoft", "mfa_enrolled": True, **over},
+        ),
+    ]
+
+
+def test_a_microsoft_address_named_by_the_real_address_is_that_person_even_when_other_addresses_share_the_name_before_the_at():
+    # A third address with the same name before the @ stops the plain "same name on the Microsoft address" rule; the name naming the real address still joins the two.
+    people = build(sources=[*_julio(), src(A, "halopsa", "julio@liveoakit.com", display_name="J. R.")])
+    p = one(people, "julio@goliveoak.com")
+    assert set(p.addresses) == {"julio@goliveoak.com", "julio@goliveoak.onmicrosoft.com"}
+    assert p.display_name == "Julio Rivera"
+    assert p.alias_reasons == {"julio@goliveoak.onmicrosoft.com": "its name is this address"}
+    assert len(people) == 2
+
+
+def test_it_is_joined_even_when_both_directories_count_a_licence_for_it():
+    people = build(sources=_julio(licensed=True))
+    assert len(people) == 1
+    assert set(people[0].addresses) == {"julio@goliveoak.com", "julio@goliveoak.onmicrosoft.com"}
+
+
+def test_a_name_that_is_an_address_on_another_domain_with_a_different_name_before_the_at_joins_nothing():
+    people = build(
+        sources=[
+            src(A, "threatmate", "julio@goliveoak.com", display_name="Julio Rivera", details={"directory": "google"}),
+            src(
+                A, "threatmate", "jrivera@goliveoak.onmicrosoft.com", display_name="julio@goliveoak.com", details={"directory": "microsoft"}
+            ),
+            src(A, "threatmate", "julio@partner.com", display_name="julio@goliveoak.com", details={"directory": "google"}),
+        ]
+    )
+    assert len(people) == 3
+
+
+def test_two_licensed_accounts_on_the_same_domain_stay_two_even_when_one_is_named_by_the_other():
+    people = build(
+        [ms(A, "bmoore@grcooling.com", display_name="brandon@grcooling.com"), ms(A, "brandon@grcooling.com", display_name="Brandon Moore")]
+    )
+    assert len(people) == 2
+
+
+def test_not_the_same_person_still_wins_over_the_name():
+    people = build(sources=_julio(), separate=[(A, "julio@goliveoak.com", "julio@goliveoak.onmicrosoft.com")])
+    assert len(people) == 2
