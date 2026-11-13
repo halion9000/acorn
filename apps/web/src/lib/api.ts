@@ -865,7 +865,7 @@ export interface IdentityDuplicate {
 }
 
 export interface IdentityList {
-  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; cloud_not_in_halo?: number; halo_inactive_cloud_enabled?: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; active?: number; failed_signins_24h?: number; brute_force?: number; password_never_expires?: number; password_policy_known?: number; inactive_90?: number; never_signed_in?: number; signin_state_known?: number };
+  summary: { total: number; with_alerts: number; without_mfa: number; admins: number; disabled: number; in_one_tool: number; cloud_not_in_halo?: number; halo_inactive_cloud_enabled?: number; tools: Record<string, number>; alert_sources?: Record<string, number>; backup_problems?: number; exposed?: number; exposed_serious?: number; guests?: number; active?: number; failed_signins_24h?: number; brute_force?: number; locked_out?: number; password_never_expires?: number; password_policy_known?: number; inactive_90?: number; never_signed_in?: number; signin_state_known?: number };
   items: IdentityPerson[];
   total: number;
   page: number;
@@ -899,7 +899,7 @@ export interface IdentityQuery {
   haloCheck?: 'cloud_not_in_halo' | 'halo_inactive_cloud_enabled';
   alertSource?: string;
   backup?: string;
-  /** failed: a failed sign-in in the last 24 hours; brute_force: ten or more. */
+  /** failed: a failed sign-in in the last 24 hours; brute_force: ten or more; locked_out: refused as locked out and not signed in since. */
   signin?: string;
   /** Only working accounts whose password is set never to expire. */
   passwordNeverExpires?: boolean;

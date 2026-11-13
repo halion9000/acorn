@@ -595,6 +595,32 @@ describe('the extra identity tiles', () => {
     await waitFor(() => expect(screen.getByTestId('failed-signins')).toHaveAttribute('aria-pressed', 'true')); // the menu and the tile are one setting
   });
 
+  it('the locked out tile counts the people refused as locked out, lists them when pressed, and shares its setting with the Sign-ins menu', async () => {
+    api.list.mockResolvedValue(list([person()], { summary: { total: 5, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {}, failed_signins_24h: 42, brute_force: 2, locked_out: 3 } }));
+    show();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByTestId('locked-out')).toHaveTextContent('3'));
+    expect(screen.getByTestId('locked-out').querySelector('div:last-child')).toHaveClass('text-red-300');
+    await user.click(screen.getByTestId('locked-out'));
+    await waitFor(() => expect(lastQuery()).toEqual(expect.objectContaining({ signin: 'locked_out', page: 1 })));
+    expect(screen.getByTestId('locked-out')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('brute-force')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('combobox', { name: 'Sign-ins' })).toHaveValue('locked_out');
+    await user.click(screen.getByTestId('locked-out'));
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Sign-ins' })).toHaveValue(''));
+  });
+
+  it('the locked out tile shows a dash when the count is not there, and a zero in the plain colour', async () => {
+    api.list.mockResolvedValue(list([person()], { summary: { total: 1, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {} } }));
+    const first = show();
+    expect(await screen.findByTestId('locked-out')).toHaveTextContent('—');
+    first.unmount();
+    api.list.mockResolvedValue(list([person()], { summary: { total: 1, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {}, locked_out: 0 } }));
+    show();
+    await waitFor(() => expect(screen.getByTestId('locked-out')).toHaveTextContent('0'));
+    expect(screen.getByTestId('locked-out').querySelector('div:last-child')).not.toHaveClass('text-red-300');
+  });
+
   it('the password-never-expires tile shows the count and how many are unknown, lists those people when pressed, and shows a dash when nobody could be checked', async () => {
     api.list.mockResolvedValue(list([person()], { summary: { total: 10, with_alerts: 0, without_mfa: 0, admins: 0, disabled: 0, in_one_tool: 0, tools: {}, password_never_expires: 3, password_policy_known: 8 } }));
     const { unmount } = show();

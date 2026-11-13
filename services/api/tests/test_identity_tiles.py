@@ -162,3 +162,38 @@ def test_a_disabled_account_is_not_counted_or_listed_as_missing_multi_factor_or_
     s = ep.summarize(people)
     assert (s.backup_problems, s.without_mfa) == (1, 1)  # the tiles and the lists agree
     assert [p.email for p in ip.filter_people(people, disabled=True)] == ["off@acme.com"]  # a disabled account is still found as disabled
+
+
+def test_the_locked_out_list_holds_people_refused_as_locked_out_and_not_signed_in_since():
+    async def body(s):
+        other = uuid.uuid4()
+        s.add_all([Tenant(id=A, name="Acme", slug="acme"), Tenant(id=other, name="Other", slug="other")])
+        await s.flush()
+        s.add_all(
+            [
+                event(A, "Locked@Acme.com", False, minutes_ago=40, code=ep.LOCKED_OUT_ERROR) for _ in range(3)
+            ]  # refused as locked out, matched ignoring case
+            + [
+                event(A, "back@acme.com", False, minutes_ago=90, code=ep.LOCKED_OUT_ERROR),
+                event(A, "back@acme.com", True, minutes_ago=10),
+            ]  # signed in after: no longer locked out
+            + [
+                event(A, "stillout@acme.com", True, minutes_ago=200),
+                event(A, "stillout@acme.com", False, minutes_ago=20, code=ep.LOCKED_OUT_ERROR),
+            ]  # the success was BEFORE the refusal
+            + [event(A, "wrong@acme.com", False, code=50126) for _ in range(12)]  # many wrong passwords but never refused as locked out
+            + [event(A, "old@acme.com", False, minutes_ago=60 * 25, code=ep.LOCKED_OUT_ERROR)]  # older than a day
+            + [event(other, "x@other.com", False, code=ep.LOCKED_OUT_ERROR)]  # outside the scope
+        )
+        await s.commit()
+        now = datetime.now(UTC)
+        return (
+            await ep.locked_out_people(s, [A], now),
+            await ep.signin_filter_people(s, [A], now, "locked_out"),
+            await ep.signin_filter_people(s, [A], now, "brute_force"),
+        )
+
+    locked, filtered, brute = run(body)
+    assert locked == {(A, "locked@acme.com"), (A, "stillout@acme.com")}
+    assert filtered == locked
+    assert brute == {(A, "wrong@acme.com")}  # the other two values still mean what they did

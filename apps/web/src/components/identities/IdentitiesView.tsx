@@ -316,7 +316,7 @@ export function IdentitiesView() {
   const [mfa, setMfa] = useState('');
   const [backup, setBackup] = useState('');
   // Only people with a failed sign-in in the last 24 hours ('failed') or ten or more ('brute_force'): what the two sign-in tiles count.
-  const [signin, setSignin] = useState<'' | 'failed' | 'brute_force'>('');
+  const [signin, setSignin] = useState<'' | 'failed' | 'brute_force' | 'locked_out'>('');
   // Only working accounts whose password is set never to expire (the tile's list).
   const [pwNever, setPwNever] = useState(false);
   // Working accounts with no sign-in for 90+ days ('inactive') or none on record ('never'): what the two sign-in-state tiles count.
@@ -440,6 +440,17 @@ export function IdentitiesView() {
         </button>
         <button
           type="button"
+          data-testid="locked-out"
+          aria-pressed={signin === 'locked_out'}
+          onClick={() => reset(() => setSignin(signin === 'locked_out' ? '' : 'locked_out'))}
+          title="People Microsoft refused in the last 24 hours because their account is locked out (too many wrong passwords), who have not signed in since. Press to list them."
+          className={`rounded-lg border p-3 text-left ${signin === 'locked_out' ? 'border-blue-500 bg-blue-500/10' : 'border-gray-800 bg-gray-900/60'}`}
+        >
+          <div className="text-xs text-gray-400">Locked out</div>
+          <div className={`text-2xl font-semibold ${summary?.locked_out ? 'text-red-300' : 'text-gray-100'}`}>{summary?.locked_out ?? '—'}</div>
+        </button>
+        <button
+          type="button"
           data-testid="password-never-expires"
           aria-pressed={pwNever}
           onClick={() => reset(() => setPwNever((v) => !v))}
@@ -513,10 +524,11 @@ export function IdentitiesView() {
           <option value="problem">Backup problem</option>
           <option value="none">No backup tool knows them</option>
         </select>
-        <select aria-label="Sign-ins" value={signin} onChange={(e) => reset(() => setSignin(e.target.value as '' | 'failed' | 'brute_force'))} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white">
+        <select aria-label="Sign-ins" value={signin} onChange={(e) => reset(() => setSignin(e.target.value as '' | 'failed' | 'brute_force' | 'locked_out'))} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white">
           <option value="">Any sign-in history</option>
           <option value="failed">Failed sign-ins (24 h)</option>
           <option value="brute_force">Possible brute force</option>
+          <option value="locked_out">Locked out</option>
         </select>
         <select aria-label="Multi-Factor" value={mfa} onChange={(e) => reset(() => setMfa(e.target.value))} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white">
           <option value="">Any Multi-Factor</option>

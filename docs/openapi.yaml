@@ -13618,13 +13618,15 @@ paths:
         schema:
           anyOf:
           - type: string
-            pattern: ^(failed|brute_force)$
+            pattern: ^(failed|brute_force|locked_out)$
           - type: 'null'
           description: 'failed: at least one failed sign-in in the last 24 hours;
-            brute_force: ten or more (the two tiles'' lists).'
+            brute_force: ten or more; locked_out: refused as locked out and not signed
+            in since (the three tiles'' lists).'
           title: Signin
         description: 'failed: at least one failed sign-in in the last 24 hours; brute_force:
-          ten or more (the two tiles'' lists).'
+          ten or more; locked_out: refused as locked out and not signed in since (the
+          three tiles'' lists).'
       - name: sort
         in: query
         required: false
@@ -13795,7 +13797,7 @@ paths:
         schema:
           anyOf:
           - type: string
-            pattern: ^(failed|brute_force)$
+            pattern: ^(failed|brute_force|locked_out)$
           - type: 'null'
           title: Signin
       - name: password_never_expires
@@ -55472,6 +55474,10 @@ components:
         brute_force:
           type: integer
           title: Brute Force
+          default: 0
+        locked_out:
+          type: integer
+          title: Locked Out
           default: 0
         password_never_expires:
           type: integer

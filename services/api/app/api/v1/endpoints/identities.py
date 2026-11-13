@@ -151,6 +151,8 @@ class IdentitySummary(BaseModel):
     # Failed password sign-ins in the last 24 hours across the people in scope, and the people with BRUTE_FORCE_FAILURES or more of them. Steps that only ask for more proof (MFA prompts) are not failures.
     failed_signins_24h: int = 0
     brute_force: int = 0
+    # People Microsoft turned away in the last 24 hours because the account is locked out (error 50053: too many wrong passwords, so it refuses even the right one).
+    locked_out: int = 0
     # Working accounts whose password is set never to expire, and how many accounts CIPP could say it for (the rest are unknown, not "expires").
     password_never_expires: int = 0
     password_policy_known: int = 0
@@ -252,6 +254,39 @@ async def failing_people(db: Any, scope: Any, now: datetime, minimum: int) -> se
         key = (tenant, str(principal or "").lower())
         counts[key] = counts.get(key, 0) + int(n)
     return {k for k, n in counts.items() if n >= minimum}
+
+
+# Microsoft's error for an account locked out by too many wrong passwords ("smart lockout"). Every sign-in it refuses after that carries it, even with the right password.
+LOCKED_OUT_ERROR = 50053
+
+
+async def locked_out_people(db: Any, scope: Any, now: datetime) -> set[tuple[uuid.UUID, str]]:
+    """The (client, address) of each person with a sign-in refused as locked out in the last 24 hours. A person who signed in successfully AFTER the last refusal is no longer locked out and is left out."""
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(
+                    SigninEvent.tenant_id,
+                    SigninEvent.user_principal,
+                    func.max(SigninEvent.occurred_at).filter(SigninEvent.error_code == LOCKED_OUT_ERROR),
+                    func.max(SigninEvent.occurred_at).filter(SigninEvent.success.is_(True)),
+                )
+                .where(SigninEvent.tenant_id.in_(scope), SigninEvent.occurred_at >= now - timedelta(hours=24))
+                .group_by(SigninEvent.tenant_id, SigninEvent.user_principal)
+            )
+        ).all()
+    out: set[tuple[uuid.UUID, str]] = set()
+    for tenant, principal, locked_at, ok_at in rows:
+        if locked_at is not None and (ok_at is None or ok_at < locked_at):
+            out.add((tenant, str(principal or "").lower()))
+    return out
+
+
+async def signin_filter_people(db: Any, scope: Any, now: datetime, which: str) -> set[tuple[uuid.UUID, str]]:
+    """The people a sign-in tile or filter value stands for: failed, brute_force or locked_out."""
+    if which == "locked_out":
+        return await locked_out_people(db, scope, now)
+    return await failing_people(db, scope, now, 1 if which == "failed" else BRUTE_FORCE_FAILURES)
 
 
 async def owner_decisions(db: Any, scope: Any) -> tuple[list[tuple[uuid.UUID, str, str]], list[tuple[uuid.UUID, str, str]]]:
@@ -378,8 +413,8 @@ async def list_identities(
     ),
     signin: str | None = Query(
         default=None,
-        pattern="^(failed|brute_force)$",
-        description="failed: at least one failed sign-in in the last 24 hours; brute_force: ten or more (the two tiles' lists).",
+        pattern="^(failed|brute_force|locked_out)$",
+        description="failed: at least one failed sign-in in the last 24 hours; brute_force: ten or more; locked_out: refused as locked out and not signed in since (the three tiles' lists).",
     ),
     sort: str = Query(default="alerts"),
 ) -> IdentityList:
@@ -389,8 +424,9 @@ async def list_identities(
     people, _ = await _people(db, user.tenant_id, client_id)
     scope, _clients = await _scope(db, user.tenant_id, client_id)
     failed, brute = await signin_failures(db, scope, datetime.now(UTC))
+    locked = await locked_out_people(db, scope, datetime.now(UTC))
     if signin:
-        failing = await failing_people(db, scope, datetime.now(UTC), 1 if signin == "failed" else BRUTE_FORCE_FAILURES)
+        failing = await signin_filter_people(db, scope, datetime.now(UTC), signin)
         people_in_filter = [p for p in people if any((p.tenant_id, a.lower()) in failing for a in p.addresses)]
     else:
         people_in_filter = people
@@ -420,7 +456,13 @@ async def list_identities(
     start = (page - 1) * page_size
     items = [_out(p) for p in rows[start : start + page_size]]
     return IdentityList(
-        summary=summarize(people).model_copy(update={"failed_signins_24h": failed, "brute_force": brute}),
+        summary=summarize(people).model_copy(
+            update={
+                "failed_signins_24h": failed,
+                "brute_force": brute,
+                "locked_out": sum(1 for p in people if any((p.tenant_id, a.lower()) in locked for a in p.addresses)),
+            }
+        ),
         items=await with_bec_badges(db, await with_ticket_counts(db, items)),
         total=total,
         page=page,
@@ -481,7 +523,7 @@ async def export_identities(
     enabled: bool = Query(default=False, description="Only accounts that are not disabled."),
     active: bool = Query(default=False, description="Only active identities: a licensed account, not a guest, not disabled."),
     kind: str | None = Query(default=None, pattern="^(user|guest|shared|other)$"),
-    signin: str | None = Query(default=None, pattern="^(failed|brute_force)$"),
+    signin: str | None = Query(default=None, pattern="^(failed|brute_force|locked_out)$"),
     password_never_expires: bool = Query(default=False, description="Only working accounts whose password is set never to expire."),
     inactivity: str | None = Query(default=None, pattern="^(inactive|never)$"),
     sort: str = Query(default="alerts"),
@@ -491,7 +533,7 @@ async def export_identities(
     people, _ = await _people(db, user.tenant_id, client_id)
     if signin:
         scope, _clients = await _scope(db, user.tenant_id, client_id)
-        failing = await failing_people(db, scope, datetime.now(UTC), 1 if signin == "failed" else BRUTE_FORCE_FAILURES)
+        failing = await signin_filter_people(db, scope, datetime.now(UTC), signin)
         people = [p for p in people if any((p.tenant_id, a.lower()) in failing for a in p.addresses)]
     rows = sort_people(
         filter_people(
