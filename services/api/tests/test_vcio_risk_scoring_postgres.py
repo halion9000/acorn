@@ -276,9 +276,9 @@ async def test_the_integrations_answers_are_filled_in_scored_and_marked_and_a_ha
     }
     asked = []
 
-    async def fake_review(_db, _user, client_id):
+    async def fake_review(_db, _user, client_id, _platform="both"):
         asked.append(client_id)
-        return dict(found)
+        return dict(found), 268
 
     monkeypatch.setattr(ep, "review_answers", fake_review)
     try:
@@ -302,6 +302,14 @@ async def test_the_integrations_answers_are_filled_in_scored_and_marked_and_a_ha
             )
             changed = await ep.put_answers(made.id, answers(("TS-001", "Preferred", {"vendor": "Fortinet"})), user, db)
             assert changed.answers["TS-001"].source is None and changed.answers["TS-001"].evidence is None
+            # Opening the assessment again with nothing new to say writes nothing: nobody is recorded as having changed it.
+            before = (await ep.get_assessment(made.id, user, db)).updated_at
+            quiet = await ep.autofill_assessment(
+                made.id, SimpleNamespace(tenant_id=w.owner, user_id=None, email="someone.else@goliveoak.com"), db
+            )
+            assert (quiet.saved, quiet.filled, quiet.changed, quiet.cleared, quiet.shared_with_review) == (False, 0, 0, 0, 268)
+            after = await ep.get_assessment(made.id, user, db)
+            assert (after.updated_at, after.updated_by) == (before, "hal@goliveoak.com")
             del found["NET-002"]
             again = await ep.autofill_assessment(made.id, user, db)
             assert (again.filled, again.kept_by_hand, again.cleared) == (0, 2, 1)

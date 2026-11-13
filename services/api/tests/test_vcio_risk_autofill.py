@@ -130,3 +130,18 @@ def test_an_auto_answer_scores_like_any_other():
     out, _ = rs.apply_autofill({}, {"ADM-001": {"answer": "Yes", "evidence": "e"}})
     card = rs.scorecard({k: v["answer"] for k, v in out.items()})
     assert card["answered"] == 1 and card["overall"] == 1.0
+
+
+def test_the_questions_shared_with_client_review_are_counted_for_the_clients_platform():
+    assess_rows = [assess(q, "needs_person") for _s, _g, q in ASSESS_QUESTIONS]
+    m365_rows = [assess(q, "needs_person") for _g, q in m365_review.QUESTIONS]
+    tech_rows = [tech(k, "unknown") for k, _g, _q in tech_stack.QUESTIONS]
+    assert rs.shared_with_review(assess_rows, m365_rows, tech_rows) == 268
+    google = sum(
+        1
+        for q in rs.library()
+        if q["category"] == "Google Workspace" and rs._text_key(q["text"]) in {rs._text_key(x) for _s, _g, x in ASSESS_QUESTIONS}
+    )
+    assert rs.shared_with_review(assess_rows, m365_rows, tech_rows, platform="m365") == 268 - google
+    assert rs.shared_with_review(assess_rows, m365_rows, tech_rows, platform="google") == 268 - len(m365_review.QUESTIONS)
+    assert rs.shared_with_review([], [], []) == 0

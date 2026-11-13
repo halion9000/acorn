@@ -28906,6 +28906,14 @@ components:
         answered_by_integrations:
           type: integer
           title: Answered By Integrations
+        shared_with_review:
+          type: integer
+          title: Shared With Review
+          default: 0
+        saved:
+          type: boolean
+          title: Saved
+          default: false
       type: object
       required:
       - assessment

@@ -303,6 +303,17 @@ def answers_from_review(assess: list[Any], m365: list[Any], tech: list[Any]) -> 
     return out
 
 
+def shared_with_review(assess: list[Any], m365: list[Any], tech: list[Any], platform: str = "both") -> int:
+    """How many of the questions here are also a Client Review question for this client (and asked on its platform): the ones a reading there can answer here."""
+    by_text = questions_by_text()
+    ids = set()
+    for row in [*assess, *m365, *tech]:
+        q = by_text.get(_text_key(str(getattr(row, "question", "") or "")))
+        if q and not excluded(q, platform):
+            ids.add(q["id"])
+    return len(ids)
+
+
 def _evidence(row: Any) -> str:
     """What the review saw, and whether a person typed the reading in Client Review."""
     text = " ".join(str(getattr(row, "evidence", "") or "").split())

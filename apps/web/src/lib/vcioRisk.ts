@@ -102,6 +102,10 @@ export interface RiskAutofill {
   kept_by_hand: number;
   cleared: number;
   answered_by_integrations: number;
+  /** How many questions of this assessment are also a Client Review question: the most the integrations could ever answer here. */
+  shared_with_review?: number;
+  /** Whether anything was written (nothing is, when no answer moved). */
+  saved?: boolean;
 }
 
 export interface RiskAssessor {
@@ -227,14 +231,18 @@ export function assessorChoices(users: RiskAssessor[], current: string): string[
 }
 
 /** What a fill-in from the integrations did, in one sentence. */
-export function autofillSentence(r: Pick<RiskAutofill, 'filled' | 'changed' | 'kept_by_hand' | 'cleared' | 'answered_by_integrations'>): string {
-  if (r.answered_by_integrations === 0) return 'The integrations have no answer for this client yet: nothing was filled in.';
+export function autofillSentence(r: Pick<RiskAutofill, 'filled' | 'changed' | 'kept_by_hand' | 'cleared' | 'answered_by_integrations' | 'shared_with_review'>): string {
+  const shared = r.shared_with_review ? ` ${r.shared_with_review} of the questions here are also Client Review questions; it answers ${r.answered_by_integrations} of them for this client, and the rest need a person.` : '';
+  if (r.answered_by_integrations === 0) return `The integrations have no answer for this client yet: nothing was filled in.${shared}`;
   const parts = [`${r.filled} answer${r.filled === 1 ? '' : 's'} filled in from the integrations`];
   if (r.changed) parts.push(`${r.changed} updated`);
   if (r.kept_by_hand) parts.push(`${r.kept_by_hand} you set by hand left as ${r.kept_by_hand === 1 ? 'it is' : 'they are'}`);
   if (r.cleared) parts.push(`${r.cleared} taken out because the integrations no longer say`);
-  return `${parts.join(', ')}.`;
+  return `${parts.join(', ')}.${shared}`;
 }
+
+/** Whether a fill changed anything a person should be told about. */
+export const autofillMoved = (r: Pick<RiskAutofill, 'filled' | 'changed' | 'cleared'>): boolean => r.filled + r.changed + r.cleared > 0;
 
 /** Whether the client's platform makes a question moot (the other suite's questions). */
 export const excludedFor = (q: Pick<RiskQuestion, 'category'>, platform: RiskPlatform): boolean =>

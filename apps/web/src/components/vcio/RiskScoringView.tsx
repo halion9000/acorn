@@ -6,13 +6,14 @@
  * kept, so a client's reviews can be compared over time. Backed by the API's vcio-risk-scoring routes.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiErrorDetail, msspApi, type ChildTenant } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
   DIRECTION_CLASS,
   RATING_TEXT,
   assessorChoices,
+  autofillMoved,
   changeText,
   assessmentCsv,
   autofillSentence,
@@ -454,7 +455,7 @@ function Method() {
   const items: [string, string][] = [
     ['Risk weight', 'Each question has a severity set from impact × likelihood (the risk model in NIST SP 800-30): Critical = 10 points, High = 6, Medium = 3, Low = 1. A failed Critical item therefore moves the score ten times more than a failed Low item.'],
     ['Credit', 'The good answer earns 100% of the points, Partial 50%, the bad answer 0%. For questions where “Yes” is the risk (exposed RDP, end-of-life devices, users clicking phishing, local admin rights) the good answer is “No”. Unknown earns 0%: an unverified control is not an assured control, and it is counted separately so it can be chased. N/A and unanswered questions are removed from both points earned and points possible.'],
-    ['Answers from the integrations', 'Fill from integrations answers every question the client’s Client Review can answer (NinjaOne, Huntress, ThreatMate, Liongard, CIPP and the other connected tools): a reading of “met” becomes the good answer, “partly” becomes Partial and “not met” the bad answer; a Tech Stack product is Preferred when it is the standard vendor and Alternative when it is not. Each such answer is marked Auto and shows what the tool saw. An answer set by hand is never replaced, and an Auto answer the tools no longer support is taken out.'],
+    ['Answers from the integrations', 'Opening an assessment fills in, by itself, every question the client’s Client Review can answer (NinjaOne, Huntress, ThreatMate, Liongard, CIPP and the other connected tools): a reading of “met” becomes the good answer, “partly” becomes Partial and “not met” the bad answer; a Tech Stack product is Preferred when it is the standard vendor and Alternative when it is not. Each such answer is marked Auto and shows what the tool saw. An answer set by hand is never replaced, and an Auto answer the tools no longer support is taken out. Fill from integrations does the same on demand. 268 of the 330 questions are also Client Review questions; the tools can answer up to about 118 of them (tool checks, Microsoft 365 settings through CIPP, and the Tech Stack), and the rest need a person in either place.'],
     ['Tech Stack', 'Tech Stack is one category inside the Business Review (its own weight in Settings), with sections for network equipment, servers, security tools, cloud services and backup. Preferred vendor = 100%, Alternative (a capable, non-standard product) = 100% by default and counted as a standardisation opportunity, None = 0%.'],
     ['Roll-up', 'Section and category score = points earned ÷ points possible. If a category contains a failed or unknown Critical item it is capped at 84% (Red) so a single major gap cannot hide behind many passes. The overall score is the weighted average of category scores (weights under Settings > Client Risk Score, which only someone who may change settings can open); categories with nothing answered drop out.'],
     ['Platform', 'A Microsoft 365 client is not asked the Google Workspace questions, and a Google Workspace client is not asked the Microsoft 365 ones. Choose Both for a client that uses both.'],
@@ -557,7 +558,34 @@ export function RiskScoringView() {
     }
   };
 
+  // The assessments already filled from the integrations in this visit, so each is filled once when it is opened and not again on every change.
+  const filledOnOpen = useRef(new Set<string>());
+
+  // Opening an assessment fills in what the client's Client Review can answer, without a press. An answer set by hand is never replaced, nothing is written when no answer moves, and
+  // a person who may not change assessments simply sees it as it is.
+  const openId = current?.id ?? '';
+  useEffect(() => {
+    if (!openId || filledOnOpen.current.has(openId)) return;
+    filledOnOpen.current.add(openId);
+    let live = true;
+    vcioRiskApi
+      .autofill(openId)
+      .then((done) => {
+        if (!live || !done?.assessment) return;
+        if (autofillMoved(done)) {
+          setCurrent((now) => (now && now.id === done.assessment.id ? done.assessment : now));
+          setList((rows) => rows.map((r) => (r.id === done.assessment.id ? { ...r, score: done.assessment.score, rating: done.assessment.rating, answered: done.assessment.answered } : r)));
+          setNotice(autofillSentence(done));
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [openId]);
+
   const fill = async (id: string) => {
+    filledOnOpen.current.add(id);
     setBusy(true);
     setError('');
     setNotice('');
@@ -581,6 +609,8 @@ export function RiskScoringView() {
       const made = await vcioRiskApi.create({ client_id: clientId === OWN ? undefined : clientId, review_date: draft.review_date || undefined, platform: draft.platform, assessor: draft.assessor });
       setStarting(false);
       setTab('questions');
+      // Marked before it is opened: the box in the window decides whether this one is filled, not the fill-on-open.
+      filledOnOpen.current.add(made.id);
       await loadList(clientId, made.id);
       if (fillOnStart) await fill(made.id);
     } catch (err) {

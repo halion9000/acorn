@@ -610,9 +610,12 @@ class AutofillOut(BaseModel):
     kept_by_hand: int
     cleared: int
     answered_by_integrations: int
+    # How many questions of this assessment are also a Client Review question (the most the integrations could ever answer here), and whether anything was written.
+    shared_with_review: int = 0
+    saved: bool = False
 
 
-async def review_answers(db: Any, user: AuthUser, client_id: uuid.UUID) -> dict[str, dict[str, str]]:
+async def review_answers(db: Any, user: AuthUser, client_id: uuid.UUID, platform: str = "both") -> tuple[dict[str, dict[str, str]], int]:
     """What the client's Client Review answers, as answers to the questions here (question id -> answer, evidence and vendor). The review is built exactly as its own page builds it, so
     the two never disagree: the same checks, the same typed answers."""
     from app.api.v1.endpoints.client_review import (
@@ -620,7 +623,8 @@ async def review_answers(db: Any, user: AuthUser, client_id: uuid.UUID) -> dict[
     )
 
     review = await client_review(client_id, user, db)
-    return rs.answers_from_review(list(review.assess), list(review.m365), list(review.tech_stack))
+    lists = (list(review.assess), list(review.m365), list(review.tech_stack))
+    return rs.answers_from_review(*lists), rs.shared_with_review(*lists, platform=platform)
 
 
 @router.post(
@@ -633,15 +637,21 @@ async def autofill_assessment(assessment_id: uuid.UUID, current_user: Writer, db
     org = await org_settings(db, owner)
     seen, names = await _find(db, current_user, assessment_id)
     # Kept now: building the review ends the transaction the assessment was read in, and reading its fields afterwards would need the database again.
-    client_id, found_id = seen.tenant_id, seen.id
-    found = await review_answers(db, current_user, client_id)
+    client_id, found_id, platform = seen.tenant_id, seen.id, seen.platform
+    found, shared = await review_answers(db, current_user, client_id, platform)
     async with _acting(db, owner, client_id):
         row = (await db.execute(select(VcioRiskAssessment).where(VcioRiskAssessment.id == found_id))).scalar_one()
-        row.answers, counts = rs.apply_autofill(row.answers, found)
-        card = _store_score(row, current_user, org)
-        await db.commit()
-        await db.refresh(row)
-    return AutofillOut(assessment=_full(row, owner, names, card), **counts)
+        answers, counts = rs.apply_autofill(row.answers, found)
+        # The page runs this each time an assessment is opened, so nothing is written (and nobody is recorded as having changed it) unless an answer really moved.
+        saved = counts["filled"] + counts["changed"] + counts["cleared"] > 0 or answers != row.answers
+        if saved:
+            row.answers = answers
+            card = _store_score(row, current_user, org)
+            await db.commit()
+            await db.refresh(row)
+        else:
+            card = _card(row, org)
+    return AutofillOut(assessment=_full(row, owner, names, card), shared_with_review=shared, saved=saved, **counts)
 
 
 @router.delete("/assessments/{assessment_id}", response_model=DeletedOut, summary="Delete a risk-scored review for good")

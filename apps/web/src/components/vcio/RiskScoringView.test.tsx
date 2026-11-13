@@ -45,6 +45,8 @@ beforeEach(() => {
   api.assessors.mockResolvedValue({ items: [{ name: 'Dana', email: 'dana@example.test' }, { name: 'Hal', email: null }] });
   api.trends.mockResolvedValue({ clients: [] });
   api.clientTrend.mockResolvedValue({ client_id: 'c1', client_name: 'Acme Dental', points: [], categories: [] });
+  // Opening an assessment asks the integrations; by default they have nothing new to say.
+  api.autofill.mockImplementation(async () => ({ assessment: assessment(), filled: 0, changed: 0, kept_by_hand: 0, cleared: 0, answered_by_integrations: 0, shared_with_review: 0, saved: false }));
 });
 
 const pickClient = async () => userEvent.selectOptions(await screen.findByLabelText('Client'), 'c1');
@@ -82,6 +84,7 @@ describe('the pure parts', () => {
     expect(autofillSentence(r)).toBe('12 answers filled in from the integrations, 1 updated, 3 you set by hand left as they are, 2 taken out because the integrations no longer say.');
     expect(autofillSentence({ filled: 0, changed: 0, kept_by_hand: 0, cleared: 0, answered_by_integrations: 0 })).toBe('The integrations have no answer for this client yet: nothing was filled in.');
     expect(autofillSentence({ filled: 1, changed: 0, kept_by_hand: 0, cleared: 0, answered_by_integrations: 1 })).toBe('1 answer filled in from the integrations.');
+    expect(autofillSentence({ filled: 30, changed: 0, kept_by_hand: 0, cleared: 0, answered_by_integrations: 30, shared_with_review: 192 })).toBe('30 answers filled in from the integrations. 192 of the questions here are also Client Review questions; it answers 30 of them for this client, and the rest need a person.');
   });
 
   it('says a change as an arrow and points, and nothing when there is nothing to compare', () => {
@@ -122,6 +125,7 @@ describe('RiskScoringView', () => {
     api.list.mockResolvedValueOnce({ items: [] });
     const made = assessment({ platform: 'both', assessor: 'Dana' });
     api.create.mockResolvedValue(made);
+    api.autofill.mockResolvedValue({ assessment: made, filled: 0, changed: 0, kept_by_hand: 0, cleared: 0, answered_by_integrations: 0, shared_with_review: 0, saved: false });
     api.list.mockResolvedValue({ items: [summary(made)] });
     api.get.mockResolvedValue(made);
     render(<RiskScoringView />);
@@ -370,5 +374,41 @@ describe('RiskScoringView', () => {
     await userEvent.click(within(box).getByRole('button', { name: 'Birch Law' }));
     await waitFor(() => expect(api.list).toHaveBeenCalledWith('c2'));
     expect(screen.queryByTestId('risk-all-clients')).toBeNull();
+  });
+
+  it('opening an assessment fills it from the integrations by itself, once, and says so only when an answer moved', async () => {
+    const start = assessment();
+    const filled = assessment({ answers: { 'NET-002': { answer: 'No', source: 'auto', evidence: 'Clean scan.' } }, answered: 1, score: 1, rating: 'green', scorecard: card({ overall: 1, rating: 'green', answered: 1 }) });
+    api.list.mockResolvedValue({ items: [summary(start)] });
+    api.get.mockResolvedValue(start);
+    api.autofill.mockResolvedValue({ assessment: filled, filled: 1, changed: 0, kept_by_hand: 0, cleared: 0, answered_by_integrations: 1, shared_with_review: 192, saved: true });
+    api.answer.mockResolvedValue(filled);
+    render(<RiskScoringView />);
+    await pickClient();
+    await waitFor(() => expect(api.autofill).toHaveBeenCalledWith('a1'));
+    expect(await screen.findByTestId('risk-notice')).toHaveTextContent('1 answer filled in from the integrations. 192 of the questions here are also Client Review questions');
+    expect(await screen.findByTestId('risk-overall')).toHaveTextContent('100%');
+    await userEvent.click(screen.getByRole('tab', { name: 'Questions' }));
+    await userEvent.click(within((await screen.findAllByTestId('risk-question'))[0]).getByRole('button', { name: 'Yes' }));
+    await waitFor(() => expect(api.answer).toHaveBeenCalledTimes(1));
+    expect(api.autofill).toHaveBeenCalledTimes(1);
+  });
+
+  it('says nothing when the integrations have nothing new, and stays quiet for a person who may not change assessments', async () => {
+    const start = assessment();
+    api.list.mockResolvedValue({ items: [summary(start)] });
+    api.get.mockResolvedValue(start);
+    api.autofill.mockResolvedValue({ assessment: start, filled: 0, changed: 0, kept_by_hand: 2, cleared: 0, answered_by_integrations: 2, shared_with_review: 192, saved: false });
+    const first = render(<RiskScoringView />);
+    await pickClient();
+    await waitFor(() => expect(api.autofill).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('risk-notice')).toBeNull();
+    first.unmount();
+    api.autofill.mockRejectedValue(new ApiError('403', 403, JSON.stringify({ detail: 'You do not have permission to change client reviews.' })));
+    render(<RiskScoringView />);
+    await pickClient();
+    await waitFor(() => expect(api.autofill).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId('risk-overall')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
