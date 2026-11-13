@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SWRConfig } from 'swr';
 
-import { FrameworkView, sfLabel, sfTally, type SecureframeMapping } from './FrameworkView';
+import { FrameworkView, failingDays, sfLabel, sfTally, testKind, type SecureframeMapping } from './FrameworkView';
 
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
@@ -285,5 +285,76 @@ describe('what a control means and what it takes', () => {
     fireEvent.change(await screen.findByLabelText('Filter controls'), { target: { value: 'background checks' } });
     await waitFor(() => expect(screen.getByTestId('guidance-CC1.1')).toBeTruthy());
     expect(screen.queryByText('Other 3')).toBeNull();
+  });
+});
+
+describe('Secureframe controls and tests under a requirement', () => {
+  const NOW = Date.parse('2026-11-13T00:00:00Z');
+  const detailed = {
+    mapped: true,
+    received_at: '2026-11-13T00:00:00Z',
+    summary: { unhealthy: 1 },
+    requirements: {
+      '9.2': {
+        title: 'Use DNS Filtering Services',
+        description: 'Use DNS filtering services on all enterprise assets to block access to known malicious domains.',
+        health: 'unhealthy',
+        failing_tests: 1,
+        controls: [
+          {
+            key: 'DNS-01', health: 'unhealthy', passing: 1, failing: 1, at_risk: 0, name: 'DNS filtering is enforced', description: 'Devices resolve names through a filtering service.', implementation: 'not_implemented', owner: 'Dana',
+            tests: [
+              { key: 't-fail', title: 'DNS filtering policy is uploaded', state: 'fail', type: 'upload', owner: null, failing_since: '2026-11-03T00:00:00Z', message: 'No evidence uploaded', action: 'Upload the DNS filtering policy.' },
+              { key: 't-pass', title: 'Every device uses the filter', state: 'pass', type: 'integration', owner: 'Hal', action: 'Keep it on.' },
+            ],
+          },
+          { key: 'OLD-9', health: 'healthy', passing: 2, failing: 0 },
+        ],
+      },
+    },
+  };
+  const serve = (mapping: unknown) =>
+    authFetch.mockImplementation((url: string) => {
+      if (url.includes('/secureframe/requirements/CIS-IG1')) return json(mapping);
+      if (url.includes('/controls')) return json({ controls: [{ control_id: '9.2', title: 'Use DNS Filtering Services', group: '9. Email and Web Browser Protections' }] });
+      if (url.includes('/report')) return json([{ total_evidence: 0, accepted: 0, pending: 0, rejected: 0, coverage_pct: 0, controls_covered: [], controls_missing: ['9.2'] }]);
+      return json([]);
+    });
+
+  it('says how a test is answered and how long it has been failing', () => {
+    expect([testKind('integration'), testKind('upload'), testKind(null), testKind('other')]).toEqual(['checked by a connected tool', 'evidence uploaded by a person', '', '']);
+    expect(failingDays('2026-11-03T00:00:00Z', NOW)).toBe(10);
+    expect([failingDays(null, NOW), failingDays('not a date', NOW), failingDays('2027-01-01T00:00:00Z', NOW)]).toEqual([null, null, null]);
+  });
+
+  it('shows what the requirement asks for, each control with its owner and status, and for a failing test why it fails and what to do', async () => {
+    serve(detailed);
+    render(<FrameworkView framework="cis_ig1" now={NOW} />);
+    const box = await screen.findByTestId('sf-detail-9.2');
+    expect(box.textContent).toContain('1 failing test to fix');
+    expect(box.textContent).toContain('Use DNS filtering services on all enterprise assets');
+    const control = screen.getByTestId('sf-control-9.2-DNS-01');
+    expect(control.textContent).toContain('DNS filtering is enforced');
+    expect(control.textContent).toContain('1 failing, 1 passing');
+    expect(control.textContent).toContain('owner Dana');
+    expect(control.textContent).toContain('not implemented');
+    expect(control.textContent).toContain('Devices resolve names through a filtering service.');
+    const failing = screen.getByTestId('sf-test-t-fail');
+    expect(failing.textContent).toContain('Failing');
+    expect(failing.textContent).toContain('evidence uploaded by a person · no owner · failing for 10 days');
+    expect(failing.textContent).toContain('No evidence uploaded');
+    expect(failing.textContent).toContain('What to do: Upload the DNS filtering policy.');
+    const passing = screen.getByTestId('sf-test-t-pass');
+    expect(passing.textContent).toContain('Passing');
+    expect(passing.textContent).toContain('checked by a connected tool · owner Hal');
+    expect(passing.textContent).not.toContain('What to do');
+    expect(screen.queryByTestId('sf-control-9.2-OLD-9')).toBeNull();
+  });
+
+  it('adds nothing when Secureframe sent only the verdict and the counts, as it did before', async () => {
+    serve({ mapped: true, received_at: null, summary: {}, requirements: { '9.2': { title: 'Use DNS Filtering Services', health: 'unhealthy', controls: [{ key: 'DNS-01', health: 'unhealthy', passing: 1, failing: 3 }] } } });
+    render(<FrameworkView framework="cis_ig1" now={NOW} />);
+    expect(await screen.findByTestId('sf-controls-9.2')).toBeTruthy();
+    expect(screen.queryByTestId('sf-detail-9.2')).toBeNull();
   });
 });

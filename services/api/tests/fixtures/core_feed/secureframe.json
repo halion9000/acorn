@@ -24,13 +24,13 @@
         {
           "key": "t-2",
           "title": "Test 2",
-          "owner": null,
-          "failing_since": null,
+          "owner": "Dana",
+          "failing_since": "2026-10-20T00:00:00.000Z",
           "frameworks": [
             "soc2"
           ],
           "domain": null,
-          "message": null
+          "message": "No evidence uploaded"
         }
       ],
       "risks": 2,
@@ -40,6 +40,7 @@
           "framework": "CIS_IG1",
           "key": "9.2",
           "title": "Use DNS Filtering Services",
+          "description": null,
           "health": "unhealthy",
           "controls": [
             {
@@ -60,6 +61,7 @@
           "framework": "CIS_IG1",
           "key": "10.1",
           "title": "Deploy and Maintain Anti-Malware Software",
+          "description": null,
           "health": "not_tested",
           "controls": []
         },
@@ -67,6 +69,7 @@
           "framework": "NIST_CSF_2",
           "key": "GV.OC-01",
           "title": null,
+          "description": null,
           "health": "unhealthy",
           "controls": [
             {
@@ -87,8 +90,71 @@
           "framework": "NIST_CSF_2",
           "key": "PR.AA-01",
           "title": null,
+          "description": null,
           "health": "healthy",
           "controls": []
+        }
+      ],
+      "controls": [
+        {
+          "key": "DNS-01",
+          "name": "DNS filtering is enforced",
+          "description": "Devices resolve names through a filtering service.",
+          "health": "unhealthy",
+          "implementation": "implemented",
+          "owner": "Dana",
+          "passing": 1,
+          "failing": 3,
+          "at_risk": 0,
+          "tests": [
+            {
+              "key": "t-2",
+              "title": "Test 2",
+              "state": "fail",
+              "type": "upload",
+              "owner": "Dana",
+              "failing_since": "2026-10-20T00:00:00.000Z",
+              "next_due": null,
+              "message": "No evidence uploaded",
+              "action": "Upload the DNS filtering policy."
+            }
+          ]
+        },
+        {
+          "key": "ORG-01",
+          "name": null,
+          "description": null,
+          "health": "unhealthy",
+          "implementation": null,
+          "owner": null,
+          "passing": 0,
+          "failing": 1,
+          "at_risk": 0,
+          "tests": []
+        },
+        {
+          "key": "DNS-02",
+          "name": null,
+          "description": null,
+          "health": "healthy",
+          "implementation": null,
+          "owner": null,
+          "passing": 2,
+          "failing": 0,
+          "at_risk": 0,
+          "tests": [
+            {
+              "key": "t-1",
+              "title": "Test 1",
+              "state": "pass",
+              "type": "integration",
+              "owner": null,
+              "failing_since": null,
+              "next_due": null,
+              "message": null,
+              "action": "Keep DNS filtering on for every device."
+            }
+          ]
         }
       ]
     }

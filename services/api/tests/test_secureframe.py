@@ -223,3 +223,107 @@ async def test_a_day_is_recorded_once_with_the_latest_counts_and_the_view_report
             await conn.execute(text("delete from secureframe_reports where tenant_id = :t"), {"t": tid})
             await conn.execute(text("delete from tenants where id = :t"), {"t": tid})
         await engine.dispose()
+
+
+# ---- the controls and their tests -----------------------------------------------------------------------------------------------------------------------------
+
+TESTS = [
+    {
+        "key": "t-fail",
+        "title": "MFA is required for every account",
+        "state": "fail",
+        "type": "integration",
+        "owner": "Dana",
+        "failing_since": "2026-10-20T00:00:00Z",
+        "message": "3 accounts have no MFA",
+        "action": "Require MFA for the 3 accounts.",
+    },
+    {"key": "t-pass", "title": "Password policy is uploaded", "state": "pass", "type": "upload", "action": "Upload the policy."},
+]
+CONTROLS = [
+    {
+        "key": "DNS-01",
+        "name": "DNS filtering is enforced",
+        "description": "Devices resolve names through a filtering service.",
+        "health": "unhealthy",
+        "implementation": "implemented",
+        "owner": "Dana",
+        "passing": 1,
+        "failing": 4,
+        "at_risk": 1,
+        "tests": TESTS,
+    },
+    {"key": "ORG-01", "name": "Mission is documented", "health": "unhealthy", "passing": 0, "failing": 1, "tests": [TESTS[0]]},
+]
+
+
+def test_the_controls_and_their_tests_are_accepted_and_a_malformed_one_is_refused():
+    ok = sf.ReportIn.model_validate(body(requirements=REQUIREMENTS, controls=CONTROLS)).report
+    assert [c.key for c in ok.controls] == ["DNS-01", "ORG-01"] and ok.controls[0].tests[0].action == "Require MFA for the 3 accounts."
+    assert sf.ReportIn.model_validate(body()).report.controls == [], "a report from before CORE sent them still reads"
+    for bad in (
+        {**CONTROLS[0], "key": ""},
+        {**CONTROLS[0], "tests": [{**TESTS[0], "state": "maybe"}]},
+        {**CONTROLS[0], "tests": [{**TESTS[0], "title": ""}]},
+        {**CONTROLS[0], "failing": -1},
+        {**CONTROLS[0], "tests": [TESTS[0]] * (sf.MAX_TESTS_PER_CONTROL + 1)},
+    ):
+        with pytest.raises(ValidationError):
+            sf.ReportIn.model_validate(body(controls=[bad]))
+
+
+def test_each_requirement_shows_its_controls_in_full_with_their_tests_and_counts_a_failing_test_once():
+    requirements = [
+        {
+            "framework": "NIST_CSF_2",
+            "key": "GV.OC-01",
+            "title": None,
+            "description": "The organizational mission is understood.",
+            "health": "unhealthy",
+            "controls": [
+                {"key": "DNS-01", "health": "unhealthy", "passing": 1, "failing": 3},
+                {"key": "ORG-01", "health": "unhealthy", "passing": 0, "failing": 1},
+                {"key": "OLD-9", "health": "healthy", "passing": 2, "failing": 0},
+            ],
+        },
+    ]
+    report = sf.ReportIn.model_validate(body(requirements=requirements, controls=CONTROLS)).report
+    req = sf.mapping_for(report, "NIST-CSF", None).requirements["GV.OC-01"]
+    assert req.description == "The organizational mission is understood."
+    dns, org, old = req.controls
+    assert (dns.name, dns.description, dns.implementation, dns.owner) == (
+        "DNS filtering is enforced",
+        "Devices resolve names through a filtering service.",
+        "implemented",
+        "Dana",
+    )
+    assert (dns.passing, dns.failing, dns.at_risk) == (
+        1,
+        4,
+        1,
+    ), "the control's own counts, which are newer than the copy under the requirement"
+    assert [(t.key, t.state, t.message, t.action) for t in dns.tests] == [
+        ("t-fail", "fail", "3 accounts have no MFA", "Require MFA for the 3 accounts."),
+        ("t-pass", "pass", None, "Upload the policy."),
+    ]
+    assert [t.key for t in org.tests] == ["t-fail"]
+    assert (old.key, old.name, old.tests, old.passing) == (
+        "OLD-9",
+        None,
+        [],
+        2,
+    ), "a control with no detail sent keeps what the requirement said about it"
+    assert req.failing_tests == 1, "the same failing test under two controls is one thing to fix"
+
+
+def test_a_report_without_control_detail_maps_exactly_as_before():
+    report = sf.ReportIn.model_validate(body(requirements=REQUIREMENTS)).report
+    cis = sf.mapping_for(report, "CIS-IG1", None)
+    first = cis.requirements["9.2"].controls[0]
+    assert (first.failing, first.name, first.tests, cis.requirements["9.2"].failing_tests, cis.requirements["9.2"].description) == (
+        3,
+        None,
+        [],
+        0,
+        None,
+    )

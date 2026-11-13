@@ -27,11 +27,102 @@ const API_KEYS: Record<string, string> = {
   cis_ig1: 'CIS-IG1',
 };
 
+/** One enabled test of a Secureframe control: what is checked, whether it passes, and what Secureframe says to do about it. */
+export interface SecureframeTest {
+  key: string;
+  title: string;
+  state: 'pass' | 'fail' | 'not_evaluated';
+  type?: string | null;
+  owner?: string | null;
+  failing_since?: string | null;
+  next_due?: string | null;
+  message?: string | null;
+  action?: string | null;
+}
+
+/** A Secureframe control under a requirement. The name, description, owner and tests are there once CORE has sent them. */
+export interface SecureframeControl {
+  key: string;
+  health: string | null;
+  passing: number;
+  failing: number;
+  name?: string | null;
+  description?: string | null;
+  implementation?: string | null;
+  owner?: string | null;
+  at_risk?: number;
+  tests?: SecureframeTest[];
+}
+
+const TEST_MARK: Record<SecureframeTest['state'], { text: string; className: string }> = {
+  fail: { text: 'Failing', className: 'border-red-500/40 text-red-300' },
+  not_evaluated: { text: 'Not evaluated', className: 'border-gray-600 text-gray-400' },
+  pass: { text: 'Passing', className: 'border-emerald-500/40 text-emerald-300' },
+};
+
+/** How a test is answered, as people say it. */
+export const testKind = (type: string | null | undefined): string => (type === 'integration' ? 'checked by a connected tool' : type === 'upload' ? 'evidence uploaded by a person' : '');
+
+/** Days a test has been failing, as of ``now``; null when it is not known. */
+export function failingDays(since: string | null | undefined, now: number): number | null {
+  const t = since ? Date.parse(since) : NaN;
+  return Number.isFinite(t) && t <= now ? Math.floor((now - t) / 86_400_000) : null;
+}
+
+/** What Secureframe holds under one requirement: what the requirement asks for, then each control with its description, owner and tests. A failing test shows why it fails and what
+ * Secureframe says to do, so "what it takes to meet this" is the list of failing tests. */
+function SecureframeDetail({ id, req, now }: { id: string; req: SecureframeMapping['requirements'][string]; now: number }) {
+  const withDetail = req.controls.filter((c) => c.name || (c.tests ?? []).length > 0);
+  if (!req.description && withDetail.length === 0) return null;
+  return (
+    <div className="mt-3 space-y-3 rounded-lg border border-sky-500/20 bg-sky-500/5 p-3" data-testid={`sf-detail-${id}`}>
+      <p className="text-xs font-semibold uppercase text-sky-300">
+        From Secureframe{(req.failing_tests ?? 0) > 0 ? <span className="ml-2 font-normal normal-case text-red-300">{req.failing_tests} failing test{req.failing_tests === 1 ? '' : 's'} to fix</span> : null}
+      </p>
+      {req.description ? <p className="text-sm text-gray-200">{req.description}</p> : null}
+      {withDetail.map((c) => (
+        <details key={c.key} open={(c.failing ?? 0) > 0} className="rounded border border-gray-700 bg-gray-900/40 p-2" data-testid={`sf-control-${id}-${c.key}`}>
+          <summary className="cursor-pointer text-sm text-gray-100">
+            <span className="font-mono text-xs text-gray-400">{c.key}</span> {c.name ?? ''}
+            <span className={`ml-2 rounded border px-1.5 py-0.5 text-[11px] ${SF_CLASS[c.health ?? ''] ?? 'border-gray-600 text-gray-400'}`}>{sfLabel(c.health)}</span>
+            <span className="ml-2 text-xs text-gray-500">
+              {c.failing} failing, {c.passing} passing{c.at_risk ? `, ${c.at_risk} at risk` : ''}
+              {c.owner ? ` · owner ${c.owner}` : ' · no owner'}
+              {c.implementation ? ` · ${c.implementation.replace(/_/g, ' ')}` : ''}
+            </span>
+          </summary>
+          {c.description ? <p className="mt-2 text-xs text-gray-400">{c.description}</p> : null}
+          {(c.tests ?? []).length > 0 ? (
+            <ul className="mt-2 space-y-2">
+              {c.tests!.map((t) => {
+                const days = t.state === 'fail' ? failingDays(t.failing_since, now) : null;
+                return (
+                  <li key={t.key} className="text-sm text-gray-200" data-testid={`sf-test-${t.key}`}>
+                    <span className={`mr-2 rounded border px-1.5 py-0.5 text-[11px] ${TEST_MARK[t.state].className}`}>{TEST_MARK[t.state].text}</span>
+                    {t.title}
+                    <span className="block text-xs text-gray-500">
+                      {[testKind(t.type), t.owner ? `owner ${t.owner}` : 'no owner', days !== null ? `failing for ${days} day${days === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')}
+                    </span>
+                    {t.state === 'fail' && t.message ? <span className="block text-xs text-red-300">{t.message}</span> : null}
+                    {t.state !== 'pass' && t.action ? <span className="block text-xs text-gray-300">What to do: {t.action}</span> : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="mt-2 text-xs text-gray-500">No enabled test for this control.</p>
+          )}
+        </details>
+      ))}
+    </div>
+  );
+}
+
 /** Secureframe's verdict on each requirement of a framework it is mapped to (NIST CSF 2.0, CIS IG1), by the control's id here (GET /api/v1/secureframe/requirements/{framework}). */
 export interface SecureframeMapping {
   mapped: boolean;
   received_at: string | null;
-  requirements: Record<string, { title: string | null; health: string | null; controls: { key: string; health: string | null; passing: number; failing: number }[] }>;
+  requirements: Record<string, { title: string | null; description?: string | null; health: string | null; failing_tests?: number; controls: SecureframeControl[] }>;
   summary: Record<string, number>;
 }
 
@@ -131,7 +222,7 @@ export function forClient(path: string, clientId: string): string {
   return clientId ? `${path}${path.includes('?') ? '&' : '?'}client_id=${encodeURIComponent(clientId)}` : path;
 }
 
-export function FrameworkView({ framework }: Props) {
+export function FrameworkView({ framework, now }: Props & { /** The time to count from; the clock when left out (tests give a fixed one). */ now?: number }) {
   const key = API_KEYS[framework];
   const [clientId, setClientId] = useState('');
   const chosen = useRef('');
@@ -249,6 +340,7 @@ export function FrameworkView({ framework }: Props) {
   }
 
   const evidenceFor = (id: string) => evidence.filter((e) => e.control_id === id);
+  const nowMs = now ?? Date.now();
   const controlState = (id: string): 'accepted' | 'pending' | 'rejected' | 'none' => {
     const items = evidenceFor(id);
     if (items.some((e) => e.status === 'accepted')) return 'accepted';
@@ -390,6 +482,7 @@ export function FrameworkView({ framework }: Props) {
                   ))}
                 </p>
               )}
+              {sf?.requirements[c.control_id] ? <SecureframeDetail id={c.control_id} req={sf.requirements[c.control_id]} now={nowMs} /> : null}
               {evidenceFor(c.control_id).map((e) => (
                 <div key={e.id} className="mt-3 flex items-start justify-between gap-3 border-t border-gray-700/60 pt-3">
                   <p className="text-sm text-gray-300">

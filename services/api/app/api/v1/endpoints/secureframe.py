@@ -28,6 +28,8 @@ ingest_router = APIRouter(prefix="/inbox", tags=["secureframe"])
 MAX_FAILING = 100
 MAX_FRAMEWORKS = 60
 MAX_REQUIREMENTS = 400
+MAX_CONTROLS = 600
+MAX_TESTS_PER_CONTROL = 40
 # A.C.O.R.N's compliance catalog key -> Secureframe's framework key, for the frameworks that have a page here.
 FRAMEWORK_KEYS = {"NIST-CSF": "NIST_CSF_2", "CIS-IG1": "CIS_IG1"}
 _COUNT = Field(ge=0, le=10_000_000)
@@ -66,12 +68,44 @@ class RequirementControl(BaseModel):
     failing: int = _COUNT
 
 
+class ControlTest(BaseModel):
+    """One enabled test of a Secureframe control: what is checked, whether it passes, and what Secureframe says to do about it."""
+
+    key: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=300)
+    state: str = Field(pattern="^(pass|fail|not_evaluated)$")
+    # "integration" (Secureframe reads a connected tool) or "upload" (a person uploads evidence).
+    type: str | None = Field(default=None, max_length=40)
+    owner: str | None = Field(default=None, max_length=120)
+    failing_since: datetime | None = None
+    next_due: datetime | None = None
+    message: str | None = Field(default=None, max_length=300)
+    action: str | None = Field(default=None, max_length=600)
+
+
+class ControlDetail(BaseModel):
+    """One Secureframe control in full: its name and description, who owns it, how far it is implemented, and its enabled tests."""
+
+    key: str = Field(min_length=1, max_length=60)
+    name: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
+    health: str | None = Field(default=None, max_length=20)
+    implementation: str | None = Field(default=None, max_length=40)
+    owner: str | None = Field(default=None, max_length=120)
+    passing: int = _COUNT
+    failing: int = _COUNT
+    at_risk: int = Field(default=0, ge=0, le=10_000_000)
+    tests: list[ControlTest] = Field(default_factory=list, max_length=MAX_TESTS_PER_CONTROL)
+
+
 class MappedRequirement(BaseModel):
     """One requirement of NIST CSF 2.0 or CIS IG1 as Secureframe sees it: its verdict and the controls that answer it."""
 
     framework: str = Field(pattern="^(NIST_CSF_2|CIS_IG1)$")
     key: str = Field(min_length=1, max_length=40)
     title: str | None = Field(default=None, max_length=300)
+    # What the requirement asks for, in Secureframe's words.
+    description: str | None = Field(default=None, max_length=600)
     health: str | None = Field(default=None, max_length=20)
     controls: list[RequirementControl] = Field(default_factory=list, max_length=30)
 
@@ -85,6 +119,8 @@ class SecureframeBody(BaseModel):
     policies: int | None = Field(default=None, ge=0, le=10_000_000)
     # Empty when the key's role may not read the framework requirements or controls.
     requirements: list[MappedRequirement] = Field(default_factory=list, max_length=MAX_REQUIREMENTS)
+    # The controls behind those requirements, each with its enabled tests. Empty when the key's role may not read controls, and in a report stored before CORE sent them.
+    controls: list[ControlDetail] = Field(default_factory=list, max_length=MAX_CONTROLS)
 
 
 class ReportIn(BaseModel):
@@ -188,10 +224,24 @@ async def secureframe_view(user: Annotated[AuthUser, Depends(require_permission(
     )
 
 
+class RequirementControlView(RequirementControl):
+    """A control under a requirement, with what Secureframe holds about it when CORE sent that (its name, what it is for, who owns it and its tests)."""
+
+    name: str | None = None
+    description: str | None = None
+    implementation: str | None = None
+    owner: str | None = None
+    at_risk: int = 0
+    tests: list[ControlTest] = Field(default_factory=list)
+
+
 class RequirementView(BaseModel):
     title: str | None = None
+    description: str | None = None
     health: str | None = None
-    controls: list[RequirementControl] = Field(default_factory=list)
+    controls: list[RequirementControlView] = Field(default_factory=list)
+    # The requirement's tests that are failing, across its controls (a test under two of them is counted once).
+    failing_tests: int = 0
 
 
 class FrameworkMapping(BaseModel):
@@ -210,9 +260,32 @@ def mapping_for(report: SecureframeBody | None, framework: str, received_at: dat
     sf_key = FRAMEWORK_KEYS.get(framework)
     if sf_key is None or report is None:
         return FrameworkMapping(framework=framework, mapped=sf_key is not None and report is not None, received_at=received_at)
-    reqs = {
-        r.key: RequirementView(title=r.title, health=r.health, controls=r.controls) for r in report.requirements if r.framework == sf_key
-    }
+    detail = {c.key: c for c in report.controls}
+
+    def control_view(c: RequirementControl) -> RequirementControlView:
+        d = detail.get(c.key)
+        if d is None:
+            return RequirementControlView(**c.model_dump())
+        return RequirementControlView(
+            key=c.key,
+            health=d.health or c.health,
+            passing=d.passing,
+            failing=d.failing,
+            name=d.name,
+            description=d.description,
+            implementation=d.implementation,
+            owner=d.owner,
+            at_risk=d.at_risk,
+            tests=d.tests,
+        )
+
+    reqs: dict[str, RequirementView] = {}
+    for r in report.requirements:
+        if r.framework != sf_key:
+            continue
+        views = [control_view(c) for c in r.controls]
+        failing = {t.key for v in views for t in v.tests if t.state == "fail"}
+        reqs[r.key] = RequirementView(title=r.title, description=r.description, health=r.health, controls=views, failing_tests=len(failing))
     summary: dict[str, int] = {}
     for r in reqs.values():
         summary[r.health or "unknown"] = summary.get(r.health or "unknown", 0) + 1

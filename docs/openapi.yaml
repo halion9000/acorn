@@ -32001,6 +32001,73 @@ components:
         knobs (poll interval, region, log filters) that the wizard surfaces
 
         so an operator can tweak them without re-pasting credentials.'
+    ControlDetail:
+      properties:
+        key:
+          type: string
+          maxLength: 60
+          minLength: 1
+          title: Key
+        name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Name
+        description:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Description
+        health:
+          anyOf:
+          - type: string
+            maxLength: 20
+          - type: 'null'
+          title: Health
+        implementation:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Implementation
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Owner
+        passing:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Passing
+        failing:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Failing
+        at_risk:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: At Risk
+          default: 0
+        tests:
+          items:
+            $ref: '#/components/schemas/ControlTest'
+          type: array
+          maxItems: 40
+          title: Tests
+      type: object
+      required:
+      - key
+      - passing
+      - failing
+      title: ControlDetail
+      description: 'One Secureframe control in full: its name and description, who
+        owns it, how far it is implemented, and its enabled tests.'
     ControlItem:
       properties:
         group:
@@ -32034,6 +32101,66 @@ components:
       - control_id
       - title
       title: ControlItem
+    ControlTest:
+      properties:
+        key:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Key
+        title:
+          type: string
+          maxLength: 300
+          minLength: 1
+          title: Title
+        state:
+          type: string
+          pattern: ^(pass|fail|not_evaluated)$
+          title: State
+        type:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Type
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Owner
+        failing_since:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Failing Since
+        next_due:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Next Due
+        message:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Message
+        action:
+          anyOf:
+          - type: string
+            maxLength: 600
+          - type: 'null'
+          title: Action
+      type: object
+      required:
+      - key
+      - title
+      - state
+      title: ControlTest
+      description: 'One enabled test of a Secureframe control: what is checked, whether
+        it passes, and what Secureframe says to do about it.'
     ControlsResponse:
       properties:
         framework_id:
@@ -40525,6 +40652,12 @@ components:
             maxLength: 300
           - type: 'null'
           title: Title
+        description:
+          anyOf:
+          - type: string
+            maxLength: 600
+          - type: 'null'
+          title: Description
         health:
           anyOf:
           - type: string
@@ -45170,6 +45303,66 @@ components:
       - passing
       - failing
       title: RequirementControl
+    RequirementControlView:
+      properties:
+        key:
+          type: string
+          maxLength: 60
+          minLength: 1
+          title: Key
+        health:
+          anyOf:
+          - type: string
+            maxLength: 20
+          - type: 'null'
+          title: Health
+        passing:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Passing
+        failing:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Failing
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        implementation:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Implementation
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        at_risk:
+          type: integer
+          title: At Risk
+          default: 0
+        tests:
+          items:
+            $ref: '#/components/schemas/ControlTest'
+          type: array
+          title: Tests
+      type: object
+      required:
+      - key
+      - passing
+      - failing
+      title: RequirementControlView
+      description: A control under a requirement, with what Secureframe holds about
+        it when CORE sent that (its name, what it is for, who owns it and its tests).
     RequirementView:
       properties:
         title:
@@ -45177,6 +45370,11 @@ components:
           - type: string
           - type: 'null'
           title: Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
         health:
           anyOf:
           - type: string
@@ -45184,9 +45382,13 @@ components:
           title: Health
         controls:
           items:
-            $ref: '#/components/schemas/RequirementControl'
+            $ref: '#/components/schemas/RequirementControlView'
           type: array
           title: Controls
+        failing_tests:
+          type: integer
+          title: Failing Tests
+          default: 0
       type: object
       title: RequirementView
     RerouteOut:
@@ -48007,6 +48209,12 @@ components:
           type: array
           maxItems: 400
           title: Requirements
+        controls:
+          items:
+            $ref: '#/components/schemas/ControlDetail'
+          type: array
+          maxItems: 600
+          title: Controls
       type: object
       required:
       - tests
