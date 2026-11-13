@@ -39,6 +39,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
     # source of the P0.3 audit finding.
     "admin": ["*"],
     "tenant_admin": [
+        "clients:view",  # see the organisation's clients; on for every role, switchable per role (migration 174)
         "finance:view",  # the workspace owner sees prices and margins; staff roles do not, and a custom role can be given them
         "finance:write",
         "alerts:read",
@@ -96,6 +97,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "plugins:read",
     ],
     "soc_lead": [
+        "clients:view",  # see the organisation's clients; on for every role, switchable per role (migration 174)
         "inventory:checkout",
         "alerts:read",
         "alerts:write",
@@ -128,6 +130,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "shifts:write",
     ],
     "soc_analyst": [
+        "clients:view",  # see the organisation's clients; on for every role, switchable per role (migration 174)
         "inventory:checkout",
         "alerts:read",
         "alerts:write",
@@ -152,6 +155,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "shifts:read",
     ],
     "threat_hunter": [
+        "clients:view",  # see the organisation's clients; on for every role, switchable per role (migration 174)
         "alerts:read",
         "cases:read",
         "cases:write",
@@ -172,6 +176,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "graph:read",
     ],
     "viewer": [
+        "clients:view",  # see the organisation's clients; on for every role, switchable per role (migration 174)
         "alerts:read",
         "cases:read",
         "reports:read",

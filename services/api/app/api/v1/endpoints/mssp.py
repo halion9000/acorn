@@ -85,7 +85,7 @@ class MetricsOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/children", response_model=list[ChildTenantOut], dependencies=[Depends(require_permission("mssp:read"))])
+@router.get("/children", response_model=list[ChildTenantOut], dependencies=[Depends(require_permission("clients:view"))])
 async def list_child_tenants(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),

@@ -422,7 +422,7 @@ async def test_the_list_of_clients_says_where_each_score_is_and_how_it_moved_big
         await cleanup(engine, w)
 
 
-async def test_the_clients_to_choose_from_are_the_organisations_shown_clients_for_anyone_who_can_read_alerts():
+async def test_the_clients_to_choose_from_are_the_organisations_shown_clients():
     # A vCIO role holds alerts:read but not mssp:read, so the MSSP client list was refused and the picker offered only "Own organisation": the page lists its own.
     engine, user, other, w = await world()
     try:

@@ -4,7 +4,8 @@ Routes are discovered from the real routers (not listed by hand), so a new route
 any of them is checked automatically. Expectations come from the real role table.
 
   mssp         GET -> mssp:read, onboarding -> mssp:onboard (platform wildcard only),
-               everything else -> mssp:manage
+               everything else -> mssp:manage. The ONE exception: GET /mssp/children, the list of clients the
+               pickers read, needs clients:view (a permission of its own, on for every role, switchable per role).
   remediation  GET -> remediation:read, everything else -> remediation:write
   reports      GET -> reports:read, everything else -> reports:write
 """
@@ -30,6 +31,8 @@ ID = "00000000-0000-0000-0000-0000000000aa"
 
 def expected_permission(module, route: APIRoute, method: str) -> str | None:
     if module is mssp:
+        if method == "GET" and route.path.endswith("/mssp/children"):
+            return "clients:view"
         if method == "GET":
             return "mssp:read"
         return "mssp:onboard" if route.path.endswith("/onboard") else "mssp:manage"

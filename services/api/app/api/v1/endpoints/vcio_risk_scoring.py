@@ -38,6 +38,7 @@ from app.services.client_mapping import tenant_hidden
 router = APIRouter(prefix="/vcio-risk-scoring", tags=["vcio"])
 
 Reader = Annotated[AuthUser, Depends(require_permission("alerts:read"))]
+ClientViewer = Annotated[AuthUser, Depends(require_permission("clients:view"))]
 # Its own permission, not mssp:manage: the vCIO role has to be able to run assessments without being able to manage delegations, rule packs and the rest of the MSSP console (mssp:manage implies it).
 Writer = Annotated[AuthUser, Depends(require_permission("vcio:assess"))]
 Platform = Literal["m365", "google", "both"]
@@ -337,9 +338,9 @@ class ClientChoices(BaseModel):
     response_model=ClientChoices,
     summary="The clients a Client Risk Score can be started for (the organisation's shown clients)",
 )
-async def list_clients(current_user: Reader, db: DBSession) -> ClientChoices:
-    """The page's client picker. It used to ask the MSSP client list, which needs mssp:read: a vCIO role without it saw only "Own organisation". Anyone who can read alerts can read this (it is
-    the same set the trends page already lists), and a client the organisation hid (a test or archived one) is not offered."""
+async def list_clients(current_user: ClientViewer, db: DBSession) -> ClientChoices:
+    """The page's client picker. It used to ask the MSSP client list, which needs mssp:read: a vCIO role without it saw only "Own organisation". Anyone who holds clients:view (on for every role, switchable per role) can read
+    this, and a client the organisation hid (a test or archived one) is not offered."""
     rows = (
         await db.execute(select(Tenant.id, Tenant.name, Tenant.settings).where(Tenant.parent_tenant_id == current_user.tenant_id))
     ).all()

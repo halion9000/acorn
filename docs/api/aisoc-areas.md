@@ -73,7 +73,7 @@ A.C.O.R.N has **776** operations in **111** areas. This is a MAP, not a list of 
 - **livez**: 1 reads, 0 changes; protection: 1 with no sign-in required; e.g. Livez
 - **llm**: 2 reads, 2 changes; protection: `settings:read`, `settings:write`; e.g. Remove the tenant's BYOK LLM credential; Read the tenant's BYOK LLM credential
 - **metrics**: 5 reads, 0 changes; protection: `alerts:read`; 1 with no sign-in required; e.g. Metrics; Get alert trend
-- **mssp**: 17 reads, 27 changes; protection: `mssp:manage`, `mssp:onboard`, `mssp:read`; e.g. Reroute existing alerts; List child tenants
+- **mssp**: 17 reads, 27 changes; protection: `clients:view`, `mssp:manage`, `mssp:onboard`, `mssp:read`; e.g. Reroute existing alerts; List child tenants
 - **nist-coverage**: 1 reads, 0 changes; protection: `alerts:read`; e.g. NIST CSF 2.0 controls with how one client stands, from live checks
 - **nl-detection**: 0 reads, 2 changes; protection: `rules:write`; e.g. Propose from nl; Translate detection
 - **nl-query**: 1 reads, 2 changes; protection: `lake:query`; e.g. Translate NL question and execute ES\|QL against Elasticsearch; The tenants this caller may search (for a tenant selector)
@@ -113,5 +113,5 @@ A.C.O.R.N has **776** operations in **111** areas. This is a MAP, not a list of 
 - **threatintel**: 4 reads, 3 changes; protection: `intel:read`, `threat_intel:read`, `threat_intel:write`; e.g. List bundles; Create bundle
 - **tool-deploy-rules**: 2 reads, 2 changes; protection: `alerts:read`, `connectors:write`; e.g. List deploy rules; Make deploy rule
 - **translation**: 1 reads, 1 changes; protection: `rules:read`, `rules:view`; e.g. List supported detection rule formats; Translate a detection rule across formats
-- **vcio-risk-scoring**: 8 reads, 6 changes; protection: `alerts:read`, `settings:read`, `settings:write`, `vcio:assess`; e.g. The risk-scored reviews of one client, or of every client, newest first; Start a risk-scored review for a client
+- **vcio-risk-scoring**: 8 reads, 6 changes; protection: `alerts:read`, `clients:view`, `settings:read`, `settings:write`, `vcio:assess`; e.g. The risk-scored reviews of one client, or of every client, newest first; Start a risk-scored review for a client
 - **waitlist**: 1 reads, 2 changes; protection: `mssp:onboard`; 1 with no sign-in required; e.g. List waitlist entries (admin only).; Update a waitlist entry's status (admin only).

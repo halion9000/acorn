@@ -79,7 +79,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | [livez](#livez) | 1 | 0 | 1 with no sign-in required |
 | [llm](#llm) | 2 | 2 | `settings:read`, `settings:write` |
 | [metrics](#metrics) | 5 | 0 | `alerts:read`; 1 with no sign-in required |
-| [mssp](#mssp) | 17 | 27 | `mssp:manage`, `mssp:onboard`, `mssp:read` |
+| [mssp](#mssp) | 17 | 27 | `clients:view`, `mssp:manage`, `mssp:onboard`, `mssp:read` |
 | [nist-coverage](#nist-coverage) | 1 | 0 | `alerts:read` |
 | [nl-detection](#nl-detection) | 0 | 2 | `rules:write` |
 | [nl-query](#nl-query) | 1 | 2 | `lake:query` |
@@ -119,7 +119,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | [threatintel](#threatintel) | 4 | 3 | `intel:read`, `threat_intel:read`, `threat_intel:write` |
 | [tool-deploy-rules](#tool-deploy-rules) | 2 | 2 | `alerts:read`, `connectors:write` |
 | [translation](#translation) | 1 | 1 | `rules:read`, `rules:view` |
-| [vcio-risk-scoring](#vcio-risk-scoring) | 8 | 6 | `alerts:read`, `settings:read`, `settings:write`, `vcio:assess` |
+| [vcio-risk-scoring](#vcio-risk-scoring) | 8 | 6 | `alerts:read`, `clients:view`, `settings:read`, `settings:write`, `vcio:assess` |
 | [waitlist](#waitlist) | 1 | 2 | `mssp:onboard`; 1 with no sign-in required |
 
 ## abuse
@@ -972,7 +972,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | Method | Path | What it does | Permission |
 | --- | --- | --- | --- |
 | POST | `/mssp/alerts/reroute` | Reroute existing alerts | `mssp:manage` |
-| GET | `/mssp/children` | List child tenants | `mssp:read` |
+| GET | `/mssp/children` | List child tenants | `clients:view` |
 | GET | `/mssp/children/{child_id}/effective-rules` | List effective rules for child | `mssp:read` |
 | GET | `/mssp/children/{child_id}/effective-rules/count` | Count effective rules for child | `mssp:read` |
 | POST | `/mssp/children/{child_id}/onboard` | Onboard child tenant | `mssp:onboard` |
@@ -1438,7 +1438,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | PUT | `/vcio-risk-scoring/assessments/{assessment_id}/answers` | Answer questions of a review, or clear their answers | `vcio:assess` |
 | POST | `/vcio-risk-scoring/assessments/{assessment_id}/autofill` | Fill in the answers the integrations can give (through the client's Client Review), never replacing one set by hand | `vcio:assess` |
 | GET | `/vcio-risk-scoring/assessors` | The A.C.O.R.N users who can be named as the assessor of a Client Risk Score | `alerts:read` |
-| GET | `/vcio-risk-scoring/clients` | The clients a Client Risk Score can be started for (the organisation's shown clients) | `alerts:read` |
+| GET | `/vcio-risk-scoring/clients` | The clients a Client Risk Score can be started for (the organisation's shown clients) | `clients:view` |
 | GET | `/vcio-risk-scoring/library` | The vCIO Risk Scoring questions and the default scoring settings | `alerts:read` |
 | GET | `/vcio-risk-scoring/settings` | The organisation's vCIO Risk Scoring settings | `settings:read` |
 | PUT | `/vcio-risk-scoring/settings` | Change the organisation's vCIO Risk Scoring settings and score every assessment again | `settings:write` |
