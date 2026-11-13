@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ library: vi.fn(), list: vi.fn(), create: vi.fn(), get: vi.fn(), update: vi.fn(), answer: vi.fn(), autofill: vi.fn(), settings: vi.fn(), saveSettings: vi.fn(), remove: vi.fn(), assessors: vi.fn(), clients: vi.fn(), trends: vi.fn(), clientTrend: vi.fn() }));
+const api = vi.hoisted(() => ({ library: vi.fn(), list: vi.fn(), create: vi.fn(), get: vi.fn(), update: vi.fn(), answer: vi.fn(), autofill: vi.fn(), settings: vi.fn(), saveSettings: vi.fn(), remove: vi.fn(), assessors: vi.fn(), clients: vi.fn(), trends: vi.fn(), clientTrend: vi.fn(), tickets: vi.fn(), createTicket: vi.fn() }));
 const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
 const csv = vi.hoisted(() => ({ downloadCsv: vi.fn() }));
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), msspApi: mssp }));
@@ -10,7 +10,7 @@ vi.mock('@/lib/csv', async (original) => ({ ...(await original<typeof import('@/
 vi.mock('@/lib/vcioRisk', async (original) => ({ ...(await original<typeof import('@/lib/vcioRisk')>()), vcioRiskApi: api }));
 
 import { ApiError } from '@/lib/api';
-import { assessmentCsv, assessorChoices, autofillSentence, changeText, excludedFor, keepQuestions, losesPoints, pct, type RiskAggregate, type RiskAssessment, type RiskLibrary, type RiskQuestion, type RiskScorecard } from '@/lib/vcioRisk';
+import { assessmentCsv, assessorChoices, autofillSentence, changeText, defaultTicketName, excludedFor, keepQuestions, losesPoints, pct, ticketLine, type RiskAggregate, type RiskAssessment, type RiskLibrary, type RiskQuestion, type RiskScorecard } from '@/lib/vcioRisk';
 import { RiskScoringView } from './RiskScoringView';
 
 const q = (over: Partial<RiskQuestion>): RiskQuestion => ({ id: 'ADM-001', category: 'Administrative', subsection: 'Onboarding', text: 'Is there an onboarding plan?', type: 'yesno', preferred: '', good: 'Yes', severity: 'High', csf: 'GV.RR', csf_function: 'Govern', csf_name: 'Roles', ...over });
@@ -46,6 +46,7 @@ beforeEach(() => {
   api.library.mockResolvedValue(LIBRARY);
   api.assessors.mockResolvedValue({ items: [{ name: 'Dana', email: 'dana@example.test' }, { name: 'Hal', email: null }] });
   api.trends.mockResolvedValue({ clients: [] });
+  api.tickets.mockResolvedValue({ items: [] });
   api.clientTrend.mockResolvedValue({ client_id: 'c1', client_name: 'Acme Dental', points: [], categories: [] });
   // Opening an assessment asks the integrations; by default they have nothing new to say.
   api.autofill.mockImplementation(async () => ({ assessment: assessment(), filled: 0, changed: 0, kept_by_hand: 0, cleared: 0, answered_by_integrations: 0, shared_with_review: 0, saved: false }));
@@ -423,5 +424,69 @@ describe('RiskScoringView', () => {
     await waitFor(() => expect(api.autofill).toHaveBeenCalledTimes(2));
     expect(await screen.findByTestId('risk-overall')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('tickets from questions', () => {
+  const ticket = (over: Record<string, unknown> = {}) => ({ id: 't1', question_id: 'ADM-001', summary: 'Fix onboarding', private_note: 'why', state: 'opened', ticket_id: '4521', status: 'On Hold', status_checked_at: '2026-11-13T10:00:00Z', message: null, created_by: 'hal', created_at: '2026-11-13T09:00:00Z', ...over });
+
+  it('says in words what each ticket is: opened with its HaloPSA status, waiting for CORE, or why it failed', () => {
+    expect(ticketLine({ state: 'opened', ticket_id: '4521', status: 'Waiting on Customer', message: null })).toBe('Ticket #4521 · Waiting on Customer');
+    expect(ticketLine({ state: 'opened', ticket_id: '4521', status: null, message: null })).toBe('Ticket #4521 · status not read yet');
+    expect(ticketLine({ state: 'waiting', ticket_id: null, status: null, message: null })).toBe('Ticket requested · waiting for CORE to open it');
+    expect(ticketLine({ state: 'failed', ticket_id: null, status: null, message: 'HaloPSA refused it' })).toBe('Ticket could not be opened: HaloPSA refused it');
+    expect(defaultTicketName({ id: 'ADM-001', text: 'x'.repeat(500) }).length).toBe(200);
+  });
+
+  it('shows the ticket and its HaloPSA status on the question line it was made from, and on no other', async () => {
+    api.list.mockResolvedValue({ items: [summary(assessment())] });
+    api.get.mockResolvedValue(assessment());
+    api.tickets.mockResolvedValue({ items: [ticket()] });
+    render(<RiskScoringView />);
+    await pickClient();
+    await userEvent.click(await screen.findByRole('tab', { name: 'Questions' }));
+    const rows = await screen.findAllByTestId('risk-question');
+    expect(await within(rows[0]).findByText('Ticket #4521 · On Hold')).toBeTruthy();
+    expect(within(rows[1]).queryByTestId('risk-tickets')).toBeNull();
+  });
+
+  it('asks for a name and a private note in a window, sends both, and shows the ticket as waiting', async () => {
+    api.list.mockResolvedValue({ items: [summary(assessment())] });
+    api.get.mockResolvedValue(assessment());
+    api.tickets.mockResolvedValue({ items: [] });
+    api.createTicket.mockResolvedValue(ticket({ state: 'waiting', ticket_id: null, status: null }));
+    render(<RiskScoringView />);
+    await pickClient();
+    await userEvent.click(await screen.findByRole('tab', { name: 'Questions' }));
+    const row = (await screen.findAllByTestId('risk-question'))[0];
+    await userEvent.click(within(row).getByRole('button', { name: 'Create HaloPSA ticket' }));
+    const dialog = await screen.findByRole('dialog', { name: 'HaloPSA ticket for ADM-001' });
+    const name = within(dialog).getByLabelText('Ticket name') as HTMLInputElement;
+    expect(name.value).toContain('Is there an onboarding plan?');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Write the onboarding plan');
+    await userEvent.type(within(dialog).getByLabelText('Private note'), 'Ask the owner first');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create ticket' }));
+    await waitFor(() => expect(api.createTicket).toHaveBeenCalledWith('a1', 'ADM-001', { summary: 'Write the onboarding plan', note: 'Ask the owner first' }));
+    expect(await within(row).findByText('Ticket requested · waiting for CORE to open it')).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'HaloPSA ticket for ADM-001' })).toBeNull();
+    // One request at a time per question: the button waits until CORE has opened it.
+    expect((within(row).getByRole('button', { name: 'Create HaloPSA ticket' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('keeps the window open with the API reason when the ticket is refused', async () => {
+    api.list.mockResolvedValue({ items: [summary(assessment())] });
+    api.get.mockResolvedValue(assessment());
+    api.tickets.mockResolvedValue({ items: [] });
+    api.createTicket.mockRejectedValue(new ApiError('409', 409, JSON.stringify({ detail: 'This client has no HaloPSA client mapped.' })));
+    render(<RiskScoringView />);
+    await pickClient();
+    await userEvent.click(await screen.findByRole('tab', { name: 'Questions' }));
+    const row = (await screen.findAllByTestId('risk-question'))[0];
+    await userEvent.click(within(row).getByRole('button', { name: 'Create HaloPSA ticket' }));
+    const dialog = await screen.findByRole('dialog', { name: 'HaloPSA ticket for ADM-001' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create ticket' }));
+    expect((await within(dialog).findByRole('alert')).textContent).toContain('no HaloPSA client mapped');
+    expect(screen.getByRole('dialog', { name: 'HaloPSA ticket for ADM-001' })).toBeTruthy();
   });
 });

@@ -17,10 +17,13 @@ import {
   changeText,
   assessmentCsv,
   autofillSentence,
+  defaultTicketName,
   excludedFor,
   goodAnswer,
   keepQuestions,
   pct,
+  ticketLine,
+  ticketsFor,
   vcioRiskApi,
   type QuestionFilter,
   type RiskAggregate,
@@ -34,6 +37,7 @@ import {
   type RiskQuestion,
   type RiskRating,
   type RiskSeverity,
+  type RiskTicket,
 } from '@/lib/vcioRisk';
 
 const input = 'rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100';
@@ -303,11 +307,16 @@ function Scorecard({ a, byId, trend, onOpen }: { a: RiskAssessment; byId: Map<st
   );
 }
 
-function QuestionRow({ q, a, library, busy, onAnswer, onSeverity }: { q: RiskQuestion; a: RiskAssessment; library: RiskLibrary; busy: boolean; onAnswer: (item: { id: string; answer?: string | null; vendor?: string | null; note?: string | null }) => void; onSeverity: (id: string, s: RiskSeverity) => void }) {
+type TicketPanel = { tickets: RiskTicket[]; onCreate: (questionId: string, body: { summary: string; note: string }) => Promise<string | null> };
+
+function QuestionRow({ q, a, library, busy, onAnswer, onSeverity, tickets }: { q: RiskQuestion; a: RiskAssessment; library: RiskLibrary; busy: boolean; onAnswer: (item: { id: string; answer?: string | null; vendor?: string | null; note?: string | null }) => void; onSeverity: (id: string, s: RiskSeverity) => void; tickets: TicketPanel }) {
   const entry = a.answers[q.id] ?? {};
   const [vendor, setVendor] = useState(entry.vendor ?? '');
   const [note, setNote] = useState(entry.note ?? '');
   const [open, setOpen] = useState(Boolean(entry.note));
+  const [making, setMaking] = useState(false);
+  const mine = ticketsFor(tickets.tickets, q.id);
+  const waiting = mine.some((t) => t.state === 'waiting');
   useEffect(() => setVendor(entry.vendor ?? ''), [entry.vendor]);
   useEffect(() => setNote(entry.note ?? ''), [entry.note]);
   const severity = a.severity[q.id] ?? q.severity;
@@ -368,13 +377,32 @@ function QuestionRow({ q, a, library, busy, onAnswer, onSeverity }: { q: RiskQue
             Auto
           </span>
         )}
-        <button type="button" onClick={() => setOpen(!open)} className="ml-auto text-xs text-blue-300 hover:underline">
+        <button
+          type="button"
+          disabled={waiting}
+          onClick={() => setMaking(true)}
+          title={waiting ? 'A ticket for this question is waiting for CORE to open it' : 'Open a HaloPSA ticket for this question'}
+          className="ml-auto text-xs text-blue-300 hover:underline disabled:text-gray-500 disabled:no-underline"
+        >
+          Create HaloPSA ticket
+        </button>
+        <button type="button" onClick={() => setOpen(!open)} className="text-xs text-blue-300 hover:underline">
           {entry.note ? 'Note' : 'Add note'}
         </button>
         <span className="text-[11px] text-gray-500" title={q.csf_name}>
           {q.csf} · {q.csf_function}
         </span>
       </div>
+      {mine.length > 0 && (
+        <ul className="mt-1 space-y-0.5" data-testid="risk-tickets">
+          {mine.map((t) => (
+            <li key={t.id} className={`text-xs ${t.state === 'failed' ? 'text-red-300' : t.state === 'opened' ? 'text-emerald-300' : 'text-gray-400'}`} title={t.summary}>
+              {ticketLine(t)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {making && <TicketDialog q={q} onClose={() => setMaking(false)} onCreate={(body) => tickets.onCreate(q.id, body)} />}
       {entry.source === 'auto' && entry.evidence ? (
         <p className="mt-1 text-xs text-gray-400" data-testid="risk-evidence">
           {entry.evidence}
@@ -395,7 +423,51 @@ function QuestionRow({ q, a, library, busy, onAnswer, onSeverity }: { q: RiskQue
   );
 }
 
-function Questions({ a, library, busy, onAnswer, onSeverity }: { a: RiskAssessment; library: RiskLibrary; busy: boolean; onAnswer: (item: { id: string; answer?: string | null; vendor?: string | null; note?: string | null }) => void; onSeverity: (id: string, s: RiskSeverity) => void }) {
+/** The window that asks for a ticket's name and its private note. The note is written on the ticket by CORE once HaloPSA has opened it, and the customer never sees it. */
+function TicketDialog({ q, onClose, onCreate }: { q: RiskQuestion; onClose: () => void; onCreate: (body: { summary: string; note: string }) => Promise<string | null> }) {
+  const [summary, setSummary] = useState(defaultTicketName(q));
+  const [note, setNote] = useState('');
+  const [sending, setSending] = useState(false);
+  const [problem, setProblem] = useState('');
+  const send = async () => {
+    setSending(true);
+    setProblem('');
+    const failed = await onCreate({ summary: summary.trim(), note: note.trim() });
+    setSending(false);
+    if (failed) setProblem(failed);
+    else onClose();
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div role="dialog" aria-modal="true" aria-label={`HaloPSA ticket for ${q.id}`} className="w-full max-w-lg space-y-3 rounded-lg border border-gray-700 bg-gray-900 p-5 shadow-xl">
+        <h3 className="text-base font-semibold text-gray-100">Create a HaloPSA ticket</h3>
+        <label className="block text-xs text-gray-400">
+          Ticket name
+          <input aria-label="Ticket name" value={summary} maxLength={200} onChange={(e) => setSummary(e.target.value)} className={`${input} mt-1 w-full`} />
+        </label>
+        <label className="block text-xs text-gray-400">
+          Private note
+          <textarea aria-label="Private note" value={note} rows={4} maxLength={3000} onChange={(e) => setNote(e.target.value)} placeholder="Written on the ticket as a private note (the customer does not see it)" className={`${input} mt-1 w-full`} />
+        </label>
+        {problem && (
+          <p role="alert" className="text-xs text-red-300">
+            {problem}
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded border border-gray-700 px-3 py-1 text-sm text-gray-300 hover:bg-gray-800">
+            Cancel
+          </button>
+          <button type="button" disabled={sending || !summary.trim()} onClick={() => void send()} className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-500 disabled:opacity-50">
+            Create ticket
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Questions({ a, library, busy, onAnswer, onSeverity, tickets }: { a: RiskAssessment; library: RiskLibrary; busy: boolean; onAnswer: (item: { id: string; answer?: string | null; vendor?: string | null; note?: string | null }) => void; onSeverity: (id: string, s: RiskSeverity) => void; tickets: TicketPanel }) {
   const [filter, setFilter] = useState<QuestionFilter>('all');
   const [category, setCategory] = useState('');
   const [search, setSearch] = useState('');
@@ -442,7 +514,7 @@ function Questions({ a, library, busy, onAnswer, onSeverity }: { a: RiskAssessme
           </h3>
           <ul className="space-y-2">
             {g.items.map((q) => (
-              <QuestionRow key={q.id} q={q} a={a} library={library} busy={busy} onAnswer={onAnswer} onSeverity={onSeverity} />
+              <QuestionRow key={q.id} q={q} a={a} library={library} busy={busy} onAnswer={onAnswer} onSeverity={onSeverity} tickets={tickets} />
             ))}
           </ul>
         </section>
@@ -490,6 +562,7 @@ export function RiskScoringView() {
   const [trend, setTrend] = useState<RiskClientTrend | null>(null);
   const [allClients, setAllClients] = useState<RiskClientTrendRow[]>([]);
   const [fillOnStart, setFillOnStart] = useState(true);
+  const [tickets, setTickets] = useState<RiskTicket[]>([]);
   const [draft, setDraft] = useState<{ review_date: string; platform: RiskPlatform; assessor: string }>({ review_date: '', platform: 'm365', assessor: '' });
 
   const fail = (err: unknown, fallback: string) => setError(apiErrorDetail(err) ?? (err instanceof Error && err.message ? err.message : fallback));
@@ -583,6 +656,38 @@ export function RiskScoringView() {
       live = false;
     };
   }, [openId]);
+
+  // The tickets made from the open assessment's questions. CORE opens them and reads their HaloPSA status on its own schedule, so the page asks again every half minute.
+  useEffect(() => {
+    if (!openId) {
+      setTickets([]);
+      return;
+    }
+    let live = true;
+    const load = () =>
+      Promise.resolve()
+        .then(() => vcioRiskApi.tickets(openId))
+        .then((r) => live && setTickets(r?.items ?? []))
+        .catch(() => undefined);
+    void load();
+    const timer = setInterval(() => void load(), 30_000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [openId]);
+
+  /** Ask for a ticket; returns the reason it was refused, or null when it was queued. */
+  const createTicket = async (questionId: string, body: { summary: string; note: string }): Promise<string | null> => {
+    if (!current) return 'No assessment is open.';
+    try {
+      const made = await vcioRiskApi.createTicket(current.id, questionId, body);
+      setTickets((rows) => [...rows, made]);
+      return null;
+    } catch (err) {
+      return apiErrorDetail(err) ?? 'The ticket could not be requested.';
+    }
+  };
 
   const fill = async (id: string) => {
     filledOnOpen.current.add(id);
@@ -750,6 +855,7 @@ export function RiskScoringView() {
               busy={busy}
               onAnswer={(item) => void change(() => vcioRiskApi.answer(current.id, [item]), 'The answer could not be saved.')}
               onSeverity={(id, s) => void change(() => vcioRiskApi.update(current.id, { severity: { [id]: s } }), 'The severity could not be saved.')}
+              tickets={{ tickets, onCreate: createTicket }}
             />
           )}
           {tab === 'method' && <Method />}

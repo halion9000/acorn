@@ -184,6 +184,36 @@ export interface RiskAssessment extends RiskAssessmentSummary {
   scorecard: RiskScorecard;
 }
 
+/** A HaloPSA ticket asked for from one question of an assessment. */
+export interface RiskTicket {
+  id: string;
+  question_id: string;
+  summary: string;
+  private_note: string;
+  /** waiting: CORE has not opened it yet; opened: HaloPSA gave it a number; failed: see message. */
+  state: 'waiting' | 'opened' | 'failed' | string;
+  ticket_id: string | null;
+  /** The status HaloPSA shows ("On Hold", "Waiting on Customer"...) as CORE last read it. */
+  status: string | null;
+  status_checked_at: string | null;
+  message: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** The tickets of one question, oldest first. */
+export const ticketsFor = (tickets: RiskTicket[], questionId: string): RiskTicket[] => tickets.filter((t) => t.question_id === questionId);
+
+/** What to show on the question line for a ticket: its number and HaloPSA status once opened, that it is waiting for CORE, or why it failed. */
+export function ticketLine(t: Pick<RiskTicket, 'state' | 'ticket_id' | 'status' | 'message'>): string {
+  if (t.state === 'opened') return `Ticket ${t.ticket_id ? `#${t.ticket_id}` : 'opened'} · ${t.status || 'status not read yet'}`;
+  if (t.state === 'failed') return `Ticket could not be opened${t.message ? `: ${t.message}` : ''}`;
+  return 'Ticket requested · waiting for CORE to open it';
+}
+
+/** The name a ticket starts with: the question's id and text, kept to the length a ticket name takes here. */
+export const defaultTicketName = (q: Pick<RiskQuestion, 'id' | 'text'>): string => `${q.id}: ${q.text}`.slice(0, 200);
+
 const json = (method: string, body: unknown) => ({ method, body: JSON.stringify(body) });
 
 export const vcioRiskApi = {
@@ -209,6 +239,11 @@ export const vcioRiskApi = {
   settings: () => apiRequest<RiskSettingsAnswer>('/api/v1/vcio-risk-scoring/settings'),
   saveSettings: (settings: RiskSettings | Record<string, never>) => apiRequest<RiskSettingsAnswer>('/api/v1/vcio-risk-scoring/settings', json('PUT', { settings })),
   remove: (id: string) => apiRequest<{ deleted: boolean }>(`/api/v1/vcio-risk-scoring/assessments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** The HaloPSA tickets made from this assessment's questions, with the status CORE last read. */
+  tickets: (id: string) => apiRequest<{ items: RiskTicket[] }>(`/api/v1/vcio-risk-scoring/assessments/${encodeURIComponent(id)}/tickets`),
+  /** Ask CORE to open a ticket for a question, with a private note written on it once it is open. */
+  createTicket: (id: string, questionId: string, body: { summary: string; note: string }) =>
+    apiRequest<RiskTicket>(`/api/v1/vcio-risk-scoring/assessments/${encodeURIComponent(id)}/questions/${encodeURIComponent(questionId)}/tickets`, json('POST', body)),
 };
 
 /** A score as a whole percentage, or a dash when nothing was answered. */
