@@ -204,6 +204,9 @@ class DeviceOut(BaseModel):
     auto_hidden: bool = False
     # Tools this device's client does not use (set on the client's page): the device is never counted as missing from them.
     excluded_tools: list[str] = Field(default_factory=list)
+    # Set when a tool's record (Huntress) is stored here because the RMM files the machine here, while that tool's own organization is mapped to ANOTHER client: that client's name. The
+    # mismatch is in the tool's organizations, not in the machine (see ``device_follow``). None when every record is under the client its organization is mapped to.
+    followed_from: str | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -238,6 +241,8 @@ class DeviceSummary(BaseModel):
     not_in_addigy: int = 0
     not_in_threatmate: int = 0
     not_in_huntress: int = 0
+    # Devices whose Huntress record is stored with the machine although its Huntress organization is mapped to another client (``DeviceOut.followed_from``).
+    followed: int = 0
     # ConnectWise Control (ScreenConnect) runs on Windows and Linux machines only: iPhones, iPads and Macs are not counted. Field Effect: every machine but phones and tablets.
     not_in_screenconnect: int = 0
     not_in_fieldeffect: int = 0
@@ -497,6 +502,11 @@ _ALERTS_PER_DEVICE = 5
 _SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 
 
+def _alert_order(a: DeviceAlertOut) -> tuple[int, float]:
+    """Worst severity first, then newest first: the order a device lists its alerts in."""
+    return (_SEVERITY_RANK.get((a.severity or "").lower(), 5), -(a.created_at.timestamp() if a.created_at else 0))
+
+
 _IP_ADDRESS = re.compile(r"^(\d{1,3}(\.\d{1,3}){3}|[0-9a-f]*:[0-9a-f:.]*)$")
 
 
@@ -531,10 +541,20 @@ async def _alerts_by_host_many(db: Any, tids: list[uuid.UUID]) -> dict[uuid.UUID
         )
     for grouped in out.values():
         for items in grouped.values():
-            items.sort(
-                key=lambda a: (_SEVERITY_RANK.get((a.severity or "").lower(), 5), -(a.created_at.timestamp() if a.created_at else 0))
-            )
+            items.sort(key=_alert_order)
     return out
+
+
+def _followed_origin(src: DeviceSource, clients: dict[uuid.UUID, str]) -> uuid.UUID | None:
+    """The client a following tool's record came from (the one its organization is mapped to), when it is one of the owner's clients and not the client the record is under now."""
+    if src.vendor not in device_follow.FOLLOWING_TOOLS:
+        return None
+    raw = (src.details or {}).get("followed_from_client")
+    try:
+        origin = uuid.UUID(str(raw)) if raw else None
+    except ValueError:
+        return None
+    return origin if origin is not None and origin in clients and origin != src.tenant_id else None
 
 
 async def _alerts_by_host(db: Any, tid: uuid.UUID) -> dict[str, list[DeviceAlertOut]]:
@@ -648,6 +668,16 @@ async def _load(db: Any, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[
         all_sources = (await db.execute(select(DeviceSource).where(DeviceSource.tenant_id.in_(tids)))).scalars().all()
         all_alerts = await _alerts_by_host_many(db, tids)
         all_snoozes = (await db.execute(select(DeviceSnooze).where(DeviceSnooze.tenant_id.in_(tids)))).scalars().all()
+        # A record that followed its machine here (device_follow) left its tool's alerts behind: they are still filed under the client the tool's organization is mapped to. Those clients'
+        # alerts are read too (only the owner's own clients, which is what ``clients`` holds), so the alerts show on the row the machine is on.
+        came_from = {src.id: origin for src in all_sources if (origin := _followed_origin(src, clients)) is not None}
+        elsewhere = sorted({o for o in came_from.values() if o not in tids}, key=str)
+        origin_names: dict[uuid.UUID, set[str]] = {}
+        if elsewhere:
+            all_alerts = {**(await _alerts_by_host_many(db, elsewhere)), **all_alerts}
+            # The machine names the origin clients have devices for: an alert of the origin that names one of them is shown on THAT row, so it is not lent to a moved machine of the same name.
+            for o_tid, o_host in (await db.execute(select(Device.tenant_id, Device.hostname).where(Device.tenant_id.in_(elsewhere)))).all():
+                origin_names.setdefault(o_tid, set()).add(host_key(o_host))
     devices_of: dict[uuid.UUID, list[Device]] = {}
     for d in all_devices:
         devices_of.setdefault(d.tenant_id, []).append(d)
@@ -657,6 +687,7 @@ async def _load(db: Any, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[
     snoozes_of: dict[uuid.UUID, dict[uuid.UUID, datetime]] = {}
     for row in all_snoozes:
         snoozes_of.setdefault(row.tenant_id, {})[row.device_id] = row.snoozed_at
+    lent_to: set[tuple[uuid.UUID, uuid.UUID]] = set()  # (origin client, alert) pairs already shown on a moved machine: each is shown once
     for tid in tids:
         devices = devices_of.get(tid, [])
         by_device = sources_of.get(tid, {})
@@ -665,6 +696,22 @@ async def _load(db: Any, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[
         for d in devices:
             srcs = sorted(by_device.get(d.id, []), key=lambda s: s.vendor)
             auto = auto_hidden_of([checkin_of(s) for s in srcs], online_now_of(srcs))
+            own_alerts = alerts.get(host_key(d.hostname), [])
+            origins = sorted({came_from[s.id] for s in srcs if s.id in came_from}, key=str)
+            lent: list[DeviceAlertOut] = []
+            for origin in origins:
+                # Only the following tools' own alerts, only by the name the tool gives the machine, and never one the origin client's own device of that name already shows: nothing else of the
+                # other client is shown here, and no alert is counted on two rows.
+                names = {host_key(s.name or d.hostname) for s in srcs if came_from.get(s.id) == origin} | {host_key(d.hostname)}
+                names -= origin_names.get(origin) or {host_key(x.hostname) for x in devices_of.get(origin, [])}
+                theirs = all_alerts.get(origin, {})
+                for n in sorted(names):
+                    for a in theirs.get(n, []):
+                        if (a.source or "") in device_follow.FOLLOWING_TOOLS and (origin, a.id) not in lent_to:
+                            lent_to.add((origin, a.id))
+                            lent.append(a)
+            if lent:
+                own_alerts = sorted([*own_alerts, *lent], key=_alert_order)
             out.append(
                 DeviceOut(
                     id=d.id,
@@ -695,8 +742,9 @@ async def _load(db: Any, owner: uuid.UUID, tids: list[uuid.UUID], clients: dict[
                     last_online=(online := last_online_of(srcs)),
                     online=online_now_of(srcs),
                     offline_days=offline_days_of(online),
-                    open_alerts=len(alerts.get(host_key(d.hostname), [])),
-                    alerts=alerts.get(host_key(d.hostname), [])[:_ALERTS_PER_DEVICE],
+                    open_alerts=len(own_alerts),
+                    alerts=own_alerts[:_ALERTS_PER_DEVICE],
+                    followed_from=", ".join(sorted({clients.get(o) or "another client" for o in origins})) or None,
                     hidden_since=hidden_since_of(snoozes.get(d.id), online) or (online if auto else None),
                     auto_hidden=auto and hidden_since_of(snoozes.get(d.id), online) is None,
                     excluded_tools=excluded_by_tenant.get(d.tenant_id, []),
@@ -746,6 +794,7 @@ def filter_devices(
     kind: str | None = None,
     encryption: str | None = None,
     mdm: str | None = None,
+    followed: bool = False,
 ) -> list[DeviceOut]:
     """The devices a page (or an export) asked for: every filter given must hold. ``search`` matches the name, serial number, client name or any IP address, ignoring case. Sorted by client, then name."""
     rows = [d for d in everything if (d.hidden_since is not None) == hidden]
@@ -788,6 +837,8 @@ def filter_devices(
         rows = [d for d in rows if d.mdm_enabled is False]
     elif mdm == "not_ade":
         rows = [d for d in rows if d.enrollment == "Manual"]
+    if followed:
+        rows = [d for d in rows if d.followed_from is not None]
     return sorted(rows, key=lambda d: (d.client_name or "", d.hostname.lower()))
 
 
@@ -865,6 +916,10 @@ async def list_devices(
         pattern="^(disabled|not_ade)$",
         description="Only devices Addigy shows with MDM disabled, or only devices enrolled by hand rather than through ADE.",
     ),
+    followed: bool = Query(
+        default=False,
+        description="Only devices whose Huntress record is stored with the machine while its Huntress organization is mapped to another client.",
+    ),
 ) -> DeviceListOut:
     owner = current_user.tenant_id
     scope, clients = await _scope(db, owner, client_id)
@@ -880,6 +935,7 @@ async def list_devices(
         not_in_addigy=sum(1 for d in counted if is_missing_from(d, "addigy")),
         not_in_threatmate=sum(1 for d in counted if is_missing_from(d, "threatmate")),
         not_in_huntress=sum(1 for d in counted if is_missing_from(d, "huntress")),
+        followed=sum(1 for d in everything if d.followed_from is not None),
         not_in_screenconnect=sum(1 for d in counted if is_missing_from(d, "screenconnect")),
         not_in_fieldeffect=sum(1 for d in counted if is_missing_from(d, "fieldeffect")),
         not_in_ninjaone=sum(1 for d in counted if is_missing_from(d, "ninjaone")),
@@ -911,6 +967,7 @@ async def list_devices(
         kind=kind,
         encryption=encryption,
         mdm=mdm,
+        followed=followed,
     )
     total = len(rows)
     start = (page - 1) * page_size
@@ -968,6 +1025,7 @@ async def export_devices(
     kind: str | None = Query(default=None, pattern="^(computer|network|camera|other)$"),
     encryption: str | None = Query(default=None, pattern="^(not_encrypted|encrypted)$"),
     mdm: str | None = Query(default=None, pattern="^(disabled|not_ade)$"),
+    followed: bool = Query(default=False),
 ) -> Response:
     owner = current_user.tenant_id
     scope, clients = await _scope(db, owner, client_id)
@@ -988,6 +1046,7 @@ async def export_devices(
         kind=kind,
         encryption=encryption,
         mdm=mdm,
+        followed=followed,
     )
     body = devices_csv(rows)
     return Response(

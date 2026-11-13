@@ -12501,6 +12501,17 @@ paths:
           title: Mdm
         description: Only devices Addigy shows with MDM disabled, or only devices
           enrolled by hand rather than through ADE.
+      - name: followed
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Only devices whose Huntress record is stored with the machine
+            while its Huntress organization is mapped to another client.
+          default: false
+          title: Followed
+        description: Only devices whose Huntress record is stored with the machine
+          while its Huntress organization is mapped to another client.
       responses:
         '200':
           description: Successful Response
@@ -12637,6 +12648,13 @@ paths:
             pattern: ^(disabled|not_ade)$
           - type: 'null'
           title: Mdm
+      - name: followed
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Followed
       responses:
         '200':
           description: Successful Response
@@ -34606,6 +34624,11 @@ components:
             type: string
           type: array
           title: Excluded Tools
+        followed_from:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Followed From
         kind:
           type: string
           title: Kind
@@ -34770,6 +34793,10 @@ components:
         not_in_huntress:
           type: integer
           title: Not In Huntress
+          default: 0
+        followed:
+          type: integer
+          title: Followed
           default: 0
         not_in_screenconnect:
           type: integer

@@ -803,6 +803,35 @@ describe('flatDetails', () => {
   });
 });
 
+describe('a Huntress agent filed under another client', () => {
+  it('says so on the row, counts them on a tile, and the tile lists only those; pressing again takes the filter off', async () => {
+    listMock.mockResolvedValue(list([device({ hostname: 'FRISCO-4', followed_from: 'ESW - Rejuvenation' }), device({ hostname: 'PLAIN-1' })], { summary: { total: 2, not_in_master: 0, followed: 16 } }));
+    render(<DevicesView />);
+    const row = async (name: string) => (await screen.findByText(name)).closest('tr') as HTMLElement;
+    expect(within(await row('FRISCO-4')).getByTestId('followed-badge')).toHaveTextContent('Huntress filed under ESW - Rejuvenation');
+    expect(within(await row('PLAIN-1')).queryByTestId('followed-badge')).not.toBeInTheDocument();
+    expect(screen.getByTestId('devices-followed')).toHaveTextContent('16');
+    const tile = screen.getByRole('button', { name: /Huntress organization differs/ });
+    await userEvent.click(tile);
+    await waitFor(() => expect(listMock.mock.calls.at(-1)![0]).toMatchObject({ followed: true, page: 1 }));
+    expect(screen.getByRole('button', { name: /Huntress organization differs/ })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: /Huntress organization differs/ }));
+    await waitFor(() => expect(listMock.mock.calls.at(-1)![0].followed).toBeUndefined());
+  });
+
+  it('a link, and the saved filters, can carry the filter', () => {
+    expect(filtersFromParams(new URLSearchParams('followed=1'))).toEqual({ followedOnly: true });
+    expect(filtersFromParams(new URLSearchParams('followed=0'))).toBeNull();
+  });
+
+  it('has no tile when there is none', async () => {
+    listMock.mockResolvedValue(list([device({ hostname: 'PLAIN-1' })], { summary: { total: 1, not_in_master: 0, followed: 0 } }));
+    render(<DevicesView />);
+    await screen.findByText('PLAIN-1');
+    expect(screen.queryByTestId('devices-followed')).not.toBeInTheDocument();
+  });
+});
+
 describe('Addigy MDM state and enrollment', () => {
   const summary = (over: Record<string, unknown> = {}) => ({ total: 4, not_in_master: 0, mdm_disabled: 3, mdm_known: 40, not_ade: 12, enrollment_known: 30, ...over });
 

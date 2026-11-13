@@ -94,6 +94,8 @@ LIST_DEFAULTS = {
     "os": None,
     "kind": None,
     "encryption": None,
+    "mdm": None,
+    "followed": False,
 }
 
 

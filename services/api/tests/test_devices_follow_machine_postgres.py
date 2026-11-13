@@ -5,6 +5,7 @@ NinjaOne and as one in Huntress), or the same client under another name. A Huntr
 machine sat under another: the Devices page then said "not in Huntress" for a machine Huntress protects. Opt in with AISOC_TEST_PG_URL and AISOC_TEST_PG_APP_URL (a disposable, migrated database).
 """
 
+import json
 import os
 import uuid
 
@@ -213,3 +214,89 @@ async def test_a_hidden_client_never_pulls_a_record_out_of_a_shown_one_and_a_mov
     _a, a_items = await held(world, "hotel_a")
     moved = next(s for s in a_items[0].sources if s.vendor == "huntress")
     assert moved.details.get("followed_from_client") == str(world["group"])
+
+
+async def test_the_mismatched_agents_can_be_listed_and_their_huntress_alerts_show_on_the_machines_row(world):
+    await send(
+        world,
+        dev("ninjaone", "A", "n1", "HOTEL-A-PC1", "SERIAL-A1"),
+        dev("ninjaone", "A", "n2", "HOTEL-A-PC2", "SERIAL-A2"),
+        dev("huntress", "H", "h1", "HOTEL-A-PC1", "SERIAL-A1"),
+        dev("huntress", "HA", "h2", "HOTEL-A-PC2", "SERIAL-A2"),  # its Huntress organization IS hotel A's: no mismatch
+    )
+    group, hotel = world["group"], world["hotel_a"]
+    # Huntress files its alerts under the client its organization is mapped to: the group. One names the machine; one is another tool's alert for a machine of that name; one is closed.
+    for source, status, title in (
+        ("huntress", "new", "Huntress incident"),
+        ("ninjaone", "new", "A NinjaOne alert of the group"),
+        ("huntress", "resolved", "Old incident"),
+    ):
+        assert (
+            await as_owner(
+                "insert into alerts (tenant_id, title, severity, status, raw_event, affected_hosts) values (:t, :ti, 'high', :st, cast(:r as jsonb), cast(:h as jsonb))",
+                {"t": group, "ti": title, "st": status, "r": json.dumps({"source": source}), "h": json.dumps(["HOTEL-A-PC1"])},
+            )
+            == 1
+        )
+    p = world["parent"]
+    devices_endpoints.forget_loaded()
+    one = await as_app(p, lambda db: list_devices(user(p), db, client_id=hotel))
+    by_name = {d.hostname: d for d in one.items}
+    moved, plain = by_name["HOTEL-A-PC1"], by_name["HOTEL-A-PC2"]
+    assert moved.followed_from is not None and moved.followed_from.startswith("group-")
+    assert plain.followed_from is None
+    # Seen from hotel A alone, the group's Huntress alert for this machine is on its row; the group's other alerts are not.
+    assert (moved.open_alerts, [a.title for a in moved.alerts]) == (1, ["Huntress incident"])
+    assert plain.open_alerts == 0
+    assert one.summary.followed == 1
+    devices_endpoints.forget_loaded()
+    only = await as_app(p, lambda db: list_devices(user(p), db, client_id=None, followed=True))
+    assert [d.hostname for d in only.items] == ["HOTEL-A-PC1"]
+    assert only.summary.followed == 1 and only.total == 1
+    # With every client loaded the alert is counted once, on the machine's row.
+    assert [d.open_alerts for d in only.items] == [1]
+
+
+async def put_alert(tenant, source, title, severity, host, status="new"):
+    assert (
+        await as_owner(
+            "insert into alerts (tenant_id, title, severity, status, raw_event, affected_hosts) values (:t, :ti, :sv, :st, cast(:r as jsonb), cast(:h as jsonb))",
+            {"t": tenant, "ti": title, "sv": severity, "st": status, "r": json.dumps({"source": source}), "h": json.dumps([host])},
+        )
+        == 1
+    )
+
+
+async def test_the_worst_alert_leads_the_row_even_when_it_came_from_the_other_client(world):
+    await send(world, dev("ninjaone", "A", "n1", "BUSY-PC", "SERIAL-B1"), dev("huntress", "H", "h1", "BUSY-PC", "SERIAL-B1"))
+    for i in range(5):
+        await put_alert(world["hotel_a"], "ninjaone", f"Low {i}", "low", "BUSY-PC")
+    await put_alert(world["group"], "huntress", "Critical incident", "critical", "BUSY-PC")
+    p = world["parent"]
+    devices_endpoints.forget_loaded()
+    row = (await as_app(p, lambda db: list_devices(user(p), db, client_id=world["hotel_a"]))).items[0]
+    assert row.open_alerts == 6
+    assert row.alerts[0].title == "Critical incident" and row.alerts[0].severity == "critical"
+    assert len(row.alerts) == 5  # the cap still applies, after the sort
+
+
+async def test_an_alert_is_shown_on_one_row_only_and_never_on_a_machine_the_origin_client_has_of_that_name(world):
+    # The group has its OWN device named SHARED-PC (Huntress only); hotel A's NinjaOne machine of the same name and serial has its agent in the same Huntress organization.
+    await send(
+        world,
+        dev("ninjaone", "A", "n1", "SHARED-PC", "SERIAL-S1"),
+        dev("huntress", "H", "h1", "SHARED-PC", "SERIAL-S1"),
+        dev("huntress", "H", "h2", "SHARED-PC", "SERIAL-S2"),  # another machine of that name, not in NinjaOne: stays with the group
+    )
+    await put_alert(world["group"], "huntress", "Incident on SHARED-PC", "high", "SHARED-PC")
+    p = world["parent"]
+    devices_endpoints.forget_loaded()
+    everything = (await as_app(p, lambda db: list_devices(user(p), db, client_id=None))).items
+    shared = [d for d in everything if d.hostname == "SHARED-PC"]
+    assert sorted(d.tenant_id == world["group"] for d in shared) == [False, True]
+    # Counted once: the group's own device of that name keeps it, the moved machine does not borrow it.
+    assert sorted(d.open_alerts for d in shared) == [0, 1]
+    assert next(d for d in shared if d.tenant_id == world["group"]).open_alerts == 1
+    devices_endpoints.forget_loaded()
+    alone = (await as_app(p, lambda db: list_devices(user(p), db, client_id=world["hotel_a"]))).items
+    assert [d.open_alerts for d in alone] == [0]

@@ -75,6 +75,7 @@ export function filtersFromParams(params: URLSearchParams | null): Partial<Saved
   if (MISSING_TOOLS.includes(missing as Missing)) out.missing = missing as Missing;
   if (params.get('attention') === '1') out.attentionOnly = true;
   if (params.get('stale') === '1') out.staleOnly = true;
+  if (params.get('followed') === '1') out.followedOnly = true;
   if (params.get('encryption') === 'not_encrypted') out.notEncryptedOnly = true;
   const mdm = params.get('mdm');
   if (mdm === 'disabled' || mdm === 'not_ade') out.mdm = mdm;
@@ -110,6 +111,8 @@ interface SavedDeviceFilters {
   attentionOnly: boolean;
   staleOnly: boolean;
   notEncryptedOnly?: boolean;
+  /** Only devices whose Huntress agent is filed under another client than the machine. */
+  followedOnly?: boolean;
   /** Only devices Addigy shows with MDM disabled ('disabled'), or only ones enrolled by hand rather than through ADE ('not_ade'). */
   mdm?: '' | 'disabled' | 'not_ade';
   offlineOnly: boolean;
@@ -143,6 +146,8 @@ export default function DevicesView() {
   const [staleOnly, setStaleOnly] = useState(false);
   const [notEncryptedOnly, setNotEncryptedOnly] = useState(false);
   const [mdm, setMdm] = useState<'' | 'disabled' | 'not_ade'>('');
+  // Only devices whose Huntress agent sits in a Huntress organization mapped to another client (a mismatch in Huntress's organizations, not a fault of the machine).
+  const [followedOnly, setFollowedOnly] = useState(false);
   const [offlineOnly, setOfflineOnly] = useState(false);
   const [alertsOnly, setAlertsOnly] = useState(false);
   const [hiddenOnly, setHiddenOnly] = useState(false);
@@ -159,6 +164,7 @@ export default function DevicesView() {
     setAttentionOnly(saved.attentionOnly === true);
     setStaleOnly(saved.staleOnly === true);
     setNotEncryptedOnly(saved.notEncryptedOnly === true);
+    setFollowedOnly(saved.followedOnly === true);
     setMdm(saved.mdm === 'disabled' || saved.mdm === 'not_ade' ? saved.mdm : '');
     setOfflineOnly(saved.offlineOnly === true);
     setAlertsOnly(saved.alertsOnly === true);
@@ -175,8 +181,8 @@ export default function DevicesView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (filtersRestored) saveFilters('devices', { clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, mdm, offlineOnly, alertsOnly } satisfies SavedDeviceFilters);
-  }, [filtersRestored, clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, mdm, offlineOnly, alertsOnly]);
+    if (filtersRestored) saveFilters('devices', { clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, followedOnly, mdm, offlineOnly, alertsOnly } satisfies SavedDeviceFilters);
+  }, [filtersRestored, clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, followedOnly, mdm, offlineOnly, alertsOnly]);
 
   // Only the answer to the NEWEST request may reach the page. The estate is large and a filtered query can answer slower than the one before it: without this, changing a filter showed the answer to
   // the previous filter whenever it arrived last, and the list stayed wrong until the page was left and opened again.
@@ -186,14 +192,14 @@ export default function DevicesView() {
     setLoading(true);
     setError('');
     try {
-      const answer = await devicesApi.list({ page, pageSize: 50, clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, mdm: mdm || undefined, hidden: hiddenOnly || undefined });
+      const answer = await devicesApi.list({ page, pageSize: 50, clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, mdm: mdm || undefined, followed: followedOnly || undefined, hidden: hiddenOnly || undefined });
       if (mine === newest.current) setData(answer);
     } catch (err) {
       if (mine === newest.current) setError(devicesLoadError(err));
     } finally {
       if (mine === newest.current) setLoading(false);
     }
-  }, [page, clientId, search, vendor, os, kind, gapsOnly, missing, offlineOnly, alertsOnly, attentionOnly, staleOnly, notEncryptedOnly, mdm, hiddenOnly]);
+  }, [page, clientId, search, vendor, os, kind, gapsOnly, missing, offlineOnly, alertsOnly, attentionOnly, staleOnly, notEncryptedOnly, mdm, followedOnly, hiddenOnly]);
 
   useEffect(() => {
     // Not before the remembered or linked filters are on the page: loading first with none asked the whole estate for an answer nobody wanted, which could land after the right one.
@@ -225,7 +231,7 @@ export default function DevicesView() {
 
   const exportCsv = async () => {
     try {
-      const text = await devicesApi.exportCsv({ clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, mdm: mdm || undefined, hidden: hiddenOnly || undefined });
+      const text = await devicesApi.exportCsv({ clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, mdm: mdm || undefined, followed: followedOnly || undefined, hidden: hiddenOnly || undefined });
       const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
       const link = document.createElement('a');
       link.href = url;
@@ -343,6 +349,23 @@ export default function DevicesView() {
             <div className="text-xs text-gray-400">Not encrypted (BitLocker)</div>
             <div className="text-2xl font-semibold text-amber-300" data-testid="devices-not-encrypted">
               {data?.summary.not_encrypted ?? '—'}
+            </div>
+          </button>
+        )}
+        {((data?.summary.followed ?? 0) > 0 || followedOnly) && (
+          <button
+            type="button"
+            onClick={() => {
+              setFollowedOnly(!followedOnly);
+              setPage(1);
+            }}
+            aria-pressed={followedOnly}
+            title="Machines whose Huntress agent is in a Huntress organization mapped to a DIFFERENT client than the one NinjaOne or Addigy files the machine under. A.C.O.R.N keeps the agent with the machine, so nothing is missing; this lists them so the organizations in Huntress can be put right. Press to list them."
+            className={`rounded-lg border p-3 text-left ${followedOnly ? 'border-sky-500 bg-sky-500/10' : 'border-gray-800 bg-gray-900/60'}`}
+          >
+            <div className="text-xs text-gray-400">Huntress organization differs</div>
+            <div className="text-2xl font-semibold text-sky-300" data-testid="devices-followed">
+              {data?.summary.followed ?? '—'}
             </div>
           </button>
         )}
@@ -474,7 +497,7 @@ export default function DevicesView() {
 
       <SavedViewsBar<SavedDeviceFilters>
         viewType="devices"
-        filters={{ clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, mdm, offlineOnly, alertsOnly }}
+        filters={{ clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, followedOnly, mdm, offlineOnly, alertsOnly }}
         onApply={(applied) => {
           applyFilters(applied);
           setPage(1);
@@ -705,6 +728,11 @@ function DeviceRowView({ d, master, open, onToggle, onHide }: { d: DeviceRow; ma
               Not encrypted
             </span>
           )}
+          {d.followed_from ? (
+            <span className="ml-2 rounded bg-sky-500/15 px-1.5 py-0.5 text-[11px] text-sky-300" data-testid="followed-badge" title={`This machine's Huntress agent is in a Huntress organization mapped to "${d.followed_from}". It is shown here, with the machine. Move the agent in Huntress, or change the mapping, to clear this.`}>
+              Huntress filed under {d.followed_from}
+            </span>
+          ) : null}
           {d.mdm_enabled === false && (
             <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] text-amber-300" data-testid="mdm-disabled-badge" title="Addigy shows this device with MDM disabled: profiles, policies and commands do not reach it">
               MDM disabled

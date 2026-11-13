@@ -715,6 +715,8 @@ export interface DeviceRow {
   encrypted?: boolean | null;
   /** Whether Addigy has a working MDM enrollment for the device; null when Addigy does not report it or does not say. */
   mdm_enabled?: boolean | null;
+  /** Set when the device's Huntress record is stored here with the machine while its Huntress organization is mapped to another client: that client's name. */
+  followed_from?: string | null;
   /** How Addigy says the device was enrolled; null when it does not say (iPhones and iPads). */
   enrollment?: 'ADE' | 'Manual' | null;
   first_seen: string;
@@ -746,7 +748,7 @@ export interface DeviceAlert {
 
 export interface DeviceList {
   master_vendor: string | null;
-  summary: { total: number; not_in_master: number; not_in_addigy?: number; not_in_threatmate?: number; not_in_huntress?: number; not_in_screenconnect?: number; not_in_fieldeffect?: number; not_in_ninjaone?: number; not_in_dnsfilter?: number; not_in_autoelevate?: number; not_encrypted?: number; encryption_known?: number; mdm_disabled?: number; mdm_known?: number; not_ade?: number; enrollment_known?: number; reporting_tools?: string[]; needs_attention?: number; stale_agents?: number; offline?: number; with_alerts?: number; hidden?: number; long_offline?: number; kinds?: Partial<Record<DeviceKind, number>> };
+  summary: { total: number; not_in_master: number; not_in_addigy?: number; not_in_threatmate?: number; not_in_huntress?: number; followed?: number; not_in_screenconnect?: number; not_in_fieldeffect?: number; not_in_ninjaone?: number; not_in_dnsfilter?: number; not_in_autoelevate?: number; not_encrypted?: number; encryption_known?: number; mdm_disabled?: number; mdm_known?: number; not_ade?: number; enrollment_known?: number; reporting_tools?: string[]; needs_attention?: number; stale_agents?: number; offline?: number; with_alerts?: number; hidden?: number; long_offline?: number; kinds?: Partial<Record<DeviceKind, number>> };
   items: DeviceRow[];
   total: number;
   page: number;
@@ -771,6 +773,8 @@ export interface DeviceQuery {
   encryption?: 'not_encrypted' | 'encrypted';
   /** Only devices Addigy shows with MDM disabled, or only devices enrolled by hand rather than through ADE. */
   mdm?: 'disabled' | 'not_ade';
+  /** Only devices whose Huntress record is stored with the machine while its Huntress organization is mapped to another client. */
+  followed?: boolean;
   /** Only devices no tool has seen online for a week or more. */
   offline?: boolean;
   /** Only devices with at least one open alert. */
@@ -1299,6 +1303,7 @@ export const devicesApi = {
     if (q.stale) p.set('stale', 'true');
     if (q.encryption) p.set('encryption', q.encryption);
     if (q.mdm) p.set('mdm', q.mdm);
+    if (q.followed) p.set('followed', 'true');
     if (q.offline) p.set('offline', 'true');
     if (q.hasAlerts) p.set('has_alerts', 'true');
     if (q.hidden) p.set('hidden', 'true');
@@ -1327,6 +1332,7 @@ export const devicesApi = {
     if (q.stale) p.set('stale', 'true');
     if (q.encryption) p.set('encryption', q.encryption);
     if (q.mdm) p.set('mdm', q.mdm);
+    if (q.followed) p.set('followed', 'true');
     if (q.offline) p.set('offline', 'true');
     if (q.hasAlerts) p.set('has_alerts', 'true');
     if (q.hidden) p.set('hidden', 'true');
