@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import delete, func, select, tuple_
+from sqlalchemy import delete, func, or_, select, tuple_
 
 from app.models.device import Device, DeviceSource
 from app.services.device_identity import (
@@ -88,14 +88,25 @@ async def preload_known(db: Any, tenant_id: uuid.UUID, reports: list[DeviceRepor
         for d in (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.id.in_(ids[i : i + 500])))).scalars().all():
             wanted[d.id] = d
     for i in range(0, len(serials), 500):
+        # By the serial a device has, or by another serial of the same machine that a person recorded when merging (alt_serials).
         for d in (
-            (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.serial_number.in_(serials[i : i + 500]))))
+            (
+                await db.execute(
+                    select(Device).where(
+                        Device.tenant_id == tenant_id,
+                        or_(Device.serial_number.in_(serials[i : i + 500]), Device.alt_serials.overlap(serials[i : i + 500])),
+                    )
+                )
+            )
             .scalars()
             .all()
         ):
             wanted[d.id] = d
     known.devices = wanted
     known.by_serial = {d.serial_number: d for d in wanted.values() if d.serial_number}
+    for d in wanted.values():
+        for alt in d.alt_serials or []:
+            known.by_serial.setdefault(alt, d)  # a serial that is some device's own wins over another's alias
     return known
 
 
@@ -128,7 +139,12 @@ async def upsert_device(db: Any, tenant_id: uuid.UUID, report: DeviceReport, kno
             owner = known.by_serial.get(serial)
         else:
             owner = (
-                await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.serial_number == serial))
+                await db.execute(
+                    select(Device)
+                    .where(Device.tenant_id == tenant_id, or_(Device.serial_number == serial, Device.alt_serials.contains([serial])))
+                    .order_by((Device.serial_number == serial).desc())
+                    .limit(1)
+                )
             ).scalar_one_or_none()
         if owner is not None:
             device = owner
@@ -136,7 +152,7 @@ async def upsert_device(db: Any, tenant_id: uuid.UUID, report: DeviceReport, kno
             device.serial_number = serial
             if known is not None:
                 known.by_serial[serial] = device
-        elif device is not None and device.serial_number != serial:
+        elif device is not None and device.serial_number != serial and serial not in (device.alt_serials or []):
             device = None  # the tool now reports a different machine's serial under the same id: it gets a device of its own
 
     if device is None:

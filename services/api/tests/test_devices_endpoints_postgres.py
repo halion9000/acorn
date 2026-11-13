@@ -672,7 +672,8 @@ async def test_merging_two_machines_with_different_serials_is_refused_with_a_rea
     ).items
     with pytest.raises(HTTPException) as err:
         await session(p, lambda db: merge_duplicate(MergeIn(keep=both[0].id, remove=both[1].id), user(p), db))
-    assert err.value.status_code == 400 and "serial" in err.value.detail
+    # 409, not 400: the page offers "merge anyway" for exactly this refusal (see test_device_same_machine_merge_postgres.py).
+    assert err.value.status_code == 409 and "serial" in err.value.detail
 
 
 async def test_the_report_names_the_unmapped_clients_busiest_first_and_leaves_ignored_ones_out(world):

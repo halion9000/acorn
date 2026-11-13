@@ -21,6 +21,10 @@ class DeviceMergeError(ValueError):
     """The request cannot be done; the message is safe to show."""
 
 
+class DifferentSerials(DeviceMergeError):
+    """Both devices have a real serial number and they differ. Right for two PCs; a person who knows it is one machine (a virtual machine two tools see differently) can say so."""
+
+
 def _ordered(a: uuid.UUID, b: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
     lo, hi = sorted((a, b), key=str)
     return lo, hi
@@ -59,6 +63,7 @@ def snapshot_of(device: Any) -> dict[str, Any]:
         "manufacturer": device.manufacturer,
         "model": device.model,
         "ip_addresses": list(device.ip_addresses or []),
+        "alt_serials": list(device.alt_serials or []),
         "first_seen": device.first_seen.isoformat() if device.first_seen else None,
         "last_seen": device.last_seen.isoformat() if device.last_seen else None,
     }
@@ -72,16 +77,24 @@ def can_undo(entry: Any, now: datetime | None = None) -> bool:
 
 
 async def merge_devices(
-    db: Any, tenant_id: uuid.UUID, keep_id: uuid.UUID, remove_id: uuid.UUID, actor_id: uuid.UUID | None = None
+    db: Any,
+    tenant_id: uuid.UUID,
+    keep_id: uuid.UUID,
+    remove_id: uuid.UUID,
+    actor_id: uuid.UUID | None = None,
+    *,
+    same_machine: bool = False,
 ) -> uuid.UUID:
     """Fold ``remove_id`` into ``keep_id``: every tool that reported the removed device now reports the kept one, blanks on the kept device are filled from the removed one,
-    and the removed device is deleted. Two devices with different serial numbers are different machines and are refused."""
+    and the removed device is deleted. Two devices with different serial numbers are different machines and are refused, unless a person says ``same_machine``: the removed device's serial is then
+    kept on the device that stays (``alt_serials``), so the next report that carries it does not split the line off again."""
     keep, remove = await _both(db, tenant_id, keep_id, remove_id)
     # Auvik keeps a MAC as the serial of a device with none; that is not a serial, so it neither proves two devices differ nor beats a real serial.
     real_keep = None if mac_key(keep.serial_number) else keep.serial_number
     real_remove = None if mac_key(remove.serial_number) else remove.serial_number
-    if real_keep and real_remove and real_keep != real_remove:
-        raise DeviceMergeError("These have different serial numbers, so they are different machines.")
+    differing = bool(real_keep and real_remove and real_keep != real_remove)
+    if differing and not same_machine:
+        raise DifferentSerials("These have different serial numbers, so they are different machines.")
     replaced_serial = keep.serial_number if (keep.serial_number and not real_keep and real_remove) else None
     if replaced_serial:
         keep.serial_number = None
@@ -98,7 +111,15 @@ async def merge_devices(
         "first_seen_was": None,
         "carried_serial": None,
         "replaced_serial": replaced_serial,
+        "added_alt_serials": [],
     }
+    # The other serials of the machine: what the removed device already knew and, on a person's word, the serial that differed. Only what is new is noted, for the undo.
+    wanted_alts = [*(remove.alt_serials or []), *([real_remove] if differing and real_remove else [])]
+    have = list(keep.alt_serials or [])
+    new_alts = [a for a in dict.fromkeys(wanted_alts) if a not in have and a != keep.serial_number]
+    if new_alts:
+        keep.alt_serials = [*have, *new_alts]
+        filled["added_alt_serials"] = new_alts
     for name in _COPIED:
         if getattr(keep, name) is None and getattr(remove, name) is not None:
             setattr(keep, name, getattr(remove, name))
@@ -171,6 +192,7 @@ async def undo_merge(db: Any, tenant_id: uuid.UUID, merge_id: uuid.UUID, now: da
             manufacturer=removed.get("manufacturer"),
             model=removed.get("model"),
             ip_addresses=list(removed.get("ip_addresses") or []),
+            alt_serials=list(removed.get("alt_serials") or []),
             first_seen=datetime.fromisoformat(removed["first_seen"]) if removed.get("first_seen") else datetime.now(UTC),
             last_seen=datetime.fromisoformat(removed["last_seen"]) if removed.get("last_seen") else datetime.now(UTC),
         )
@@ -184,6 +206,8 @@ async def undo_merge(db: Any, tenant_id: uuid.UUID, merge_id: uuid.UUID, now: da
             .all()
         ):
             source.device_id = restored_id
+    if filled.get("added_alt_serials"):
+        keep.alt_serials = [a for a in (keep.alt_serials or []) if a not in filled["added_alt_serials"]]
     for name in filled.get("fields", []):
         if getattr(keep, name) == removed.get(name):
             setattr(keep, name, None)

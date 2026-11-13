@@ -1286,9 +1286,9 @@ export const devicesApi = {
   async dismissDuplicate(deviceA: string, deviceB: string): Promise<void> {
     await request<void>('/api/v1/devices/duplicates/dismiss', { method: 'POST', body: JSON.stringify({ device_a: deviceA, device_b: deviceB }) });
   },
-  /** These two are the same machine: fold `remove` into `keep`. */
-  async mergeDuplicates(keep: string, remove: string): Promise<DeviceRow> {
-    return request<DeviceRow>('/api/v1/devices/duplicates/merge', { method: 'POST', body: JSON.stringify({ keep, remove }) });
+  /** These two are the same machine: fold `remove` into `keep`. Two devices with different serial numbers are refused with 409 unless `sameMachine` (a person's word) is given. */
+  async mergeDuplicates(keep: string, remove: string, sameMachine = false): Promise<DeviceRow> {
+    return request<DeviceRow>('/api/v1/devices/duplicates/merge', { method: 'POST', body: JSON.stringify({ keep, remove, ...(sameMachine ? { same_machine: true } : {}) }) });
   },
   async list(q: DeviceQuery = {}): Promise<DeviceList> {
     const p = new URLSearchParams();

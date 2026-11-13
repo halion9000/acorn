@@ -41044,6 +41044,13 @@ components:
           type: string
           format: uuid
           title: Remove
+        same_machine:
+          type: boolean
+          title: Same Machine
+          description: A person's word that two devices with DIFFERENT serial numbers
+            are one machine (a virtual machine two tools see differently). Without
+            it they are refused with 409.
+          default: false
       type: object
       required:
       - keep

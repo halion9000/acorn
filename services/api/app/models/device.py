@@ -28,6 +28,9 @@ class Device(Base):
     manufacturer: Mapped[str | None] = mapped_column(String(100), nullable=True)
     model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     ip_addresses: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    # Other serial numbers of this same machine (normalized), set when a person merged two lines that are one machine under different serials (migration 175): a report that carries one of them
+    # belongs to this device. Empty otherwise.
+    alt_serials: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list, server_default="{}")
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

@@ -36,7 +36,15 @@ from app.services import device_follow, tool_exclusions
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.client_mapping import IncomingClient, auto_link_by_devices, record_device_hints, tenant_hidden, upsert_clients
 from app.services.device_identity import confidence_label, pair_confidence
-from app.services.device_merge import DeviceMergeError, auto_merge_same_name, can_undo, dismiss_pair, merge_devices, undo_merge
+from app.services.device_merge import (
+    DeviceMergeError,
+    DifferentSerials,
+    auto_merge_same_name,
+    can_undo,
+    dismiss_pair,
+    merge_devices,
+    undo_merge,
+)
 from app.services.device_upsert import DeviceReport, duplicate_pairs, preload_known, upsert_device
 from app.services.infra_review import encryption_state
 
@@ -1003,6 +1011,10 @@ class DismissIn(BaseModel):
 class MergeIn(BaseModel):
     keep: uuid.UUID = Field(description="The device that stays; every tool that reported the other one now reports this one.")
     remove: uuid.UUID
+    same_machine: bool = Field(
+        default=False,
+        description="A person's word that two devices with DIFFERENT serial numbers are one machine (a virtual machine two tools see differently). Without it they are refused with 409.",
+    )
 
 
 @router.get("/export.csv", summary="The devices the page is showing, as a CSV file")
@@ -1247,7 +1259,9 @@ async def merge_duplicate(
     tid = await _client_of(db, owner, body.keep)
     try:
         async with _as(db, owner, tid):
-            kept = await merge_devices(db, tid, body.keep, body.remove, current_user.user_id)
+            kept = await merge_devices(db, tid, body.keep, body.remove, current_user.user_id, same_machine=body.same_machine)
+    except DifferentSerials as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except DeviceMergeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     forget_loaded()

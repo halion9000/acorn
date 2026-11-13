@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
-import { devicesApi, type DeviceRow } from '@/lib/api';
+import { ApiError, apiErrorDetail, devicesApi, type DeviceRow } from '@/lib/api';
 import { compareRows } from './DuplicateDevices';
 
 const tools = (d: DeviceRow): string => [...new Set(d.sources.map((s) => s.vendor))].sort().join(', ') || 'no tool';
@@ -21,6 +21,8 @@ export function MergeDeviceInto({ device, onMerged }: { device: DeviceRow; onMer
   const [chosen, setChosen] = useState<DeviceRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
+  // The server refused because the two have different serial numbers (409): a person who knows they are one machine can say so.
+  const [serialsDiffer, setSerialsDiffer] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 250);
@@ -41,18 +43,21 @@ export function MergeDeviceInto({ device, onMerged }: { device: DeviceRow; onMer
     };
   }, [searching, debounced, device.tenant_id, device.id]);
 
-  async function merge(into: DeviceRow) {
+  async function merge(into: DeviceRow, sameMachine = false) {
     setBusy(true);
     setProblem('');
+    setSerialsDiffer(false);
     try {
-      await devicesApi.mergeDuplicates(into.id, device.id);
+      await devicesApi.mergeDuplicates(into.id, device.id, sameMachine);
       toast.success(`${device.hostname} merged into ${into.hostname}`);
       setChosen(null);
       setSearching(false);
       setQ('');
       onMerged();
     } catch (err) {
-      setProblem(err instanceof Error ? err.message : 'That was not accepted.');
+      // The server's own words ("These have different serial numbers..."), not "API 409 - /api/...".
+      setProblem(apiErrorDetail(err) ?? (err instanceof ApiError ? 'That was not accepted.' : err instanceof Error ? err.message : 'That was not accepted.'));
+      setSerialsDiffer(err instanceof ApiError && err.status === 409);
     } finally {
       setBusy(false);
     }
@@ -131,13 +136,29 @@ export function MergeDeviceInto({ device, onMerged }: { device: DeviceRow; onMer
                 {problem}
               </p>
             )}
+            {serialsDiffer && (
+              <p className="mt-2 text-xs text-gray-400" data-testid="same-machine-note">
+                A virtual machine can carry two serial numbers (the host&apos;s in one tool, the guest&apos;s in another). If you know these are the same machine, merge anyway: the other serial is kept on the merged device, so the tools do
+                not split it again. You can still undo it from Possible duplicates.
+              </p>
+            )}
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => { setChosen(null); setProblem(''); }} disabled={busy} className="rounded border border-gray-600 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-800">
+              <button type="button" onClick={() => {
+                  setChosen(null);
+                  setProblem('');
+                  setSerialsDiffer(false);
+                }} disabled={busy} className="rounded border border-gray-600 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-800">
                 No, cancel
               </button>
-              <button type="button" disabled={busy} onClick={() => void merge(chosen)} className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500">
-                {busy ? 'Merging…' : 'Yes, merge'}
-              </button>
+              {serialsDiffer ? (
+                <button type="button" disabled={busy} onClick={() => void merge(chosen, true)} className="rounded bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-500">
+                  {busy ? 'Merging…' : 'They are the same machine: merge anyway'}
+                </button>
+              ) : (
+                <button type="button" disabled={busy} onClick={() => void merge(chosen)} className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500">
+                  {busy ? 'Merging…' : 'Yes, merge'}
+                </button>
+              )}
             </div>
           </div>
         </div>

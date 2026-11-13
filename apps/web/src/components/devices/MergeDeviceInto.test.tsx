@@ -6,7 +6,7 @@ const api = vi.hoisted(() => ({ list: vi.fn(), mergeDuplicates: vi.fn(), toast: 
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), devicesApi: { list: api.list, mergeDuplicates: api.mergeDuplicates } }));
 vi.mock('react-hot-toast', () => ({ default: api.toast }));
 
-import type { DeviceRow } from '@/lib/api';
+import { ApiError, type DeviceRow } from '@/lib/api';
 import { MergeDeviceInto } from './MergeDeviceInto';
 
 const dev = (over: Partial<DeviceRow>): DeviceRow =>
@@ -37,26 +37,52 @@ describe('Merge into another device', () => {
     expect(within(screen.getByTestId('merge-compare')).getByText('0000-0011')).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Yes, merge' }));
     // The chosen device is the one that STAYS (keep), this one goes (remove).
-    await waitFor(() => expect(api.mergeDuplicates).toHaveBeenCalledWith('d2', 'd1'));
+    await waitFor(() => expect(api.mergeDuplicates).toHaveBeenCalledWith('d2', 'd1', false));
     expect(api.toast.success).toHaveBeenCalledWith('AANPC-AZURE merged into AANPCBDCAZURE');
     expect(onMerged).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('says why when the server refuses (different serial numbers), and merges nothing further; cancel merges nothing', async () => {
-    api.mergeDuplicates.mockRejectedValue(new Error('These have different serial numbers, so they are different machines.'));
-    const onMerged = vi.fn();
-    const user = userEvent.setup();
-    render(<MergeDeviceInto device={THIS} onMerged={onMerged} />);
+  const refusal = (status: number, detail: string) => new ApiError(`API ${status} - /api/v1/devices/duplicates/merge`, status, JSON.stringify({ detail }));
+  const choose = async (user: ReturnType<typeof userEvent.setup>) => {
     await user.click(screen.getByRole('button', { name: /Merge into another device/ }));
     await user.type(screen.getByLabelText('Find the device to merge into'), 'AANPC');
     await user.click(await screen.findByRole('button', { name: /AANPCBDCAZURE/ }));
+  };
+
+  it('says the server\u2019s reason in its own words, not the address that failed, and cancel merges nothing', async () => {
+    api.mergeDuplicates.mockRejectedValue(refusal(400, 'The device it was merged into no longer exists.'));
+    const onMerged = vi.fn();
+    const user = userEvent.setup();
+    render(<MergeDeviceInto device={THIS} onMerged={onMerged} />);
+    await choose(user);
     await user.click(screen.getByRole('button', { name: 'Yes, merge' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('different serial numbers');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('The device it was merged into no longer exists.');
+    expect(alert).not.toHaveTextContent('/api/v1');
+    expect(screen.queryByTestId('same-machine-note')).toBeNull();
+    expect(screen.queryByRole('button', { name: /merge anyway/ })).toBeNull(); // only the serial refusal offers it
     expect(onMerged).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'No, cancel' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(api.mergeDuplicates).toHaveBeenCalledTimes(1);
+  });
+
+  it('when the two have different serial numbers it says so and offers to merge anyway, as the same machine, on a second deliberate press', async () => {
+    api.mergeDuplicates.mockRejectedValueOnce(refusal(409, 'These have different serial numbers, so they are different machines.'));
+    const onMerged = vi.fn();
+    const user = userEvent.setup();
+    render(<MergeDeviceInto device={THIS} onMerged={onMerged} />);
+    await choose(user);
+    await user.click(screen.getByRole('button', { name: 'Yes, merge' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('These have different serial numbers, so they are different machines.');
+    expect(screen.getByTestId('same-machine-note')).toHaveTextContent('virtual machine can carry two serial numbers');
+    expect(api.mergeDuplicates).toHaveBeenCalledWith('d2', 'd1', false);
+    expect(screen.queryByRole('button', { name: 'Yes, merge' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'They are the same machine: merge anyway' }));
+    await waitFor(() => expect(api.mergeDuplicates).toHaveBeenLastCalledWith('d2', 'd1', true));
+    expect(onMerged).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('does not search for fewer than two letters, and says so when nothing matches', async () => {
