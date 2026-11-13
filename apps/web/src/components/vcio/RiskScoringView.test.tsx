@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ library: vi.fn(), list: vi.fn(), create: vi.fn(), get: vi.fn(), update: vi.fn(), answer: vi.fn(), autofill: vi.fn(), settings: vi.fn(), saveSettings: vi.fn(), remove: vi.fn(), assessors: vi.fn(), trends: vi.fn(), clientTrend: vi.fn() }));
+const api = vi.hoisted(() => ({ library: vi.fn(), list: vi.fn(), create: vi.fn(), get: vi.fn(), update: vi.fn(), answer: vi.fn(), autofill: vi.fn(), settings: vi.fn(), saveSettings: vi.fn(), remove: vi.fn(), assessors: vi.fn(), clients: vi.fn(), trends: vi.fn(), clientTrend: vi.fn() }));
 const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
 const csv = vi.hoisted(() => ({ downloadCsv: vi.fn() }));
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), msspApi: mssp }));
@@ -39,7 +39,9 @@ const summary = (a: RiskAssessment) => ({ id: a.id, client_id: a.client_id, clie
 
 beforeEach(() => {
   for (const f of Object.values(api)) f.mockReset();
-  mssp.listChildren.mockReset().mockResolvedValue([{ id: 'c2', name: 'Birch Law', mssp_role: 'child' }, { id: 'c1', name: 'Acme Dental', mssp_role: 'child' }]);
+  // The picker's list comes from the page's own route (a vCIO role cannot read the MSSP client list), and the MSSP list is never asked for.
+  mssp.listChildren.mockReset().mockRejectedValue(new ApiError('403', 403, JSON.stringify({ detail: 'Permission denied: mssp:read' })));
+  api.clients.mockResolvedValue({ items: [{ id: 'c2', name: 'Birch Law' }, { id: 'c1', name: 'Acme Dental' }] });
   csv.downloadCsv.mockReset();
   api.library.mockResolvedValue(LIBRARY);
   api.assessors.mockResolvedValue({ items: [{ name: 'Dana', email: 'dana@example.test' }, { name: 'Hal', email: null }] });
@@ -50,6 +52,17 @@ beforeEach(() => {
 });
 
 const pickClient = async () => userEvent.selectOptions(await screen.findByLabelText('Client'), 'c1');
+
+describe('the client picker', () => {
+  it('lists the clients from the page’s own route, so a role that cannot read the MSSP client list still sees every client', async () => {
+    api.list.mockResolvedValue({ items: [] });
+    render(<RiskScoringView />);
+    const picker = await screen.findByLabelText('Client');
+    await waitFor(() => expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual(['Choose a client', 'Own organisation', 'Acme Dental', 'Birch Law']));
+    expect(api.clients).toHaveBeenCalledTimes(1);
+    expect(mssp.listChildren).not.toHaveBeenCalled();
+  });
+});
 
 describe('the pure parts', () => {
   it('shows a score as a whole percentage and a dash for nothing', () => {

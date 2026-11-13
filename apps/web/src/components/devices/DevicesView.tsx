@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { apiErrorDetail, devicesApi, msspApi, type ChildTenant, type DeviceKind, type DeviceList, type DeviceQuery, type DeviceRow } from '@/lib/api';
 import VendorBadge from '@/components/mssp/VendorBadge';
 import DuplicateDevices from './DuplicateDevices';
+import { MergeDeviceInto } from './MergeDeviceInto';
 import UnmappedDevices from './UnmappedDevices';
 import { ClientRollupTable } from './ClientRollupTable';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
@@ -616,7 +617,7 @@ export default function DevicesView() {
           </thead>
           <tbody>
             {data?.items.map((d) => (
-              <DeviceRowView key={d.id} d={d} master={master} open={open === d.id} onToggle={() => setOpen(open === d.id ? null : d.id)} onHide={(hide) => void setHidden(d, hide)} />
+              <DeviceRowView key={d.id} d={d} master={master} open={open === d.id} onToggle={() => setOpen(open === d.id ? null : d.id)} onHide={(hide) => void setHidden(d, hide)} onMerged={() => void load()} />
             ))}
             {loading && !data && (
               <tr>
@@ -662,7 +663,7 @@ export default function DevicesView() {
   );
 }
 
-function DeviceRowView({ d, master, open, onToggle, onHide }: { d: DeviceRow; master: string | null; open: boolean; onToggle: () => void; onHide: (hide: boolean) => void }) {
+function DeviceRowView({ d, master, open, onToggle, onHide, onMerged }: { d: DeviceRow; master: string | null; open: boolean; onToggle: () => void; onHide: (hide: boolean) => void; onMerged: () => void }) {
   const tools = toolsOf(d);
   return (
     <>
@@ -801,6 +802,7 @@ function DeviceRowView({ d, master, open, onToggle, onHide }: { d: DeviceRow; ma
                 Show alerts{(d.open_alerts ?? 0) > 0 ? ` (${d.open_alerts} open)` : ''}
               </Link>
             </div>
+            <MergeDeviceInto device={d} onMerged={onMerged} />
             {(d.alerts ?? []).length > 0 && (
               <>
                 <h3 className="mb-1 mt-3 text-xs font-semibold uppercase text-gray-400">Open alerts on this device</h3>

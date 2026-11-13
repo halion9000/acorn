@@ -197,6 +197,8 @@ export const vcioRiskApi = {
     apiRequest<RiskAssessment>(`/api/v1/vcio-risk-scoring/assessments/${encodeURIComponent(id)}/answers`, json('PUT', { items })),
   /** The organisation's A.C.O.R.N users, for the assessor of an assessment. */
   assessors: () => apiRequest<{ items: RiskAssessor[] }>('/api/v1/vcio-risk-scoring/assessors'),
+  /** The clients an assessment can be started for. Readable with alert access, unlike the MSSP client list (which a vCIO role does not hold). */
+  clients: () => apiRequest<{ items: { id: string; name: string }[] }>('/api/v1/vcio-risk-scoring/clients'),
   /** Every client's latest score and how it moved since the assessment before, biggest drop first. */
   trends: () => apiRequest<{ clients: RiskClientTrendRow[] }>('/api/v1/vcio-risk-scoring/trends'),
   /** One client's score over time, with the change per category between its last two scored assessments. */

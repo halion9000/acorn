@@ -33,6 +33,7 @@ from app.models.tenant import Tenant, User
 from app.models.vcio_risk_assessment import VcioRiskAssessment
 from app.services import vcio_risk_scoring as rs
 from app.services.audit import emit_audit
+from app.services.client_mapping import tenant_hidden
 
 router = APIRouter(prefix="/vcio-risk-scoring", tags=["vcio"])
 
@@ -320,6 +321,31 @@ async def _checked_assessor(db: Any, owner: uuid.UUID, given: str, current: str 
 )
 async def list_assessors(current_user: Reader, db: DBSession) -> AssessorList:
     return AssessorList(items=await assessor_names(db, current_user.tenant_id))
+
+
+class ClientChoice(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class ClientChoices(BaseModel):
+    items: list[ClientChoice]
+
+
+@router.get(
+    "/clients",
+    response_model=ClientChoices,
+    summary="The clients a Client Risk Score can be started for (the organisation's shown clients)",
+)
+async def list_clients(current_user: Reader, db: DBSession) -> ClientChoices:
+    """The page's client picker. It used to ask the MSSP client list, which needs mssp:read: a vCIO role without it saw only "Own organisation". Anyone who can read alerts can read this (it is
+    the same set the trends page already lists), and a client the organisation hid (a test or archived one) is not offered."""
+    rows = (
+        await db.execute(select(Tenant.id, Tenant.name, Tenant.settings).where(Tenant.parent_tenant_id == current_user.tenant_id))
+    ).all()
+    return ClientChoices(
+        items=[ClientChoice(id=r.id, name=r.name) for r in sorted(rows, key=lambda r: r.name.lower()) if not tenant_hidden(r)]
+    )
 
 
 class TrendPoint(BaseModel):

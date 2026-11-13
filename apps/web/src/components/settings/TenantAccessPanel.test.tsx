@@ -5,7 +5,8 @@ import { axe } from 'vitest-axe';
 import { SWRConfig } from 'swr';
 
 const tenantAccessApi = vi.hoisted(() => ({ manageable: vi.fn(), list: vi.fn(), grant: vi.fn(), revoke: vi.fn(), listAll: vi.fn(), grantAll: vi.fn(), revokeAll: vi.fn() }));
-vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), tenantAccessApi }));
+const people = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), tenantAccessApi, tenantsApi: { users: () => people() } }));
 const tenantState = vi.hoisted(() => vi.fn());
 vi.mock('@/components/layout/TenantProvider', () => ({ useTenant: () => tenantState() }));
 const toastSuccess = vi.hoisted(() => vi.fn());
@@ -13,7 +14,7 @@ vi.mock('react-hot-toast', () => ({ __esModule: true, default: { success: toastS
 vi.mock('date-fns', async () => ({ ...(await vi.importActual<typeof import('date-fns')>('date-fns')), formatDistanceToNow: () => '3 months ago' }));
 
 import { ApiError } from '@/lib/api';
-import { TenantAccessPanel, levelLabel } from './TenantAccessPanel';
+import { TenantAccessPanel, accountChoices, levelLabel } from './TenantAccessPanel';
 
 const HOME = { id: 'home', name: 'Live Oak IT', slug: 'lo', relationship: 'self' as const };
 const CUSTOMER = { id: 'c1', name: 'Customer A', slug: 'a', relationship: 'child' as const };
@@ -24,6 +25,8 @@ const refusal = (status: number, detail: string) => new ApiError(`API ${status} 
 let grantsByTenant: Record<string, unknown[]>;
 beforeEach(() => {
   Object.values(tenantAccessApi).forEach((f) => f.mockReset());
+  // By default the people cannot be listed (a role without users:read): the account is typed, as it always was.
+  people.mockReset().mockRejectedValue(new Error('403'));
   toastSuccess.mockReset();
   tenantState.mockReturnValue({ viewingOther: false, home: { name: 'Live Oak IT' } });
   grantsByTenant = { home: [], c1: [grant({}), grant({ user_id: 'u2', account_name: 'tech.two', email: null, access: 'full' })] };
@@ -108,6 +111,32 @@ describe('TenantAccessPanel', () => {
   it('says so when nobody from another tenant has access', async () => {
     renderPanel();
     expect(await screen.findByText('Nobody from another tenant has access')).toBeInTheDocument();
+  });
+
+  it('the account is picked from a drop-down of the active people of the organisation, leaving out those already granted', async () => {
+    people.mockResolvedValue([
+      { id: 'p1', account_name: 'tech.one', email: 'one@msp.example', username: null, role: 'viewer', is_active: true, last_login: null, created_at: '' },
+      { id: 'p2', account_name: 'vcio.sam', email: 'sam@msp.example', username: null, role: 'viewer', is_active: true, last_login: null, created_at: '' },
+      { id: 'p3', account_name: 'gone.person', email: null, username: null, role: 'viewer', is_active: false, last_login: null, created_at: '' },
+    ]);
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByLabelText('Tenant');
+    await user.selectOptions(screen.getByLabelText('Tenant'), 'c1'); // tech.one already holds access here
+    const pick = await screen.findByRole('combobox', { name: 'Account name' });
+    await waitFor(() => expect(within(pick).getAllByRole('option').map((o) => o.textContent)).toEqual(['Choose a person…', 'vcio.sam · sam@msp.example']));
+    await user.selectOptions(pick, 'vcio.sam');
+    await user.click(screen.getByRole('button', { name: 'Grant access' }));
+    await waitFor(() => expect(tenantAccessApi.grant).toHaveBeenCalledWith('c1', 'vcio.sam', 'view'));
+  });
+
+  it('the choices are the active accounts by name, minus those taken, matched ignoring case', () => {
+    const p = (account_name: string, is_active = true, email: string | null = null) => ({ id: account_name, account_name, email, username: null, role: 'viewer', is_active, last_login: null, created_at: '' });
+    expect(accountChoices([p('b.two', true, 'b@x.test'), p('a.one'), p('c.off', false), p('D.Four')], ['d.four'])).toEqual([
+      { account: 'a.one', label: 'a.one' },
+      { account: 'b.two', label: 'b.two · b@x.test' },
+    ]);
+    expect(accountChoices(undefined, [])).toEqual([]);
   });
 
   it('granting read-only is the default and happens at once, without a prompt, then the form is cleared and the list reloads', async () => {

@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { apiErrorDetail, msspApi, type ChildTenant } from '@/lib/api';
+import { apiErrorDetail } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
   DIRECTION_CLASS,
@@ -475,7 +475,7 @@ function Method() {
 }
 
 export function RiskScoringView() {
-  const [clients, setClients] = useState<ChildTenant[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [clientId, setClientId] = useState('');
   const [library, setLibrary] = useState<RiskLibrary | null>(null);
   const [list, setList] = useState<RiskAssessmentSummary[]>([]);
@@ -495,7 +495,7 @@ export function RiskScoringView() {
   const fail = (err: unknown, fallback: string) => setError(apiErrorDetail(err) ?? (err instanceof Error && err.message ? err.message : fallback));
 
   useEffect(() => {
-    msspApi.listChildren().then((rows) => setClients([...rows].sort((x, y) => x.name.localeCompare(y.name)))).catch(() => setClients([]));
+    vcioRiskApi.clients().then((r) => setClients([...r.items].sort((x, y) => x.name.localeCompare(y.name)))).catch(() => setClients([]));
     vcioRiskApi.library().then(setLibrary).catch((err) => fail(err, 'The questions could not be loaded.'));
     vcioRiskApi.assessors().then((r) => setAssessors(r.items)).catch(() => setAssessors([]));
     vcioRiskApi.trends().then((r) => setAllClients(r.clients)).catch(() => setAllClients([]));

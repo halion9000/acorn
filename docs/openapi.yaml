@@ -17891,6 +17891,28 @@ paths:
                 $ref: '#/components/schemas/AssessorList'
       security:
       - HTTPBearer: []
+  /api/v1/vcio-risk-scoring/clients:
+    get:
+      tags:
+      - vcio
+      summary: The clients a Client Risk Score can be started for (the organisation's
+        shown clients)
+      description: 'The page''s client picker. It used to ask the MSSP client list,
+        which needs mssp:read: a vCIO role without it saw only "Own organisation".
+        Anyone who can read alerts can read this (it is
+
+        the same set the trends page already lists), and a client the organisation
+        hid (a test or archived one) is not offered.'
+      operationId: list_clients_api_v1_vcio_risk_scoring_clients_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientChoices'
+      security:
+      - HTTPBearer: []
   /api/v1/vcio-risk-scoring/trends:
     get:
       tags:
@@ -30984,6 +31006,17 @@ components:
       - id
       - name
       title: ClientChoice
+    ClientChoices:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ClientChoice'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: ClientChoices
     ClientCount:
       properties:
         client_id:

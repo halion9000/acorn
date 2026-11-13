@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useTenant } from '@/components/layout/TenantProvider';
-import { tenantAccessApi, type AccessLevel } from '@/lib/api';
+import { tenantAccessApi, tenantsApi, type AccessLevel, type TenantUser } from '@/lib/api';
 import { Field, PanelHeader, errorText, inputClass } from './panel-parts';
 
 /** What a person may do in a tenant they were granted, in the words shown on screen. */
@@ -59,6 +59,36 @@ export function TenantAccessPanel({ canGrantAll }: { canGrantAll: boolean }) {
   return <Inner canGrantAll={canGrantAll} />;
 }
 
+/** The people a grant can be for, as the choices of a drop-down: this organisation's active accounts, by account name, leaving out the ones already granted. */
+export function accountChoices(people: TenantUser[] | undefined, taken: string[]): { account: string; label: string }[] {
+  const held = new Set(taken.map((t) => t.toLowerCase()));
+  return (people ?? [])
+    .filter((p) => p.is_active && p.account_name && !held.has(p.account_name.toLowerCase()))
+    .map((p) => ({ account: p.account_name, label: [p.account_name, p.email ?? p.username].filter(Boolean).join(' · ') }))
+    .sort((a, b) => a.account.localeCompare(b.account));
+}
+
+/**
+ * The account to grant access to: a drop-down of the organisation's people, so a name is picked and never mistyped. When the list cannot be read (a role without the users permission) or is empty, it is
+ * the plain text box it used to be, so a person from another tenant can still be named.
+ */
+function AccountPicker({ label, value, onChange, people, taken }: { label: string; value: string; onChange: (v: string) => void; people: TenantUser[] | undefined; taken: string[] }) {
+  const choices = accountChoices(people, taken);
+  if (choices.length === 0) {
+    return <input aria-label={label} className={inputClass()} value={value} onChange={(e) => onChange(e.target.value)} placeholder="e.g. hal.liveoak" />;
+  }
+  return (
+    <select aria-label={label} className={inputClass()} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Choose a person…</option>
+      {choices.map((c) => (
+        <option key={c.account} value={c.account}>
+          {c.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function Inner({ canGrantAll }: { canGrantAll: boolean }) {
   const { data: manageable, isLoading: loadingTenants, error: tenantsError } = useSWR('settings:tenant-manageable', () => tenantAccessApi.manageable());
   const [chosen, setChosen] = useState<string | null>(null);
@@ -69,6 +99,7 @@ function Inner({ canGrantAll }: { canGrantAll: boolean }) {
   const { data: grants, isLoading: loadingGrants, mutate: reloadGrants } = useSWR(tenantId ? ['settings:tenant-access', tenantId] : null, () => tenantAccessApi.list(tenantId as string));
   const { data: everyTenant, mutate: reloadAll } = useSWR(canGrantAll ? 'settings:all-tenant-access' : null, () => tenantAccessApi.listAll());
 
+  const { data: people } = useSWR('settings:account-picker', () => tenantsApi.users(), { revalidateOnFocus: false, shouldRetryOnError: false });
   const [name, setName] = useState('');
   const [level, setLevel] = useState<AccessLevel>('view');
   const [allName, setAllName] = useState('');
@@ -177,7 +208,7 @@ function Inner({ canGrantAll }: { canGrantAll: boolean }) {
 
               <div className="flex flex-col gap-3 rounded-lg border border-gray-800 bg-gray-950/40 p-4 sm:flex-row sm:items-end">
                 <Field label="Account name">
-                  <input aria-label="Account name" className={inputClass()} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. hal.liveoak" />
+                  <AccountPicker label="Account name" value={name} onChange={setName} people={people} taken={(grants ?? []).map((g) => g.account_name)} />
                 </Field>
                 <Field label="Access level">
                   <select aria-label="Access level" className={inputClass()} value={level} onChange={(e) => setLevel(e.target.value as AccessLevel)}>
@@ -256,7 +287,7 @@ function Inner({ canGrantAll }: { canGrantAll: boolean }) {
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <Field label="Account name">
-                    <input aria-label="Account name for every tenant" className={inputClass()} value={allName} onChange={(e) => setAllName(e.target.value)} placeholder="e.g. hal.liveoak" />
+                    <AccountPicker label="Account name for every tenant" value={allName} onChange={setAllName} people={people} taken={(everyTenant ?? []).map((g) => g.account_name)} />
                   </Field>
                   <Field label="Access level">
                     <select aria-label="Access level for every tenant" className={inputClass()} value={allLevel} onChange={(e) => setAllLevel(e.target.value as AccessLevel | '')}>

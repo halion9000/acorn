@@ -420,3 +420,26 @@ async def test_the_list_of_clients_says_where_each_score_is_and_how_it_moved_big
             assert (await ep.list_trends(other, db)).clients == []
     finally:
         await cleanup(engine, w)
+
+
+async def test_the_clients_to_choose_from_are_the_organisations_shown_clients_for_anyone_who_can_read_alerts():
+    # A vCIO role holds alerts:read but not mssp:read, so the MSSP client list was refused and the picker offered only "Own organisation": the page lists its own.
+    engine, user, other, w = await world()
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("update tenants set settings = jsonb_build_object('hidden', true) where id = :t"), {"t": w.birch})
+        async with AsyncSession(engine) as db:
+            listed = await ep.list_clients(user, db)
+            assert [(c.id, c.name) for c in listed.items] == [
+                (w.acme, "Acme Dental")
+            ], "this organisation's shown clients, by name; a hidden one is left out"
+            assert [(c.id, c.name) for c in (await ep.list_clients(other, db)).items] == [
+                (w.theirs, "Their Client")
+            ], "never another organisation's"
+        async with engine.begin() as conn:
+            await conn.execute(text("update tenants set settings = '{}'::jsonb where id = :t"), {"t": w.birch})
+        async with AsyncSession(engine) as db:
+            assert [c.name for c in (await ep.list_clients(user, db)).items] == ["Acme Dental", "Birch Law"]
+    finally:
+        await cleanup(engine, w)
+        await engine.dispose()
