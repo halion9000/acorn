@@ -130,7 +130,7 @@ type FilterStatus = Case['status'] | 'all' | 'auto_closed';
 /** The most cases the list loads at once (the API's own ceiling), newest first. The tiles above it count every case. */
 const CASES_FETCHED = 500;
 /** Every status that still needs somebody: the Act now board picks among these. */
-const ACT_NOW_STATUSES = 'new,triaged,open,pending,investigating,contained,in_progress';
+export const ACT_NOW_STATUSES = 'new,triaged,open,pending,investigating,contained,in_progress';
 
 interface CasesViewProps {
   /**

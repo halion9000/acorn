@@ -32,7 +32,7 @@ from app.services.alert_rail import (
     build_rail_envelope,
 )
 from app.services.alert_scope import alert_scope
-from app.services.alert_status import FINISHED_ALERT_STATUSES, is_finished
+from app.services.alert_status import FINISHED_ALERT_STATUSES, STALE, SUPPRESSED, is_finished
 from app.services.audit import emit_audit
 from app.services.event_sanitiser import (
     SubmitPayloadTooLarge,
@@ -215,6 +215,9 @@ class AlertListResponse(BaseModel):
 
 # The statuses an analyst can set by hand. "suppressed" is set only by a suppression rule (it remembers the status it replaced), so it is not here.
 SETTABLE_STATUSES = ("new", "triaged", "triaging", "investigating", "in_progress", "resolved", "closed", "false_positive", "fp")
+# Every value the list's ``status`` filter can match: the open group, what a person can set, and the two a rule sets. A page that offers any other value shows an empty list;
+# apps/web/src/lib/filterValues.json holds the same list for the web's own test.
+FILTER_STATUSES = (OPEN_STATUS, *SETTABLE_STATUSES, SUPPRESSED, STALE)
 MAX_TAGS = 50
 MAX_TAG_LENGTH = 64
 

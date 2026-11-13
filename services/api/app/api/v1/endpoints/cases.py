@@ -102,6 +102,10 @@ CaseSeverity = Literal["info", "low", "medium", "high", "critical"]
 # resolved or closed without passing through every stage. (It used to allow only the NEXT step, so choosing "In progress" on a new case was refused with a bare 422.) Going back is not allowed.
 _STATUS_ORDER = ["new", "triaged", "investigating", "contained", "resolved", "closed"]
 _TRANSITIONS: dict[str, set[str]] = {status: set(_STATUS_ORDER[i + 1 :]) for i, status in enumerate(_STATUS_ORDER)}
+# Statuses older cases still carry, which the counts group with today's.
+LEGACY_STATUSES = ("open", "pending", "in_progress", "auto_closed")
+# Every value the list's ``status`` filter can match. A page that asks for any other shows an empty list; apps/web/src/lib/filterValues.json holds the same list for the web's own test.
+FILTER_STATUSES = (*_STATUS_ORDER, *LEGACY_STATUSES)
 
 
 class CreateCaseRequest(BaseModel):

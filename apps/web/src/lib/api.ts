@@ -2681,7 +2681,7 @@ const BACKEND_TO_UI_STATUS: Record<string, CaseStatus> = {
   closed: 'closed',
 };
 
-const UI_TO_BACKEND_STATUS: Record<CaseStatus, string> = {
+export const UI_TO_BACKEND_STATUS: Record<CaseStatus, string> = {
   // The console's Open tab is every case still waiting to be worked (new and triaged), and In Progress is investigating and contained: a comma-separated list is any of them.
   open: 'new,triaged',
   pending: 'triaged',

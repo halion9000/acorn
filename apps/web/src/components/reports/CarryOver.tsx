@@ -7,7 +7,7 @@ import { alertsApi, casesApi } from '@/lib/api';
 import { CARRY_LIST_CAP, ageLabel, byUrgency, carryOverText, type CarryOverData } from './carryOverList';
 
 /** The statuses of a case that is still being worked. */
-const OPEN_CASE_STATUSES = 'new,triaged,investigating,contained';
+export const OPEN_CASE_STATUSES = 'new,triaged,investigating,contained';
 
 /** Reads what is still open: the critical and high alerts, and the cases being worked. With a client, only that client's. */
 export async function loadCarryOver(clientId: string): Promise<CarryOverData> {

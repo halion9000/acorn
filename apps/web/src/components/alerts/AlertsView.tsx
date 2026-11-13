@@ -97,6 +97,8 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
+/** The status tabs above the list. Each but "all" is sent to the server as it is, so each has to be a status the server matches (see lib/filterValues.test.ts). */
+export const ALERT_STATUS_TABS = ['open', 'new', 'investigating', 'resolved', 'false_positive', 'stale', 'all'] as const;
 const FINISHED = new Set(['resolved', 'closed', 'false_positive', 'auto_closed']);
 export const STALE_ALERT_DAYS = 7;
 
@@ -173,7 +175,7 @@ export function FiltersBar({
   const clients = Array.isArray(clientData) ? [...clientData].sort((a, b) => a.name.localeCompare(b.name)) : [];
   const severities = ['all', 'critical', 'high', 'medium', 'low', 'info'] as const;
   // "open" is every alert that is not finished (resolved, closed or a false positive); "all" has no status filter at all.
-  const statuses = ['open', 'new', 'investigating', 'resolved', 'false_positive', 'stale', 'all'] as const;
+  const statuses = ALERT_STATUS_TABS;
 
   // The box is typed into freely; the list is only re-queried a moment after typing stops (and straight away on Enter or clear).
   const [text, setText] = useState(filters.search ?? '');

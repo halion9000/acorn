@@ -5,7 +5,7 @@ import type { AlertFilters } from '@/lib/api';
  * that is no longer valid (an older build saved something else) is ignored rather than trusted.
  */
 const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const;
-const STATUSES = ['open', 'new', 'investigating', 'resolved', 'false_positive'] as const;
+export const STATUSES = ['open', 'new', 'investigating', 'resolved', 'false_positive'] as const;
 
 export interface RememberedAlertFilters {
   severity?: string;

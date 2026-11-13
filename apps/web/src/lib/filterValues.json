@@ -1,0 +1,4 @@
+{
+  "alert_status": ["open", "new", "triaged", "triaging", "investigating", "in_progress", "resolved", "closed", "false_positive", "fp", "suppressed", "stale"],
+  "case_status": ["new", "triaged", "investigating", "contained", "resolved", "closed", "open", "pending", "in_progress", "auto_closed"]
+}
