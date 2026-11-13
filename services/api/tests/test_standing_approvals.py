@@ -56,3 +56,27 @@ def test_undo_is_possible_once_within_24_hours_for_an_approved_action_that_said_
     assert "how it can be reversed" in undo_problem("approved", None, ok_time, None, NOW)
     assert "within 24 hours" in undo_problem("approved", undo, NOW - timedelta(hours=UNDO_HOURS + 1), None, NOW)
     assert "within 24 hours" in undo_problem("approved", undo, None, None, NOW)
+
+
+def test_the_clients_chosen_are_trimmed_deduplicated_kept_in_order_and_capped():
+    assert sa.client_targets([" acme ", "", "beta", "acme", "  "]) == ["acme", "beta"]
+    assert sa.client_targets(None) == [] and sa.client_targets([]) == []
+    many = [f"c{i}" for i in range(80)]
+    assert sa.client_targets(many) == many[: sa.MAX_CLIENTS_AT_ONCE]
+    assert sa.client_targets(["x" * 200]) == ["x" * 80]
+
+
+def test_a_client_is_already_covered_by_its_own_approval_of_that_kind_or_by_one_for_all_clients():
+    active = [
+        {"action_type": "close_alert", "client_id": "acme"},
+        {"action_type": "create_case", "client_id": "beta"},
+    ]
+    assert sa.clients_still_to_cover(["acme", "beta", "gamma"], active, "close_alert") == (["beta", "gamma"], ["acme"])
+    assert sa.clients_still_to_cover(["acme"], active, " CLOSE_ALERT ") == ([], ["acme"])  # the kind is matched ignoring case and space
+    everyone = [*active, {"action_type": "close_alert", "client_id": None}]
+    assert sa.clients_still_to_cover(["acme", "gamma"], everyone, "close_alert") == ([], ["acme", "gamma"])
+    assert sa.clients_still_to_cover(["gamma"], everyone, "create_case") == (
+        ["gamma"],
+        [],
+    )  # an all-clients approval of another kind covers nothing here
+    assert sa.clients_still_to_cover([], active, "close_alert") == ([], [])

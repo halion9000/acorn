@@ -12,8 +12,10 @@ from types import SimpleNamespace
 
 import pytest
 from app.api.v1.endpoints import inventory as inv
+from app.api.v1.endpoints import standing_approvals as sap
 from app.api.v1.endpoints import vcio_risk_scoring as vrs
 from app.db.rls import set_rls_context
+from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -142,3 +144,35 @@ async def test_a_clients_inventory_item_can_be_deleted_alone_or_with_others_and_
     out = await as_app(w, lambda db: inv.bulk_delete(inv.BulkDeleteIn(ids=[b.id, c.id, d.id], confirm=True), w.user, db))
     assert (out.deleted, [r.name for r in out.refused]) == (2, ["D1"])
     assert await audit_count(w, "inventory:item_deleted") == 3
+
+
+async def test_one_standing_approval_for_several_clients_is_added_together_skips_the_covered_and_is_logged(world):
+    w = world
+    body = sap.StandingManyIn(action_type="close_alert", client_ids=[str(w.acme), str(w.birch), str(w.acme)], days=30)
+    first = await as_app(w, lambda db: sap.create_standing_for_clients(body, None, w.user, db))
+    assert sorted(r.client_id for r in first.created) == sorted([str(w.acme), str(w.birch)])
+    assert first.already_covered == []
+    assert await audit_count(w, "standing_approval:created") == 2
+    again = await as_app(
+        w,
+        lambda db: sap.create_standing_for_clients(
+            sap.StandingManyIn(action_type="close_alert", client_ids=[str(w.acme), "gamma"]), None, w.user, db
+        ),
+    )
+    assert [r.client_id for r in again.created] == ["gamma"]
+    assert again.already_covered == [str(w.acme)]
+    refused = await as_app(
+        w,
+        lambda db: _refused(
+            sap.create_standing_for_clients(sap.StandingManyIn(action_type="isolate_host", client_ids=["x"]), None, w.user, db)
+        ),
+    )
+    assert refused == 422
+
+
+async def _refused(call):
+    try:
+        await call
+    except HTTPException as exc:
+        return exc.status_code
+    return None

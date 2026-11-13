@@ -1914,6 +1914,38 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/standing-approvals/many:
+    post:
+      tags:
+      - autonomy-policy
+      summary: Create Standing For Clients
+      description: 'One standing approval for each of several clients at once (the
+        same kind, the same number of days). Clients that are already covered are
+        skipped and named. All or nothing: when
+
+        adding them would pass the limit of active approvals, none is added.'
+      operationId: create_standing_for_clients_api_v1_standing_approvals_many_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StandingManyIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandingManyOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/standing-approvals/{standing_id}/revoke:
     post:
       tags:
@@ -49656,6 +49688,53 @@ components:
       - allowed_types
       - default_days
       title: StandingList
+    StandingManyIn:
+      properties:
+        action_type:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Action Type
+        client_ids:
+          items:
+            type: string
+          type: array
+          maxItems: 50
+          minItems: 1
+          title: Client Ids
+        days:
+          type: integer
+          maximum: 365.0
+          minimum: 1.0
+          title: Days
+          default: 90
+        note:
+          type: string
+          maxLength: 300
+          title: Note
+          default: ''
+      type: object
+      required:
+      - action_type
+      - client_ids
+      title: StandingManyIn
+    StandingManyOut:
+      properties:
+        created:
+          items:
+            $ref: '#/components/schemas/StandingOut'
+          type: array
+          title: Created
+        already_covered:
+          items:
+            type: string
+          type: array
+          title: Already Covered
+      type: object
+      required:
+      - created
+      - already_covered
+      title: StandingManyOut
     StandingOut:
       properties:
         id:

@@ -6307,6 +6307,12 @@ export interface StandingApproval {
   state: 'active' | 'expired' | 'revoked';
 }
 
+/** One standing approval for each of several clients at once; clients that already had one of that kind are named in ``already_covered`` and got nothing new. */
+export interface StandingApprovalMany {
+  created: StandingApproval[];
+  already_covered: string[];
+}
+
 export interface StandingApprovalList {
   items: StandingApproval[];
   allowed_types: string[];
@@ -6327,6 +6333,8 @@ export const standingApprovalsApi = {
   list: () => request<StandingApprovalList>('/api/v1/standing-approvals'),
   create: (body: { action_type: string; client_id?: string | null; days: number; note?: string }) =>
     request<StandingApproval>('/api/v1/standing-approvals', { method: 'POST', body: JSON.stringify(body) }),
+  createForClients: (body: { action_type: string; client_ids: string[]; days: number; note?: string }) =>
+    request<StandingApprovalMany>('/api/v1/standing-approvals/many', { method: 'POST', body: JSON.stringify(body) }),
   revoke: (id: string) => request<StandingApproval>(`/api/v1/standing-approvals/${encodeURIComponent(id)}/revoke`, { method: 'POST' }),
   /** Approved cards, newest first; the ones a standing approval approved on its own carry standing_approval_id. */
   recentApproved: () => request<{ items: AutoApprovedCard[] }>('/api/v1/approvals?status=approved&page_size=50'),

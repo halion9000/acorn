@@ -33,6 +33,19 @@ class StandingIn(BaseModel):
     note: str = Field(default="", max_length=300)
 
 
+class StandingManyIn(BaseModel):
+    action_type: str = Field(min_length=1, max_length=80)
+    client_ids: list[str] = Field(min_length=1, max_length=sa.MAX_CLIENTS_AT_ONCE)
+    days: int = Field(default=sa.DEFAULT_DAYS, ge=1, le=sa.MAX_DAYS)
+    note: str = Field(default="", max_length=300)
+
+
+class StandingManyOut(BaseModel):
+    created: list[StandingOut]
+    # Clients that already had an active standing approval of this kind (their own, or one for all clients): nothing was added for them.
+    already_covered: list[str]
+
+
 class StandingOut(BaseModel):
     id: uuid.UUID
     action_type: str
@@ -130,6 +143,71 @@ async def create_standing(
     await db.commit()
     await db.refresh(row)
     return _out(row, now)
+
+
+@router.post(
+    "/many", response_model=StandingManyOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_signed_in_session)]
+)
+async def create_standing_for_clients(
+    body: StandingManyIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: TenantDBSession
+) -> StandingManyOut:
+    """One standing approval for each of several clients at once (the same kind, the same number of days). Clients that are already covered are skipped and named. All or nothing: when
+    adding them would pass the limit of active approvals, none is added."""
+    action_type = body.action_type.strip().lower()
+    problem = sa.refusal(action_type)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=problem)
+    targets = sa.client_targets(body.client_ids)
+    if not targets:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Choose at least one client.")
+    now = datetime.now(UTC)
+    active_rows = (
+        (
+            await db.execute(
+                select(StandingApproval).where(
+                    StandingApproval.tenant_id == user.tenant_id, StandingApproval.revoked_at.is_(None), StandingApproval.expires_at > now
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    needed, covered = sa.clients_still_to_cover(
+        targets, [{"action_type": r.action_type, "client_id": r.client_id} for r in active_rows], action_type
+    )
+    if len(active_rows) + len(needed) > MAX_ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"That would pass the limit of {MAX_ACTIVE} active standing approvals ({len(active_rows)} now, {len(needed)} to add); revoke some first.",
+        )
+    rows = [
+        StandingApproval(
+            tenant_id=user.tenant_id,
+            action_type=action_type,
+            client_id=c,
+            note=body.note.strip(),
+            created_by=user.user_id,
+            expires_at=now + timedelta(days=body.days),
+        )
+        for c in needed
+    ]
+    db.add_all(rows)
+    await db.flush()
+    for row in rows:
+        await emit_audit(
+            db=db,
+            tenant_id=user.tenant_id,
+            actor_id=user.user_id,
+            action="standing_approval:created",
+            resource="standing_approval",
+            resource_id=str(row.id),
+            changes={"action_type": row.action_type, "client_id": row.client_id, "days": body.days, "together_with": len(rows)},
+            request=request,
+        )
+    await db.commit()
+    for row in rows:
+        await db.refresh(row)
+    return StandingManyOut(created=[_out(r, now) for r in rows], already_covered=covered)
 
 
 @router.post("/{standing_id}/revoke", response_model=StandingOut, dependencies=[Depends(require_signed_in_session)])

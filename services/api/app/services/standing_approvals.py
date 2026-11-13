@@ -62,3 +62,27 @@ def matches(standing: dict[str, Any], action: Any, title: str | None, now: datet
     if wanted in (None, ""):
         return True
     return client_of(action) == str(wanted)
+
+
+MAX_CLIENTS_AT_ONCE = 50
+
+
+def client_targets(client_ids: list[str] | None) -> list[str]:
+    """The clients a standing approval is for, from what was chosen: each trimmed, empty ones dropped, repeats removed, in the order given, at most ``MAX_CLIENTS_AT_ONCE`` (pure)."""
+    seen: dict[str, None] = {}
+    for raw in client_ids or []:
+        v = str(raw).strip()[:80]
+        if v:
+            seen.setdefault(v, None)
+    return list(seen)[:MAX_CLIENTS_AT_ONCE]
+
+
+def clients_still_to_cover(targets: list[str], active: list[dict[str, Any]], action_type: str) -> tuple[list[str], list[str]]:
+    """(clients that need a new standing approval, clients already covered) for this kind of action (pure). A client is covered by an active approval for the same kind that names it,
+    or by one that names no client (all clients), which then covers every client."""
+    kind = action_type.strip().lower()
+    mine = [a for a in active if str(a.get("action_type", "")).strip().lower() == kind]
+    if any(a.get("client_id") in (None, "") for a in mine):
+        return [], list(targets)
+    covered = {str(a.get("client_id")) for a in mine}
+    return [t for t in targets if t not in covered], [t for t in targets if t in covered]
