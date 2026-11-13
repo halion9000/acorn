@@ -32,7 +32,7 @@ from app.models.alert import Alert
 from app.models.client_alias import ClientAlias, ClientDeviceHint
 from app.models.device import Device, DeviceMergeDismissal, DeviceMergeLog, DeviceSnooze, DeviceSource
 from app.models.tenant import Tenant
-from app.services import tool_exclusions
+from app.services import device_follow, tool_exclusions
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.client_mapping import IncomingClient, auto_link_by_devices, record_device_hints, tenant_hidden, upsert_clients
 from app.services.device_identity import confidence_label, pair_confidence
@@ -1321,6 +1321,8 @@ class DevicesResponse(BaseModel):
     auto_linked: int = 0
     # Pairs of devices merged just now because they are plainly one machine seen by different tools (see ``device_merge.auto_merge_same_name``).
     merged: int = 0
+    # Records stored under another client than their tool's organization is mapped to, because the RMM files that very machine there (see ``device_follow``).
+    followed: int = 0
 
 
 # A client is checked for same-name pairs at most this often: the tools report in many small batches and the check reads the client's devices.
@@ -1359,8 +1361,11 @@ async def apply_devices(db: Any, owner: uuid.UUID, report: DevicesReport) -> Dev
     the feed's own tenant (an organisation with no clients)."""
     rows = (await db.execute(select(ClientAlias).where(ClientAlias.tenant_id == owner))).scalars().all()
     known = {(a.vendor, a.vendor_client_id): a for a in rows}
-    children = set((await db.execute(select(Tenant.id).where(Tenant.parent_tenant_id == owner))).scalars().all())
+    child_rows = (await db.execute(select(Tenant.id, Tenant.settings).where(Tenant.parent_tenant_id == owner))).all()
+    children = {r.id for r in child_rows}
+    shown_children = {r.id for r in child_rows if not tenant_hidden(r)}
     by_tenant: dict[uuid.UUID, list[DeviceIn]] = {}
+    placed: list[tuple[uuid.UUID, DeviceIn]] = []
     waiting: dict[tuple[str, str], int] = {}
     waiting_names: dict[tuple[str, str], list[str]] = {}
     unmapped = 0
@@ -1380,7 +1385,23 @@ async def apply_devices(db: Any, owner: uuid.UUID, report: DevicesReport) -> Dev
                 continue
         else:
             target = owner
-        by_tenant.setdefault(target, []).append(item)
+        placed.append((target, item))
+    # A Huntress agent goes to the client the RMM files its machine under, when that is plainly the same machine and another client than its Huntress organization's (device_follow).
+    anchored = await device_follow.anchored_machines(
+        db, shown_children, [(it.vendor, it.hostname, it.serial, target) for target, it in placed]
+    )
+    moves = device_follow.follow_targets(
+        [(i, it.vendor, it.hostname, it.serial, target) for i, (target, it) in enumerate(placed)], anchored
+    )
+    kept: dict[tuple[str, str], uuid.UUID] = {}
+    for i, (target, item) in enumerate(placed):
+        home = moves.get(i, target)
+        if i in moves:
+            # Said on the record, so a person can see why it is not under the client its Huntress organization is mapped to.
+            item.details = {**item.details, "followed_from_client": str(target)}
+        by_tenant.setdefault(home, []).append(item)
+        if item.vendor in device_follow.FOLLOWING_TOOLS and home in children:
+            kept[(item.vendor, item.external_id)] = home
     # The machine names of clients that are not mapped yet are kept, to suggest which client they belong to (see client_mapping.device_overlaps).
     for (vendor, vid), hostnames in waiting_names.items():
         await record_device_hints(db, owner, vendor, vid, hostnames)
@@ -1423,12 +1444,20 @@ async def apply_devices(db: Any, owner: uuid.UUID, report: DevicesReport) -> Dev
                     known,
                 )
                 accepted += 1
+    # A record that followed its machine is taken away from the client it used to sit under.
+    await device_follow.remove_left_behind(db, children, kept, lambda tid: acting_as_tenant(db, tid))
     await tool_exclusions.run_excluded_present(
         db, owner, list(by_tenant)
     )  # a tool marked as not used for a client that is reporting devices for it
     merged = await _auto_merge_touched(db, list(by_tenant))
     return DevicesResponse(
-        accepted=accepted, unmapped=unmapped, ignored=ignored, unmapped_clients=unmapped_clients, auto_linked=auto_linked, merged=merged
+        accepted=accepted,
+        unmapped=unmapped,
+        ignored=ignored,
+        unmapped_clients=unmapped_clients,
+        auto_linked=auto_linked,
+        merged=merged,
+        followed=len(moves),
     )
 
 

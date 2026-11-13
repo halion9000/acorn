@@ -258,7 +258,13 @@ async def test_scripts_are_stored_on_the_owner_tenant(world):
 
 
 async def test_a_closed_incident_resolves_only_the_new_alert_that_holds_it(world):
-    out = await call(world, "closed", world["good"])
+    # Its own body, not the recorded example: the example was once a Huntress incident and is now a CIPP one, and this test is about the Huntress alert the world holds.
+    route = ROUTES["closed"]
+    body = route.body_field.field_info.annotation.model_validate(
+        {"vendor": "huntress", "closed": [{"uid": "huntress:4821", "state": "resolved"}]}
+    )
+    async with world["factory"]() as s:
+        out = await route.endpoint(db=s, tenant_token=world["good"], body=body)
     assert out.resolved >= 1
     assert (await alert_row(world, "huntress:4821")).status in ("resolved", "closed")
     assert (await alert_row(world, "blumira:abc-006")).status == "new"

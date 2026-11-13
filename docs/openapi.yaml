@@ -55054,6 +55054,10 @@ components:
           type: integer
           title: Merged
           default: 0
+        followed:
+          type: integer
+          title: Followed
+          default: 0
       type: object
       required:
       - accepted
