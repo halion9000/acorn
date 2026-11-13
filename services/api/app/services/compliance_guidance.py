@@ -1,7 +1,7 @@
 """What each control of a compliance framework means in plain words, what has to be in place to meet it, and what to attach as evidence.
 
 The control titles in ``compliance_catalog`` are short and say what the criterion is about, not what a company has to do. This says the rest, for the SOC 2 Trust Services Criteria (the 61
-controls of that page). It is guidance written for this page, in A.C.O.R.N's own words: it is not the AICPA's text and not an auditor's opinion. An auditor decides what is enough for a
+controls of that page), and since 2026-11-13 for HIPAA (63) and NIST CSF 2.0 (106). It is guidance written for this page, in A.C.O.R.N's own words: it is not the AICPA's text and not an auditor's opinion. An auditor decides what is enough for a
 given company; this is the usual shape of "enough" for a small or mid-sized service organisation, so a control is never left as a title and an empty evidence box.
 
 Each entry is ``(meaning, what it takes, evidence to attach)``. Frameworks not listed here have no guidance yet and their controls show none.
@@ -10,6 +10,10 @@ Each entry is ``(meaning, what it takes, evidence to attach)``. Frameworks not l
 from __future__ import annotations
 
 from typing import NamedTuple
+
+from app.services import compliance_guidance_hipaa as _hipaa
+from app.services import compliance_guidance_nist_gi as _nist_gi
+from app.services import compliance_guidance_nist_pr as _nist_pr
 
 
 class Guidance(NamedTuple):
@@ -681,7 +685,16 @@ SOC2: dict[str, Guidance] = {
     ),
 }
 
-GUIDANCE: dict[str, dict[str, Guidance]] = {"SOC2": SOC2}
+
+def _from(entries: dict[str, tuple[str, list[str], list[str]]]) -> dict[str, Guidance]:
+    return {cid: _g(meaning, to_meet, evidence) for cid, (meaning, to_meet, evidence) in entries.items()}
+
+
+# HIPAA and NIST CSF 2.0 are written from the public texts, in A.C.O.R.N's own words (see each module). Same shape as SOC 2.
+HIPAA: dict[str, Guidance] = _from(_hipaa.ENTRIES)
+NIST_CSF: dict[str, Guidance] = {**_from(_nist_gi.ENTRIES), **_from(_nist_pr.ENTRIES)}
+
+GUIDANCE: dict[str, dict[str, Guidance]] = {"SOC2": SOC2, "HIPAA": HIPAA, "NIST-CSF": NIST_CSF}
 
 
 def guidance_for(framework: str, control_id: str) -> Guidance | None:

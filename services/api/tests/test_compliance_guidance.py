@@ -3,7 +3,7 @@
 import pytest
 from app.api.v1.endpoints import compliance as ep
 from app.services.compliance_catalog import CATALOGS
-from app.services.compliance_guidance import GUIDANCE, SOC2, guidance_for
+from app.services.compliance_guidance import GUIDANCE, HIPAA, NIST_CSF, SOC2, guidance_for
 
 
 def test_every_soc_2_control_of_the_catalog_has_guidance_and_no_guidance_is_for_a_control_that_does_not_exist():
@@ -13,20 +13,34 @@ def test_every_soc_2_control_of_the_catalog_has_guidance_and_no_guidance_is_for_
     assert sorted(set(SOC2) - set(ids)) == [], "guidance for an id the catalog does not have is never shown"
 
 
-def test_each_piece_of_guidance_says_something_usable():
-    for cid, g in SOC2.items():
+def test_every_hipaa_and_nist_csf_control_of_the_catalog_has_guidance_and_none_is_for_a_control_that_does_not_exist():
+    for key, written, expected in (("HIPAA", HIPAA, 63), ("NIST-CSF", NIST_CSF, 106)):
+        ids = [cid for _group, cid, _title in CATALOGS[key]]
+        assert len(ids) == expected, key
+        assert [cid for cid in ids if cid not in written] == [], key
+        assert sorted(set(written) - set(ids)) == [], key
+
+
+@pytest.mark.parametrize("written", [SOC2, HIPAA, NIST_CSF], ids=["SOC2", "HIPAA", "NIST-CSF"])
+def test_each_piece_of_guidance_says_something_usable(written):
+    for cid, g in written.items():
         assert len(g.meaning) >= 40 and g.meaning.endswith("."), cid
         assert len(g.to_meet) >= 1 and len(g.evidence) >= 1, cid
         assert all(len(item) >= 12 for item in (*g.to_meet, *g.evidence)), cid
         assert len(set(g.to_meet)) == len(g.to_meet) and len(set(g.evidence)) == len(g.evidence), cid
-    assert sum(len(g.to_meet) for g in SOC2.values()) >= 170, "on average about three things to do per control"
+    assert sum(len(g.to_meet) for g in written.values()) >= 2 * len(written), "at least two things to do per control on average"
+
+
+def test_soc_2_has_about_three_things_to_do_per_control():
+    assert sum(len(g.to_meet) for g in SOC2.values()) >= 170
 
 
 def test_guidance_is_looked_up_by_framework_and_control_and_is_none_where_there_is_none():
     assert guidance_for("SOC2", "CC6.1").to_meet[1].startswith("Multi-factor sign-in")
     assert guidance_for("SOC2", "CC9.9") is None
     assert guidance_for("ISO27001", "A.5.1") is None and guidance_for("nope", "CC6.1") is None
-    assert set(GUIDANCE) == {"SOC2"}
+    assert guidance_for("HIPAA", "164.308(a)(1)(ii)(A)") is not None and guidance_for("NIST-CSF", "GV.OC-01") is not None
+    assert set(GUIDANCE) == {"SOC2", "HIPAA", "NIST-CSF"}
 
 
 @pytest.mark.asyncio
@@ -38,6 +52,10 @@ async def test_the_controls_of_a_framework_come_with_their_guidance_and_a_framew
     assert cc11.meaning == "The company says how its people are expected to behave, and acts when they do not."
     assert cc11.to_meet[0].startswith("A code of conduct") and cc11.evidence_examples[0] == "The code of conduct with its approval date"
     assert all(c.meaning and c.to_meet and c.evidence_examples for c in soc2.values())
-    other = next(k for k in ep.FRAMEWORKS if k != "SOC2")
-    plain = (await ep.list_framework_controls(other)).controls
+    for key in ("HIPAA", "NIST-CSF"):
+        written = (await ep.list_framework_controls(key)).controls
+        assert written and all(c.meaning and c.to_meet and c.evidence_examples for c in written), key
+    unwritten = [k for k in ep.FRAMEWORKS if k not in GUIDANCE]
+    assert unwritten, "some framework still has no guidance, to show it comes without"
+    plain = (await ep.list_framework_controls(unwritten[0])).controls
     assert plain and all(c.meaning is None and c.to_meet == [] and c.evidence_examples == [] for c in plain)
