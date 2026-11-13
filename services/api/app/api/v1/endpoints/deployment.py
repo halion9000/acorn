@@ -88,13 +88,13 @@ _config = DeploymentConfig(
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 
-@router.get("/config", response_model=DeploymentConfig, dependencies=[Depends(require_permission("settings:read"))])
+@router.get("/config", response_model=DeploymentConfig, dependencies=[Depends(require_permission("settings_deployment:view"))])
 async def get_deployment_config() -> DeploymentConfig:
     """Return the current deployment configuration."""
     return _config
 
 
-@router.put("/config", response_model=DeploymentConfig, dependencies=[Depends(require_permission("settings:write"))])
+@router.put("/config", response_model=DeploymentConfig, dependencies=[Depends(require_permission("settings_deployment:manage"))])
 async def update_deployment_config(body: DeploymentConfigUpdate) -> DeploymentConfig:
     """Update deployment configuration fields."""
     global _config
@@ -113,7 +113,7 @@ async def update_deployment_config(body: DeploymentConfigUpdate) -> DeploymentCo
     return _config
 
 
-@router.get("/airgap/status", response_model=AirgapStatus, dependencies=[Depends(require_permission("settings:read"))])
+@router.get("/airgap/status", response_model=AirgapStatus, dependencies=[Depends(require_permission("settings_deployment:view"))])
 async def get_airgap_status() -> AirgapStatus:
     """Check air-gap readiness: local LLM health, offline bundles, sync age."""
     is_airgap = _config.mode == DeploymentMode.airgap
@@ -163,7 +163,7 @@ async def get_airgap_status() -> AirgapStatus:
     "/airgap/bundle",
     response_model=BundleJob,
     status_code=status.HTTP_202_ACCEPTED,
-    dependencies=[Depends(require_permission("settings:write"))],
+    dependencies=[Depends(require_permission("settings_deployment:manage"))],
 )
 async def create_airgap_bundle() -> BundleJob:
     """Trigger creation of an offline update bundle for air-gapped deployments."""

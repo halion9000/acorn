@@ -27,7 +27,7 @@ class ReportDefinitionBody(BaseModel):
 @router.post("/validate")
 async def validate_report(
     body: ReportDefinitionBody,
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:read"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_reports:view"))],
 ) -> dict[str, Any]:
     """Validate a report definition (whitelisted widget types + sources, unique
     ids, bounded size) without rendering or persisting it."""
@@ -41,7 +41,7 @@ async def validate_report(
 @router.post("/render")
 async def render(
     body: ReportDefinitionBody,
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:read"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_reports:view"))],
     db: DBSession,
 ) -> dict[str, Any]:
     """Render a report by resolving each widget's data server-side. Wires the

@@ -41,6 +41,17 @@ _MIN_SERIAL_LEN = 4
 _UNFILLED_TEMPLATE = re.compile(r"^(\$\(.*\)|%.*%|\{.*\}|<.*>)$")
 
 
+# What a hypervisor guest says about itself as make and model ("Microsoft Corporation" "Virtual Machine" for Hyper-V and Azure, "VMware, Inc." "VMware Virtual Platform", "innotek GmbH" "VirtualBox", QEMU and KVM...).
+_VIRTUAL_MARKERS = ("virtual machine", "vmware", "virtualbox", "kvm", "qemu", "xen", "parallels", "hvm domu", "bochs", "virtual platform")
+
+
+def is_virtual_machine(manufacturer: object, model: object) -> bool:
+    """Whether the make and model are a hypervisor guest's (pure). A virtual machine's serial number is not an identity: the host gives one, the guest operating system another, and each tool reads
+    one or the other, so two tools can hold one machine under two serials."""
+    text = f"{manufacturer or ''} {model or ''}".lower()
+    return any(m in text for m in _VIRTUAL_MARKERS)
+
+
 def normalize_serial(raw: object) -> str | None:
     """The comparable form of a serial number, or None when the value is empty or a known placeholder."""
     if raw is None:

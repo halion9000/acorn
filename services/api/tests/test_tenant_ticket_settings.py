@@ -87,6 +87,6 @@ def test_the_routes_need_the_settings_permissions():
     from route_introspect import required_permissions
 
     routes = {(m, r.path): r for r in ts.router.routes if isinstance(r, APIRoute) for m in r.methods}
-    assert set(required_permissions(routes[("GET", "/tenant-settings/tickets")])) == {"settings:read"}
-    assert set(required_permissions(routes[("PUT", "/tenant-settings/tickets")])) == {"settings:write"}
-    assert set(required_permissions(routes[("DELETE", "/tenant-settings/tickets")])) == {"settings:write"}
+    assert set(required_permissions(routes[("GET", "/tenant-settings/tickets")])) == {"settings_tickets:view"}
+    assert set(required_permissions(routes[("PUT", "/tenant-settings/tickets")])) == {"settings_tickets:manage"}
+    assert set(required_permissions(routes[("DELETE", "/tenant-settings/tickets")])) == {"settings_tickets:manage"}

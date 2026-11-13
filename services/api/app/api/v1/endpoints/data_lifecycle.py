@@ -34,7 +34,7 @@ class RetentionUpdate(BaseModel):
 
 @router.get("/retention", response_model=RetentionOut)
 async def get_retention(
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:read"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_data:view"))],
     db: DBSession,
 ) -> RetentionOut:
     row = (await db.execute(select(RetentionPolicyRow).where(RetentionPolicyRow.tenant_id == current_user.tenant_id))).scalar_one_or_none()
@@ -77,7 +77,7 @@ async def retention_preview() -> RetentionPreviewOut:
 @router.put("/retention", response_model=RetentionOut)
 async def put_retention(
     body: RetentionUpdate,
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:write"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_data:manage"))],
     db: DBSession,
 ) -> RetentionOut:
     row = (await db.execute(select(RetentionPolicyRow).where(RetentionPolicyRow.tenant_id == current_user.tenant_id))).scalar_one_or_none()
@@ -133,7 +133,7 @@ def _to_out(row: CustomParserRow) -> ParserOut:
 
 @router.get("/parsers", response_model=list[ParserOut])
 async def list_parsers(
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:read"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_data:view"))],
     db: DBSession,
 ) -> list[ParserOut]:
     rows = (await db.execute(select(CustomParserRow).where(CustomParserRow.tenant_id == current_user.tenant_id))).scalars().all()
@@ -143,7 +143,7 @@ async def list_parsers(
 @router.post("/parsers", response_model=ParserOut, status_code=status.HTTP_201_CREATED)
 async def create_parser(
     body: ParserIn,
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:write"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_data:manage"))],
     db: DBSession,
 ) -> ParserOut:
     try:
@@ -167,7 +167,7 @@ async def create_parser(
 @router.post("/parsers/test", response_model=ParserTestOut)
 async def test_parser(
     body: ParserTestIn,
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:read"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_data:view"))],
 ) -> ParserTestOut:
     """Dry-run a parser pipeline against a sample event — validate + preview
     the reshaped event without persisting anything (W5.2/W5.3)."""
@@ -182,7 +182,7 @@ async def test_parser(
 @router.delete("/parsers/{parser_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_parser(
     parser_id: uuid.UUID,
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:write"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_data:manage"))],
     db: DBSession,
 ) -> None:
     row = (

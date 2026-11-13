@@ -169,7 +169,7 @@ class AgreementResponse(BaseModel):
     rules: str
 
 
-@router.get("/agreement", response_model=AgreementResponse, dependencies=[Depends(require_permission("settings:read"))])
+@router.get("/agreement", response_model=AgreementResponse, dependencies=[Depends(require_permission("settings_automation:view"))])
 async def approval_agreement(user: AuthUser, db: TenantDBSession) -> AgreementResponse:
     """For each kind of action an agent asked approval for in the last 90 days: how many, how many a person approved, denied or let expire, and the agreement share, with a suggestion (promote, keep, demote, too few).
 

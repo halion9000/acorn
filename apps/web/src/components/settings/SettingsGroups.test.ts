@@ -38,4 +38,22 @@ describe('settings groups', () => {
     const account = groups.find((g) => g.title === 'Your account')!;
     expect(account.entries[0]).toMatchObject({ kind: 'tab', id: 'profile' });
   });
+
+  it('leave out the pages of a Settings area the person may not open, and keep them all when capabilities are not known', () => {
+    const labels = (caps?: string[]) => groupedSettings([...tabs] as never, caps).flatMap((g) => g.entries.map((e) => e.label));
+    const gated = MORE_SETTINGS.filter((m) => m.requires);
+    expect(gated.map((m) => [m.href, m.requires])).toEqual([
+      ['/settings/retention', 'settings_data'],
+      ['/settings/triage', 'settings_automation'],
+      ['/settings/tickets', 'settings_tickets'],
+      ['/settings/vcio-risk-scoring', 'settings_clients'],
+    ]);
+    for (const m of gated) expect(labels(undefined), m.href).toContain(m.label);
+    // Someone who holds only the data area sees Data retention and none of the other gated pages; a page with no requirement is always shown.
+    const dataOnly = labels(['settings_data']);
+    expect(dataOnly).toContain('Data retention');
+    for (const m of gated.filter((g) => g.requires !== 'settings_data')) expect(dataOnly, m.href).not.toContain(m.label);
+    expect(dataOnly).toContain('Connectors');
+    expect(labels([])).not.toContain('Data retention');
+  });
 });

@@ -1,0 +1,16 @@
+{
+  "route": "risk-tickets/status",
+  "method": "POST",
+  "body": {
+    "tickets": [
+      {
+        "id": "6001",
+        "status": "On Hold"
+      },
+      {
+        "id": "6002",
+        "status": "Waiting on Customer"
+      }
+    ]
+  }
+}

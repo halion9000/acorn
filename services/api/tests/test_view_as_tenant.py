@@ -1225,16 +1225,84 @@ class TestCapabilities:
             "manage_users": "users:write",
             "respond_identities": "identities:respond",
             "run_bec": "identities:bec",
+            # The Settings areas (a View each): the console shows an area only to a person who may open it.
+            "settings_automation": "settings_automation:view",
+            "settings_clients": "settings_clients:view",
+            "settings_data": "settings_data:view",
+            "settings_deployment": "settings_deployment:view",
+            "settings_reports": "settings_reports:view",
+            "settings_security": "settings_security:view",
+            "settings_tickets": "settings_tickets:view",
+            "settings_workspace": "settings_workspace:view",
         }
-        assert capabilities_for_role("platform_admin") == ["manage_users", "platform_admin", "respond_identities", "run_bec"]
+        assert capabilities_for_role("platform_admin") == [
+            "manage_users",
+            "platform_admin",
+            "respond_identities",
+            "run_bec",
+            "settings_automation",
+            "settings_clients",
+            "settings_data",
+            "settings_deployment",
+            "settings_reports",
+            "settings_security",
+            "settings_tickets",
+            "settings_workspace",
+        ]
         assert capabilities_for_role("no-such-role") == []
 
     @pytest.mark.parametrize(
         "who,expected",
         [
-            ("platform", ["manage_users", "platform_admin", "respond_identities", "run_bec"]),
-            ("p_admin", ["manage_users", "respond_identities", "run_bec"]),
-            ("c1_admin", ["manage_users", "respond_identities", "run_bec"]),
+            (
+                "platform",
+                [
+                    "manage_users",
+                    "platform_admin",
+                    "respond_identities",
+                    "run_bec",
+                    "settings_automation",
+                    "settings_clients",
+                    "settings_data",
+                    "settings_deployment",
+                    "settings_reports",
+                    "settings_security",
+                    "settings_tickets",
+                    "settings_workspace",
+                ],
+            ),
+            (
+                "p_admin",
+                [
+                    "manage_users",
+                    "respond_identities",
+                    "run_bec",
+                    "settings_automation",
+                    "settings_clients",
+                    "settings_data",
+                    "settings_deployment",
+                    "settings_reports",
+                    "settings_security",
+                    "settings_tickets",
+                    "settings_workspace",
+                ],
+            ),
+            (
+                "c1_admin",
+                [
+                    "manage_users",
+                    "respond_identities",
+                    "run_bec",
+                    "settings_automation",
+                    "settings_clients",
+                    "settings_data",
+                    "settings_deployment",
+                    "settings_reports",
+                    "settings_security",
+                    "settings_tickets",
+                    "settings_workspace",
+                ],
+            ),
             ("p_lead", []),
             ("p_analyst", []),
             ("p_viewer", []),
@@ -1251,9 +1319,44 @@ class TestCapabilities:
         got = {role: capabilities_for_role(role) for role in ROLE_PERMISSIONS}
         assert got == {
             "custom": [],  # a custom-role person's capabilities come from that role (capabilities_for_permissions)
-            "platform_admin": ["manage_users", "platform_admin", "respond_identities", "run_bec"],
-            "admin": ["manage_users", "respond_identities", "run_bec"],
-            "tenant_admin": ["manage_users"],
+            "platform_admin": [
+                "manage_users",
+                "platform_admin",
+                "respond_identities",
+                "run_bec",
+                "settings_automation",
+                "settings_clients",
+                "settings_data",
+                "settings_deployment",
+                "settings_reports",
+                "settings_security",
+                "settings_tickets",
+                "settings_workspace",
+            ],
+            "admin": [
+                "manage_users",
+                "respond_identities",
+                "run_bec",
+                "settings_automation",
+                "settings_clients",
+                "settings_data",
+                "settings_deployment",
+                "settings_reports",
+                "settings_security",
+                "settings_tickets",
+                "settings_workspace",
+            ],
+            "tenant_admin": [
+                "manage_users",
+                "settings_automation",
+                "settings_clients",
+                "settings_data",
+                "settings_deployment",
+                "settings_reports",
+                "settings_security",
+                "settings_tickets",
+                "settings_workspace",
+            ],
             "soc_lead": [],
             "soc_analyst": [],
             "threat_hunter": [],
@@ -1271,7 +1374,19 @@ class TestCapabilities:
 
     def test_saving_a_preference_does_not_make_the_console_lose_them(self, world):
         r = world.client.patch("/api/v1/auth/me/preferences", headers=world.auth("p_admin"), json={"preferences": {"theme": "dark"}})
-        assert r.status_code == 200 and r.json()["capabilities"] == ["manage_users", "respond_identities", "run_bec"]
+        assert r.status_code == 200 and r.json()["capabilities"] == [
+            "manage_users",
+            "respond_identities",
+            "run_bec",
+            "settings_automation",
+            "settings_clients",
+            "settings_data",
+            "settings_deployment",
+            "settings_reports",
+            "settings_security",
+            "settings_tickets",
+            "settings_workspace",
+        ]
 
 
 class TestManageableTenants:

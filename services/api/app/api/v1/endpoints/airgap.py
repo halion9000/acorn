@@ -27,7 +27,7 @@ from app.core.airgap import airgap_status
 router = APIRouter(prefix="/airgap", tags=["airgap"])
 
 
-@router.get("/status", summary="Current air-gap egress policy", dependencies=[Depends(require_permission("settings:read"))])
+@router.get("/status", summary="Current air-gap egress policy", dependencies=[Depends(require_permission("settings_deployment:view"))])
 async def get_airgap_status() -> dict[str, object]:
     """Return the live air-gap policy snapshot for this pod.
 

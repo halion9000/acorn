@@ -150,7 +150,7 @@ async def _synthesise(question: str, chunks: list[KBChunk]) -> str | None:
     response_model=list[KBDocResponse],
     status_code=status.HTTP_201_CREATED,
     summary="Ingest document into knowledge base",
-    dependencies=[Depends(require_permission("settings:write"))],
+    dependencies=[Depends(require_permission("settings_security:manage"))],
 )
 async def ingest(body: IngestRequest, db: DBSession, user: AuthUser) -> list[KBDocResponse]:
     chunks = chunk_text(body.content)
@@ -232,7 +232,7 @@ async def get_document(doc_id: uuid.UUID, db: DBSession, user: AuthUser) -> KBDo
     status_code=status.HTTP_204_NO_CONTENT,
     response_model=None,
     summary="Remove KB document",
-    dependencies=[Depends(require_permission("settings:write"))],
+    dependencies=[Depends(require_permission("settings_security:manage"))],
 )
 async def delete_document(doc_id: uuid.UUID, db: DBSession, user: AuthUser) -> None:
     existing = (

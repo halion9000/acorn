@@ -82,7 +82,7 @@ def _out(row: StandingApproval, now: datetime) -> StandingOut:
     )
 
 
-@router.get("", response_model=StandingList, dependencies=[Depends(require_permission("settings:read"))])
+@router.get("", response_model=StandingList, dependencies=[Depends(require_permission("settings_automation:view"))])
 async def list_standing(user: AuthUser, db: TenantDBSession) -> StandingList:
     now = datetime.now(UTC)
     rows = (
@@ -102,7 +102,10 @@ async def list_standing(user: AuthUser, db: TenantDBSession) -> StandingList:
 
 @router.post("", response_model=StandingOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_signed_in_session)])
 async def create_standing(
-    body: StandingIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: TenantDBSession
+    body: StandingIn,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("settings_automation:manage"))],
+    db: TenantDBSession,
 ) -> StandingOut:
     action_type = body.action_type.strip().lower()
     problem = sa.refusal(action_type)
@@ -149,7 +152,10 @@ async def create_standing(
     "/many", response_model=StandingManyOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_signed_in_session)]
 )
 async def create_standing_for_clients(
-    body: StandingManyIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: TenantDBSession
+    body: StandingManyIn,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("settings_automation:manage"))],
+    db: TenantDBSession,
 ) -> StandingManyOut:
     """One standing approval for each of several clients at once (the same kind, the same number of days). Clients that are already covered are skipped and named. All or nothing: when
     adding them would pass the limit of active approvals, none is added."""
@@ -212,7 +218,10 @@ async def create_standing_for_clients(
 
 @router.post("/{standing_id}/revoke", response_model=StandingOut, dependencies=[Depends(require_signed_in_session)])
 async def revoke_standing(
-    standing_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: TenantDBSession
+    standing_id: uuid.UUID,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("settings_automation:manage"))],
+    db: TenantDBSession,
 ) -> StandingOut:
     row = (
         await db.execute(select(StandingApproval).where(StandingApproval.id == standing_id, StandingApproval.tenant_id == user.tenant_id))

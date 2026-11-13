@@ -62,13 +62,15 @@ async def _tenant(db: DBSession, tenant_id) -> Tenant:
 
 
 @router.get("/auto-close", response_model=AutoCloseSetting, summary="This tenant's own auto-close confidence (None = the platform value)")
-async def get_auto_close(user: Annotated[AuthUser, Depends(require_permission("settings:read"))], db: DBSession) -> AutoCloseSetting:
+async def get_auto_close(
+    user: Annotated[AuthUser, Depends(require_permission("settings_automation:view"))], db: DBSession
+) -> AutoCloseSetting:
     return AutoCloseSetting(threshold=stored_threshold((await _tenant(db, user.tenant_id)).settings))
 
 
 @router.put("/auto-close", response_model=AutoCloseSetting, summary="Set this tenant's own auto-close confidence")
 async def set_auto_close(
-    body: SetAutoClose, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession
+    body: SetAutoClose, user: Annotated[AuthUser, Depends(require_permission("settings_automation:manage"))], db: DBSession
 ) -> AutoCloseSetting:
     tenant = await _tenant(db, user.tenant_id)
     settings = dict(tenant.settings or {})
@@ -80,7 +82,9 @@ async def set_auto_close(
 
 
 @router.delete("/auto-close", response_model=AutoCloseSetting, summary="Go back to the platform's auto-close confidence")
-async def clear_auto_close(user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession) -> AutoCloseSetting:
+async def clear_auto_close(
+    user: Annotated[AuthUser, Depends(require_permission("settings_automation:manage"))], db: DBSession
+) -> AutoCloseSetting:
     tenant = await _tenant(db, user.tenant_id)
     settings = dict(tenant.settings or {})
     settings.pop(KEY, None)

@@ -116,6 +116,14 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
         "/api/v1/inbox/core-feed/{tenant_token}/person-tickets",
     ): "CORE's recent HaloPSA tickets per person: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only write under that feed's own mapped client tenants",
     (
+        "GET",
+        "/api/v1/inbox/core-feed/{tenant_token}/risk-tickets",
+    ): "The ticket numbers CORE should read the status of: authenticated by the core-feed token in the path, checked in the handler (401 without it); reads only that feed's own clients.",
+    (
+        "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/risk-tickets/status",
+    ): "CORE's read of those tickets' status names: authenticated by the core-feed token in the path, checked in the handler (401 without it); updates only tickets already opened from a question under that feed's own clients.",
+    (
         "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/vulnerabilities",
     ): "CORE's list of each client's vulnerabilities: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only write under that feed's own mapped clients.",

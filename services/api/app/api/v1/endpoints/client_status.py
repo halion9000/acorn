@@ -111,7 +111,7 @@ class LinksOut(BaseModel):
     default_days: int
 
 
-@router.get("", response_model=LinksOut, dependencies=[Depends(require_permission("settings:read"))])
+@router.get("", response_model=LinksOut, dependencies=[Depends(require_permission("settings_clients:view"))])
 async def list_links(user: AuthUser, db: DBSession) -> LinksOut:
     now = datetime.now(UTC)
     rows = (
@@ -136,7 +136,7 @@ async def list_links(user: AuthUser, db: DBSession) -> LinksOut:
 
 @router.post("", response_model=LinkCreated, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_signed_in_session)])
 async def create_link(
-    body: LinkIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession
+    body: LinkIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings_clients:manage"))], db: DBSession
 ) -> LinkCreated:
     names = await _names(db, user.tenant_id)
     if body.client_id not in names:
@@ -177,7 +177,7 @@ async def create_link(
     return LinkCreated(**_out(row, names, now).model_dump(), token=token)
 
 
-@router.get("/{link_id}/preview", dependencies=[Depends(require_permission("settings:read"))])
+@router.get("/{link_id}/preview", dependencies=[Depends(require_permission("settings_clients:view"))])
 async def preview_link(link_id: uuid.UUID, user: AuthUser, db: DBSession) -> dict[str, Any]:
     """Exactly what the client would see for this link (the same function the public page uses), so the wording can be reviewed before the link is switched on."""
     row = await _own_link(db, user.tenant_id, link_id)
@@ -186,7 +186,7 @@ async def preview_link(link_id: uuid.UUID, user: AuthUser, db: DBSession) -> dic
 
 @router.post("/{link_id}/review", response_model=LinkOut, dependencies=[Depends(require_signed_in_session)])
 async def review_link(
-    link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession
+    link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings_clients:manage"))], db: DBSession
 ) -> LinkOut:
     """A person has read the preview and is happy with what the client will see: the link starts to work."""
     row = await _own_link(db, user.tenant_id, link_id)
@@ -211,7 +211,7 @@ async def review_link(
 
 @router.post("/{link_id}/revoke", response_model=LinkOut, dependencies=[Depends(require_signed_in_session)])
 async def revoke_link(
-    link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession
+    link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings_clients:manage"))], db: DBSession
 ) -> LinkOut:
     row = await _own_link(db, user.tenant_id, link_id)
     now = datetime.now(UTC)
@@ -234,7 +234,7 @@ async def revoke_link(
 
 @router.delete("/{link_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_signed_in_session)])
 async def delete_link(
-    link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession
+    link_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("settings_clients:manage"))], db: DBSession
 ) -> Response:
     """Remove a link from the list for good. Only a link that is already revoked or has run out can be deleted: a live link must be revoked first, so a click cannot silently take a client's page away."""
     row = await _own_link(db, user.tenant_id, link_id)

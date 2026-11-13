@@ -14,7 +14,14 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.device import Device, DeviceMergeDismissal, DeviceMergeLog, DeviceSource
-from app.services.device_identity import could_be_same_machine, hostname_key, is_placeholder_name, loose_name_key, mac_key
+from app.services.device_identity import (
+    could_be_same_machine,
+    hostname_key,
+    is_placeholder_name,
+    is_virtual_machine,
+    loose_name_key,
+    mac_key,
+)
 
 
 class DeviceMergeError(ValueError):
@@ -549,7 +556,8 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
       * no tool reports both (two entries from the same tool are two machines that happen to share a name), except for the tools in ``DUPLICATING_TOOLS`` (one record per agent install), a device that already holds several Auvik
         records of one computer (``auto_merge_rediscovered``), and that the old ScreenConnect record (keyed by company and name) and a
         ScreenConnect session record are the same tool seen before and after the feed learned real session ids;
-      * they are not provably different: no two different serial numbers, and the operating systems they report do not disagree (a Windows PC and a Mac);
+      * they are not provably different: no two different serial numbers (unless both are virtual machines, whose serial depends on the tool that read it: the merge then keeps both serials), and the
+        operating systems they report do not disagree (a Windows PC and a Mac);
       * nobody said they are different machines (a pair marked "not a duplicate", or a merge that was undone).
     Each merge is the ordinary one: logged, and a person can undo it for two weeks."""
     await drop_legacy_screenconnect(db, tenant_id)
@@ -595,7 +603,11 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
             vo = vendors.get(other.id, set())
             if not held or not vo or (held & vo) - DUPLICATING_TOOLS:
                 continue
-            if serial and other.serial_number:
+            # Two real serials that differ keep two devices apart, except for two virtual machines: a guest's serial depends on which tool read it (Hyper-V's own or the guest operating system's),
+            # so the same name from different tools is the same machine, and the merge keeps both serials (same_machine).
+            both_virtual = is_virtual_machine(keep.manufacturer, keep.model) and is_virtual_machine(other.manufacturer, other.model)
+            differing = bool(serial and other.serial_number and serial != other.serial_number)
+            if serial and other.serial_number and not (differing and both_virtual):
                 continue
             if not could_be_same_machine(held, vo):
                 continue
@@ -604,7 +616,7 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
                 continue
             if _ordered(keep.id, other.id) in dismissed:
                 continue
-            await merge_devices(db, tenant_id, keep.id, other.id, actor_id)
+            await merge_devices(db, tenant_id, keep.id, other.id, actor_id, same_machine=differing)
             await drop_legacy_screenconnect(db, tenant_id)
             merged += 1
             held |= vo

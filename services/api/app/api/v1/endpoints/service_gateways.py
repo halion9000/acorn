@@ -17,7 +17,7 @@ only credential is the unguessable token id, so it cannot sit behind a login or 
 
 Permissions: reads need `alerts:read`; creating or revoking a honeytoken, `alerts:write`; deleting one, `alerts:delete`;
 recording purple-team results, drift snapshots and tabletop activity, `rules:write`; syncing the Atomic library and RUNNING
-a simulation (`atomics/run`, `caldera/run`), `settings:write`, which is deliberately the narrow, admin-level choice.
+a simulation (`atomics/run`, `caldera/run`), `settings_security:manage`, which is deliberately the narrow, admin-level choice.
 """
 
 import json
@@ -56,7 +56,7 @@ class Gateway:
     routes: tuple[GatewayRoute, ...]
 
 
-R, W, D, RW, S = "alerts:read", "alerts:write", "alerts:delete", "rules:write", "settings:write"
+R, W, D, RW, S = "alerts:read", "alerts:write", "alerts:delete", "rules:write", "settings_security:manage"
 
 GATEWAYS: tuple[Gateway, ...] = (
     Gateway(

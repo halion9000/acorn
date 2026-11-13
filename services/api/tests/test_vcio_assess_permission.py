@@ -33,6 +33,6 @@ def test_mssp_manage_still_covers_it_so_nobody_who_could_before_loses_it():
         assert permission_in(ROLE_PERMISSIONS[role], "vcio:assess"), role
 
 
-def test_the_scoring_settings_still_need_the_settings_permissions():
+def test_the_scoring_settings_still_need_the_client_settings_permission():
     perms = {(m, p): perms for m, p, perms in _routes()}
-    assert perms[("PUT", "/api/v1/vcio-risk-scoring/settings")] == {"settings:write"}
+    assert perms[("PUT", "/api/v1/vcio-risk-scoring/settings")] == {"settings_clients:manage"}

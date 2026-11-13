@@ -158,7 +158,7 @@ async def easm_status(db: AsyncSession = Depends(get_db), current_user: CurrentU
     return {"plan": scan_plan(get_settings(), [], targets_expected=True), "last_scan": last if isinstance(last, dict) else None}
 
 
-@router.post("/scan", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(require_permission("settings:write"))])
+@router.post("/scan", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(require_permission("settings_security:manage"))])
 async def trigger_easm_scan(
     body: ScanRequest,
     background_tasks: BackgroundTasks,

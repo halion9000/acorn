@@ -246,7 +246,7 @@ class CspmScanResponse(BaseModel):
     evidence: list[dict[str, Any]]
 
 
-@router.post("/scan", response_model=CspmScanResponse, dependencies=[Depends(require_permission("settings:write"))])
+@router.post("/scan", response_model=CspmScanResponse, dependencies=[Depends(require_permission("settings_security:manage"))])
 async def cspm_scan(
     body: CspmScanRequest,
     current_user: User = Depends(get_current_user),
@@ -269,7 +269,7 @@ class DestinationPreviewRequest(BaseModel):
     recipients: list[str] = Field(default_factory=list)
 
 
-@router.post("/destinations/preview", dependencies=[Depends(require_permission("settings:read"))])
+@router.post("/destinations/preview", dependencies=[Depends(require_permission("settings_security:view"))])
 async def destination_preview(
     body: DestinationPreviewRequest,
     current_user: User = Depends(get_current_user),

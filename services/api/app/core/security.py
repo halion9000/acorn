@@ -338,6 +338,22 @@ _UNGRANTED_PERMISSIONS = frozenset(
         "identities:bec",
         "inventory:write",
         "vcio:assess",
+        "settings_workspace:view",
+        "settings_workspace:manage",
+        "settings_deployment:view",
+        "settings_deployment:manage",
+        "settings_clients:view",
+        "settings_clients:manage",
+        "settings_automation:view",
+        "settings_automation:manage",
+        "settings_tickets:view",
+        "settings_tickets:manage",
+        "settings_data:view",
+        "settings_data:manage",
+        "settings_reports:view",
+        "settings_reports:manage",
+        "settings_security:view",
+        "settings_security:manage",
     }
 )  # hunts:read: held through lake:query (IMPLIED_BY below) or granted on its own  # noqa: E501
 
@@ -402,6 +418,22 @@ IMPLIED_BY: dict[str, tuple[str, ...]] = {
     "inventory:checkout": (
         "inventory:write",
     ),  # checking a device out and in: held by the technician roles; administrators hold it through inventory:write
+    "settings_workspace:view": ("settings:read", "settings_workspace:manage"),
+    "settings_workspace:manage": ("settings:write",),
+    "settings_deployment:view": ("settings:read", "settings_deployment:manage"),
+    "settings_deployment:manage": ("settings:write",),
+    "settings_clients:view": ("settings:read", "settings_clients:manage"),
+    "settings_clients:manage": ("settings:write",),
+    "settings_automation:view": ("settings:read", "settings_automation:manage"),
+    "settings_automation:manage": ("settings:write",),
+    "settings_tickets:view": ("settings:read", "settings_tickets:manage"),
+    "settings_tickets:manage": ("settings:write",),
+    "settings_data:view": ("settings:read", "settings_data:manage"),
+    "settings_data:manage": ("settings:write",),
+    "settings_reports:view": ("settings:read", "settings_reports:manage"),
+    "settings_reports:manage": ("settings:write",),
+    "settings_security:view": ("settings:read", "settings_security:manage"),
+    "settings_security:manage": ("settings:write",),
     "vcio:assess": (
         "mssp:manage",
     ),  # starting, answering and deleting Client Risk Score assessments: whoever could manage the MSSP console always could; a custom role (the vCIO role) can be given vcio:assess on its own
@@ -437,6 +469,14 @@ UI_CAPABILITIES: dict[str, str] = {
     "manage_users": "users:write",
     "respond_identities": "identities:respond",
     "run_bec": "identities:bec",
+    "settings_workspace": "settings_workspace:view",
+    "settings_deployment": "settings_deployment:view",
+    "settings_clients": "settings_clients:view",
+    "settings_automation": "settings_automation:view",
+    "settings_tickets": "settings_tickets:view",
+    "settings_data": "settings_data:view",
+    "settings_reports": "settings_reports:view",
+    "settings_security": "settings_security:view",
 }
 
 

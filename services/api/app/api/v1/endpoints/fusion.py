@@ -133,7 +133,7 @@ async def fusion_health() -> dict[str, Any]:
     }
 
 
-@router.get("/metrics", summary="Fusion worker metrics", dependencies=[Depends(require_permission("settings:read"))])
+@router.get("/metrics", summary="Fusion worker metrics", dependencies=[Depends(require_permission("settings_deployment:view"))])
 async def fusion_metrics() -> dict[str, Any]:
     upstream = await _proxy_get("/metrics")
     if upstream is not None:

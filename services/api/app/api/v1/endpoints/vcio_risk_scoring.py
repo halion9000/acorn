@@ -31,8 +31,11 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.models.tenant import Tenant, User
 from app.models.vcio_risk_assessment import VcioRiskAssessment
+from app.models.vcio_risk_ticket import VcioRiskTicket
 from app.services import vcio_risk_scoring as rs
+from app.services import vcio_risk_tickets as tk
 from app.services.audit import emit_audit
+from app.services.bec_followup import halo_client_for
 from app.services.client_mapping import tenant_hidden
 
 router = APIRouter(prefix="/vcio-risk-scoring", tags=["vcio"])
@@ -211,8 +214,8 @@ async def _find(db: Any, user: AuthUser, assessment_id: uuid.UUID) -> tuple[Vcio
     return found, names
 
 
-SettingsReader = Annotated[AuthUser, Depends(require_permission("settings:read"))]
-SettingsWriter = Annotated[AuthUser, Depends(require_permission("settings:write"))]
+SettingsReader = Annotated[AuthUser, Depends(require_permission("settings_clients:view"))]
+SettingsWriter = Annotated[AuthUser, Depends(require_permission("settings_clients:manage"))]
 
 
 class SettingsOut(BaseModel):
@@ -680,6 +683,130 @@ async def autofill_assessment(assessment_id: uuid.UUID, current_user: Writer, db
         else:
             card = _card(row, org)
     return AutofillOut(assessment=_full(row, owner, names, card), shared_with_review=shared, saved=saved, **counts)
+
+
+class TicketIn(BaseModel):
+    summary: str = Field(min_length=1, max_length=tk.SUMMARY_MAX, description="The name of the HaloPSA ticket.")
+    note: str = Field(
+        default="",
+        max_length=tk.NOTE_MAX,
+        description="A private note written on the ticket once it is open (never shown to the customer).",
+    )
+
+
+class TicketOut(BaseModel):
+    id: uuid.UUID
+    question_id: str
+    summary: str
+    private_note: str
+    # waiting: CORE has not opened it yet; opened: HaloPSA gave it a number; failed: see ``message``.
+    state: str
+    ticket_id: str | None = None
+    # The ticket's status in HaloPSA as CORE last read it ("On Hold", "Waiting on Customer"...), and when; None until CORE has read one.
+    status: str | None = None
+    status_checked_at: datetime | None = None
+    message: str | None = None
+    created_by: str | None = None
+    created_at: datetime
+
+
+class TicketList(BaseModel):
+    items: list[TicketOut]
+
+
+def _ticket_out(r: VcioRiskTicket) -> TicketOut:
+    return TicketOut(
+        id=r.id,
+        question_id=r.question_id,
+        summary=r.summary,
+        private_note=r.private_note,
+        state=r.state,
+        ticket_id=r.ticket_id,
+        status=r.status,
+        status_checked_at=r.status_checked_at,
+        message=r.message,
+        created_by=r.created_by,
+        created_at=r.created_at,
+    )
+
+
+@router.get(
+    "/assessments/{assessment_id}/tickets", response_model=TicketList, summary="The HaloPSA tickets made from the questions of a review"
+)
+async def list_tickets(assessment_id: uuid.UUID, current_user: Reader, db: DBSession) -> TicketList:
+    seen, _names = await _find(db, current_user, assessment_id)
+    async with _acting(db, current_user.tenant_id, seen.tenant_id):
+        rows = (
+            (await db.execute(select(VcioRiskTicket).where(VcioRiskTicket.assessment_id == seen.id).order_by(VcioRiskTicket.created_at)))
+            .scalars()
+            .all()
+        )
+    return TicketList(items=[_ticket_out(r) for r in rows])
+
+
+@router.post(
+    "/assessments/{assessment_id}/questions/{question_id}/tickets",
+    response_model=TicketOut,
+    status_code=201,
+    summary="Ask CORE to open a HaloPSA ticket for a question of a review",
+)
+async def create_ticket(assessment_id: uuid.UUID, question_id: str, body: TicketIn, current_user: Writer, db: DBSession) -> TicketOut:
+    owner = current_user.tenant_id
+    seen, names = await _find(db, current_user, assessment_id)
+    question = rs.questions_by_id().get(question_id)
+    if question is None:
+        raise HTTPException(status_code=404, detail=f"There is no question {question_id}")
+    summary = tk.clean_summary(body.summary)
+    if not summary:
+        raise HTTPException(status_code=422, detail="Give the ticket a name.")
+    now = datetime.now(UTC)
+    who = current_user.email or "a person"
+    found_id, client_id, review_date = seen.id, seen.tenant_id, seen.review_date.isoformat()
+    # The mapping to a HaloPSA client is the organisation's: read here, before acting as the client.
+    halo = await halo_client_for(db, owner, client_id) if client_id != owner else None
+    async with _acting(db, owner, client_id):
+        waiting = (
+            await db.execute(
+                select(VcioRiskTicket.id).where(
+                    VcioRiskTicket.assessment_id == found_id, VcioRiskTicket.question_id == question_id, VcioRiskTicket.state == "waiting"
+                )
+            )
+        ).first()
+        if waiting is not None:
+            raise HTTPException(
+                status_code=409, detail="A ticket for this question is already being opened (CORE collects it within about a minute)."
+            )
+        try:
+            row = await tk.queue_ticket(
+                db,
+                halo_client_id=halo,
+                client_id=client_id,
+                client_name=names.get(client_id) or "this organisation",
+                assessment_id=found_id,
+                review_date=review_date,
+                question=question,
+                summary=summary,
+                private_note=body.note,
+                by=who,
+                now=now,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        out = _ticket_out(row)
+        await db.commit()
+    # The organisation's own audit line, written after the client's scope ends (row-level security refuses another tenant's line inside it).
+    await emit_audit(
+        db=db,
+        tenant_id=owner,
+        actor_id=current_user.user_id,
+        actor_email=current_user.email,
+        action="vcio:risk_ticket_requested",
+        resource="vcio_risk_assessment",
+        resource_id=str(found_id),
+        changes={"question": question_id, "summary": summary, "client_id": str(client_id)},
+    )
+    await db.commit()
+    return out
 
 
 @router.delete("/assessments/{assessment_id}", response_model=DeletedOut, summary="Delete a risk-scored review for good")

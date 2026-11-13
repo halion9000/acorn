@@ -32,6 +32,7 @@ from app.models.connector import Connector
 from app.models.tenant import Tenant
 from app.models.vendor_action import VendorAction
 from app.services import core_approvals
+from app.services import vcio_risk_tickets as vcio_tickets
 from app.services.alert_settle import closed_in_tool, has_open_ticket, tickets_all_closed
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.alert_ticket_rules import link_created_ticket
@@ -702,6 +703,10 @@ async def report_core_feed_action_result(
                     from app.services.bec_followup import on_ticket_created  # noqa: PLC0415
 
                     await on_ticket_created(db, tid, row.incident_uid, body.ticket_id, now)
+                    # Or for a Client Risk Score question: record its number on the question's line and queue its private note.
+                    await vcio_tickets.on_created(db, tid, row.incident_uid, body.ticket_id, now)
+                if body.status == "failed" and row.action == "create_ticket" and row.alert_id is None:
+                    await vcio_tickets.on_failed(db, tid, row.incident_uid, body.message, now)
                 if body.status == "done" and row.action == "resolve":
                     # The vendor accepted the resolution: mirror it now rather than waiting for the next closed-incident sweep. Same narrow rule as ``apply_closed``: never override an analyst's decision.
                     await db.execute(
@@ -975,6 +980,51 @@ async def report_core_feed_tickets(tenant_token: str, body: TicketsReport, db: D
     )
     await db.commit()
     return TicketsResponse(updated=updated)
+
+
+class RiskTicketsOut(BaseModel):
+    tickets: list[str]
+
+
+@router.get("/core-feed/{tenant_token}/risk-tickets", response_model=RiskTicketsOut)
+async def core_feed_risk_tickets(tenant_token: str, db: DBSession) -> RiskTicketsOut:
+    """The HaloPSA ticket numbers opened from Client Risk Score questions that CORE should read the status of (not closed, or closed only recently)."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    per_tenant = await _across(db, tenant_id, lambda tid: vcio_tickets.tracked_ticket_ids(db, tid, now))
+    wanted: list[str] = []
+    for ids in per_tenant:
+        for t in ids:
+            if t not in wanted:
+                wanted.append(t)
+    return RiskTicketsOut(tickets=wanted[: vcio_tickets.TRACKED_MAX])
+
+
+class RiskTicketStatus(BaseModel):
+    id: str = Field(pattern=r"^[0-9]{1,12}$")
+    # HaloPSA's name for the ticket's status ("On Hold", "Waiting on Customer"...); none when CORE could not read one.
+    status: str | None = Field(default=None, max_length=100)
+
+
+class RiskTicketStatuses(BaseModel):
+    tickets: list[RiskTicketStatus] = Field(max_length=500)
+
+
+class RiskTicketStatusesOut(BaseModel):
+    updated: int
+
+
+@router.post("/core-feed/{tenant_token}/risk-tickets/status", response_model=RiskTicketStatusesOut)
+async def report_core_feed_risk_ticket_statuses(tenant_token: str, body: RiskTicketStatuses, db: DBSession) -> RiskTicketStatusesOut:
+    """Record the status CORE read from HaloPSA for the tickets opened from Client Risk Score questions, so each question's line shows where its ticket is."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    statuses = {t.id: t.status for t in body.tickets}
+    updated = sum(await _across(db, tenant_id, lambda tid: vcio_tickets.apply_statuses(db, tid, statuses, now)))
+    await db.commit()
+    return RiskTicketStatusesOut(updated=updated)
 
 
 class DeviceItem(BaseModel):

@@ -18,7 +18,7 @@ from app.api.v1 import deps
 from app.api.v1.deps import CurrentUser
 from app.api.v1.dev_auth import DEMO_TENANT_ID
 from app.api.v1.endpoints import service_gateways as gw
-from app.core.security import ROLE_PERMISSIONS
+from app.core.security import ROLE_PERMISSIONS, permission_in
 from app.main import app
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
@@ -69,7 +69,10 @@ def _call(c, g, r, **kw):
 
 def _allowed(role, permission):
     perms = ROLE_PERMISSIONS[role]
-    return "*" in perms or permission in perms or f"{permission.split(':')[0]}:*" in perms
+    if "*" in perms or permission in perms or f"{permission.split(':')[0]}:*" in perms:
+        return True
+    # A permission split out of a broader one is implied by it (IMPLIED_BY): the Settings areas by settings:read / settings:write.
+    return permission_in(perms, permission)
 
 
 # ------------------------------------------------------------------------ registration ----
@@ -95,14 +98,14 @@ PINNED_PERMISSIONS = {
     ("honeytokens", "PATCH", "/{token_id}/revoke"): "alerts:write",
     ("honeytokens", "DELETE", "/{token_id}"): "alerts:delete",
     ("honeytokens", "GET", "/{token_id}/triggers"): "alerts:read",
-    ("purple-team", "POST", "/atomics/sync"): "settings:write",
+    ("purple-team", "POST", "/atomics/sync"): "settings_security:manage",
     ("purple-team", "GET", "/atomics"): "alerts:read",
-    ("purple-team", "POST", "/atomics/run"): "settings:write",
+    ("purple-team", "POST", "/atomics/run"): "settings_security:manage",
     ("purple-team", "GET", "/caldera/health"): "alerts:read",
     ("purple-team", "GET", "/caldera/abilities"): "alerts:read",
     ("purple-team", "GET", "/caldera/adversaries"): "alerts:read",
     ("purple-team", "GET", "/caldera/operations"): "alerts:read",
-    ("purple-team", "POST", "/caldera/run"): "settings:write",
+    ("purple-team", "POST", "/caldera/run"): "settings_security:manage",
     ("purple-team", "GET", "/executions"): "alerts:read",
     ("purple-team", "PATCH", "/executions/{execution_id}/detection"): "rules:write",
     ("purple-team", "GET", "/coverage"): "alerts:read",
@@ -133,7 +136,7 @@ def test_running_a_simulation_and_syncing_need_the_admin_level_permission():
         needs[("purple-team", "/atomics/run")]
         == needs[("purple-team", "/caldera/run")]
         == needs[("purple-team", "/atomics/sync")]
-        == "settings:write"
+        == "settings_security:manage"
     )
     assert all(r.permission == "alerts:read" for g, r in ALL if r.method == "GET")
 

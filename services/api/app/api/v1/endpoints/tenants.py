@@ -432,7 +432,7 @@ async def get_my_tenant_identity(
 
 @router.get("/me", response_model=TenantResponse)
 async def get_my_tenant(
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:read"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_workspace:view"))],
     db: DBSession,
 ) -> TenantResponse:
     """Get the current user's tenant details (full config — requires settings:read)."""
@@ -446,7 +446,7 @@ async def get_my_tenant(
 @router.patch("/me/settings", response_model=TenantResponse)
 async def update_tenant_settings(
     request: UpdateTenantSettingsRequest,
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:write"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_workspace:manage"))],
     db: DBSession,
 ) -> TenantResponse:
     """Update tenant settings."""
@@ -467,7 +467,7 @@ async def update_tenant_settings(
 @router.patch("/me/name", response_model=TenantResponse)
 async def rename_my_workspace(
     request: RenameWorkspaceRequest,
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:write"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_workspace:manage"))],
     db: DBSession,
 ) -> TenantResponse:
     """Give this workspace its name (shown in Settings and the top bar). The slug and id stay as they are."""

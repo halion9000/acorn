@@ -23,6 +23,17 @@ from app.main import app
 from fastapi.routing import APIRoute
 from route_introspect import required_permissions as _required_permissions
 
+# The eight Settings areas that were split out of settings:read / settings:write (tests/test_settings_area_permissions.py pins the rest): each View is implied by the blanket read and by its own
+# Manage, each Manage by the blanket write.
+_SETTINGS_AREAS = {
+    permission: implied_by
+    for area in ("workspace", "deployment", "clients", "automation", "tickets", "data", "reports", "security")
+    for permission, implied_by in (
+        (f"settings_{area}:view", ("settings:read", f"settings_{area}:manage")),
+        (f"settings_{area}:manage", ("settings:write",)),
+    )
+}
+
 
 def required_permissions(route) -> set[str]:
     """The introspection helper returns a list; every comparison here is about sets."""
@@ -111,6 +122,7 @@ class TestTheImplication:
             "billing:view": ("alerts:read",),
             "inventory:write": ("mssp:manage",),
             "vcio:assess": ("mssp:manage",),
+            **_SETTINGS_AREAS,
         }
 
     def test_no_implied_permission_is_a_platform_permission_and_nothing_implies_a_platform_permission(self):

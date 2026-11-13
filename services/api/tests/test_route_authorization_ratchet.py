@@ -57,5 +57,8 @@ def test_the_scanner_actually_sees_the_routes():
         "assets.py::delete_asset",
         "deployment.py::update_deployment_config",
         "mssp.py::create_rule_override",
+        # Guarded by a module-level alias (``Writer = Annotated[AuthUser, Depends(require_permission(...))]``) that the route takes as its caller.
+        "vcio_risk_scoring.py::put_answers",
+        "vcio_risk_scoring.py::create_ticket",
     ):
         assert not any(known_guarded in r for r in found), f"{known_guarded} should be recognised as guarded"

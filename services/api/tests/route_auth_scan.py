@@ -2,9 +2,10 @@
 
 A route counts as guarded when it declares Depends(require_permission("x")) or its
 BODY (comments and docstring excluded) contains a guard-style call (require_*,
-ensure_*, assert_*, check_*, ...), a role comparison, or has_permission. This is
-a heuristic safety net, not proof of correctness: it exists so that a NEW route
-cannot quietly ship with a login check only.
+ensure_*, assert_*, check_*, ...), a role comparison, or has_permission. A module-level alias such as
+``Reader = Annotated[AuthUser, Depends(require_permission("alerts:read"))]`` counts too, when a route's
+parameters use it. This is a heuristic safety net, not proof of correctness: it exists so that a NEW
+route cannot quietly ship with a login check only.
 """
 
 import ast
@@ -30,6 +31,16 @@ def unguarded_routes() -> list[str]:
         except SyntaxError:
             continue
         prefix = ""
+        # Names defined once at the top of a module as a guarded type (``Writer = Annotated[AuthUser, Depends(require_permission("vcio:assess"))]``): a route that takes one is guarded.
+        aliases = {
+            t.id
+            for n in tree.body
+            if isinstance(n, ast.Assign)
+            and re.search(r'(?:require_permission|case_scoped)\(\s*["\']', ast.get_source_segment(src, n.value) or "")
+            for t in n.targets
+            if isinstance(t, ast.Name)
+        }
+        alias_use = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(aliases))) + r")\b") if aliases else None
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call) and getattr(node.value.func, "id", "") == "APIRouter":
                 for kw in node.value.keywords:
@@ -57,6 +68,7 @@ def unguarded_routes() -> list[str]:
                     if fn.body and isinstance(fn.body[0], ast.Expr) and isinstance(getattr(fn.body[0], "value", None), ast.Constant)
                     else fn.body
                 )
+                declared = declared or bool(alias_use and alias_use.search(header))
                 inline = bool(GUARD.search("\n".join(ast.unparse(b) for b in body)))
                 if not declared and not inline:
                     out.append(f"{dec.func.attr.upper()} {prefix}{route} [{os.path.basename(path)}::{fn.name}]")

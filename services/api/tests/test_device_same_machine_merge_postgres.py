@@ -13,7 +13,7 @@ import pytest
 from app.api.v1.endpoints import devices as devices_endpoints
 from app.api.v1.endpoints.devices import MergeIn, merge_duplicate
 from app.db.rls import set_rls_context
-from app.services.device_merge import DeviceMergeError, merge_devices, undo_merge
+from app.services.device_merge import DeviceMergeError, auto_merge_same_name, merge_devices, undo_merge
 from app.services.device_upsert import DeviceReport, upsert_device
 from fastapi import HTTPException
 from sqlalchemy import text
@@ -146,3 +146,46 @@ async def test_the_route_answers_409_for_different_serials_and_merges_when_the_p
     assert refused.value.status_code == 409 and "different serial numbers" in str(refused.value.detail)
     merged = await run(p, lambda db: merge_duplicate(MergeIn(keep=ninja, remove=guest, same_machine=True), user, db))
     assert merged.id == ninja and sorted(s.vendor for s in merged.sources) == ["huntress", "ninjaone", "screenconnect"]
+
+
+async def report(t, vendor, ext, host, serial, model, manufacturer="Microsoft Corporation"):
+    return await run(
+        t, lambda db: upsert_device(db, t, DeviceReport(vendor, ext, host, serial=serial, manufacturer=manufacturer, model=model))
+    )
+
+
+async def auto(t):
+    return await run(t, lambda db: auto_merge_same_name(db, t))
+
+
+async def test_two_lines_of_one_virtual_machine_merge_by_themselves_despite_the_serials_and_the_merge_holds(world):
+    # What AANPCBDCAZURE looked like: Hyper-V's serial in NinjaOne, the guest's in the security tools, both lines a "Virtual Machine".
+    t = world["acme"]
+    ninja = await report(t, "ninjaone", "n-1", "AZ-DC", HYPERV, "Virtual Machine")
+    await report(t, "huntress", "h-1", "AZ-DC", GUEST, "Virtual Machine")
+    await report(t, "screenconnect", "s-1", "AZ-DC", GUEST, "Virtual Machine")
+    assert len(await devices_of(t)) == 2
+    assert await auto(t) == 1
+    assert len(await devices_of(t)) == 1
+    assert sorted(v for v, _d in await sources_of(t)) == ["huntress", "ninjaone", "screenconnect"]
+    # The next hourly reports do not split it, and a second automatic pass has nothing to do.
+    await report(t, "ninjaone", "n-1", "AZ-DC", HYPERV, "Virtual Machine")
+    await report(t, "huntress", "h-1", "AZ-DC", GUEST, "Virtual Machine")
+    assert len(await devices_of(t)) == 1
+    assert await auto(t) == 0
+    del ninja
+
+
+async def test_the_serial_still_keeps_apart_what_is_not_plainly_one_virtual_machine(world):
+    t = world["acme"]
+    # Two physical PCs with one name and different serials: two machines.
+    await report(t, "ninjaone", "n-1", "FRONT-PC", "SERIAL-AAA1", "OptiPlex 7090", "Dell Inc.")
+    await report(t, "huntress", "h-1", "FRONT-PC", "SERIAL-BBB2", "OptiPlex 7090", "Dell Inc.")
+    # A virtual machine and a physical one with one name: two machines.
+    await report(t, "ninjaone", "n-2", "MIXED", "SERIAL-CCC3", "Virtual Machine")
+    await report(t, "huntress", "h-2", "MIXED", "SERIAL-DDD4", "OptiPlex 7090", "Dell Inc.")
+    # Two virtual machines from the same tool: a tool lists each machine once, so these are two.
+    await report(t, "ninjaone", "n-3", "CLONE", "SERIAL-EEE5", "Virtual Machine")
+    await report(t, "ninjaone", "n-4", "CLONE", "SERIAL-FFF6", "Virtual Machine")
+    assert await auto(t) == 0
+    assert len(await devices_of(t)) == 6

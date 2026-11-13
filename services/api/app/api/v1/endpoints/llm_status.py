@@ -381,7 +381,7 @@ async def tenant_llm_status(
     )
 
 
-@router.get("/status", summary="Current LLM provider configuration", dependencies=[Depends(require_permission("settings:read"))])
+@router.get("/status", summary="Current LLM provider configuration", dependencies=[Depends(require_permission("settings_deployment:view"))])
 async def get_llm_status() -> dict[str, object]:
     """Return the env-only LLM provider snapshot for this pod.
 

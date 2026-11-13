@@ -64,13 +64,15 @@ def _view(settings: object) -> TicketSettings:
 
 
 @router.get("/tickets", response_model=TicketSettings, summary="The HaloPSA status a resolved incident moves its ticket to")
-async def get_ticket_settings(user: Annotated[AuthUser, Depends(require_permission("settings:read"))], db: DBSession) -> TicketSettings:
+async def get_ticket_settings(
+    user: Annotated[AuthUser, Depends(require_permission("settings_tickets:view"))], db: DBSession
+) -> TicketSettings:
     return _view((await _tenant(db, user.tenant_id)).settings)
 
 
 @router.put("/tickets", response_model=TicketSettings, summary="Choose the HaloPSA status a resolved incident moves its ticket to")
 async def set_ticket_settings(
-    body: SetTicketSettings, user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession
+    body: SetTicketSettings, user: Annotated[AuthUser, Depends(require_permission("settings_tickets:manage"))], db: DBSession
 ) -> TicketSettings:
     cleaned = " ".join(body.close_status.split())
     if not cleaned:
@@ -85,7 +87,9 @@ async def set_ticket_settings(
 
 
 @router.delete("/tickets", response_model=TicketSettings, summary="Go back to the default ticket status (Tech Updated)")
-async def clear_ticket_settings(user: Annotated[AuthUser, Depends(require_permission("settings:write"))], db: DBSession) -> TicketSettings:
+async def clear_ticket_settings(
+    user: Annotated[AuthUser, Depends(require_permission("settings_tickets:manage"))], db: DBSession
+) -> TicketSettings:
     tenant = await _tenant(db, user.tenant_id)
     settings = dict(tenant.settings or {})
     settings.pop(KEY, None)

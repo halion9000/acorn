@@ -221,7 +221,7 @@ def _enforce_provider_invariants(
     summary="Read the tenant's BYOK LLM credential",
 )
 async def get_llm_credential(
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:read"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_deployment:view"))],
     db: DBSession,
 ) -> LlmCredentialView | None:
     """Return the per-tenant LLM credential, or ``null`` if none stored.
@@ -250,7 +250,7 @@ async def get_llm_credential(
 async def upsert_llm_credential(
     payload: LlmCredentialUpsert,
     request: Request,
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:write"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_deployment:manage"))],
     db: DBSession,
 ) -> LlmCredentialView:
     """Create or update the tenant's BYOK credential.
@@ -381,7 +381,7 @@ async def upsert_llm_credential(
 )
 async def delete_llm_credential(
     request: Request,
-    current_user: Annotated[AuthUser, Depends(require_permission("settings:write"))],
+    current_user: Annotated[AuthUser, Depends(require_permission("settings_deployment:manage"))],
     db: DBSession,
 ) -> None:
     """Hard-delete the credential. Platform falls back to env-var config."""

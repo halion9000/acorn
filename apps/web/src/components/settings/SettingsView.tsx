@@ -291,9 +291,11 @@ export const SETTINGS_GROUPS: { title: string; items: string[] }[] = [
 export type SettingsEntry = { kind: 'tab'; id: TabId; label: string; description: string } | { kind: 'link'; href: string; label: string; description: string };
 
 /** The groups a person sees: each group's entries in order, only the tabs they may use, and no group left empty (pure). Anything not placed in a group is added at the end under "More", never dropped. */
-export function groupedSettings(visibleTabs: { id: TabId; label: string; description: string }[]): { title: string; entries: SettingsEntry[] }[] {
+export function groupedSettings(visibleTabs: { id: TabId; label: string; description: string }[], capabilities?: string[]): { title: string; entries: SettingsEntry[] }[] {
   const tabs = new Map(visibleTabs.map((t) => [t.id as string, t]));
-  const links = new Map(MORE_SETTINGS.map((m) => [m.href, m]));
+  // A page of an area the person may not open is left out (given no capabilities at all it is not filtered, as before: the server still refuses what is not theirs).
+  const shown = MORE_SETTINGS.filter((m) => !m.requires || !capabilities || capabilities.includes(m.requires));
+  const links = new Map(shown.map((m) => [m.href, m]));
   const placed = new Set<string>();
   const groups = SETTINGS_GROUPS.map((g) => ({
     title: g.title,
@@ -307,7 +309,7 @@ export function groupedSettings(visibleTabs: { id: TabId; label: string; descrip
   }));
   const rest: SettingsEntry[] = [
     ...visibleTabs.filter((t) => !placed.has(t.id)).map((t): SettingsEntry => ({ kind: 'tab', id: t.id, label: t.label, description: t.description })),
-    ...MORE_SETTINGS.filter((m) => !placed.has(m.href)).map((m): SettingsEntry => ({ kind: 'link', href: m.href, label: m.label, description: m.description })),
+    ...shown.filter((m) => !placed.has(m.href)).map((m): SettingsEntry => ({ kind: 'link', href: m.href, label: m.label, description: m.description })),
   ];
   return [...groups, { title: 'More', entries: rest }].filter((g) => g.entries.length > 0);
 }
@@ -359,10 +361,10 @@ export function SettingsView() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-1.5 text-sm text-gray-100 placeholder:text-gray-600"
             />
-            {search.trim() && filterSettingsGroups(groupedSettings(visibleTabs), search).length === 0 ? (
+            {search.trim() && filterSettingsGroups(groupedSettings(visibleTabs, capabilities), search).length === 0 ? (
               <p className="px-3 py-2 text-xs text-gray-500" data-testid="settings-search-empty">Nothing matches &quot;{search.trim()}&quot;.</p>
             ) : null}
-            {filterSettingsGroups(groupedSettings(visibleTabs), search).map((g) => (
+            {filterSettingsGroups(groupedSettings(visibleTabs, capabilities), search).map((g) => (
               <section key={g.title} aria-label={g.title}>
                 <p className="px-3 py-1 text-xs font-medium uppercase tracking-wider text-gray-500">{g.title}</p>
                 <ul className="space-y-1">
