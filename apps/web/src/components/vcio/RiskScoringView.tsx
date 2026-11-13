@@ -12,6 +12,7 @@ import { downloadCsv } from '@/lib/csv';
 import {
   RATING_TEXT,
   assessmentCsv,
+  autofillSentence,
   excludedFor,
   goodAnswer,
   keepQuestions,
@@ -25,7 +26,6 @@ import {
   type RiskPlatform,
   type RiskQuestion,
   type RiskRating,
-  type RiskSettings,
   type RiskSeverity,
 } from '@/lib/vcioRisk';
 
@@ -48,13 +48,13 @@ const FILTERS: { value: QuestionFilter; label: string }[] = [
   { value: 'open', label: 'Unanswered' },
   { value: 'gaps', label: 'Gaps (lost points)' },
   { value: 'unknown', label: 'Unknown' },
+  { value: 'auto', label: 'Filled in by the integrations' },
   { value: 'critical', label: 'Critical only' },
 ];
-type Tab = 'scorecard' | 'questions' | 'settings' | 'method';
+type Tab = 'scorecard' | 'questions' | 'method';
 const TABS: { value: Tab; label: string }[] = [
   { value: 'scorecard', label: 'Scorecard' },
   { value: 'questions', label: 'Questions' },
-  { value: 'settings', label: 'Settings' },
   { value: 'method', label: 'Method' },
 ];
 const OWN = 'own';
@@ -233,6 +233,11 @@ function QuestionRow({ q, a, library, busy, onAnswer, onSeverity }: { q: RiskQue
             className={`${input} ml-1 w-64 text-xs`}
           />
         )}
+        {entry.source === 'auto' && (
+          <span className="rounded border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[11px] text-sky-300" data-testid="risk-auto" title="Filled in from the integrations, through the client's Client Review. Press another answer to set it yourself.">
+            Auto
+          </span>
+        )}
         <button type="button" onClick={() => setOpen(!open)} className="ml-auto text-xs text-blue-300 hover:underline">
           {entry.note ? 'Note' : 'Add note'}
         </button>
@@ -240,6 +245,11 @@ function QuestionRow({ q, a, library, busy, onAnswer, onSeverity }: { q: RiskQue
           {q.csf} · {q.csf_function}
         </span>
       </div>
+      {entry.source === 'auto' && entry.evidence ? (
+        <p className="mt-1 text-xs text-gray-400" data-testid="risk-evidence">
+          {entry.evidence}
+        </p>
+      ) : null}
       {open && (
         <textarea
           aria-label={`Evidence or notes for ${q.id}`}
@@ -311,57 +321,13 @@ function Questions({ a, library, busy, onAnswer, onSeverity }: { a: RiskAssessme
   );
 }
 
-function SettingsForm({ a, library, busy, onSave }: { a: RiskAssessment; library: RiskLibrary; busy: boolean; onSave: (s: Partial<RiskSettings> | Record<string, never>) => void }) {
-  const [draft, setDraft] = useState<RiskSettings>(a.scorecard.settings);
-  useEffect(() => setDraft(a.scorecard.settings), [a.scorecard.settings]);
-  const num = (label: string, value: number, set: (n: number) => void, step = 1, max = 100) => (
-    <label className="flex items-center justify-between gap-3 text-sm text-gray-200">
-      <span>{label}</span>
-      <input type="number" aria-label={label} value={value} min={0} max={max} step={step} onChange={(e) => set(Number(e.target.value))} className={`${input} w-24 text-right`} />
-    </label>
-  );
-  return (
-    <div className="grid gap-4 md:grid-cols-2" data-testid="risk-settings">
-      <section className="space-y-2 rounded-lg border border-gray-800 bg-gray-900/40 p-4">
-        <h2 className="text-sm font-semibold text-white">Severity points</h2>
-        {library.severities.map((s) => num(`${s} points`, draft.points[s], (n) => setDraft({ ...draft, points: { ...draft.points, [s]: n } })))}
-        <h2 className="pt-2 text-sm font-semibold text-white">Answer credit (0 to 1)</h2>
-        {num('Partial', draft.partial, (n) => setDraft({ ...draft, partial: n }), 0.05, 1)}
-        {num('Unknown', draft.unknown, (n) => setDraft({ ...draft, unknown: n }), 0.05, 1)}
-        {num('Alternative vendor', draft.alternative, (n) => setDraft({ ...draft, alternative: n }), 0.05, 1)}
-        <h2 className="pt-2 text-sm font-semibold text-white">Critical-gap cap and ratings</h2>
-        <label className="flex items-center justify-between gap-3 text-sm text-gray-200">
-          <span>Cap a category that has a failed critical item</span>
-          <input type="checkbox" aria-label="Apply the critical-gap cap" checked={draft.cap_on} onChange={(e) => setDraft({ ...draft, cap_on: e.target.checked })} />
-        </label>
-        {num('Cap the category at', draft.cap, (n) => setDraft({ ...draft, cap: n }), 0.01, 1)}
-        {num('Green at or above', draft.green, (n) => setDraft({ ...draft, green: n }), 0.01, 1)}
-        {num('Amber at or above', draft.amber, (n) => setDraft({ ...draft, amber: n }), 0.01, 1)}
-      </section>
-      <section className="space-y-2 rounded-lg border border-gray-800 bg-gray-900/40 p-4">
-        <h2 className="text-sm font-semibold text-white">Category weights</h2>
-        <p className="text-xs text-gray-500">Relative weights. A category with nothing answered drops out and the rest share the whole.</p>
-        {library.categories.map((c) => num(c, draft.weights[c] ?? 0, (n) => setDraft({ ...draft, weights: { ...draft.weights, [c]: n } })))}
-        <div className="flex justify-end gap-2 pt-3">
-          <button type="button" disabled={busy} onClick={() => onSave({})} className="rounded-md border border-gray-700 px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800">
-            Reset to defaults
-          </button>
-          <button type="button" disabled={busy} onClick={() => onSave(draft)} className="rounded-md bg-sky-600 px-3 py-1.5 text-sm text-white disabled:opacity-50">
-            Save settings
-          </button>
-        </div>
-        <p className="text-xs text-gray-500">Settings belong to this assessment: changing them does not change another client&apos;s or an earlier review&apos;s score.</p>
-      </section>
-    </div>
-  );
-}
-
 function Method() {
   const items: [string, string][] = [
     ['Risk weight', 'Each question has a severity set from impact × likelihood (the risk model in NIST SP 800-30): Critical = 10 points, High = 6, Medium = 3, Low = 1. A failed Critical item therefore moves the score ten times more than a failed Low item.'],
     ['Credit', 'The good answer earns 100% of the points, Partial 50%, the bad answer 0%. For questions where “Yes” is the risk (exposed RDP, end-of-life devices, users clicking phishing, local admin rights) the good answer is “No”. Unknown earns 0%: an unverified control is not an assured control, and it is counted separately so it can be chased. N/A and unanswered questions are removed from both points earned and points possible.'],
+    ['Answers from the integrations', 'Fill from integrations answers every question the client’s Client Review can answer (NinjaOne, Huntress, ThreatMate, Liongard, CIPP and the other connected tools): a reading of “met” becomes the good answer, “partly” becomes Partial and “not met” the bad answer; a Tech Stack product is Preferred when it is the standard vendor and Alternative when it is not. Each such answer is marked Auto and shows what the tool saw. An answer set by hand is never replaced, and an Auto answer the tools no longer support is taken out.'],
     ['Tech Stack', 'Tech Stack is one category inside the Business Review (its own weight in Settings), with sections for network equipment, servers, security tools, cloud services and backup. Preferred vendor = 100%, Alternative (a capable, non-standard product) = 100% by default and counted as a standardisation opportunity, None = 0%.'],
-    ['Roll-up', 'Section and category score = points earned ÷ points possible. If a category contains a failed or unknown Critical item it is capped at 84% (Red) so a single major gap cannot hide behind many passes. The overall score is the weighted average of category scores (weights in Settings); categories with nothing answered drop out.'],
+    ['Roll-up', 'Section and category score = points earned ÷ points possible. If a category contains a failed or unknown Critical item it is capped at 84% (Red) so a single major gap cannot hide behind many passes. The overall score is the weighted average of category scores (weights under Settings > vCIO Risk Scoring, which only someone who may change settings can open); categories with nothing answered drop out.'],
     ['Platform', 'A Microsoft 365 client is not asked the Google Workspace questions, and a Google Workspace client is not asked the Microsoft 365 ones. Choose Both for a client that uses both.'],
     ['Ratings', 'Green ≥ 95%, Amber 85–94%, Red < 85%: the same bands as the vCIO Toolbox.'],
     ['NIST CSF 2.0 view', 'Every question is mapped to a CSF 2.0 function and category, giving a second read of the same answers for compliance-focused clients. The question set has no Respond-function questions (incident response plan, escalation, notification); that row shows “no questions”.'],
@@ -389,6 +355,8 @@ export function RiskScoringView() {
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [fillOnStart, setFillOnStart] = useState(true);
   const [draft, setDraft] = useState<{ review_date: string; platform: RiskPlatform; assessor: string }>({ review_date: '', platform: 'm365', assessor: '' });
 
   const fail = (err: unknown, fallback: string) => setError(apiErrorDetail(err) ?? (err instanceof Error && err.message ? err.message : fallback));
@@ -437,14 +405,32 @@ export function RiskScoringView() {
     }
   };
 
+  const fill = async (id: string) => {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const done = await vcioRiskApi.autofill(id);
+      setCurrent(done.assessment);
+      setList((rows) => rows.map((r) => (r.id === done.assessment.id ? { ...r, score: done.assessment.score, rating: done.assessment.rating, answered: done.assessment.answered } : r)));
+      setNotice(autofillSentence(done));
+    } catch (err) {
+      fail(err, 'The answers could not be filled in from the integrations.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const start = async () => {
     setBusy(true);
     setError('');
+    setNotice('');
     try {
       const made = await vcioRiskApi.create({ client_id: clientId === OWN ? undefined : clientId, review_date: draft.review_date || undefined, platform: draft.platform, assessor: draft.assessor.trim() });
       setStarting(false);
       setTab('questions');
       await loadList(clientId, made.id);
+      if (fillOnStart) await fill(made.id);
     } catch (err) {
       fail(err, 'The assessment could not be started.');
     } finally {
@@ -499,6 +485,9 @@ export function RiskScoringView() {
             <button type="button" onClick={() => downloadCsv(`vcio-risk-scoring-${clientName.replace(/[^A-Za-z0-9]+/g, '-').toLowerCase() || 'client'}-${current.review_date}.csv`, assessmentCsv(library.questions, current))} className="rounded-md border border-gray-700 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-800">
               Export CSV
             </button>
+            <button type="button" disabled={busy} onClick={() => void fill(current.id)} title="Answer every question the client's Client Review can answer from the connected tools. An answer you set by hand is never replaced." className="rounded-md border border-sky-500/50 px-3 py-1.5 text-sm text-white hover:bg-sky-500/20 disabled:opacity-50">
+              Fill from integrations
+            </button>
             <button type="button" onClick={() => window.print()} className="rounded-md border border-gray-700 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-800">
               Print / PDF
             </button>
@@ -512,6 +501,12 @@ export function RiskScoringView() {
       {error && (
         <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
           {error}
+        </p>
+      )}
+
+      {notice && (
+        <p role="status" className="rounded-lg border border-sky-500/40 bg-sky-500/10 p-3 text-sm text-sky-100" data-testid="risk-notice">
+          {notice}
         </p>
       )}
 
@@ -567,7 +562,6 @@ export function RiskScoringView() {
               onSeverity={(id, s) => void change(() => vcioRiskApi.update(current.id, { severity: { [id]: s } }), 'The severity could not be saved.')}
             />
           )}
-          {tab === 'settings' && <SettingsForm a={current} library={library} busy={busy} onSave={(s) => void change(() => vcioRiskApi.update(current.id, { settings: s }), 'The settings could not be saved.')} />}
           {tab === 'method' && <Method />}
         </>
       )}
@@ -594,7 +588,11 @@ export function RiskScoringView() {
               Assessor
               <input aria-label="New assessor" value={draft.assessor} onChange={(e) => setDraft({ ...draft, assessor: e.target.value })} className={`${input} mt-1 block w-full`} />
             </label>
-            <p className="text-xs text-gray-500">It starts empty. Earlier assessments of this client stay as they are.</p>
+            <label className="flex items-center gap-2 text-sm text-gray-200">
+              <input type="checkbox" aria-label="Fill in what the integrations can answer" checked={fillOnStart} onChange={(e) => setFillOnStart(e.target.checked)} />
+              Fill in what the integrations can answer
+            </label>
+            <p className="text-xs text-gray-500">Earlier assessments of this client stay as they are.</p>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setStarting(false)} disabled={busy} className="rounded-md border border-gray-700 px-3 py-1.5 text-sm text-gray-300">
                 Cancel

@@ -115,7 +115,7 @@ async def test_an_answer_that_is_not_one_or_a_question_that_does_not_exist_is_re
         await cleanup(engine, w)
 
 
-async def test_the_date_platform_settings_and_a_questions_severity_can_be_changed_and_each_changes_the_score():
+async def test_the_date_platform_and_a_questions_severity_can_be_changed_and_each_changes_the_score():
     engine, user, _other, w = await world()
     try:
         async with AsyncSession(engine) as db:
@@ -136,9 +136,6 @@ async def test_the_date_platform_settings_and_a_questions_severity_can_be_change
             )
             back = await ep.update_assessment(made.id, ep.AssessmentPatch(severity={"ADM-001": None}), user, db)
             assert back.severity == {} and back.score == pytest.approx(3 / 9)
-            custom = await ep.update_assessment(made.id, ep.AssessmentPatch(settings={"points": {"High": 3}}), user, db)
-            assert custom.score == pytest.approx(3 / 6) and custom.scorecard["settings"]["points"]["High"] == 3
-            assert (await ep.update_assessment(made.id, ep.AssessmentPatch(settings={}), user, db)).score == pytest.approx(3 / 9)
             for bad in ({"ADM-001": "Huge"}, {"NOPE-1": "Low"}):
                 with pytest.raises(HTTPException) as refused:
                     await ep.update_assessment(made.id, ep.AssessmentPatch(severity=bad), user, db)
@@ -208,3 +205,110 @@ async def test_the_library_gives_the_questions_and_the_defaults():
         "Unknown",
         "N/A",
     ]
+
+
+async def test_the_scoring_settings_belong_to_the_organisation_and_saving_them_scores_every_assessment_again():
+    engine, user, other, w = await world()
+    try:
+        async with AsyncSession(engine) as db:
+            acme = await ep.create_assessment(ep.AssessmentIn(client_id=w.acme), user, db)
+            birch = await ep.create_assessment(ep.AssessmentIn(client_id=w.birch), user, db)
+            for made in (acme, birch):
+                await ep.put_answers(made.id, answers(("ADM-001", "No", {}), ("ADM-002", "Yes", {})), user, db)
+            start = await ep.get_settings(user, db)
+            assert start.using_defaults is True and start.settings == start.defaults and start.settings["points"]["High"] == 6
+            saved = await ep.put_settings(ep.SettingsIn(settings={"points": {"High": 3, "Low": "x"}, "cap": 0.84, "junk": 1}), user, db)
+            assert (saved.using_defaults, saved.rescored, saved.settings["points"]) == (
+                False,
+                2,
+                {"Critical": 10, "High": 3, "Medium": 3, "Low": 1},
+            )
+            stored = (
+                await db.execute(text("select settings -> 'vcio_risk_scoring' from tenants where id = :t"), {"t": w.owner})
+            ).scalar_one()
+            assert stored == {"points": {"Critical": 10, "High": 3, "Medium": 3, "Low": 1}}, "only what differs from the defaults is kept"
+            # ADM-001 High wrong (0 of 3 now), ADM-002 Medium right (3 of 3): 3/6 instead of 3/9, for every client, in the list too.
+            assert {i.client_name: i.score for i in (await ep.list_assessments(user, db, client_id=None)).items} == {
+                "Acme Dental": pytest.approx(0.5),
+                "Birch Law": pytest.approx(0.5),
+            }
+            opened = await ep.get_assessment(acme.id, user, db)
+            assert opened.score == pytest.approx(0.5) and opened.scorecard["settings"]["points"]["High"] == 3
+            assert opened.updated_by == "hal@goliveoak.com", "scoring again does not claim someone edited the assessment"
+            fresh = await ep.create_assessment(ep.AssessmentIn(client_id=w.acme), user, db)
+            assert fresh.scorecard["settings"]["points"]["High"] == 3, "a new assessment uses the organisation's settings"
+            # Another organisation has its own: nothing of this one's reaches it.
+            assert (await ep.get_settings(other, db)).using_defaults is True
+            reset = await ep.put_settings(ep.SettingsIn(settings={}), user, db)
+            assert reset.using_defaults is True and reset.rescored == 3
+            assert (await ep.get_assessment(acme.id, user, db)).score == pytest.approx(3 / 9)
+            logged = (
+                await db.execute(
+                    text("select count(*) from audit_log where tenant_id = :t and action = 'vcio:risk_settings_changed'"), {"t": w.owner}
+                )
+            ).scalar_one()
+            assert logged == 2
+    finally:
+        await cleanup(engine, w)
+
+
+async def test_the_integrations_answers_are_filled_in_scored_and_marked_and_a_hand_answer_or_a_note_is_never_lost(monkeypatch):
+    engine, user, _other, w = await world()
+    found = {
+        "ADM-001": {"answer": "Yes", "evidence": "From a check."},
+        "NET-002": {"answer": "No", "evidence": "Clean scan."},
+        "TS-001": {"answer": "Alternative", "vendor": "Fortinet", "evidence": "1 firewall."},
+    }
+    asked = []
+
+    async def fake_review(_db, _user, client_id):
+        asked.append(client_id)
+        return dict(found)
+
+    monkeypatch.setattr(ep, "review_answers", fake_review)
+    try:
+        async with AsyncSession(engine) as db:
+            made = await ep.create_assessment(ep.AssessmentIn(client_id=w.acme), user, db)
+            await ep.put_answers(made.id, answers(("ADM-001", "No", {"note": "they told us"})), user, db)
+            out = await ep.autofill_assessment(made.id, user, db)
+            assert asked == [w.acme], "the review asked for is the assessed client's"
+            assert (out.filled, out.changed, out.kept_by_hand, out.cleared, out.answered_by_integrations) == (2, 0, 1, 0, 3)
+            got = out.assessment.answers
+            assert (got["ADM-001"].answer, got["ADM-001"].source, got["ADM-001"].note) == ("No", None, "they told us")
+            assert (got["NET-002"].answer, got["NET-002"].source, got["NET-002"].evidence) == ("No", "auto", "Clean scan.")
+            assert (got["TS-001"].answer, got["TS-001"].vendor, got["TS-001"].source) == ("Alternative", "Fortinet", "auto")
+            assert out.assessment.answered == 3 and out.assessment.score is not None
+            # A note on an auto answer keeps it auto; changing the answer makes it the person's.
+            noted = await ep.put_answers(made.id, answers(("NET-002", "No", {"note": "confirmed with the ISP"})), user, db)
+            assert (noted.answers["NET-002"].source, noted.answers["NET-002"].evidence, noted.answers["NET-002"].note) == (
+                "auto",
+                "Clean scan.",
+                "confirmed with the ISP",
+            )
+            changed = await ep.put_answers(made.id, answers(("TS-001", "Preferred", {"vendor": "Fortinet"})), user, db)
+            assert changed.answers["TS-001"].source is None and changed.answers["TS-001"].evidence is None
+            del found["NET-002"]
+            again = await ep.autofill_assessment(made.id, user, db)
+            assert (again.filled, again.kept_by_hand, again.cleared) == (0, 2, 1)
+            assert (
+                again.assessment.answers["NET-002"].answer is None and again.assessment.answers["NET-002"].note == "confirmed with the ISP"
+            )
+            assert again.assessment.answers["TS-001"].answer == "Preferred"
+    finally:
+        await cleanup(engine, w)
+
+
+async def test_filling_in_from_the_real_client_review_works_for_a_client_no_tool_reports_on_and_fills_nothing_it_cannot_know():
+    engine, user, _other, w = await world()
+    try:
+        async with AsyncSession(engine) as db:
+            made = await ep.create_assessment(ep.AssessmentIn(client_id=w.acme), user, db)
+            out = await ep.autofill_assessment(made.id, user, db)
+            assert out.filled == out.answered_by_integrations and out.kept_by_hand == 0 and out.cleared == 0
+            assert all(a.source == "auto" and a.evidence for a in out.assessment.answers.values())
+            by_id = ep.rs.questions_by_id()
+            assert all(
+                a.answer in ep.rs.allowed_answers(by_id[qid]) for qid, a in out.assessment.answers.items()
+            ), "every filled answer is one the question accepts"
+    finally:
+        await cleanup(engine, w)

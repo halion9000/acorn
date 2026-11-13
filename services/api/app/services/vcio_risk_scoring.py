@@ -239,3 +239,104 @@ def scorecard(
         "alternative_vendors": sum(1 for a in given.values() if a == "Alternative"),
         "settings": s,
     }
+
+
+# ---- answers from the integrations ------------------------------------------------------------------------------------------------------------------------------
+
+
+def _text_key(text: str) -> str:
+    return " ".join("".join(ch.lower() if ch.isalnum() else " " for ch in text).split())
+
+
+@lru_cache(maxsize=1)
+def questions_by_text() -> dict[str, dict[str, Any]]:
+    """The library by question wording (letters and digits only), which is how a Client Review question finds its counterpart here: both come from the same template workbook."""
+    return {_text_key(q["text"]): q for q in library()}
+
+
+def _matches_preferred(product: str, preferred: str) -> bool:
+    """Whether the product in use is (one of) the preferred vendor(s): "Meraki MX68" for "Meraki / UniFi"."""
+    have = _text_key(product)
+    return any(part and part in have for part in (_text_key(p) for p in preferred.split("/")))
+
+
+def answer_from_status(question: dict[str, Any], status: str) -> str | None:
+    """A Client Review reading (met, partly, not_met, not_applicable) as this question's answer. ``met`` means the practice is as the template wants it, so it is the good answer whichever
+    way the question is worded; ``not_met`` is the other one. Anything else (needs_person) is no answer."""
+    if question["type"] != "yesno":
+        return None
+    if status == "met":
+        return question["good"]
+    if status == "not_met":
+        return "No" if question["good"] == "Yes" else "Yes"
+    return {"partly": "Partial", "not_applicable": "N/A"}.get(status)
+
+
+def answer_from_tech(question: dict[str, Any], status: str, product: str | None) -> tuple[str | None, str | None]:
+    """A Client Review Tech Stack reading as (answer, product in use). ``seen`` with a product is Preferred when the product is the preferred vendor and Alternative when it is another;
+    ``not_seen`` is None (the tool that would show it covers this client and shows nothing); ``unknown`` is no answer. A yes/no Tech Stack question reads seen as Yes and not_seen as No."""
+    name = (product or "").strip() or None
+    if question["type"] == "vendor":
+        if status == "seen" and name:
+            return ("Preferred" if _matches_preferred(name, question["preferred"]) else "Alternative"), name[:200]
+        return ("None", None) if status == "not_seen" else (None, None)
+    return ("Yes" if status == "seen" else "No" if status == "not_seen" else None), None
+
+
+def answers_from_review(assess: list[Any], m365: list[Any], tech: list[Any]) -> dict[str, dict[str, str]]:
+    """Question id -> the answer the client's Client Review gives it (``answer``, ``evidence`` and, for a Tech Stack vendor, ``vendor``). Each list is the Client Review's own (objects with
+    ``question``, ``status``, ``evidence`` and for Tech Stack ``suggested``); a question the review cannot answer, or that has no counterpart here, is left out."""
+    by_text = questions_by_text()
+    out: dict[str, dict[str, str]] = {}
+    for row in [*assess, *m365]:
+        q = by_text.get(_text_key(str(getattr(row, "question", "") or "")))
+        answer = answer_from_status(q, str(getattr(row, "status", "") or "")) if q else None
+        if q and answer:
+            out[q["id"]] = {"answer": answer, "evidence": _evidence(row)}
+    for row in tech:
+        q = by_text.get(_text_key(str(getattr(row, "question", "") or "")))
+        if not q:
+            continue
+        answer, vendor = answer_from_tech(q, str(getattr(row, "status", "") or ""), getattr(row, "suggested", None))
+        if answer:
+            out[q["id"]] = {"answer": answer, "evidence": _evidence(row), **({"vendor": vendor} if vendor else {})}
+    return out
+
+
+def _evidence(row: Any) -> str:
+    """What the review saw, and whether a person typed the reading in Client Review."""
+    text = " ".join(str(getattr(row, "evidence", "") or "").split())
+    note = " ".join(str(getattr(row, "note", "") or "").split())
+    if getattr(row, "manual", False):
+        text = f"Typed in Client Review{': ' + note if note else ''}." + (f" {text}" if text else "")
+    return (text or "From Client Review.")[:500]
+
+
+def apply_autofill(stored: dict[str, Any], found: dict[str, dict[str, str]]) -> tuple[dict[str, Any], dict[str, int]]:
+    """The stored answers with the integrations' answers laid in, and what happened. An answer a person set by hand is never replaced. An answer filled in earlier is replaced by the new
+    reading, and is taken out again when the integrations no longer say anything for that question (so a stale auto-answer does not stay as if it were current)."""
+    out = {k: dict(v) for k, v in (stored or {}).items() if isinstance(v, dict)}
+    filled = changed = kept = cleared = 0
+    for qid, got in found.items():
+        entry = out.get(qid, {})
+        by_hand = bool(entry.get("answer")) and entry.get("source") != "auto"
+        if by_hand:
+            kept += 1
+            continue
+        before = (entry.get("answer"), entry.get("vendor"))
+        fresh = {**{k: v for k, v in entry.items() if k == "note"}, "answer": got["answer"], "source": "auto", "evidence": got["evidence"]}
+        if got.get("vendor"):
+            fresh["vendor"] = got["vendor"]
+        out[qid] = fresh
+        if before[0] is None:
+            filled += 1
+        elif before != (fresh["answer"], fresh.get("vendor")):
+            changed += 1
+    for qid in [k for k, v in out.items() if v.get("source") == "auto" and k not in found]:
+        rest = {k: v for k, v in out[qid].items() if k == "note"}
+        if rest:
+            out[qid] = rest
+        else:
+            del out[qid]
+        cleared += 1
+    return out, {"filled": filled, "changed": changed, "kept_by_hand": kept, "cleared": cleared, "answered_by_integrations": len(found)}

@@ -39,6 +39,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/settings/platform-health': { title: 'Platform Health', description: 'Is every service answering' },
   '/settings/onboarding': { title: 'Client onboarding', description: 'How far each client has got' },
   '/settings/retention': { title: 'Data retention', description: 'What is kept, for how long' },
+  '/settings/vcio-risk-scoring': { title: 'vCIO Risk Scoring settings', description: 'How every client is scored' },
   '/dashboard': { title: 'SOC Dashboard', description: 'SOC overview and metrics' },
   '/alerts': { title: 'Alerts', description: 'Security alerts and incidents' },
   '/cases': { title: 'Cases', description: 'Incident case management' },

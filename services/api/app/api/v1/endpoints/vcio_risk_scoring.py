@@ -4,9 +4,12 @@
 - ``GET /vcio-risk-scoring/assessments``: the assessments of one client or of every client, newest first, each with its score.
 - ``POST /vcio-risk-scoring/assessments``: start one for a client.
 - ``GET /vcio-risk-scoring/assessments/{id}``: one assessment with its answers and its scorecard.
-- ``PATCH /vcio-risk-scoring/assessments/{id}``: its date, platform, assessor, settings, or a question's severity.
+- ``PATCH /vcio-risk-scoring/assessments/{id}``: its date, platform, assessor, or a question's severity.
 - ``PUT /vcio-risk-scoring/assessments/{id}/answers``: answer questions (or clear answers).
+- ``POST /vcio-risk-scoring/assessments/{id}/autofill``: fill in what the integrations can answer, from the client's Client Review.
 - ``DELETE /vcio-risk-scoring/assessments/{id}``.
+- ``GET`` and ``PUT /vcio-risk-scoring/settings``: the organisation's scoring settings (points, credits, cap, rating bands, category weights). One set for every client, changed only by
+  someone who may change settings; saving them scores every assessment again.
 
 The scoring itself is in ``app.services.vcio_risk_scoring``. Every write stores the score, so the list never has to score again.
 """
@@ -70,6 +73,9 @@ class AnswerOut(BaseModel):
     answer: str | None = None
     vendor: str | None = None
     note: str | None = None
+    # "auto" when the answer was filled in from the integrations (through the client's Client Review) and nobody has changed it; ``evidence`` is what they saw.
+    source: str | None = None
+    evidence: str | None = None
 
 
 class AssessmentOut(AssessmentSummary):
@@ -89,9 +95,6 @@ class AssessmentPatch(BaseModel):
     review_date: date | None = None
     platform: Platform | None = None
     assessor: str | None = Field(default=None, max_length=200)
-    settings: dict[str, Any] | None = Field(
-        default=None, description="Scoring settings to use instead of the defaults; an empty object goes back to the defaults."
-    )
     severity: dict[str, str | None] | None = Field(
         default=None, description="Question id -> the severity to use for it; null puts the library's back."
     )
@@ -131,19 +134,30 @@ def plain_answers(stored: dict[str, Any]) -> dict[str, str]:
     return out
 
 
-def _card(row: VcioRiskAssessment) -> dict[str, Any]:
+SETTINGS_KEY = "vcio_risk_scoring"
+
+
+async def org_settings(db: Any, owner: uuid.UUID) -> dict[str, Any]:
+    """The scoring settings of the organisation (one set for all its clients, changed under Settings), or nothing when it uses the defaults."""
+    tenant = await db.get(Tenant, owner)
+    found = (tenant.settings or {}).get(SETTINGS_KEY) if tenant is not None else None
+    return found if isinstance(found, dict) else {}
+
+
+def _card(row: VcioRiskAssessment, org: dict[str, Any]) -> dict[str, Any]:
     return rs.scorecard(
-        plain_answers(row.answers), row.platform, {k: v for k, v in (row.severity or {}).items() if isinstance(v, str)}, row.settings
+        plain_answers(row.answers), row.platform, {k: v for k, v in (row.severity or {}).items() if isinstance(v, str)}, org
     )
 
 
-def _store_score(row: VcioRiskAssessment, user: AuthUser) -> dict[str, Any]:
-    card = _card(row)
+def _store_score(row: VcioRiskAssessment, user: AuthUser | None, org: dict[str, Any]) -> dict[str, Any]:
+    card = _card(row, org)
     row.score = card["overall"]
     row.rating = card["rating"]
     row.answered = card["answered"]
-    row.updated_at = datetime.now(UTC)
-    row.updated_by = user.email
+    if user is not None:
+        row.updated_at = datetime.now(UTC)
+        row.updated_by = user.email
     return card
 
 
@@ -163,9 +177,9 @@ def _summary(row: VcioRiskAssessment, owner: uuid.UUID, names: dict[uuid.UUID, s
     }
 
 
-def _full(row: VcioRiskAssessment, owner: uuid.UUID, names: dict[uuid.UUID, str], card: dict[str, Any] | None = None) -> AssessmentOut:
+def _full(row: VcioRiskAssessment, owner: uuid.UUID, names: dict[uuid.UUID, str], card: dict[str, Any]) -> AssessmentOut:
     answers = {
-        qid: AnswerOut(**{k: v for k, v in entry.items() if k in ("answer", "vendor", "note")})
+        qid: AnswerOut(**{k: v for k, v in entry.items() if k in ("answer", "vendor", "note", "source", "evidence")})
         for qid, entry in (row.answers or {}).items()
         if isinstance(entry, dict)
     }
@@ -173,7 +187,7 @@ def _full(row: VcioRiskAssessment, owner: uuid.UUID, names: dict[uuid.UUID, str]
         **_summary(row, owner, names),
         answers=answers,
         severity={k: v for k, v in (row.severity or {}).items() if isinstance(v, str)},
-        scorecard=card if card is not None else _card(row),
+        scorecard=card,
     )
 
 
@@ -190,6 +204,77 @@ async def _find(db: Any, user: AuthUser, assessment_id: uuid.UUID) -> tuple[Vcio
     if found is None:
         raise HTTPException(status_code=404, detail="Assessment not found")
     return found, names
+
+
+SettingsReader = Annotated[AuthUser, Depends(require_permission("settings:read"))]
+SettingsWriter = Annotated[AuthUser, Depends(require_permission("settings:write"))]
+
+
+class SettingsOut(BaseModel):
+    settings: dict[str, Any]
+    defaults: dict[str, Any]
+    # True when the organisation has changed nothing: the defaults are in use.
+    using_defaults: bool
+    rescored: int = 0
+
+
+class SettingsIn(BaseModel):
+    settings: dict[str, Any] = Field(
+        description="The settings to use. Anything missing or not valid keeps its default; an empty object goes back to the defaults."
+    )
+
+
+@router.get("/settings", response_model=SettingsOut, summary="The organisation's vCIO Risk Scoring settings")
+async def get_settings(current_user: SettingsReader, db: DBSession) -> SettingsOut:
+    stored = await org_settings(db, current_user.tenant_id)
+    return SettingsOut(settings=rs.merge_settings(stored), defaults=rs.merge_settings(None), using_defaults=not stored)
+
+
+@router.put(
+    "/settings", response_model=SettingsOut, summary="Change the organisation's vCIO Risk Scoring settings and score every assessment again"
+)
+async def put_settings(body: SettingsIn, current_user: SettingsWriter, db: DBSession) -> SettingsOut:
+    owner = current_user.tenant_id
+    tenant = await db.get(Tenant, owner)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+    defaults = rs.merge_settings(None)
+    merged = rs.merge_settings(body.settings)
+    # Only what was really changed is kept, so a default that changes later still reaches an organisation that never touched it.
+    kept = {k: v for k, v in merged.items() if v != defaults[k]} if body.settings else {}
+    before = (tenant.settings or {}).get(SETTINGS_KEY) or {}
+    settings = dict(tenant.settings or {})
+    if kept:
+        settings[SETTINGS_KEY] = kept
+    else:
+        settings.pop(SETTINGS_KEY, None)
+    tenant.settings = settings
+    await emit_audit(
+        db=db,
+        tenant_id=owner,
+        actor_id=current_user.user_id,
+        actor_email=current_user.email,
+        action="vcio:risk_settings_changed",
+        resource="vcio_risk_settings",
+        resource_id=str(owner),
+        changes={"before": before, "after": kept},
+    )
+    # The stored scores (what the list of assessments shows) were worked out with the old settings.
+    names = await _clients(db, owner)
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(VcioRiskAssessment.id, VcioRiskAssessment.tenant_id).where(VcioRiskAssessment.tenant_id.in_([owner, *names]))
+            )
+        ).all()
+    rescored = 0
+    for assessment_id, tid in rows:
+        async with _acting(db, owner, tid):
+            row = (await db.execute(select(VcioRiskAssessment).where(VcioRiskAssessment.id == assessment_id))).scalar_one()
+            _store_score(row, None, kept)
+            rescored += 1
+    await db.commit()
+    return SettingsOut(settings=merged if kept else defaults, defaults=defaults, using_defaults=not kept, rescored=rescored)
 
 
 @router.get("/library", response_model=LibraryOut, summary="The vCIO Risk Scoring questions and the default scoring settings")
@@ -237,6 +322,7 @@ async def list_assessments(
 @router.post("/assessments", response_model=AssessmentOut, status_code=201, summary="Start a risk-scored review for a client")
 async def create_assessment(body: AssessmentIn, current_user: Writer, db: DBSession) -> AssessmentOut:
     owner = current_user.tenant_id
+    org = await org_settings(db, owner)
     names = await _clients(db, owner)
     target = body.client_id or owner
     if target != owner and target not in names:
@@ -253,7 +339,7 @@ async def create_assessment(body: AssessmentIn, current_user: Writer, db: DBSess
             settings={},
             created_by=current_user.email,
         )
-        card = _store_score(row, current_user)
+        card = _store_score(row, current_user, org)
         db.add(row)
         await db.commit()
         await db.refresh(row)
@@ -263,16 +349,17 @@ async def create_assessment(body: AssessmentIn, current_user: Writer, db: DBSess
 @router.get("/assessments/{assessment_id}", response_model=AssessmentOut, summary="One risk-scored review: its answers and its scorecard")
 async def get_assessment(assessment_id: uuid.UUID, current_user: Reader, db: DBSession) -> AssessmentOut:
     row, names = await _find(db, current_user, assessment_id)
-    return _full(row, current_user.tenant_id, names)
+    return _full(row, current_user.tenant_id, names, _card(row, await org_settings(db, current_user.tenant_id)))
 
 
 @router.patch(
     "/assessments/{assessment_id}",
     response_model=AssessmentOut,
-    summary="Change a review's date, platform, assessor, scoring settings or a question's severity",
+    summary="Change a review's date, platform, assessor or a question's severity",
 )
 async def update_assessment(assessment_id: uuid.UUID, body: AssessmentPatch, current_user: Writer, db: DBSession) -> AssessmentOut:
     owner = current_user.tenant_id
+    org = await org_settings(db, owner)
     seen, names = await _find(db, current_user, assessment_id)
     known = rs.questions_by_id()
     for qid, sev in (body.severity or {}).items():
@@ -288,9 +375,6 @@ async def update_assessment(assessment_id: uuid.UUID, body: AssessmentPatch, cur
             row.platform = body.platform
         if body.assessor is not None:
             row.assessor = body.assessor.strip()
-        if body.settings is not None:
-            # Only what differs from nothing is kept as given; the scoring ignores whatever is not a valid setting.
-            row.settings = dict(body.settings)
         if body.severity is not None:
             merged = dict(row.severity or {})
             for qid, sev in body.severity.items():
@@ -299,7 +383,7 @@ async def update_assessment(assessment_id: uuid.UUID, body: AssessmentPatch, cur
                 else:
                     merged[qid] = sev
             row.severity = merged
-        card = _store_score(row, current_user)
+        card = _store_score(row, current_user, org)
         await db.commit()
         await db.refresh(row)
     return _full(row, owner, names, card)
@@ -310,6 +394,7 @@ async def update_assessment(assessment_id: uuid.UUID, body: AssessmentPatch, cur
 )
 async def put_answers(assessment_id: uuid.UUID, body: AnswersIn, current_user: Writer, db: DBSession) -> AssessmentOut:
     owner = current_user.tenant_id
+    org = await org_settings(db, owner)
     seen, names = await _find(db, current_user, assessment_id)
     known = rs.questions_by_id()
     for item in body.items:
@@ -330,15 +415,63 @@ async def put_answers(assessment_id: uuid.UUID, body: AnswersIn, current_user: W
                 "note": (item.note or "").strip() or None,
             }
             entry = {k: v for k, v in entry.items() if v is not None}
+            before = merged.get(item.id, {})
+            # Adding a note to an answer the integrations filled in does not make it a hand answer: only changing the answer (or the vendor) does.
+            if before.get("source") == "auto" and (before.get("answer"), before.get("vendor")) == (
+                entry.get("answer"),
+                entry.get("vendor"),
+            ):
+                entry = {**entry, "source": "auto", **({"evidence": before["evidence"]} if before.get("evidence") else {})}
             if entry:
                 merged[item.id] = entry
             else:
                 merged.pop(item.id, None)
         row.answers = merged
-        card = _store_score(row, current_user)
+        card = _store_score(row, current_user, org)
         await db.commit()
         await db.refresh(row)
     return _full(row, owner, names, card)
+
+
+class AutofillOut(BaseModel):
+    assessment: AssessmentOut
+    filled: int
+    changed: int
+    kept_by_hand: int
+    cleared: int
+    answered_by_integrations: int
+
+
+async def review_answers(db: Any, user: AuthUser, client_id: uuid.UUID) -> dict[str, dict[str, str]]:
+    """What the client's Client Review answers, as answers to the questions here (question id -> answer, evidence and vendor). The review is built exactly as its own page builds it, so
+    the two never disagree: the same checks, the same typed answers."""
+    from app.api.v1.endpoints.client_review import (
+        client_review,  # noqa: PLC0415 - the review imports half the API; only this route needs it
+    )
+
+    review = await client_review(client_id, user, db)
+    return rs.answers_from_review(list(review.assess), list(review.m365), list(review.tech_stack))
+
+
+@router.post(
+    "/assessments/{assessment_id}/autofill",
+    response_model=AutofillOut,
+    summary="Fill in the answers the integrations can give (through the client's Client Review), never replacing one set by hand",
+)
+async def autofill_assessment(assessment_id: uuid.UUID, current_user: Writer, db: DBSession) -> AutofillOut:
+    owner = current_user.tenant_id
+    org = await org_settings(db, owner)
+    seen, names = await _find(db, current_user, assessment_id)
+    # Kept now: building the review ends the transaction the assessment was read in, and reading its fields afterwards would need the database again.
+    client_id, found_id = seen.tenant_id, seen.id
+    found = await review_answers(db, current_user, client_id)
+    async with _acting(db, owner, client_id):
+        row = (await db.execute(select(VcioRiskAssessment).where(VcioRiskAssessment.id == found_id))).scalar_one()
+        row.answers, counts = rs.apply_autofill(row.answers, found)
+        card = _store_score(row, current_user, org)
+        await db.commit()
+        await db.refresh(row)
+    return AutofillOut(assessment=_full(row, owner, names, card), **counts)
 
 
 @router.delete("/assessments/{assessment_id}", response_model=DeletedOut, summary="Delete a risk-scored review for good")

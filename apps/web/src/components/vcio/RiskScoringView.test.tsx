@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ library: vi.fn(), list: vi.fn(), create: vi.fn(), get: vi.fn(), update: vi.fn(), answer: vi.fn(), remove: vi.fn() }));
+const api = vi.hoisted(() => ({ library: vi.fn(), list: vi.fn(), create: vi.fn(), get: vi.fn(), update: vi.fn(), answer: vi.fn(), autofill: vi.fn(), settings: vi.fn(), saveSettings: vi.fn(), remove: vi.fn() }));
 const mssp = vi.hoisted(() => ({ listChildren: vi.fn() }));
 const csv = vi.hoisted(() => ({ downloadCsv: vi.fn() }));
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), msspApi: mssp }));
@@ -10,7 +10,7 @@ vi.mock('@/lib/csv', async (original) => ({ ...(await original<typeof import('@/
 vi.mock('@/lib/vcioRisk', async (original) => ({ ...(await original<typeof import('@/lib/vcioRisk')>()), vcioRiskApi: api }));
 
 import { ApiError } from '@/lib/api';
-import { assessmentCsv, excludedFor, keepQuestions, losesPoints, pct, type RiskAggregate, type RiskAssessment, type RiskLibrary, type RiskQuestion, type RiskScorecard } from '@/lib/vcioRisk';
+import { assessmentCsv, autofillSentence, excludedFor, keepQuestions, losesPoints, pct, type RiskAggregate, type RiskAssessment, type RiskLibrary, type RiskQuestion, type RiskScorecard } from '@/lib/vcioRisk';
 import { RiskScoringView } from './RiskScoringView';
 
 const q = (over: Partial<RiskQuestion>): RiskQuestion => ({ id: 'ADM-001', category: 'Administrative', subsection: 'Onboarding', text: 'Is there an onboarding plan?', type: 'yesno', preferred: '', good: 'Yes', severity: 'High', csf: 'GV.RR', csf_function: 'Govern', csf_name: 'Roles', ...over });
@@ -71,14 +71,24 @@ describe('the pure parts', () => {
     expect(keepQuestions(QUESTIONS, { ...a, severity: { 'ADM-001': 'Critical' } }, { filter: 'critical', category: '', search: '' }).map((x) => x.id)).toEqual(['ADM-001', 'NET-002']);
     expect(ids({ category: 'Tech Stack' })).toEqual(['TS-001']);
     expect(ids({ search: ' rdp ' })).toEqual(['NET-002']);
+    expect(keepQuestions(QUESTIONS, { ...a, answers: { 'NET-002': { answer: 'No', source: 'auto' }, 'ADM-001': { answer: 'No' } } }, { filter: 'auto', category: '', search: '' }).map((x) => x.id)).toEqual(['NET-002']);
+  });
+
+  it('says in one sentence what a fill from the integrations did', () => {
+    const r = { filled: 12, changed: 1, kept_by_hand: 3, cleared: 2, answered_by_integrations: 16 };
+    expect(autofillSentence(r)).toBe('12 answers filled in from the integrations, 1 updated, 3 you set by hand left as they are, 2 taken out because the integrations no longer say.');
+    expect(autofillSentence({ filled: 0, changed: 0, kept_by_hand: 0, cleared: 0, answered_by_integrations: 0 })).toBe('The integrations have no answer for this client yet: nothing was filled in.');
+    expect(autofillSentence({ filled: 1, changed: 0, kept_by_hand: 0, cleared: 0, answered_by_integrations: 1 })).toBe('1 answer filled in from the integrations.');
   });
 
   it('writes the assessment as a CSV, one row per question the client is asked', () => {
     const rows = assessmentCsv(QUESTIONS, assessment({ answers: { 'TS-001': { answer: 'Alternative', vendor: 'Fortinet', note: 'renew in May' } }, severity: { 'ADM-001': 'Low' } })).trim().split(/\r?\n/);
     expect(rows).toHaveLength(4);
-    expect(rows[0].replace('﻿', '')).toBe('ID,Category,Section,Question,Severity,Good answer,Answer,Vendor / product in use,Evidence / notes,NIST CSF 2.0,CSF function');
-    expect(rows[1]).toBe('ADM-001,Administrative,Onboarding,Is there an onboarding plan?,Low,Yes,,,,GV.RR,Govern');
-    expect(rows[3]).toBe('TS-001,Tech Stack,Network Equipment,What is the client firewall?,Medium,Preferred,Alternative,Fortinet,renew in May,GV.RR,Govern');
+    expect(rows[0].replace('﻿', '')).toBe('ID,Category,Section,Question,Severity,Good answer,Answer,Vendor / product in use,Evidence / notes,NIST CSF 2.0,CSF function,Answer source,What the integrations saw');
+    expect(rows[1]).toBe('ADM-001,Administrative,Onboarding,Is there an onboarding plan?,Low,Yes,,,,GV.RR,Govern,,');
+    expect(rows[3]).toBe('TS-001,Tech Stack,Network Equipment,What is the client firewall?,Medium,Preferred,Alternative,Fortinet,renew in May,GV.RR,Govern,Typed,');
+    const auto = assessmentCsv(QUESTIONS, assessment({ answers: { 'ADM-001': { answer: 'Yes', source: 'auto', evidence: 'From a check' } } })).trim().split(/\r?\n/);
+    expect(auto[1]).toBe('ADM-001,Administrative,Onboarding,Is there an onboarding plan?,High,Yes,Yes,,,GV.RR,Govern,Integrations,From a check');
   });
 });
 
@@ -184,22 +194,59 @@ describe('RiskScoringView', () => {
     await waitFor(() => expect(api.update).toHaveBeenCalledWith('a1', { severity: { 'ADM-001': 'Low' } }));
   });
 
-  it('the settings are saved for this assessment, and can be put back to the defaults', async () => {
+  it('has no settings on this page: they are under Settings, for the people who may change them', async () => {
     const start = assessment();
     api.list.mockResolvedValue({ items: [summary(start)] });
     api.get.mockResolvedValue(start);
-    api.update.mockResolvedValue(start);
     render(<RiskScoringView />);
     await pickClient();
-    await userEvent.click(await screen.findByRole('tab', { name: 'Settings' }));
-    const points = screen.getByLabelText('Critical points');
-    await userEvent.clear(points);
-    await userEvent.type(points, '20');
-    await userEvent.click(screen.getByRole('button', { name: 'Save settings' }));
-    await waitFor(() => expect(api.update).toHaveBeenCalledTimes(1));
-    expect(api.update.mock.calls[0][1].settings.points.Critical).toBe(20);
-    await userEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }));
-    await waitFor(() => expect(api.update).toHaveBeenLastCalledWith('a1', { settings: {} }));
+    await screen.findByTestId('risk-overall');
+    expect(screen.queryByRole('tab', { name: 'Settings' })).toBeNull();
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Scorecard', 'Questions', 'Method']);
+    await userEvent.click(screen.getByRole('tab', { name: 'Method' }));
+    expect(screen.getByTestId('risk-method')).toHaveTextContent('Settings > vCIO Risk Scoring');
+  });
+
+  it('Fill from integrations asks the API, shows the answers it sends back marked Auto with what the tool saw, and says what it did', async () => {
+    const start = assessment({ answers: { 'ADM-001': { answer: 'No' } } });
+    const filled = assessment({ answers: { 'ADM-001': { answer: 'No' }, 'NET-002': { answer: 'No', source: 'auto', evidence: 'From threatmate_external_exposure. No issues found.' } }, answered: 2, score: 0.5, rating: 'red' });
+    api.list.mockResolvedValue({ items: [summary(start)] });
+    api.get.mockResolvedValue(start);
+    api.autofill.mockResolvedValue({ assessment: filled, filled: 1, changed: 0, kept_by_hand: 1, cleared: 0, answered_by_integrations: 2 });
+    render(<RiskScoringView />);
+    await pickClient();
+    await userEvent.click(await screen.findByRole('button', { name: 'Fill from integrations' }));
+    await waitFor(() => expect(api.autofill).toHaveBeenCalledWith('a1'));
+    expect(await screen.findByTestId('risk-notice')).toHaveTextContent('1 answer filled in from the integrations, 1 you set by hand left as it is.');
+    await userEvent.click(screen.getByRole('tab', { name: 'Questions' }));
+    const rows = await screen.findAllByTestId('risk-question');
+    expect(within(rows[1]).getByTestId('risk-auto')).toHaveTextContent('Auto');
+    expect(within(rows[1]).getByTestId('risk-evidence')).toHaveTextContent('From threatmate_external_exposure. No issues found.');
+    expect(within(rows[0]).queryByTestId('risk-auto')).toBeNull();
+    await userEvent.selectOptions(screen.getByLabelText('Which questions'), 'auto');
+    expect(screen.getAllByTestId('risk-question')).toHaveLength(1);
+  });
+
+  it('a new assessment is filled from the integrations unless the box is unticked', async () => {
+    const made = assessment();
+    api.list.mockResolvedValueOnce({ items: [] }).mockResolvedValue({ items: [summary(made)] });
+    api.create.mockResolvedValue(made);
+    api.get.mockResolvedValue(made);
+    api.autofill.mockResolvedValue({ assessment: made, filled: 0, changed: 0, kept_by_hand: 0, cleared: 0, answered_by_integrations: 0 });
+    render(<RiskScoringView />);
+    await pickClient();
+    await userEvent.click(await screen.findByRole('button', { name: 'New assessment' }));
+    expect(screen.getByLabelText('Fill in what the integrations can answer')).toBeChecked();
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Start' }));
+    await waitFor(() => expect(api.autofill).toHaveBeenCalledWith('a1'));
+    expect(await screen.findByTestId('risk-notice')).toHaveTextContent('The integrations have no answer for this client yet');
+    api.autofill.mockClear();
+    await userEvent.click(screen.getByRole('button', { name: 'New assessment' }));
+    await userEvent.click(screen.getByLabelText('Fill in what the integrations can answer'));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Start' }));
+    await waitFor(() => expect(api.create).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(api.autofill).not.toHaveBeenCalled();
   });
 
   it('exports the open assessment, explains the method, and deletes only after a yes', async () => {

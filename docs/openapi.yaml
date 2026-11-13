@@ -17793,6 +17793,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/vcio-risk-scoring/settings:
+    get:
+      tags:
+      - vcio
+      summary: The organisation's vCIO Risk Scoring settings
+      operationId: get_settings_api_v1_vcio_risk_scoring_settings_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsOut'
+      security:
+      - HTTPBearer: []
+    put:
+      tags:
+      - vcio
+      summary: Change the organisation's vCIO Risk Scoring settings and score every
+        assessment again
+      operationId: put_settings_api_v1_vcio_risk_scoring_settings_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingsIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/vcio-risk-scoring/library:
     get:
       tags:
@@ -17901,8 +17943,7 @@ paths:
     patch:
       tags:
       - vcio
-      summary: Change a review's date, platform, assessor, scoring settings or a question's
-        severity
+      summary: Change a review's date, platform, assessor or a question's severity
       operationId: update_assessment_api_v1_vcio_risk_scoring_assessments__assessment_id__patch
       security:
       - HTTPBearer: []
@@ -17990,6 +18031,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AssessmentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/vcio-risk-scoring/assessments/{assessment_id}/autofill:
+    post:
+      tags:
+      - vcio
+      summary: Fill in the answers the integrations can give (through the client's
+        Client Review), never replacing one set by hand
+      operationId: autofill_assessment_api_v1_vcio_risk_scoring_assessments__assessment_id__autofill_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Assessment Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutofillOut'
         '422':
           description: Validation Error
           content:
@@ -28003,14 +28074,6 @@ components:
             maxLength: 200
           - type: 'null'
           title: Assessor
-        settings:
-          anyOf:
-          - additionalProperties: true
-            type: object
-          - type: 'null'
-          title: Settings
-          description: Scoring settings to use instead of the defaults; an empty object
-            goes back to the defaults.
         severity:
           anyOf:
           - additionalProperties:
@@ -28737,6 +28800,34 @@ components:
       - enabled
       title: AutoTuneRequest
       description: Body for ``POST /detection/tuning/{rule_id}/auto_tune``.
+    AutofillOut:
+      properties:
+        assessment:
+          $ref: '#/components/schemas/AssessmentOut'
+        filled:
+          type: integer
+          title: Filled
+        changed:
+          type: integer
+          title: Changed
+        kept_by_hand:
+          type: integer
+          title: Kept By Hand
+        cleared:
+          type: integer
+          title: Cleared
+        answered_by_integrations:
+          type: integer
+          title: Answered By Integrations
+      type: object
+      required:
+      - assessment
+      - filled
+      - changed
+      - kept_by_hand
+      - cleared
+      - answered_by_integrations
+      title: AutofillOut
     AutonomyPolicyResponse:
       properties:
         tenant_id:
@@ -48193,6 +48284,41 @@ components:
       required:
       - close_status
       title: SetTicketSettings
+    SettingsIn:
+      properties:
+        settings:
+          additionalProperties: true
+          type: object
+          title: Settings
+          description: The settings to use. Anything missing or not valid keeps its
+            default; an empty object goes back to the defaults.
+      type: object
+      required:
+      - settings
+      title: SettingsIn
+    SettingsOut:
+      properties:
+        settings:
+          additionalProperties: true
+          type: object
+          title: Settings
+        defaults:
+          additionalProperties: true
+          type: object
+          title: Defaults
+        using_defaults:
+          type: boolean
+          title: Using Defaults
+        rescored:
+          type: integer
+          title: Rescored
+          default: 0
+      type: object
+      required:
+      - settings
+      - defaults
+      - using_defaults
+      title: SettingsOut
     Setup:
       properties:
         mailbox:
@@ -55897,6 +56023,16 @@ components:
           - type: string
           - type: 'null'
           title: Note
+        source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source
+        evidence:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Evidence
       type: object
       title: AnswerOut
     app__api__v1__endpoints__vcio_risk_scoring__DeletedOut:
