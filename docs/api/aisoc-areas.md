@@ -113,5 +113,5 @@ A.C.O.R.N has **775** operations in **111** areas. This is a MAP, not a list of 
 - **threatintel**: 4 reads, 3 changes; protection: `intel:read`, `threat_intel:read`, `threat_intel:write`; e.g. List bundles; Create bundle
 - **tool-deploy-rules**: 2 reads, 2 changes; protection: `alerts:read`, `connectors:write`; e.g. List deploy rules; Make deploy rule
 - **translation**: 1 reads, 1 changes; protection: `rules:read`, `rules:view`; e.g. List supported detection rule formats; Translate a detection rule across formats
-- **vcio-risk-scoring**: 7 reads, 6 changes; protection: `alerts:read`, `mssp:manage`, `settings:read`, `settings:write`; e.g. The risk-scored reviews of one client, or of every client, newest first; Start a risk-scored review for a client
+- **vcio-risk-scoring**: 7 reads, 6 changes; protection: `alerts:read`, `settings:read`, `settings:write`, `vcio:assess`; e.g. The risk-scored reviews of one client, or of every client, newest first; Start a risk-scored review for a client
 - **waitlist**: 1 reads, 2 changes; protection: `mssp:onboard`; 1 with no sign-in required; e.g. List waitlist entries (admin only).; Update a waitlist entry's status (admin only).

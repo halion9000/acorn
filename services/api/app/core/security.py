@@ -332,6 +332,7 @@ _UNGRANTED_PERMISSIONS = frozenset(
         "identities:respond",
         "identities:bec",
         "inventory:write",
+        "vcio:assess",
     }
 )  # hunts:read: held through lake:query (IMPLIED_BY below) or granted on its own  # noqa: E501
 
@@ -396,6 +397,9 @@ IMPLIED_BY: dict[str, tuple[str, ...]] = {
     "inventory:checkout": (
         "inventory:write",
     ),  # checking a device out and in: held by the technician roles; administrators hold it through inventory:write
+    "vcio:assess": (
+        "mssp:manage",
+    ),  # starting, answering and deleting Client Risk Score assessments: whoever could manage the MSSP console always could; a custom role (the vCIO role) can be given vcio:assess on its own
     "inventory:write": (
         "mssp:manage",
     ),  # whoever could manage the MSSP console could always change inventory; a custom role can be given inventory:write on its own

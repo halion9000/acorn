@@ -97,6 +97,7 @@ class TestTheImplication:
             "inventory:checkout": ("inventory:write",),
             "billing:view": ("alerts:read",),
             "inventory:write": ("mssp:manage",),
+            "vcio:assess": ("mssp:manage",),
         }
 
     def test_no_implied_permission_is_a_platform_permission_and_nothing_implies_one(self):

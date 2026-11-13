@@ -37,7 +37,8 @@ from app.services.audit import emit_audit
 router = APIRouter(prefix="/vcio-risk-scoring", tags=["vcio"])
 
 Reader = Annotated[AuthUser, Depends(require_permission("alerts:read"))]
-Writer = Annotated[AuthUser, Depends(require_permission("mssp:manage"))]
+# Its own permission, not mssp:manage: the vCIO role has to be able to run assessments without being able to manage delegations, rule packs and the rest of the MSSP console (mssp:manage implies it).
+Writer = Annotated[AuthUser, Depends(require_permission("vcio:assess"))]
 Platform = Literal["m365", "google", "both"]
 NOTE_MAX = 2000
 VENDOR_MAX = 200

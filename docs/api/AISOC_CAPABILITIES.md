@@ -119,7 +119,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | [threatintel](#threatintel) | 4 | 3 | `intel:read`, `threat_intel:read`, `threat_intel:write` |
 | [tool-deploy-rules](#tool-deploy-rules) | 2 | 2 | `alerts:read`, `connectors:write` |
 | [translation](#translation) | 1 | 1 | `rules:read`, `rules:view` |
-| [vcio-risk-scoring](#vcio-risk-scoring) | 7 | 6 | `alerts:read`, `mssp:manage`, `settings:read`, `settings:write` |
+| [vcio-risk-scoring](#vcio-risk-scoring) | 7 | 6 | `alerts:read`, `settings:read`, `settings:write`, `vcio:assess` |
 | [waitlist](#waitlist) | 1 | 2 | `mssp:onboard`; 1 with no sign-in required |
 
 ## abuse
@@ -1431,12 +1431,12 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | Method | Path | What it does | Permission |
 | --- | --- | --- | --- |
 | GET | `/vcio-risk-scoring/assessments` | The risk-scored reviews of one client, or of every client, newest first | `alerts:read` |
-| POST | `/vcio-risk-scoring/assessments` | Start a risk-scored review for a client | `mssp:manage` |
-| DELETE | `/vcio-risk-scoring/assessments/{assessment_id}` | Delete a risk-scored review for good | `mssp:manage` |
+| POST | `/vcio-risk-scoring/assessments` | Start a risk-scored review for a client | `vcio:assess` |
+| DELETE | `/vcio-risk-scoring/assessments/{assessment_id}` | Delete a risk-scored review for good | `vcio:assess` |
 | GET | `/vcio-risk-scoring/assessments/{assessment_id}` | One risk-scored review: its answers and its scorecard | `alerts:read` |
-| PATCH | `/vcio-risk-scoring/assessments/{assessment_id}` | Change a review's date, platform, assessor or a question's severity | `mssp:manage` |
-| PUT | `/vcio-risk-scoring/assessments/{assessment_id}/answers` | Answer questions of a review, or clear their answers | `mssp:manage` |
-| POST | `/vcio-risk-scoring/assessments/{assessment_id}/autofill` | Fill in the answers the integrations can give (through the client's Client Review), never replacing one set by hand | `mssp:manage` |
+| PATCH | `/vcio-risk-scoring/assessments/{assessment_id}` | Change a review's date, platform, assessor or a question's severity | `vcio:assess` |
+| PUT | `/vcio-risk-scoring/assessments/{assessment_id}/answers` | Answer questions of a review, or clear their answers | `vcio:assess` |
+| POST | `/vcio-risk-scoring/assessments/{assessment_id}/autofill` | Fill in the answers the integrations can give (through the client's Client Review), never replacing one set by hand | `vcio:assess` |
 | GET | `/vcio-risk-scoring/assessors` | The A.C.O.R.N users who can be named as the assessor of a Client Risk Score | `alerts:read` |
 | GET | `/vcio-risk-scoring/library` | The vCIO Risk Scoring questions and the default scoring settings | `alerts:read` |
 | GET | `/vcio-risk-scoring/settings` | The organisation's vCIO Risk Scoring settings | `settings:read` |

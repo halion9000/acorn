@@ -55,6 +55,7 @@ Audit of every value-limiting constraint added since 080 (2026-10-23): each colu
 | `155_alert_script_rules.sql` | `alert_script_rules`: run a script automatically for an alert type, choosing the script by the machine's operating system |
 | `156_tool_deploy_rules.sql` | `tool_deploy_rules`: install a tool (Huntress, Field Effect, ScreenConnect) automatically on machines that should have it and do not |
 | `161_signin_state.sql` | `identity_mfa_users.signin_state` and `days_since_signin` (active / inactive 90+ / never, or unknown) from CIPP's inactive-accounts report |
+| `173_vcio_assess_permission.sql` | `vcio:assess` added to the permissions catalog (implied by `mssp:manage`), the permission for starting, answering, filling in and deleting Client Risk Score assessments, so the vCIO role does not need the whole MSSP console |
 | `169_inventory_checkout_permission.sql` | `inventory:checkout` added to the permissions catalog (implied by `inventory:write`; held by the technician roles), the permission for the two check-out and check-in routes |
 | `160_password_never_expires.sql` | `identity_mfa_users.password_never_expires` (true / false / unknown) from CIPP's user list, for the Identities tile |
 | `159_user_totp.sql` | `user_totp`: authenticator-app (TOTP) setup per person, secret encrypted, single-use recovery codes stored as hashes (A13) |
