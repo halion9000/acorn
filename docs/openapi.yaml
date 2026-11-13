@@ -9376,7 +9376,7 @@ paths:
       tags:
       - compliance
       summary: List controls for a framework
-      operationId: _control_item_api_v1_compliance_frameworks__framework_id__controls_get
+      operationId: list_framework_controls_api_v1_compliance_frameworks__framework_id__controls_get
       security:
       - HTTPBearer: []
       parameters:
@@ -9386,18 +9386,6 @@ paths:
         schema:
           type: string
           title: Framework Id
-      - name: control_id
-        in: query
-        required: true
-        schema:
-          type: string
-          title: Control Id
-      - name: title
-        in: query
-        required: true
-        schema:
-          type: string
-          title: Title
       responses:
         '200':
           description: Successful Response

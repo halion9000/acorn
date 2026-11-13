@@ -220,12 +220,6 @@ async def list_frameworks() -> FrameworksResponse:
     return FrameworksResponse(frameworks=FRAMEWORKS)
 
 
-@router.get(
-    "/frameworks/{framework_id}/controls",
-    response_model=ControlsResponse,
-    summary="List controls for a framework",
-    dependencies=[Depends(require_permission("reports:read"))],
-)
 def _control_item(framework_id: str, control_id: str, title: str) -> ControlItem:
     g = guidance_for(framework_id, control_id)
     return ControlItem(
@@ -238,6 +232,12 @@ def _control_item(framework_id: str, control_id: str, title: str) -> ControlItem
     )
 
 
+@router.get(
+    "/frameworks/{framework_id}/controls",
+    response_model=ControlsResponse,
+    summary="List controls for a framework",
+    dependencies=[Depends(require_permission("reports:read"))],
+)
 async def list_framework_controls(framework_id: str) -> ControlsResponse:
     controls = FRAMEWORKS.get(framework_id)
     if controls is None:

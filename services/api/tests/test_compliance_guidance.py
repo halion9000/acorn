@@ -59,3 +59,24 @@ async def test_the_controls_of_a_framework_come_with_their_guidance_and_a_framew
     assert unwritten, "some framework still has no guidance, to show it comes without"
     plain = (await ep.list_framework_controls(unwritten[0])).controls
     assert plain and all(c.meaning is None and c.to_meet == [] and c.evidence_examples == [] for c in plain)
+
+
+def test_the_controls_route_itself_answers_for_every_framework():
+    """Asked for over HTTP, the way the page asks. The route's decorator once sat on a helper beside it: every framework answered 422 while the tests, which called the function directly, passed."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+    app.include_router(ep.router, prefix="/api/v1")
+    for route in ep.router.routes:
+        for dep in getattr(route, "dependencies", []):
+            app.dependency_overrides[dep.dependency] = lambda: None
+    client = TestClient(app)
+    for key in ep.FRAMEWORKS:
+        answer = client.get(f"/api/v1/compliance/frameworks/{key}/controls")
+        assert answer.status_code == 200, (key, answer.text[:200])
+        body = answer.json()
+        assert body["framework_id"] == key and len(body["controls"]) == len(ep.FRAMEWORKS[key]), key
+    hipaa = client.get("/api/v1/compliance/frameworks/HIPAA/controls").json()["controls"]
+    assert all(c["meaning"] and c["to_meet"] and c["evidence_examples"] for c in hipaa)
+    assert client.get("/api/v1/compliance/frameworks/NOPE/controls").status_code == 404
