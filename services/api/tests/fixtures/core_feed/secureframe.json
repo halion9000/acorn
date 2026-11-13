@@ -156,6 +156,52 @@
             }
           ]
         }
+      ],
+      "policy_list": [
+        {
+          "name": "Acceptable Use Policy",
+          "status": "published",
+          "published_at": "2026-05-01T00:00:00.000Z",
+          "accepted": 9,
+          "eligible": 12,
+          "frameworks": [
+            "NIST CSF 2.0"
+          ]
+        },
+        {
+          "name": "Access Control Policy",
+          "status": "published",
+          "published_at": null,
+          "accepted": 12,
+          "eligible": 12,
+          "frameworks": []
+        }
+      ],
+      "risk_list": [
+        {
+          "id": "R-2",
+          "description": "A key vendor has an outage.",
+          "status": "completed",
+          "treatment": "accept",
+          "categories": [],
+          "impact": 3,
+          "likelihood": 2,
+          "residual_impact": 3,
+          "residual_likelihood": 2
+        },
+        {
+          "id": "R-1",
+          "description": "A laptop with client data is lost or stolen.",
+          "status": "completed",
+          "treatment": "mitigate",
+          "categories": [
+            "Operational"
+          ],
+          "impact": 4,
+          "likelihood": 3,
+          "residual_impact": 2,
+          "residual_likelihood": 2
+        }
       ]
     }
   }

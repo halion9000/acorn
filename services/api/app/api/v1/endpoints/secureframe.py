@@ -1,7 +1,7 @@
 """Secureframe's compliance state, shown read only on the Compliance page.
 
 CORE reads Secureframe (control tests, frameworks, risks and policies) with the customer's own API key and sends ``POST /core-feed/{token}/secureframe``: the test counts, the failing and passing tests per
-framework, the oldest failing tests with their owner, and the number of risks and policies. No credential, policy text or evidence is in it. ``GET /secureframe`` shows the latest report.
+framework, the oldest failing tests with their owner, the number of risks and policies, each policy by name with its acceptance, and the risk register. No credential, policy text or test evidence is in it. ``GET /secureframe`` shows the latest report.
 """
 
 from __future__ import annotations
@@ -29,6 +29,8 @@ MAX_FAILING = 100
 MAX_FRAMEWORKS = 60
 MAX_REQUIREMENTS = 400
 MAX_CONTROLS = 600
+MAX_POLICIES = 500
+MAX_RISKS = 500
 MAX_TESTS_PER_CONTROL = 40
 # A.C.O.R.N's compliance catalog key -> Secureframe's framework key, for the frameworks that have a page here.
 FRAMEWORK_KEYS = {"NIST-CSF": "NIST_CSF_2", "CIS-IG1": "CIS_IG1"}
@@ -98,6 +100,34 @@ class ControlDetail(BaseModel):
     tests: list[ControlTest] = Field(default_factory=list, max_length=MAX_TESTS_PER_CONTROL)
 
 
+class PolicyLine(BaseModel):
+    """One policy as Secureframe lists it: its name, whether it is published and how many of the people who must accept it have. Never its text."""
+
+    name: str = Field(min_length=1, max_length=200)
+    status: str | None = Field(default=None, max_length=40)
+    published_at: datetime | None = None
+    accepted: int = Field(default=0, ge=0, le=10_000_000)
+    eligible: int = Field(default=0, ge=0, le=10_000_000)
+    frameworks: list[Annotated[str, Field(max_length=80)]] = Field(default_factory=list, max_length=20)
+
+
+_RATING = Field(default=None, ge=0, le=100)
+
+
+class RiskLine(BaseModel):
+    """One entry of the risk register: what the risk is, what was decided about it, and its rating before and after treatment."""
+
+    id: str | None = Field(default=None, max_length=60)
+    description: str = Field(min_length=1, max_length=400)
+    status: str | None = Field(default=None, max_length=40)
+    treatment: str | None = Field(default=None, max_length=40)
+    categories: list[Annotated[str, Field(max_length=80)]] = Field(default_factory=list, max_length=10)
+    impact: float | None = _RATING
+    likelihood: float | None = _RATING
+    residual_impact: float | None = _RATING
+    residual_likelihood: float | None = _RATING
+
+
 class MappedRequirement(BaseModel):
     """One requirement of NIST CSF 2.0 or CIS IG1 as Secureframe sees it: its verdict and the controls that answer it."""
 
@@ -121,6 +151,9 @@ class SecureframeBody(BaseModel):
     requirements: list[MappedRequirement] = Field(default_factory=list, max_length=MAX_REQUIREMENTS)
     # The controls behind those requirements, each with its enabled tests. Empty when the key's role may not read controls, and in a report stored before CORE sent them.
     controls: list[ControlDetail] = Field(default_factory=list, max_length=MAX_CONTROLS)
+    # The policies by name with their acceptance, and the risk register. Empty when the key's role may not read them, and in a report stored before CORE sent them.
+    policy_list: list[PolicyLine] = Field(default_factory=list, max_length=MAX_POLICIES)
+    risk_list: list[RiskLine] = Field(default_factory=list, max_length=MAX_RISKS)
 
 
 class ReportIn(BaseModel):

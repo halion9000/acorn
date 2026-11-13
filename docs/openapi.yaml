@@ -43627,6 +43627,50 @@ components:
       - loaded_at
       - error
       title: PluginOut
+    PolicyLine:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+        status:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Status
+        published_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Published At
+        accepted:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Accepted
+          default: 0
+        eligible:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Eligible
+          default: 0
+        frameworks:
+          items:
+            type: string
+            maxLength: 80
+          type: array
+          maxItems: 20
+          title: Frameworks
+      type: object
+      required:
+      - name
+      title: PolicyLine
+      description: 'One policy as Secureframe lists it: its name, whether it is published
+        and how many of the people who must accept it have. Never its text.'
     PolicyProgress:
       properties:
         client_id:
@@ -45817,6 +45861,72 @@ components:
       - risks
       - refreshed_at
       title: ReviewVcio
+    RiskLine:
+      properties:
+        id:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Id
+        description:
+          type: string
+          maxLength: 400
+          minLength: 1
+          title: Description
+        status:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Status
+        treatment:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Treatment
+        categories:
+          items:
+            type: string
+            maxLength: 80
+          type: array
+          maxItems: 10
+          title: Categories
+        impact:
+          anyOf:
+          - type: number
+            maximum: 100.0
+            minimum: 0.0
+          - type: 'null'
+          title: Impact
+        likelihood:
+          anyOf:
+          - type: number
+            maximum: 100.0
+            minimum: 0.0
+          - type: 'null'
+          title: Likelihood
+        residual_impact:
+          anyOf:
+          - type: number
+            maximum: 100.0
+            minimum: 0.0
+          - type: 'null'
+          title: Residual Impact
+        residual_likelihood:
+          anyOf:
+          - type: number
+            maximum: 100.0
+            minimum: 0.0
+          - type: 'null'
+          title: Residual Likelihood
+      type: object
+      required:
+      - description
+      title: RiskLine
+      description: 'One entry of the risk register: what the risk is, what was decided
+        about it, and its rating before and after treatment.'
     RiskProfileOut:
       properties:
         id:
@@ -48409,6 +48519,18 @@ components:
           type: array
           maxItems: 600
           title: Controls
+        policy_list:
+          items:
+            $ref: '#/components/schemas/PolicyLine'
+          type: array
+          maxItems: 500
+          title: Policy List
+        risk_list:
+          items:
+            $ref: '#/components/schemas/RiskLine'
+          type: array
+          maxItems: 500
+          title: Risk List
       type: object
       required:
       - tests

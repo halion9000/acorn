@@ -327,3 +327,49 @@ def test_a_report_without_control_detail_maps_exactly_as_before():
         0,
         None,
     )
+
+
+# ---- the policies and the risk register -------------------------------------------------------------------------------------------------------------------------
+
+POLICIES = [
+    {
+        "name": "Acceptable Use Policy",
+        "status": "published",
+        "published_at": "2026-05-01T00:00:00Z",
+        "accepted": 9,
+        "eligible": 12,
+        "frameworks": ["NIST CSF 2.0"],
+    },
+    {"name": "Access Control Policy"},
+]
+RISKS = [
+    {
+        "id": "R-1",
+        "description": "A laptop with client data is lost or stolen.",
+        "status": "completed",
+        "treatment": "mitigate",
+        "categories": ["Operational"],
+        "impact": 4,
+        "likelihood": 3,
+        "residual_impact": 2,
+        "residual_likelihood": 2,
+    },
+    {"description": "A key vendor has an outage."},
+]
+
+
+def test_the_policies_and_the_risk_register_are_accepted_and_a_malformed_entry_is_refused():
+    ok = sf.ReportIn.model_validate(body(policy_list=POLICIES, risk_list=RISKS)).report
+    assert [(p.name, p.accepted, p.eligible) for p in ok.policy_list] == [("Acceptable Use Policy", 9, 12), ("Access Control Policy", 0, 0)]
+    assert [(r.id, r.treatment, r.residual_impact) for r in ok.risk_list] == [("R-1", "mitigate", 2), (None, None, None)]
+    plain = sf.ReportIn.model_validate(body()).report
+    assert plain.policy_list == [] and plain.risk_list == [], "a report from before CORE sent them still reads"
+    for bad in (
+        {"policy_list": [{"name": ""}]},
+        {"policy_list": [{"name": "x", "accepted": -1}]},
+        {"risk_list": [{"description": ""}]},
+        {"risk_list": [{"description": "x", "impact": 101}]},
+        {"risk_list": [{"description": "x" * 401}]},
+    ):
+        with pytest.raises(ValidationError):
+            sf.ReportIn.model_validate(body(**bad))

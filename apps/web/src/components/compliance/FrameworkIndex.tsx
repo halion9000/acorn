@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 import { authFetch } from '@/lib/auth-session';
 import { SecureframeCard } from './SecureframeCard';
+import { SecureframeRegisters } from './SecureframeRegisters';
 
 export interface FrameworkCard {
   id: string;
@@ -121,6 +122,7 @@ export function FrameworkIndex({ frameworks }: { frameworks: FrameworkCard[] }) 
       </div>
 
       {!clientId && <SecureframeCard />}
+      {!clientId && <SecureframeRegisters />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {frameworks.map((fw) => (
