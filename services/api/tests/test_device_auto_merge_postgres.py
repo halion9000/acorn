@@ -409,3 +409,84 @@ async def test_merging_a_device_that_only_has_a_mac_serial_gives_the_machine_its
         == "AA:BB:CC:DD:EE:09"
     )
     assert await count(tenant, "select serial_number from devices where tenant_id = :t and hostname = :h", h="REAL-PC") == "PF2REAL9"
+
+
+# ---- Auvik files a laptop again each time its address changes ---------------------------------------------------------------------------------------------------
+
+
+def auvik(seen, kind="Workstation", status="offline", **more):
+    return {"device_type": kind, "online_status": status, "last_seen_at": seen, **more}
+
+
+async def test_a_laptop_auvik_filed_three_times_as_its_address_changed_is_one_device_and_keeps_the_newest_record(tenant):
+    # What the Devices page showed: one Mac, three Auvik records, each last seen on a different day, each with its own address (and its own private Wi-Fi MAC).
+    await report(
+        tenant,
+        "auvik",
+        "a1",
+        "Kates-MacBook-Air-5.local.",
+        ip_addresses=["10.0.0.21"],
+        details=auvik("2026-10-31T22:09:40Z", macs=["aa0000000001"]),
+    )
+    await report(
+        tenant,
+        "auvik",
+        "a2",
+        "Kates-MacBook-Air-5.local.",
+        ip_addresses=["10.0.0.57"],
+        details=auvik("2026-11-03T23:00:15Z", macs=["aa0000000002"]),
+    )
+    await report(
+        tenant,
+        "auvik",
+        "a3",
+        "Kates-MacBook-Air-5.local.",
+        ip_addresses=["10.0.0.93"],
+        details=auvik("2026-11-11T23:32:43Z", status="online", macs=["aa0000000003"]),
+    )
+    assert await count(tenant) == 3
+    assert await merge_pass(tenant) == 2
+    assert await count(tenant) == 1
+    assert (
+        await count(tenant, "select count(*) from device_sources where tenant_id = :t") == 3
+    ), "every Auvik record is kept on the one device"
+    kept = "select d.ip_addresses from devices d where d.tenant_id = :t"
+    assert await count(tenant, kept) == ["10.0.0.93"], "the device is the record seen most recently"
+    assert await merge_pass(tenant) == 0, "a second pass finds nothing more to do"
+
+
+async def test_two_auvik_records_of_one_name_both_seen_now_are_two_machines(tenant):
+    await report(tenant, "auvik", "a1", "Kates-MacBook-Air-5.local.", details=auvik("2026-11-11T23:00:00Z", status="online"))
+    await report(tenant, "auvik", "a2", "Kates-MacBook-Air-5.local.", details=auvik("2026-11-11T23:30:00Z", status="online"))
+    assert await merge_pass(tenant) == 0
+    assert await count(tenant) == 2
+
+
+async def test_auvik_network_gear_with_one_name_is_never_folded_whatever_the_dates(tenant):
+    await report(tenant, "auvik", "a1", "Closet-Switch-Floor2", details=auvik("2026-10-01T00:00:00Z", kind="Switch"))
+    await report(tenant, "auvik", "a2", "Closet-Switch-Floor2", details=auvik("2026-11-11T00:00:00Z", kind="Switch"))
+    await report(tenant, "auvik", "a3", "Lobby-Kiosk-Tablet", details=auvik("2026-10-01T00:00:00Z", kind="Tablet"))
+    await report(tenant, "auvik", "a4", "Lobby-Kiosk-Tablet", details=auvik("2026-11-11T00:00:00Z", kind="Access Point"))
+    assert await merge_pass(tenant) == 0
+    assert await count(tenant) == 4
+
+
+async def test_an_auvik_pair_is_left_alone_when_a_date_is_missing_a_person_said_no_or_the_name_is_a_stock_one(tenant):
+    await report(tenant, "auvik", "a1", "Sams-MacBook-Pro-2.local", details=auvik("2026-10-01T00:00:00Z"))
+    await report(tenant, "auvik", "a2", "Sams-MacBook-Pro-2.local", details={"device_type": "Workstation"})
+    await report(tenant, "auvik", "b1", "MacBook-Pro", details=auvik("2026-10-01T00:00:00Z"))
+    await report(tenant, "auvik", "b2", "MacBook-Pro", details=auvik("2026-11-11T00:00:00Z"))
+    c1 = await report(tenant, "auvik", "c1", "Dana-Dell-7440", details=auvik("2026-10-01T00:00:00Z"))
+    c2 = await report(tenant, "auvik", "c2", "Dana-Dell-7440", details=auvik("2026-11-11T00:00:00Z"))
+    await run(tenant, lambda db: dismiss_pair(db, tenant, c1, c2))
+    assert await merge_pass(tenant) == 0
+    assert await count(tenant) == 6
+
+
+async def test_the_auvik_records_of_a_laptop_an_agent_also_reports_still_join_that_machine(tenant):
+    await report(tenant, "auvik", "a1", "Kates-MacBook-Air-5", details=auvik("2026-10-31T00:00:00Z"))
+    await report(tenant, "auvik", "a2", "Kates-MacBook-Air-5", details=auvik("2026-11-11T00:00:00Z"))
+    await report(tenant, "addigy", "m1", "Kates-MacBook-Air-5", os="macOS 15")
+    assert await merge_pass(tenant) == 2
+    assert await count(tenant) == 1
+    assert await count(tenant, "select count(distinct vendor) from device_sources where tenant_id = :t") == 2

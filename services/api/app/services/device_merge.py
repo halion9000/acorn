@@ -425,19 +425,113 @@ async def auto_merge_by_ip(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | 
     return merged
 
 
+# How long before the newest record an older Auvik record of the same computer must have gone quiet. Two records seen within this of each other may be two machines that are both in use.
+REDISCOVERY_GAP = timedelta(hours=6)
+
+
+def _seen_at(value: Any) -> datetime | None:
+    """Auvik's last-seen time as a time, or None when it gave none that can be read."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        seen = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return seen if seen.tzinfo else seen.replace(tzinfo=UTC)
+
+
+async def auto_merge_rediscovered(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> int:
+    """Fold the records Auvik leaves behind when it files one computer again. Returns how many merges were made.
+
+    Auvik identifies a computer it finds on the network by its address and network card. A laptop or phone on DHCP gets a new address (and, with a private Wi-Fi address, a new card address too),
+    so Auvik files it as a NEW device under the same name and leaves the old record behind: one Mac shows as three devices, each last seen on a different day. The rule that two records of one
+    tool are two machines is right for network gear and wrong here, so this is narrow. Records fold into the one seen most recently only when ALL hold: every tool behind each device is Auvik
+    alone; Auvik calls each a computer (never a switch, firewall or access point); they carry the same name, which is not a stock name, and no more of them than ``MAX_AUTO_MERGE_GROUP``; each
+    older record was last seen at least ``REDISCOVERY_GAP`` before the newest and is not online now (two records both in use are two machines); no real serials differ; nobody said they are
+    different. A record with no readable last-seen time is left alone. Each merge is the ordinary logged one and can be undone."""
+    rows = (
+        await db.execute(
+            select(
+                DeviceSource.device_id,
+                DeviceSource.vendor,
+                DeviceSource.details["device_type"],
+                DeviceSource.details["online_status"],
+                DeviceSource.details["last_seen_at"],
+            ).where(DeviceSource.tenant_id == tenant_id)
+        )
+    ).all()
+    tools: dict[uuid.UUID, set[str]] = {}
+    for device_id, vendor, _type, _status, _seen in rows:
+        tools.setdefault(device_id, set()).add(vendor)
+    # One Auvik record per device at this point (a device holding several is one already folded): its type, whether it is online, and when it was last seen.
+    facts: dict[uuid.UUID, tuple[bool, bool, datetime | None]] = {}
+    for device_id, vendor, device_type, status, seen in rows:
+        if vendor != "auvik" or tools[device_id] != {"auvik"}:
+            continue
+        computer = str(device_type or "").strip().lower() in _AUVIK_COMPUTER_TYPES
+        online = str(status or "").strip().lower() == "online"
+        when = _seen_at(seen)
+        before = facts.get(device_id)
+        if before is None:
+            facts[device_id] = (computer, online, when)
+        else:
+            # Several Auvik records on one device: a computer only if all are, online if any is, and seen when the latest was.
+            latest = max((t for t in (before[2], when) if t is not None), default=None)
+            facts[device_id] = (before[0] and computer, before[1] or online, latest)
+    candidates = {i for i, (computer, _online, when) in facts.items() if computer and when is not None}
+    if len(candidates) < 2:
+        return 0
+    devices = {
+        d.id: d for d in (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.id.in_(candidates)))).scalars().all()
+    }
+    by_name: dict[str, list[Device]] = {}
+    for d in devices.values():
+        key = hostname_key(d.hostname)
+        if key and usable_for_merge(key) and not is_placeholder_name(key):
+            by_name.setdefault(key, []).append(d)
+    groups = [g for g in by_name.values() if 2 <= len(g) <= MAX_AUTO_MERGE_GROUP]
+    if not groups:
+        return 0
+    dismissed = {
+        (x.device_a, x.device_b)
+        for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tenant_id))).scalars().all()
+    }
+    merged = 0
+    for group in groups:
+        ordered = sorted(group, key=lambda d: (facts[d.id][2], str(d.id)), reverse=True)
+        keep = ordered[0]
+        newest = facts[keep.id][2]
+        real_keep = None if mac_key(keep.serial_number) else keep.serial_number
+        for other in ordered[1:]:
+            _computer, online, when = facts[other.id]
+            if online or when is None or newest is None or newest - when < REDISCOVERY_GAP:
+                continue
+            real_other = None if mac_key(other.serial_number) else other.serial_number
+            if real_keep and real_other and real_keep != real_other:
+                continue
+            if _ordered(keep.id, other.id) in dismissed:
+                continue
+            await merge_devices(db, tenant_id, keep.id, other.id, actor_id)
+            merged += 1
+    return merged
+
+
 async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> int:
     """Merge, in one client, the devices that are plainly one machine seen by different tools. Returns how many merges were made.
 
     A name can be held by several records at once (one per tool that has not yet been matched), so each name's records are folded one by one into the one that already holds the most tools.
     A record joins only when ALL of these hold, so a wrong merge stays rare:
       * the name is not a stock name (``server``, ``MacBook-Pro``...) and no more than ``MAX_AUTO_MERGE_GROUP`` devices in the client carry it;
-      * no tool reports both (two entries from the same tool are two machines that happen to share a name), except for the tools in ``DUPLICATING_TOOLS`` (one record per agent install) and that the old ScreenConnect record (keyed by company and name) and a
+      * no tool reports both (two entries from the same tool are two machines that happen to share a name), except for the tools in ``DUPLICATING_TOOLS`` (one record per agent install), a device that already holds several Auvik
+        records of one computer (``auto_merge_rediscovered``), and that the old ScreenConnect record (keyed by company and name) and a
         ScreenConnect session record are the same tool seen before and after the feed learned real session ids;
       * they are not provably different: no two different serial numbers, and the operating systems they report do not disagree (a Windows PC and a Mac);
       * nobody said they are different machines (a pair marked "not a duplicate", or a merge that was undone).
     Each merge is the ordinary one: logged, and a person can undo it for two weeks."""
     await drop_legacy_screenconnect(db, tenant_id)
     by_mac = await auto_merge_by_mac(db, tenant_id, actor_id) + await auto_merge_by_ip(db, tenant_id, actor_id)
+    # After the MAC and address rules (which can give an Auvik record to the machine an agent runs on) and before the name rule, so a laptop Auvik filed three times is one device by then.
+    by_mac += await auto_merge_rediscovered(db, tenant_id, actor_id)
     devices = (await db.execute(select(Device).where(Device.tenant_id == tenant_id))).scalars().all()
     by_name: dict[str, list[Device]] = {}
     for d in devices:
