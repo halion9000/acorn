@@ -15,5 +15,5 @@ export const MORE_SETTINGS: { href: string; label: string; description: string }
   { href: '/settings/guide', label: 'ACORN Setup Guide', description: 'How to set up and use A.C.O.R.N, page by page (the former User guide)' },
   { href: '/settings/business-context', label: 'Business context rules', description: "Rules that adjust an alert's importance for a client before it is triaged" },
   { href: '/settings/tickets', label: 'Tickets', description: 'The HaloPSA status a resolved incident moves its ticket to' },
-  { href: '/settings/vcio-risk-scoring', label: 'vCIO Risk Scoring', description: 'How every client is scored: severity points, answer credits, the critical-gap cap, rating bands and category weights' },
+  { href: '/settings/vcio-risk-scoring', label: 'Client Risk Score', description: 'How every client is scored: severity points, answer credits, the critical-gap cap, rating bands and category weights' },
 ];

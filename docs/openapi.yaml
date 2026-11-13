@@ -17835,6 +17835,68 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/vcio-risk-scoring/assessors:
+    get:
+      tags:
+      - vcio
+      summary: The A.C.O.R.N users who can be named as the assessor of a Client Risk
+        Score
+      operationId: list_assessors_api_v1_vcio_risk_scoring_assessors_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessorList'
+      security:
+      - HTTPBearer: []
+  /api/v1/vcio-risk-scoring/trends:
+    get:
+      tags:
+      - vcio
+      summary: Every client's latest Client Risk Score and how it moved since the
+        assessment before
+      operationId: list_trends_api_v1_vcio_risk_scoring_trends_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendsOut'
+      security:
+      - HTTPBearer: []
+  /api/v1/vcio-risk-scoring/trends/{client_id}:
+    get:
+      tags:
+      - vcio
+      summary: One client's Client Risk Score over time, assessment by assessment,
+        with the change per category
+      operationId: client_trend_api_v1_vcio_risk_scoring_trends__client_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientTrend'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/vcio-risk-scoring/library:
     get:
       tags:
@@ -28146,6 +28208,31 @@ components:
       - updated_at
       - updated_by
       title: AssessmentSummary
+    Assessor:
+      properties:
+        name:
+          type: string
+          title: Name
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Email
+      type: object
+      required:
+      - name
+      title: Assessor
+    AssessorList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Assessor'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: AssessorList
     AssetCreate:
       properties:
         asset_type:
@@ -30490,6 +30577,31 @@ components:
       - name
       - patterns
       title: CatalogForCore
+    CategoryChange:
+      properties:
+        name:
+          type: string
+          title: Name
+        before:
+          type: number
+          title: Before
+        after:
+          type: number
+          title: After
+        change:
+          type: number
+          title: Change
+        direction:
+          type: string
+          title: Direction
+      type: object
+      required:
+      - name
+      - before
+      - after
+      - change
+      - direction
+      title: CategoryChange
     CertInfo:
       properties:
         organization:
@@ -31195,6 +31307,88 @@ components:
       - not_in_huntress
       - offline
       title: ClientRollup
+    ClientTrend:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        points:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__vcio_risk_scoring__TrendPoint'
+          type: array
+          title: Points
+        categories:
+          items:
+            $ref: '#/components/schemas/CategoryChange'
+          type: array
+          title: Categories
+      type: object
+      required:
+      - client_id
+      - client_name
+      - points
+      title: ClientTrend
+    ClientTrendRow:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        assessments:
+          type: integer
+          title: Assessments
+        latest_date:
+          type: string
+          format: date
+          title: Latest Date
+        latest_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Latest Score
+        rating:
+          type: string
+          title: Rating
+        previous_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Previous Date
+        previous_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Previous Score
+        change:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Change
+        direction:
+          type: string
+          title: Direction
+          default: none
+      type: object
+      required:
+      - client_id
+      - client_name
+      - assessments
+      - latest_date
+      - latest_score
+      - rating
+      title: ClientTrendRow
     ClientsOut:
       properties:
         clients:
@@ -33538,7 +33732,7 @@ components:
           title: Topmitre
         alertsTrend:
           items:
-            $ref: '#/components/schemas/TrendPoint'
+            $ref: '#/components/schemas/app__api__v1__endpoints__metrics__TrendPoint'
           type: array
           title: Alertstrend
         threatsBySource:
@@ -51820,23 +52014,17 @@ components:
       - label
       - rule
       title: TranslationResult
-    TrendPoint:
+    TrendsOut:
       properties:
-        timestamp:
-          type: string
-          title: Timestamp
-        count:
-          type: integer
-          title: Count
-        severity:
-          type: string
-          title: Severity
+        clients:
+          items:
+            $ref: '#/components/schemas/ClientTrendRow'
+          type: array
+          title: Clients
       type: object
       required:
-      - timestamp
-      - count
-      - severity
-      title: TrendPoint
+      - clients
+      title: TrendsOut
     TroubleshootRequest:
       properties:
         connector_type:
@@ -56088,6 +56276,23 @@ components:
         wall-clock span from first to last event. ``attempt_count`` counts unique
 
         retry attempts inferred from ``agent_start`` events.'
+    app__api__v1__endpoints__metrics__TrendPoint:
+      properties:
+        timestamp:
+          type: string
+          title: Timestamp
+        count:
+          type: integer
+          title: Count
+        severity:
+          type: string
+          title: Severity
+      type: object
+      required:
+      - timestamp
+      - count
+      - severity
+      title: TrendPoint
     app__api__v1__endpoints__mssp_clients__ImportOut:
       properties:
         created:
@@ -56252,6 +56457,61 @@ components:
       required:
       - deleted
       title: DeletedOut
+    app__api__v1__endpoints__vcio_risk_scoring__TrendPoint:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        review_date:
+          type: string
+          format: date
+          title: Review Date
+        score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Score
+        rating:
+          type: string
+          title: Rating
+        answered:
+          type: integer
+          title: Answered
+        assessor:
+          type: string
+          title: Assessor
+          default: ''
+        change:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Change
+        direction:
+          type: string
+          title: Direction
+          default: none
+        compared_with:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Compared With
+        categories:
+          additionalProperties:
+            anyOf:
+            - type: number
+            - type: 'null'
+          type: object
+          title: Categories
+      type: object
+      required:
+      - id
+      - review_date
+      - score
+      - rating
+      - answered
+      title: TrendPoint
   securitySchemes:
     HTTPBearer:
       type: http

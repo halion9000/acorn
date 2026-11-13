@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The organisation's vCIO Risk Scoring settings: the points each severity weighs, the credit a partial or unknown answer earns, the critical-gap cap, the rating bands and the category
+ * The organisation's Client Risk Score settings (the page was first called vCIO Risk Scoring): the points each severity weighs, the credit a partial or unknown answer earns, the critical-gap cap, the rating bands and the category
  * weights. One set for every client, kept here under Settings so only someone who may change settings can change how every client is scored. Saving scores every assessment again.
  */
 
@@ -55,7 +55,7 @@ export function VcioRiskSettings() {
   return (
     <div className="space-y-4" data-testid="vcio-risk-settings">
       <div>
-        <h1 className="text-xl font-semibold text-gray-100">vCIO Risk Scoring</h1>
+        <h1 className="text-xl font-semibold text-gray-100">Client Risk Score</h1>
         <p className="mt-1 text-sm text-gray-400">
           How every client&apos;s Business Review is scored. One set for all clients: changing a value here changes every assessment&apos;s score, old and new.
           {answer ? (answer.using_defaults ? ' The defaults are in use.' : ' These differ from the defaults.') : ''}

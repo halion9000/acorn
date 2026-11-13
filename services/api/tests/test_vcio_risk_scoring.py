@@ -143,3 +143,44 @@ def test_settings_keep_the_defaults_for_anything_missing_out_of_range_or_of_the_
     assert s["weights"]["Servers"] == 0.0 and "Nope" not in s["weights"] and "junk" not in s
     assert rs.merge_settings("not a dict") == rs.DEFAULTS
     assert rs.rating(0.95, s) == "green" and rs.rating(0.9, rs.DEFAULTS) == "amber" and rs.rating(0.8499, rs.DEFAULTS) == "red"
+
+
+def test_a_change_is_in_percentage_points_and_under_half_a_point_is_flat():
+    assert rs.points_change(0.82, 0.90) == 8.0 and rs.points_change(0.9, 0.82) == -8.0
+    assert rs.points_change(None, 0.9) is None and rs.points_change(0.9, None) is None
+    assert [rs.direction(c) for c in (8.0, 0.5, 0.4, 0.0, -0.4, -0.5, None)] == ["up", "up", "flat", "flat", "flat", "down", "none"]
+
+
+def test_each_assessment_is_compared_with_the_last_one_that_had_a_score_oldest_first():
+    points = rs.trend_points(
+        [
+            {
+                "id": "c",
+                "review_date": "2026-09-01",
+                "score": 0.6,
+                "rating": "red",
+                "answered": 9,
+                "categories": {"Administrative": 1.0, "Servers": 0.5},
+            },
+            {
+                "id": "a",
+                "review_date": "2026-03-01",
+                "score": 0.8,
+                "rating": "red",
+                "answered": 5,
+                "categories": {"Administrative": 0.5, "Servers": 0.9, "Workstations": 1.0},
+            },
+            {"id": "b", "review_date": "2026-06-01", "score": None, "rating": "na", "answered": 0, "categories": {}},
+        ]
+    )
+    assert [(p["id"], p["change"], p["direction"], p["compared_with"]) for p in points] == [
+        ("a", None, "none", None),
+        ("b", None, "none", None),
+        ("c", -20.0, "down", "2026-03-01"),
+    ]
+    changes = rs.category_changes(points)
+    assert [(c["name"], c["change"], c["direction"]) for c in changes] == [
+        ("Servers", -40.0, "down"),
+        ("Administrative", 50.0, "up"),
+    ], "a category only one of the two scored is left out"
+    assert rs.category_changes(points[:2]) == [] and rs.trend_points([]) == []

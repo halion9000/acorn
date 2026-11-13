@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * vCIO Risk Scoring: a client's Business Review answered question by question and scored by risk, from Live Oak's scoring workbook. Pick a client, start or open an assessment, answer the
+ * Client Risk Score (first called vCIO Risk Scoring): a client's Business Review answered question by question and scored by risk, from Live Oak's scoring workbook. Pick a client, start or open an assessment, answer the
  * questions; the scorecard (overall, per category and section, the NIST CSF 2.0 reading and the gaps that lose the most points) is recomputed by the API on every answer. Each assessment is
  * kept, so a client's reviews can be compared over time. Backed by the API's vcio-risk-scoring routes.
  */
@@ -10,7 +10,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiErrorDetail, msspApi, type ChildTenant } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
+  DIRECTION_CLASS,
   RATING_TEXT,
+  assessorChoices,
+  changeText,
   assessmentCsv,
   autofillSentence,
   excludedFor,
@@ -21,6 +24,9 @@ import {
   type QuestionFilter,
   type RiskAggregate,
   type RiskAssessment,
+  type RiskAssessor,
+  type RiskClientTrend,
+  type RiskClientTrendRow,
   type RiskAssessmentSummary,
   type RiskLibrary,
   type RiskPlatform,
@@ -74,8 +80,124 @@ function Bar({ row, label, sub, flag }: { row: Pick<RiskAggregate, 'score' | 'ra
   );
 }
 
-function Scorecard({ a, byId }: { a: RiskAssessment; byId: Map<string, RiskQuestion> }) {
+/** A client's score over time: each assessment with how far it moved since the one before, and where between the last two the movement came from. */
+function Trend({ trend, currentId, onOpen }: { trend: RiskClientTrend; currentId: string; onOpen: (id: string) => void }) {
+  if (trend.points.length < 2) {
+    return (
+      <section className="rounded-lg border border-gray-800 bg-gray-900/40 p-4" data-testid="risk-trend">
+        <h2 className="text-sm font-semibold text-white">Trend</h2>
+        <p className="mt-1 text-sm text-gray-400">This is the client&apos;s only assessment. The trend appears from the second one on: start a new assessment at the next review and its score is compared with this one.</p>
+      </section>
+    );
+  }
+  const newestFirst = [...trend.points].reverse();
+  return (
+    <section className="space-y-3 rounded-lg border border-gray-800 bg-gray-900/40 p-4" data-testid="risk-trend">
+      <h2 className="text-sm font-semibold text-white">
+        Trend <span className="font-normal text-gray-500">({trend.points.length} assessments, newest first)</span>
+      </h2>
+      <table className="w-full text-left text-sm">
+        <thead className="text-xs text-gray-500">
+          <tr>
+            <th scope="col" className="py-1 pr-3">Review date</th>
+            <th scope="col" className="py-1 pr-3">Score</th>
+            <th scope="col" className="py-1 pr-3">Since the one before</th>
+            <th scope="col" className="w-1/3 py-1 pr-3" aria-hidden="true" />
+            <th scope="col" className="py-1 pr-3">Answered</th>
+            <th scope="col" className="py-1">Assessor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {newestFirst.map((p) => (
+            <tr key={p.id} className={`border-t border-gray-800 ${p.id === currentId ? 'bg-gray-800/40' : ''}`} data-testid="risk-trend-point">
+              <td className="py-1.5 pr-3">
+                {p.id === currentId ? (
+                  <span className="text-gray-100">{p.review_date} (open)</span>
+                ) : (
+                  <button type="button" onClick={() => onOpen(p.id)} className="text-blue-300 hover:underline" title="Open this assessment">
+                    {p.review_date}
+                  </button>
+                )}
+              </td>
+              <td className={`py-1.5 pr-3 tabular-nums ${RATING_TEXT_CLASS[p.rating]}`}>{pct(p.score)}</td>
+              <td className={`py-1.5 pr-3 ${DIRECTION_CLASS[p.direction]}`} title={p.compared_with ? `Compared with ${p.compared_with}` : undefined}>
+                {changeText(p.change, p.direction) || (p.score === null ? 'nothing answered' : 'first assessment')}
+              </td>
+              <td className="py-1.5 pr-3">
+                <div className="h-2 overflow-hidden rounded bg-gray-800">
+                  <div className={`h-full ${RATING_BAR[p.rating]}`} style={{ width: `${p.score === null ? 0 : Math.max(1, p.score * 100)}%` }} />
+                </div>
+              </td>
+              <td className="py-1.5 pr-3 tabular-nums text-gray-300">{p.answered}</td>
+              <td className="py-1.5 text-gray-400">{p.assessor || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {trend.categories.length > 0 && (
+        <div data-testid="risk-trend-categories">
+          <p className="text-xs font-semibold uppercase text-gray-500">Where it moved between the last two scored assessments</p>
+          <ul className="mt-1 grid gap-x-6 gap-y-0.5 text-sm sm:grid-cols-2">
+            {trend.categories.map((cat) => (
+              <li key={cat.name} className="flex justify-between gap-3">
+                <span className="text-gray-300">{cat.name}</span>
+                <span className={`tabular-nums ${DIRECTION_CLASS[cat.direction]}`}>
+                  {pct(cat.before)} → {pct(cat.after)} · {changeText(cat.change, cat.direction)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Every client that has an assessment: where its score is and how it moved, biggest drop first. Shown before a client is chosen. */
+function AllClients({ rows, onOpen }: { rows: RiskClientTrendRow[]; onOpen: (clientId: string, own: boolean) => void }) {
+  if (rows.length === 0) return null;
+  const down = rows.filter((r) => r.direction === 'down').length;
+  const up = rows.filter((r) => r.direction === 'up').length;
+  return (
+    <section className="rounded-lg border border-gray-800 bg-gray-900/40 p-4" data-testid="risk-all-clients">
+      <h2 className="text-sm font-semibold text-white">
+        All clients <span className="font-normal text-gray-500">({rows.length} assessed: {down} down, {up} up since their assessment before)</span>
+      </h2>
+      <table className="mt-2 w-full text-left text-sm">
+        <thead className="text-xs text-gray-500">
+          <tr>
+            <th scope="col" className="py-1 pr-3">Client</th>
+            <th scope="col" className="py-1 pr-3">Latest score</th>
+            <th scope="col" className="py-1 pr-3">Since the one before</th>
+            <th scope="col" className="py-1 pr-3">Latest review</th>
+            <th scope="col" className="py-1">Assessments</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.client_id} className="border-t border-gray-800" data-testid="risk-client-row">
+              <td className="py-1.5 pr-3">
+                <button type="button" onClick={() => onOpen(r.client_id, r.client_name === null)} className="text-blue-300 hover:underline">
+                  {r.client_name ?? 'Own organisation'}
+                </button>
+              </td>
+              <td className={`py-1.5 pr-3 tabular-nums ${RATING_TEXT_CLASS[r.rating]}`}>{pct(r.latest_score)}</td>
+              <td className={`py-1.5 pr-3 ${DIRECTION_CLASS[r.direction]}`} title={r.previous_date ? `Was ${pct(r.previous_score)} on ${r.previous_date}` : undefined}>
+                {changeText(r.change, r.direction) || (r.assessments === 1 ? 'first assessment' : '—')}
+              </td>
+              <td className="py-1.5 pr-3 text-gray-300">{r.latest_date}</td>
+              <td className="py-1.5 tabular-nums text-gray-300">{r.assessments}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function Scorecard({ a, byId, trend, onOpen }: { a: RiskAssessment; byId: Map<string, RiskQuestion>; trend: RiskClientTrend | null; onOpen: (id: string) => void }) {
   const c = a.scorecard;
+  const mine = trend?.points.find((p) => p.id === a.id);
   const capped = c.categories.filter((cat) => cat.critical_gaps > 0);
   const kpis: [string, string | number][] = [
     ['Answered', `${c.answered} of ${c.total}`],
@@ -93,6 +215,11 @@ function Scorecard({ a, byId }: { a: RiskAssessment; byId: Map<string, RiskQuest
             {pct(c.overall)}
           </div>
           <div className={`text-xs ${RATING_TEXT_CLASS[c.rating]}`}>{RATING_TEXT[c.rating]}</div>
+          {mine && changeText(mine.change, mine.direction) ? (
+            <div className={`mt-1 text-xs ${DIRECTION_CLASS[mine.direction]}`} data-testid="risk-overall-change" title={mine.compared_with ? `Compared with the assessment of ${mine.compared_with}` : undefined}>
+              {changeText(mine.change, mine.direction)} since {mine.compared_with}
+            </div>
+          ) : null}
         </div>
         {kpis.map(([label, value]) => (
           <div key={label} className="rounded-lg border border-gray-800 bg-gray-900/60 p-3">
@@ -101,6 +228,8 @@ function Scorecard({ a, byId }: { a: RiskAssessment; byId: Map<string, RiskQuest
           </div>
         ))}
       </div>
+
+      {trend ? <Trend trend={trend} currentId={a.id} onOpen={onOpen} /> : null}
 
       <section className="space-y-2 rounded-lg border border-gray-800 bg-gray-900/40 p-4">
         <h2 className="text-sm font-semibold text-white">By category</h2>
@@ -327,7 +456,7 @@ function Method() {
     ['Credit', 'The good answer earns 100% of the points, Partial 50%, the bad answer 0%. For questions where “Yes” is the risk (exposed RDP, end-of-life devices, users clicking phishing, local admin rights) the good answer is “No”. Unknown earns 0%: an unverified control is not an assured control, and it is counted separately so it can be chased. N/A and unanswered questions are removed from both points earned and points possible.'],
     ['Answers from the integrations', 'Fill from integrations answers every question the client’s Client Review can answer (NinjaOne, Huntress, ThreatMate, Liongard, CIPP and the other connected tools): a reading of “met” becomes the good answer, “partly” becomes Partial and “not met” the bad answer; a Tech Stack product is Preferred when it is the standard vendor and Alternative when it is not. Each such answer is marked Auto and shows what the tool saw. An answer set by hand is never replaced, and an Auto answer the tools no longer support is taken out.'],
     ['Tech Stack', 'Tech Stack is one category inside the Business Review (its own weight in Settings), with sections for network equipment, servers, security tools, cloud services and backup. Preferred vendor = 100%, Alternative (a capable, non-standard product) = 100% by default and counted as a standardisation opportunity, None = 0%.'],
-    ['Roll-up', 'Section and category score = points earned ÷ points possible. If a category contains a failed or unknown Critical item it is capped at 84% (Red) so a single major gap cannot hide behind many passes. The overall score is the weighted average of category scores (weights under Settings > vCIO Risk Scoring, which only someone who may change settings can open); categories with nothing answered drop out.'],
+    ['Roll-up', 'Section and category score = points earned ÷ points possible. If a category contains a failed or unknown Critical item it is capped at 84% (Red) so a single major gap cannot hide behind many passes. The overall score is the weighted average of category scores (weights under Settings > Client Risk Score, which only someone who may change settings can open); categories with nothing answered drop out.'],
     ['Platform', 'A Microsoft 365 client is not asked the Google Workspace questions, and a Google Workspace client is not asked the Microsoft 365 ones. Choose Both for a client that uses both.'],
     ['Ratings', 'Green ≥ 95%, Amber 85–94%, Red < 85%: the same bands as the vCIO Toolbox.'],
     ['NIST CSF 2.0 view', 'Every question is mapped to a CSF 2.0 function and category, giving a second read of the same answers for compliance-focused clients. The question set has no Respond-function questions (incident response plan, escalation, notification); that row shows “no questions”.'],
@@ -356,6 +485,9 @@ export function RiskScoringView() {
   const [starting, setStarting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [notice, setNotice] = useState('');
+  const [assessors, setAssessors] = useState<RiskAssessor[]>([]);
+  const [trend, setTrend] = useState<RiskClientTrend | null>(null);
+  const [allClients, setAllClients] = useState<RiskClientTrendRow[]>([]);
   const [fillOnStart, setFillOnStart] = useState(true);
   const [draft, setDraft] = useState<{ review_date: string; platform: RiskPlatform; assessor: string }>({ review_date: '', platform: 'm365', assessor: '' });
 
@@ -364,6 +496,8 @@ export function RiskScoringView() {
   useEffect(() => {
     msspApi.listChildren().then((rows) => setClients([...rows].sort((x, y) => x.name.localeCompare(y.name)))).catch(() => setClients([]));
     vcioRiskApi.library().then(setLibrary).catch((err) => fail(err, 'The questions could not be loaded.'));
+    vcioRiskApi.assessors().then((r) => setAssessors(r.items)).catch(() => setAssessors([]));
+    vcioRiskApi.trends().then((r) => setAllClients(r.clients)).catch(() => setAllClients([]));
   }, []);
 
   const loadList = useCallback(async (id: string, open?: string) => {
@@ -389,6 +523,24 @@ export function RiskScoringView() {
   }, [clientId, loadList]);
 
   const byId = useMemo(() => new Map((library?.questions ?? []).map((q) => [q.id, q])), [library]);
+
+  // The trend follows the open assessment: any saved change can move its score, and with it the comparison.
+  const trendOf = current ? `${current.client_id}|${current.id}|${current.score}|${current.review_date}|${current.assessor}` : '';
+  useEffect(() => {
+    if (!current) {
+      setTrend(null);
+      return;
+    }
+    let live = true;
+    vcioRiskApi
+      .clientTrend(current.client_id)
+      .then((t) => live && setTrend(t))
+      .catch(() => live && setTrend(null));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trendOf]);
 
   /** Every change goes to the API, and what it sends back (the answers with the new scorecard) replaces what is on the page. */
   const change = async (work: () => Promise<RiskAssessment>, fallback: string) => {
@@ -426,7 +578,7 @@ export function RiskScoringView() {
     setError('');
     setNotice('');
     try {
-      const made = await vcioRiskApi.create({ client_id: clientId === OWN ? undefined : clientId, review_date: draft.review_date || undefined, platform: draft.platform, assessor: draft.assessor.trim() });
+      const made = await vcioRiskApi.create({ client_id: clientId === OWN ? undefined : clientId, review_date: draft.review_date || undefined, platform: draft.platform, assessor: draft.assessor });
       setStarting(false);
       setTab('questions');
       await loadList(clientId, made.id);
@@ -476,7 +628,7 @@ export function RiskScoringView() {
           </select>
         )}
         {clientId && (
-          <button type="button" onClick={() => { setDraft({ review_date: new Date().toISOString().slice(0, 10), platform: current?.platform ?? 'm365', assessor: current?.assessor ?? '' }); setStarting(true); }} className="rounded-md bg-sky-600 px-3 py-1.5 text-sm text-white hover:bg-sky-500">
+          <button type="button" onClick={() => { setDraft({ review_date: new Date().toISOString().slice(0, 10), platform: current?.platform ?? 'm365', assessor: assessors.some((u) => u.name === current?.assessor) ? (current?.assessor ?? '') : '' }); setStarting(true); }} className="rounded-md bg-sky-600 px-3 py-1.5 text-sm text-white hover:bg-sky-500">
             New assessment
           </button>
         )}
@@ -511,6 +663,7 @@ export function RiskScoringView() {
       )}
 
       {!clientId && <p className="rounded-lg border border-gray-800 bg-gray-900/60 p-4 text-sm text-gray-400">Choose a client to see its risk-scored reviews or to start one.</p>}
+      {!clientId && <AllClients rows={allClients} onOpen={(id, own) => setClientId(own ? OWN : id)} />}
       {clientId && !current && !error && (
         <p className="rounded-lg border border-gray-800 bg-gray-900/60 p-4 text-sm text-gray-400" data-testid="risk-none">
           No assessment for {clientName} yet. Press New assessment to start one.
@@ -540,7 +693,14 @@ export function RiskScoringView() {
             </label>
             <label className="text-xs text-gray-400">
               Assessor
-              <input aria-label="Assessor" defaultValue={current.assessor} key={`${current.id}-${current.assessor}`} disabled={busy} onBlur={(e) => e.target.value.trim() !== current.assessor && void change(() => vcioRiskApi.update(current.id, { assessor: e.target.value.trim() }), 'The assessor could not be saved.')} className={`${input} mt-1 block`} />
+              <select aria-label="Assessor" value={current.assessor} disabled={busy} onChange={(e) => void change(() => vcioRiskApi.update(current.id, { assessor: e.target.value }), 'The assessor could not be saved.')} className={`${input} mt-1 block`}>
+                <option value="">Not set</option>
+                {assessorChoices(assessors, current.assessor).map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
@@ -552,7 +712,7 @@ export function RiskScoringView() {
             ))}
           </div>
 
-          {tab === 'scorecard' && <Scorecard a={current} byId={byId} />}
+          {tab === 'scorecard' && <Scorecard a={current} byId={byId} trend={trend} onOpen={(id) => void loadList(clientId, id)} />}
           {tab === 'questions' && (
             <Questions
               a={current}
@@ -586,7 +746,14 @@ export function RiskScoringView() {
             </label>
             <label className="block text-xs text-gray-400">
               Assessor
-              <input aria-label="New assessor" value={draft.assessor} onChange={(e) => setDraft({ ...draft, assessor: e.target.value })} className={`${input} mt-1 block w-full`} />
+              <select aria-label="New assessor" value={draft.assessor} onChange={(e) => setDraft({ ...draft, assessor: e.target.value })} className={`${input} mt-1 block w-full`}>
+                <option value="">Not set</option>
+                {assessors.map((u) => (
+                  <option key={u.name} value={u.name}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-200">
               <input type="checkbox" aria-label="Fill in what the integrations can answer" checked={fillOnStart} onChange={(e) => setFillOnStart(e.target.checked)} />

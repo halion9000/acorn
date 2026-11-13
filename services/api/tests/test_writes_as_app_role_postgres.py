@@ -40,11 +40,17 @@ async def world():
                 text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, :n, :s, :p)"),
                 {"t": tid, "n": name, "s": f"app-{tag}-{str(tid)[:6]}", "p": parent},
             )
+        hal = uuid.uuid4()
+        await conn.execute(
+            text("insert into users (id, tenant_id, email, username, hashed_password, account_name) values (:i, :t, :e, 'Hal', 'x', :a)"),
+            {"i": hal, "t": owner, "e": f"{hal.hex[:10]}@example.test", "a": f"u{hal.hex[:12]}"},
+        )
     yield SimpleNamespace(
         owner=owner, acme=acme, birch=birch, user=SimpleNamespace(tenant_id=owner, user_id=None, email="hal@goliveoak.com")
     )
     async with engine.begin() as conn:
         await conn.execute(text("set local session_replication_role = replica"))
+        await conn.execute(text("delete from users where tenant_id = :t"), {"t": owner})
         await conn.execute(text("delete from tenants where id = any(:t)"), {"t": [owner, acme, birch]})
     await engine.dispose()
 
@@ -87,6 +93,9 @@ async def test_a_clients_risk_assessment_can_be_started_answered_filled_and_dele
     filled = await as_app(w, lambda db: vrs.autofill_assessment(made.id, w.user, db))
     assert filled.kept_by_hand == 0 or filled.assessment.answers["ADM-001"].answer == "Yes"
     assert [i.id for i in (await as_app(w, lambda db: vrs.list_assessments(w.user, db, client_id=None))).items] == [made.id]
+    assert [a.name for a in (await as_app(w, lambda db: vrs.list_assessors(w.user, db))).items] == ["Hal"]
+    assert [p.id for p in (await as_app(w, lambda db: vrs.client_trend(w.acme, w.user, db))).points] == [made.id]
+    assert [r.client_name for r in (await as_app(w, lambda db: vrs.list_trends(w.user, db))).clients] == ["Acme Dental"]
     out = await as_app(w, lambda db: vrs.delete_assessment(made.id, w.user, db))
     assert out.deleted is True
     assert (await as_app(w, lambda db: vrs.list_assessments(w.user, db, client_id=w.acme))).items == []

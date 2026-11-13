@@ -37,6 +37,20 @@ async def world():
                 text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, :n, :s, :p)"),
                 {"t": tid, "n": name, "s": f"vrs-{tag}-{str(tid)[:6]}", "p": parent},
             )
+        # The organisation's own A.C.O.R.N users (an assessor has to be one of them); one is switched off, and the other organisation has its own.
+        for tid, name, active in (
+            (owner, "Hal", True),
+            (owner, "Dana", True),
+            (owner, "Gone Person", False),
+            (stranger, "Stranger Sam", True),
+        ):
+            uid = uuid.uuid4()
+            await conn.execute(
+                text(
+                    "insert into users (id, tenant_id, email, username, hashed_password, account_name, is_active) values (:i, :t, :e, :u, 'x', :a, :on)"
+                ),
+                {"i": uid, "t": tid, "e": f"{uid.hex[:10]}@example.test", "u": name, "a": f"u{uid.hex[:12]}", "on": active},
+            )
     user = SimpleNamespace(tenant_id=owner, user_id=None, email="hal@goliveoak.com")
     other = SimpleNamespace(tenant_id=stranger, user_id=None, email="x@other.example")
     return engine, user, other, SimpleNamespace(owner=owner, acme=acme, birch=birch, stranger=stranger, theirs=theirs)
@@ -45,6 +59,7 @@ async def world():
 async def cleanup(engine, w):
     async with engine.begin() as conn:
         await conn.execute(text("set local session_replication_role = replica"))
+        await conn.execute(text("delete from users where tenant_id = any(:t)"), {"t": [w.owner, w.stranger]})
         await conn.execute(text("delete from tenants where id = any(:t)"), {"t": [w.owner, w.acme, w.birch, w.stranger, w.theirs]})
     await engine.dispose()
 
@@ -310,5 +325,90 @@ async def test_filling_in_from_the_real_client_review_works_for_a_client_no_tool
             assert all(
                 a.answer in ep.rs.allowed_answers(by_id[qid]) for qid, a in out.assessment.answers.items()
             ), "every filled answer is one the question accepts"
+    finally:
+        await cleanup(engine, w)
+
+
+async def test_the_assessor_is_one_of_the_organisations_active_users_and_anyone_else_is_refused():
+    engine, user, other, w = await world()
+    try:
+        async with AsyncSession(engine) as db:
+            assert [a.name for a in (await ep.list_assessors(user, db)).items] == [
+                "Dana",
+                "Hal",
+            ], "active users of this organisation only, by name"
+            assert [a.name for a in (await ep.list_assessors(other, db)).items] == ["Stranger Sam"]
+            made = await ep.create_assessment(ep.AssessmentIn(client_id=w.acme, assessor=" hal "), user, db)
+            assert made.assessor == "Hal", "stored as the user is named"
+            for name in ("Somebody Else", "Gone Person", "Stranger Sam"):
+                with pytest.raises(HTTPException) as refused:
+                    await ep.create_assessment(ep.AssessmentIn(client_id=w.acme, assessor=name), user, db)
+                assert refused.value.status_code == 422 and "choose the assessor from the list" in refused.value.detail
+                with pytest.raises(HTTPException):
+                    await ep.update_assessment(made.id, ep.AssessmentPatch(assessor=name), user, db)
+            assert (await ep.update_assessment(made.id, ep.AssessmentPatch(assessor="Dana"), user, db)).assessor == "Dana"
+            assert (await ep.update_assessment(made.id, ep.AssessmentPatch(assessor=""), user, db)).assessor == ""
+            # An assessment written before the list existed keeps the name it has when something else about it is saved.
+            await db.execute(text("update vcio_risk_assessments set assessor = 'Old Free Text' where id = :i"), {"i": made.id})
+            await db.commit()
+            kept = await ep.update_assessment(made.id, ep.AssessmentPatch(assessor="Old Free Text", platform="both"), user, db)
+            assert (kept.assessor, kept.platform) == ("Old Free Text", "both")
+    finally:
+        await cleanup(engine, w)
+
+
+async def test_a_clients_score_over_time_says_how_far_it_moved_each_time_and_in_which_categories():
+    engine, user, other, w = await world()
+    try:
+        async with AsyncSession(engine) as db:
+            first = await ep.create_assessment(ep.AssessmentIn(client_id=w.acme, review_date=date(2026, 3, 1)), user, db)
+            await ep.put_answers(first.id, answers(("ADM-001", "No", {}), ("ADM-002", "Yes", {}), ("TS-001", "Preferred", {})), user, db)
+            empty = await ep.create_assessment(ep.AssessmentIn(client_id=w.acme, review_date=date(2026, 6, 1)), user, db)
+            latest = await ep.create_assessment(ep.AssessmentIn(client_id=w.acme, review_date=date(2026, 9, 1)), user, db)
+            await ep.put_answers(latest.id, answers(("ADM-001", "Yes", {}), ("ADM-002", "Yes", {}), ("TS-001", "None", {})), user, db)
+            trend = await ep.client_trend(w.acme, user, db)
+            assert [p.id for p in trend.points] == [first.id, empty.id, latest.id], "oldest first"
+            # First: Administrative 3/9 at weight 8, Tech Stack 100% at 15. Latest: Administrative 100%, Tech Stack 0%.
+            assert trend.points[0].score == pytest.approx((3 / 9 * 8 + 15) / 23) and trend.points[0].change is None
+            assert (trend.points[1].score, trend.points[1].change, trend.points[1].direction) == (None, None, "none")
+            assert trend.points[2].score == pytest.approx(8 / 23)
+            assert (
+                trend.points[2].change == pytest.approx(round((8 / 23 - (3 / 9 * 8 + 15) / 23) * 100, 1))
+                and trend.points[2].direction == "down"
+            )
+            assert trend.points[2].compared_with == date(2026, 3, 1), "the empty assessment in between is not what it is compared with"
+            assert [(c.name, c.direction) for c in trend.categories] == [
+                ("Tech Stack", "down"),
+                ("Administrative", "up"),
+            ], "biggest drop first"
+            assert trend.categories[0].change == -100.0 and trend.categories[1].change == pytest.approx(66.7)
+            with pytest.raises(HTTPException) as hidden:
+                await ep.client_trend(w.acme, other, db)
+            assert hidden.value.status_code == 404
+    finally:
+        await cleanup(engine, w)
+
+
+async def test_the_list_of_clients_says_where_each_score_is_and_how_it_moved_biggest_drop_first():
+    engine, user, other, w = await world()
+    try:
+        async with AsyncSession(engine) as db:
+            for client, day, good in (
+                (w.acme, date(2026, 3, 1), "Yes"),
+                (w.acme, date(2026, 9, 1), "No"),
+                (w.birch, date(2026, 4, 1), "No"),
+                (w.birch, date(2026, 10, 1), "Yes"),
+            ):
+                made = await ep.create_assessment(ep.AssessmentIn(client_id=client, review_date=day), user, db)
+                await ep.put_answers(made.id, answers(("ADM-001", good, {})), user, db)
+            await ep.create_assessment(ep.AssessmentIn(review_date=date(2026, 5, 1)), user, db)
+            rows = (await ep.list_trends(user, db)).clients
+            assert [(r.client_name, r.assessments, r.latest_score, r.change, r.direction) for r in rows] == [
+                ("Acme Dental", 2, 0.0, -100.0, "down"),
+                ("Birch Law", 2, 1.0, 100.0, "up"),
+                (None, 1, None, None, "none"),
+            ]
+            assert (rows[0].latest_date, rows[0].previous_date, rows[0].previous_score) == (date(2026, 9, 1), date(2026, 3, 1), 1.0)
+            assert (await ep.list_trends(other, db)).clients == []
     finally:
         await cleanup(engine, w)

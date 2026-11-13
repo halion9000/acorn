@@ -1,5 +1,5 @@
 /**
- * vCIO Risk Scoring: the types and the calls behind the page, plus the small pure parts the page shows (percentages, which questions a filter keeps, the CSV).
+ * Client Risk Score (first called vCIO Risk Scoring; the routes keep that name): the types and the calls behind the page, plus the small pure parts the page shows (percentages, which questions a filter keeps, the CSV).
  * The scoring itself is done by the API (its vcio-risk-scoring routes); nothing here re-computes a score.
  */
 import { apiRequest } from '@/lib/api';
@@ -104,6 +104,55 @@ export interface RiskAutofill {
   answered_by_integrations: number;
 }
 
+export interface RiskAssessor {
+  name: string;
+  email: string | null;
+}
+
+export type RiskDirection = 'up' | 'down' | 'flat' | 'none';
+
+export interface RiskTrendPoint {
+  id: string;
+  review_date: string;
+  score: number | null;
+  rating: RiskRating;
+  answered: number;
+  assessor: string;
+  /** Percentage points since the last assessment that had a score; null for the first one and for one with nothing answered. */
+  change: number | null;
+  direction: RiskDirection;
+  compared_with: string | null;
+  categories: Record<string, number | null>;
+}
+
+export interface RiskCategoryChange {
+  name: string;
+  before: number;
+  after: number;
+  change: number;
+  direction: RiskDirection;
+}
+
+export interface RiskClientTrend {
+  client_id: string;
+  client_name: string | null;
+  points: RiskTrendPoint[];
+  categories: RiskCategoryChange[];
+}
+
+export interface RiskClientTrendRow {
+  client_id: string;
+  client_name: string | null;
+  assessments: number;
+  latest_date: string;
+  latest_score: number | null;
+  rating: RiskRating;
+  previous_date: string | null;
+  previous_score: number | null;
+  change: number | null;
+  direction: RiskDirection;
+}
+
 export interface RiskSettingsAnswer {
   settings: RiskSettings;
   defaults: RiskSettings;
@@ -142,6 +191,12 @@ export const vcioRiskApi = {
     apiRequest<RiskAssessment>(`/api/v1/vcio-risk-scoring/assessments/${encodeURIComponent(id)}`, json('PATCH', body)),
   answer: (id: string, items: { id: string; answer?: string | null; vendor?: string | null; note?: string | null }[]) =>
     apiRequest<RiskAssessment>(`/api/v1/vcio-risk-scoring/assessments/${encodeURIComponent(id)}/answers`, json('PUT', { items })),
+  /** The organisation's A.C.O.R.N users, for the assessor of an assessment. */
+  assessors: () => apiRequest<{ items: RiskAssessor[] }>('/api/v1/vcio-risk-scoring/assessors'),
+  /** Every client's latest score and how it moved since the assessment before, biggest drop first. */
+  trends: () => apiRequest<{ clients: RiskClientTrendRow[] }>('/api/v1/vcio-risk-scoring/trends'),
+  /** One client's score over time, with the change per category between its last two scored assessments. */
+  clientTrend: (clientId: string) => apiRequest<RiskClientTrend>(`/api/v1/vcio-risk-scoring/trends/${encodeURIComponent(clientId)}`),
   /** Fill in what the integrations can answer, from the client's Client Review. An answer set by hand is never replaced. */
   autofill: (id: string) => apiRequest<RiskAutofill>(`/api/v1/vcio-risk-scoring/assessments/${encodeURIComponent(id)}/autofill`, { method: 'POST' }),
   /** The organisation's scoring settings (kept under Settings). */
@@ -154,6 +209,22 @@ export const vcioRiskApi = {
 export const pct = (v: number | null | undefined): string => (v === null || v === undefined ? '—' : `${Math.round(v * 100)}%`);
 
 export const RATING_TEXT: Record<RiskRating, string> = { green: 'Green', amber: 'Amber', red: 'Red', na: 'Not assessed' };
+
+/** A change in points as people read it: "▲ 8 points", "▼ 3.5 points", "no change"; empty when there is nothing to compare with. */
+export function changeText(change: number | null | undefined, direction: RiskDirection): string {
+  if (change === null || change === undefined || direction === 'none') return '';
+  if (direction === 'flat') return 'no change';
+  const size = Math.abs(change);
+  return `${direction === 'up' ? '▲' : '▼'} ${size} point${size === 1 ? '' : 's'}`;
+}
+
+export const DIRECTION_CLASS: Record<RiskDirection, string> = { up: 'text-emerald-300', down: 'text-red-300', flat: 'text-gray-400', none: 'text-gray-500' };
+
+/** The assessor choices: the organisation's users, plus the name an assessment already carries when that person is no longer one of them (so opening an old assessment does not blank it). */
+export function assessorChoices(users: RiskAssessor[], current: string): string[] {
+  const names = users.map((u) => u.name);
+  return current && !names.some((n) => n.toLowerCase() === current.toLowerCase()) ? [...names, current] : names;
+}
 
 /** What a fill-in from the integrations did, in one sentence. */
 export function autofillSentence(r: Pick<RiskAutofill, 'filled' | 'changed' | 'kept_by_hand' | 'cleared' | 'answered_by_integrations'>): string {

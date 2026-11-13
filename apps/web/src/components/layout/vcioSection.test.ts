@@ -20,11 +20,11 @@ describe('the sidebar order', () => {
 });
 
 describe('the vCIO sidebar section', () => {
-  it('holds Compliance, Executive Digest, Client Review and vCIO Risk Scoring, and Platform does not', () => {
+  it('holds Compliance, Executive Digest, Client Review and Client Risk Score, and Platform does not', () => {
     const labels = (title: string) => NAV_CATALOG.find((s) => s.title === title)?.items.map((i) => i.label);
-    expect(labels('vCIO')).toEqual(['Compliance', 'Executive Digest', 'Client Review', 'vCIO Risk Scoring']);
+    expect(labels('vCIO')).toEqual(['Compliance', 'Executive Digest', 'Client Review', 'Client Risk Score']);
     const platform = labels('Platform') ?? [];
-    for (const moved of ['Compliance', 'Executive Digest', 'Client Review', 'vCIO Risk Scoring']) expect(platform).not.toContain(moved);
+    for (const moved of ['Compliance', 'Executive Digest', 'Client Review', 'Client Risk Score']) expect(platform).not.toContain(moved);
   });
 
   it('sits after Automation, and each page keeps its address', () => {

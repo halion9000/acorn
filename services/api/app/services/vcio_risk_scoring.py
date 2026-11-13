@@ -340,3 +340,52 @@ def apply_autofill(stored: dict[str, Any], found: dict[str, dict[str, str]]) -> 
             del out[qid]
         cleared += 1
     return out, {"filled": filled, "changed": changed, "kept_by_hand": kept, "cleared": cleared, "answered_by_integrations": len(found)}
+
+
+# ---- how a client's score moves from one assessment to the next ------------------------------------------------------------------------------------------------
+
+
+def points_change(before: float | None, after: float | None) -> float | None:
+    """How far a score moved, in percentage points (82% to 90% is +8.0). None when either assessment has no score (nothing answered)."""
+    return None if before is None or after is None else round((after - before) * 100, 1)
+
+
+def direction(change: float | None) -> str:
+    """up, down or flat for a change in points; none when there is nothing to compare. Under half a point either way is flat: it would round to the same percentage."""
+    return "none" if change is None else "up" if change >= 0.5 else "down" if change <= -0.5 else "flat"
+
+
+def trend_points(assessments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """A client's assessments oldest first, each with how its score moved since the one before it. ``assessments`` are ``{id, review_date, score, rating, answered, categories}`` in
+    any order, ``categories`` being category name -> score. An assessment with no score is listed and skipped as a point of comparison, so the next one is compared with the last
+    that had a score."""
+    out: list[dict[str, Any]] = []
+    last_scored: dict[str, Any] | None = None
+    for a in sorted(assessments, key=lambda x: (x["review_date"], str(x.get("created_at") or ""), str(x["id"]))):
+        change = points_change(last_scored["score"], a["score"]) if last_scored is not None else None
+        out.append(
+            {
+                **a,
+                "change": change,
+                "direction": direction(change),
+                "compared_with": last_scored["review_date"] if last_scored is not None and a["score"] is not None else None,
+            }
+        )
+        if a["score"] is not None:
+            last_scored = a
+    return out
+
+
+def category_changes(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Per category, how the score moved between the last two assessments that scored it, biggest drop first. Empty until two assessments have a score."""
+    scored = [p for p in points if p["score"] is not None]
+    if len(scored) < 2:
+        return []
+    before, after = scored[-2], scored[-1]
+    rows = []
+    for name in CATEGORY_ORDER:
+        b, a = (before.get("categories") or {}).get(name), (after.get("categories") or {}).get(name)
+        change = points_change(b, a)
+        if change is not None:
+            rows.append({"name": name, "before": b, "after": a, "change": change, "direction": direction(change)})
+    return sorted(rows, key=lambda r: (r["change"], CATEGORY_ORDER.index(r["name"])))

@@ -12,7 +12,7 @@ export const PAGE_WORDS: Record<string, string[]> = {
   '/inventory': ['stock', 'checkout', 'spares', 'hardware'],
   '/reports/digest': ['executive digest', 'weekly', 'summary', 'report'],
   '/reports/client-review': ['qbr', 'client review', 'quarterly'],
-  '/vcio-risk-scoring': ['vcio', 'risk scoring', 'business review', 'scorecard', 'nist csf', 'tech stack'],
+  '/vcio-risk-scoring': ['client risk score', 'vcio', 'risk scoring', 'risk score', 'trend', 'business review', 'scorecard', 'nist csf', 'tech stack'],
   '/honeytokens': ['canary', 'decoy', 'tripwire'],
   '/fim': ['file integrity', 'file changes'],
   '/devices/environment': ['network map', 'drawing', 'diagram', 'topology'],

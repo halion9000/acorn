@@ -390,7 +390,7 @@ const navSections: NavSection[] = [
         icon: <DocumentReportIcon />,
       },
       {
-        label: 'vCIO Risk Scoring',
+        label: 'Client Risk Score',
         href: '/vcio-risk-scoring',
         icon: <DocumentReportIcon />,
       },

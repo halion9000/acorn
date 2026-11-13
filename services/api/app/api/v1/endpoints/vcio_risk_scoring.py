@@ -1,6 +1,8 @@
-"""vCIO Risk Scoring: a client's Business Review, answered question by question and scored by risk (Live Oak's scoring workbook, kept here instead of in a spreadsheet per client).
+"""Client Risk Score (the page was first called vCIO Risk Scoring, and the routes keep that name): a client's Business Review, answered question by question and scored by risk (Live Oak's scoring workbook, kept here instead of in a spreadsheet per client).
 
 - ``GET /vcio-risk-scoring/library``: the questions and the default settings.
+- ``GET /vcio-risk-scoring/assessors``: the organisation's A.C.O.R.N users, for the assessor of an assessment.
+- ``GET /vcio-risk-scoring/trends`` and ``/trends/{client}``: how each client's score moved since its assessment before, and one client's score over time.
 - ``GET /vcio-risk-scoring/assessments``: the assessments of one client or of every client, newest first, each with its score.
 - ``POST /vcio-risk-scoring/assessments``: start one for a client.
 - ``GET /vcio-risk-scoring/assessments/{id}``: one assessment with its answers and its scorecard.
@@ -27,7 +29,7 @@ from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
-from app.models.tenant import Tenant
+from app.models.tenant import Tenant, User
 from app.models.vcio_risk_assessment import VcioRiskAssessment
 from app.services import vcio_risk_scoring as rs
 from app.services.audit import emit_audit
@@ -279,6 +281,170 @@ async def put_settings(body: SettingsIn, current_user: SettingsWriter, db: DBSes
     return SettingsOut(settings=merged if kept else defaults, defaults=defaults, using_defaults=not kept, rescored=rescored)
 
 
+class Assessor(BaseModel):
+    name: str
+    email: str | None = None
+
+
+class AssessorList(BaseModel):
+    items: list[Assessor]
+
+
+async def assessor_names(db: Any, owner: uuid.UUID) -> list[Assessor]:
+    """The people who can be named as the assessor: the organisation's own active A.C.O.R.N users, by name."""
+    rows = (await db.execute(select(User.username, User.email).where(User.tenant_id == owner, User.is_active.is_(True)))).all()
+    seen: dict[str, Assessor] = {}
+    for username, email in rows:
+        name = (username or "").strip()
+        if name and name.lower() not in seen:
+            seen[name.lower()] = Assessor(name=name, email=email)
+    return sorted(seen.values(), key=lambda a: a.name.lower())
+
+
+async def _checked_assessor(db: Any, owner: uuid.UUID, given: str, current: str = "") -> str:
+    """The assessor to store: empty, the one already stored (an earlier assessment may name someone who has since left), or one of the organisation's users. Anything else is refused."""
+    name = given.strip()
+    if not name or name == current:
+        return name
+    known = {a.name.lower(): a.name for a in await assessor_names(db, owner)}
+    if name.lower() not in known:
+        raise HTTPException(
+            status_code=422, detail=f"{name} is not an A.C.O.R.N user of this organisation: choose the assessor from the list"
+        )
+    return known[name.lower()]
+
+
+@router.get(
+    "/assessors", response_model=AssessorList, summary="The A.C.O.R.N users who can be named as the assessor of a Client Risk Score"
+)
+async def list_assessors(current_user: Reader, db: DBSession) -> AssessorList:
+    return AssessorList(items=await assessor_names(db, current_user.tenant_id))
+
+
+class TrendPoint(BaseModel):
+    id: uuid.UUID
+    review_date: date
+    score: float | None
+    rating: str
+    answered: int
+    assessor: str = ""
+    # Percentage points since the last assessment that had a score; None for the first, and for one with nothing answered.
+    change: float | None = None
+    direction: str = "none"
+    compared_with: date | None = None
+    categories: dict[str, float | None] = Field(default_factory=dict)
+
+
+class CategoryChange(BaseModel):
+    name: str
+    before: float
+    after: float
+    change: float
+    direction: str
+
+
+class ClientTrend(BaseModel):
+    client_id: uuid.UUID
+    client_name: str | None
+    points: list[TrendPoint]
+    # Between the last two assessments that have a score, per category, biggest drop first.
+    categories: list[CategoryChange] = Field(default_factory=list)
+
+
+class ClientTrendRow(BaseModel):
+    client_id: uuid.UUID
+    client_name: str | None
+    assessments: int
+    latest_date: date
+    latest_score: float | None
+    rating: str
+    previous_date: date | None = None
+    previous_score: float | None = None
+    change: float | None = None
+    direction: str = "none"
+
+
+class TrendsOut(BaseModel):
+    # Every client that has an assessment: where its score is and how it moved since the one before. Biggest drop first, then the ones with nothing to compare.
+    clients: list[ClientTrendRow]
+
+
+def _points_of(rows: list[VcioRiskAssessment], org: dict[str, Any], with_categories: bool) -> list[dict[str, Any]]:
+    return rs.trend_points(
+        [
+            {
+                "id": r.id,
+                "review_date": r.review_date,
+                "created_at": r.created_at,
+                "score": r.score,
+                "rating": r.rating,
+                "answered": r.answered,
+                "assessor": r.assessor,
+                "categories": {c["name"]: c["score"] for c in _card(r, org)["categories"] if not c["excluded"]} if with_categories else {},
+            }
+            for r in rows
+        ]
+    )
+
+
+@router.get(
+    "/trends", response_model=TrendsOut, summary="Every client's latest Client Risk Score and how it moved since the assessment before"
+)
+async def list_trends(current_user: Reader, db: DBSession) -> TrendsOut:
+    owner = current_user.tenant_id
+    names = await _clients(db, owner)
+    async with cross_tenant_reads(db):
+        rows = (await db.execute(select(VcioRiskAssessment).where(VcioRiskAssessment.tenant_id.in_([owner, *names])))).scalars().all()
+    by_client: dict[uuid.UUID, list[VcioRiskAssessment]] = {}
+    for r in rows:
+        by_client.setdefault(r.tenant_id, []).append(r)
+    out: list[ClientTrendRow] = []
+    for tid, mine in by_client.items():
+        points = _points_of(mine, {}, with_categories=False)
+        last = points[-1]
+        scored = [p for p in points if p["score"] is not None]
+        latest = scored[-1] if scored else last
+        previous = scored[-2] if len(scored) >= 2 else None
+        out.append(
+            ClientTrendRow(
+                client_id=tid,
+                client_name=names.get(tid),
+                assessments=len(points),
+                latest_date=latest["review_date"],
+                latest_score=latest["score"],
+                rating=latest["rating"],
+                previous_date=previous["review_date"] if previous else None,
+                previous_score=previous["score"] if previous else None,
+                change=latest["change"] if previous else None,
+                direction=latest["direction"] if previous else "none",
+            )
+        )
+    out.sort(key=lambda r: (r.change is None, r.change if r.change is not None else 0, (r.client_name or "").lower()))
+    return TrendsOut(clients=out)
+
+
+@router.get(
+    "/trends/{client_id}",
+    response_model=ClientTrend,
+    summary="One client's Client Risk Score over time, assessment by assessment, with the change per category",
+)
+async def client_trend(client_id: uuid.UUID, current_user: Reader, db: DBSession) -> ClientTrend:
+    owner = current_user.tenant_id
+    names = await _clients(db, owner)
+    if client_id != owner and client_id not in names:
+        raise HTTPException(status_code=404, detail="Client not found")
+    org = await org_settings(db, owner)
+    async with cross_tenant_reads(db):
+        rows = (await db.execute(select(VcioRiskAssessment).where(VcioRiskAssessment.tenant_id == client_id))).scalars().all()
+    points = _points_of(list(rows), org, with_categories=True)
+    return ClientTrend(
+        client_id=client_id,
+        client_name=names.get(client_id),
+        points=[TrendPoint(**{k: v for k, v in p.items() if k != "created_at"}) for p in points],
+        categories=[CategoryChange(**c) for c in rs.category_changes(points)],
+    )
+
+
 @router.get("/library", response_model=LibraryOut, summary="The vCIO Risk Scoring questions and the default scoring settings")
 async def get_library(current_user: Reader) -> LibraryOut:
     return LibraryOut(
@@ -329,13 +495,14 @@ async def create_assessment(body: AssessmentIn, current_user: Writer, db: DBSess
     target = body.client_id or owner
     if target != owner and target not in names:
         raise HTTPException(status_code=404, detail="Client not found")
+    assessor = await _checked_assessor(db, owner, body.assessor)
     async with _acting(db, owner, target):
         row = VcioRiskAssessment(
             id=uuid.uuid4(),
             tenant_id=target,
             review_date=body.review_date or datetime.now(UTC).date(),
             platform=body.platform,
-            assessor=body.assessor.strip(),
+            assessor=assessor,
             answers={},
             severity={},
             settings={},
@@ -369,14 +536,15 @@ async def update_assessment(assessment_id: uuid.UUID, body: AssessmentPatch, cur
             raise HTTPException(status_code=422, detail=f"There is no question {qid}")
         if sev is not None and sev not in rs.SEVERITIES:
             raise HTTPException(status_code=422, detail=f"{sev} is not a severity: use Critical, High, Medium or Low")
+    assessor = None if body.assessor is None else await _checked_assessor(db, owner, body.assessor, seen.assessor)
     async with _acting(db, owner, seen.tenant_id):
         row = (await db.execute(select(VcioRiskAssessment).where(VcioRiskAssessment.id == seen.id))).scalar_one()
         if body.review_date is not None:
             row.review_date = body.review_date
         if body.platform is not None:
             row.platform = body.platform
-        if body.assessor is not None:
-            row.assessor = body.assessor.strip()
+        if assessor is not None:
+            row.assessor = assessor
         if body.severity is not None:
             merged = dict(row.severity or {})
             for qid, sev in body.severity.items():
