@@ -259,6 +259,8 @@ async def put_settings(body: SettingsIn, current_user: SettingsWriter, db: DBSes
         resource_id=str(owner),
         changes={"before": before, "after": kept},
     )
+    # Sent now, in the organisation's own scope: left queued, it would go out inside the first client's scope below and be refused.
+    await db.flush()
     # The stored scores (what the list of assessments shows) were worked out with the old settings.
     names = await _clients(db, owner)
     async with cross_tenant_reads(db):
@@ -478,23 +480,27 @@ async def autofill_assessment(assessment_id: uuid.UUID, current_user: Writer, db
 async def delete_assessment(assessment_id: uuid.UUID, current_user: Writer, db: DBSession) -> DeletedOut:
     owner = current_user.tenant_id
     seen, names = await _find(db, current_user, assessment_id)
-    async with _acting(db, owner, seen.tenant_id):
-        await db.execute(VcioRiskAssessment.__table__.delete().where(VcioRiskAssessment.id == seen.id))
-        await emit_audit(
-            db=db,
-            tenant_id=owner,
-            actor_id=current_user.user_id,
-            actor_email=current_user.email,
-            action="vcio:risk_assessment_deleted",
-            resource="vcio_risk_assessment",
-            resource_id=str(seen.id),
-            changes={
-                "client_id": str(seen.tenant_id),
-                "client_name": names.get(seen.tenant_id),
-                "review_date": seen.review_date.isoformat(),
-                "score": seen.score,
-                "answered": seen.answered,
-            },
-        )
-        await db.commit()
+    what = {
+        "client_id": str(seen.tenant_id),
+        "client_name": names.get(seen.tenant_id),
+        "review_date": seen.review_date.isoformat(),
+        "score": seen.score,
+        "answered": seen.answered,
+    }
+    found_id, client_id = seen.id, seen.tenant_id
+    # The row is the client's, so it is removed in the client's scope. The audit line is the organisation's, so it is written after that scope ends: written inside it, row-level security
+    # refuses the line (it belongs to another tenant than the one being acted as) and the whole deletion fails.
+    async with _acting(db, owner, client_id):
+        await db.execute(VcioRiskAssessment.__table__.delete().where(VcioRiskAssessment.id == found_id))
+    await emit_audit(
+        db=db,
+        tenant_id=owner,
+        actor_id=current_user.user_id,
+        actor_email=current_user.email,
+        action="vcio:risk_assessment_deleted",
+        resource="vcio_risk_assessment",
+        resource_id=str(found_id),
+        changes=what,
+    )
+    await db.commit()
     return DeletedOut(deleted=True)

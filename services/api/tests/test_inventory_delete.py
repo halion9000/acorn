@@ -31,7 +31,7 @@ def item(**over):
 
 @pytest.fixture
 def rig(monkeypatch):
-    db = SimpleNamespace(execute=AsyncMock(), commit=AsyncMock())
+    db = SimpleNamespace(execute=AsyncMock(), commit=AsyncMock(), flush=AsyncMock())
     audit = AsyncMock()
     found = {}
 

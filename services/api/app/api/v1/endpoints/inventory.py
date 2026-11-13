@@ -517,18 +517,23 @@ async def _delete(db: Any, user: AuthUser, item: Any, names: dict[uuid.UUID, str
         "client_name": names.get(item.tenant_id),
         "source": item.source,
     }
-    async with _acting(db, owner, item.tenant_id):
-        await db.execute(InventoryItem.__table__.delete().where(InventoryItem.id == item.id))  # its events go with it (ON DELETE CASCADE)
-        await emit_audit(
-            db=db,
-            tenant_id=owner,
-            actor_id=user.user_id,
-            actor_email=user.email,
-            action="inventory:item_deleted",
-            resource="inventory_item",
-            resource_id=str(item.id),
-            changes=summary,
-        )
+    item_id, holder = item.id, item.tenant_id
+    # The item is the client's, so it is removed in the client's scope; the audit line is the organisation's, so it is written after that scope ends. Written inside it, row-level security
+    # refuses the line (it belongs to another tenant than the one being acted as) and the deletion fails, which is what deleting a client's item did.
+    async with _acting(db, owner, holder):
+        await db.execute(InventoryItem.__table__.delete().where(InventoryItem.id == item_id))  # its events go with it (ON DELETE CASCADE)
+    await emit_audit(
+        db=db,
+        tenant_id=owner,
+        actor_id=user.user_id,
+        actor_email=user.email,
+        action="inventory:item_deleted",
+        resource="inventory_item",
+        resource_id=str(item_id),
+        changes=summary,
+    )
+    # Sent now, in the organisation's scope: a bulk deletion enters the next client's scope right after.
+    await db.flush()
 
 
 class BulkDeleteIn(BaseModel):
