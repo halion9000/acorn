@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { overTargetCount, targetStanding } from './vulnTarget';
+import { EXPLOITED_FIX_DAYS, exploitDue, exploitDueText, overTargetCount, targetStanding } from './vulnTarget';
 
 const NOW = Date.parse('2026-11-11T12:00:00Z');
 const ago = (hours: number) => new Date(NOW - hours * 3_600_000).toISOString();
@@ -33,5 +33,26 @@ describe('overTargetCount', () => {
     ];
     expect(overTargetCount(findings, NOW)).toBe(1);
     expect(overTargetCount([], NOW)).toBe(0);
+  });
+});
+
+describe('exploitDue', () => {
+  it('gives a known-exploited vulnerability two weeks from the day it was first seen, counted in whole days', () => {
+    expect(EXPLOITED_FIX_DAYS).toBe(14);
+    expect(exploitDue('2026-11-06T23:50:00Z', NOW)).toEqual({ date: '2026-11-20', days: 9, over: false });
+    expect(exploitDue('2026-10-28T00:10:00Z', NOW)).toEqual({ date: '2026-11-11', days: 0, over: false });
+    expect(exploitDue('2026-10-27T08:00:00Z', NOW)).toEqual({ date: '2026-11-10', days: 1, over: true });
+    expect(exploitDue('2026-09-01T08:00:00Z', NOW)).toEqual({ date: '2026-09-15', days: 57, over: true });
+  });
+
+  it('has no due date for a date that cannot be read', () => {
+    expect([exploitDue('', NOW), exploitDue(null, NOW), exploitDue('soon', NOW)]).toEqual([null, null, null]);
+  });
+
+  it('says it in words', () => {
+    expect(exploitDueText({ date: '2026-11-20', days: 9, over: false })).toBe('fix by 2026-11-20 (9 days left)');
+    expect(exploitDueText({ date: '2026-11-12', days: 1, over: false })).toBe('fix by 2026-11-12 (1 day left)');
+    expect(exploitDueText({ date: '2026-11-11', days: 0, over: false })).toBe('fix by 2026-11-11 (today)');
+    expect(exploitDueText({ date: '2026-11-10', days: 1, over: true })).toBe('fix was due 2026-11-10 (1 day ago)');
   });
 });
