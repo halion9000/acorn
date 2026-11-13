@@ -265,6 +265,16 @@ def pair_confidence(a: Any, b: Any) -> tuple[int, list[str]]:
     return max(0, min(100, score)), why
 
 
+# Auvik lists everything on the network under whatever name DHCP gave it, usually with no serial and often no maker. A pair that involves an Auvik record and rests on one weak sign (the name alone, or an
+# address alone) cannot be told from two machines that share a stock name or reuse an address, so it is not worth a person's time. Name AND address (65) or a serial/maker on top of those clears it.
+THIN_EVIDENCE_BELOW = 65
+
+
+def is_thin_pair(tools_a: set[str], tools_b: set[str], score: int) -> bool:
+    """True when a pair involves an Auvik record and its confidence ``score`` (from ``pair_confidence``) is below ``THIN_EVIDENCE_BELOW``: not enough data to say whether it is a duplicate."""
+    return bool(("auvik" in tools_a or "auvik" in tools_b) and score < THIN_EVIDENCE_BELOW)
+
+
 def confidence_label(score: int) -> str:
     """high (70 and up), medium (40 and up) or low."""
     return "high" if score >= 70 else "medium" if score >= 40 else "low"

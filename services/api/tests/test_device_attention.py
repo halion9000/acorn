@@ -639,3 +639,60 @@ async def test_a_failed_refresh_leaves_the_last_list_and_lets_the_next_request_t
     assert await devices_module._load_cached(object(), owner, [tid], {}, None) is first, "the page keeps showing the last list"
     assert len(devices_module._background) == 1, "and tries to refresh again"
     await _settle()
+
+
+# ---- an Auvik record with only a name or an address to go on is not offered as a duplicate -----------------------------------------------------------
+
+
+async def _duplicates_of(monkeypatch, devices):
+    tid = devices[0].tenant_id
+
+    async def scope(db, o, client_id):
+        return [tid], {}
+
+    async def load(db, o, scope_ids, clients, master):
+        return devices
+
+    class Db:
+        async def get(self, model, key):
+            return None
+
+        async def execute(self, statement):
+            return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
+
+    monkeypatch.setattr(devices_module, "_scope", scope)
+    monkeypatch.setattr(devices_module, "_load_cached", load)
+    monkeypatch.setattr(devices_module, "_as", lambda db, o, t: __import__("contextlib").nullcontext())
+    return await devices_module.list_duplicates(current_user=SimpleNamespace(tenant_id=uuid.uuid4()), db=Db(), client_id=None)
+
+
+def _named(tenant, tool, name, ips=()):
+    d = device("Windows 11", [(tool, {})])
+    d.tenant_id, d.hostname, d.ip_addresses = tenant, name, list(ips)
+    return d
+
+
+@pytest.mark.asyncio
+async def test_an_auvik_pair_that_shares_only_a_name_is_left_out_and_counted(monkeypatch):
+    t = uuid.uuid4()
+    out = await _duplicates_of(monkeypatch, [_named(t, "auvik", "FRONT-DESK-PC"), _named(t, "huntress", "FRONT-DESK-PC")])
+    assert out.items == []
+    assert out.not_enough_data == 1
+
+
+@pytest.mark.asyncio
+async def test_an_auvik_pair_with_a_name_and_an_address_in_common_is_still_offered(monkeypatch):
+    t = uuid.uuid4()
+    out = await _duplicates_of(
+        monkeypatch, [_named(t, "auvik", "FRONT-DESK-PC", ["10.1.2.3"]), _named(t, "huntress", "FRONT-DESK-PC", ["10.1.2.3"])]
+    )
+    assert len(out.items) == 1
+    assert out.not_enough_data == 0
+
+
+@pytest.mark.asyncio
+async def test_a_name_only_pair_without_auvik_is_still_offered(monkeypatch):
+    t = uuid.uuid4()
+    out = await _duplicates_of(monkeypatch, [_named(t, "ninjaone", "FRONT-DESK-PC"), _named(t, "huntress", "FRONT-DESK-PC")])
+    assert len(out.items) == 1
+    assert out.not_enough_data == 0

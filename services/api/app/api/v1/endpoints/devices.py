@@ -35,7 +35,7 @@ from app.models.tenant import Tenant
 from app.services import device_follow, tool_exclusions
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.client_mapping import IncomingClient, auto_link_by_devices, record_device_hints, tenant_hidden, upsert_clients
-from app.services.device_identity import confidence_label, pair_confidence
+from app.services.device_identity import confidence_label, is_thin_pair, pair_confidence
 from app.services.device_merge import (
     DeviceMergeError,
     DifferentSerials,
@@ -1001,6 +1001,8 @@ class DuplicatePairOut(BaseModel):
 
 class DuplicatesOut(BaseModel):
     items: list[DuplicatePairOut]
+    # Pairs left out because an Auvik record is involved and the name or address alone is all there is to go on.
+    not_enough_data: int = 0
 
 
 class DismissIn(BaseModel):
@@ -1152,6 +1154,7 @@ async def list_duplicates(
     scope, clients = await _scope(db, owner, client_id)
     master = _master_of(await db.get(Tenant, owner))
     items: list[DuplicatePairOut] = []
+    thin = 0  # pairs involving an Auvik record with too little to go on (see is_thin_pair); left out of the list
     # The same load the device list uses, so the two requests share it. The pairs are worked out from it in memory; only what a person dismissed is read from the database, one small query per client
     # (finding the pairs used to take three queries per client, 11.7 s for 187 clients).
     loaded = await _load_cached(db, owner, scope, clients, master)
@@ -1174,11 +1177,14 @@ async def list_duplicates(
         for a, b in pairs:
             if a in by_id and b in by_id:
                 score, why = pair_confidence(by_id[a], by_id[b])
+                if is_thin_pair(tools.get(a, set()), tools.get(b, set()), score):
+                    thin += 1
+                    continue
                 items.append(
                     DuplicatePairOut(a=by_id[a], b=by_id[b], confidence=score, confidence_label=confidence_label(score), reasons=why)
                 )
     items.sort(key=lambda p: (-p.confidence, (p.a.client_name or ""), p.a.hostname.lower()))
-    return DuplicatesOut(items=items)
+    return DuplicatesOut(items=items, not_enough_data=thin)
 
 
 async def _client_of(db: Any, owner: uuid.UUID, device_id: uuid.UUID) -> uuid.UUID:
