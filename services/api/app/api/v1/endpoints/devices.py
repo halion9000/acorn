@@ -803,6 +803,7 @@ def filter_devices(
     encryption: str | None = None,
     mdm: str | None = None,
     followed: bool = False,
+    presence: str = "all",
 ) -> list[DeviceOut]:
     """The devices a page (or an export) asked for: every filter given must hold. ``search`` matches the name, serial number, client name or any IP address, ignoring case. Sorted by client, then name."""
     rows = [d for d in everything if (d.hidden_since is not None) == hidden]
@@ -819,6 +820,11 @@ def filter_devices(
             or needle in (d.client_name or "").lower()
             or any(needle in ip.lower() for ip in d.ip_addresses)
         ]
+    # Online or offline as the tools say right now; a device no tool gives a state for (a scanner, a camera) is in neither and shows only under all.
+    if presence == "online":
+        rows = [d for d in rows if d.online is True]
+    elif presence == "offline":
+        rows = [d for d in rows if d.online is False]
     if vendor:
         rows = [d for d in rows if any(s.vendor == vendor for s in d.sources)]
     if os:
@@ -928,6 +934,11 @@ async def list_devices(
         default=False,
         description="Only devices whose Huntress record is stored with the machine while its Huntress organization is mapped to another client.",
     ),
+    presence: str = Query(
+        default="all",
+        pattern="^(online|offline|all)$",
+        description="Only devices the tools say are online now, only those they say are offline, or all.",
+    ),
 ) -> DeviceListOut:
     owner = current_user.tenant_id
     scope, clients = await _scope(db, owner, client_id)
@@ -976,6 +987,7 @@ async def list_devices(
         encryption=encryption,
         mdm=mdm,
         followed=followed,
+        presence=presence,
     )
     total = len(rows)
     start = (page - 1) * page_size
@@ -1060,6 +1072,7 @@ async def export_devices(
     encryption: str | None = Query(default=None, pattern="^(not_encrypted|encrypted)$"),
     mdm: str | None = Query(default=None, pattern="^(disabled|not_ade)$"),
     followed: bool = Query(default=False),
+    presence: str = Query(default="all", pattern="^(online|offline|all)$"),
 ) -> Response:
     owner = current_user.tenant_id
     scope, clients = await _scope(db, owner, client_id)
@@ -1081,6 +1094,7 @@ async def export_devices(
         encryption=encryption,
         mdm=mdm,
         followed=followed,
+        presence=presence,
     )
     body = devices_csv(rows)
     return Response(

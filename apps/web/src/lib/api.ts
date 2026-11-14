@@ -831,6 +831,8 @@ export interface DeviceQuery {
   followed?: boolean;
   /** Only devices no tool has seen online for a week or more. */
   offline?: boolean;
+  /** Only devices the tools say are online now, only those they say are offline, or all (the default). */
+  presence?: 'online' | 'offline' | 'all';
   /** Only devices with at least one open alert. */
   hasAlerts?: boolean;
   /** Only devices a person hid until they check back in (they are left out otherwise). */
@@ -1375,6 +1377,7 @@ export const devicesApi = {
     if (q.offline) p.set('offline', 'true');
     if (q.hasAlerts) p.set('has_alerts', 'true');
     if (q.hidden) p.set('hidden', 'true');
+    if (q.presence && q.presence !== 'all') p.set('presence', q.presence);
     if (q.os) p.set('os', q.os);
     if (q.kind) p.set('kind', q.kind);
     const qs = p.toString();
@@ -1404,6 +1407,7 @@ export const devicesApi = {
     if (q.offline) p.set('offline', 'true');
     if (q.hasAlerts) p.set('has_alerts', 'true');
     if (q.hidden) p.set('hidden', 'true');
+    if (q.presence && q.presence !== 'all') p.set('presence', q.presence);
     if (q.os) p.set('os', q.os);
     if (q.kind) p.set('kind', q.kind);
     return p.toString();

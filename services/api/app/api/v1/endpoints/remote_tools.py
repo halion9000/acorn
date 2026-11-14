@@ -13,7 +13,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -21,6 +21,7 @@ from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
 from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.db.rls_sessions import adopt_tenant
 from app.models.client_alias import ClientAlias
+from app.models.device import Device, DeviceSource
 from app.models.remote_tool import ALL_CLIENTS, CustomRemoteTool, DeviceRemoteTool, RemoteToolRule, RemoteToolScan
 from app.models.tenant import Tenant
 from app.services import remote_tools as rt
@@ -60,6 +61,44 @@ async def _rules(db: Any, owner: uuid.UUID) -> dict[tuple[str, uuid.UUID | None]
 async def _sightings(db: Any, scope: list[uuid.UUID]) -> list[DeviceRemoteTool]:
     async with cross_tenant_reads(db):
         return list((await db.execute(select(DeviceRemoteTool).where(DeviceRemoteTool.tenant_id.in_(scope)))).scalars().all())
+
+
+async def _online_by_host(
+    db: Any, scope: list[uuid.UUID], hostnames: set[str]
+) -> dict[tuple[uuid.UUID, str], tuple[bool | None, datetime | None]]:
+    """For each (client, host key): whether the client's tools say the machine is online right now, and when a tool last saw it online. Read from the Devices page's own records, matched by name
+    inside the client; a machine A.C.O.R.N has no device for is simply absent (the page shows it as unknown)."""
+    from app.api.v1.endpoints.devices import last_online_of, online_now_of  # noqa: PLC0415
+
+    if not hostnames:
+        return {}
+    keys = sorted(hostnames)
+    out: dict[tuple[uuid.UUID, str], tuple[bool | None, datetime | None]] = {}
+    async with cross_tenant_reads(db):
+        devices = (
+            await db.execute(
+                select(Device.id, Device.tenant_id, Device.hostname).where(
+                    Device.tenant_id.in_(scope), func.split_part(func.lower(Device.hostname), ".", 1).in_(keys)
+                )
+            )
+        ).all()
+        by_id = {d.id: (d.tenant_id, rt.host_key(d.hostname)) for d in devices}
+        if not by_id:
+            return {}
+        sources = (await db.execute(select(DeviceSource).where(DeviceSource.device_id.in_(list(by_id))))).scalars().all()
+    grouped: dict[uuid.UUID, list[DeviceSource]] = {}
+    for src in sources:
+        grouped.setdefault(src.device_id, []).append(src)
+    for device_id, key in by_id.items():
+        srcs = grouped.get(device_id, [])
+        flag, seen = online_now_of(srcs), last_online_of(srcs)
+        previous = out.get(key)
+        # Two devices with the same name in one client: online if either is.
+        out[key] = (
+            True if (previous and previous[0]) or flag else flag if flag is not None else (previous[0] if previous else None),
+            max([t for t in (seen, previous[1] if previous else None) if t], default=None),
+        )
+    return out
 
 
 class ToolRow(BaseModel):
@@ -200,6 +239,9 @@ class DeviceRow(BaseModel):
     instance_id: str = ""
     # For an install that belongs to another server than yours (see the tool's own identifiers): True.
     foreign: bool = False
+    # Whether the client's tools say the machine is online right now (True / False), or None when none does or A.C.O.R.N has no device by that name; and when a tool last saw it online.
+    online: bool | None = None
+    last_online: datetime | None = None
 
 
 @router.get("/tools/{tool_key}/devices", response_model=list[DeviceRow], summary="The devices one tool was found on")
@@ -224,6 +266,8 @@ async def tool_devices(
     mine = rt.trusted_instances(getattr(await db.get(Tenant, owner), "settings", None)).get(tool_key, [])
     rows = [s for s in await _sightings(db, scope) if s.tool_key == tool_key]
     rows.sort(key=lambda s: ((clients.get(s.tenant_id) or "").lower(), s.hostname.lower(), getattr(s, "instance_id", "") or ""))
+    rows = rows[:limit]
+    live = await _online_by_host(db, scope, {rt.host_key(s.hostname) for s in rows})
     return [
         DeviceRow(
             client_id=s.tenant_id,
@@ -237,8 +281,10 @@ async def tool_devices(
             program=getattr(s, "program", None),
             instance_id=getattr(s, "instance_id", "") or "",
             foreign=bool(mine and getattr(s, "instance_id", "") and s.instance_id not in mine),
+            online=live.get((s.tenant_id, rt.host_key(s.hostname)), (None, None))[0],
+            last_online=live.get((s.tenant_id, rt.host_key(s.hostname)), (None, None))[1],
         )
-        for s in rows[:limit]
+        for s in rows
     ]
 
 

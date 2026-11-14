@@ -122,6 +122,8 @@ interface SavedDeviceFilters {
   mdm?: '' | 'disabled' | 'not_ade';
   offlineOnly: boolean;
   alertsOnly: boolean;
+  /** Only set once a person has picked online / offline / all themselves. */
+  presence?: 'online' | 'offline' | 'all';
 }
 
 export default function DevicesView() {
@@ -156,6 +158,9 @@ export default function DevicesView() {
   const [offlineOnly, setOfflineOnly] = useState(false);
   const [alertsOnly, setAlertsOnly] = useState(false);
   const [hiddenOnly, setHiddenOnly] = useState(false);
+  // Online, offline or all, as the tools say right now. It starts on online. A problem filter (a tile: missing from a tool, needs attention, offline...) counts machines whatever their state, so
+  // while one is on and the person has not picked, the list shows all; picking online / offline / all always wins.
+  const [presencePicked, setPresencePicked] = useState<'online' | 'offline' | 'all' | null>(null);
   // The devices ticked for a script run. They stay ticked across pages and filters until cleared or run.
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
@@ -175,6 +180,7 @@ export default function DevicesView() {
     setMdm(saved.mdm === 'disabled' || saved.mdm === 'not_ade' ? saved.mdm : '');
     setOfflineOnly(saved.offlineOnly === true);
     setAlertsOnly(saved.alertsOnly === true);
+    setPresencePicked(saved.presence === 'online' || saved.presence === 'offline' || saved.presence === 'all' ? saved.presence : null);
   };
   // The filters a person picked last time come back when they return (not the search or the hidden list, which are for the moment).
   const [filtersRestored, setFiltersRestored] = useState(false);
@@ -188,8 +194,12 @@ export default function DevicesView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (filtersRestored) saveFilters('devices', { clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, followedOnly, mdm, offlineOnly, alertsOnly } satisfies SavedDeviceFilters);
-  }, [filtersRestored, clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, followedOnly, mdm, offlineOnly, alertsOnly]);
+    if (filtersRestored) saveFilters('devices', { clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, followedOnly, mdm, offlineOnly, alertsOnly, ...(presencePicked ? { presence: presencePicked } : {}) } satisfies SavedDeviceFilters);
+  }, [filtersRestored, clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, followedOnly, mdm, offlineOnly, alertsOnly, presencePicked]);
+
+  // The choice in force: what the person picked, else all while a problem filter is on, else online.
+  const problemFilter = gapsOnly || !!missing || attentionOnly || staleOnly || notEncryptedOnly || followedOnly || !!mdm || offlineOnly || alertsOnly || hiddenOnly;
+  const presence: 'online' | 'offline' | 'all' = presencePicked ?? (problemFilter ? 'all' : 'online');
 
   // Only the answer to the NEWEST request may reach the page. The estate is large and a filtered query can answer slower than the one before it: without this, changing a filter showed the answer to
   // the previous filter whenever it arrived last, and the list stayed wrong until the page was left and opened again.
@@ -199,14 +209,14 @@ export default function DevicesView() {
     setLoading(true);
     setError('');
     try {
-      const answer = await devicesApi.list({ page, pageSize: 50, clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, mdm: mdm || undefined, followed: followedOnly || undefined, hidden: hiddenOnly || undefined });
+      const answer = await devicesApi.list({ page, pageSize: 50, clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, mdm: mdm || undefined, followed: followedOnly || undefined, hidden: hiddenOnly || undefined, presence });
       if (mine === newest.current) setData(answer);
     } catch (err) {
       if (mine === newest.current) setError(devicesLoadError(err));
     } finally {
       if (mine === newest.current) setLoading(false);
     }
-  }, [page, clientId, search, vendor, os, kind, gapsOnly, missing, offlineOnly, alertsOnly, attentionOnly, staleOnly, notEncryptedOnly, mdm, followedOnly, hiddenOnly]);
+  }, [page, clientId, search, vendor, os, kind, gapsOnly, missing, offlineOnly, alertsOnly, attentionOnly, staleOnly, notEncryptedOnly, mdm, followedOnly, hiddenOnly, presence]);
 
   useEffect(() => {
     // Not before the remembered or linked filters are on the page: loading first with none asked the whole estate for an answer nobody wanted, which could land after the right one.
@@ -238,7 +248,7 @@ export default function DevicesView() {
 
   const exportCsv = async () => {
     try {
-      const text = await devicesApi.exportCsv({ clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, mdm: mdm || undefined, followed: followedOnly || undefined, hidden: hiddenOnly || undefined });
+      const text = await devicesApi.exportCsv({ clientId: clientId || undefined, search, vendor: vendor || undefined, os: (os || undefined) as DeviceQuery['os'], kind: (kind || undefined) as DeviceQuery['kind'], notInMaster: gapsOnly, missing: missing ?? undefined, offline: offlineOnly || undefined, hasAlerts: alertsOnly || undefined, attention: attentionOnly || undefined, stale: staleOnly || undefined, encryption: notEncryptedOnly ? 'not_encrypted' : undefined, mdm: mdm || undefined, followed: followedOnly || undefined, hidden: hiddenOnly || undefined, presence });
       const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
       const link = document.createElement('a');
       link.href = url;
@@ -573,6 +583,22 @@ export default function DevicesView() {
             </option>
           ))}
         </select>
+        <div role="group" aria-label="Online status" className="flex overflow-hidden rounded-md border border-gray-700 text-sm" data-testid="presence-toggle">
+          {(['online', 'offline', 'all'] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              aria-pressed={presence === p}
+              onClick={() => {
+                setPresencePicked(p);
+                setPage(1);
+              }}
+              className={`px-2 py-1.5 capitalize ${presence === p ? 'bg-blue-500/20 text-blue-200' : 'bg-gray-900 text-gray-300 hover:bg-gray-800'}`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
         <button type="button" onClick={() => void exportCsv()} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white hover:bg-gray-800">
           Export CSV
         </button>

@@ -13216,6 +13216,18 @@ paths:
           title: Followed
         description: Only devices whose Huntress record is stored with the machine
           while its Huntress organization is mapped to another client.
+      - name: presence
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(online|offline|all)$
+          description: Only devices the tools say are online now, only those they
+            say are offline, or all.
+          default: all
+          title: Presence
+        description: Only devices the tools say are online now, only those they say
+          are offline, or all.
       responses:
         '200':
           description: Successful Response
@@ -13359,6 +13371,14 @@ paths:
           type: boolean
           default: false
           title: Followed
+      - name: presence
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(online|offline|all)$
+          default: all
+          title: Presence
       responses:
         '200':
           description: Successful Response
@@ -35971,6 +35991,17 @@ components:
           type: boolean
           title: Foreign
           default: false
+        online:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Online
+        last_online:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Online
       type: object
       required:
       - client_id

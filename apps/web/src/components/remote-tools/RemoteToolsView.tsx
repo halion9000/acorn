@@ -50,6 +50,16 @@ interface DeviceRow {
   program?: string | null;
   instance_id?: string;
   foreign?: boolean;
+  /** Whether the client's tools say the machine is online now; null when none does or A.C.O.R.N has no device by that name. */
+  online?: boolean | null;
+  last_online?: string | null;
+}
+
+export type Presence = 'online' | 'offline' | 'all';
+
+/** The machines to show for a choice: online ones, offline ones, or all. A machine no tool gives a state for is in neither of the first two (pure). */
+export function byPresence<T extends { online?: boolean | null }>(rows: T[], presence: Presence): T[] {
+  return presence === 'online' ? rows.filter((r) => r.online === true) : presence === 'offline' ? rows.filter((r) => r.online === false) : rows;
 }
 
 /** "798cebdb8316a8ff, 1111222233334444" as a list of identifiers: split on commas, spaces and semicolons, empty parts dropped. */
@@ -343,6 +353,7 @@ export default function RemoteToolsView() {
   const [filter, setFilter] = useState<Filter>('all');
   const [open, setOpen] = useState<string | null>(null);
   const [devices, setDevices] = useState<DeviceRow[] | null>(null);
+  const [presence, setPresence] = useState<Presence>('online');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -555,6 +566,16 @@ export default function RemoteToolsView() {
                         {devices === null ? (
                           <span className="text-xs text-gray-500">Loading…</span>
                         ) : (
+                          <div>
+                          <div role="group" aria-label="Show machines" className="mb-2 flex items-center gap-1 text-xs" data-testid="presence-toggle">
+                            {(['online', 'offline', 'all'] as Presence[]).map((p) => (
+                              <button key={p} type="button" aria-pressed={presence === p} onClick={() => setPresence(p)} className={`rounded border px-2 py-0.5 capitalize ${presence === p ? 'border-blue-500 bg-blue-500/20 text-blue-200' : 'border-gray-700 text-gray-300 hover:bg-gray-800'}`}>
+                                {p}
+                              </button>
+                            ))}
+                            <span className="ml-2 text-gray-500">{byPresence(devices, presence).length} of {devices.length}</span>
+                            {presence !== 'all' && <span className="text-gray-500"> (a machine no tool gives an online state for shows under All)</span>}
+                          </div>
                           <table className="w-full text-xs">
                             <thead className="text-gray-500">
                               <tr>
@@ -568,10 +589,16 @@ export default function RemoteToolsView() {
                               </tr>
                             </thead>
                             <tbody>
-                              {devices.map((d) => (
+                              {byPresence(devices, presence).map((d) => (
                                 <tr key={`${d.client_id}:${d.hostname}:${d.instance_id ?? ''}`} className={`border-t border-gray-800 ${d.foreign ? 'bg-red-500/5 text-red-200' : 'text-gray-300'}`}>
                                   <td className="py-1 pr-3">{d.client_name ?? '—'}</td>
                                   <td className="pr-3">
+                                    <span
+                                      data-testid="online-dot"
+                                      data-online={d.online === true ? 'online' : d.online === false ? 'offline' : 'unknown'}
+                                      title={d.online === true ? 'Online now' : d.online === false ? `Offline${d.last_online ? `, last seen ${new Date(d.last_online).toISOString().slice(0, 16).replace('T', ' ')} UTC` : ''}` : 'No tool says whether it is online'}
+                                      className={`mr-2 inline-block h-2 w-2 rounded-full ${d.online === true ? 'bg-emerald-400' : d.online === false ? 'bg-gray-500' : 'border border-gray-600'}`}
+                                    />
                                     <Link href={`/devices?search=${encodeURIComponent(d.hostname)}`} className="text-sky-300 hover:underline">
                                       {d.hostname}
                                     </Link>
@@ -599,6 +626,7 @@ export default function RemoteToolsView() {
                               ))}
                             </tbody>
                           </table>
+                          </div>
                         )}
                       </td>
                     </tr>

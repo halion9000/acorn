@@ -6,7 +6,7 @@ const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a> }));
 
-import RemoteToolsView, { categoryLabel, counts, filterTools, parseIds, reach, type Inventory, type ToolRow } from './RemoteToolsView';
+import RemoteToolsView, { byPresence, categoryLabel, counts, filterTools, parseIds, reach, type Inventory, type ToolRow } from './RemoteToolsView';
 
 const tool = (over: Partial<ToolRow> & { key: string; name: string }): ToolRow => ({
   category: 'remote_access', clients: 1, devices: 1, last_seen: '2026-11-03T14:28:00Z', verdict: 'unreviewed', client_rules: 0, blocked_devices: 0, allowed_devices: 0, unreviewed_devices: 1, ...over,
@@ -113,7 +113,7 @@ describe('RemoteToolsView', () => {
 
   it('opens a tool to list its devices and lets one client be approved or follow the general decision', async () => {
     serve(inventory(), [
-      { client_id: 'c1', client_name: 'Acme', hostname: 'PC-1', version: '8.0', last_seen: '2026-11-03T14:28:00Z', verdict: 'blocked' },
+      { client_id: 'c1', client_name: 'Acme', hostname: 'PC-1', version: '8.0', last_seen: '2026-11-03T14:28:00Z', verdict: 'blocked', online: true },
     ]);
     render(<RemoteToolsView />);
     await userEvent.click(await screen.findByRole('button', { name: 'AnyDesk' }));
@@ -124,6 +124,36 @@ describe('RemoteToolsView', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('AnyDesk is now approved for Acme.'));
     const put = authFetch.mock.calls.find((c) => c[1]?.method === 'PUT')!;
     expect(JSON.parse(put[1].body)).toEqual({ verdict: 'allowed', client_id: 'c1' });
+  });
+
+  it('marks each machine with a green, grey or empty dot, and starts on the online machines with an Online / Offline / All choice', async () => {
+    const base = { client_id: 'c1', client_name: 'Acme', version: '8.0', last_seen: '2026-11-03T14:28:00Z', verdict: 'unreviewed' };
+    serve(inventory(), [
+      { ...base, hostname: 'UP-1', online: true },
+      { ...base, hostname: 'DOWN-1', online: false, last_online: '2026-11-01T08:00:00Z' },
+      { ...base, hostname: 'UNKNOWN-1', online: null },
+    ]);
+    render(<RemoteToolsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'AnyDesk' }));
+    const panel = await screen.findByTestId('devices-anydesk');
+    expect(within(panel).getByRole('link', { name: 'UP-1' })).toBeTruthy();
+    expect(within(panel).queryByRole('link', { name: 'DOWN-1' })).toBeNull();
+    expect(within(panel).getByRole('button', { name: 'online' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(panel).getByTestId('online-dot')).toHaveAttribute('data-online', 'online');
+    await userEvent.click(within(panel).getByRole('button', { name: 'offline' }));
+    expect(within(panel).getByRole('link', { name: 'DOWN-1' })).toBeTruthy();
+    expect(within(panel).queryByRole('link', { name: 'UP-1' })).toBeNull();
+    expect(within(panel).getByTestId('online-dot')).toHaveAttribute('data-online', 'offline');
+    expect(within(panel).getByTestId('online-dot').getAttribute('title')).toContain('last seen 2026-11-01 08:00 UTC');
+    await userEvent.click(within(panel).getByRole('button', { name: 'all' }));
+    expect(within(panel).getAllByTestId('online-dot').map((d) => d.getAttribute('data-online'))).toEqual(['online', 'offline', 'unknown']);
+  });
+
+  it('byPresence keeps the online ones, the offline ones or all, and leaves the unknown ones to All', () => {
+    const rows = [{ online: true }, { online: false }, { online: null }, {}];
+    expect(byPresence(rows, 'online')).toHaveLength(1);
+    expect(byPresence(rows, 'offline')).toHaveLength(1);
+    expect(byPresence(rows, 'all')).toHaveLength(4);
   });
 
   it('says plainly when nothing has been scanned yet, and when a scan found nothing', async () => {
@@ -164,8 +194,8 @@ describe('where it is installed, and whose server it connects to', () => {
 
   it('shows the install folder of each device and marks an install for another server', async () => {
     serve(withSc(['798cebdb8316a8ff'], 1), [
-      { client_id: 'c1', client_name: 'Acme', hostname: 'PC-1', version: '24.1', last_seen: '2026-11-03T14:28:00Z', verdict: 'allowed', install_path: PATH, instance_id: '1111222233334444', foreign: true },
-      { client_id: 'c1', client_name: 'Acme', hostname: 'PC-2', version: '24.1', last_seen: '2026-11-03T14:28:00Z', verdict: 'allowed', install_path: 'C:\Program Files (x86)\ScreenConnect Client (798cebdb8316a8ff)', instance_id: '798cebdb8316a8ff', foreign: false },
+      { client_id: 'c1', client_name: 'Acme', hostname: 'PC-1', version: '24.1', last_seen: '2026-11-03T14:28:00Z', verdict: 'allowed', install_path: PATH, instance_id: '1111222233334444', foreign: true, online: true },
+      { client_id: 'c1', client_name: 'Acme', hostname: 'PC-2', version: '24.1', last_seen: '2026-11-03T14:28:00Z', verdict: 'allowed', install_path: 'C:\Program Files (x86)\ScreenConnect Client (798cebdb8316a8ff)', instance_id: '798cebdb8316a8ff', foreign: false, online: true },
     ]);
     render(<RemoteToolsView />);
     expect(await screen.findByTestId('foreign-screenconnect')).toHaveTextContent('(1 for another server)');
