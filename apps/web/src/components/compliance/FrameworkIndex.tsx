@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
 import { authFetch } from '@/lib/auth-session';
+import { complianceDashboardApi } from '@/lib/api';
 import { SecureframeCard } from './SecureframeCard';
 import { SecureframeRegisters } from './SecureframeRegisters';
 
@@ -85,6 +86,24 @@ export function FrameworkIndex({ frameworks }: { frameworks: FrameworkCard[] }) 
     setClientId(clientFromAddress(window.location.search));
   }, []);
 
+  // The frameworks turned on in the Overview for the chosen client: only those are listed here. null while reading, and when it could not be read (then every framework is listed rather than none).
+  const [enabled, setEnabled] = useState<string[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    setEnabled(null);
+    (async () => {
+      try {
+        const r = await complianceDashboardApi.enabled(clientId);
+        if (live) setEnabled(r.enabled);
+      } catch {
+        if (live) setEnabled(null);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [clientId]);
+
   // How far along each framework is, for the chosen client (or the organization). undefined while reading, null when it could not be read.
   const [posture, setPosture] = useState<Record<string, { pct: number; covered: number; total: number } | null> | null | undefined>(undefined);
   useEffect(() => {
@@ -138,7 +157,18 @@ export function FrameworkIndex({ frameworks }: { frameworks: FrameworkCard[] }) 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {frameworks.map((fw) => (
+        {enabled !== null && enabled.length === 0 && (
+          <p className="col-span-full text-sm text-gray-400" data-testid="no-frameworks-on">
+            No framework is turned on{clientId ? ' for this client' : ''} yet. Turn them on in the{' '}
+            <Link href={clientId ? `/compliance?client=${encodeURIComponent(clientId)}` : '/compliance'} className="text-blue-300 hover:underline">
+              Overview
+            </Link>
+            .
+          </p>
+        )}
+        {frameworks
+          .filter((fw) => enabled === null || enabled.includes(FRAMEWORK_KEYS[fw.id] ?? fw.id))
+          .map((fw) => (
           <Link
             key={fw.id}
             href={frameworkHref(fw.id, clientId)}

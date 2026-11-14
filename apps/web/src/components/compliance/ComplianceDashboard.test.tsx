@@ -107,6 +107,21 @@ describe('ComplianceDashboard', () => {
     expect((screen.getByRole('button', { name: 'Next page' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('the Open buttons on the rings open the page for the client the dashboard is showing', async () => {
+    window.history.replaceState(null, '', '/compliance?client=c9');
+    show();
+    await screen.findByTestId('card-health');
+    expect(within(screen.getByTestId('card-health')).getByRole('link', { name: 'Open' })).toHaveAttribute('href', '/compliance/frameworks?client=c9');
+    expect(within(screen.getByTestId('card-testing')).getByRole('link', { name: 'Open' })).toHaveAttribute('href', '/compliance/frameworks?client=c9');
+    expect(within(screen.getByTestId('card-risks')).getByRole('link', { name: 'Open' })).toHaveAttribute('href', '/compliance/risk-register?client=c9');
+  });
+
+  it('without a client the Open buttons open the plain pages', async () => {
+    show();
+    await screen.findByTestId('card-health');
+    expect(within(screen.getByTestId('card-risks')).getByRole('link', { name: 'Open' })).toHaveAttribute('href', '/compliance/risk-register');
+  });
+
   it('shows the reason when the API refuses, and asks for the client named in the address', async () => {
     window.history.replaceState(null, '', '/compliance?client=c9');
     api.dashboard.mockRejectedValue(new Error('Client not found'));

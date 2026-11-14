@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
 const listChildren = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/api', () => ({ msspApi: { listChildren } }));
+const enabledMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/api', () => ({ msspApi: { listChildren }, complianceDashboardApi: { enabled: enabledMock } }));
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
@@ -28,6 +29,7 @@ beforeEach(() => {
   authFetch.mockReset();
   authFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
   listChildren.mockReset();
+  enabledMock.mockReset().mockImplementation(() => Promise.reject(new Error('not read')));
   window.history.replaceState(null, '', '/compliance');
 });
 
@@ -88,6 +90,35 @@ describe('the compliance index', () => {
     renderIndex();
     await waitFor(() => expect(screen.getByRole('link', { name: /SOC 2 Type II/ }).getAttribute('href')).toBe('/compliance/soc2?client=c1'));
     expect((await screen.findByLabelText('Client') as HTMLSelectElement).value).toBe('c1');
+  });
+});
+
+describe('only the frameworks turned on in the Overview are listed', () => {
+  it('lists the ones that are on, for the client chosen, and none of the others', async () => {
+    listChildren.mockResolvedValue([]);
+    enabledMock.mockResolvedValue({ enabled: ['HIPAA'], available: [] });
+    renderIndex();
+    expect(await screen.findByRole('link', { name: /HIPAA Security Rule/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /SOC 2 Type II/ })).toBeNull();
+    expect(enabledMock).toHaveBeenCalledWith('');
+  });
+
+  it('says to turn some on, with a link to the Overview, when none is on', async () => {
+    listChildren.mockResolvedValue([]);
+    enabledMock.mockResolvedValue({ enabled: [], available: [] });
+    renderIndex();
+    expect(await screen.findByTestId('no-frameworks-on')).toHaveTextContent('No framework is turned on yet');
+    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('href', '/compliance');
+    expect(screen.queryByRole('link', { name: /SOC 2 Type II/ })).toBeNull();
+  });
+
+  it('asks for the client in the address, and lists every framework when the list could not be read', async () => {
+    window.history.replaceState(null, '', '/compliance/frameworks?client=c5');
+    listChildren.mockResolvedValue([{ id: 'c5', name: 'Acme Dental' }]);
+    renderIndex();
+    await waitFor(() => expect(enabledMock).toHaveBeenCalledWith('c5'));
+    expect(await screen.findByRole('link', { name: /SOC 2 Type II/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /HIPAA Security Rule/ })).toBeInTheDocument();
   });
 });
 

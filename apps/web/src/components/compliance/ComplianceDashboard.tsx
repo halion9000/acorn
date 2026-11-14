@@ -62,6 +62,8 @@ function Card({ title, href, children, testId }: { title: string; href?: string;
 
 export function ComplianceDashboard() {
   const [clientId, setClientId] = useState('');
+  // The pages the cards open show the same client the dashboard is showing.
+  const open = (href: string) => (clientId ? `${href}?client=${encodeURIComponent(clientId)}` : href);
   const isHome = useIsHomeClient(clientId);
   const ownView = clientId === '' || isHome;
   const [data, setData] = useState<ComplianceDashboard | null>(null);
@@ -169,7 +171,7 @@ export function ComplianceDashboard() {
       </section>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card title="Testing" testId="card-testing" href="/compliance/frameworks">
+        <Card title="Testing" testId="card-testing" href={open('/compliance/frameworks')}>
           {ownView && t ? (
             <div className="flex items-center gap-4">
               <Donut
@@ -197,7 +199,7 @@ export function ComplianceDashboard() {
           )}
         </Card>
 
-        <Card title="Control health" testId="card-health" href="/compliance/frameworks">
+        <Card title="Control health" testId="card-health" href={open('/compliance/frameworks')}>
           {h ? (
             <div className="flex items-center gap-4">
               <Donut
@@ -227,7 +229,7 @@ export function ComplianceDashboard() {
           )}
         </Card>
 
-        <Card title="Risk levels" testId="card-risks" href="/compliance/risk-register">
+        <Card title="Risk levels" testId="card-risks" href={open('/compliance/risk-register')}>
           {risks ? (
             <div className="flex items-center gap-4">
               <Donut
