@@ -19,18 +19,21 @@ describe('the sidebar order', () => {
   });
 });
 
-describe('the vCIO sidebar section', () => {
-  it('holds Compliance, Executive Digest, Client Review and Client Risk Score, and Platform does not', () => {
-    const labels = (title: string) => NAV_CATALOG.find((s) => s.title === title)?.items.map((i) => i.label);
-    expect(labels('vCIO')).toEqual(['Compliance', 'Executive Digest', 'Client Review', 'Client Risk Score']);
+describe('the Compliance and vCIO sidebar sections', () => {
+  const labels = (title: string) => NAV_CATALOG.find((s) => s.title === title)?.items.map((i) => i.label);
+
+  it('Compliance is a section of its own with the pages that are built, and vCIO no longer holds it', () => {
+    expect(labels('Compliance')).toEqual(['Overview', 'Frameworks', 'Risk Management', 'Vulnerabilities', 'Asset Inventory']);
+    expect(labels('vCIO')).toEqual(['Executive Digest', 'Client Review', 'Client Risk Score']);
     const platform = labels('Platform') ?? [];
     for (const moved of ['Compliance', 'Executive Digest', 'Client Review', 'Client Risk Score']) expect(platform).not.toContain(moved);
   });
 
-  it('sits after Automation, and each page keeps its address', () => {
+  it('Compliance sits after Automation and before vCIO, and each page keeps its address', () => {
     const titles = NAV_CATALOG.map((s) => s.title);
-    expect(titles.indexOf('vCIO')).toBe(titles.indexOf('Automation') + 1);
-    const hrefs = NAV_CATALOG.find((s) => s.title === 'vCIO')?.items.map((i) => i.href);
-    expect(hrefs).toEqual(['/compliance', '/reports/digest', '/reports/client-review', '/vcio-risk-scoring']);
+    expect(titles.indexOf('Compliance')).toBe(titles.indexOf('Automation') + 1);
+    expect(titles.indexOf('vCIO')).toBe(titles.indexOf('Compliance') + 1);
+    expect(NAV_CATALOG.find((s) => s.title === 'Compliance')?.items.map((i) => i.href)).toEqual(['/compliance', '/compliance/frameworks', '/compliance/risk-register', '/vulnerabilities', '/inventory']);
+    expect(NAV_CATALOG.find((s) => s.title === 'vCIO')?.items.map((i) => i.href)).toEqual(['/reports/digest', '/reports/client-review', '/vcio-risk-scoring']);
   });
 });

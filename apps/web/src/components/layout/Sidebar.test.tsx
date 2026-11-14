@@ -49,8 +49,26 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: /marketplace/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /detection catalog/i })).not.toBeInTheDocument();
 
-    const compliance = screen.getByRole('link', { name: /compliance/i });
-    expect(compliance).toHaveAttribute('href', '/compliance');
+    const dashboard = screen.getAllByRole('link').find((a) => a.getAttribute('href') === '/compliance');
+    expect(dashboard).toHaveTextContent('Overview');
+  });
+
+  it('has a Compliance section of its own, apart from vCIO, with the pages that are built', () => {
+    const { container } = render(<Sidebar />);
+    expect(screen.getByText('Compliance')).toBeInTheDocument();
+    const section = screen.getByText('Compliance').closest('div')!;
+    const links = [...section.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')]);
+    expect(links).toEqual([
+      ['Overview', '/compliance'],
+      ['Frameworks', '/compliance/frameworks'],
+      ['Risk Management', '/compliance/risk-register'],
+      ['Vulnerabilities', '/vulnerabilities'],
+      ['Asset Inventory', '/inventory'],
+    ]);
+    const vcio = screen.getByText('vCIO').closest('div')!;
+    expect([...vcio.querySelectorAll('a')].map((a) => a.getAttribute('href'))).not.toContain('/compliance');
+    const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(new Set(hrefs).size).toBe(hrefs.length);
   });
 
   it('has a Client Security section with the client posture, Multi-Factor and sign-in scores pages, and cleanup and platform health live under Settings instead', () => {

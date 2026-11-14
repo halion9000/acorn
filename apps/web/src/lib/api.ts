@@ -7717,3 +7717,37 @@ export const riskRegisterApi = {
   deleteTask: (clientId: string, id: string, taskId: string) =>
     request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}?${riskQs(clientId)}`, { method: 'DELETE' }),
 };
+
+/** The Compliance dashboard and the frameworks turned on (GET /api/v1/compliance/dashboard, GET/PUT /api/v1/compliance/frameworks/enabled). `clientId` reads or writes one client. */
+export interface ComplianceHealth {
+  healthy: number;
+  at_risk: number;
+  unhealthy: number;
+  not_tested: number;
+  total: number;
+  percent_healthy: number | null;
+}
+export interface ComplianceActionItem {
+  kind: 'evidence_expired' | 'risk_task';
+  name: string;
+  event: string;
+  owner: string | null;
+  due: string | null;
+  link: string | null;
+}
+export interface ComplianceDashboard {
+  enabled: string[];
+  health: ComplianceHealth | null;
+  by_framework: { framework: string; health: ComplianceHealth }[];
+  risks: { critical: number; high: number; medium: number; low: number; total: number };
+  action_items: ComplianceActionItem[];
+  generated_at: string;
+}
+const complianceQs = (clientId: string): string => (clientId ? `?client_id=${encodeURIComponent(clientId)}` : '');
+
+export const complianceDashboardApi = {
+  dashboard: (clientId: string) => request<ComplianceDashboard>(`/api/v1/compliance/dashboard${complianceQs(clientId)}`),
+  enabled: (clientId: string) => request<{ enabled: string[]; available: string[] }>(`/api/v1/compliance/frameworks/enabled${complianceQs(clientId)}`),
+  setEnabled: (clientId: string, frameworks: string[]) =>
+    request<{ enabled: string[]; available: string[] }>(`/api/v1/compliance/frameworks/enabled${complianceQs(clientId)}`, { method: 'PUT', body: JSON.stringify({ frameworks }) }),
+};

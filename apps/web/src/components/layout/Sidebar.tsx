@@ -13,6 +13,8 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
+  /** When the page is one of this entry's own pages, if a plain "starts with the address" is not right (the Compliance dashboard is /compliance and nothing under it). */
+  match?: (pathname: string) => boolean;
   badge?: number;
   badgeColor?: string;
   /**
@@ -310,18 +312,8 @@ const navSections: NavSection[] = [
         icon: <ShieldIcon />,
       },
       {
-        label: 'Vulnerabilities',
-        href: '/vulnerabilities',
-        icon: <ShieldIcon />,
-      },
-      {
         label: 'Client Docs',
         href: '/settings/client-docs',
-        icon: <FolderIcon />,
-      },
-      {
-        label: 'Inventory',
-        href: '/inventory',
         icon: <FolderIcon />,
       },
       {
@@ -372,13 +364,23 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: 'Compliance',
+    items: [
+      { label: 'Overview', href: '/compliance', icon: <ShieldIcon />, match: (p) => p === '/compliance' },
+      {
+        label: 'Frameworks',
+        href: '/compliance/frameworks',
+        icon: <DocumentReportIcon />,
+        match: (p) => p === '/compliance/frameworks' || /^\/compliance\/(soc2|iso27001|nist_csf|pci_dss|hipaa|cis_ig1)(\/|$)/.test(p),
+      },
+      { label: 'Risk Management', href: '/compliance/risk-register', icon: <ScanIcon /> },
+      { label: 'Vulnerabilities', href: '/vulnerabilities', icon: <ScanIcon /> },
+      { label: 'Asset Inventory', href: '/inventory', icon: <InboxIcon /> },
+    ],
+  },
+  {
     title: 'vCIO',
     items: [
-      {
-        label: 'Compliance',
-        href: '/compliance',
-        icon: <ShieldIcon />,
-      },
       {
         label: 'Executive Digest',
         href: '/reports/digest',
@@ -431,6 +433,8 @@ export function Sidebar() {
 
   // A link is active when it is the most specific one that matches: /detection/vendor-detections must not also light up /detection.
   const isActive = (href: string) => {
+    const own = navSections.flatMap((sec) => sec.items).find((it) => it.href === href);
+    if (own?.match) return own.match(pathname);
     if (href === '/dashboard') return pathname === '/dashboard';
     if (!pathname.startsWith(href)) return false;
     const better = navSections.some((sec) => sec.items.some((it) => it.href.length > href.length && pathname.startsWith(it.href)));

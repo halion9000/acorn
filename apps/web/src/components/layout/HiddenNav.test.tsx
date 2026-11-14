@@ -49,7 +49,7 @@ describe('the sidebar for a role that hides things', () => {
     render(<Sidebar />);
     expect(screen.queryByRole('link', { name: /Roles/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /SLA Tracking/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Compliance/ })).toBeInTheDocument(); // the vCIO section is its own, not part of Platform
+    expect(screen.getByRole('link', { name: /Risk Management/ })).toBeInTheDocument(); // the Compliance section is its own, not part of Platform
   });
 });
 

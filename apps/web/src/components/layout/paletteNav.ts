@@ -22,7 +22,9 @@ export const PAGE_WORDS: Record<string, string[]> = {
   '/shifts': ['handover', 'on call', 'rota', 'schedule'],
   '/easm': ['attack surface', 'external', 'exposed', 'internet facing'],
   '/playbooks': ['automation', 'response', 'runbooks', 'workflows'],
-  '/compliance': ['frameworks', 'controls', 'audit', 'cis', 'nist', 'secureframe'],
+  '/compliance': ['frameworks', 'controls', 'audit', 'cis', 'nist', 'secureframe', 'control health'],
+  '/compliance/frameworks': ['soc 2', 'iso 27001', 'hipaa', 'pci', 'nist', 'cis', 'controls', 'evidence'],
+  '/compliance/risk-register': ['risks', 'risk register', 'treatment', 'residual', 'likelihood'],
 };
 
 export interface PaletteNavItem {
