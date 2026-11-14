@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     airgap,
     alert_account,
     alert_explain,
+    alert_investigation,
     alert_notes,
     alert_quarantine_release,
     alert_related,
@@ -152,6 +153,7 @@ api_router.include_router(api_keys.router)
 api_router.include_router(alerts.router)
 api_router.include_router(alert_vendor_actions.router)
 api_router.include_router(alert_scripts.router)
+api_router.include_router(alert_investigation.router)
 api_router.include_router(alert_account.router)
 api_router.include_router(alert_related.router)
 api_router.include_router(alert_script_rules.router)

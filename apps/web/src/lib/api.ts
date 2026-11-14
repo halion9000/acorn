@@ -2339,6 +2339,15 @@ export const alertsApi = {
   /** Put back alerts a bulk close finished in the last ten minutes; one changed since, or closed longer ago, is left alone and counted. */
   bulkCloseUndo: (body: { items: { id: string; status_from: string }[]; status: 'resolved' | 'false_positive' | 'closed' }) =>
     request<BulkCloseUndoResult>('/api/v1/alerts/bulk-close/undo', { method: 'POST', body: JSON.stringify(body) }),
+  /** Before an AI investigation: make sure the alert has a case (opened when it has none) and a HaloPSA ticket (requested from CORE when it has none). */
+  openInvestigation: (id: string) =>
+    request<{ case_id: string; case_created: boolean; ticket: 'existing' | 'queued' | 'waiting' | 'none'; ticket_note: string | null }>(`/api/v1/alerts/${encodeURIComponent(id)}/investigation/open`, { method: 'POST' }),
+  /** After it: put the report on the case as a comment and on the ticket as a private note. */
+  reportInvestigation: (id: string, report: string, runId?: string) =>
+    request<{ case_commented: boolean; ticket: 'queued' | 'waiting' | 'none' }>(`/api/v1/alerts/${encodeURIComponent(id)}/investigation/report`, {
+      method: 'POST',
+      body: JSON.stringify({ report, run_id: runId ?? null }),
+    }),
   runScriptBulk: (body: { script_id: number; alert_ids: string[]; preview?: boolean }) =>
     request<BulkScriptRun>('/api/v1/alerts/scripts/run-bulk', { method: 'POST', body: JSON.stringify(body) }),
 

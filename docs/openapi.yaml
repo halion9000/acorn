@@ -1618,6 +1618,71 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/alerts/{alert_id}/investigation/open:
+    post:
+      tags:
+      - alerts
+      summary: Make sure the alert has a case and a ticket before an AI investigation
+        starts
+      operationId: open_investigation_api_v1_alerts__alert_id__investigation_open_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alerts/{alert_id}/investigation/report:
+    post:
+      tags:
+      - alerts
+      summary: Put a finished AI investigation's report on the alert's case and ticket
+      operationId: report_investigation_api_v1_alerts__alert_id__investigation_report_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__alert_investigation__ReportIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__alert_investigation__ReportOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}/account:
     get:
       tags:
@@ -13970,7 +14035,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReportOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__remote_tools__ReportOut'
         '422':
           description: Validation Error
           content:
@@ -15434,7 +15499,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ReportIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__secureframe__ReportIn'
       responses:
         '200':
           description: Successful Response
@@ -44393,6 +44458,34 @@ components:
       - next_step
       - first_data_at
       title: OnboardingRow
+    OpenOut:
+      properties:
+        case_id:
+          type: string
+          format: uuid
+          title: Case Id
+        case_created:
+          type: boolean
+          title: Case Created
+        ticket:
+          type: string
+          enum:
+          - existing
+          - queued
+          - waiting
+          - none
+          title: Ticket
+        ticket_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ticket Note
+      type: object
+      required:
+      - case_id
+      - case_created
+      - ticket
+      title: OpenOut
     OrgOut:
       properties:
         id:
@@ -47213,52 +47306,6 @@ components:
       required:
       - name
       title: ReportDefinitionBody
-    ReportIn:
-      properties:
-        vendor:
-          type: string
-          pattern: ^secureframe$
-          title: Vendor
-          default: secureframe
-        report:
-          $ref: '#/components/schemas/SecureframeBody'
-      type: object
-      required:
-      - report
-      title: ReportIn
-    ReportOut:
-      properties:
-        stored:
-          type: integer
-          title: Stored
-        removed:
-          type: integer
-          title: Removed
-        unknown_tools:
-          type: integer
-          title: Unknown Tools
-        unmapped:
-          type: boolean
-          title: Unmapped
-        alerts_raised:
-          type: integer
-          title: Alerts Raised
-        alerts_closed:
-          type: integer
-          title: Alerts Closed
-          default: 0
-        alerts_reopened:
-          type: integer
-          title: Alerts Reopened
-          default: 0
-      type: object
-      required:
-      - stored
-      - removed
-      - unknown_tools
-      - unmapped
-      - alerts_raised
-      title: ReportOut
     ReportResponse:
       properties:
         stored:
@@ -56829,6 +56876,40 @@ components:
       - at
       - success
       title: SigninRow
+    app__api__v1__endpoints__alert_investigation__ReportIn:
+      properties:
+        report:
+          type: string
+          maxLength: 30000
+          minLength: 1
+          title: Report
+        run_id:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Run Id
+      type: object
+      required:
+      - report
+      title: ReportIn
+    app__api__v1__endpoints__alert_investigation__ReportOut:
+      properties:
+        case_commented:
+          type: boolean
+          title: Case Commented
+        ticket:
+          type: string
+          enum:
+          - queued
+          - waiting
+          - none
+          title: Ticket
+      type: object
+      required:
+      - case_commented
+      - ticket
+      title: ReportOut
     app__api__v1__endpoints__alert_notes__NoteIn:
       properties:
         body:
@@ -58900,6 +58981,39 @@ components:
       - description
       - is_system
       title: RoleOut
+    app__api__v1__endpoints__remote_tools__ReportOut:
+      properties:
+        stored:
+          type: integer
+          title: Stored
+        removed:
+          type: integer
+          title: Removed
+        unknown_tools:
+          type: integer
+          title: Unknown Tools
+        unmapped:
+          type: boolean
+          title: Unmapped
+        alerts_raised:
+          type: integer
+          title: Alerts Raised
+        alerts_closed:
+          type: integer
+          title: Alerts Closed
+          default: 0
+        alerts_reopened:
+          type: integer
+          title: Alerts Reopened
+          default: 0
+      type: object
+      required:
+      - stored
+      - removed
+      - unknown_tools
+      - unmapped
+      - alerts_raised
+      title: ReportOut
     app__api__v1__endpoints__risk_register__Summary:
       properties:
         total:
@@ -58935,6 +59049,19 @@ components:
       - overdue_tasks
       - untreated
       title: Summary
+    app__api__v1__endpoints__secureframe__ReportIn:
+      properties:
+        vendor:
+          type: string
+          pattern: ^secureframe$
+          title: Vendor
+          default: secureframe
+        report:
+          $ref: '#/components/schemas/SecureframeBody'
+      type: object
+      required:
+      - report
+      title: ReportIn
     app__api__v1__endpoints__vcio_proposals__ProposalOut:
       properties:
         id:

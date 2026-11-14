@@ -102,6 +102,18 @@ def rule_covers(
     return moment >= rule.created_at
 
 
+NOTE_MAX = 3500
+
+
+def report_note(report: str) -> str:
+    """What is written on the ticket for a finished AI investigation: a heading and the report, cut to what a HaloPSA note takes (pure)."""
+    text_ = report.strip()
+    head = "A.C.O.R.N AI investigation:\n\n"
+    if len(head) + len(text_) > NOTE_MAX:
+        text_ = text_[: NOTE_MAX - len(head) - 60].rstrip() + "\n\n(cut here; the full report is on the case in A.C.O.R.N)"
+    return head + text_
+
+
 def ticket_params(alert: Any, halo_client_id: str | None, rule_title: str, release_url: str | None = None) -> dict[str, Any]:
     """What CORE needs to open the ticket: a summary and details taken from the alert, and the HaloPSA client the alert's client is mapped to (when it is)."""
     title = " ".join(str(alert.title or rule_title or "Alert").split())
@@ -287,6 +299,11 @@ async def link_created_ticket(db: Any, tenant_id: uuid.UUID, alert_id: uuid.UUID
         # The look into why the message was held finished before this ticket existed: put it on the ticket now (once).
         _queue_ticket_note(db, tenant_id, alert.id, [ticket_id], check_note(str(check["text"])), now)
         enrichment["quarantine_check"] = {**check, "ticketed": True}
+    ai = enrichment.get("ai_investigation")
+    if isinstance(ai, dict) and ai.get("text") and not ai.get("ticketed"):
+        # An AI investigation finished before this ticket existed: put its report on the ticket now (once).
+        _queue_ticket_note(db, tenant_id, alert.id, [ticket_id], report_note(str(ai["text"])), now)
+        enrichment["ai_investigation"] = {**ai, "ticketed": True}
     alert.enrichment_data = enrichment  # a new dict, so the JSONB column is seen as changed
     return True
 

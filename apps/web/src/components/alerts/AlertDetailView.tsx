@@ -10,7 +10,7 @@ import { QuarantineRelease } from './QuarantineRelease';
 import { TicketRuleButton } from './TicketRuleButton';
 import { ScriptRuleButton } from './ScriptRuleButton';
 import { AlertDescription } from './AlertDescription';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -284,6 +284,9 @@ export function AIInvestigation({ alertId }: { alertId: string }) {
   const [investigation, setInvestigation] = useState<AgentInvestigation | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Where the report goes: the case and the HaloPSA ticket made (or found) when the run started, and what happened when it finished.
+  const [paperwork, setPaperwork] = useState<{ caseId: string | null; started: string; finished: string | null } | null>(null);
+  const reported = useRef<string | null>(null);
 
   const pollInvestigation = async (runId: string) => {
     const maxAttempts = 60; // 5 minutes at 5s intervals
@@ -293,6 +296,13 @@ export function AIInvestigation({ alertId }: { alertId: string }) {
         setInvestigation(result);
         if (result.status === 'completed' || result.status === 'failed') {
           setIsRunning(false);
+          if (result.status === 'completed' && result.findings && reported.current !== runId) {
+            reported.current = runId;
+            alertsApi
+              .reportInvestigation(alertId, result.findings, runId)
+              .then((r) => setPaperwork((p) => (p ? { ...p, finished: r.ticket === 'queued' ? 'The report was added to the case and written on the HaloPSA ticket.' : 'The report was added to the case. It is written on the HaloPSA ticket as soon as CORE has opened it.' } : p)))
+              .catch(() => setPaperwork((p) => (p ? { ...p, finished: 'The report could not be added to the case or the ticket. Copy it from here.' } : p)));
+          }
           return;
         }
       } catch (err) {
@@ -311,6 +321,15 @@ export function AIInvestigation({ alertId }: { alertId: string }) {
   const startInvestigation = async () => {
     setIsRunning(true);
     setError(null);
+    setPaperwork(null);
+    // A case and a ticket first, so the run has somewhere to report. If this fails the investigation still runs.
+    try {
+      const o = await alertsApi.openInvestigation(alertId);
+      const ticket = o.ticket === 'existing' ? 'The alert already has a HaloPSA ticket.' : o.ticket === 'queued' ? 'A HaloPSA ticket was requested from CORE.' : o.ticket === 'waiting' ? 'A HaloPSA ticket is being opened.' : 'No HaloPSA ticket will be opened.';
+      setPaperwork({ caseId: o.case_id, started: `${o.case_created ? 'A case was opened' : 'The alert is in a case'}. ${ticket}${o.ticket_note ? ` ${o.ticket_note}` : ''}`, finished: null });
+    } catch {
+      setPaperwork({ caseId: null, started: 'A case and a ticket could not be opened for this run; the investigation still runs but has nowhere to report.', finished: null });
+    }
     try {
       const result = await agentsApi.investigate(alertId);
       setInvestigation(result);
@@ -390,6 +409,21 @@ export function AIInvestigation({ alertId }: { alertId: string }) {
       )}
 
       {/* Findings */}
+      {paperwork && (
+        <p className="text-xs text-gray-400" data-testid="investigation-paperwork">
+          {paperwork.started}
+          {paperwork.caseId ? (
+            <>
+              {' '}
+              <a href={`/cases/${paperwork.caseId}`} className="text-blue-400 hover:underline">
+                Open the case
+              </a>
+            </>
+          ) : null}
+          {paperwork.finished ? ` ${paperwork.finished}` : ''}
+        </p>
+      )}
+
       {investigation.findings && (
         <div className="bg-gray-950/60 rounded-lg p-4 text-xs text-gray-300 font-mono leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
           {investigation.findings}
