@@ -7603,3 +7603,92 @@ export const totpApi = {
   /** Ten new recovery codes (the old ones stop working), returned ONCE; needs the password and a current code. */
   newRecoveryCodes: (password: string, code: string) => request<{ recovery_codes: string[]; note: string }>('/api/v1/auth/totp/recovery', { method: 'POST', body: JSON.stringify({ password, code }) }),
 };
+
+/** The risk register (GET/POST /api/v1/risk-register ...). `clientId` reads or writes one of the organisation's clients. */
+export interface RiskTask {
+  id: string;
+  title: string;
+  owner: string | null;
+  due_date: string | null;
+  done: boolean;
+  done_at: string | null;
+  overdue: boolean;
+}
+export interface RiskItem {
+  id: string;
+  ref: string;
+  title: string;
+  description: string;
+  category: string;
+  owner: string | null;
+  likelihood: number;
+  impact: number;
+  inherent_score: number;
+  inherent_level: 'critical' | 'high' | 'medium' | 'low';
+  treatment: 'mitigate' | 'accept' | 'transfer' | 'avoid' | 'undecided';
+  treatment_note: string;
+  residual_likelihood: number | null;
+  residual_impact: number | null;
+  residual_score: number | null;
+  residual_level: 'critical' | 'high' | 'medium' | 'low' | null;
+  status: 'open' | 'assessed' | 'archived';
+  open_tasks: number;
+  updated_at: string;
+  archived_at: string | null;
+}
+export interface RiskDetail extends RiskItem {
+  tasks: RiskTask[];
+  history: { actor: string | null; action: string; detail: string; created_at: string }[];
+}
+export interface RiskRegister {
+  risks: RiskItem[];
+  summary: { total: number; by_level: Record<string, number>; matrix: number[][]; open_tasks: number; overdue_tasks: number; untreated: number };
+  categories: string[];
+}
+export interface RiskLibraryItem {
+  id: string;
+  title: string;
+  category: string;
+  likelihood: number;
+  impact: number;
+  description: string;
+  added: boolean;
+}
+export interface RiskInput {
+  title: string;
+  description?: string;
+  category?: string;
+  owner?: string | null;
+  likelihood: number;
+  impact: number;
+  treatment?: RiskItem['treatment'];
+  treatment_note?: string;
+  residual_likelihood?: number | null;
+  residual_impact?: number | null;
+}
+
+const riskQ = (clientId: string, extra = ''): string => {
+  const p = new URLSearchParams(extra);
+  if (clientId) p.set('client_id', clientId);
+  const s = p.toString();
+  return s ? `?${s}` : '';
+};
+const riskPath = (suffix: string, clientId: string, extra = ''): string => `/api/v1/risk-register${suffix}${riskQ(clientId, extra)}`;
+
+export const riskRegisterApi = {
+  list: (clientId: string, archived = false) => request<RiskRegister>(riskPath('', clientId, archived ? 'archived=true' : '')),
+  get: (clientId: string, id: string) => request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}`, clientId)),
+  create: (clientId: string, body: RiskInput) => request<RiskDetail>(riskPath('', clientId), { method: 'POST', body: JSON.stringify(body) }),
+  update: (clientId: string, id: string, body: Partial<RiskInput> & { clear_residual?: boolean }) =>
+    request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}`, clientId), { method: 'PATCH', body: JSON.stringify(body) }),
+  archive: (clientId: string, id: string) => request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}/archive`, clientId), { method: 'POST' }),
+  restore: (clientId: string, id: string) => request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}/restore`, clientId), { method: 'POST' }),
+  library: (clientId: string) => request<RiskLibraryItem[]>(riskPath('/library', clientId)),
+  fromLibrary: (clientId: string, libraryId: string) => request<RiskDetail>(riskPath('/from-library', clientId), { method: 'POST', body: JSON.stringify({ library_id: libraryId }) }),
+  addTask: (clientId: string, id: string, body: { title: string; owner?: string | null; due_date?: string | null }) =>
+    request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}/tasks`, clientId), { method: 'POST', body: JSON.stringify(body) }),
+  updateTask: (clientId: string, id: string, taskId: string, body: { done?: boolean; title?: string; owner?: string | null; due_date?: string | null }) =>
+    request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}`, clientId), { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteTask: (clientId: string, id: string, taskId: string) =>
+    request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}`, clientId), { method: 'DELETE' }),
+};

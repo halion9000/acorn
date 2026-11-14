@@ -18,6 +18,12 @@ export function homeClientId(clients: { id: string; name: string }[]): string {
   return (sorted.find((c) => c.name.trim().toLowerCase() === HOME_CLIENT_NAME) ?? sorted[0])?.id ?? '';
 }
 
+/** True when `clientId` is the organisation's own company (Live Oak IT Partners): the views that belong to the organisation itself (its own Secureframe, the organisation snapshot) stay on for it, as they were for the old "My organisation" line. */
+export function useIsHomeClient(clientId: string): boolean {
+  const { data: clients } = useSWR(['client-picker'], () => msspApi.listChildren().catch(() => []));
+  return clientId !== '' && !!clients && homeClientId(clients) === clientId;
+}
+
 export function ClientPicker({ value, onChange, ownLabel, label = 'Show' }: { value: string; onChange: (clientId: string) => void; ownLabel?: string; label?: string }) {
   const { data: clients } = useSWR(['client-picker'], () => msspApi.listChildren().catch(() => []));
   const start = ownLabel === undefined && value === '' && clients && clients.length > 0 ? homeClientId(clients) : '';

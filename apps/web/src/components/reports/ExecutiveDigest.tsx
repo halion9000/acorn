@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 
-import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
+import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
 import { CarryOver } from './CarryOver';
 import { ClientSnapshot } from './ClientSnapshot';
 import { OrgSnapshot } from './OrgSnapshot';
@@ -114,6 +114,9 @@ export function ExecutiveDigest() {
   const [printError, setPrintError] = useState<string | null>(null);
 
   const [clientId, setClientId] = useState('');
+  const isHome = useIsHomeClient(clientId);
+  // The organisation snapshot belongs to the organisation itself: no client chosen, or its own company.
+  const ownView = !clientId || isHome;
   // A link can open the digest of one client (?client=<id>).
   useEffect(() => {
     setClientId(clientFromAddress(window.location.search));
@@ -213,7 +216,7 @@ export function ExecutiveDigest() {
       {/* A handover window (12 or 24 hours) also offers what is still open, which no window of time shows. */}
       {days <= 1 && <CarryOver clientId={clientId} />}
       <ClientSnapshot clientId={clientId} />
-      {!clientId && <OrgSnapshot />}
+      {ownView && <OrgSnapshot />}
 
       {data && <DigestBody digest={data} clientId={clientId} />}
     </div>

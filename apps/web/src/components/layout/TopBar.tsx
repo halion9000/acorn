@@ -53,6 +53,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/purple-team': { title: 'Purple Team', description: 'Adversary emulation and detection coverage' },
   '/settings/connectors': { title: 'Connectors', description: 'Security tool integrations' },
   '/settings/client-mapping': { title: 'Client mapping', description: 'Link the clients of each tool to your clients' },
+  '/compliance/risk-register': { title: 'Risk register', description: 'Risks, how they are treated, and the tasks that treat them' },
   '/compliance': { title: 'Compliance', description: 'Frameworks, controls, and evidence' },
   '/mssp': { title: 'MSSP', description: 'Cross-tenant operations for the clients you manage' },
   '/sla': { title: 'SLA Tracking', description: 'Response time targets and breach risk' },

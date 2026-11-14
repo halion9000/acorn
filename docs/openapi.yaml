@@ -12439,6 +12439,493 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/risk-register:
+    get:
+      tags:
+      - risk-register
+      summary: The risks of this organisation or client, with the dashboard figures
+      operationId: list_risks_api_v1_risk_register_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: archived
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: True lists the archived risks instead of the active ones.
+          default: false
+          title: Archived
+        description: True lists the archived risks instead of the active ones.
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - risk-register
+      summary: Add a risk
+      operationId: create_risk_api_v1_risk_register_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RiskIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/risk-register/library:
+    get:
+      tags:
+      - risk-register
+      summary: Common risks to start from
+      operationId: library_api_v1_risk_register_library_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LibraryItem'
+                title: Response Library Api V1 Risk Register Library Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/risk-register/from-library:
+    post:
+      tags:
+      - risk-register
+      summary: Add a risk from the starter library
+      operationId: from_library_api_v1_risk_register_from_library_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LibraryPick'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/risk-register/{risk_id}:
+    get:
+      tags:
+      - risk-register
+      summary: One risk with its tasks and history
+      operationId: get_risk_api_v1_risk_register__risk_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: risk_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Risk Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - risk-register
+      summary: Change a risk
+      operationId: update_risk_api_v1_risk_register__risk_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: risk_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Risk Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RiskPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/risk-register/{risk_id}/archive:
+    post:
+      tags:
+      - risk-register
+      summary: Archive a risk (it stays in the history and can be restored)
+      operationId: archive_risk_api_v1_risk_register__risk_id__archive_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: risk_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Risk Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/risk-register/{risk_id}/restore:
+    post:
+      tags:
+      - risk-register
+      summary: Bring an archived risk back
+      operationId: restore_risk_api_v1_risk_register__risk_id__restore_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: risk_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Risk Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/risk-register/{risk_id}/tasks:
+    post:
+      tags:
+      - risk-register
+      summary: Add a task that treats this risk
+      operationId: add_task_api_v1_risk_register__risk_id__tasks_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: risk_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Risk Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/risk-register/{risk_id}/tasks/{task_id}:
+    patch:
+      tags:
+      - risk-register
+      summary: Change or finish a task
+      operationId: update_task_api_v1_risk_register__risk_id__tasks__task_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: risk_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Risk Id
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Task Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - risk-register
+      summary: Remove a task
+      operationId: delete_task_api_v1_risk_register__risk_id__tasks__task_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: risk_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Risk Id
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Task Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/devices/settings:
     get:
       tags:
@@ -38992,6 +39479,30 @@ components:
       - at
       - source
       title: HistoryEntry
+    HistoryOut:
+      properties:
+        actor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Actor
+        action:
+          type: string
+          title: Action
+        detail:
+          type: string
+          title: Detail
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - actor
+      - action
+      - detail
+      - created_at
+      title: HistoryOut
     Hit:
       properties:
         kind:
@@ -40227,7 +40738,7 @@ components:
           type: integer
           title: Pages
         summary:
-          $ref: '#/components/schemas/Summary'
+          $ref: '#/components/schemas/app__api__v1__endpoints__inventory__Summary'
       type: object
       required:
       - items
@@ -40616,6 +41127,39 @@ components:
       - days_ago
       - silent
       title: LastReportedRow
+    LibraryItem:
+      properties:
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        category:
+          type: string
+          title: Category
+        likelihood:
+          type: integer
+          title: Likelihood
+        impact:
+          type: integer
+          title: Impact
+        description:
+          type: string
+          title: Description
+        added:
+          type: boolean
+          title: Added
+      type: object
+      required:
+      - id
+      - title
+      - category
+      - likelihood
+      - impact
+      - description
+      - added
+      title: LibraryItem
     LibraryOut:
       properties:
         questions:
@@ -40663,6 +41207,17 @@ components:
       - vendor_answers
       - defaults
       title: LibraryOut
+    LibraryPick:
+      properties:
+        library_id:
+          type: string
+          maxLength: 60
+          minLength: 1
+          title: Library Id
+      type: object
+      required:
+      - library_id
+      title: LibraryPick
     LicenseCountIn:
       properties:
         item:
@@ -46063,6 +46618,26 @@ components:
           default: My phone
       type: object
       title: RegisterBeginRequest
+    RegisterOut:
+      properties:
+        risks:
+          items:
+            $ref: '#/components/schemas/RiskOut'
+          type: array
+          title: Risks
+        summary:
+          $ref: '#/components/schemas/app__api__v1__endpoints__risk_register__Summary'
+        categories:
+          items:
+            type: string
+          type: array
+          title: Categories
+      type: object
+      required:
+      - risks
+      - summary
+      - categories
+      title: RegisterOut
     RelatedAlert:
       properties:
         id:
@@ -46742,6 +47317,186 @@ components:
       - risks
       - refreshed_at
       title: ReviewVcio
+    RiskDetail:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        ref:
+          type: string
+          title: Ref
+        title:
+          type: string
+          title: Title
+        description:
+          type: string
+          title: Description
+        category:
+          type: string
+          title: Category
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        likelihood:
+          type: integer
+          title: Likelihood
+        impact:
+          type: integer
+          title: Impact
+        inherent_score:
+          type: integer
+          title: Inherent Score
+        inherent_level:
+          type: string
+          title: Inherent Level
+        treatment:
+          type: string
+          title: Treatment
+        treatment_note:
+          type: string
+          title: Treatment Note
+        residual_likelihood:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Residual Likelihood
+        residual_impact:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Residual Impact
+        residual_score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Residual Score
+        residual_level:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Residual Level
+        status:
+          type: string
+          title: Status
+        open_tasks:
+          type: integer
+          title: Open Tasks
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        archived_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Archived At
+        tasks:
+          items:
+            $ref: '#/components/schemas/TaskOut'
+          type: array
+          title: Tasks
+        history:
+          items:
+            $ref: '#/components/schemas/HistoryOut'
+          type: array
+          title: History
+      type: object
+      required:
+      - id
+      - ref
+      - title
+      - description
+      - category
+      - owner
+      - likelihood
+      - impact
+      - inherent_score
+      - inherent_level
+      - treatment
+      - treatment_note
+      - residual_likelihood
+      - residual_impact
+      - residual_score
+      - residual_level
+      - status
+      - open_tasks
+      - updated_at
+      - archived_at
+      - tasks
+      - history
+      title: RiskDetail
+    RiskIn:
+      properties:
+        title:
+          type: string
+          maxLength: 300
+          minLength: 3
+          title: Title
+        description:
+          type: string
+          maxLength: 4000
+          title: Description
+          default: ''
+        category:
+          type: string
+          maxLength: 60
+          title: Category
+          default: Other
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Owner
+        likelihood:
+          type: integer
+          maximum: 5.0
+          minimum: 1.0
+          title: Likelihood
+        impact:
+          type: integer
+          maximum: 5.0
+          minimum: 1.0
+          title: Impact
+        treatment:
+          type: string
+          enum:
+          - mitigate
+          - accept
+          - transfer
+          - avoid
+          - undecided
+          title: Treatment
+          default: undecided
+        treatment_note:
+          type: string
+          maxLength: 4000
+          title: Treatment Note
+          default: ''
+        residual_likelihood:
+          anyOf:
+          - type: integer
+            maximum: 5.0
+            minimum: 1.0
+          - type: 'null'
+          title: Residual Likelihood
+        residual_impact:
+          anyOf:
+          - type: integer
+            maximum: 5.0
+            minimum: 1.0
+          - type: 'null'
+          title: Residual Impact
+      type: object
+      required:
+      - title
+      - likelihood
+      - impact
+      title: RiskIn
     RiskLine:
       properties:
         id:
@@ -46808,6 +47563,184 @@ components:
       title: RiskLine
       description: 'One entry of the risk register: what the risk is, what was decided
         about it, and its rating before and after treatment.'
+    RiskOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        ref:
+          type: string
+          title: Ref
+        title:
+          type: string
+          title: Title
+        description:
+          type: string
+          title: Description
+        category:
+          type: string
+          title: Category
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        likelihood:
+          type: integer
+          title: Likelihood
+        impact:
+          type: integer
+          title: Impact
+        inherent_score:
+          type: integer
+          title: Inherent Score
+        inherent_level:
+          type: string
+          title: Inherent Level
+        treatment:
+          type: string
+          title: Treatment
+        treatment_note:
+          type: string
+          title: Treatment Note
+        residual_likelihood:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Residual Likelihood
+        residual_impact:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Residual Impact
+        residual_score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Residual Score
+        residual_level:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Residual Level
+        status:
+          type: string
+          title: Status
+        open_tasks:
+          type: integer
+          title: Open Tasks
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        archived_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Archived At
+      type: object
+      required:
+      - id
+      - ref
+      - title
+      - description
+      - category
+      - owner
+      - likelihood
+      - impact
+      - inherent_score
+      - inherent_level
+      - treatment
+      - treatment_note
+      - residual_likelihood
+      - residual_impact
+      - residual_score
+      - residual_level
+      - status
+      - open_tasks
+      - updated_at
+      - archived_at
+      title: RiskOut
+    RiskPatch:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 300
+            minLength: 3
+          - type: 'null'
+          title: Title
+        description:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Description
+        category:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Category
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Owner
+        likelihood:
+          anyOf:
+          - type: integer
+            maximum: 5.0
+            minimum: 1.0
+          - type: 'null'
+          title: Likelihood
+        impact:
+          anyOf:
+          - type: integer
+            maximum: 5.0
+            minimum: 1.0
+          - type: 'null'
+          title: Impact
+        treatment:
+          anyOf:
+          - type: string
+            enum:
+            - mitigate
+            - accept
+            - transfer
+            - avoid
+            - undecided
+          - type: 'null'
+          title: Treatment
+        treatment_note:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Treatment Note
+        residual_likelihood:
+          anyOf:
+          - type: integer
+            maximum: 5.0
+            minimum: 1.0
+          - type: 'null'
+          title: Residual Likelihood
+        residual_impact:
+          anyOf:
+          - type: integer
+            maximum: 5.0
+            minimum: 1.0
+          - type: 'null'
+          title: Residual Impact
+        clear_residual:
+          type: boolean
+          title: Clear Residual
+          default: false
+      type: object
+      title: RiskPatch
     RiskProfileOut:
       properties:
         id:
@@ -51062,36 +51995,6 @@ components:
       - proposal_id
       - created_at
       title: SuggestionResponse
-    Summary:
-      properties:
-        total:
-          type: integer
-          title: Total
-        by_status:
-          additionalProperties:
-            type: integer
-          type: object
-          title: By Status
-        categories:
-          items:
-            prefixItems:
-            - type: string
-            - type: integer
-            type: array
-            maxItems: 2
-            minItems: 2
-          type: array
-          title: Categories
-        unmatched_customers:
-          type: integer
-          title: Unmatched Customers
-      type: object
-      required:
-      - total
-      - by_status
-      - categories
-      - unmatched_customers
-      title: Summary
     SuppressRequest:
       properties:
         reason:
@@ -51527,6 +52430,99 @@ components:
       - client_id
       - target
       title: TargetOut
+    TaskIn:
+      properties:
+        title:
+          type: string
+          maxLength: 300
+          minLength: 2
+          title: Title
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+      type: object
+      required:
+      - title
+      title: TaskIn
+    TaskOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        title:
+          type: string
+          title: Title
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        done:
+          type: boolean
+          title: Done
+        done_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Done At
+        overdue:
+          type: boolean
+          title: Overdue
+      type: object
+      required:
+      - id
+      - title
+      - owner
+      - due_date
+      - done
+      - done_at
+      - overdue
+      title: TaskOut
+    TaskPatch:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 300
+            minLength: 2
+          - type: 'null'
+          title: Title
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        done:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Done
+      type: object
+      title: TaskPatch
     TaskResponse:
       properties:
         id:
@@ -57374,6 +58370,36 @@ components:
       title: ItemPatch
       description: Any of an item's fields; only those sent change. Moving it to another
         client is ``client_id`` (``own`` is expressed by sending ``move_to_own``).
+    app__api__v1__endpoints__inventory__Summary:
+      properties:
+        total:
+          type: integer
+          title: Total
+        by_status:
+          additionalProperties:
+            type: integer
+          type: object
+          title: By Status
+        categories:
+          items:
+            prefixItems:
+            - type: string
+            - type: integer
+            type: array
+            maxItems: 2
+            minItems: 2
+          type: array
+          title: Categories
+        unmatched_customers:
+          type: integer
+          title: Unmatched Customers
+      type: object
+      required:
+      - total
+      - by_status
+      - categories
+      - unmatched_customers
+      title: Summary
     app__api__v1__endpoints__investigations__EventOut:
       properties:
         id:
@@ -57526,6 +58552,41 @@ components:
       - target
       - remapped
       title: MergeOut
+    app__api__v1__endpoints__risk_register__Summary:
+      properties:
+        total:
+          type: integer
+          title: Total
+        by_level:
+          additionalProperties:
+            type: integer
+          type: object
+          title: By Level
+        matrix:
+          items:
+            items:
+              type: integer
+            type: array
+          type: array
+          title: Matrix
+        open_tasks:
+          type: integer
+          title: Open Tasks
+        overdue_tasks:
+          type: integer
+          title: Overdue Tasks
+        untreated:
+          type: integer
+          title: Untreated
+      type: object
+      required:
+      - total
+      - by_level
+      - matrix
+      - open_tasks
+      - overdue_tasks
+      - untreated
+      title: Summary
     app__api__v1__endpoints__vcio_proposals__ProposalOut:
       properties:
         id:

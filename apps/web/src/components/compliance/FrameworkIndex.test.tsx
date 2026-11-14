@@ -68,6 +68,20 @@ describe('the compliance index', () => {
     expect(window.location.search).toBe('?client=c3');
   });
 
+  it('keeps the own Secureframe for the own company (the client the picker starts on) and hides it for any other client', async () => {
+    authFetch.mockImplementation((url: string) =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve(String(url).includes('/secureframe') ? { report: { tests: { total: 7, enabled: 7, passing: 5, failing: 2, not_evaluated: 0, disabled: 0 }, frameworks: [], failing: [], risks: 0, policies: 0 }, received_at: null, passing_percent: 71 } : []) }),
+    );
+    listChildren.mockResolvedValue([{ id: 'c1', name: 'Acme Dental' }, { id: 'c2', name: 'Live Oak IT Partners' }]);
+    renderIndex();
+    const user = userEvent.setup();
+    await screen.findByLabelText('Client');
+    await waitFor(() => expect(window.location.search).toBe('?client=c2'));
+    expect(await screen.findByTestId('secureframe-card')).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText('Client'), 'c1');
+    await waitFor(() => expect(screen.queryByTestId('secureframe-card')).toBeNull());
+  });
+
   it('opens on the client named in its own address, so a reload or a shared link keeps the choice', async () => {
     window.history.replaceState(null, '', '/compliance?client=c1');
     listChildren.mockResolvedValue([{ id: 'c1', name: 'Acme Dental' }]);

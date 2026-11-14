@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
-import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
+import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
 import { evidenceAgeNote, staleControlCount } from './evidenceAge';
 
 interface Props {
@@ -225,6 +225,7 @@ export function forClient(path: string, clientId: string): string {
 export function FrameworkView({ framework, now }: Props & { /** The time to count from; the clock when left out (tests give a fixed one). */ now?: number }) {
   const key = API_KEYS[framework];
   const [clientId, setClientId] = useState('');
+  const isHome = useIsHomeClient(clientId);
   const chosen = useRef('');
   chosen.current = clientId;
   // A link can open on one client (?client=<id>); read once, after the first paint so the server and browser markup agree.
@@ -257,7 +258,7 @@ export function FrameworkView({ framework, now }: Props & { /** The time to coun
       setPosture(r[0] ?? null);
       setEvidence(e);
       setError(null);
-      if ((key === 'NIST-CSF' || key === 'CIS-IG1') && !clientId) {
+      if ((key === 'NIST-CSF' || key === 'CIS-IG1') && (!clientId || isHome)) {
         getJson<SecureframeMapping>(`/api/v1/secureframe/requirements/${encodeURIComponent(key)}`)
           .then((m) => {
             if (chosen.current === clientId) setSf(m.mapped ? m : null);
@@ -269,7 +270,7 @@ export function FrameworkView({ framework, now }: Props & { /** The time to coun
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this framework');
     }
-  }, [key, clientId]);
+  }, [key, clientId, isHome]);
 
   useEffect(() => {
     void load();

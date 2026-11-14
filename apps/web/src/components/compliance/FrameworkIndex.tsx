@@ -7,7 +7,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
+import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
 import { authFetch } from '@/lib/auth-session';
 import { SecureframeCard } from './SecureframeCard';
 import { SecureframeRegisters } from './SecureframeRegisters';
@@ -77,6 +77,9 @@ function Progress({ value }: { value: Completion | null | undefined }) {
 
 export function FrameworkIndex({ frameworks }: { frameworks: FrameworkCard[] }) {
   const [clientId, setClientId] = useState('');
+  const isHome = useIsHomeClient(clientId);
+  // The organisation's own Secureframe is shown for the organisation itself (no client, or its own company).
+  const ownView = !clientId || isHome;
   // A link can open on one client; read once, after the first paint so the server and browser markup agree.
   useEffect(() => {
     setClientId(clientFromAddress(window.location.search));
@@ -121,8 +124,18 @@ export function FrameworkIndex({ frameworks }: { frameworks: FrameworkCard[] }) 
         </div>
       </div>
 
-      {!clientId && <SecureframeCard />}
-      {!clientId && <SecureframeRegisters />}
+      {ownView && <SecureframeCard />}
+      {ownView && <SecureframeRegisters />}
+
+      <div>
+        <Link
+          href={clientId ? `/compliance/risk-register?client=${encodeURIComponent(clientId)}` : '/compliance/risk-register'}
+          className="inline-block rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-white hover:border-blue-500"
+        >
+          <span className="font-semibold">Risk register</span>
+          <span className="ml-2 text-gray-400">risks, how they are treated, and the tasks that treat them</span>
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {frameworks.map((fw) => (

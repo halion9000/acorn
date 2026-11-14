@@ -58,6 +58,7 @@ from app.models.tenant import ApiKey, Tenant, User
 from app.models.tenant_access import AllTenantAccessGrant, TenantAccessGrant
 from app.models.threat_intel import ThreatActor, ThreatIntelFeed, ThreatIntelIOC
 from app.models.vcio_risk_assessment import VcioRiskAssessment
+from app.models.risk_register import RiskRegisterHistory, RiskRegisterItem, RiskRegisterTask
 from app.models.vcio_risk_ticket import VcioRiskTicket
 from app.models.vendor_action import VendorAction
 
@@ -143,5 +144,8 @@ __all__ = [
     "OutcomeSuppression",
     "Shift",
     "VcioRiskAssessment",
+    "RiskRegisterHistory",
+    "RiskRegisterItem",
+    "RiskRegisterTask",
     "VcioRiskTicket",
 ]
