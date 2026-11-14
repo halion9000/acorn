@@ -10,6 +10,7 @@ import DeviceScriptBar from './DeviceScriptBar';
 import DuplicateDevices from './DuplicateDevices';
 import { MergeDeviceInto } from './MergeDeviceInto';
 import { WhereElse } from './WhereElse';
+import { CommandPrompt } from './CommandPrompt';
 import UnmappedDevices from './UnmappedDevices';
 import { ClientRollupTable } from './ClientRollupTable';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
@@ -830,6 +831,7 @@ function DeviceRowView({ d, master, picked, onPick, open, onToggle, onHide, onMe
             </div>
             <MergeDeviceInto device={d} onMerged={onMerged} />
             <WhereElse deviceId={d.id} />
+            {(d.sources ?? []).some((s) => s.vendor === 'screenconnect') && <CommandPrompt deviceId={d.id} hostname={d.hostname} />}
             {(d.alerts ?? []).length > 0 && (
               <>
                 <h3 className="mb-1 mt-3 text-xs font-semibold uppercase text-gray-400">Open alerts on this device</h3>

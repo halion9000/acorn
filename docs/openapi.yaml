@@ -12347,6 +12347,98 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/devices/{device_id}/console:
+    get:
+      tags:
+      - devices
+      summary: The recent commands sent to this machine, with their answers
+      operationId: console_history_api_v1_devices__device_id__console_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Device Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleHistory'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - devices
+      summary: Send one command to this machine through ScreenConnect
+      operationId: console_send_api_v1_devices__device_id__console_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Device Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsoleIn'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleLine'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/devices/console/{request_id}:
+    get:
+      tags:
+      - devices
+      summary: One command's state and answer
+      operationId: console_line_api_v1_devices_console__request_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Request Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleLine'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/devices/settings:
     get:
       tags:
@@ -31265,6 +31357,7 @@ components:
           - allow_sender
           - create_halo_user
           - addigy_push
+          - sc_command
           title: Action
         incident_uid:
           type: string
@@ -32662,6 +32755,85 @@ components:
         knobs (poll interval, region, log filters) that the wizard surfaces
 
         so an operator can tweak them without re-pasting credentials.'
+    ConsoleHistory:
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        device:
+          type: string
+          title: Device
+        available:
+          type: boolean
+          title: Available
+        blocked:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Blocked
+        lines:
+          items:
+            $ref: '#/components/schemas/ConsoleLine'
+          type: array
+          title: Lines
+      type: object
+      required:
+      - device_id
+      - device
+      - available
+      - lines
+      title: ConsoleHistory
+    ConsoleIn:
+      properties:
+        command:
+          type: string
+          maxLength: 1000
+          minLength: 1
+          title: Command
+      type: object
+      required:
+      - command
+      title: ConsoleIn
+    ConsoleLine:
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          title: Request Id
+        command:
+          type: string
+          title: Command
+        status:
+          type: string
+          enum:
+          - pending
+          - claimed
+          - done
+          - failed
+          title: Status
+        output:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output
+        requested_at:
+          type: string
+          format: date-time
+          title: Requested At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+      type: object
+      required:
+      - request_id
+      - command
+      - status
+      - requested_at
+      title: ConsoleLine
     ControlDetail:
       properties:
         key:

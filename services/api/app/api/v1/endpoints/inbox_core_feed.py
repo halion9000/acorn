@@ -560,6 +560,7 @@ class ClaimedAction(BaseModel):
         "allow_sender",
         "create_halo_user",
         "addigy_push",
+        "sc_command",
     ]
     incident_uid: str
     params: dict[str, Any]

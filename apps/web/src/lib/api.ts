@@ -680,6 +680,23 @@ export interface AlertScriptOptions {
   suggested_script_id?: number | null;
 }
 
+/** One command sent to a machine from the Devices page command prompt, with the machine's answer once CORE has it. */
+export interface ConsoleLine {
+  request_id: string;
+  command: string;
+  status: 'pending' | 'claimed' | 'done' | 'failed';
+  output: string | null;
+  requested_at: string;
+  finished_at: string | null;
+}
+export interface ConsoleHistory {
+  device_id: string;
+  device: string;
+  available: boolean;
+  blocked: string | null;
+  lines: ConsoleLine[];
+}
+
 /** Another device that shares a serial number or name with the one asked about (GET /api/v1/devices/{id}/elsewhere). */
 export interface DeviceElsewhere {
   device_id: string;
@@ -1315,6 +1332,10 @@ export const devicesApi = {
   /** These two are the same machine: fold `remove` into `keep`. Two devices with different serial numbers are refused with 409 unless `sameMachine` (a person's word) is given. */
   /** Other devices, under any client, with the same serial number or name: where a tool's record of this machine may be filed. */
   elsewhere: (id: string) => request<DeviceElsewhere>(`/api/v1/devices/${encodeURIComponent(id)}/elsewhere`),
+  /** The command prompt: the recent commands for a machine, one command sent (CORE sends it through ScreenConnect), and one command's state. */
+  consoleHistory: (id: string) => request<ConsoleHistory>(`/api/v1/devices/${encodeURIComponent(id)}/console`),
+  consoleSend: (id: string, command: string) => request<ConsoleLine>(`/api/v1/devices/${encodeURIComponent(id)}/console`, { method: 'POST', body: JSON.stringify({ command }) }),
+  consoleLine: (requestId: string) => request<ConsoleLine>(`/api/v1/devices/console/${encodeURIComponent(requestId)}`),
   /** The scripts CORE has switched on (Settings > Manage NinjaOne scripts in CORE). */
   scriptOptions: () => request<DeviceScriptOptions>('/api/v1/devices/scripts/options'),
   /** One script for many devices: one request (and one new HaloPSA ticket) per machine, one approval in CORE. `preview` queues nothing and says what would happen. */
