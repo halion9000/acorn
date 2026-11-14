@@ -312,6 +312,11 @@ const navSections: NavSection[] = [
         icon: <ShieldIcon />,
       },
       {
+        label: 'Vulnerabilities',
+        href: '/vulnerabilities',
+        icon: <ShieldIcon />,
+      },
+      {
         label: 'Client Docs',
         href: '/settings/client-docs',
         icon: <FolderIcon />,
@@ -374,7 +379,6 @@ const navSections: NavSection[] = [
         match: (p) => p === '/compliance/frameworks' || /^\/compliance\/(soc2|iso27001|nist_csf|pci_dss|hipaa|cis_ig1)(\/|$)/.test(p),
       },
       { label: 'Risk Management', href: '/compliance/risk-register', icon: <ScanIcon /> },
-      { label: 'Vulnerabilities', href: '/vulnerabilities', icon: <ScanIcon /> },
       { label: 'Asset Inventory', href: '/inventory', icon: <InboxIcon /> },
     ],
   },

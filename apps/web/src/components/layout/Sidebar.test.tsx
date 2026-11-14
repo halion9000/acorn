@@ -62,7 +62,6 @@ describe('Sidebar', () => {
       ['Overview', '/compliance'],
       ['Frameworks', '/compliance/frameworks'],
       ['Risk Management', '/compliance/risk-register'],
-      ['Vulnerabilities', '/vulnerabilities'],
       ['Asset Inventory', '/inventory'],
     ]);
     const vcio = screen.getByText('vCIO').closest('div')!;
