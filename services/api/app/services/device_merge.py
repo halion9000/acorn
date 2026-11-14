@@ -556,12 +556,12 @@ async def auto_merge_rediscovered(db: Any, tenant_id: uuid.UUID, actor_id: uuid.
 
 
 async def auto_merge_stale_auvik(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> int:
-    """Fold an old Auvik-only record of a computer into the device that already holds that computer's newer Auvik record AND another tool (NinjaOne, Huntress...). Returns how many merges were made.
+    """Fold an Auvik-only record of a computer into the device that already holds another Auvik record of it AND another tool (NinjaOne, Huntress...). Returns how many merges were made.
 
     ``auto_merge_rediscovered`` only folds Auvik-only records into each other. When Auvik refiled a Mac, the newest record was joined to the machine's NinjaOne line by the same-name rule, but the older
     one was left as its own Auvik-only device, which the Devices page then listed as "not in NinjaOne" (83 such lines found 2026-11-13). The same narrow conditions apply: Auvik calls the old record a
-    computer, it is not online now, its last-seen time is at least ``REDISCOVERY_GAP`` before the newest Auvik record on the other device, the name is not a stock or made-up one, exactly ONE device
-    holds that name together with other tools (no more than ``MAX_AUTO_MERGE_GROUP`` records in all), no real serials differ, and nobody said they are different."""
+    computer, the two Auvik records were last seen at least ``REDISCOVERY_GAP`` apart and the OLDER of them is not online now, the name is not a stock or made-up one, exactly ONE device holds that
+    name together with other tools (no more than ``MAX_AUTO_MERGE_GROUP`` records in all), no real serials differ, and nobody said they are different. Either record may be the newer one."""
     rows = (
         await db.execute(
             select(
@@ -587,7 +587,7 @@ async def auto_merge_stale_auvik(db: Any, tenant_id: uuid.UUID, actor_id: uuid.U
         when = _seen_at(seen)
         if when is not None and (device_id not in auvik_seen or when > auvik_seen[device_id]):
             auvik_seen[device_id] = when
-    old_ids = {i for i, t in tools.items() if t == {"auvik"} and computer.get(i) and not online.get(i) and i in auvik_seen}
+    old_ids = {i for i, t in tools.items() if t == {"auvik"} and computer.get(i) and i in auvik_seen}
     target_ids = {i for i, t in tools.items() if "auvik" in t and len(t) > 1 and i in auvik_seen}
     if not old_ids or not target_ids:
         return 0
@@ -619,7 +619,12 @@ async def auto_merge_stale_auvik(db: Any, tenant_id: uuid.UUID, actor_id: uuid.U
         keep = targets[0]
         newest = auvik_seen[keep.id]
         for old in olds:
-            if newest - auvik_seen[old.id] < REDISCOVERY_GAP:
+            # Either record may be the newer one: the live data had the NinjaOne line holding Auvik's OLDER record and the Auvik-only line the newest. Two records seen close together, or the older of
+            # the two still online, may be two machines in use.
+            if abs(newest - auvik_seen[old.id]) < REDISCOVERY_GAP:
+                continue
+            older_online = online.get(old.id, False) if auvik_seen[old.id] < newest else online.get(keep.id, False)
+            if older_online:
                 continue
             if real_serial(keep) and real_serial(old) and real_serial(keep) != real_serial(old):
                 continue

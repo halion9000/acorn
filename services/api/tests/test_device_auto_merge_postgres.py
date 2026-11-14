@@ -542,3 +542,35 @@ async def test_an_old_auvik_record_with_a_different_real_serial_is_not_folded(te
     await report(tenant, "auvik", "a-old", "QTZ-LAB-07.local.", serial="ZZZZ999988", details=auvik("2026-10-01T00:00:00Z"))
     await settle(tenant)
     assert await count(tenant) == 2, "two real serials are two machines, whatever the dates"
+
+
+async def test_a_newer_auvik_only_record_folds_into_the_ninjaone_line_that_holds_the_older_one(tenant):
+    # The order of the live data (blythef-MacBook-Air): NinjaOne's line holds Auvik's record from 25 October; Auvik filed the Mac again on 1 November under a new address, as its own device.
+    await report(tenant, "ninjaone", "n1", "blythef-MacBook-Air.local", serial="H21YXQWT7M")
+    await report(tenant, "auvik", "a-old", "blythef-MacBook-Air.local.", details=auvik("2026-10-25T16:52:12Z"))
+    await settle(tenant)
+    assert await count(tenant) == 1
+    await report(tenant, "auvik", "a-new", "blythef-MacBook-Air.local.", details=auvik("2026-11-01T22:10:22Z"))
+    assert await count(tenant) == 2, "the newest record is its own device, listed as 'not in NinjaOne'"
+    await settle(tenant)
+    assert await count(tenant) == 1
+    assert await count(tenant, "select count(*) from device_sources where tenant_id = :t") == 3
+    assert await count(tenant, "select serial_number from devices where tenant_id = :t") == "H21YXQWT7M"
+
+
+async def test_the_newer_record_may_be_online_but_the_older_one_must_not_be(tenant):
+    await report(tenant, "ninjaone", "n1", "dsstudent-laptop", serial="H2WGP0X4Q6NW")
+    await report(tenant, "auvik", "a-old", "dsstudent-laptop.local.", details=auvik("2026-10-25T16:52:12Z"))
+    await settle(tenant)
+    await report(tenant, "auvik", "a-new", "dsstudent-laptop.local.", details=auvik("2026-11-14T04:00:00Z", status="online"))
+    await settle(tenant)
+    assert await count(tenant) == 1, "the Mac is online now under its new address; the old record is long gone"
+
+    await report(tenant, "ninjaone", "n2", "lab-server-9", serial="SRV9000111")
+    await report(tenant, "auvik", "b-old", "lab-server-9.local.", details=auvik("2026-10-25T16:52:12Z", status="online"))
+    await settle(tenant)
+    await report(tenant, "auvik", "b-new", "lab-server-9.local.", details=auvik("2026-11-14T04:00:00Z", status="online"))
+    await settle(tenant)
+    assert (
+        await count(tenant, "select count(*) from devices where tenant_id = :t and hostname ilike 'lab-server-9%'") == 2
+    ), "both in use: two machines"
