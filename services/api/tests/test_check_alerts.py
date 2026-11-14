@@ -257,3 +257,15 @@ def test_addigy_may_send_its_own_checks():
     from app.services.infra_review import TOOL_CHECK_SOURCES
 
     assert TOOL_CHECK_SOURCES.get("addigy") == "addigy"
+
+
+def test_a_history_row_is_named_added_worsened_improved_or_changed():
+    from app.services.check_alerts import change_label
+
+    assert change_label(None, "not_met") == "added"
+    assert change_label("met", "not_met") == "worsened"
+    assert change_label("partly", "not_met") == "worsened"
+    assert change_label("not_met", "partly") == "improved"
+    assert change_label("not_met", "met") == "improved"
+    assert change_label("met", "unheard_of") == "changed"
+    assert change_label("odd", "met") == "changed"

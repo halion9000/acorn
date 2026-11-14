@@ -1206,3 +1206,49 @@ async def test_the_review_answers_the_google_two_step_question_from_the_clients_
     answer = {a.question: a for a in r.assess}[question]
     assert answer.status == "partly"
     assert "enforced for 1 of 2 Google accounts" in answer.evidence, "the Microsoft person is not counted"
+
+
+async def test_what_changed_can_be_limited_to_a_period_and_to_a_kind_of_change(world):
+    """The configuration changes feed (L27): the check history, named added / worsened / improved and cut to the last N days."""
+    from app.api.v1.endpoints import client_posture as cp
+
+    async def alias(db):
+        await db.execute(
+            text(
+                "insert into client_aliases (tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) "
+                "values (:t, 'cipp', 'h-2', 'h-2', 'h-2', :c, false, 'manual')"
+            ),
+            {"t": world["msp"], "c": world["client"]},
+        )
+
+    await run(world["msp"], alias)
+    steps = [
+        [{"key": "a", "status": "met", "evidence": "one"}, {"key": "b", "status": "not_met", "evidence": "two"}],  # both added
+        [
+            {"key": "a", "status": "not_met", "evidence": "broke"},
+            {"key": "b", "status": "partly", "evidence": "better"},
+        ],  # a worse, b better
+    ]
+    for checks in steps:
+        await run(world["msp"], lambda db, checks=checks: ep.apply_m365_checks(db, world["msp"], m365_report(client="h-2", checks=checks)))
+    # The two "added" rows are from 40 days ago.
+    await run(
+        world["msp"],
+        lambda db: db.execute(
+            text(
+                "update client_check_history set observed_at = now() - interval '40 days' where tenant_id = :c and previous_status is null"
+            ),
+            {"c": world["client"]},
+        ),
+    )
+
+    async def history(**kw):
+        out = await run(world["msp"], lambda db: cp.check_history(world["client"], NS(tenant_id=world["msp"]), db, **kw))
+        return sorted((r.key, r.change) for r in out.rows)
+
+    assert await history() == [("a", "added"), ("a", "worsened"), ("b", "added"), ("b", "improved")]
+    assert await history(days=7) == [("a", "worsened"), ("b", "improved")], "the last week: the 40-day-old additions are left out"
+    assert await history(days=90) == [("a", "added"), ("a", "worsened"), ("b", "added"), ("b", "improved")]
+    assert await history(change="worsened") == [("a", "worsened")]
+    assert await history(change="improved", days=7) == [("b", "improved")]
+    assert await history(change="added", days=7) == []

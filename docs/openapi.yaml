@@ -15666,6 +15666,29 @@ paths:
           minimum: 1
           default: 200
           title: Limit
+      - name: days
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 400
+            minimum: 1
+          - type: 'null'
+          description: Only changes in the last this many days (1 to 400).
+          title: Days
+        description: Only changes in the last this many days (1 to 400).
+      - name: change
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(added|worsened|improved|changed)$
+          - type: 'null'
+          description: Only this kind of change.
+          title: Change
+        description: Only this kind of change.
       responses:
         '200':
           description: Successful Response
@@ -31157,6 +31180,10 @@ components:
           type: string
           format: date-time
           title: Observed At
+        change:
+          type: string
+          title: Change
+          default: changed
       type: object
       required:
       - key

@@ -13,6 +13,7 @@ import { vendorLabel } from "@/components/mssp/ClientMapping";
 import { vendorClientUrl } from "@/lib/vendor-links";
 import { DomainChecks } from "./DomainChecks";
 import { NistCoverage } from "./NistCoverage";
+import { ConfigChanges } from "./ConfigChanges";
 import { ToolChecks, checkTitle, type PostureCheck } from "./ToolChecks";
 import { ClientSummary } from "./ClientSummary";
 import { SourceHealth } from "./SourceHealth";
@@ -290,6 +291,7 @@ export function ClientPosture() {
           ))}
           <DomainChecks clientId={shown.client_id} />
           <NistCoverage clientId={shown.client_id} />
+          <ConfigChanges clientId={shown.client_id} labelFor={labelFor} />
           <ClientSummary posture={shown} labelFor={labelFor} />
           <section>
             <h3 className="mb-2 text-sm uppercase text-gray-500">Alerts and cases</h3>

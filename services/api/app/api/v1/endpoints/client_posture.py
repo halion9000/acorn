@@ -40,7 +40,7 @@ from app.models.signin import (
 from app.models.tenant import Tenant
 from app.services import fleet_cache, tool_exclusions
 from app.services.audit import emit_audit
-from app.services.check_alerts import raises_alert
+from app.services.check_alerts import change_label, raises_alert
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domains
 from app.services.fix_targets import standing
 from app.services.fleet_posture import (
@@ -400,6 +400,8 @@ class CheckHistoryRow(BaseModel):
     previous_status: str | None
     evidence: str
     observed_at: datetime
+    # added, worsened, improved or changed (see ``check_alerts.change_label``).
+    change: str = "changed"
 
 
 class CheckHistoryOut(BaseModel):
@@ -500,6 +502,8 @@ async def check_history(
     db: DBSession,
     key: str | None = None,
     limit: Annotated[int, Query(ge=1, le=5000)] = 200,
+    days: Annotated[int | None, Query(ge=1, le=400, description="Only changes in the last this many days (1 to 400).")] = None,
+    change: Annotated[str | None, Query(pattern="^(added|worsened|improved|changed)$", description="Only this kind of change.")] = None,
 ) -> CheckHistoryOut:
     owner = current_user.tenant_id
     await _client_of_owner(db, owner, client_id)
@@ -507,26 +511,32 @@ async def check_history(
     stmt = select(ClientCheckHistory).where(ClientCheckHistory.tenant_id == client_id)
     if key:
         stmt = stmt.where(ClientCheckHistory.key == key)
+    if days is not None:
+        stmt = stmt.where(ClientCheckHistory.observed_at >= datetime.now(UTC) - timedelta(days=days))
     async with contextlib.nullcontext() if client_id == owner else acting_as_tenant(db, client_id):
         rows = (
-            (await db.execute(stmt.order_by(ClientCheckHistory.observed_at.desc(), ClientCheckHistory.id.desc()).limit(limit)))
+            (
+                await db.execute(
+                    stmt.order_by(ClientCheckHistory.observed_at.desc(), ClientCheckHistory.id.desc()).limit(5000 if change else limit)
+                )
+            )
             .scalars()
             .all()
         )
-    return CheckHistoryOut(
-        client_id=client_id,
-        rows=[
-            CheckHistoryRow(
-                key=r.key,
-                source=r.source,
-                status=r.status,
-                previous_status=r.previous_status,
-                evidence=r.evidence,
-                observed_at=r.observed_at,
-            )
-            for r in rows
-        ],
-    )
+    out = [
+        CheckHistoryRow(
+            key=r.key,
+            source=r.source,
+            status=r.status,
+            previous_status=r.previous_status,
+            evidence=r.evidence,
+            observed_at=r.observed_at,
+            change=change_label(r.previous_status, r.status),
+        )
+        for r in rows
+    ]
+    # The kind of change is worked out here, so with a kind asked for the rows are read first and the limit applies to what is left.
+    return CheckHistoryOut(client_id=client_id, rows=[r for r in out if change is None or r.change == change][:limit])
 
 
 class ScoreDay(BaseModel):

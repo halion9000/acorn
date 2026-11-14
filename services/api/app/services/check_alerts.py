@@ -100,6 +100,15 @@ def worsened(previous: str | None, status: str, least: str) -> bool:
     return RANK[status] > RANK[previous] and RANK[status] >= RANK[least]
 
 
+def change_label(previous: str | None, status: str) -> str:
+    """What a history row means for a person reading "what changed": ``added`` (the check appeared), ``worsened``, ``improved``, or ``changed`` (a status this ranking does not order). Pure."""
+    if previous is None:
+        return "added"
+    if previous in RANK and status in RANK:
+        return "worsened" if RANK[status] > RANK[previous] else "improved" if RANK[status] < RANK[previous] else "changed"
+    return "changed"
+
+
 def alerts_for_changes(changes: list[dict[str, Any]], source: str, now: datetime) -> list[dict[str, Any]]:
     """The alerts a report's changes call for, as plain dicts (``title``, ``severity``, ``description``, ``idempotency_key``, ``key``), one per watched check that got worse. ``changes`` come from
     ``check_history.changes``."""
