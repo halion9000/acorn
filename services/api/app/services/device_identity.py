@@ -265,6 +265,30 @@ def pair_confidence(a: Any, b: Any) -> tuple[int, list[str]]:
     return max(0, min(100, score)), why
 
 
+def lookalikes(target: Any, others: list[Any]) -> list[tuple[Any, list[str]]]:
+    """The other devices (under any client) that may be the same machine as ``target``, and what they share: ``serial`` (the same real serial number), ``name`` (the same name, or the same
+    apart from punctuation). For a person to look at when a machine is shown as missing from a tool its record sits elsewhere. Nothing is merged or moved. Pure; the target itself is skipped."""
+    serial = normalize_serial(getattr(target, "serial_number", None))
+    name = hostname_key(target.hostname)
+    loose = loose_name_key(target.hostname)
+    found: list[tuple[Any, list[str]]] = []
+    for d in others:
+        if d.id == target.id:
+            continue
+        why: list[str] = []
+        other_serial = normalize_serial(getattr(d, "serial_number", None))
+        if serial and other_serial and serial == other_serial:
+            why.append("serial")
+        other_name = hostname_key(d.hostname)
+        if (name and name == other_name) or (loose and loose == loose_name_key(d.hostname)):
+            why.append("name")
+        if why:
+            found.append((d, why))
+    # Same serial first (the strong sign), then same client, then by name.
+    found.sort(key=lambda x: ("serial" not in x[1], x[0].tenant_id != target.tenant_id, (x[0].hostname or "").lower()))
+    return found
+
+
 # Auvik lists everything on the network under whatever name DHCP gave it, usually with no serial and often no maker. A pair that involves an Auvik record and rests on one weak sign (the name alone, or an
 # address alone) cannot be told from two machines that share a stock name or reuse an address, so it is not worth a person's time. Name AND address (65) or a serial/maker on top of those clears it.
 THIN_EVIDENCE_BELOW = 65

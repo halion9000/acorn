@@ -35,7 +35,7 @@ from app.models.tenant import Tenant
 from app.services import device_follow, tool_exclusions
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.client_mapping import IncomingClient, auto_link_by_devices, record_device_hints, tenant_hidden, upsert_clients
-from app.services.device_identity import confidence_label, is_thin_pair, pair_confidence
+from app.services.device_identity import confidence_label, is_thin_pair, lookalikes, pair_confidence
 from app.services.device_merge import (
     DeviceMergeError,
     DifferentSerials,
@@ -1005,6 +1005,26 @@ class DuplicatesOut(BaseModel):
     not_enough_data: int = 0
 
 
+class ElsewhereItem(BaseModel):
+    device_id: uuid.UUID
+    hostname: str
+    client_name: str | None = None
+    same_client: bool
+    serial_number: str | None = None
+    tools: list[str]
+    last_seen: datetime
+    # What it shares with the device asked about: "serial" and/or "name".
+    matched_on: list[str]
+
+
+class ElsewhereOut(BaseModel):
+    device_id: uuid.UUID
+    hostname: str
+    client_name: str | None = None
+    tools: list[str]
+    items: list[ElsewhereItem]
+
+
 class DismissIn(BaseModel):
     device_a: uuid.UUID
     device_b: uuid.UUID
@@ -1185,6 +1205,41 @@ async def list_duplicates(
                 )
     items.sort(key=lambda p: (-p.confidence, (p.a.client_name or ""), p.a.hostname.lower()))
     return DuplicatesOut(items=items, not_enough_data=thin)
+
+
+@router.get("/{device_id}/elsewhere", response_model=ElsewhereOut, summary="Where else the same machine is filed")
+async def device_elsewhere(
+    device_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
+) -> ElsewhereOut:
+    """The other devices, under ANY client, that share this one's serial number or name: where a tool's record of this machine may be filed when the machine shows as missing from that tool.
+    Read only; nothing is merged or moved."""
+    owner = current_user.tenant_id
+    scope, clients = await _scope(db, owner, None)
+    master = _master_of(await db.get(Tenant, owner))
+    loaded = await _load_cached(db, owner, scope, clients, master)
+    target = next((d for d in loaded if d.id == device_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Device not found")
+    items = [
+        ElsewhereItem(
+            device_id=d.id,
+            hostname=d.hostname,
+            client_name=d.client_name,
+            same_client=d.tenant_id == target.tenant_id,
+            serial_number=d.serial_number,
+            tools=sorted({s.vendor for s in d.sources}),
+            last_seen=d.last_seen,
+            matched_on=why,
+        )
+        for d, why in lookalikes(target, loaded)[:20]
+    ]
+    return ElsewhereOut(
+        device_id=target.id,
+        hostname=target.hostname,
+        client_name=target.client_name,
+        tools=sorted({s.vendor for s in target.sources}),
+        items=items,
+    )
 
 
 async def _client_of(db: Any, owner: uuid.UUID, device_id: uuid.UUID) -> uuid.UUID:

@@ -696,3 +696,59 @@ async def test_a_name_only_pair_without_auvik_is_still_offered(monkeypatch):
     out = await _duplicates_of(monkeypatch, [_named(t, "ninjaone", "FRONT-DESK-PC"), _named(t, "huntress", "FRONT-DESK-PC")])
     assert len(out.items) == 1
     assert out.not_enough_data == 0
+
+
+# ---- where else a machine is filed -----------------------------------------------------------------------------------------------------------------
+
+
+def _filed(tenant, tool, name, serial=None):
+    d = device("Windows 11", [(tool, {})])
+    d.tenant_id, d.hostname, d.serial_number = tenant, name, serial
+    return d
+
+
+def test_lookalikes_find_the_same_serial_or_name_under_any_client_strongest_first():
+    from app.services.device_identity import lookalikes
+
+    a, b = uuid.uuid4(), uuid.uuid4()
+    me = _filed(a, "ninjaone", "MEGAN-LAPTOP", "ABC1234")
+    huntress_elsewhere = _filed(b, "huntress", "Megan-Laptop", "abc1234")
+    same_name_only = _filed(a, "screenconnect", "MEGAN LAPTOP")
+    unrelated = _filed(b, "huntress", "OTHER-PC", "ZZZ9999")
+    other_serial_other_name = _filed(b, "huntress", "NOT-MEGAN", "ABC1234")
+    found = lookalikes(me, [me, unrelated, same_name_only, huntress_elsewhere, other_serial_other_name])
+    assert [(d.hostname, why) for d, why in found] == [
+        ("Megan-Laptop", ["serial", "name"]),
+        ("NOT-MEGAN", ["serial"]),
+        ("MEGAN LAPTOP", ["name"]),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_the_elsewhere_lookup_names_the_client_and_tools_of_each_lookalike_and_404s_for_an_unknown_device(monkeypatch):
+    a, b = uuid.uuid4(), uuid.uuid4()
+    me = _filed(a, "ninjaone", "MEGAN-LAPTOP", "ABC1234")
+    elsewhere = _filed(b, "huntress", "MEGAN-LAPTOP", "ABC1234")
+    elsewhere.client_name = "First Baptist (older)"
+
+    async def scope(db, o, client_id):
+        return [a, b], {}
+
+    async def load(db, o, scope_ids, clients, master):
+        return [me, elsewhere]
+
+    class Db:
+        async def get(self, model, key):
+            return None
+
+    monkeypatch.setattr(devices_module, "_scope", scope)
+    monkeypatch.setattr(devices_module, "_load_cached", load)
+    user = SimpleNamespace(tenant_id=uuid.uuid4())
+    out = await devices_module.device_elsewhere(me.id, user, Db())
+    assert out.tools == ["ninjaone"]
+    assert [(i.client_name, i.same_client, i.tools, i.matched_on) for i in out.items] == [
+        ("First Baptist (older)", False, ["huntress"], ["serial", "name"])
+    ]
+    with pytest.raises(HTTPException) as err:
+        await devices_module.device_elsewhere(uuid.uuid4(), user, Db())
+    assert err.value.status_code == 404

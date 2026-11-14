@@ -12285,6 +12285,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/devices/scripts/options:
+    get:
+      tags:
+      - devices
+      summary: The scripts CORE has switched on, to run on picked devices
+      operationId: device_script_options_api_v1_devices_scripts_options_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceScripts'
+      security:
+      - HTTPBearer: []
+  /api/v1/devices/scripts/run-bulk:
+    post:
+      tags:
+      - devices
+      summary: Queue one script for each picked device
+      operationId: run_script_on_devices_api_v1_devices_scripts_run_bulk_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkDeviceRun'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkDeviceResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/devices/settings:
     get:
       tags:
@@ -12734,6 +12776,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/app__api__v1__endpoints__devices__DuplicatesOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/devices/{device_id}/elsewhere:
+    get:
+      tags:
+      - devices
+      summary: Where else the same machine is filed
+      description: 'The other devices, under ANY client, that share this one''s serial
+        number or name: where a tool''s record of this machine may be filed when the
+        machine shows as missing from that tool.
+
+        Read only; nothing is merged or moved.'
+      operationId: device_elsewhere_api_v1_devices__device_id__elsewhere_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Device Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ElsewhereOut'
         '422':
           description: Validation Error
           content:
@@ -29893,6 +29969,100 @@ components:
       required:
       - deleted
       title: BulkDeleteOut
+    BulkDeviceItem:
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        device:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Device
+        outcome:
+          type: string
+          enum:
+          - queued
+          - skipped
+          title: Outcome
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+        request_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Request Id
+      type: object
+      required:
+      - device_id
+      - outcome
+      title: BulkDeviceItem
+    BulkDeviceResponse:
+      properties:
+        batch_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Batch Id
+        preview:
+          type: boolean
+          title: Preview
+        script_name:
+          type: string
+          title: Script Name
+        runs_at_once:
+          type: boolean
+          title: Runs At Once
+        queued:
+          type: integer
+          title: Queued
+        skipped:
+          type: integer
+          title: Skipped
+        items:
+          items:
+            $ref: '#/components/schemas/BulkDeviceItem'
+          type: array
+          title: Items
+      type: object
+      required:
+      - preview
+      - script_name
+      - runs_at_once
+      - queued
+      - skipped
+      - items
+      title: BulkDeviceResponse
+    BulkDeviceRun:
+      properties:
+        script_id:
+          type: integer
+          maximum: 2000000000.0
+          minimum: 1.0
+          title: Script Id
+        device_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Device Ids
+        preview:
+          type: boolean
+          title: Preview
+          description: 'True: say what would be queued, queue nothing.'
+          default: false
+      type: object
+      required:
+      - script_id
+      - device_ids
+      title: BulkDeviceRun
     BulkError:
       properties:
         ioc:
@@ -34897,6 +35067,22 @@ components:
       - last_seen
       - verdict
       title: DeviceRow
+    DeviceScripts:
+      properties:
+        scripts:
+          items:
+            $ref: '#/components/schemas/ScriptOption'
+          type: array
+          title: Scripts
+        blocked:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Blocked
+      type: object
+      required:
+      - scripts
+      title: DeviceScripts
     DeviceSettings:
       properties:
         master_vendor:
@@ -36056,6 +36242,82 @@ components:
       - override_note
       - parameter_overrides
       title: EffectiveRuleOut
+    ElsewhereItem:
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        hostname:
+          type: string
+          title: Hostname
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        same_client:
+          type: boolean
+          title: Same Client
+        serial_number:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Serial Number
+        tools:
+          items:
+            type: string
+          type: array
+          title: Tools
+        last_seen:
+          type: string
+          format: date-time
+          title: Last Seen
+        matched_on:
+          items:
+            type: string
+          type: array
+          title: Matched On
+      type: object
+      required:
+      - device_id
+      - hostname
+      - same_client
+      - tools
+      - last_seen
+      - matched_on
+      title: ElsewhereItem
+    ElsewhereOut:
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        hostname:
+          type: string
+          title: Hostname
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        tools:
+          items:
+            type: string
+          type: array
+          title: Tools
+        items:
+          items:
+            $ref: '#/components/schemas/ElsewhereItem'
+          type: array
+          title: Items
+      type: object
+      required:
+      - device_id
+      - hostname
+      - tools
+      - items
+      title: ElsewhereOut
     EnrolOut:
       properties:
         secret:

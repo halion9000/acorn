@@ -680,6 +680,32 @@ export interface AlertScriptOptions {
   suggested_script_id?: number | null;
 }
 
+/** Another device that shares a serial number or name with the one asked about (GET /api/v1/devices/{id}/elsewhere). */
+export interface DeviceElsewhere {
+  device_id: string;
+  hostname: string;
+  client_name: string | null;
+  tools: string[];
+  items: Array<{ device_id: string; hostname: string; client_name: string | null; same_client: boolean; serial_number: string | null; tools: string[]; last_seen: string; matched_on: string[] }>;
+}
+
+/** The scripts CORE has switched on, to run on picked devices. */
+export interface DeviceScriptOptions {
+  scripts: Array<{ id: number; name: string; one_click: boolean }>;
+  blocked: string | null;
+}
+
+/** What one script run on several picked devices did (or, as a preview, would do). */
+export interface DeviceScriptRun {
+  batch_id: string | null;
+  preview: boolean;
+  script_name: string;
+  runs_at_once: boolean;
+  queued: number;
+  skipped: number;
+  items: Array<{ device_id: string; device: string | null; outcome: 'queued' | 'skipped'; reason: string | null; request_id: string | null }>;
+}
+
 export interface DeviceSourceRef {
   vendor: string;
   name: string | null;
@@ -1287,6 +1313,13 @@ export const devicesApi = {
     await request<void>('/api/v1/devices/duplicates/dismiss', { method: 'POST', body: JSON.stringify({ device_a: deviceA, device_b: deviceB }) });
   },
   /** These two are the same machine: fold `remove` into `keep`. Two devices with different serial numbers are refused with 409 unless `sameMachine` (a person's word) is given. */
+  /** Other devices, under any client, with the same serial number or name: where a tool's record of this machine may be filed. */
+  elsewhere: (id: string) => request<DeviceElsewhere>(`/api/v1/devices/${encodeURIComponent(id)}/elsewhere`),
+  /** The scripts CORE has switched on (Settings > Manage NinjaOne scripts in CORE). */
+  scriptOptions: () => request<DeviceScriptOptions>('/api/v1/devices/scripts/options'),
+  /** One script for many devices: one request (and one new HaloPSA ticket) per machine, one approval in CORE. `preview` queues nothing and says what would happen. */
+  runScript: (body: { script_id: number; device_ids: string[]; preview?: boolean }) =>
+    request<DeviceScriptRun>('/api/v1/devices/scripts/run-bulk', { method: 'POST', body: JSON.stringify(body) }),
   async mergeDuplicates(keep: string, remove: string, sameMachine = false): Promise<DeviceRow> {
     return request<DeviceRow>('/api/v1/devices/duplicates/merge', { method: 'POST', body: JSON.stringify({ keep, remove, ...(sameMachine ? { same_machine: true } : {}) }) });
   },

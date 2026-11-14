@@ -53,6 +53,7 @@ from app.api.v1.endpoints import (
     detection_rules,
     detection_vendor,
     devices,
+    devices_scripts,
     dmarc,
     easm,
     effective_permissions,
@@ -266,6 +267,8 @@ api_router.include_router(saved_views.router)
 # Wave 3 — operational maturity
 api_router.include_router(assets.router)
 api_router.include_router(client_environment.router)
+# Before the devices router: its "/{device_id}" paths must not catch "/devices/scripts/...".
+api_router.include_router(devices_scripts.router)
 api_router.include_router(devices.router)
 api_router.include_router(devices.ingest_router)
 api_router.include_router(remote_tools.router)

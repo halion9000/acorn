@@ -6,8 +6,10 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { apiErrorDetail, devicesApi, msspApi, type ChildTenant, type DeviceKind, type DeviceList, type DeviceQuery, type DeviceRow } from '@/lib/api';
 import VendorBadge from '@/components/mssp/VendorBadge';
+import DeviceScriptBar from './DeviceScriptBar';
 import DuplicateDevices from './DuplicateDevices';
 import { MergeDeviceInto } from './MergeDeviceInto';
+import { WhereElse } from './WhereElse';
 import UnmappedDevices from './UnmappedDevices';
 import { ClientRollupTable } from './ClientRollupTable';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
@@ -152,6 +154,8 @@ export default function DevicesView() {
   const [offlineOnly, setOfflineOnly] = useState(false);
   const [alertsOnly, setAlertsOnly] = useState(false);
   const [hiddenOnly, setHiddenOnly] = useState(false);
+  // The devices ticked for a script run. They stay ticked across pages and filters until cleared or run.
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
 
   /** Put a set of filters on the page (what was remembered, a link's filters, or a saved view's). */
@@ -602,10 +606,29 @@ export default function DevicesView() {
         </div>
       )}
 
+      <DeviceScriptBar deviceIds={[...picked]} onClear={() => setPicked(new Set())} />
+
       <div className={`overflow-x-auto rounded-lg border border-gray-800 transition-opacity ${loading && data ? "opacity-50" : ""}`} aria-busy={loading} data-testid="devices-table">
         <table className="w-full text-left text-sm">
           <thead className="bg-gray-900 text-xs uppercase text-gray-400">
             <tr>
+              <th className="w-8 px-3 py-2">
+                <input
+                  type="checkbox"
+                  aria-label="Select every device on this page"
+                  checked={Boolean(data?.items.length) && data!.items.every((d) => picked.has(d.id))}
+                  onChange={(e) =>
+                    setPicked((now) => {
+                      const next = new Set(now);
+                      for (const d of data?.items ?? []) {
+                        if (e.target.checked) next.add(d.id);
+                        else next.delete(d.id);
+                      }
+                      return next;
+                    })
+                  }
+                />
+              </th>
               <th className="px-3 py-2">Device</th>
               <th className="px-3 py-2">Client</th>
               <th className="px-3 py-2">Serial</th>
@@ -617,18 +640,18 @@ export default function DevicesView() {
           </thead>
           <tbody>
             {data?.items.map((d) => (
-              <DeviceRowView key={d.id} d={d} master={master} open={open === d.id} onToggle={() => setOpen(open === d.id ? null : d.id)} onHide={(hide) => void setHidden(d, hide)} onMerged={() => void load()} />
+              <DeviceRowView key={d.id} d={d} master={master} picked={picked.has(d.id)} onPick={(on) => setPicked((now) => { const next = new Set(now); if (on) next.add(d.id); else next.delete(d.id); return next; })} open={open === d.id} onToggle={() => setOpen(open === d.id ? null : d.id)} onHide={(hide) => void setHidden(d, hide)} onMerged={() => void load()} />
             ))}
             {loading && !data && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-gray-400" data-testid="devices-loading">
+                <td colSpan={8} className="px-3 py-8 text-center text-gray-400" data-testid="devices-loading">
                   Loading devices... a large estate can take several seconds the first time.
                 </td>
               </tr>
             )}
             {!loading && data?.items.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+                <td colSpan={8} className="px-3 py-8 text-center text-gray-400">
                   No devices match.
                 </td>
               </tr>
@@ -663,11 +686,14 @@ export default function DevicesView() {
   );
 }
 
-function DeviceRowView({ d, master, open, onToggle, onHide, onMerged }: { d: DeviceRow; master: string | null; open: boolean; onToggle: () => void; onHide: (hide: boolean) => void; onMerged: () => void }) {
+function DeviceRowView({ d, master, picked, onPick, open, onToggle, onHide, onMerged }: { d: DeviceRow; master: string | null; picked: boolean; onPick: (on: boolean) => void; open: boolean; onToggle: () => void; onHide: (hide: boolean) => void; onMerged: () => void }) {
   const tools = toolsOf(d);
   return (
     <>
       <tr onClick={onToggle} className="cursor-pointer border-t border-gray-800 hover:bg-gray-900/60">
+        <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+          <input type="checkbox" aria-label={`Select ${d.hostname}`} checked={picked} onChange={(e) => onPick(e.target.checked)} />
+        </td>
         <td className="px-3 py-2 font-medium text-white">
           {d.online != null && (
             <span
@@ -780,7 +806,7 @@ function DeviceRowView({ d, master, open, onToggle, onHide, onMerged }: { d: Dev
       </tr>
       {open && (
         <tr className="border-t border-gray-800 bg-gray-900/40">
-          <td colSpan={7} className="px-4 py-3 text-sm text-gray-300">
+          <td colSpan={8} className="px-4 py-3 text-sm text-gray-300">
             <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
               <Field label="Serial number" value={d.serial_number} />
               <Field label="Manufacturer" value={d.manufacturer} />
@@ -803,6 +829,7 @@ function DeviceRowView({ d, master, open, onToggle, onHide, onMerged }: { d: Dev
               </Link>
             </div>
             <MergeDeviceInto device={d} onMerged={onMerged} />
+            <WhereElse deviceId={d.id} />
             {(d.alerts ?? []).length > 0 && (
               <>
                 <h3 className="mb-1 mt-3 text-xs font-semibold uppercase text-gray-400">Open alerts on this device</h3>

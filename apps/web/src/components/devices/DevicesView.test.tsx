@@ -396,8 +396,8 @@ describe('missing-from-tool cards', () => {
     expect(screen.getByRole('columnheader', { name: 'Last online' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Last synced' })).toBeInTheDocument();
     const cells = (name: string) => within((screen.getByText(name).closest('tr')) as HTMLElement).getAllByRole('cell');
-    expect(cells('ONLINE-PC')[5].textContent).toMatch(/2020/);
-    expect(cells('NO-IDEA')[5]).toHaveTextContent('—');
+    expect(cells('ONLINE-PC')[6].textContent).toMatch(/2020/);
+    expect(cells('NO-IDEA')[6]).toHaveTextContent('—');
   });
 
   it('marks a device that has been offline for days, and the tiles filter by offline and by open alerts', async () => {
