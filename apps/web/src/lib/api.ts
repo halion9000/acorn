@@ -7718,6 +7718,89 @@ export const riskRegisterApi = {
     request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}?${riskQs(clientId)}`, { method: 'DELETE' }),
 };
 
+/** Vendor management (GET/POST /api/v1/compliance/vendors ...). `clientId` reads or writes one client. */
+export interface VendorReviewRow {
+  id: string;
+  kind: 'recurring' | 'one_time';
+  title: string;
+  start_date: string;
+  due_date: string;
+  status: 'in_progress' | 'complete';
+  reviewer: string | null;
+  outcome: 'no_concerns' | 'concerns' | null;
+  findings: string;
+  completed_at: string | null;
+  overdue: boolean;
+}
+export interface VendorDocumentRow {
+  id: string;
+  name: string;
+  doc_type: string;
+  url: string | null;
+  added_by: string | null;
+  added_at: string;
+}
+export interface VendorRow {
+  id: string;
+  name: string;
+  website: string | null;
+  trust_url: string | null;
+  service: string | null;
+  category: string;
+  owner: string | null;
+  risk_level: 'unassessed' | 'low' | 'medium' | 'high' | 'critical';
+  data_access: 'unknown' | 'none' | 'internal' | 'sensitive';
+  auth_type: string | null;
+  mfa: boolean | null;
+  account_manager_name: string | null;
+  account_manager_email: string | null;
+  contract_start: string | null;
+  contract_end: string | null;
+  review_interval_months: number | null;
+  notes: string;
+  status: 'active' | 'archived';
+  review_state: 'none' | 'in_progress' | 'overdue' | 'due' | 'current';
+  next_review_due: string | null;
+  last_reviewed: string | null;
+  document_count: number;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+}
+export interface VendorDetail extends VendorRow {
+  reviews: VendorReviewRow[];
+  documents: VendorDocumentRow[];
+  history: { actor: string | null; action: string; detail: string; created_at: string }[];
+}
+export interface VendorList {
+  vendors: VendorRow[];
+  summary: { total: number; by_risk: Record<string, number>; reviews_overdue: number; reviews_in_progress: number; unassessed: number };
+  categories: string[];
+  document_types: string[];
+}
+export type VendorInput = Partial<Omit<VendorRow, 'id' | 'status' | 'review_state' | 'next_review_due' | 'last_reviewed' | 'document_count' | 'created_at' | 'updated_at' | 'archived_at'>> & {
+  name: string;
+  clear_review_schedule?: boolean;
+};
+
+export const vendorApi = {
+  list: (clientId: string, archived = false) => request<VendorList>(`/api/v1/compliance/vendors?${riskQs(clientId, archived ? 'archived=true' : '')}`),
+  get: (clientId: string, id: string) => request<VendorDetail>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}?${riskQs(clientId)}`),
+  create: (clientId: string, body: VendorInput) => request<VendorDetail>(`/api/v1/compliance/vendors?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  update: (clientId: string, id: string, body: Partial<VendorInput>) =>
+    request<VendorDetail>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  archive: (clientId: string, id: string) => request<VendorDetail>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}/archive?${riskQs(clientId)}`, { method: 'POST' }),
+  restore: (clientId: string, id: string) => request<VendorDetail>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}/restore?${riskQs(clientId)}`, { method: 'POST' }),
+  startReview: (clientId: string, id: string, body: { kind?: 'recurring' | 'one_time'; title?: string; due_date?: string | null }) =>
+    request<VendorDetail>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}/reviews?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  completeReview: (clientId: string, id: string, reviewId: string, body: { outcome: 'no_concerns' | 'concerns'; findings?: string }) =>
+    request<VendorDetail>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}/reviews/${encodeURIComponent(reviewId)}/complete?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  addDocument: (clientId: string, id: string, body: { name: string; doc_type: string; url?: string | null }) =>
+    request<VendorDetail>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}/documents?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  removeDocument: (clientId: string, id: string, docId: string) =>
+    request<VendorDetail>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}?${riskQs(clientId)}`, { method: 'DELETE' }),
+};
+
 /** The Compliance dashboard and the frameworks turned on (GET /api/v1/compliance/dashboard, GET/PUT /api/v1/compliance/frameworks/enabled). `clientId` reads or writes one client. */
 export interface ComplianceHealth {
   healthy: number;

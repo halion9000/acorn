@@ -54,6 +54,8 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/settings/connectors': { title: 'Connectors', description: 'Security tool integrations' },
   '/settings/client-mapping': { title: 'Client mapping', description: 'Link the clients of each tool to your clients' },
   '/compliance/risk-register': { title: 'Risk register', description: 'Risks, how they are treated, and the tasks that treat them' },
+  '/compliance/policies': { title: 'Policies', description: 'Written policies and what must be reviewed again' },
+  '/compliance/vendors': { title: 'Vendors', description: 'Third parties you depend on, their risk and reviews' },
   '/compliance/frameworks': { title: 'Frameworks', description: 'Controls and evidence for each framework' },
   '/compliance': { title: 'Compliance', description: 'Frameworks, control health, risks and what needs doing' },
   '/mssp': { title: 'MSSP', description: 'Cross-tenant operations for the clients you manage' },

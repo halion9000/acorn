@@ -24,6 +24,8 @@ export const PAGE_WORDS: Record<string, string[]> = {
   '/playbooks': ['automation', 'response', 'runbooks', 'workflows'],
   '/compliance': ['frameworks', 'controls', 'audit', 'cis', 'nist', 'secureframe', 'control health'],
   '/compliance/frameworks': ['soc 2', 'iso 27001', 'hipaa', 'pci', 'nist', 'cis', 'controls', 'evidence'],
+  '/compliance/policies': ['policy', 'policies', 'review calendar', 'procedures'],
+  '/compliance/vendors': ['vendors', 'third party', 'suppliers', 'vendor risk', 'vendor review'],
   '/compliance/risk-register': ['risks', 'risk register', 'treatment', 'residual', 'likelihood'],
 };
 

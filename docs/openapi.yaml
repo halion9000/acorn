@@ -13054,6 +13054,463 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/vendors:
+    get:
+      tags:
+      - vendors
+      summary: The vendors of this organization or client, with the dashboard figures
+      operationId: list_vendors_api_v1_compliance_vendors_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: archived
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: True lists the archived vendors instead of the active ones.
+          default: false
+          title: Archived
+        description: True lists the archived vendors instead of the active ones.
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - vendors
+      summary: Add a vendor
+      operationId: create_vendor_api_v1_compliance_vendors_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/vendors/{vendor_id}:
+    get:
+      tags:
+      - vendors
+      summary: One vendor with its reviews, documents and history
+      operationId: get_vendor_api_v1_compliance_vendors__vendor_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: vendor_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Vendor Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - vendors
+      summary: Change a vendor
+      operationId: update_vendor_api_v1_compliance_vendors__vendor_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: vendor_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Vendor Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/vendors/{vendor_id}/archive:
+    post:
+      tags:
+      - vendors
+      summary: Archive a vendor (it stays in the history and can be restored)
+      operationId: archive_vendor_api_v1_compliance_vendors__vendor_id__archive_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: vendor_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Vendor Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/vendors/{vendor_id}/restore:
+    post:
+      tags:
+      - vendors
+      summary: Bring an archived vendor back
+      operationId: restore_vendor_api_v1_compliance_vendors__vendor_id__restore_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: vendor_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Vendor Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/vendors/{vendor_id}/reviews:
+    post:
+      tags:
+      - vendors
+      summary: Start a security review of a vendor
+      operationId: start_review_api_v1_compliance_vendors__vendor_id__reviews_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: vendor_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Vendor Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/vendors/{vendor_id}/reviews/{review_id}/complete:
+    post:
+      tags:
+      - vendors
+      summary: Finish a security review with what it found
+      operationId: complete_review_api_v1_compliance_vendors__vendor_id__reviews__review_id__complete_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: vendor_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Vendor Id
+      - name: review_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Review Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewDone'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/vendors/{vendor_id}/documents:
+    post:
+      tags:
+      - vendors
+      summary: Record a document held for a vendor
+      operationId: add_document_api_v1_compliance_vendors__vendor_id__documents_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: vendor_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Vendor Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/vendors/{vendor_id}/documents/{document_id}:
+    delete:
+      tags:
+      - vendors
+      summary: Remove a document record
+      operationId: remove_document_api_v1_compliance_vendors__vendor_id__documents__document_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: vendor_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Vendor Id
+      - name: document_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Document Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/frameworks/enabled:
     get:
       tags:
@@ -36716,6 +37173,63 @@ components:
       - kinds
       - refreshed_at
       title: DocSummary
+    DocumentIn:
+      properties:
+        name:
+          type: string
+          maxLength: 300
+          minLength: 2
+          title: Name
+        doc_type:
+          type: string
+          maxLength: 40
+          title: Doc Type
+          default: Other
+        url:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          title: Url
+      type: object
+      required:
+      - name
+      title: DocumentIn
+    DocumentOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        doc_type:
+          type: string
+          title: Doc Type
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        added_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Added By
+        added_at:
+          type: string
+          format: date-time
+          title: Added At
+      type: object
+      required:
+      - id
+      - name
+      - doc_type
+      - url
+      - added_by
+      - added_at
+      title: DocumentOut
     DomainDetail:
       properties:
         domain:
@@ -47798,6 +48312,29 @@ components:
       required:
       - comment
       title: ReviewCommentRequest
+    ReviewDone:
+      properties:
+        outcome:
+          type: string
+          enum:
+          - no_concerns
+          - concerns
+          title: Outcome
+        findings:
+          type: string
+          maxLength: 4000
+          title: Findings
+          default: ''
+        reviewer:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Reviewer
+      type: object
+      required:
+      - outcome
+      title: ReviewDone
     ReviewEvidenceRequest:
       properties:
         decision:
@@ -47815,6 +48352,100 @@ components:
       required:
       - decision
       title: ReviewEvidenceRequest
+    ReviewIn:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Title
+        kind:
+          type: string
+          enum:
+          - recurring
+          - one_time
+          title: Kind
+          default: one_time
+        start_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Start Date
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        reviewer:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Reviewer
+      type: object
+      title: ReviewIn
+    ReviewOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        kind:
+          type: string
+          title: Kind
+        title:
+          type: string
+          title: Title
+        start_date:
+          type: string
+          format: date
+          title: Start Date
+        due_date:
+          type: string
+          format: date
+          title: Due Date
+        status:
+          type: string
+          title: Status
+        reviewer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reviewer
+        outcome:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Outcome
+        findings:
+          type: string
+          title: Findings
+        completed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Completed At
+        overdue:
+          type: boolean
+          title: Overdue
+      type: object
+      required:
+      - id
+      - kind
+      - title
+      - start_date
+      - due_date
+      - status
+      - reviewer
+      - outcome
+      - findings
+      - completed_at
+      - overdue
+      title: ReviewOut
     ReviewScore:
       properties:
         percent:
@@ -56147,6 +56778,165 @@ components:
       - supported
       - actions
       title: VendorActionsResponse
+    VendorDetail:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        website:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Website
+        trust_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Trust Url
+        service:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Service
+        category:
+          type: string
+          title: Category
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        risk_level:
+          type: string
+          title: Risk Level
+        data_access:
+          type: string
+          title: Data Access
+        auth_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Auth Type
+        mfa:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Mfa
+        account_manager_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Account Manager Name
+        account_manager_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Account Manager Email
+        contract_start:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Contract Start
+        contract_end:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Contract End
+        review_interval_months:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Review Interval Months
+        notes:
+          type: string
+          title: Notes
+        status:
+          type: string
+          title: Status
+        review_state:
+          type: string
+          title: Review State
+        next_review_due:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Next Review Due
+        last_reviewed:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Last Reviewed
+        document_count:
+          type: integer
+          title: Document Count
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        archived_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Archived At
+        reviews:
+          items:
+            $ref: '#/components/schemas/ReviewOut'
+          type: array
+          title: Reviews
+        documents:
+          items:
+            $ref: '#/components/schemas/DocumentOut'
+          type: array
+          title: Documents
+        history:
+          items:
+            $ref: '#/components/schemas/HistoryOut'
+          type: array
+          title: History
+      type: object
+      required:
+      - id
+      - name
+      - website
+      - trust_url
+      - service
+      - category
+      - owner
+      - risk_level
+      - data_access
+      - auth_type
+      - mfa
+      - account_manager_name
+      - account_manager_email
+      - contract_start
+      - contract_end
+      - review_interval_months
+      - notes
+      - status
+      - review_state
+      - next_review_due
+      - last_reviewed
+      - document_count
+      - created_at
+      - updated_at
+      - archived_at
+      - reviews
+      - documents
+      - history
+      title: VendorDetail
     VendorDetection:
       properties:
         source:
@@ -56196,6 +56986,393 @@ components:
       - window_days
       - detections
       title: VendorDetectionsResponse
+    VendorIn:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 2
+          title: Name
+        website:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Website
+        trust_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Trust Url
+        service:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Service
+        category:
+          type: string
+          maxLength: 60
+          title: Category
+          default: Other
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Owner
+        risk_level:
+          type: string
+          enum:
+          - unassessed
+          - low
+          - medium
+          - high
+          - critical
+          title: Risk Level
+          default: unassessed
+        data_access:
+          type: string
+          enum:
+          - unknown
+          - none
+          - internal
+          - sensitive
+          title: Data Access
+          default: unknown
+        auth_type:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Auth Type
+        mfa:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Mfa
+        account_manager_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Account Manager Name
+        account_manager_email:
+          anyOf:
+          - type: string
+            maxLength: 320
+          - type: 'null'
+          title: Account Manager Email
+        contract_start:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Contract Start
+        contract_end:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Contract End
+        review_interval_months:
+          anyOf:
+          - type: integer
+            maximum: 60.0
+            minimum: 1.0
+          - type: 'null'
+          title: Review Interval Months
+        notes:
+          type: string
+          maxLength: 4000
+          title: Notes
+          default: ''
+      type: object
+      required:
+      - name
+      title: VendorIn
+    VendorList:
+      properties:
+        vendors:
+          items:
+            $ref: '#/components/schemas/VendorOut'
+          type: array
+          title: Vendors
+        summary:
+          $ref: '#/components/schemas/app__api__v1__endpoints__vendor_management__Summary'
+        categories:
+          items:
+            type: string
+          type: array
+          title: Categories
+        document_types:
+          items:
+            type: string
+          type: array
+          title: Document Types
+      type: object
+      required:
+      - vendors
+      - summary
+      - categories
+      - document_types
+      title: VendorList
+    VendorOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        website:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Website
+        trust_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Trust Url
+        service:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Service
+        category:
+          type: string
+          title: Category
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        risk_level:
+          type: string
+          title: Risk Level
+        data_access:
+          type: string
+          title: Data Access
+        auth_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Auth Type
+        mfa:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Mfa
+        account_manager_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Account Manager Name
+        account_manager_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Account Manager Email
+        contract_start:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Contract Start
+        contract_end:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Contract End
+        review_interval_months:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Review Interval Months
+        notes:
+          type: string
+          title: Notes
+        status:
+          type: string
+          title: Status
+        review_state:
+          type: string
+          title: Review State
+        next_review_due:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Next Review Due
+        last_reviewed:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Last Reviewed
+        document_count:
+          type: integer
+          title: Document Count
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        archived_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Archived At
+      type: object
+      required:
+      - id
+      - name
+      - website
+      - trust_url
+      - service
+      - category
+      - owner
+      - risk_level
+      - data_access
+      - auth_type
+      - mfa
+      - account_manager_name
+      - account_manager_email
+      - contract_start
+      - contract_end
+      - review_interval_months
+      - notes
+      - status
+      - review_state
+      - next_review_due
+      - last_reviewed
+      - document_count
+      - created_at
+      - updated_at
+      - archived_at
+      title: VendorOut
+    VendorPatch:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 2
+          - type: 'null'
+          title: Name
+        website:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Website
+        trust_url:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Trust Url
+        service:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Service
+        category:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Category
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Owner
+        risk_level:
+          anyOf:
+          - type: string
+            enum:
+            - unassessed
+            - low
+            - medium
+            - high
+            - critical
+          - type: 'null'
+          title: Risk Level
+        data_access:
+          anyOf:
+          - type: string
+            enum:
+            - unknown
+            - none
+            - internal
+            - sensitive
+          - type: 'null'
+          title: Data Access
+        auth_type:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Auth Type
+        mfa:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Mfa
+        account_manager_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Account Manager Name
+        account_manager_email:
+          anyOf:
+          - type: string
+            maxLength: 320
+          - type: 'null'
+          title: Account Manager Email
+        contract_start:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Contract Start
+        contract_end:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Contract End
+        review_interval_months:
+          anyOf:
+          - type: integer
+            maximum: 60.0
+            minimum: 1.0
+          - type: 'null'
+          title: Review Interval Months
+        notes:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Notes
+        clear_review_schedule:
+          type: boolean
+          title: Clear Review Schedule
+          default: false
+      type: object
+      title: VendorPatch
     VerdictIn:
       properties:
         verdict:
@@ -59524,6 +60701,33 @@ components:
       - rating
       - answered
       title: TrendPoint
+    app__api__v1__endpoints__vendor_management__Summary:
+      properties:
+        total:
+          type: integer
+          title: Total
+        by_risk:
+          additionalProperties:
+            type: integer
+          type: object
+          title: By Risk
+        reviews_overdue:
+          type: integer
+          title: Reviews Overdue
+        reviews_in_progress:
+          type: integer
+          title: Reviews In Progress
+        unassessed:
+          type: integer
+          title: Unassessed
+      type: object
+      required:
+      - total
+      - by_risk
+      - reviews_overdue
+      - reviews_in_progress
+      - unassessed
+      title: Summary
   securitySchemes:
     HTTPBearer:
       type: http

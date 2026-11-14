@@ -62,6 +62,7 @@ from app.models.threat_intel import ThreatActor, ThreatIntelFeed, ThreatIntelIOC
 from app.models.vcio_risk_assessment import VcioRiskAssessment
 from app.models.vcio_risk_ticket import VcioRiskTicket
 from app.models.vendor_action import VendorAction
+from app.models.vendor_management import Vendor, VendorDocument, VendorHistory, VendorReview
 
 __all__ = [
     "ClientAlias",
@@ -149,5 +150,9 @@ __all__ = [
     "RiskRegisterHistory",
     "RiskRegisterItem",
     "RiskRegisterTask",
+    "Vendor",
+    "VendorDocument",
+    "VendorHistory",
+    "VendorReview",
     "VcioRiskTicket",
 ]

@@ -61,7 +61,9 @@ describe('Sidebar', () => {
     expect(links).toEqual([
       ['Overview', '/compliance'],
       ['Frameworks', '/compliance/frameworks'],
+      ['Policies', '/compliance/policies'],
       ['Risk Management', '/compliance/risk-register'],
+      ['Vendors', '/compliance/vendors'],
       ['Asset Inventory', '/inventory'],
     ]);
     const vcio = screen.getByText('vCIO').closest('div')!;

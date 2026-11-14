@@ -143,6 +143,7 @@ from app.api.v1.endpoints import (
     translation,
     vcio_proposals,
     vcio_risk_scoring,
+    vendor_management,
     waitlist,
 )
 
@@ -278,6 +279,7 @@ api_router.include_router(devices_scripts.router)
 api_router.include_router(devices_console.router)
 api_router.include_router(devices_ninja_deploy.router)
 api_router.include_router(risk_register.router)
+api_router.include_router(vendor_management.router)
 api_router.include_router(compliance_dashboard.router)
 api_router.include_router(devices.router)
 api_router.include_router(devices.ingest_router)
