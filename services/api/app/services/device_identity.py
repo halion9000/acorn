@@ -13,6 +13,7 @@ from typing import Any
 _PLACEHOLDERS = frozenset(
     {
         "TOBEFILLEDBYOEM",
+        "CHASSISSERIALNUMBER",  # what some BIOSes (and so NinjaOne) report when no serial was set: found on 21 machines 2026-11-13
         "TOBEFILLEDBYO.E.M.",
         "DEFAULTSTRING",
         "SYSTEMSERIALNUMBER",
@@ -75,7 +76,8 @@ def serial_is_name(serial: object, hostname: object) -> bool:
 def real_serial(device: Any) -> str | None:
     """A device's serial number when it can tell two machines apart: not empty, not a MAC address (Auvik keeps one as the serial of a device with none) and not the machine's own name."""
     serial = getattr(device, "serial_number", None)
-    if not serial or mac_key(serial) or serial_is_name(serial, getattr(device, "hostname", None)):
+    # A stored placeholder ("CHASSISSERIALNUMBER") counts as no serial too, even if it was saved before it was known as one.
+    if not serial or normalize_serial(serial) is None or mac_key(serial) or serial_is_name(serial, getattr(device, "hostname", None)):
         return None
     return serial  # type: ignore[no-any-return]
 

@@ -785,3 +785,11 @@ async def test_an_auvik_device_with_a_made_up_name_is_offered_on_an_address_and_
     agent2 = _named(t, "ninjaone", "OFFICE-PC-3", ["10.0.0.9"])
     out = await _duplicates_of(monkeypatch, [auvik2, agent2])
     assert out.items == [] and out.not_enough_data == 1
+
+
+def test_a_placeholder_serial_is_no_serial_even_when_it_was_stored_before_it_was_known_as_one():
+    from app.services.device_identity import normalize_serial, real_serial
+
+    assert normalize_serial("CHASSISSERIALNUMBER") is None
+    assert real_serial(SimpleNamespace(serial_number="CHASSISSERIALNUMBER", hostname="CK-WORK")) is None
+    assert real_serial(SimpleNamespace(serial_number="NXJNPAA001622233902P00", hostname="CK-WORK")) == "NXJNPAA001622233902P00"
