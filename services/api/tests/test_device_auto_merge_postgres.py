@@ -490,3 +490,55 @@ async def test_the_auvik_records_of_a_laptop_an_agent_also_reports_still_join_th
     assert await merge_pass(tenant) == 2
     assert await count(tenant) == 1
     assert await count(tenant, "select count(distinct vendor) from device_sources where tenant_id = :t") == 2
+
+
+# ---- the old Auvik record of a Mac NinjaOne already has ("not in NinjaOne", 83 lines on 2026-11-13) --------------------------------------------------------------------
+
+
+async def settle(tid):
+    """Run the automatic merges until nothing more happens (the page's hourly pass does this over successive reports)."""
+    total = 0
+    for _ in range(5):
+        n = await merge_pass(tid)
+        total += n
+        if n == 0:
+            return total
+    return total
+
+
+async def test_an_old_auvik_record_of_a_mac_ninjaone_already_has_folds_into_that_device(tenant):
+    # The order of the live data: Auvik's newest record was joined to the machine's NinjaOne line first, and an older record of the same Mac (filed under an earlier address) turned up after.
+    await report(tenant, "ninjaone", "n1", "kimg", serial="FVHHJ778Q6L4")
+    await report(tenant, "auvik", "a-new", "kimg.local.", details=auvik("2026-11-11T22:00:00Z"))
+    await settle(tenant)
+    assert await count(tenant) == 1
+    await report(tenant, "auvik", "a-old", "kimg.local.", details=auvik("2026-10-20T08:00:00Z"))
+    assert await count(tenant) == 2, "the old record is its own device, listed as 'not in NinjaOne'"
+    await settle(tenant)
+    assert await count(tenant) == 1, "one device, not a NinjaOne line plus a stray Auvik-only one"
+    assert await count(tenant, "select count(*) from device_sources where tenant_id = :t") == 3
+    assert await count(tenant, "select serial_number from devices where tenant_id = :t") == "FVHHJ778Q6L4"
+
+
+async def test_an_auvik_record_seen_at_about_the_same_time_or_still_online_is_not_folded(tenant):
+    await report(tenant, "ninjaone", "n1", "kimg", serial="FVHHJ778Q6L4")
+    await report(tenant, "auvik", "a-new", "kimg.local.", details=auvik("2026-11-11T22:00:00Z"))
+    await settle(tenant)
+    await report(
+        tenant, "auvik", "a-near", "kimg.local.", details=auvik("2026-11-11T20:00:00Z")
+    )  # two hours earlier: may be a second machine in use
+    await settle(tenant)
+    assert await count(tenant) == 2
+    await report(tenant, "auvik", "a-up", "kimg.local.", details=auvik("2026-10-01T00:00:00Z", status="online"))
+    await settle(tenant)
+    assert await count(tenant) == 3
+
+
+async def test_an_old_auvik_record_with_a_different_real_serial_is_not_folded(tenant):
+    await report(tenant, "ninjaone", "n1", "QTZ-LAB-07", serial="AAAA111122")
+    await report(tenant, "auvik", "a1", "QTZ-LAB-07.local.", details=auvik("2026-11-11T22:00:00Z"))
+    await settle(tenant)
+    assert await count(tenant) == 1
+    await report(tenant, "auvik", "a-old", "QTZ-LAB-07.local.", serial="ZZZZ999988", details=auvik("2026-10-01T00:00:00Z"))
+    await settle(tenant)
+    assert await count(tenant) == 2, "two real serials are two machines, whatever the dates"

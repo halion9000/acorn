@@ -555,6 +555,81 @@ async def auto_merge_rediscovered(db: Any, tenant_id: uuid.UUID, actor_id: uuid.
     return merged
 
 
+async def auto_merge_stale_auvik(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> int:
+    """Fold an old Auvik-only record of a computer into the device that already holds that computer's newer Auvik record AND another tool (NinjaOne, Huntress...). Returns how many merges were made.
+
+    ``auto_merge_rediscovered`` only folds Auvik-only records into each other. When Auvik refiled a Mac, the newest record was joined to the machine's NinjaOne line by the same-name rule, but the older
+    one was left as its own Auvik-only device, which the Devices page then listed as "not in NinjaOne" (83 such lines found 2026-11-13). The same narrow conditions apply: Auvik calls the old record a
+    computer, it is not online now, its last-seen time is at least ``REDISCOVERY_GAP`` before the newest Auvik record on the other device, the name is not a stock or made-up one, exactly ONE device
+    holds that name together with other tools (no more than ``MAX_AUTO_MERGE_GROUP`` records in all), no real serials differ, and nobody said they are different."""
+    rows = (
+        await db.execute(
+            select(
+                DeviceSource.device_id,
+                DeviceSource.vendor,
+                DeviceSource.details["device_type"],
+                DeviceSource.details["online_status"],
+                DeviceSource.details["last_seen_at"],
+            ).where(DeviceSource.tenant_id == tenant_id)
+        )
+    ).all()
+    tools: dict[uuid.UUID, set[str]] = {}
+    for device_id, vendor, _type, _status, _seen in rows:
+        tools.setdefault(device_id, set()).add(vendor)
+    auvik_seen: dict[uuid.UUID, datetime] = {}
+    computer: dict[uuid.UUID, bool] = {}
+    online: dict[uuid.UUID, bool] = {}
+    for device_id, vendor, device_type, status, seen in rows:
+        if vendor != "auvik":
+            continue
+        computer[device_id] = computer.get(device_id, True) and str(device_type or "").strip().lower() in _AUVIK_COMPUTER_TYPES
+        online[device_id] = online.get(device_id, False) or str(status or "").strip().lower() == "online"
+        when = _seen_at(seen)
+        if when is not None and (device_id not in auvik_seen or when > auvik_seen[device_id]):
+            auvik_seen[device_id] = when
+    old_ids = {i for i, t in tools.items() if t == {"auvik"} and computer.get(i) and not online.get(i) and i in auvik_seen}
+    target_ids = {i for i, t in tools.items() if "auvik" in t and len(t) > 1 and i in auvik_seen}
+    if not old_ids or not target_ids:
+        return 0
+    devices = {
+        d.id: d
+        for d in (await db.execute(select(Device).where(Device.tenant_id == tenant_id, Device.id.in_(old_ids | target_ids))))
+        .scalars()
+        .all()
+    }
+    # Every device in the client that carries a name counts towards the group size, whatever its tools.
+    sizes: dict[str, int] = {}
+    for name in (hostname_key(h) for (h,) in (await db.execute(select(Device.hostname).where(Device.tenant_id == tenant_id))).all()):
+        sizes[name] = sizes.get(name, 0) + 1
+    by_name: dict[str, tuple[list[Device], list[Device]]] = {}
+    for d in devices.values():
+        key = hostname_key(d.hostname)
+        if not key or not usable_for_merge(key) or is_placeholder_name(key) or sizes.get(key, 0) > MAX_AUTO_MERGE_GROUP:
+            continue
+        olds, targets = by_name.setdefault(key, ([], []))
+        (olds if d.id in old_ids else targets).append(d)
+    dismissed = {
+        (x.device_a, x.device_b)
+        for x in (await db.execute(select(DeviceMergeDismissal).where(DeviceMergeDismissal.tenant_id == tenant_id))).scalars().all()
+    }
+    merged = 0
+    for olds, targets in by_name.values():
+        if len(targets) != 1 or not olds:
+            continue
+        keep = targets[0]
+        newest = auvik_seen[keep.id]
+        for old in olds:
+            if newest - auvik_seen[old.id] < REDISCOVERY_GAP:
+                continue
+            if real_serial(keep) and real_serial(old) and real_serial(keep) != real_serial(old):
+                continue
+            if _ordered(keep.id, old.id) in dismissed or not could_be_same_machine(tools[keep.id], tools[old.id]):
+                continue
+            await merge_devices(db, tenant_id, keep.id, old.id, actor_id)
+            merged += 1
+    return merged
+
+
 async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> int:
     """Merge, in one client, the devices that are plainly one machine seen by different tools. Returns how many merges were made.
 
@@ -572,6 +647,7 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
     by_mac = await auto_merge_by_mac(db, tenant_id, actor_id) + await auto_merge_by_ip(db, tenant_id, actor_id)
     # After the MAC and address rules (which can give an Auvik record to the machine an agent runs on) and before the name rule, so a laptop Auvik filed three times is one device by then.
     by_mac += await auto_merge_rediscovered(db, tenant_id, actor_id)
+    by_mac += await auto_merge_stale_auvik(db, tenant_id, actor_id)
     devices = (await db.execute(select(Device).where(Device.tenant_id == tenant_id))).scalars().all()
     by_name: dict[str, list[Device]] = {}
     for d in devices:
