@@ -325,7 +325,13 @@ export function filterSettingsGroups(groups: { title: string; entries: SettingsE
 
 export function SettingsView() {
   const [search, setSearch] = useState('');
-  const [pickedTab, setTab] = useState<TabId>('profile');
+  const [pickedTab, setPickedTab] = useState<TabId>('profile');
+  // The list is long: choosing an entry far down it must show the panel, not leave it above the screen. The panel is brought to the top of the view, and the list scrolls on its own beside it.
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const setTab = (id: TabId) => {
+    setPickedTab(id);
+    panelRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  };
   // What this person may do, from /auth/me at sign-in. Read after mount so the first paint is the same on the server and the client.
   const [capabilities, setCapabilities] = useState<string[]>([]);
   useEffect(() => {
@@ -350,9 +356,9 @@ export function SettingsView() {
         {/* ── Sidebar ── */}
         <nav
           aria-label="Settings sections"
-          className="lg:sticky lg:top-4 lg:w-64 lg:shrink-0"
+          className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-64 lg:shrink-0 lg:overflow-y-auto"
         >
-          <div className="space-y-3 rounded-xl border border-gray-800 bg-gray-900/40 p-2" data-testid="settings-groups">
+          <div className="space-y-4 rounded-xl border border-gray-800 bg-gray-900/40 p-2" data-testid="settings-groups">
             <input
               type="search"
               aria-label="Search settings"
@@ -365,8 +371,8 @@ export function SettingsView() {
               <p className="px-3 py-2 text-xs text-gray-500" data-testid="settings-search-empty">Nothing matches &quot;{search.trim()}&quot;.</p>
             ) : null}
             {filterSettingsGroups(groupedSettings(visibleTabs, capabilities), search).map((g) => (
-              <section key={g.title} aria-label={g.title}>
-                <p className="px-3 py-1 text-xs font-medium uppercase tracking-wider text-gray-500">{g.title}</p>
+              <section key={g.title} aria-label={g.title} className="border-t border-gray-700/70 pt-3 first:border-t-0 first:pt-0" data-testid="settings-group">
+                <p className="mb-1 rounded-md bg-gray-800/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-sky-300/90">{g.title}</p>
                 <ul className="space-y-1">
                   {g.entries.map((e) => (
                     <li key={e.kind === 'tab' ? e.id : e.href}>
@@ -398,7 +404,7 @@ export function SettingsView() {
         </nav>
 
         {/* ── Panel ── */}
-        <div className="flex-1 min-w-0">
+        <div ref={panelRef} className="min-w-0 flex-1 scroll-mt-4">
           <AnimatePresence mode="wait">
             <motion.div
               key={tab}
