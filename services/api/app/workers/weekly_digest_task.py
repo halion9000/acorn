@@ -1,7 +1,10 @@
 """WS-G2 — Weekly executive digest auto-generation worker.
 
 Runs as a single ``asyncio.Task`` started from the API's ``lifespan`` hook
-(see ``app/main.py``).  Every Monday at 00:05 UTC the worker:
+(see ``app/main.py``).  Every hour the worker looks for active tenants that have no digest yet
+for the last completed week and makes it (so on Monday morning it makes them all, and a run cut
+short by a restart is finished the next hour; before 2026-11-14 it only tried in Monday's hour 00,
+and a restart at 00:22 left 60 clients without a digest for the week of 2 Nov for good).  It:
 
 1. Fetches all *active* tenants.
 2. Calls :func:`build_weekly_digest` to assemble the ``ExecutiveDigest`` for
@@ -27,8 +30,7 @@ Configuration
     Set to ``false`` to disable (e.g. in unit-test environments).
 ``WEEKLY_DIGEST_POLL_INTERVAL_SECONDS``
     How often (seconds) the worker checks whether a digest is due.  Defaults
-    to ``3600`` (1 hour).  The worker only *generates* when the current UTC
-    weekday is Monday and the hour is ``00``.
+    to ``3600`` (1 hour).  A tenant that already has the digest is skipped.
 
 Author: Beenu <beenu@cyble.com>
 """
@@ -45,6 +47,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import AsyncSessionLocal
+from app.db.rls_scope import cross_tenant_reads
 from app.db.rls_sessions import mark_tenant
 from app.models.report import ReportArtefact
 from app.models.tenant import Tenant
@@ -55,11 +58,6 @@ from app.services.executive_digest import build_weekly_digest
 logger = logging.getLogger(__name__)
 
 __all__ = ["run_once", "run_forever"]
-
-# Weekday index for Monday in Python's datetime (0 = Monday).
-_MONDAY = 0
-# UTC hour at which we trigger generation (00:05 → hour == 0).
-_TRIGGER_HOUR = 0
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +76,7 @@ def _week_window(ref: date) -> tuple[datetime, datetime]:
     tuple[datetime, datetime]
         ``(prev_monday_00:00, prev_sunday_23:59:59)`` — both UTC-aware.
     """
+    ref = ref - timedelta(days=ref.weekday())  # any day of the week: the Monday that began it
     prev_monday = ref - timedelta(days=7)
     period_start = datetime(prev_monday.year, prev_monday.month, prev_monday.day, tzinfo=UTC)
     # End is Sunday 23:59:59 of the prev week, which is one microsecond
@@ -90,6 +89,19 @@ async def _fetch_active_tenants(db: AsyncSession) -> list[Tenant]:
     """Return all tenants with ``is_active=True``."""
     result = await db.execute(select(Tenant).where(Tenant.is_active.is_(True)))
     return list(result.scalars().all())
+
+
+async def _tenants_with_digest(period_start: datetime) -> set[uuid.UUID]:
+    """The tenants that already have the weekly digest for this window (one query across all of them)."""
+    async with AsyncSessionLocal() as db:
+        async with cross_tenant_reads(db):
+            result = await db.execute(
+                select(ReportArtefact.tenant_id).where(
+                    ReportArtefact.report_type == "weekly_digest",
+                    ReportArtefact.period_start == period_start,
+                )
+            )
+            return set(result.scalars().all())
 
 
 async def _artefact_exists(
@@ -216,6 +228,9 @@ async def run_once(ref_date: date | None = None) -> dict[str, int]:
     async with AsyncSessionLocal() as db:
         tenants = await _fetch_active_tenants(db)
 
+    # Only the tenants still without this week's digest, and only those that existed in that week.
+    done = await _tenants_with_digest(period_start)
+    tenants = [t for t in tenants if t.id not in done and (getattr(t, "created_at", None) is None or t.created_at <= period_end)]
     stats["tenants"] = len(tenants)
 
     for tenant in tenants:
@@ -240,7 +255,7 @@ async def run_once(ref_date: date | None = None) -> dict[str, int]:
 
 
 async def run_forever(*, stop_event: asyncio.Event | None = None) -> None:
-    """Poll hourly and generate digests every Monday at 00:xx UTC.
+    """Poll hourly and make the last completed week's digest for every tenant that does not have it.
 
     Mirrors the structure of ``workers/oauth_refresh.py`` so the two workers
     are consistent in how they integrate with the ASGI ``lifespan`` hook.
@@ -261,25 +276,18 @@ async def run_forever(*, stop_event: asyncio.Event | None = None) -> None:
                 break
 
             error: str | None = None
-            now_utc = datetime.now(UTC)
-            if now_utc.weekday() == _MONDAY and now_utc.hour == _TRIGGER_HOUR:
-                try:
-                    stats = await run_once()
+            try:
+                stats = await run_once()
+                if stats["tenants"]:
                     logger.info(
                         "weekly_digest.tick tenants=%d generated=%d failed=%d",
                         stats["tenants"],
                         stats["generated"],
                         stats["failed"],
                     )
-                except Exception as exc:  # noqa: BLE001
-                    logger.exception("weekly_digest.tick_failed err=%s", type(exc).__name__)
-                    error = type(exc).__name__
-            else:
-                logger.debug(
-                    "weekly_digest.idle weekday=%d hour=%d — not Monday 00:xx UTC",
-                    now_utc.weekday(),
-                    now_utc.hour,
-                )
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("weekly_digest.tick_failed err=%s", type(exc).__name__)
+                error = type(exc).__name__
             worker_heartbeat.beat("weekly_digest", error=error)
 
             try:

@@ -11,7 +11,7 @@ OWN RE-IMPLEMENTATION and asserts on the copy's output, so it can never see what
 import ast
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -152,7 +152,40 @@ async def test_the_weekly_run_names_each_client_but_not_the_organisation_that_ow
 
     monkeypatch.setattr(wdt, "AsyncSessionLocal", _Factory(_Session()))
     monkeypatch.setattr(wdt, "_fetch_active_tenants", AsyncMock(return_value=[own, child]))
+    monkeypatch.setattr(wdt, "_tenants_with_digest", AsyncMock(return_value=set()))
     monkeypatch.setattr(wdt, "_generate_for_tenant", fake_generate)
     stats = await wdt.run_once(datetime(2026, 10, 12, tzinfo=UTC).date())
     assert stats == {"tenants": 2, "generated": 2, "failed": 0}
     assert calls == [(own.id, None), (child.id, "Acme Dental")]
+
+
+def test_any_day_of_a_week_asks_for_the_same_last_completed_week():
+    monday = wdt._week_window(datetime(2026, 11, 9, tzinfo=UTC).date())
+    assert monday[0] == datetime(2026, 11, 2, tzinfo=UTC)
+    for day in range(9, 16):  # Monday 9 Nov to Sunday 15 Nov
+        assert wdt._week_window(datetime(2026, 11, day, tzinfo=UTC).date()) == monday, day
+    assert wdt._week_window(datetime(2026, 11, 16, tzinfo=UTC).date())[0] == datetime(2026, 11, 9, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_a_run_cut_short_is_finished_by_the_next_one_and_never_repeats_or_invents_a_week(monkeypatch):
+    """On 9 Nov 2026 a restart at 00:22 left 60 of 228 clients without a digest; the worker only tried in Monday's hour 00, so they never got one."""
+    start = datetime(2026, 11, 2, tzinfo=UTC)
+    end = datetime(2026, 11, 9, tzinfo=UTC) - timedelta(microseconds=1)
+    done = SimpleNamespace(id=uuid.uuid4(), name="Done", parent_tenant_id=None, created_at=start)
+    cut_off = SimpleNamespace(id=uuid.uuid4(), name="Cut off", parent_tenant_id=None, created_at=start)
+    too_new = SimpleNamespace(id=uuid.uuid4(), name="Too new", parent_tenant_id=None, created_at=end + timedelta(days=2))
+    made = []
+
+    async def fake_generate(tenant_id, s, e, client_name=None):
+        assert (s, e) == (start, end)
+        made.append(tenant_id)
+
+    monkeypatch.setattr(wdt, "AsyncSessionLocal", _Factory(_Session()))
+    monkeypatch.setattr(wdt, "_fetch_active_tenants", AsyncMock(return_value=[done, cut_off, too_new]))
+    monkeypatch.setattr(wdt, "_tenants_with_digest", AsyncMock(return_value={done.id}))
+    monkeypatch.setattr(wdt, "_generate_for_tenant", fake_generate)
+    # Thursday of the next week: not Monday's hour 00, and still the same week is asked for.
+    stats = await wdt.run_once(datetime(2026, 11, 12, tzinfo=UTC).date())
+    assert made == [cut_off.id]
+    assert stats == {"tenants": 1, "generated": 1, "failed": 0}

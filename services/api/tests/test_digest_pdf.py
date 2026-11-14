@@ -186,11 +186,14 @@ class TestWeeklyDigestRunOnce:
 
         tenant_a = MagicMock()
         tenant_a.id = uuid.uuid4()
+        tenant_a.created_at = None
         tenant_b = MagicMock()
         tenant_b.id = uuid.uuid4()
+        tenant_b.created_at = None
 
         with (
             patch.object(wdt, "_fetch_active_tenants", new=AsyncMock(return_value=[tenant_a, tenant_b])),
+            patch.object(wdt, "_tenants_with_digest", new=AsyncMock(return_value=set())),
             patch.object(wdt, "_generate_for_tenant", new=AsyncMock()) as mock_gen,
             patch("app.workers.weekly_digest_task.AsyncSessionLocal"),
         ):
@@ -208,8 +211,10 @@ class TestWeeklyDigestRunOnce:
 
         tenant_a = MagicMock()
         tenant_a.id = uuid.uuid4()
+        tenant_a.created_at = None
         tenant_b = MagicMock()
         tenant_b.id = uuid.uuid4()
+        tenant_b.created_at = None
 
         async def gen_side_effect(tenant_id, *args, **kwargs):
             if tenant_id == tenant_a.id:
@@ -217,6 +222,7 @@ class TestWeeklyDigestRunOnce:
 
         with (
             patch.object(wdt, "_fetch_active_tenants", new=AsyncMock(return_value=[tenant_a, tenant_b])),
+            patch.object(wdt, "_tenants_with_digest", new=AsyncMock(return_value=set())),
             patch.object(wdt, "_generate_for_tenant", new=AsyncMock(side_effect=gen_side_effect)),
             patch("app.workers.weekly_digest_task.AsyncSessionLocal"),
         ):
