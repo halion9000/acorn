@@ -673,7 +673,7 @@ COPILOT_TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "search_alerts",
-            "description": "Search alerts across this organisation and its clients, worst first. Filter by severity, how many hours back, and open only. Returns alerts with IDs and the client each belongs to.",
+            "description": "Search alerts across this organization and its clients, worst first. Filter by severity, how many hours back, and open only. Returns alerts with IDs and the client each belongs to.",
             "parameters": {
                 "type": "object",
                 "properties": {

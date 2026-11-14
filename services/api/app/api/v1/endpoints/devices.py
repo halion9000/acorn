@@ -1492,7 +1492,7 @@ async def apply_devices(db: Any, owner: uuid.UUID, report: DevicesReport) -> Dev
     """Store each device under the client its vendor client id is mapped to. The caller owns the transaction.
 
     A device whose client is not mapped yet (or ignored) is counted and skipped, not guessed at: it arrives again on the next run, after the mapping. A device with no client id at all belongs to
-    the feed's own tenant (an organisation with no clients)."""
+    the feed's own tenant (an organization with no clients)."""
     rows = (await db.execute(select(ClientAlias).where(ClientAlias.tenant_id == owner))).scalars().all()
     known = {(a.vendor, a.vendor_client_id): a for a in rows}
     child_rows = (await db.execute(select(Tenant.id, Tenant.settings).where(Tenant.parent_tenant_id == owner))).all()

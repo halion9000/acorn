@@ -98,7 +98,7 @@ A.C.O.R.N has **802** operations in **112** areas. This is a MAP, not a list of 
 - **remote-tools**: 4 reads, 4 changes; protection: `alerts:read`, `mssp:manage`; e.g. The tools that are looked for, the built-in list and the ones added by hand; The tools added by hand
 - **report-builder**: 0 reads, 2 changes; protection: `settings_reports:view`; e.g. Render; Validate report
 - **reports**: 5 reads, 3 changes; protection: `reports:read`, `reports:write`; e.g. List artefacts; Get artefact
-- **risk-register**: 3 reads, 8 changes; protection: `reports:read`, `reports:write`; e.g. The risks of this organisation or client, with the dashboard figures; Add a risk
+- **risk-register**: 3 reads, 8 changes; protection: `reports:read`, `reports:write`; e.g. The risks of this organization or client, with the dashboard figures; Add a risk
 - **rules**: 4 reads, 6 changes; protection: `rules:read`, `rules:view`, `rules:write`; e.g. List rules; Create rule
 - **saved-hunts**: 2 reads, 4 changes; protection: `hunts:read`, `lake:query`; e.g. List saved hunts; Create saved hunt
 - **saved-views**: 1 reads, 3 changes; protection: 4 signed-in with no permission declared; e.g. List saved views; Create saved view

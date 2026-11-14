@@ -5,7 +5,7 @@ A person presses "Create a HaloPSA ticket" on a question's line, names the ticke
 action (CORE writes it as a PRIVATE note and moves the ticket to Tech Updated). CORE reads the ticket's status from HaloPSA now and then and reports it (``apply_statuses``); the question's line shows
 it ("On Hold", "Waiting on Customer"), so the person sees where the work is without opening HaloPSA.
 
-The ticket belongs to the client the review is for, so it needs that client to be mapped to a HaloPSA client (Client mapping); the organisation's own reviews have none and are refused with a reason.
+The ticket belongs to the client the review is for, so it needs that client to be mapped to a HaloPSA client (Client mapping); the organization's own reviews have none and are refused with a reason.
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ async def queue_ticket(
     now: datetime,
 ) -> VcioRiskTicket:
     """Record the request and queue it for CORE. ``db`` is in the client's scope; the caller commits. ``halo_client_id`` is the HaloPSA client the review's client is mapped to, read by the caller in the
-    organisation's scope (the mapping is the organisation's, not the client's). Raises ValueError (a reason safe to show) when there is none."""
+    organization's scope (the mapping is the organization's, not the client's). Raises ValueError (a reason safe to show) when there is none."""
     halo = halo_client_id
     if not halo:
         raise ValueError(

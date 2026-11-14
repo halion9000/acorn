@@ -45,7 +45,7 @@ Concretely:
 
 ### Roadmap
 
-- Cyble commercial adapter — out of scope for the OSS repo. Tracked as a separate effort under Cyble's product organisation.
+- Cyble commercial adapter — out of scope for the OSS repo. Tracked as a separate effort under Cyble's product organization.
 - Pulsedive provider — owned by A.C.O.R.N core, tracked under the next release's connectors milestone.
 
 ## Alternatives considered

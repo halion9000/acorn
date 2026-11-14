@@ -1,5 +1,5 @@
 """vCIO Risk Scoring against a REAL Postgres (opt in with AISOC_TEST_PG_URL; the database needs migration 172): an assessment is stored under its client, scored on every write, and
-never seen or changed by another organisation."""
+never seen or changed by another organization."""
 
 import os
 import uuid
@@ -37,7 +37,7 @@ async def world():
                 text("insert into tenants (id, name, slug, parent_tenant_id) values (:t, :n, :s, :p)"),
                 {"t": tid, "n": name, "s": f"vrs-{tag}-{str(tid)[:6]}", "p": parent},
             )
-        # The organisation's own A.C.O.R.N users (an assessor has to be one of them); one is switched off, and the other organisation has its own.
+        # The organization's own A.C.O.R.N users (an assessor has to be one of them); one is switched off, and the other organization has its own.
         for tid, name, active in (
             (owner, "Hal", True),
             (owner, "Dana", True),
@@ -188,7 +188,7 @@ async def test_the_list_is_newest_first_per_client_or_for_all_and_a_deleted_asse
         await cleanup(engine, w)
 
 
-async def test_another_organisation_never_sees_changes_or_deletes_an_assessment_and_cannot_start_one_for_a_client_that_is_not_its_own():
+async def test_another_organization_never_sees_changes_or_deletes_an_assessment_and_cannot_start_one_for_a_client_that_is_not_its_own():
     engine, user, other, w = await world()
     try:
         async with AsyncSession(engine) as db:
@@ -222,7 +222,7 @@ async def test_the_library_gives_the_questions_and_the_defaults():
     ]
 
 
-async def test_the_scoring_settings_belong_to_the_organisation_and_saving_them_scores_every_assessment_again():
+async def test_the_scoring_settings_belong_to_the_organization_and_saving_them_scores_every_assessment_again():
     engine, user, other, w = await world()
     try:
         async with AsyncSession(engine) as db:
@@ -251,8 +251,8 @@ async def test_the_scoring_settings_belong_to_the_organisation_and_saving_them_s
             assert opened.score == pytest.approx(0.5) and opened.scorecard["settings"]["points"]["High"] == 3
             assert opened.updated_by == "hal@goliveoak.com", "scoring again does not claim someone edited the assessment"
             fresh = await ep.create_assessment(ep.AssessmentIn(client_id=w.acme), user, db)
-            assert fresh.scorecard["settings"]["points"]["High"] == 3, "a new assessment uses the organisation's settings"
-            # Another organisation has its own: nothing of this one's reaches it.
+            assert fresh.scorecard["settings"]["points"]["High"] == 3, "a new assessment uses the organization's settings"
+            # Another organization has its own: nothing of this one's reaches it.
             assert (await ep.get_settings(other, db)).using_defaults is True
             reset = await ep.put_settings(ep.SettingsIn(settings={}), user, db)
             assert reset.using_defaults is True and reset.rescored == 3
@@ -337,14 +337,14 @@ async def test_filling_in_from_the_real_client_review_works_for_a_client_no_tool
         await cleanup(engine, w)
 
 
-async def test_the_assessor_is_one_of_the_organisations_active_users_and_anyone_else_is_refused():
+async def test_the_assessor_is_one_of_the_organizations_active_users_and_anyone_else_is_refused():
     engine, user, other, w = await world()
     try:
         async with AsyncSession(engine) as db:
             assert [a.name for a in (await ep.list_assessors(user, db)).items] == [
                 "Dana",
                 "Hal",
-            ], "active users of this organisation only, by name"
+            ], "active users of this organization only, by name"
             assert [a.name for a in (await ep.list_assessors(other, db)).items] == ["Stranger Sam"]
             made = await ep.create_assessment(ep.AssessmentIn(client_id=w.acme, assessor=" hal "), user, db)
             assert made.assessor == "Hal", "stored as the user is named"
@@ -422,8 +422,8 @@ async def test_the_list_of_clients_says_where_each_score_is_and_how_it_moved_big
         await cleanup(engine, w)
 
 
-async def test_the_clients_to_choose_from_are_the_organisations_shown_clients():
-    # A vCIO role holds alerts:read but not mssp:read, so the MSSP client list was refused and the picker offered only "Own organisation": the page lists its own.
+async def test_the_clients_to_choose_from_are_the_organizations_shown_clients():
+    # A vCIO role holds alerts:read but not mssp:read, so the MSSP client list was refused and the picker offered only "Own organization": the page lists its own.
     engine, user, other, w = await world()
     try:
         async with engine.begin() as conn:
@@ -432,10 +432,10 @@ async def test_the_clients_to_choose_from_are_the_organisations_shown_clients():
             listed = await ep.list_clients(user, db)
             assert [(c.id, c.name) for c in listed.items] == [
                 (w.acme, "Acme Dental")
-            ], "this organisation's shown clients, by name; a hidden one is left out"
+            ], "this organization's shown clients, by name; a hidden one is left out"
             assert [(c.id, c.name) for c in (await ep.list_clients(other, db)).items] == [
                 (w.theirs, "Their Client")
-            ], "never another organisation's"
+            ], "never another organization's"
         async with engine.begin() as conn:
             await conn.execute(text("update tenants set settings = '{}'::jsonb where id = :t"), {"t": w.birch})
         async with AsyncSession(engine) as db:

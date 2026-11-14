@@ -15,7 +15,7 @@ class PluginManifest(BaseModel):
     name: str = Field(..., description="Human-readable name")
     version: str = Field(..., description="SemVer string, e.g. '1.0.0'")
     description: str = Field(default="", description="Short description shown in the marketplace")
-    author: str = Field(default="", description="Author or organisation name")
+    author: str = Field(default="", description="Author or organization name")
     tags: list[str] = Field(default_factory=list, description="Free-form tags for discovery")
     plugin_type: str = Field(
         ...,

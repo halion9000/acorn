@@ -47,7 +47,7 @@ def matrix(rows: list[Any]) -> list[list[int]]:
     return grid
 
 
-# Common risks of a small organisation that an IT provider looks after: a starting point a person adjusts, never applied on its own.
+# Common risks of a small organization that an IT provider looks after: a starting point a person adjusts, never applied on its own.
 LIBRARY: tuple[dict[str, Any], ...] = (
     {
         "id": "phishing-takeover",
@@ -63,7 +63,7 @@ LIBRARY: tuple[dict[str, Any], ...] = (
         "category": "Endpoints and devices",
         "likelihood": 3,
         "impact": 5,
-        "description": "Malware locks the organisation's files and demands payment; work stops until systems are restored.",
+        "description": "Malware locks the organization's files and demands payment; work stops until systems are restored.",
     },
     {
         "id": "bec-payment-fraud",
@@ -115,7 +115,7 @@ LIBRARY: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "vendor-breach",
-        "title": "A vendor or supplier breach exposes the organisation's data",
+        "title": "A vendor or supplier breach exposes the organization's data",
         "category": "Vendors and third parties",
         "likelihood": 3,
         "impact": 4,
@@ -127,7 +127,7 @@ LIBRARY: tuple[dict[str, Any], ...] = (
         "category": "Data protection",
         "likelihood": 2,
         "impact": 4,
-        "description": "A shared link, storage bucket or mailbox rule is left open to anyone, or forwards mail outside the organisation.",
+        "description": "A shared link, storage bucket or mailbox rule is left open to anyone, or forwards mail outside the organization.",
     },
     {
         "id": "insider-data-theft",
@@ -143,7 +143,7 @@ LIBRARY: tuple[dict[str, Any], ...] = (
         "category": "People",
         "likelihood": 3,
         "impact": 3,
-        "description": "Loss of that person (illness, resignation, an argument) leaves the organisation unable to manage or recover systems.",
+        "description": "Loss of that person (illness, resignation, an argument) leaves the organization unable to manage or recover systems.",
     },
     {
         "id": "outage",

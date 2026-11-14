@@ -1,6 +1,6 @@
 """The risk register, against a REAL Postgres as the restricted role (AISOC_TEST_PG_URL / AISOC_TEST_PG_APP_URL, a disposable fully migrated database).
 
-Risks are numbered per organisation, one client never sees another's, a risk is archived and restored rather than deleted, tasks and every change are kept with the risk.
+Risks are numbered per organization, one client never sees another's, a risk is archived and restored rather than deleted, tasks and every change are kept with the risk.
 """
 
 import os
@@ -75,7 +75,7 @@ async def listing(w, tenant=None, archived=False):
     return await run(t, lambda db: ep.list_risks(t, db, w.user, archived))
 
 
-async def test_risks_are_numbered_per_organisation_and_scored_by_likelihood_times_impact(world):
+async def test_risks_are_numbered_per_organization_and_scored_by_likelihood_times_impact(world):
     w = world
     a = await add(w)
     b = await add(w, title="Backups cannot be restored", likelihood=3, impact=5)

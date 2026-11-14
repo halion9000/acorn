@@ -27,7 +27,7 @@ config_schema:
     tailnet:
       type: string
       description: >
-        Your tailnet name (organisation slug or email address shown in the
+        Your tailnet name (organization slug or email address shown in the
         Tailscale admin console).  Use '-' to use the default tailnet of the
         authenticated token.
     api_key:

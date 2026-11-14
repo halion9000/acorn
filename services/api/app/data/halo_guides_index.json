@@ -421,7 +421,7 @@
 },
 {
 "id": "1781",
-"title": "Global Organisation Settings",
+"title": "Global Organization Settings",
 "section": "Configuration Settings Guides"
 },
 {
@@ -526,7 +526,7 @@
 },
 {
 "id": "1339",
-"title": "Organisation Settings",
+"title": "Organization Settings",
 "section": "Configuration Settings Guides"
 },
 {
@@ -3056,7 +3056,7 @@
 },
 {
 "id": "2659",
-"title": "API Applications with Organisation access",
+"title": "API Applications with Organization access",
 "section": "Using and Configuring Halo > Custom Automations"
 },
 {
@@ -3582,137 +3582,137 @@
 {
 "id": "2815",
 "title": "Account Managers",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2764",
 "title": "Allow Users to Update their own Details from the Portal",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2678",
 "title": "Creating Users",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2449",
 "title": "Customer Areas",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2127",
 "title": "Customer Relationships",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "878",
 "title": "Customer, Site and User Records",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "903",
 "title": "Followers and Following Tickets",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2353",
 "title": "How To Onboard New Customers",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2366",
 "title": "Important Users/Customers",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2873",
 "title": "Linked Users",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2331",
 "title": "Managing Multiple End User Portals",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2539",
-"title": "Organisation Contracts/Agreements",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"title": "Organization Contracts/Agreements",
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "1673",
 "title": "Pop-Up Notes For Customers, Sites, & Users",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2813",
 "title": "Redacting Personal Information on Tickets - PII Data Flagging",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2793",
 "title": "Security Questions",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2576",
 "title": "Service Users",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2506",
 "title": "Site Contacts",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2882",
 "title": "Site Fields",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "1904",
 "title": "Sites",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "1937",
 "title": "Ticket/Client Areas",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2170",
 "title": "Top Levels",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2998",
 "title": "User and Agent Groups",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "962",
 "title": "User Management",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2637",
 "title": "User Out of Office Detection",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2818",
 "title": "User Roles",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "1905",
 "title": "Users",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2287",
 "title": "Using CRM Notes",
-"section": "Using and Configuring Halo > Organisations/Customers, Sites and Users"
+"section": "Using and Configuring Halo > Organizations/Customers, Sites and Users"
 },
 {
 "id": "2406",
@@ -4877,121 +4877,121 @@
 {
 "id": "2426",
 "title": "Access Control",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "1194",
 "title": "Add an external agent to Halo and restrict their access",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "1665",
 "title": "Adding Agent Signatures",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "2546",
 "title": "Admin Mode",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "2496",
 "title": "Agent Access to Services",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "883",
 "title": "Agent Permission Settings",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "1946",
 "title": "Agent Resource Booking",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "2390",
 "title": "Agent Statuses",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "2405",
 "title": "Agent Work Hours",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "1899",
 "title": "Agents",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "2333",
 "title": "Co-Managed IT",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "2239",
 "title": "Concurrent Licensing and Agent App Session Improvements",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "882",
 "title": "Configuring Agent Roles",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "877",
 "title": "Creating Agents and Editing Agent Details",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "1897",
 "title": "Departments",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "860",
 "title": "Departments and Teams",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "2330",
 "title": "Multi-Tenancy",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "979",
 "title": "My Account",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "1895",
-"title": "Organisations",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"title": "Organizations",
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "884",
 "title": "Organising Teams of Agents",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "2682",
 "title": "Restricting Information Access for Agents",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "2765",
-"title": "Start to Finish: Organisation Structure",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"title": "Start to Finish: Organization Structure",
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "1898",
 "title": "Teams",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 },
 {
 "id": "918",
 "title": "The Activity Feed",
-"section": "Using and Configuring Halo > Your Organisation Structure"
+"section": "Using and Configuring Halo > Your Organization Structure"
 }
 ]

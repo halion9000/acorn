@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The organisation's Client Risk Score settings (the page was first called vCIO Risk Scoring): the points each severity weighs, the credit a partial or unknown answer earns, the critical-gap cap, the rating bands and the category
+ * The organization's Client Risk Score settings (the page was first called vCIO Risk Scoring): the points each severity weighs, the credit a partial or unknown answer earns, the critical-gap cap, the rating bands and the category
  * weights. One set for every client, kept here under Settings so only someone who may change settings can change how every client is scored. Saving scores every assessment again.
  */
 

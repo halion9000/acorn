@@ -51,7 +51,7 @@ variable "cloudflare_zone_id" {
 # -----------------------------------------------------------------------------
 
 variable "fly_org" {
-  description = "Fly.io organisation slug that owns the managed deployment."
+  description = "Fly.io organization slug that owns the managed deployment."
   type        = string
   default     = "aisoc"
 }

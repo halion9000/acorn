@@ -152,7 +152,7 @@ async def test_filters_narrow_the_lines_and_the_counts_and_pages_follow_the_same
     assert (await read(world, limit=1)).total == 4, "the counts are of everything that matches, not of the page"
 
 
-async def test_another_organisation_sees_none_of_it_and_cannot_ask_for_a_client_that_is_not_its_own(world):
+async def test_another_organization_sees_none_of_it_and_cannot_ask_for_a_client_that_is_not_its_own(world):
     await send(world, "msp", "cust-acme", [vuln("CVE-1")])
     await send(world, "other_msp", "cust-x", [vuln("CVE-X")])
     assert [r.cve for r in (await read(world, "msp")).rows] == ["CVE-1"]

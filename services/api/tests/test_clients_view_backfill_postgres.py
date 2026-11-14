@@ -1,6 +1,6 @@
 """Migration 174 turns clients:view on for every role that exists, against a REAL Postgres (AISOC_TEST_PG_URL, a disposable fully migrated database).
 
-The permission is new and the people who have roles today must not lose sight of their clients, so the migration grants it to every role, system and custom, in every organisation, and a second run
+The permission is new and the people who have roles today must not lose sight of their clients, so the migration grants it to every role, system and custom, in every organization, and a second run
 adds nothing. A role made afterwards starts without it (it is a choice per role).
 """
 

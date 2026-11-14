@@ -21,8 +21,8 @@ Auth: Tailscale supports two auth methods:
     ``client_secret`` are both provided, it performs the client-credentials
     flow automatically and refreshes the token before expiry.
 
-Tailnet: the organisational identifier. For personal accounts this is the
-email address (``alice@example.com``). For organisations it is the custom
+Tailnet: the organizational identifier. For personal accounts this is the
+email address (``alice@example.com``). For organizations it is the custom
 short-name shown in the admin panel, or ``-`` to use the default tailnet of
 the authenticated token.
 """
@@ -135,7 +135,7 @@ class TailscaleConnector(BaseConnector):
                     "Tailnet",
                     placeholder="example.com or -",
                     help_text=(
-                        "Your tailnet name (the organisation slug shown in the Tailscale "
+                        "Your tailnet name (the organization slug shown in the Tailscale "
                         "admin console, e.g. 'example.com'). Use '-' to use the default "
                         "tailnet associated with the API key / OAuth token."
                     ),

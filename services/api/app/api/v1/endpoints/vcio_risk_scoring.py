@@ -1,7 +1,7 @@
 """Client Risk Score (the page was first called vCIO Risk Scoring, and the routes keep that name): a client's Business Review, answered question by question and scored by risk (Live Oak's scoring workbook, kept here instead of in a spreadsheet per client).
 
 - ``GET /vcio-risk-scoring/library``: the questions and the default settings.
-- ``GET /vcio-risk-scoring/assessors``: the organisation's A.C.O.R.N users, for the assessor of an assessment.
+- ``GET /vcio-risk-scoring/assessors``: the organization's A.C.O.R.N users, for the assessor of an assessment.
 - ``GET /vcio-risk-scoring/trends`` and ``/trends/{client}``: how each client's score moved since its assessment before, and one client's score over time.
 - ``GET /vcio-risk-scoring/assessments``: the assessments of one client or of every client, newest first, each with its score.
 - ``POST /vcio-risk-scoring/assessments``: start one for a client.
@@ -10,7 +10,7 @@
 - ``PUT /vcio-risk-scoring/assessments/{id}/answers``: answer questions (or clear answers).
 - ``POST /vcio-risk-scoring/assessments/{id}/autofill``: fill in what the integrations can answer, from the client's Client Review.
 - ``DELETE /vcio-risk-scoring/assessments/{id}``.
-- ``GET`` and ``PUT /vcio-risk-scoring/settings``: the organisation's scoring settings (points, credits, cap, rating bands, category weights). One set for every client, changed only by
+- ``GET`` and ``PUT /vcio-risk-scoring/settings``: the organization's scoring settings (points, credits, cap, rating bands, category weights). One set for every client, changed only by
   someone who may change settings; saving them scores every assessment again.
 
 The scoring itself is in ``app.services.vcio_risk_scoring``. Every write stores the score, so the list never has to score again.
@@ -93,7 +93,7 @@ class AssessmentOut(AssessmentSummary):
 
 
 class AssessmentIn(BaseModel):
-    client_id: uuid.UUID | None = Field(default=None, description="The client assessed; left out, the caller's own organisation.")
+    client_id: uuid.UUID | None = Field(default=None, description="The client assessed; left out, the caller's own organization.")
     review_date: date | None = None
     platform: Platform = "m365"
     assessor: str = Field(default="", max_length=200)
@@ -146,7 +146,7 @@ SETTINGS_KEY = "vcio_risk_scoring"
 
 
 async def org_settings(db: Any, owner: uuid.UUID) -> dict[str, Any]:
-    """The scoring settings of the organisation (one set for all its clients, changed under Settings), or nothing when it uses the defaults."""
+    """The scoring settings of the organization (one set for all its clients, changed under Settings), or nothing when it uses the defaults."""
     tenant = await db.get(Tenant, owner)
     found = (tenant.settings or {}).get(SETTINGS_KEY) if tenant is not None else None
     return found if isinstance(found, dict) else {}
@@ -221,7 +221,7 @@ SettingsWriter = Annotated[AuthUser, Depends(require_permission("settings_client
 class SettingsOut(BaseModel):
     settings: dict[str, Any]
     defaults: dict[str, Any]
-    # True when the organisation has changed nothing: the defaults are in use.
+    # True when the organization has changed nothing: the defaults are in use.
     using_defaults: bool
     rescored: int = 0
 
@@ -232,23 +232,23 @@ class SettingsIn(BaseModel):
     )
 
 
-@router.get("/settings", response_model=SettingsOut, summary="The organisation's vCIO Risk Scoring settings")
+@router.get("/settings", response_model=SettingsOut, summary="The organization's vCIO Risk Scoring settings")
 async def get_settings(current_user: SettingsReader, db: DBSession) -> SettingsOut:
     stored = await org_settings(db, current_user.tenant_id)
     return SettingsOut(settings=rs.merge_settings(stored), defaults=rs.merge_settings(None), using_defaults=not stored)
 
 
 @router.put(
-    "/settings", response_model=SettingsOut, summary="Change the organisation's vCIO Risk Scoring settings and score every assessment again"
+    "/settings", response_model=SettingsOut, summary="Change the organization's vCIO Risk Scoring settings and score every assessment again"
 )
 async def put_settings(body: SettingsIn, current_user: SettingsWriter, db: DBSession) -> SettingsOut:
     owner = current_user.tenant_id
     tenant = await db.get(Tenant, owner)
     if tenant is None:
-        raise HTTPException(status_code=404, detail="Organisation not found")
+        raise HTTPException(status_code=404, detail="Organization not found")
     defaults = rs.merge_settings(None)
     merged = rs.merge_settings(body.settings)
-    # Only what was really changed is kept, so a default that changes later still reaches an organisation that never touched it.
+    # Only what was really changed is kept, so a default that changes later still reaches an organization that never touched it.
     kept = {k: v for k, v in merged.items() if v != defaults[k]} if body.settings else {}
     before = (tenant.settings or {}).get(SETTINGS_KEY) or {}
     settings = dict(tenant.settings or {})
@@ -267,7 +267,7 @@ async def put_settings(body: SettingsIn, current_user: SettingsWriter, db: DBSes
         resource_id=str(owner),
         changes={"before": before, "after": kept},
     )
-    # Sent now, in the organisation's own scope: left queued, it would go out inside the first client's scope below and be refused.
+    # Sent now, in the organization's own scope: left queued, it would go out inside the first client's scope below and be refused.
     await db.flush()
     # The stored scores (what the list of assessments shows) were worked out with the old settings.
     names = await _clients(db, owner)
@@ -297,7 +297,7 @@ class AssessorList(BaseModel):
 
 
 async def assessor_names(db: Any, owner: uuid.UUID) -> list[Assessor]:
-    """The people who can be named as the assessor: the organisation's own active A.C.O.R.N users, by name."""
+    """The people who can be named as the assessor: the organization's own active A.C.O.R.N users, by name."""
     rows = (await db.execute(select(User.username, User.email).where(User.tenant_id == owner, User.is_active.is_(True)))).all()
     seen: dict[str, Assessor] = {}
     for username, email in rows:
@@ -308,14 +308,14 @@ async def assessor_names(db: Any, owner: uuid.UUID) -> list[Assessor]:
 
 
 async def _checked_assessor(db: Any, owner: uuid.UUID, given: str, current: str = "") -> str:
-    """The assessor to store: empty, the one already stored (an earlier assessment may name someone who has since left), or one of the organisation's users. Anything else is refused."""
+    """The assessor to store: empty, the one already stored (an earlier assessment may name someone who has since left), or one of the organization's users. Anything else is refused."""
     name = given.strip()
     if not name or name == current:
         return name
     known = {a.name.lower(): a.name for a in await assessor_names(db, owner)}
     if name.lower() not in known:
         raise HTTPException(
-            status_code=422, detail=f"{name} is not an A.C.O.R.N user of this organisation: choose the assessor from the list"
+            status_code=422, detail=f"{name} is not an A.C.O.R.N user of this organization: choose the assessor from the list"
         )
     return known[name.lower()]
 
@@ -339,11 +339,11 @@ class ClientChoices(BaseModel):
 @router.get(
     "/clients",
     response_model=ClientChoices,
-    summary="The clients a Client Risk Score can be started for (the organisation's shown clients)",
+    summary="The clients a Client Risk Score can be started for (the organization's shown clients)",
 )
 async def list_clients(current_user: ClientViewer, db: DBSession) -> ClientChoices:
-    """The page's client picker. It used to ask the MSSP client list, which needs mssp:read: a vCIO role without it saw only "Own organisation". Anyone who holds clients:view (on for every role, switchable per role) can read
-    this, and a client the organisation hid (a test or archived one) is not offered."""
+    """The page's client picker. It used to ask the MSSP client list, which needs mssp:read: a vCIO role without it saw only "Own organization". Anyone who holds clients:view (on for every role, switchable per role) can read
+    this, and a client the organization hid (a test or archived one) is not offered."""
     rows = (
         await db.execute(select(Tenant.id, Tenant.name, Tenant.settings).where(Tenant.parent_tenant_id == current_user.tenant_id))
     ).all()
@@ -495,7 +495,7 @@ async def get_library(current_user: Reader) -> LibraryOut:
 async def list_assessments(
     current_user: Reader,
     db: DBSession,
-    client_id: uuid.UUID | None = Query(default=None, description="One client (or the caller's own organisation); left out, every client."),
+    client_id: uuid.UUID | None = Query(default=None, description="One client (or the caller's own organization); left out, every client."),
 ) -> AssessmentList:
     owner = current_user.tenant_id
     names = await _clients(db, owner)
@@ -762,7 +762,7 @@ async def create_ticket(assessment_id: uuid.UUID, question_id: str, body: Ticket
     now = datetime.now(UTC)
     who = current_user.email or "a person"
     found_id, client_id, review_date = seen.id, seen.tenant_id, seen.review_date.isoformat()
-    # The mapping to a HaloPSA client is the organisation's: read here, before acting as the client.
+    # The mapping to a HaloPSA client is the organization's: read here, before acting as the client.
     halo = await halo_client_for(db, owner, client_id) if client_id != owner else None
     async with _acting(db, owner, client_id):
         waiting = (
@@ -781,7 +781,7 @@ async def create_ticket(assessment_id: uuid.UUID, question_id: str, body: Ticket
                 db,
                 halo_client_id=halo,
                 client_id=client_id,
-                client_name=names.get(client_id) or "this organisation",
+                client_name=names.get(client_id) or "this organization",
                 assessment_id=found_id,
                 review_date=review_date,
                 question=question,
@@ -794,7 +794,7 @@ async def create_ticket(assessment_id: uuid.UUID, question_id: str, body: Ticket
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         out = _ticket_out(row)
         await db.commit()
-    # The organisation's own audit line, written after the client's scope ends (row-level security refuses another tenant's line inside it).
+    # The organization's own audit line, written after the client's scope ends (row-level security refuses another tenant's line inside it).
     await emit_audit(
         db=db,
         tenant_id=owner,
@@ -821,7 +821,7 @@ async def delete_assessment(assessment_id: uuid.UUID, current_user: Writer, db: 
         "answered": seen.answered,
     }
     found_id, client_id = seen.id, seen.tenant_id
-    # The row is the client's, so it is removed in the client's scope. The audit line is the organisation's, so it is written after that scope ends: written inside it, row-level security
+    # The row is the client's, so it is removed in the client's scope. The audit line is the organization's, so it is written after that scope ends: written inside it, row-level security
     # refuses the line (it belongs to another tenant than the one being acted as) and the whole deletion fails.
     async with _acting(db, owner, client_id):
         await db.execute(VcioRiskAssessment.__table__.delete().where(VcioRiskAssessment.id == found_id))

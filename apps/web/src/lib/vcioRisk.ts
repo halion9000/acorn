@@ -225,7 +225,7 @@ export const vcioRiskApi = {
     apiRequest<RiskAssessment>(`/api/v1/vcio-risk-scoring/assessments/${encodeURIComponent(id)}`, json('PATCH', body)),
   answer: (id: string, items: { id: string; answer?: string | null; vendor?: string | null; note?: string | null }[]) =>
     apiRequest<RiskAssessment>(`/api/v1/vcio-risk-scoring/assessments/${encodeURIComponent(id)}/answers`, json('PUT', { items })),
-  /** The organisation's A.C.O.R.N users, for the assessor of an assessment. */
+  /** The organization's A.C.O.R.N users, for the assessor of an assessment. */
   assessors: () => apiRequest<{ items: RiskAssessor[] }>('/api/v1/vcio-risk-scoring/assessors'),
   /** The clients an assessment can be started for. Readable with alert access, unlike the MSSP client list (which a vCIO role does not hold). */
   clients: () => apiRequest<{ items: { id: string; name: string }[] }>('/api/v1/vcio-risk-scoring/clients'),
@@ -235,7 +235,7 @@ export const vcioRiskApi = {
   clientTrend: (clientId: string) => apiRequest<RiskClientTrend>(`/api/v1/vcio-risk-scoring/trends/${encodeURIComponent(clientId)}`),
   /** Fill in what the integrations can answer, from the client's Client Review. An answer set by hand is never replaced. */
   autofill: (id: string) => apiRequest<RiskAutofill>(`/api/v1/vcio-risk-scoring/assessments/${encodeURIComponent(id)}/autofill`, { method: 'POST' }),
-  /** The organisation's scoring settings (kept under Settings). */
+  /** The organization's scoring settings (kept under Settings). */
   settings: () => apiRequest<RiskSettingsAnswer>('/api/v1/vcio-risk-scoring/settings'),
   saveSettings: (settings: RiskSettings | Record<string, never>) => apiRequest<RiskSettingsAnswer>('/api/v1/vcio-risk-scoring/settings', json('PUT', { settings })),
   remove: (id: string) => apiRequest<{ deleted: boolean }>(`/api/v1/vcio-risk-scoring/assessments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
@@ -261,7 +261,7 @@ export function changeText(change: number | null | undefined, direction: RiskDir
 
 export const DIRECTION_CLASS: Record<RiskDirection, string> = { up: 'text-emerald-300', down: 'text-red-300', flat: 'text-gray-400', none: 'text-gray-500' };
 
-/** The assessor choices: the organisation's users, plus the name an assessment already carries when that person is no longer one of them (so opening an old assessment does not blank it). */
+/** The assessor choices: the organization's users, plus the name an assessment already carries when that person is no longer one of them (so opening an old assessment does not blank it). */
 export function assessorChoices(users: RiskAssessor[], current: string): string[] {
   const names = users.map((u) => u.name);
   return current && !names.some((n) => n.toLowerCase() === current.toLowerCase()) ? [...names, current] : names;

@@ -115,7 +115,7 @@ export function ExecutiveDigest() {
 
   const [clientId, setClientId] = useState('');
   const isHome = useIsHomeClient(clientId);
-  // The organisation snapshot belongs to the organisation itself: no client chosen, or its own company.
+  // The organization snapshot belongs to the organization itself: no client chosen, or its own company.
   const ownView = !clientId || isHome;
   // A link can open the digest of one client (?client=<id>).
   useEffect(() => {

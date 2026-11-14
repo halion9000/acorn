@@ -157,7 +157,7 @@ class TestAdminActions:
         assert r.status_code == 403
         assert login(world, "boss", OLD).status_code == 200
 
-    def test_nobody_can_reach_a_user_of_another_organisation(self, world):
+    def test_nobody_can_reach_a_user_of_another_organization(self, world):
         boss = login(world, "boss")
         assert (
             world.client.post(

@@ -1,6 +1,6 @@
 """Knowledge-base + RAG over org docs/runbooks (tier3-rag).
 
-Analysts ingest organisation documents (runbooks, policies, playbooks, SOPs)
+Analysts ingest organization documents (runbooks, policies, playbooks, SOPs)
 into a full-text-searchable store.  A ``/query`` endpoint retrieves relevant
 chunks and, when an LLM key is configured, synthesises a cited answer.
 

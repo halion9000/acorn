@@ -184,7 +184,7 @@ export function VulnerabilitiesView() {
                       <td className="px-3 py-2">
                         <span className={`rounded border px-2 py-0.5 text-xs ${SEVERITY_TEXT[a.severity] ?? SEVERITY_TEXT.info}`}>{a.severity}</span>
                       </td>
-                      <td className="px-3 py-2 text-gray-200">{a.clientName ?? 'This organisation'}</td>
+                      <td className="px-3 py-2 text-gray-200">{a.clientName ?? 'This organization'}</td>
                       <td className="px-3 py-2">
                         <p className="text-gray-100">{a.title}</p>
                         {a.description ? <p className="mt-0.5 text-xs text-gray-400">{a.description}</p> : null}

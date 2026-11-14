@@ -47,14 +47,14 @@ describe('the compliance index', () => {
     expect(screen.getByRole('link', { name: /HIPAA Security Rule/ }).getAttribute('href')).toBe('/compliance/hipaa');
   });
 
-  it('shows no client choice for an organisation with no clients', async () => {
+  it('shows no client choice for an organization with no clients', async () => {
     listChildren.mockResolvedValue([]);
     renderIndex();
     await waitFor(() => expect(listChildren).toHaveBeenCalled());
     expect(screen.queryByLabelText('Client')).toBeNull();
   });
 
-  it('starts on the own company of the organisation (a client in the list, no "My organisation" line), and puts the chosen client on every card and in the address', async () => {
+  it('starts on the own company of the organization (a client in the list, no "My organization" line), and puts the chosen client on every card and in the address', async () => {
     listChildren.mockResolvedValue([{ id: 'c1', name: 'Acme Dental' }, { id: 'c2', name: 'Live Oak IT Partners' }, { id: 'c3', name: 'Beta Law' }]);
     renderIndex();
     const user = userEvent.setup();

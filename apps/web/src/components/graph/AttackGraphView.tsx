@@ -265,7 +265,7 @@ function MitreHeatmap({ coverage }: { coverage: MitreCoverage }) {
 
 export function AttackGraphView() {
   const [selected, setSelected] = useState<GraphNode | null>(null);
-  // '' is the whole organisation (every client together); an id is one client.
+  // '' is the whole organization (every client together); an id is one client.
   const [client, setClient] = useState('');
 
   const graphState = useSWR<AttackGraph | null>(

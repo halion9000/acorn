@@ -1,7 +1,7 @@
 """A HaloPSA ticket from a Client Risk Score question, against a REAL Postgres as the restricted role (AISOC_TEST_PG_URL / AISOC_TEST_PG_APP_URL, a disposable fully migrated database).
 
 The request is queued for CORE (which holds the HaloPSA key); CORE answers with the ticket's number, and the private note is then queued as its own action. The ticket is the client's, so every
-write runs in the client's scope and the organisation's audit line outside it (the rule that broke deleting an assessment on 2026-11-12).
+write runs in the client's scope and the organization's audit line outside it (the rule that broke deleting an assessment on 2026-11-12).
 """
 
 import os
@@ -125,7 +125,7 @@ async def test_a_ticket_is_queued_for_core_with_the_name_the_client_and_where_it
     assert audited[0][0] == 1
 
 
-async def test_it_is_refused_with_a_reason_for_a_client_with_no_halopsa_link_the_own_organisation_a_blank_name_and_an_unknown_question(
+async def test_it_is_refused_with_a_reason_for_a_client_with_no_halopsa_link_the_own_organization_a_blank_name_and_an_unknown_question(
     world,
 ):
     w = world

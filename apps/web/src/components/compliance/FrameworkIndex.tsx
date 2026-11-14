@@ -2,7 +2,7 @@
 
 /**
  * The Compliance index: a card for each framework, with a "Whose compliance" choice above them. A client chosen here goes with every card's link (`?client=<id>`), so the framework page opens on that
- * client and not on the organisation's own evidence. The choice is also written into this page's address, so a reload or a shared link keeps it. An organisation with no clients sees no choice.
+ * client and not on the organization's own evidence. The choice is also written into this page's address, so a reload or a shared link keeps it. An organization with no clients sees no choice.
  */
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -78,7 +78,7 @@ function Progress({ value }: { value: Completion | null | undefined }) {
 export function FrameworkIndex({ frameworks }: { frameworks: FrameworkCard[] }) {
   const [clientId, setClientId] = useState('');
   const isHome = useIsHomeClient(clientId);
-  // The organisation's own Secureframe is shown for the organisation itself (no client, or its own company).
+  // The organization's own Secureframe is shown for the organization itself (no client, or its own company).
   const ownView = !clientId || isHome;
   // A link can open on one client; read once, after the first paint so the server and browser markup agree.
   useEffect(() => {

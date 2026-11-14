@@ -115,7 +115,7 @@ describe('the client picker', () => {
     await waitFor(() => expect(getMitreCoverage).toHaveBeenLastCalledWith({ client: 'c-1' }));
   });
 
-  it('is not drawn for an organisation with no clients', async () => {
+  it('is not drawn for an organization with no clients', async () => {
     children.list = [];
     getOverview.mockResolvedValue({ nodes: [], edges: [], generatedAt: '2026-10-08T12:00:00Z' });
     getMitreCoverage.mockResolvedValue(coverage);

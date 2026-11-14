@@ -1284,7 +1284,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 
 | Method | Path | What it does | Permission |
 | --- | --- | --- | --- |
-| GET | `/risk-register` | The risks of this organisation or client, with the dashboard figures | `reports:read` |
+| GET | `/risk-register` | The risks of this organization or client, with the dashboard figures | `reports:read` |
 | POST | `/risk-register` | Add a risk | `reports:write` |
 | POST | `/risk-register/from-library` | Add a risk from the starter library | `reports:write` |
 | GET | `/risk-register/library` | Common risks to start from | `reports:read` |
@@ -1470,10 +1470,10 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | POST | `/vcio-risk-scoring/assessments/{assessment_id}/questions/{question_id}/tickets` | Ask CORE to open a HaloPSA ticket for a question of a review | `vcio:assess` |
 | GET | `/vcio-risk-scoring/assessments/{assessment_id}/tickets` | The HaloPSA tickets made from the questions of a review | `alerts:read` |
 | GET | `/vcio-risk-scoring/assessors` | The A.C.O.R.N users who can be named as the assessor of a Client Risk Score | `alerts:read` |
-| GET | `/vcio-risk-scoring/clients` | The clients a Client Risk Score can be started for (the organisation's shown clients) | `clients:view` |
+| GET | `/vcio-risk-scoring/clients` | The clients a Client Risk Score can be started for (the organization's shown clients) | `clients:view` |
 | GET | `/vcio-risk-scoring/library` | The vCIO Risk Scoring questions and the default scoring settings | `alerts:read` |
-| GET | `/vcio-risk-scoring/settings` | The organisation's vCIO Risk Scoring settings | `settings_clients:view` |
-| PUT | `/vcio-risk-scoring/settings` | Change the organisation's vCIO Risk Scoring settings and score every assessment again | `settings_clients:manage` |
+| GET | `/vcio-risk-scoring/settings` | The organization's vCIO Risk Scoring settings | `settings_clients:view` |
+| PUT | `/vcio-risk-scoring/settings` | Change the organization's vCIO Risk Scoring settings and score every assessment again | `settings_clients:manage` |
 | GET | `/vcio-risk-scoring/trends` | Every client's latest Client Risk Score and how it moved since the assessment before | `alerts:read` |
 | GET | `/vcio-risk-scoring/trends/{client_id}` | One client's Client Risk Score over time, assessment by assessment, with the change per category | `alerts:read` |
 

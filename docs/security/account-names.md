@@ -10,7 +10,7 @@ Login was by email, unique platform-wide. But nothing checks that an address is 
 
 An account name is **3 to 32 characters**: lower-case letters, digits, `.`, `_` and `-`, starting and ending with a letter or digit, and **no `@`** (so anything with an `@` is recognisably an email). It is **unique across the whole platform** and compared case-insensitively (`Hal.LiveOak` and `hal.liveoak` are one name; names are stored lower-cased). The database enforces the shape (a `CHECK`) and the uniqueness (a unique index on `lower(account_name)`).
 
-Because names are platform-wide, only one tenant can own `admin`. Use a convention that includes the organisation, for example `hal.liveoak`.
+Because names are platform-wide, only one tenant can own `admin`. Use a convention that includes the organization, for example `hal.liveoak`.
 
 ## What changed
 
@@ -18,7 +18,7 @@ Because names are platform-wide, only one tenant can own `admin`. Use a conventi
 * **Email is optional contact information.** An account need not have one; it is not verified and not needed to sign in. It is still unique when present.
 * **Email sign-in is OFF by default.** People sign in with their account name; an email address offered at sign-in is refused exactly like a wrong password (same status, same body, same timing, and it counts toward the lockout), so it cannot be used to find out which addresses belong to accounts. It was on during the transition so that nobody was locked out; set `LOGIN_ALLOW_EMAIL=true` if people still need it (an account name never contains `@`, so the two cannot be confused). **Finding a name:** a person who can no longer sign in cannot read it in the console, so an operator tells them: `python -m app.scripts.platform_admin list` shows every platform administrator's `account_name`, and `SELECT account_name, email FROM users` shows everyone's (migration 071 derived each name from the username if valid, otherwise from the part of the email before the `@`).
 * **Tokens** carry `account_name`, and the `email` claim is now a *label for "who"*: the email if the account has one, otherwise the account name. Audit, rule tuning and the rest read that label, so a person with no email still appears by name.
-* **Creating a user** (`POST /tenants/me/users`) takes `account_name` (validated; a taken name is `409 That account name is already taken`, a bad one is `422` with the rule) and an optional `email`. A client that does not send an `account_name` still works: one is made from the `username` (or the email) and numbered if taken (`dave-brown`, `dave-brown-2`). Because a name is not private, "taken" is said plainly; an **email** that belongs to another organisation is still refused without saying so.
+* **Creating a user** (`POST /tenants/me/users`) takes `account_name` (validated; a taken name is `409 That account name is already taken`, a bad one is `422` with the rule) and an optional `email`. A client that does not send an `account_name` still works: one is made from the `username` (or the email) and numbered if taken (`dave-brown`, `dave-brown-2`). Because a name is not private, "taken" is said plainly; an **email** that belongs to another organization is still refused without saying so.
 * **The failed-sign-in lock** counts by the name as typed, so `Alice` and `alice` share one count (see `login-throttling.md`).
 
 ## Existing accounts: migration 071

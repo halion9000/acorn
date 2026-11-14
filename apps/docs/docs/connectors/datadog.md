@@ -27,16 +27,16 @@ envelope is preserved on `raw_event` so detection rules can match on
 
 ## Prerequisites
 
-- A **Datadog organisation** on any of: `datadoghq.com`,
+- A **Datadog organization** on any of: `datadoghq.com`,
   `datadoghq.eu`, `us3.datadoghq.com`, `us5.datadoghq.com`,
   `ddog-gov.com`, or `ap1.datadoghq.com`.
-- An **API key** (Organisation Settings → API Keys → New Key).
+- An **API key** (Organization Settings → API Keys → New Key).
 - An **Application key** (Personal Settings → Application Keys → New Key).
 - For `mode: signals`, the org must have **Cloud SIEM** enabled.
 
 ## Setup walkthrough
 
-1. In Datadog, **Organisation Settings → API Keys → New Key**. Name it
+1. In Datadog, **Organization Settings → API Keys → New Key**. Name it
    `aisoc-ingest` and copy the value.
 2. **Personal Settings → Application Keys → New Key**. Name it
    `aisoc-ingest-app` and copy the value.

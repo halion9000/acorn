@@ -7618,7 +7618,7 @@ export const totpApi = {
   newRecoveryCodes: (password: string, code: string) => request<{ recovery_codes: string[]; note: string }>('/api/v1/auth/totp/recovery', { method: 'POST', body: JSON.stringify({ password, code }) }),
 };
 
-/** The risk register (GET/POST /api/v1/risk-register ...). `clientId` reads or writes one of the organisation's clients. */
+/** The risk register (GET/POST /api/v1/risk-register ...). `clientId` reads or writes one of the organization's clients. */
 export interface RiskTask {
   id: string;
   title: string;
@@ -7681,28 +7681,26 @@ export interface RiskInput {
   residual_impact?: number | null;
 }
 
-const riskQ = (clientId: string, extra = ''): string => {
+const riskQs = (clientId: string, extra = ''): string => {
   const p = new URLSearchParams(extra);
   if (clientId) p.set('client_id', clientId);
-  const s = p.toString();
-  return s ? `?${s}` : '';
+  return p.toString();
 };
-const riskPath = (suffix: string, clientId: string, extra = ''): string => `/api/v1/risk-register${suffix}${riskQ(clientId, extra)}`;
 
 export const riskRegisterApi = {
-  list: (clientId: string, archived = false) => request<RiskRegister>(riskPath('', clientId, archived ? 'archived=true' : '')),
-  get: (clientId: string, id: string) => request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}`, clientId)),
-  create: (clientId: string, body: RiskInput) => request<RiskDetail>(riskPath('', clientId), { method: 'POST', body: JSON.stringify(body) }),
+  list: (clientId: string, archived = false) => request<RiskRegister>(`/api/v1/risk-register?${riskQs(clientId, archived ? 'archived=true' : '')}`),
+  get: (clientId: string, id: string) => request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}?${riskQs(clientId)}`),
+  create: (clientId: string, body: RiskInput) => request<RiskDetail>(`/api/v1/risk-register?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
   update: (clientId: string, id: string, body: Partial<RiskInput> & { clear_residual?: boolean }) =>
-    request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}`, clientId), { method: 'PATCH', body: JSON.stringify(body) }),
-  archive: (clientId: string, id: string) => request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}/archive`, clientId), { method: 'POST' }),
-  restore: (clientId: string, id: string) => request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}/restore`, clientId), { method: 'POST' }),
-  library: (clientId: string) => request<RiskLibraryItem[]>(riskPath('/library', clientId)),
-  fromLibrary: (clientId: string, libraryId: string) => request<RiskDetail>(riskPath('/from-library', clientId), { method: 'POST', body: JSON.stringify({ library_id: libraryId }) }),
+    request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  archive: (clientId: string, id: string) => request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/archive?${riskQs(clientId)}`, { method: 'POST' }),
+  restore: (clientId: string, id: string) => request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/restore?${riskQs(clientId)}`, { method: 'POST' }),
+  library: (clientId: string) => request<RiskLibraryItem[]>(`/api/v1/risk-register/library?${riskQs(clientId)}`),
+  fromLibrary: (clientId: string, libraryId: string) => request<RiskDetail>(`/api/v1/risk-register/from-library?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify({ library_id: libraryId }) }),
   addTask: (clientId: string, id: string, body: { title: string; owner?: string | null; due_date?: string | null }) =>
-    request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}/tasks`, clientId), { method: 'POST', body: JSON.stringify(body) }),
+    request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/tasks?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
   updateTask: (clientId: string, id: string, taskId: string, body: { done?: boolean; title?: string; owner?: string | null; due_date?: string | null }) =>
-    request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}`, clientId), { method: 'PATCH', body: JSON.stringify(body) }),
+    request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteTask: (clientId: string, id: string, taskId: string) =>
-    request<RiskDetail>(riskPath(`/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}`, clientId), { method: 'DELETE' }),
+    request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}?${riskQs(clientId)}`, { method: 'DELETE' }),
 };

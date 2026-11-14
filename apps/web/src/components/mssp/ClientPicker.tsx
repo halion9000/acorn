@@ -1,16 +1,16 @@
 'use client';
 
 /**
- * Chooses whose data a page shows: this organisation's own, or one of its clients. Nothing is drawn for an organisation with no clients, so an ordinary tenant sees no change.
- * The value is the client's tenant id. A page that gives an ``ownLabel`` ("All clients") gets that extra first choice with the value ''; without one there is no such choice: the organisation's own
- * company is one of the clients in the list (Live Oak IT Partners), so a picker with no ``ownLabel`` starts on it (or on the first client when there is none by that name) instead of on a "My organisation" line.
+ * Chooses whose data a page shows: this organization's own, or one of its clients. Nothing is drawn for an organization with no clients, so an ordinary tenant sees no change.
+ * The value is the client's tenant id. A page that gives an ``ownLabel`` ("All clients") gets that extra first choice with the value ''; without one there is no such choice: the organization's own
+ * company is one of the clients in the list (Live Oak IT Partners), so a picker with no ``ownLabel`` starts on it (or on the first client when there is none by that name) instead of on a "My organization" line.
  */
 import { useEffect } from 'react';
 import useSWR from 'swr';
 
 import { msspApi } from '@/lib/api';
 
-/** The client the pickers start on: the organisation's own company, which is in the client list under its own name. */
+/** The client the pickers start on: the organization's own company, which is in the client list under its own name. */
 export const HOME_CLIENT_NAME = 'live oak it partners';
 
 export function homeClientId(clients: { id: string; name: string }[]): string {
@@ -18,7 +18,7 @@ export function homeClientId(clients: { id: string; name: string }[]): string {
   return (sorted.find((c) => c.name.trim().toLowerCase() === HOME_CLIENT_NAME) ?? sorted[0])?.id ?? '';
 }
 
-/** True when `clientId` is the organisation's own company (Live Oak IT Partners): the views that belong to the organisation itself (its own Secureframe, the organisation snapshot) stay on for it, as they were for the old "My organisation" line. */
+/** True when `clientId` is the organization's own company (Live Oak IT Partners): the views that belong to the organization itself (its own Secureframe, the organization snapshot) stay on for it, as they were for the old "My organization" line. */
 export function useIsHomeClient(clientId: string): boolean {
   const { data: clients } = useSWR(['client-picker'], () => msspApi.listChildren().catch(() => []));
   return clientId !== '' && !!clients && homeClientId(clients) === clientId;

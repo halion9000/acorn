@@ -2,7 +2,7 @@
 
 The control titles in ``compliance_catalog`` are short and say what the criterion is about, not what a company has to do. This says the rest, for the SOC 2 Trust Services Criteria (the 61
 controls of that page), and since 2026-11-13 for HIPAA (63) and NIST CSF 2.0 (106). It is guidance written for this page, in A.C.O.R.N's own words: it is not the AICPA's text and not an auditor's opinion. An auditor decides what is enough for a
-given company; this is the usual shape of "enough" for a small or mid-sized service organisation, so a control is never left as a title and an empty evidence box.
+given company; this is the usual shape of "enough" for a small or mid-sized service organization, so a control is never left as a title and an empty evidence box.
 
 Each entry is ``(meaning, what it takes, evidence to attach)``. Frameworks not listed here have no guidance yet and their controls show none.
 """
@@ -59,12 +59,12 @@ SOC2: dict[str, Guidance] = {
     "CC1.3": _g(
         "It is clear who reports to whom and who is responsible for what, including for security.",
         [
-            "A current organisation chart",
+            "A current organization chart",
             "Written job descriptions for the roles that touch systems and customer data",
             "A named person responsible for security, and one for each key control (access, change, backup, incident response)",
         ],
         [
-            "The organisation chart with its date",
+            "The organization chart with its date",
             "Job descriptions for security-relevant roles",
             "A roles and responsibilities matrix (who owns which control)",
         ],
@@ -175,7 +175,7 @@ SOC2: dict[str, Guidance] = {
         ["The fraud section of the risk assessment", "A separation of duties matrix"],
     ),
     "CC3.4": _g(
-        "Changes that could weaken controls are noticed and assessed: new systems, new vendors, new laws, reorganisations, acquisitions.",
+        "Changes that could weaken controls are noticed and assessed: new systems, new vendors, new laws, reorganizations, acquisitions.",
         [
             "The risk assessment is revisited when something significant changes, not only yearly",
             "New systems and vendors get a security review before they are used",

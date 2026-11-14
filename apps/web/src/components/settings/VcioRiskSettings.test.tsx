@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 describe('VcioRiskSettings', () => {
-  it('shows the organisation’s settings and says the defaults are in use', async () => {
+  it('shows the organization’s settings and says the defaults are in use', async () => {
     render(<VcioRiskSettings />);
     expect(await screen.findByLabelText('Critical points')).toHaveValue(10);
     expect(screen.getByLabelText('Cap the category at')).toHaveValue(0.84);

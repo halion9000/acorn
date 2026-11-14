@@ -1,6 +1,6 @@
 -- Migration 180: the risk register (Secureframe parity plan, step 1).
 --
--- risk_register_items: one risk of one organisation (or one of its clients): what it is, its category and owner, likelihood and impact (1 to 5 each) before treatment, what was decided
+-- risk_register_items: one risk of one organization (or one of its clients): what it is, its category and owner, likelihood and impact (1 to 5 each) before treatment, what was decided
 -- (mitigate, accept, transfer, avoid, undecided) and the likelihood and impact left after it. The score is likelihood times impact and is worked out in code, never stored.
 -- risk_register_tasks: the work that treats a risk, with an owner and a due date.
 -- risk_register_history: who changed what and when, one line per change, kept even after the risk is archived.

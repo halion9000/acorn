@@ -1,4 +1,4 @@
-"""Search-everything on a REAL Postgres (AISOC_TEST_PG_URL, a DISPOSABLE fully migrated database): what is found, and that nobody finds another organisation's records."""
+"""Search-everything on a REAL Postgres (AISOC_TEST_PG_URL, a DISPOSABLE fully migrated database): what is found, and that nobody finds another organization's records."""
 
 from __future__ import annotations
 
@@ -149,7 +149,7 @@ async def test_short_questions_find_nothing_and_a_percent_sign_is_not_a_wildcard
         await cleanup(engine, w)
 
 
-async def test_a_name_or_an_email_finds_the_person_once_and_only_inside_the_callers_own_organisation():
+async def test_a_name_or_an_email_finds_the_person_once_and_only_inside_the_callers_own_organization():
     engine, user, w = await world()
     try:
         async with AsyncSession(engine) as db:

@@ -58,7 +58,7 @@ class MsspProgramTier(str, Enum):
 
 
 class MsspPartner(SQLModel, table=True):
-    """One row per MSSP organisation operating on AiSOC."""
+    """One row per MSSP organization operating on AiSOC."""
 
     __tablename__ = "mssp_partner"
 

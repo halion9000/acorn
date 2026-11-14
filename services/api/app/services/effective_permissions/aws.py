@@ -39,7 +39,7 @@ The model captures the four sources of allow/deny that govern an IAM call:
    ``Allow`` from a resource policy grants access even if no identity-based
    policy mentions the action — but only when the principal is named in the
    resource policy's ``Principal`` element.
-3. **Service Control Policies (SCPs)** at the organisation level. They
+3. **Service Control Policies (SCPs)** at the organization level. They
    *cannot* grant — they only narrow. The resolver intersects the candidate
    action set with the union of SCP-allowed actions.
 4. **Explicit deny** anywhere — always wins.

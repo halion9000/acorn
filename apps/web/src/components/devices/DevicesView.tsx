@@ -233,7 +233,7 @@ export default function DevicesView() {
     msspApi
       .listChildren()
       .then(setClients)
-      .catch(() => setClients([])); // an organisation with no clients has nothing to pick
+      .catch(() => setClients([])); // an organization with no clients has nothing to pick
   }, []);
 
   const exportCsv = async () => {

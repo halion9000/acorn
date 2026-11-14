@@ -661,7 +661,7 @@ async def create_user(
     else:
         name = await unique_account_name(db, request.username or request.email or "")
 
-    # The optional email. Addresses are unique across ALL tenants, so a clash may be with a user of another organisation. Say so only for the caller's own tenant, whose users the caller can list anyway; for another
+    # The optional email. Addresses are unique across ALL tenants, so a clash may be with a user of another organization. Say so only for the caller's own tenant, whose users the caller can list anyway; for another
     # tenant's user do not confirm that the address is registered anywhere (that would tell this admin who uses the platform), and record the attempt so probing can be seen.
     email = (
         normalize_email(request.email) if request.email else None

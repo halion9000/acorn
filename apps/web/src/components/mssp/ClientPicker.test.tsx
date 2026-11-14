@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 
 describe('ClientPicker', () => {
-  it('has no "My organisation" line: the organisation own company is one of the clients, and the picker starts on it', async () => {
+  it('has no "My organization" line: the organization own company is one of the clients, and the picker starts on it', async () => {
     const onChange = vi.fn();
     render(<ClientPicker value="" onChange={onChange} />);
     const select = await screen.findByRole('combobox', { name: 'Client' });

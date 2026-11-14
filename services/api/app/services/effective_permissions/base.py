@@ -12,7 +12,7 @@ Neo4j cache writer all consume one envelope:
   identified as explicitly denied, even though some upstream policy in the
   chain attempted to allow them. The UI surfaces these in red so SOC analysts
   can see "you tried to grant this, but the SCP / Azure deny assignment /
-  organisation policy blocks it."
+  organization policy blocks it."
 * ``policy_chain`` is the ordered provenance — every Policy / Role / Binding
   the resolver visited to reach the decision. Each step carries an ``effect``
   so the UI can render the deny-overrides hops in line.

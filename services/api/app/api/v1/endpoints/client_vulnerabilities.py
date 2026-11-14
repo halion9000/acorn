@@ -197,7 +197,7 @@ async def list_client_vulnerabilities(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
     db: DBSession,
     client_id: uuid.UUID | None = Query(
-        default=None, description="One client (or the caller's own organisation); left out, every client together."
+        default=None, description="One client (or the caller's own organization); left out, every client together."
     ),
     severity: str | None = Query(default=None, pattern="^(critical|high|medium|low)$"),
     exploited: bool | None = Query(default=None, description="True: only those with a known exploit."),

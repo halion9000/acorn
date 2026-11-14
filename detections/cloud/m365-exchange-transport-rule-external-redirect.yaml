@@ -21,7 +21,7 @@ detection:
     AND recipient_domain NOT IN org_domains
 false_positives:
 - Approved compliance journaling rule
-- Partner organisation relay
+- Partner organization relay
 playbook: tpl-collection
 enabled: true
 author: AiSOC

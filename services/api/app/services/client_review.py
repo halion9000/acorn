@@ -162,7 +162,7 @@ TOOL_ITEMS = (
     ("cipp_inactive_accounts", "inactive_accounts", "Are accounts nobody signs in to removed or switched off?"),
     ("fieldeffect_device_risk", "device_risk", "Are the client's computers free of critical and high-risk findings?"),
     ("cipp_ca_legacy_auth", "legacy_auth_blocked", "Is legacy e-mail sign-in (old protocols that skip multi-factor) blocked?"),
-    ("cipp_mailbox_forwarding", "mailbox_forwarding", "Is mail free of rules that forward it outside the organisation?"),
+    ("cipp_mailbox_forwarding", "mailbox_forwarding", "Is mail free of rules that forward it outside the organization?"),
     (
         "cipp_defender_vulnerabilities",
         "known_vulnerabilities",

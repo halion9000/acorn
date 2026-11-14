@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The risk register of the organisation or of one of its clients: a Dashboard (counts by level and the likelihood by impact grid), the Register (a table; open a risk to change it, treat it and add tasks) and the
+ * The risk register of the organization or of one of its clients: a Dashboard (counts by level and the likelihood by impact grid), the Register (a table; open a risk to change it, treat it and add tasks) and the
  * Archive (nothing is ever deleted). Starter risks come from a library of common ones, added one at a time.
  */
 import { useCallback, useEffect, useState } from 'react';

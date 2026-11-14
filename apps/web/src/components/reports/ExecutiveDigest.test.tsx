@@ -196,7 +196,7 @@ describe('ExecutiveDigest', () => {
 });
 
 describe('ExecutiveDigest for a client', () => {
-  it('offers no client choice to an organisation with no clients, and asks for its own digest', async () => {
+  it('offers no client choice to an organization with no clients, and asks for its own digest', async () => {
     api.weeklyDigest.mockResolvedValue(digest());
     renderIt();
     await screen.findByText('Oct 1 to Oct 7');

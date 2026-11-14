@@ -1,6 +1,6 @@
 """An email address is one account, whatever its letter case.
 
-`users.email` was UNIQUE only case-sensitively, so `Alice@x.com` and `alice@x.com` could both exist. Login matched the exact text, and the check that stops one organisation claiming another's address could be bypassed by changing a letter's case.
+`users.email` was UNIQUE only case-sensitively, so `Alice@x.com` and `alice@x.com` could both exist. Login matched the exact text, and the check that stops one organization claiming another's address could be bypassed by changing a letter's case.
 Addresses are now compared by `normalize_email`, found through `find_user_by_email` (compares lower(email), so a LEGACY mixed-case account still signs in), and stored lower-cased on creation; migration 070 adds a unique index on lower(email).
 A real SQLite database and the real router. The index and the migration's duplicate handling were checked on real Postgres (see the commit message).
 """
@@ -254,7 +254,7 @@ class TestCreatingAUser:
 
     @pytest.mark.parametrize("variant", ["bob@b.example", "BOB@B.EXAMPLE", "Bob@b.example"])
     def test_a_case_variant_of_ANOTHER_tenants_legacy_address_is_refused_without_saying_it_is_registered(self, world, variant):
-        """The bypass: changing a letter's case used to get past the check that keeps one organisation from claiming another's address."""
+        """The bypass: changing a letter's case used to get past the check that keeps one organization from claiming another's address."""
         with pytest.raises(HTTPException) as e:
             self.create(world, world.ta, variant)
         assert e.value.status_code == 409 and e.value.detail == "This email address cannot be used. Choose a different one."

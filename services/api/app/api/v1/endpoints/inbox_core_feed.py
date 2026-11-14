@@ -885,7 +885,7 @@ class NinjaDeployOptionsResponse(BaseModel):
 async def report_core_feed_ninja_deploy_options(
     tenant_token: str, body: NinjaDeployOptionsReport, db: DBSession
 ) -> NinjaDeployOptionsResponse:
-    """CORE tells A.C.O.R.N which NinjaOne roles, organisations and locations the Devices page can offer for installing the agent. The whole list replaces the last one."""
+    """CORE tells A.C.O.R.N which NinjaOne roles, organizations and locations the Devices page can offer for installing the agent. The whole list replaces the last one."""
     tenant_id = await _verify_core_feed_token(db, tenant_token)
     await adopt_tenant(db, tenant_id)
     value = {"roles": [r.model_dump() for r in body.roles], "organizations": [o.model_dump() for o in body.organizations]}

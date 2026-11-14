@@ -217,7 +217,7 @@ async function getJson<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** Adds the client (when one is chosen) to an API path, so the evidence read or written is that client's and not the organisation's own. */
+/** Adds the client (when one is chosen) to an API path, so the evidence read or written is that client's and not the organization's own. */
 export function forClient(path: string, clientId: string): string {
   return clientId ? `${path}${path.includes('?') ? '&' : '?'}client_id=${encodeURIComponent(clientId)}` : path;
 }

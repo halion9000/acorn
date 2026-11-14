@@ -1,6 +1,6 @@
 """Installing the NinjaOne agent from the Devices page, against a REAL Postgres as the restricted role (AISOC_TEST_PG_URL / AISOC_TEST_PG_APP_URL, a disposable fully migrated database).
 
-CORE shares what can be chosen (roles, organisations, locations); a request is only QUEUED for CORE, which makes the installer link, runs it through ScreenConnect and sets the role.
+CORE shares what can be chosen (roles, organizations, locations); a request is only QUEUED for CORE, which makes the installer link, runs it through ScreenConnect and sets the role.
 """
 
 import json

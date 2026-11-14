@@ -5,7 +5,7 @@ The repository ships about 77 imported Sigma rules (``detections/sigma-imports``
 ``PUT /mssp/rule-packs/{pack}/clients/{client}``); assigning it is what makes its rules part of that client's effective rules. Nothing is copied into each client.
 
 The rules are stored ``active`` at the parent: the resolver only hands a child the ACTIVE rules of a pack it is assigned, so a rule left in testing would reach nobody. The
-parent's own tenant therefore also evaluates them, which is the MSP's own organisation and is wanted.
+parent's own tenant therefore also evaluates them, which is the MSP's own organization and is wanted.
 
 Idempotent: a rule (matched by the Sigma id kept in its provenance), a pack (by name) and a membership that exist are left as they are, so a person's later edits and
 assignments survive every restart.

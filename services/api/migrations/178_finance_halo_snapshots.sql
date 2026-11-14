@@ -1,6 +1,6 @@
 -- Migration 178: the latest HaloPSA money snapshot CORE sent.
 --
--- finance_halo_snapshots: ONE row per organisation, replaced each time CORE sends (about once a day): the recurring invoices with their lines (quantity, unit price, unit cost) and the invoices still
+-- finance_halo_snapshots: ONE row per organization, replaced each time CORE sends (about once a day): the recurring invoices with their lines (quantity, unit price, unit cost) and the invoices still
 -- owed (amount due, due date), as HaloPSA holds them. A.C.O.R.N holds no HaloPSA key; CORE reads Halo and sends this. Margin and ageing are worked out from it when a person with the finance
 -- permissions asks, so the row holds the raw snapshot and nothing derived. Row-level security with the standard policy (migration 081). Idempotent.
 

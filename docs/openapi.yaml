@@ -2773,10 +2773,10 @@ paths:
           - type: string
             format: uuid
           - type: 'null'
-          description: One client (or the caller's own organisation); left out, every
+          description: One client (or the caller's own organization); left out, every
             client together.
           title: Client Id
-        description: One client (or the caller's own organisation); left out, every
+        description: One client (or the caller's own organization); left out, every
           client together.
       - name: severity
         in: query
@@ -12506,7 +12506,7 @@ paths:
     get:
       tags:
       - risk-register
-      summary: The risks of this organisation or client, with the dashboard figures
+      summary: The risks of this organization or client, with the dashboard figures
       operationId: list_risks_api_v1_risk_register_get
       security:
       - HTTPBearer: []
@@ -18598,7 +18598,7 @@ paths:
     get:
       tags:
       - vcio
-      summary: The organisation's vCIO Risk Scoring settings
+      summary: The organization's vCIO Risk Scoring settings
       operationId: get_settings_api_v1_vcio_risk_scoring_settings_get
       responses:
         '200':
@@ -18612,7 +18612,7 @@ paths:
     put:
       tags:
       - vcio
-      summary: Change the organisation's vCIO Risk Scoring settings and score every
+      summary: Change the organization's vCIO Risk Scoring settings and score every
         assessment again
       operationId: put_settings_api_v1_vcio_risk_scoring_settings_put
       requestBody:
@@ -18656,14 +18656,14 @@ paths:
     get:
       tags:
       - vcio
-      summary: The clients a Client Risk Score can be started for (the organisation's
+      summary: The clients a Client Risk Score can be started for (the organization's
         shown clients)
       description: 'The page''s client picker. It used to ask the MSSP client list,
-        which needs mssp:read: a vCIO role without it saw only "Own organisation".
+        which needs mssp:read: a vCIO role without it saw only "Own organization".
         Anyone who holds clients:view (on for every role, switchable per role) can
         read
 
-        this, and a client the organisation hid (a test or archived one) is not offered.'
+        this, and a client the organization hid (a test or archived one) is not offered.'
       operationId: list_clients_api_v1_vcio_risk_scoring_clients_get
       responses:
         '200':
@@ -18752,10 +18752,10 @@ paths:
           - type: string
             format: uuid
           - type: 'null'
-          description: One client (or the caller's own organisation); left out, every
+          description: One client (or the caller's own organization); left out, every
             client.
           title: Client Id
-        description: One client (or the caller's own organisation); left out, every
+        description: One client (or the caller's own organization); left out, every
           client.
       responses:
         '200':
@@ -25871,7 +25871,7 @@ paths:
       tags:
       - inbox-core-feed
       summary: Report Core Feed Ninja Deploy Options
-      description: CORE tells A.C.O.R.N which NinjaOne roles, organisations and locations
+      description: CORE tells A.C.O.R.N which NinjaOne roles, organizations and locations
         the Devices page can offer for installing the agent. The whole list replaces
         the last one.
       operationId: report_core_feed_ninja_deploy_options_api_v1_inbox_core_feed__tenant_token__ninja_deploy_options_post
@@ -29031,7 +29031,7 @@ components:
             format: uuid
           - type: 'null'
           title: Client Id
-          description: The client assessed; left out, the caller's own organisation.
+          description: The client assessed; left out, the caller's own organization.
         review_date:
           anyOf:
           - type: string

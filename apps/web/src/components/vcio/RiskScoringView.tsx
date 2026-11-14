@@ -183,7 +183,7 @@ function AllClients({ rows, onOpen }: { rows: RiskClientTrendRow[]; onOpen: (cli
             <tr key={r.client_id} className="border-t border-gray-800" data-testid="risk-client-row">
               <td className="py-1.5 pr-3">
                 <button type="button" onClick={() => onOpen(r.client_id, r.client_name === null)} className="text-blue-300 hover:underline">
-                  {r.client_name ?? 'Own organisation'}
+                  {r.client_name ?? 'Own organization'}
                 </button>
               </td>
               <td className={`py-1.5 pr-3 tabular-nums ${RATING_TEXT_CLASS[r.rating]}`}>{pct(r.latest_score)}</td>
@@ -739,7 +739,7 @@ export function RiskScoringView() {
     }
   };
 
-  const clientName = clientId === OWN ? 'Own organisation' : (clients.find((c) => c.id === clientId)?.name ?? '');
+  const clientName = clientId === OWN ? 'Own organization' : (clients.find((c) => c.id === clientId)?.name ?? '');
 
   return (
     <div className="space-y-4" data-testid="risk-scoring">

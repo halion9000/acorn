@@ -59,7 +59,7 @@ export function TenantAccessPanel({ canGrantAll }: { canGrantAll: boolean }) {
   return <Inner canGrantAll={canGrantAll} />;
 }
 
-/** The people a grant can be for, as the choices of a drop-down: this organisation's active accounts, by account name, leaving out the ones already granted. */
+/** The people a grant can be for, as the choices of a drop-down: this organization's active accounts, by account name, leaving out the ones already granted. */
 export function accountChoices(people: TenantUser[] | undefined, taken: string[]): { account: string; label: string }[] {
   const held = new Set(taken.map((t) => t.toLowerCase()));
   return (people ?? [])
@@ -69,7 +69,7 @@ export function accountChoices(people: TenantUser[] | undefined, taken: string[]
 }
 
 /**
- * The account to grant access to: a drop-down of the organisation's people, so a name is picked and never mistyped. When the list cannot be read (a role without the users permission) or is empty, it is
+ * The account to grant access to: a drop-down of the organization's people, so a name is picked and never mistyped. When the list cannot be read (a role without the users permission) or is empty, it is
  * the plain text box it used to be, so a person from another tenant can still be named.
  */
 function AccountPicker({ label, value, onChange, people, taken }: { label: string; value: string; onChange: (v: string) => void; people: TenantUser[] | undefined; taken: string[] }) {

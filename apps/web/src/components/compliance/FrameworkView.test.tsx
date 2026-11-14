@@ -110,7 +110,7 @@ describe('FrameworkView for a client', () => {
     return json([]);
   };
 
-  it('starts on the own company of the organisation, then reads and writes only the evidence of whichever client is chosen', async () => {
+  it('starts on the own company of the organization, then reads and writes only the evidence of whichever client is chosen', async () => {
     listChildren.mockResolvedValue([
       { id: 'c1', name: 'Acme Dental', mssp_role: 'client' },
       { id: 'c-home', name: 'Live Oak IT Partners', mssp_role: 'client' },

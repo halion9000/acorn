@@ -743,7 +743,7 @@
         "label": "Tailnet",
         "required": true,
         "placeholder": "example.com or -",
-        "help_text": "Your tailnet name (the organisation slug shown in the Tailscale admin console, e.g. 'example.com'). Use '-' to use the default tailnet associated with the API key / OAuth token."
+        "help_text": "Your tailnet name (the organization slug shown in the Tailscale admin console, e.g. 'example.com'). Use '-' to use the default tailnet associated with the API key / OAuth token."
       },
       {
         "name": "api_key",

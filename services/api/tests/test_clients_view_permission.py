@@ -1,7 +1,7 @@
-"""Seeing the organisation's clients is a permission of its own (clients:view), on for every role that exists today and switchable off per role.
+"""Seeing the organization's clients is a permission of its own (clients:view), on for every role that exists today and switchable off per role.
 
-Before it, the client list that the pickers read needed mssp:read, which is not in the role editor, so a custom role (the vCIO role) saw only "Own organisation" and nobody could grant it. Hal,
-2026-11-13: every user of the organisation sees all clients, and it must still be possible to allow it or not, per role.
+Before it, the client list that the pickers read needed mssp:read, which is not in the role editor, so a custom role (the vCIO role) saw only "Own organization" and nobody could grant it. Hal,
+2026-11-13: every user of the organization sees all clients, and it must still be possible to allow it or not, per role.
 """
 
 from app.core.security import ROLE_PERMISSIONS, known_permissions, permission_in

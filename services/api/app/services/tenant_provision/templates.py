@@ -10,7 +10,7 @@ Three buckets:
 
 1. **RBAC roles** (``DEFAULT_INITIAL_RBAC_ROLES``) — the role / permission
    tuples we materialise the first time a new tenant boots so the
-   organisation can immediately log in as an admin and start handing out
+   organization can immediately log in as an admin and start handing out
    scoped access. We do not try to mirror the entire static
    ``ROLE_PERMISSIONS`` map here; the goal is a minimal viable RBAC
    surface that maps onto ``has_permission_db`` checks across the API.

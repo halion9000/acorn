@@ -13,7 +13,7 @@ Two transports today, mirroring how AiSOC connectors are wired:
   required for the smallest install.
 
 Bot tokens (when present) are decrypted via the shared credential vault
-so an organisation that has migrated to OAuth tokens can ship them through
+so an organization that has migrated to OAuth tokens can ship them through
 the same code path without re-implementing decryption.
 """
 

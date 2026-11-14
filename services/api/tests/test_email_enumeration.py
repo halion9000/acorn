@@ -4,7 +4,7 @@ LOGIN. `user is None or not verify_password(...)` skipped the password hash for 
 which addresses (admins included) are registered. Login now does the same work either way, against a real hash made the way every stored one is. Wall-clock time makes a flaky test, so these assert the cause (the expensive check runs exactly
 once on EVERY path, against the right hash) and that the answers are identical; the timing itself was measured over HTTP, interleaved, before and after (see the commit message).
 
-USER CREATION. Email addresses are unique across ALL tenants (login is by email alone), so creating a user whose address belongs to another organisation must be refused, but the refusal no longer says the address is registered: that is said only
+USER CREATION. Email addresses are unique across ALL tenants (login is by email alone), so creating a user whose address belongs to another organization must be refused, but the refusal no longer says the address is registered: that is said only
 for the caller's own tenant, whose users the caller can list anyway. The attempt is logged so probing can be seen. (A refusal still differs from a success, so a tenant admin can still learn something about a few addresses: removing that needs
 per-tenant uniqueness or an invitation flow.)
 """

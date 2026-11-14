@@ -1,4 +1,4 @@
-"""The risk register of an organisation or of one of its clients (Secureframe parity plan, step 1).
+"""The risk register of an organization or of one of its clients (Secureframe parity plan, step 1).
 
 Each risk has a category, an owner, a likelihood and an impact (1 to 5 each, scored as their product) before treatment, a treatment decision and, once treated, the likelihood and impact that remain. Tasks
 carry out the treatment. Every change is a line in the risk's history, and a risk is archived, never deleted. ``client_id`` reads or writes one of the caller's clients, exactly as the compliance pages do.
@@ -209,7 +209,7 @@ async def _note(db: Any, tenant: uuid.UUID, risk_id: uuid.UUID, user: Any, actio
 
 
 async def _next_ref(db: Any, tenant: uuid.UUID) -> int:
-    # One writer at a time per organisation, so two people adding a risk at once do not get the same number.
+    # One writer at a time per organization, so two people adding a risk at once do not get the same number.
     await db.execute(select(func.pg_advisory_xact_lock(func.hashtext(f"risk-register:{tenant}"))))
     return int(
         (
@@ -242,7 +242,7 @@ async def _audit(
     )
 
 
-@router.get("", response_model=RegisterOut, summary="The risks of this organisation or client, with the dashboard figures")
+@router.get("", response_model=RegisterOut, summary="The risks of this organization or client, with the dashboard figures")
 async def list_risks(
     tenant: ScopeTenant,
     db: DBSession,

@@ -117,8 +117,12 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's recent HaloPSA tickets per person: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only write under that feed's own mapped client tenants",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/ninja-deploy-options",
+    ): "CORE's list of the NinjaOne roles, organizations and locations the Devices page offers when it installs the agent (names and numeric ids only): authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own list.",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/finance",
-    ): "CORE's daily snapshot of HaloPSA's recurring and owed invoices: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organisation's own snapshot, readable only with the finance permissions.",
+    ): "CORE's daily snapshot of HaloPSA's recurring and owed invoices: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own snapshot, readable only with the finance permissions.",
     (
         "GET",
         "/api/v1/inbox/core-feed/{tenant_token}/risk-tickets",

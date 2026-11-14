@@ -296,7 +296,7 @@ def build_related_entities(alert: Alert) -> list[RelatedEntity]:
     # ── Tenant ──────────────────────────────────────────────────────────
     # Workspace / org-level pivots. The connector type lives here
     # because "which data source did this fire on" is an
-    # organisational question, not a workflow one.
+    # organizational question, not a workflow one.
     if alert.connector_type:
         bucket.add(
             group="tenant",

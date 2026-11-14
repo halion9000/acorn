@@ -4,7 +4,7 @@
 
 ## One address, one account, whatever its letter case
 
-`Alice@Example.com` and `alice@example.com` are the same mailbox for every mail system. Here they used to be two accounts: `users.email` was UNIQUE only case-sensitively, login matched the exact text, and the check that stops one organisation claiming another's address could be bypassed by changing a letter's case.
+`Alice@Example.com` and `alice@example.com` are the same mailbox for every mail system. Here they used to be two accounts: `users.email` was UNIQUE only case-sensitively, login matched the exact text, and the check that stops one organization claiming another's address could be bypassed by changing a letter's case.
 
 Now:
 

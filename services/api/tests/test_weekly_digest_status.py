@@ -120,7 +120,7 @@ def test_every_status_the_application_assigns_to_a_report_artefact_is_one_the_da
 
 
 @pytest.mark.asyncio
-async def test_a_clients_stored_digest_is_headed_with_the_clients_name_and_the_organisations_own_is_not(monkeypatch):
+async def test_a_clients_stored_digest_is_headed_with_the_clients_name_and_the_organizations_own_is_not(monkeypatch):
     seen = []
 
     def render(digest):
@@ -142,7 +142,7 @@ async def test_a_clients_stored_digest_is_headed_with_the_clients_name_and_the_o
 
 
 @pytest.mark.asyncio
-async def test_the_weekly_run_names_each_client_but_not_the_organisation_that_owns_them(monkeypatch):
+async def test_the_weekly_run_names_each_client_but_not_the_organization_that_owns_them(monkeypatch):
     own = SimpleNamespace(id=uuid.uuid4(), name="Live Oak IT Partners", parent_tenant_id=None)
     child = SimpleNamespace(id=uuid.uuid4(), name="Acme Dental", parent_tenant_id=own.id)
     calls = []

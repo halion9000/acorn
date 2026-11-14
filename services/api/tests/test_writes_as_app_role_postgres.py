@@ -1,5 +1,5 @@
-"""The routes that write into a CLIENT's rows and into the organisation's audit log, run the way production runs them: as the restricted ``aisoc_app`` role, which row-level security applies
-to. Run as the database owner (which bypasses it) they all passed while the live site answered 500: the audit line for the organisation was written while the session was acting as the
+"""The routes that write into a CLIENT's rows and into the organization's audit log, run the way production runs them: as the restricted ``aisoc_app`` role, which row-level security applies
+to. Run as the database owner (which bypasses it) they all passed while the live site answered 500: the audit line for the organization was written while the session was acting as the
 client, and the policy refused it.
 
 Opt in with AISOC_TEST_PG_URL (owner, to build and clean the world) and AISOC_TEST_PG_APP_URL (aisoc_app); the database must be disposable and fully migrated.
@@ -58,7 +58,7 @@ async def world():
 
 
 async def as_app(w, work):
-    """Run ``work(db)`` in a fresh session of the restricted role, scoped to the organisation as a signed-in request is."""
+    """Run ``work(db)`` in a fresh session of the restricted role, scoped to the organization as a signed-in request is."""
     engine = create_async_engine(APP_URL, poolclass=NullPool)
     try:
         async with async_sessionmaker(engine, expire_on_commit=False)() as db:
@@ -79,7 +79,7 @@ async def audit_count(w, action):
         await engine.dispose()
 
 
-async def test_a_clients_risk_assessment_can_be_started_answered_filled_and_deleted_and_the_deletion_is_in_the_organisations_audit_log(
+async def test_a_clients_risk_assessment_can_be_started_answered_filled_and_deleted_and_the_deletion_is_in_the_organizations_audit_log(
     world,
 ):
     w = world
@@ -104,7 +104,7 @@ async def test_a_clients_risk_assessment_can_be_started_answered_filled_and_dele
     assert await audit_count(w, "vcio:risk_assessment_deleted") == 1
 
 
-async def test_the_organisations_own_assessment_can_be_deleted_too(world):
+async def test_the_organizations_own_assessment_can_be_deleted_too(world):
     w = world
     made = await as_app(w, lambda db: vrs.create_assessment(vrs.AssessmentIn(), w.user, db))
     assert (await as_app(w, lambda db: vrs.delete_assessment(made.id, w.user, db))).deleted is True

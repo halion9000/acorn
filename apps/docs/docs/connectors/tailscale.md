@@ -31,7 +31,7 @@ Events are normalized with `source: tailscale`, `category: network`.
 3. Copy the key (it starts with `tskey-api-…`) — you will not be able to see it again.
 4. In AiSOC, go to **Connectors → Add connector → Tailscale**.
 5. Fill in:
-   - **Tailnet**: your organisation slug or email (e.g. `example.com`). Use `-` to auto-detect from the key.
+   - **Tailnet**: your organization slug or email (e.g. `example.com`). Use `-` to auto-detect from the key.
    - **API Key**: paste the key.
 6. Click **Test connection**, then **Save**.
 
@@ -43,7 +43,7 @@ Events are normalized with `source: tailscale`, `category: network`.
 4. Copy the **Client ID** and **Client Secret**.
 5. In AiSOC, go to **Connectors → Add connector → Tailscale**.
 6. Fill in:
-   - **Tailnet**: your organisation slug.
+   - **Tailnet**: your organization slug.
    - **OAuth Client ID**: paste the client ID.
    - **OAuth Client Secret**: paste the secret (stored encrypted in the credential vault).
 7. Click **Test connection**, then **Save**.

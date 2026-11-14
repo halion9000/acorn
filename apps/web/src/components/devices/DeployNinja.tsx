@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * "Deploy NinjaOne" on an open device that ScreenConnect knows and NinjaOne does not: pick the kind of package, the NinjaOne organisation and location and the role, and A.C.O.R.N asks CORE to install the
+ * "Deploy NinjaOne" on an open device that ScreenConnect knows and NinjaOne does not: pick the kind of package, the NinjaOne organization and location and the role, and A.C.O.R.N asks CORE to install the
  * agent through ScreenConnect and then set that role once the machine shows up in NinjaOne (NinjaOne's installer link has no role of its own). The result is read back here; the role can take a few minutes.
  */
 import { useEffect, useState } from 'react';

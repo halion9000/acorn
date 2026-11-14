@@ -69,7 +69,7 @@ CORE runs from `C:\CORE` as `liveoakadmin`, started with `corepack pnpm run hud`
 
 ## 2. Reach the machines
 
-Install the NinjaOne agent on both VMs through each VM's Run Command (Azure portal > the VM > Run command), using the organisation's installer. From then on use the NinjaOne remote session. Add NordLayer or Tailscale later; neither is needed for the steps below.
+Install the NinjaOne agent on both VMs through each VM's Run Command (Azure portal > the VM > Run command), using the organization's installer. From then on use the NinjaOne remote session. Add NordLayer or Tailscale later; neither is needed for the steps below.
 
 ## 3. A.C.O.R.N VM (Linux)
 

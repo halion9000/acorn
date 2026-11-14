@@ -8,7 +8,7 @@
 -- ============================================================
 
 INSERT INTO permissions (name, description, category) VALUES
-    ('settings_workspace:view', 'See the workspace settings: the organisation''s name, branding and locale', 'settings'),
+    ('settings_workspace:view', 'See the workspace settings: the organization''s name, branding and locale', 'settings'),
     ('settings_workspace:manage', 'Change the workspace settings', 'settings'),
     ('settings_deployment:view', 'See Deployment and AI: the deployment mode, the air-gap policy, the AI provider and its status', 'settings'),
     ('settings_deployment:manage', 'Change Deployment and AI: the deployment mode, the air-gap bundle and the AI key', 'settings'),

@@ -1,4 +1,4 @@
-"""The latest HaloPSA money snapshot CORE sent, one row per organisation (migration 178). Read only by people with the finance permissions."""
+"""The latest HaloPSA money snapshot CORE sent, one row per organization (migration 178). Read only by people with the finance permissions."""
 
 from __future__ import annotations
 

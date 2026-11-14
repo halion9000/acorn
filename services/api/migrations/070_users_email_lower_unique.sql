@@ -1,7 +1,7 @@
 -- Migration 070: an email address is one account, whatever its letter case.
 --
--- WHAT WAS WRONG. users.email is UNIQUE, but case-sensitively: `Alice@x.com` and `alice@x.com` could both exist as separate accounts. Login matched the exact text, and the check that stops one organisation from claiming another
--- organisation's address could be bypassed by changing a letter's case. The application now compares and stores addresses lower-cased (app/core/emails.py); this makes the database refuse a case-variant too.
+-- WHAT WAS WRONG. users.email is UNIQUE, but case-sensitively: `Alice@x.com` and `alice@x.com` could both exist as separate accounts. Login matched the exact text, and the check that stops one organization from claiming another
+-- organization's address could be bypassed by changing a letter's case. The application now compares and stores addresses lower-cased (app/core/emails.py); this makes the database refuse a case-variant too.
 --
 -- THE INDEX. A UNIQUE index on lower(email). Existing rows are NOT rewritten (their stored text may be relied on, and lookups compare lower(email) anyway).
 --

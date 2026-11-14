@@ -1,6 +1,6 @@
 """Install the NinjaOne agent on a machine ScreenConnect already reaches, from the Devices page.
 
-A.C.O.R.N holds no NinjaOne or ScreenConnect key. CORE tells A.C.O.R.N what can be chosen (the NinjaOne roles, organisations and locations; ``POST /core-feed/{token}/ninja-deploy-options``), the page
+A.C.O.R.N holds no NinjaOne or ScreenConnect key. CORE tells A.C.O.R.N what can be chosen (the NinjaOne roles, organizations and locations; ``POST /core-feed/{token}/ninja-deploy-options``), the page
 asks for one choice, and the request is only QUEUED for CORE (a ``vendor_actions`` row, vendor ``core``, action ``ninja_deploy``). CORE makes the installer link, sends the install command through
 ScreenConnect, waits for the machine to show up in NinjaOne and sets the role that was picked (NinjaOne's installer link has no role of its own: it is always "Auto").
 
@@ -61,7 +61,7 @@ class DeployOptions(BaseModel):
     suggested_package: Literal["msi", "pkg"]
     roles: list[RoleOut]
     organizations: list[OrgOut]
-    # The NinjaOne organisation the machine's client is mapped to, when it is.
+    # The NinjaOne organization the machine's client is mapped to, when it is.
     suggested_org_id: int | None = None
 
 
@@ -132,7 +132,7 @@ async def deploy_options(
     elif in_ninja is not None:
         blocked = "NinjaOne already has this machine."
     elif not roles or not orgs:
-        blocked = "CORE has not shared the NinjaOne organisations and roles yet. It does that on its own within a few minutes of NinjaOne being connected."
+        blocked = "CORE has not shared the NinjaOne organizations and roles yet. It does that on its own within a few minutes of NinjaOne being connected."
     return DeployOptions(
         device_id=device_id,
         device=device.hostname or "",
@@ -165,7 +165,7 @@ async def deploy(
     location = next((x for x in (org or {}).get("locations", []) if x.get("id") == body.location_id), None)
     if role is None or org is None or location is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="That organisation, location or role is not one NinjaOne offers."
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="That organization, location or role is not one NinjaOne offers."
         )
     if role.get("node_class") not in CLASSES[body.package]:
         raise HTTPException(

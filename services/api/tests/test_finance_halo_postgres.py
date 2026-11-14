@@ -1,7 +1,7 @@
 """The HaloPSA money snapshot, against a REAL Postgres as the restricted role (AISOC_TEST_PG_URL / AISOC_TEST_PG_APP_URL, a disposable fully migrated database).
 
-CORE posts the snapshot with the feed token; the latest one replaces the one before; the finance endpoint works margin and ageing out of it for the organisation that owns the token, and another
-organisation never sees it.
+CORE posts the snapshot with the feed token; the latest one replaces the one before; the finance endpoint works margin and ageing out of it for the organization that owns the token, and another
+organization never sees it.
 """
 
 import os
@@ -114,7 +114,7 @@ async def test_a_newer_snapshot_replaces_the_one_before_not_adds_to_it(world):
     assert got["aging"]["clients"] == []
 
 
-async def test_another_organisation_never_sees_it(world):
+async def test_another_organization_never_sees_it(world):
     app, w = world
     await send(app, "tok-mine", snapshot())
     assert (await view(app, w.other))["margin"] is None

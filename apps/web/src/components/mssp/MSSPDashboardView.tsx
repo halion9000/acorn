@@ -84,7 +84,7 @@ export function tenantsToCsv(rows: ManagedTenantRow[]): string {
   return [header.join(','), ...lines].join('\n') + '\n';
 }
 
-/** Each tile opens the page that lists what it counts, with the filter that matches (alerts and cases cover this organisation and all its clients). */
+/** Each tile opens the page that lists what it counts, with the filter that matches (alerts and cases cover this organization and all its clients). */
 export function kpiCards(overview: MsspOverview) {
   return [
     { label: 'Managed tenants', value: String(overview.total_tenants), hint: `${overview.tenants_reporting} reporting metrics`, href: '#tenant-overview' },

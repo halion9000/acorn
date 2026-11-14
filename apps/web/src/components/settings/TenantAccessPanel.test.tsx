@@ -113,7 +113,7 @@ describe('TenantAccessPanel', () => {
     expect(await screen.findByText('Nobody from another tenant has access')).toBeInTheDocument();
   });
 
-  it('the account is picked from a drop-down of the active people of the organisation, leaving out those already granted', async () => {
+  it('the account is picked from a drop-down of the active people of the organization, leaving out those already granted', async () => {
     people.mockResolvedValue([
       { id: 'p1', account_name: 'tech.one', email: 'one@msp.example', username: null, role: 'viewer', is_active: true, last_login: null, created_at: '' },
       { id: 'p2', account_name: 'vcio.sam', email: 'sam@msp.example', username: null, role: 'viewer', is_active: true, last_login: null, created_at: '' },

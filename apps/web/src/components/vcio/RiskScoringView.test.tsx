@@ -105,7 +105,7 @@ describe('the pure parts', () => {
     expect([changeText(8, 'up'), changeText(-3.5, 'down'), changeText(1, 'up'), changeText(0.2, 'flat'), changeText(null, 'none'), changeText(5, 'none')]).toEqual(['▲ 8 points', '▼ 3.5 points', '▲ 1 point', 'no change', '', '']);
   });
 
-  it('offers the organisation’s users as assessor, and keeps a name an old assessment carries', () => {
+  it('offers the organization’s users as assessor, and keeps a name an old assessment carries', () => {
     const users = [{ name: 'Dana', email: null }, { name: 'Hal', email: null }];
     expect(assessorChoices(users, 'Hal')).toEqual(['Dana', 'Hal']);
     expect(assessorChoices(users, 'hal')).toEqual(['Dana', 'Hal']);
@@ -384,7 +384,7 @@ describe('RiskScoringView', () => {
     render(<RiskScoringView />);
     const box = await screen.findByTestId('risk-all-clients');
     expect(box).toHaveTextContent('3 assessed: 1 down, 1 up since their assessment before');
-    expect(screen.getAllByTestId('risk-client-row').map((r) => r.textContent)).toEqual(['Birch Law60%▼ 20 points2026-10-013', 'Acme Dental96%▲ 6 points2026-11-122', 'Own organisation—first assessment2026-01-011']);
+    expect(screen.getAllByTestId('risk-client-row').map((r) => r.textContent)).toEqual(['Birch Law60%▼ 20 points2026-10-013', 'Acme Dental96%▲ 6 points2026-11-122', 'Own organization—first assessment2026-01-011']);
     await userEvent.click(within(box).getByRole('button', { name: 'Birch Law' }));
     await waitFor(() => expect(api.list).toHaveBeenCalledWith('c2'));
     expect(screen.queryByTestId('risk-all-clients')).toBeNull();

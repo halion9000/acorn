@@ -3,7 +3,7 @@
 import { clsx } from 'clsx';
 
 /**
- * The user's *organisation-level* role, surfaced in the TopBar so operators
+ * The user's *organization-level* role, surfaced in the TopBar so operators
  * always know what permissions they're operating under. Tone is tuned per
  * role so an `admin` badge visually outranks a `viewer` badge.
  *
