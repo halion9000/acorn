@@ -60,6 +60,8 @@ function LoginInner() {
   const router = useRouter();
   const search = useSearchParams();
   const next = sanitizeNext(search?.get('next'));
+  // Sent here by the inactivity timeout (lib/idle-timeout.ts): say why the session ended.
+  const endedForInactivity = search?.get('reason') === 'idle';
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -185,6 +187,12 @@ function LoginInner() {
               Open-source AI SOC console. Sign in with your tenant&rsquo;s account.
             </p>
           </div>
+
+          {endedForInactivity ? (
+            <p role="status" data-testid="idle-notice" className="mb-6 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-200">
+              You were signed out after 4 hours without activity. Sign in again to continue.
+            </p>
+          ) : null}
 
           {finishing ? (
             <p role="status" className="text-center text-sm text-zinc-400">

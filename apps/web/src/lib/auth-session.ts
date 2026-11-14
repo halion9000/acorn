@@ -26,11 +26,13 @@ import { getViewedTenantId, setViewedTenantId, viewAsHeaders, VIEW_AS_ERROR_HEAD
 export const AUTH_TOKEN_KEY = 'aisoc.responder.accessToken';
 export const AUTH_REFRESH_KEY = 'aisoc.responder.refreshToken';
 export const AUTH_USER_KEY = 'aisoc.responder.user';
+/** When a person last did something in the console (see idle-timeout.ts); forgotten with the sign-in, so a new login starts a fresh clock. */
+export const AUTH_ACTIVITY_KEY = 'aisoc.responder.lastActive';
 
 /** Replaceable in tests (jsdom cannot intercept window.location.assign). */
 export const sessionHooks = {
-  redirectToLogin(next: string): void {
-    window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+  redirectToLogin(next: string, reason?: string): void {
+    window.location.assign(`/login?next=${encodeURIComponent(next)}${reason ? `&reason=${encodeURIComponent(reason)}` : ''}`);
   },
   reload(): void {
     window.location.reload();
@@ -71,6 +73,7 @@ export function clearSession(): void {
     s?.removeItem(AUTH_TOKEN_KEY);
     s?.removeItem(AUTH_REFRESH_KEY);
     s?.removeItem(AUTH_USER_KEY);
+    s?.removeItem(AUTH_ACTIVITY_KEY);
   } catch {
     /* storage unavailable */
   }

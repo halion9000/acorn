@@ -15,6 +15,7 @@ import { DemoAutoLogin } from '@/components/demo/DemoAutoLogin';
 import { ClientOnly } from '@/components/util/ClientOnly';
 import { isDemoMode } from '@/lib/demoMode';
 import { redirectIfSignedOut } from '@/lib/auth-session';
+import { IdleLogout } from './IdleLogout';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -55,6 +56,8 @@ export function AppShell({ children }: AppShellProps) {
         No-ops outside demo mode.
       */}
       <DemoAutoLogin />
+      {/* Signs a person out after four hours without activity (draws nothing). */}
+      <IdleLogout />
       {/*
         v1.5 (W4 + W5): TimeWindow + Tenant contexts mount once at the shell
         boundary so every page (and the TopBar) reads from the same source of
