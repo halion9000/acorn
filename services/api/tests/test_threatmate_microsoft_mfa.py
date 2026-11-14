@@ -1,4 +1,4 @@
-"""Microsoft 365 people read by ThreatMate for a client without CIPP: judged on enrolment, and replaced by CIPP's when it reports."""
+"""Microsoft 365 people read by ThreatMate for a client without CIPP: judged on enrollment, and replaced by CIPP's when it reports."""
 
 from __future__ import annotations
 

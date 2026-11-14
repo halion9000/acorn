@@ -98,7 +98,7 @@ This document describes the end-to-end architecture of the A.C.O.R.N platform af
 | `services/ueba` | Python 3.11 | Welford / Z-score user-behavior analytics, peer-group baselines | Background baseline rebuild |
 | `services/honeytokens` | Python 3.11 | Deception platform: mints AWS keys, doc lures, DNS canaries; emits `honeytoken.tripped` | n/a |
 | `services/purple-team` | Python 3.11 | Adversary emulation orchestrator (ATT&CK technique runner) | Detection-coverage scorer |
-| `services/osquery-tls` | Go 1.25 | TLS server for osquery enrol / config / distributed / log endpoints | Ships normalised host events into `services/ingest` |
+| `services/osquery-tls` | Go 1.25 | TLS server for osquery enroll / config / distributed / log endpoints | Ships normalised host events into `services/ingest` |
 | `services/osquery-extensions` | Go 1.25 | Out-of-band osquery extensions (custom virtual tables + decorators) | Loaded by `osquery-tls`-managed agents |
 | `services/slack-bot` | Python 3.11 | ChatOps surface: posts approval prompts, `/aisoc` slash command | Verifies inbound interactions with HMAC-signed Slack request signatures |
 | `services/realtime` | Node 20 | WebSocket fan-out + Web Push for the web console + Responder PWA | n/a |
@@ -385,9 +385,9 @@ The v2.2 increment is scoped to first-mile ergonomics — getting events into A.
 
 ### 13.1 Endpoint Telemetry (osquery TLS server + extensions)
 
-`services/osquery-tls` is a Go TLS server that implements the four osquery endpoints — `/enroll`, `/config`, `/distributed/read`, `/distributed/write`, `/log` — so that any host running osquery can be enrolled into A.C.O.R.N with a single enrol secret. Result rows are normalised into OCSF and shipped to `services/ingest`'s `/v1/ingest/batch` endpoint, sharing the same KEV correlator and ATT&CK tagger described in §1.
+`services/osquery-tls` is a Go TLS server that implements the four osquery endpoints — `/enroll`, `/config`, `/distributed/read`, `/distributed/write`, `/log` — so that any host running osquery can be enrolled into A.C.O.R.N with a single enroll secret. Result rows are normalised into OCSF and shipped to `services/ingest`'s `/v1/ingest/batch` endpoint, sharing the same KEV correlator and ATT&CK tagger described in §1.
 
-`services/osquery-extensions` registers custom virtual tables and decorators that the standard osquery distribution doesn't ship — for example, AiSOC-specific process-lineage and EDR-correlated host metadata — and is loaded out-of-band by agents managed by `osquery-tls`. The split (server vs extensions) keeps the TLS server's surface area minimal and lets the extensions iterate without touching the enrol path.
+`services/osquery-extensions` registers custom virtual tables and decorators that the standard osquery distribution doesn't ship — for example, AiSOC-specific process-lineage and EDR-correlated host metadata — and is loaded out-of-band by agents managed by `osquery-tls`. The split (server vs extensions) keeps the TLS server's surface area minimal and lets the extensions iterate without touching the enroll path.
 
 This makes A.C.O.R.N self-sufficient for endpoint telemetry: a tenant who doesn't own a CrowdStrike or SentinelOne licence can still get host events into the platform without standing up a separate fleet manager.
 

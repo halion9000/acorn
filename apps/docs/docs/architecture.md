@@ -183,7 +183,7 @@ AiSOC/
 │   ├── connectors/           # Connector polling + credential vault (50 vendors)
 │   ├── demo-producer/        # Synthetic event generator for demos
 │   ├── mcp/                  # Model Context Protocol server (TypeScript)
-│   ├── osquery-tls/          # osquery TLS server: enrol hosts, ship results
+│   ├── osquery-tls/          # osquery TLS server: enroll hosts, ship results
 │   ├── osquery-extensions/   # Custom osquery tables/decorators
 │   └── slack-bot/            # ChatOps surface (HMAC-signed approvals)
 ├── packages/
@@ -228,7 +228,7 @@ AiSOC/
 | `connectors` | — | Python | Connector polling (APScheduler), credential vault (`CredentialVault`), registry-based discovery — **50 vendors shipped** across EDR / SIEM / cloud / IAM / SaaS / network / email |
 | `demo-producer` | — | Python | Synthetic event generator for demos and evaluation |
 | `mcp` | n/a | TypeScript | Model Context Protocol stdio server, 13 tools for IDE-side agents (Claude / Cursor / Continue / Cody) — discovery, deep-dive, action/replay, and the warm-tier lake query pair |
-| `osquery-tls` | 8443 | Go | TLS server implementing osquery's enrol/config/distributed/log endpoints; ships normalised host events into `ingest` |
+| `osquery-tls` | 8443 | Go | TLS server implementing osquery's enroll/config/distributed/log endpoints; ships normalised host events into `ingest` |
 | `osquery-extensions` | — | Go | Out-of-band osquery extensions registering custom virtual tables and decorators consumed by `osquery-tls` |
 | `slack-bot` | — | Python | ChatOps surface: posts approval prompts, exposes `/aisoc` slash command, verifies inbound interactions with HMAC-signed Slack request signatures |
 | `web` | 3000 | TypeScript (Next.js) | React console + Responder PWA route group, **`/alerts` Investigation Rail**, **benchmark scoreboard**, conversational investigation chat |

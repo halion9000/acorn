@@ -13,7 +13,7 @@ from typing import Any
 def required_of(u: Any) -> bool:
     """Something makes this person use a second factor: a conditional access policy, security defaults, or the per-user setting.
 
-    A source in ``ENFORCEMENT_UNREPORTED`` says only who enrolled, never what requires it, so for those rows enrolment is the whole answer: an enrolled person counts as covered (see below)."""
+    A source in ``ENFORCEMENT_UNREPORTED`` says only who enrolled, never what requires it, so for those rows enrollment is the whole answer: an enrolled person counts as covered (see below)."""
     if (getattr(u, "source", None) or "") in ENFORCEMENT_UNREPORTED:
         return True
     return bool(u.ca_enforced or u.security_defaults or (u.per_user or "").lower() in ("enforced", "enabled"))
@@ -32,7 +32,7 @@ def has_second_factor(u: Any, known: bool) -> bool:
 # Rows that are not Microsoft's: the people of a client's Google Workspace, read by ThreatMate and stored under its name. Google says plainly who enrolled in 2-Step Verification and whether it is enforced,
 # so a Google group is always judged by what it reports, never by the "Microsoft may not say" fallback above, and never mixed into a judgement about Microsoft 365.
 GOOGLE_SOURCES: frozenset[str] = frozenset({"threatmate"})
-# Microsoft 365 people read by ThreatMate for a client that has no CIPP (Live Oak's own company is one). ThreatMate says who enrolled in 2-factor but not what requires it, so these rows are judged on enrolment alone, and
+# Microsoft 365 people read by ThreatMate for a client that has no CIPP (Live Oak's own company is one). ThreatMate says who enrolled in 2-factor but not what requires it, so these rows are judged on enrollment alone, and
 # only while no CIPP row exists for the client: CIPP is the fuller source and replaces them (see apply_mfa_users).
 THREATMATE_MICROSOFT = "threatmate-microsoft"
 ENFORCEMENT_UNREPORTED: frozenset[str] = frozenset({THREATMATE_MICROSOFT})

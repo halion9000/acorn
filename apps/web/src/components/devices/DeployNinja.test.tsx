@@ -63,7 +63,7 @@ describe('DeployNinja', () => {
     expect(screen.getByText(/Install the agent on PC-1 as SYSTEM, for Acme Dental\?/)).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Yes, install' }));
     expect(api.deployNinja).toHaveBeenCalledWith('d1', { package: 'msi', org_id: 27, location_id: 28, role_id: 202 });
-    expect(await screen.findByText(/waiting for the machine to enrol/)).toBeTruthy();
+    expect(await screen.findByText(/waiting for the machine to enroll/)).toBeTruthy();
     api.consoleLine.mockResolvedValue(line({ status: 'done', output: 'NinjaOne agent installed on PC-1, enrolled in Acme Dental, and its role set to WINDOWS_LAPTOP.' }));
     await waitFor(() => expect(screen.getByTestId('deploy-result')).toHaveTextContent('its role set to WINDOWS_LAPTOP'), { timeout: 6000 });
   });

@@ -110,7 +110,7 @@ GOOGLE_PEOPLE_FRESH_DAYS = 7
 
 def google_two_step_answer(people: list[Any], now: datetime) -> tuple[str, str] | None:
     """Whether 2-Step Verification is enforced for every Google account, from the client's stored Google people (``source`` in GOOGLE_SOURCES): switched-on accounts refreshed within
-    GOOGLE_PEOPLE_FRESH_DAYS. All enforced is met, some partly, none not met. None when there is no such person: an empty list never answers. Enrolment alone is not enforcement, so the
+    GOOGLE_PEOPLE_FRESH_DAYS. All enforced is met, some partly, none not met. None when there is no such person: an empty list never answers. Enrollment alone is not enforcement, so the
     people who have signed up without it being required are said, not counted."""
     cut = now - timedelta(days=GOOGLE_PEOPLE_FRESH_DAYS)
     live = [

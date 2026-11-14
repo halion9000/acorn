@@ -273,13 +273,13 @@ class TestResetMfa:
     def test_it_also_removes_the_authenticator_app_and_says_so_in_the_audit_entry(self, world):
         from app.services import totp, totp_store
 
-        async def enrol(s):
+        async def enroll(s):
             secret, _ = await totp_store.start_enrolment(s, world.ann.id, world.tenant.id, "ann")
             codes = await totp_store.confirm(s, world.ann.id, world.tenant.id, totp.code_for_step(secret, totp.current_step()))
             await s.commit()
             return codes
 
-        assert run(world, enrol), "the authenticator app is on before the reset"
+        assert run(world, enroll), "the authenticator app is on before the reset"
 
         async def on(s):
             return await totp_store.is_enabled(s, world.ann.id, world.tenant.id)
@@ -301,12 +301,12 @@ class TestSecondFactorsShownInTheList:
     def test_the_list_says_who_has_passkeys_and_an_authenticator_app(self, world):
         from app.services import totp, totp_store
 
-        async def enrol(s):
+        async def enroll(s):
             secret, _ = await totp_store.start_enrolment(s, world.second.id, world.tenant.id, "second")
             await totp_store.confirm(s, world.second.id, world.tenant.id, totp.code_for_step(secret, totp.current_step()))
             await s.commit()
 
-        run(world, enrol)
+        run(world, enroll)
         listed = {u["account_name"]: u for u in world.client.get("/tenants/me/users", headers=login(world, "boss")).json()}
         assert (listed["ann"]["passkeys"], listed["ann"]["authenticator"]) == (1, False)
         assert (listed["second"]["passkeys"], listed["second"]["authenticator"]) == (0, True)

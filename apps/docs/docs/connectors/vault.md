@@ -6,7 +6,7 @@ description: Stream HashiCorp Vault audit-device events (secrets ops, policy cha
 
 # HashiCorp Vault
 
-The Vault connector pulls **audit-device events** from HashiCorp Vault — every secret read, write, lease renewal, policy change, and token issuance. It surfaces the control-plane activity that almost no other source captures, so privilege-elevating actions (root tokens, broad policies, auth-method enrolment) land in AiSOC alongside the rest of the identity-plane signal.
+The Vault connector pulls **audit-device events** from HashiCorp Vault — every secret read, write, lease renewal, policy change, and token issuance. It surfaces the control-plane activity that almost no other source captures, so privilege-elevating actions (root tokens, broad policies, auth-method enrollment) land in AiSOC alongside the rest of the identity-plane signal.
 
 > Vault deliberately **does not expose audit events through its HTTP API**. Audit data flows out of the cluster via Vault's audit devices (`file`, `socket`, `syslog`). This connector consumes the AiSOC ingest buffer that the recommended sidecar topology writes to.
 

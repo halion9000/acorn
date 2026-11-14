@@ -156,7 +156,7 @@ export function DeployNinja({ deviceId, hostname }: { deviceId: string; hostname
       )}
       {options && !options.blocked && !line && (
         <div className="space-y-2">
-          <p className="text-xs text-gray-400">NinjaOne&apos;s installer link has no role of its own, so the role is set after the machine enrols (a few minutes).</p>
+          <p className="text-xs text-gray-400">NinjaOne&apos;s installer link has no role of its own, so the role is set after the machine enrolls (a few minutes).</p>
           {confirming ? (
             <div className="flex items-center gap-2 text-sm text-gray-200">
               <span>
@@ -178,7 +178,7 @@ export function DeployNinja({ deviceId, hostname }: { deviceId: string; hostname
       )}
       {line && (
         <div className="rounded border border-gray-800 bg-black p-3 font-mono text-xs" data-testid="deploy-result">
-          {waiting && <p className="text-gray-400">Installing and waiting for the machine to enrol in NinjaOne (up to about eight minutes)...</p>}
+          {waiting && <p className="text-gray-400">Installing and waiting for the machine to enroll in NinjaOne (up to about eight minutes)...</p>}
           {line.status === 'done' && <p className="whitespace-pre-wrap text-emerald-300">{line.output}</p>}
           {line.status === 'failed' && <p className="whitespace-pre-wrap text-red-300">{line.output || 'The install failed.'}</p>}
         </div>

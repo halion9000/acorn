@@ -211,7 +211,7 @@ def _out(p: Person, with_sources: bool = False) -> PersonOut:
 
 
 BRUTE_FORCE_FAILURES = 10
-# Microsoft "errors" that are the sign-in asking for more (MFA, enrolment, a challenge, "stay signed in?"), not a wrong password or a refusal.
+# Microsoft "errors" that are the sign-in asking for more (MFA, enrollment, a challenge, "stay signed in?"), not a wrong password or a refusal.
 NOT_FAILURES = (50072, 50074, 50076, 50140, 50158)
 
 

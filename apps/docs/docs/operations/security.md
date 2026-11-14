@@ -54,7 +54,7 @@ Both providers issue the same internal JWT after authentication, so authorizatio
 Two MFA paths are available:
 
 - **WebAuthn / passkeys** — implemented in [`services/api/app/api/v1/endpoints/passkeys.py`](https://github.com/beenuar/AiSOC/blob/main/services/api/app/api/v1/endpoints/passkeys.py). Required for the [Responder PWA](../intro) (`/responder/*` route). Passkey-only login means there is no password fallback for on-call responders — you authenticate with the device, biometric, or hardware key the user registered.
-- **TOTP** — standard 6-digit time-based codes for analyst console accounts when SSO is not in use. Backup codes are generated at enrolment and shown once.
+- **TOTP** — standard 6-digit time-based codes for analyst console accounts when SSO is not in use. Backup codes are generated at enrollment and shown once.
 
 Both MFA methods are enforced per-user, configurable per-role: tenant admins can require MFA for any role they choose.
 

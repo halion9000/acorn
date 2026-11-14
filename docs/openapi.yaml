@@ -13054,6 +13054,118 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/frameworks/enabled:
+    get:
+      tags:
+      - compliance
+      summary: The frameworks turned on for this organization or client
+      operationId: enabled_frameworks_api_v1_compliance_frameworks_enabled_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnabledOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - compliance
+      summary: Turn frameworks on or off (the list given is the whole set that is
+        on)
+      operationId: set_enabled_frameworks_api_v1_compliance_frameworks_enabled_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnabledIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnabledOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/dashboard:
+    get:
+      tags:
+      - compliance
+      summary: Control health, risk levels and action items for the frameworks that
+        are on
+      operationId: dashboard_api_v1_compliance_dashboard_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/devices/settings:
     get:
       tags:
@@ -14874,7 +14986,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ActionItem'
+                $ref: '#/components/schemas/app__api__v1__endpoints__identity_actions__ActionItem'
         '422':
           description: Validation Error
           content:
@@ -26937,63 +27049,11 @@ components:
       - reversible
       - summary
       title: ActionInfo
-    ActionItem:
-      properties:
-        id:
-          type: string
-          format: uuid
-          title: Id
-        action:
-          type: string
-          title: Action
-        label:
-          type: string
-          title: Label
-        email:
-          type: string
-          title: Email
-        status:
-          type: string
-          enum:
-          - pending
-          - running
-          - done
-          - failed
-          title: Status
-        message:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Message
-        requested_by:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Requested By
-        created_at:
-          type: string
-          format: date-time
-          title: Created At
-        finished_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Finished At
-      type: object
-      required:
-      - id
-      - action
-      - label
-      - email
-      - status
-      - created_at
-      title: ActionItem
     ActionList:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/ActionItem'
+            $ref: '#/components/schemas/app__api__v1__endpoints__identity_actions__ActionItem'
           type: array
           title: Items
       type: object
@@ -35059,6 +35119,42 @@ components:
       - alertsTrend
       - threatsBySource
       title: DashboardMetrics
+    DashboardOut:
+      properties:
+        enabled:
+          items:
+            type: string
+          type: array
+          title: Enabled
+        health:
+          anyOf:
+          - $ref: '#/components/schemas/Health'
+          - type: 'null'
+        by_framework:
+          items:
+            $ref: '#/components/schemas/FrameworkHealth'
+          type: array
+          title: By Framework
+        risks:
+          $ref: '#/components/schemas/RiskLevels'
+        action_items:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__compliance_dashboard__ActionItem'
+          type: array
+          title: Action Items
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+      type: object
+      required:
+      - enabled
+      - health
+      - by_framework
+      - risks
+      - action_items
+      - generated_at
+      title: DashboardOut
     DashboardPeriod:
       properties:
         start:
@@ -37328,6 +37424,33 @@ components:
       - tools
       - items
       title: ElsewhereOut
+    EnabledIn:
+      properties:
+        frameworks:
+          items:
+            type: string
+          type: array
+          maxItems: 20
+          title: Frameworks
+      type: object
+      title: EnabledIn
+    EnabledOut:
+      properties:
+        enabled:
+          items:
+            type: string
+          type: array
+          title: Enabled
+        available:
+          items:
+            type: string
+          type: array
+          title: Available
+      type: object
+      required:
+      - enabled
+      - available
+      title: EnabledOut
     EnrolOut:
       properties:
         secret:
@@ -39142,6 +39265,18 @@ components:
       - failing
       - passing
       title: FrameworkCounts
+    FrameworkHealth:
+      properties:
+        framework:
+          type: string
+          title: Framework
+        health:
+          $ref: '#/components/schemas/Health'
+      type: object
+      required:
+      - framework
+      - health
+      title: FrameworkHealth
     FrameworkMapping:
       properties:
         framework:
@@ -39666,6 +39801,37 @@ components:
       required:
       - notes
       title: HandoffNotes
+    Health:
+      properties:
+        healthy:
+          type: integer
+          title: Healthy
+        at_risk:
+          type: integer
+          title: At Risk
+        unhealthy:
+          type: integer
+          title: Unhealthy
+        not_tested:
+          type: integer
+          title: Not Tested
+        total:
+          type: integer
+          title: Total
+        percent_healthy:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Percent Healthy
+      type: object
+      required:
+      - healthy
+      - at_risk
+      - unhealthy
+      - not_tested
+      - total
+      - percent_healthy
+      title: Health
     HiddenRequest:
       properties:
         hidden:
@@ -47875,6 +48041,31 @@ components:
       - likelihood
       - impact
       title: RiskIn
+    RiskLevels:
+      properties:
+        critical:
+          type: integer
+          title: Critical
+        high:
+          type: integer
+          title: High
+        medium:
+          type: integer
+          title: Medium
+        low:
+          type: integer
+          title: Low
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - critical
+      - high
+      - medium
+      - low
+      - total
+      title: RiskLevels
     RiskLine:
       properties:
         id:
@@ -57284,6 +57475,42 @@ components:
       - first_seen
       - last_seen
       title: VulnerabilityOut
+    app__api__v1__endpoints__compliance_dashboard__ActionItem:
+      properties:
+        kind:
+          type: string
+          enum:
+          - evidence_expired
+          - risk_task
+          title: Kind
+        name:
+          type: string
+          title: Name
+        event:
+          type: string
+          title: Event
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        due:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Due
+        link:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Link
+      type: object
+      required:
+      - kind
+      - name
+      - event
+      title: ActionItem
     app__api__v1__endpoints__detection_rules__HuntResponse:
       properties:
         hunt_id:
@@ -58019,6 +58246,58 @@ components:
       - audits_scored_last_24h
       - audits_unscored
       title: IdentitySummary
+    app__api__v1__endpoints__identity_actions__ActionItem:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        action:
+          type: string
+          title: Action
+        label:
+          type: string
+          title: Label
+        email:
+          type: string
+          title: Email
+        status:
+          type: string
+          enum:
+          - pending
+          - running
+          - done
+          - failed
+          title: Status
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        requested_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requested By
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+      type: object
+      required:
+      - id
+      - action
+      - label
+      - email
+      - status
+      - created_at
+      title: ActionItem
     app__api__v1__endpoints__identity_timeline__TimelineEvent:
       properties:
         event_id:
