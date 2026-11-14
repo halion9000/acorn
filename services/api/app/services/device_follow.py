@@ -6,7 +6,8 @@ up. Its agents then landed under the client that organization is mapped to, whil
 beside a machine Huntress protects (found 2026-11-13: 29 organization pairs sharing three or more machines under different names).
 
 The rule is narrow on purpose. A record follows only when ALL hold:
-  * it comes from a tool in ``FOLLOWING_TOOLS`` (Huntress: its agent ids are unique across the whole account, so a record can be told apart wherever it sits);
+  * it comes from a tool in ``FOLLOWING_TOOLS`` (Huntress agents, ThreatMate assets and ScreenConnect sessions: each id is unique across the whole account, so a record can be told apart wherever it sits;
+    ThreatMate and ScreenConnect were added 2026-11-14 after 317 of the machines flagged "not in NinjaOne" were found filed under the client their group is mapped to, e.g. the New Waterloo hotels);
   * it carries a real serial number (not empty, not a placeholder);
   * a tool in ``ANCHOR_TOOLS`` (the RMMs: they are what says which client a machine belongs to) holds a device with that same serial AND the same machine name under exactly ONE of the owner's
     clients, and that client is not the one the record was heading for;
@@ -31,7 +32,7 @@ from app.services.device_identity import hostname_key, normalize_serial
 # The tools that say which client a machine belongs to.
 ANCHOR_TOOLS = frozenset({"ninjaone", "addigy"})
 # The tools whose record follows the machine. Only tools whose ids for a device are unique across the whole account belong here.
-FOLLOWING_TOOLS = frozenset({"huntress"})
+FOLLOWING_TOOLS = frozenset({"huntress", "threatmate", "screenconnect"})
 # How lately the RMM must have reported its record for it to say where a machine belongs. Devices are reported every hour; nothing removes a record the RMM stops sending.
 ANCHOR_FRESH = timedelta(days=3)
 

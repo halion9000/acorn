@@ -47,6 +47,8 @@ async def world():
                 ("ninjaone", "G", "group"),
                 ("huntress", "H", "group"),
                 ("huntress", "HA", "hotel_a"),
+                ("threatmate", "H", "group"),
+                ("screenconnect", "H", "group"),
             ]:
                 await conn.execute(
                     text(
@@ -300,3 +302,25 @@ async def test_an_alert_is_shown_on_one_row_only_and_never_on_a_machine_the_orig
     devices_endpoints.forget_loaded()
     alone = (await as_app(p, lambda db: list_devices(user(p), db, client_id=world["hotel_a"]))).items
     assert [d.open_alerts for d in alone] == [0]
+
+
+async def test_threatmate_and_screenconnect_records_follow_the_machine_too_but_only_when_serial_and_name_agree(world):
+    res = await send(
+        world,
+        dev("ninjaone", "A", "n1", "HOTEL-A-MBA", "SERIAL-A1"),
+        dev("ninjaone", "B", "n2", "HOTEL-B-PC1", "SERIAL-B1"),
+        dev("threatmate", "H", "t1", "HOTEL-A-MBA", "serial-a1"),  # same name and serial: follows to hotel A
+        dev("screenconnect", "H", "s1", "HOTEL-B-PC1", "SERIAL-B1"),  # same: follows to hotel B
+        dev("screenconnect", "H", "s2", "HOTEL-A-MBA", "OTHER-SERIAL"),  # same name, a different serial: stays put
+        dev("threatmate", "H", "t2", "HOTEL-B-PC1", None),  # same name, no serial to be sure by: stays put
+    )
+    assert res.accepted == 6 and res.followed == 2
+    a, _ = await held(world, "hotel_a")
+    b, _ = await held(world, "hotel_b")
+    g, _ = await held(world, "group")
+    assert a == [("HOTEL-A-MBA", ["ninjaone", "threatmate"])]
+    assert b == [("HOTEL-B-PC1", ["ninjaone", "screenconnect"])]
+    assert sorted(h for h, _v in g) == [
+        "HOTEL-A-MBA",
+        "HOTEL-B-PC1",
+    ], "the two records that could not be told to be the same machine stay where their organization is mapped"
