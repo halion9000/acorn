@@ -59,7 +59,7 @@ describe('the client picker', () => {
     api.list.mockResolvedValue({ items: [] });
     render(<RiskScoringView />);
     const picker = await screen.findByLabelText('Client');
-    await waitFor(() => expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual(['Choose a client', 'Own organisation', 'Acme Dental', 'Birch Law']));
+    await waitFor(() => expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual(['Choose a client', 'Acme Dental', 'Birch Law']));
     expect(api.clients).toHaveBeenCalledTimes(1);
     expect(mssp.listChildren).not.toHaveBeenCalled();
   });

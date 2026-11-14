@@ -746,7 +746,6 @@ export function RiskScoringView() {
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         <select aria-label="Client" value={clientId} onChange={(e) => setClientId(e.target.value)} className={input}>
           <option value="">Choose a client</option>
-          <option value={OWN}>Own organisation</option>
           {clients.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}

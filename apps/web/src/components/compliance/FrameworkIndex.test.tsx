@@ -54,17 +54,18 @@ describe('the compliance index', () => {
     expect(screen.queryByLabelText('Client')).toBeNull();
   });
 
-  it('puts the chosen client on every card and in the address, and goes back to the plain links when the choice is cleared', async () => {
-    listChildren.mockResolvedValue([{ id: 'c1', name: 'Acme Dental' }, { id: 'c2', name: 'Beta Law' }]);
+  it('starts on the own company of the organisation (a client in the list, no "My organisation" line), and puts the chosen client on every card and in the address', async () => {
+    listChildren.mockResolvedValue([{ id: 'c1', name: 'Acme Dental' }, { id: 'c2', name: 'Live Oak IT Partners' }, { id: 'c3', name: 'Beta Law' }]);
     renderIndex();
     const user = userEvent.setup();
-    await user.selectOptions(await screen.findByLabelText('Client'), 'c2');
-    expect(screen.getByRole('link', { name: /SOC 2 Type II/ }).getAttribute('href')).toBe('/compliance/soc2?client=c2');
-    expect(screen.getByRole('link', { name: /HIPAA Security Rule/ }).getAttribute('href')).toBe('/compliance/hipaa?client=c2');
+    const picker = (await screen.findByLabelText('Client')) as HTMLSelectElement;
+    expect(Array.from(picker.options).map((o) => o.textContent)).toEqual(['Acme Dental', 'Beta Law', 'Live Oak IT Partners']);
+    await waitFor(() => expect(screen.getByRole('link', { name: /SOC 2 Type II/ }).getAttribute('href')).toBe('/compliance/soc2?client=c2'));
     expect(window.location.search).toBe('?client=c2');
-    await user.selectOptions(screen.getByLabelText('Client'), '');
-    expect(screen.getByRole('link', { name: /SOC 2 Type II/ }).getAttribute('href')).toBe('/compliance/soc2');
-    expect(window.location.search).toBe('');
+    await user.selectOptions(screen.getByLabelText('Client'), 'c3');
+    expect(screen.getByRole('link', { name: /SOC 2 Type II/ }).getAttribute('href')).toBe('/compliance/soc2?client=c3');
+    expect(screen.getByRole('link', { name: /HIPAA Security Rule/ }).getAttribute('href')).toBe('/compliance/hipaa?client=c3');
+    expect(window.location.search).toBe('?client=c3');
   });
 
   it('opens on the client named in its own address, so a reload or a shared link keeps the choice', async () => {

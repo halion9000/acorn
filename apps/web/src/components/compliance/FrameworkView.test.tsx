@@ -110,16 +110,19 @@ describe('FrameworkView for a client', () => {
     return json([]);
   };
 
-  it('reads and writes the own evidence of the organisation until a client is chosen, then only that of the client', async () => {
-    listChildren.mockResolvedValue([{ id: 'c1', name: 'Acme Dental', mssp_role: 'client' }]);
+  it('starts on the own company of the organisation, then reads and writes only the evidence of whichever client is chosen', async () => {
+    listChildren.mockResolvedValue([
+      { id: 'c1', name: 'Acme Dental', mssp_role: 'client' },
+      { id: 'c-home', name: 'Live Oak IT Partners', mssp_role: 'client' },
+    ]);
     authFetch.mockImplementation((url: string) => answer(url));
     render(
       <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
         <FrameworkView framework="soc2" />
       </SWRConfig>,
     );
-    await waitFor(() => expect(screen.getByTestId('coverage')).toBeTruthy());
-    expect(authFetch.mock.calls.filter((c) => String(c[0]).includes('/evidence') || String(c[0]).includes('/report')).every((c) => !String(c[0]).includes('client_id'))).toBe(true);
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]).includes('/report?framework=SOC2&client_id=c-home'))).toBe(true));
+    expect(await screen.findByRole('combobox', { name: 'Client' })).toHaveValue('c-home');
 
     authFetch.mockClear();
     await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Client' }), 'c1');

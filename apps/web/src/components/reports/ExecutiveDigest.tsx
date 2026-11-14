@@ -163,7 +163,7 @@ export function ExecutiveDigest() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ClientPicker value={clientId} onChange={setClientId} label="Digest for" ownLabel="My organisation (internal)" />
+          <ClientPicker value={clientId} onChange={setClientId} label="Digest for" />
           <select
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
