@@ -70,8 +70,10 @@ describe('InventoryView list', () => {
   it('asks the server for what the filters say and starts again at page one', async () => {
     view();
     await screen.findAllByTestId('inventory-row');
-    await userEvent.selectOptions(screen.getByLabelText('Client'), 'own');
-    await waitFor(() => expect(lastQuery()).toMatchObject({ kind: 'stock', client: 'own', page: 1 }));
+    // The own company is one of the clients: there is no separate own-stock line while the organization has clients.
+    expect(within(screen.getByLabelText('Client')).queryByRole('option', { name: /own stock/i })).toBeNull();
+    await userEvent.selectOptions(screen.getByLabelText('Client'), 'c1');
+    await waitFor(() => expect(lastQuery()).toMatchObject({ kind: 'stock', client: 'c1', page: 1 }));
     await userEvent.selectOptions(screen.getByLabelText('Client'), 'c2');
     await waitFor(() => expect(lastQuery().client).toBe('c2'));
     await userEvent.selectOptions(screen.getByLabelText('Category'), 'Drives');
@@ -152,7 +154,7 @@ describe('InventoryView actions', () => {
     expect(entries[1]).toHaveTextContent('created');
   });
 
-  it('adds an item for a chosen client, or for Live Oak when none is chosen', async () => {
+  it('adds an item for a chosen client, or for the own company (the first client when none is called Live Oak IT Partners) when none is chosen', async () => {
     api.create.mockResolvedValue(item());
     view();
     await screen.findAllByTestId('inventory-row');
@@ -169,10 +171,23 @@ describe('InventoryView actions', () => {
     await userEvent.type(within(screen.getByRole('dialog')).getByLabelText('Name'), 'Cables');
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(api.create).toHaveBeenCalledTimes(2));
-    expect(api.create.mock.calls[1][0]).not.toHaveProperty('client_id');
+    expect(api.create.mock.calls[1][0]).toMatchObject({ client_id: 'c1' });
   });
 
-  it('edits an item and moves it to Live Oak or to a client', async () => {
+  it('edits an item and moves it to another client', async () => {
+    api.update.mockResolvedValue(item());
+    view();
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Client'), 'c2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.update).toHaveBeenCalledTimes(1));
+    expect(api.update.mock.calls[0][1]).toMatchObject({ name: 'Dell Pro Max 16', client_id: 'c2' });
+    expect(api.update.mock.calls[0][1]).not.toHaveProperty('move_to_own');
+  });
+
+  it('an organization with no clients keeps an Own stock choice, and moving an item to it is move_to_own', async () => {
+    mssp.listChildren.mockResolvedValue([]);
     api.update.mockResolvedValue(item());
     view();
     await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
@@ -180,8 +195,7 @@ describe('InventoryView actions', () => {
     await userEvent.selectOptions(within(dialog).getByLabelText('Client'), 'own');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.update).toHaveBeenCalledTimes(1));
-    expect(api.update.mock.calls[0][1]).toMatchObject({ name: 'Dell Pro Max 16', move_to_own: true });
-    expect(api.update.mock.calls[0][1]).not.toHaveProperty('client_id');
+    expect(api.update.mock.calls[0][1]).toMatchObject({ move_to_own: true });
   });
 });
 
@@ -263,18 +277,18 @@ describe('InventoryView bulk edit', () => {
     expect(screen.queryByTestId('bulk-bar')).toBeNull();
   });
 
-  it('sends Live Oak own stock as move_to_own and shows the API message when the change is refused', async () => {
+  it('sends a move to a client and shows the API message when the change is refused', async () => {
     api.bulk.mockRejectedValueOnce(new Error('Client not found'));
     view();
     await screen.findAllByTestId('inventory-row');
     await userEvent.click(screen.getByLabelText('Select Dell Pro Max 16'));
     await userEvent.click(screen.getByRole('button', { name: 'Edit selected' }));
     const dialog = screen.getByRole('dialog');
-    await userEvent.selectOptions(within(dialog).getByLabelText('Move to client'), 'own');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Move to client'), 'c2');
     await userEvent.type(within(dialog).getByLabelText('Add a tag'), 'loaner');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save 1 items' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Client not found');
-    expect(api.bulk.mock.calls[0][0]).toEqual({ ids: ['i1'], move_to_own: true, add_tags: ['loaner'] });
+    expect(api.bulk.mock.calls[0][0]).toEqual({ ids: ['i1'], client_id: 'c2', add_tags: ['loaner'] });
   });
 });
 

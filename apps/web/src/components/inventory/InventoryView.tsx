@@ -13,6 +13,7 @@ import { safeDistance } from '@/lib/safe-date';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { longOutNote } from './longOut';
 import { InventoryLabel } from './InventoryLabel';
+import { homeClientId } from '@/components/mssp/ClientPicker';
 
 export const STATUS_LABEL: Record<InventoryStatus, string> = { checked_in: 'Checked in', checked_out: 'Checked out', offline: 'Offline', retired: 'Retired' };
 const STATUS_STYLE: Record<InventoryStatus, string> = {
@@ -61,7 +62,8 @@ type Clients = { id: string; name: string }[];
 function ItemForm({ kind, item, clients, onDone, onClose }: { kind: InventoryKind; item?: InventoryItem; clients: Clients; onDone: () => void; onClose: () => void }) {
   const [f, setF] = useState({
     name: item?.name ?? '',
-    client: item ? (item.client_id ?? 'own') : 'own',
+    // The organization's own company is one of the clients (Live Oak IT Partners): its stock is filed under it, not under a separate "own stock" line. An organization with no clients keeps "own".
+    client: item?.client_id ?? (clients.length > 0 ? homeClientId(clients) : 'own'),
     serial: item?.serial ?? '',
     category: item?.category ?? '',
     model: item?.model ?? '',
@@ -110,7 +112,7 @@ function ItemForm({ kind, item, clients, onDone, onClose }: { kind: InventoryKin
         <div className="col-span-2">
           <Field label="Client">
             <select aria-label="Client" value={f.client} onChange={set('client')} className={`${input} w-full`}>
-              <option value="own">Live Oak (own stock)</option>
+              {clients.length === 0 && <option value="own">Own stock</option>}
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -534,7 +536,7 @@ function BulkForm({ ids, clients, onDone, onClose }: { ids: string[]; clients: C
         <Field label="Move to client">
           <select aria-label="Move to client" value={client} onChange={(e) => setClient(e.target.value)} className={`${input} w-full`}>
             <option value="">Leave as it is</option>
-            <option value="own">Live Oak (own stock)</option>
+            {clients.length === 0 && <option value="own">Own stock</option>}
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -881,7 +883,7 @@ export function InventoryView() {
         <input type="search" aria-label="Search inventory" placeholder="Search name, serial, model, person or client" value={search} onChange={(e) => reset(() => setSearch(e.target.value))} className={`${input} w-72`} />
         <select aria-label="Client" value={client} onChange={(e) => reset(() => setClient(e.target.value))} className={input}>
           <option value="">All clients</option>
-          <option value="own">Live Oak (own stock)</option>
+          {clients.length === 0 && <option value="own">Own stock</option>}
           <option value="unmatched">Not matched to a client</option>
           {clients.map((c) => (
             <option key={c.id} value={c.id}>
