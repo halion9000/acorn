@@ -38,6 +38,7 @@ MODELS = {
     "device-names": feed.DevicesReport,
     "entities": feed.EntitiesReport,
     "scripts": feed.ScriptsReport,
+    "ninja-deploy-options": feed.NinjaDeployOptionsReport,
     "status": feed.StatusReport,
     "sync-requests-claim": None,
     "devices": dev.DevicesReport,

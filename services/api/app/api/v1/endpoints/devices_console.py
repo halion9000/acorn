@@ -26,6 +26,8 @@ router = APIRouter(prefix="/devices", tags=["devices"])
 
 CONSOLE_VENDOR = "core"
 CONSOLE_ACTION = "sc_command"
+# A deploy of the NinjaOne agent (devices_ninja_deploy.py) is read back the same way.
+CONSOLE_ACTIONS = ("sc_command", "ninja_deploy")
 MAX_COMMAND = 1000
 HISTORY = 20
 
@@ -95,7 +97,7 @@ async def console_history(
                     .where(
                         VendorAction.tenant_id == tid,
                         VendorAction.vendor == CONSOLE_VENDOR,
-                        VendorAction.action == CONSOLE_ACTION,
+                        VendorAction.action.in_(CONSOLE_ACTIONS),
                         VendorAction.incident_uid.like(f"sc:{device_id}:%"),
                     )
                     .order_by(VendorAction.created_at.desc())
@@ -143,7 +145,7 @@ async def console_send(
                 select(VendorAction.id).where(
                     VendorAction.tenant_id == tid,
                     VendorAction.vendor == CONSOLE_VENDOR,
-                    VendorAction.action == CONSOLE_ACTION,
+                    VendorAction.action.in_(CONSOLE_ACTIONS),
                     VendorAction.status.in_(("pending", "claimed")),
                     VendorAction.created_at > now - PENDING_TTL,
                     VendorAction.incident_uid.like(f"sc:{device_id}:%"),
@@ -194,7 +196,7 @@ async def console_line(
                         VendorAction.id == request_id,
                         VendorAction.tenant_id == tid,
                         VendorAction.vendor == CONSOLE_VENDOR,
-                        VendorAction.action == CONSOLE_ACTION,
+                        VendorAction.action.in_(CONSOLE_ACTIONS),
                     )
                 )
             ).scalar_one_or_none()

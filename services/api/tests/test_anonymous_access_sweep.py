@@ -110,6 +110,9 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/finance"): (
         "CORE's daily snapshot of HaloPSA's recurring invoices and owed invoices: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organisation's own snapshot, which only people with the finance permissions can read."
     ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/ninja-deploy-options"): (
+        "CORE's list of the NinjaOne roles, organisations and locations the Devices page can offer when it installs the agent (names and numeric ids only, no key or link): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organisation's own list.",
+    ),
     ("GET", "/api/v1/inbox/core-feed/{tenant_token}/risk-tickets"): (
         "The HaloPSA ticket numbers opened from Client Risk Score questions that CORE should read the status of (numbers only, no client or question): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it reads only that feed's own clients."
     ),

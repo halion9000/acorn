@@ -8895,7 +8895,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/RoleOut'
+                  $ref: '#/components/schemas/app__api__v1__endpoints__rbac__RoleOut'
                 type: array
                 title: Response List Roles Api V1 Rbac Roles Get
       security:
@@ -8918,7 +8918,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RoleOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__rbac__RoleOut'
         '422':
           description: Validation Error
           content:
@@ -8949,7 +8949,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RoleOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__rbac__RoleOut'
         '422':
           description: Validation Error
           content:
@@ -8983,7 +8983,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RoleOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__rbac__RoleOut'
         '422':
           description: Validation Error
           content:
@@ -12428,6 +12428,69 @@ paths:
           title: Request Id
       responses:
         '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleLine'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/devices/{device_id}/ninja-deploy:
+    get:
+      tags:
+      - devices
+      summary: What can be chosen to install the NinjaOne agent on this machine
+      operationId: deploy_options_api_v1_devices__device_id__ninja_deploy_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Device Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeployOptions'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - devices
+      summary: Install the NinjaOne agent on this machine through ScreenConnect
+      operationId: deploy_api_v1_devices__device_id__ninja_deploy_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Device Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeployIn'
+      responses:
+        '202':
           description: Successful Response
           content:
             application/json:
@@ -25803,6 +25866,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/ninja-deploy-options:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Ninja Deploy Options
+      description: CORE tells A.C.O.R.N which NinjaOne roles, organisations and locations
+        the Devices page can offer for installing the agent. The whole list replaces
+        the last one.
+      operationId: report_core_feed_ninja_deploy_options_api_v1_inbox_core_feed__tenant_token__ninja_deploy_options_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NinjaDeployOptionsReport'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NinjaDeployOptionsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/clients:
     post:
       tags:
@@ -31845,6 +31943,7 @@ components:
           - create_halo_user
           - addigy_push
           - sc_command
+          - ninja_deploy
           title: Action
         incident_uid:
           type: string
@@ -35101,6 +35200,79 @@ components:
       title: Delivery
       description: What became of the mail, in the order a person cares about it.
         Every message counts in exactly one of these.
+    DeployIn:
+      properties:
+        package:
+          type: string
+          enum:
+          - msi
+          - pkg
+          title: Package
+        org_id:
+          type: integer
+          maximum: 2000000000.0
+          minimum: 1.0
+          title: Org Id
+        location_id:
+          type: integer
+          maximum: 2000000000.0
+          minimum: 1.0
+          title: Location Id
+        role_id:
+          type: integer
+          maximum: 2000000000.0
+          minimum: 1.0
+          title: Role Id
+      type: object
+      required:
+      - package
+      - org_id
+      - location_id
+      - role_id
+      title: DeployIn
+    DeployOptions:
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        device:
+          type: string
+          title: Device
+        blocked:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Blocked
+        suggested_package:
+          type: string
+          enum:
+          - msi
+          - pkg
+          title: Suggested Package
+        roles:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__devices_ninja_deploy__RoleOut'
+          type: array
+          title: Roles
+        organizations:
+          items:
+            $ref: '#/components/schemas/OrgOut'
+          type: array
+          title: Organizations
+        suggested_org_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Suggested Org Id
+      type: object
+      required:
+      - device_id
+      - device
+      - suggested_package
+      - roles
+      - organizations
+      title: DeployOptions
     DeployRuleIn:
       properties:
         tool:
@@ -41704,6 +41876,19 @@ components:
         only signal we expose — same convention the OAuth credential view
 
         uses (``has_secret``).'
+    LocationOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+      type: object
+      required:
+      - id
+      - name
+      title: LocationOut
     LoginAbuse:
       properties:
         window_minutes:
@@ -43588,6 +43773,102 @@ components:
       - id
       - name
       title: NewClientOut
+    NinjaDeployOptionsReport:
+      properties:
+        roles:
+          items:
+            $ref: '#/components/schemas/NinjaRoleItem'
+          type: array
+          maxItems: 300
+          title: Roles
+        organizations:
+          items:
+            $ref: '#/components/schemas/NinjaOrgItem'
+          type: array
+          maxItems: 3000
+          title: Organizations
+      type: object
+      required:
+      - roles
+      - organizations
+      title: NinjaDeployOptionsReport
+    NinjaDeployOptionsResponse:
+      properties:
+        roles:
+          type: integer
+          title: Roles
+        organizations:
+          type: integer
+          title: Organizations
+      type: object
+      required:
+      - roles
+      - organizations
+      title: NinjaDeployOptionsResponse
+    NinjaLocationItem:
+      properties:
+        id:
+          type: integer
+          maximum: 2000000000.0
+          minimum: 1.0
+          title: Id
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+      type: object
+      required:
+      - id
+      - name
+      title: NinjaLocationItem
+    NinjaOrgItem:
+      properties:
+        id:
+          type: integer
+          maximum: 2000000000.0
+          minimum: 1.0
+          title: Id
+        name:
+          type: string
+          maxLength: 300
+          minLength: 1
+          title: Name
+        locations:
+          items:
+            $ref: '#/components/schemas/NinjaLocationItem'
+          type: array
+          maxItems: 100
+          title: Locations
+      type: object
+      required:
+      - id
+      - name
+      - locations
+      title: NinjaOrgItem
+    NinjaRoleItem:
+      properties:
+        id:
+          type: integer
+          maximum: 2000000000.0
+          minimum: 1.0
+          title: Id
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+        node_class:
+          type: string
+          maxLength: 60
+          minLength: 1
+          title: Node Class
+      type: object
+      required:
+      - id
+      - name
+      - node_class
+      title: NinjaRoleItem
     NodeCreate:
       properties:
         node_type:
@@ -44081,6 +44362,25 @@ components:
       - next_step
       - first_data_at
       title: OnboardingRow
+    OrgOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        locations:
+          items:
+            $ref: '#/components/schemas/LocationOut'
+          type: array
+          title: Locations
+      type: object
+      required:
+      - id
+      - name
+      - locations
+      title: OrgOut
     OutcomeIn:
       properties:
         outcome:
@@ -47946,47 +48246,6 @@ components:
       required:
       - name
       title: RoleIn
-    RoleOut:
-      properties:
-        id:
-          type: string
-          format: uuid
-          title: Id
-        tenant_id:
-          type: string
-          format: uuid
-          title: Tenant Id
-        name:
-          type: string
-          title: Name
-        description:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Description
-        is_system:
-          type: boolean
-          title: Is System
-        hidden_nav:
-          items:
-            type: string
-          type: array
-          title: Hidden Nav
-          default: []
-        permissions:
-          items:
-            $ref: '#/components/schemas/PermissionOut'
-          type: array
-          title: Permissions
-          default: []
-      type: object
-      required:
-      - id
-      - tenant_id
-      - name
-      - description
-      - is_system
-      title: RoleOut
     RoleUpdate:
       properties:
         name:
@@ -57089,6 +57348,23 @@ components:
       - kept_device_id
       - created_at
       title: MergeOut
+    app__api__v1__endpoints__devices_ninja_deploy__RoleOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        node_class:
+          type: string
+          title: Node Class
+      type: object
+      required:
+      - id
+      - name
+      - node_class
+      title: RoleOut
     app__api__v1__endpoints__enrichment__IndicatorOut:
       properties:
         id:
@@ -58552,6 +58828,47 @@ components:
       - target
       - remapped
       title: MergeOut
+    app__api__v1__endpoints__rbac__RoleOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        tenant_id:
+          type: string
+          format: uuid
+          title: Tenant Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        is_system:
+          type: boolean
+          title: Is System
+        hidden_nav:
+          items:
+            type: string
+          type: array
+          title: Hidden Nav
+          default: []
+        permissions:
+          items:
+            $ref: '#/components/schemas/PermissionOut'
+          type: array
+          title: Permissions
+          default: []
+      type: object
+      required:
+      - id
+      - tenant_id
+      - name
+      - description
+      - is_system
+      title: RoleOut
     app__api__v1__endpoints__risk_register__Summary:
       properties:
         total:

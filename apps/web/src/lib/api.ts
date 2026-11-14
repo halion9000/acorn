@@ -697,6 +697,17 @@ export interface ConsoleHistory {
   lines: ConsoleLine[];
 }
 
+/** What can be chosen to install the NinjaOne agent on a machine (GET /api/v1/devices/{id}/ninja-deploy). */
+export interface NinjaDeployOptions {
+  device_id: string;
+  device: string;
+  blocked: string | null;
+  suggested_package: 'msi' | 'pkg';
+  roles: { id: number; name: string; node_class: string }[];
+  organizations: { id: number; name: string; locations: { id: number; name: string }[] }[];
+  suggested_org_id: number | null;
+}
+
 /** Another device that shares a serial number or name with the one asked about (GET /api/v1/devices/{id}/elsewhere). */
 export interface DeviceElsewhere {
   device_id: string;
@@ -1335,6 +1346,9 @@ export const devicesApi = {
   /** The command prompt: the recent commands for a machine, one command sent (CORE sends it through ScreenConnect), and one command's state. */
   consoleHistory: (id: string) => request<ConsoleHistory>(`/api/v1/devices/${encodeURIComponent(id)}/console`),
   consoleSend: (id: string, command: string) => request<ConsoleLine>(`/api/v1/devices/${encodeURIComponent(id)}/console`, { method: 'POST', body: JSON.stringify({ command }) }),
+  deployOptions: (id: string) => request<NinjaDeployOptions>(`/api/v1/devices/${encodeURIComponent(id)}/ninja-deploy`),
+  deployNinja: (id: string, body: { package: 'msi' | 'pkg'; org_id: number; location_id: number; role_id: number }) =>
+    request<ConsoleLine>(`/api/v1/devices/${encodeURIComponent(id)}/ninja-deploy`, { method: 'POST', body: JSON.stringify(body) }),
   consoleLine: (requestId: string) => request<ConsoleLine>(`/api/v1/devices/console/${encodeURIComponent(requestId)}`),
   /** The scripts CORE has switched on (Settings > Manage NinjaOne scripts in CORE). */
   scriptOptions: () => request<DeviceScriptOptions>('/api/v1/devices/scripts/options'),

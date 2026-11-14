@@ -1,0 +1,25 @@
+{
+  "route": "ninja-deploy-options",
+  "method": "POST",
+  "body": {
+    "roles": [
+      {
+        "id": 202,
+        "name": "WINDOWS_LAPTOP",
+        "node_class": "WINDOWS_WORKSTATION"
+      }
+    ],
+    "organizations": [
+      {
+        "id": 27,
+        "name": "Acme Dental",
+        "locations": [
+          {
+            "id": 27,
+            "name": "Main"
+          }
+        ]
+      }
+    ]
+  }
+}

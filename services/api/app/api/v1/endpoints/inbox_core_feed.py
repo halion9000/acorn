@@ -561,6 +561,7 @@ class ClaimedAction(BaseModel):
         "create_halo_user",
         "addigy_push",
         "sc_command",
+        "ninja_deploy",
     ]
     incident_uid: str
     params: dict[str, Any]
@@ -851,6 +852,54 @@ async def report_core_feed_scripts(tenant_token: str, body: ScriptsReport, db: D
     )
     await db.commit()
     return ScriptsResponse(stored=len(scripts))
+
+
+class NinjaRoleItem(BaseModel):
+    id: int = Field(ge=1, le=2_000_000_000)
+    name: str = Field(min_length=1, max_length=200)
+    node_class: str = Field(min_length=1, max_length=60)
+
+
+class NinjaLocationItem(BaseModel):
+    id: int = Field(ge=1, le=2_000_000_000)
+    name: str = Field(min_length=1, max_length=200)
+
+
+class NinjaOrgItem(BaseModel):
+    id: int = Field(ge=1, le=2_000_000_000)
+    name: str = Field(min_length=1, max_length=300)
+    locations: list[NinjaLocationItem] = Field(max_length=100)
+
+
+class NinjaDeployOptionsReport(BaseModel):
+    roles: list[NinjaRoleItem] = Field(max_length=300)
+    organizations: list[NinjaOrgItem] = Field(max_length=3000)
+
+
+class NinjaDeployOptionsResponse(BaseModel):
+    roles: int
+    organizations: int
+
+
+@router.post("/core-feed/{tenant_token}/ninja-deploy-options", response_model=NinjaDeployOptionsResponse)
+async def report_core_feed_ninja_deploy_options(
+    tenant_token: str, body: NinjaDeployOptionsReport, db: DBSession
+) -> NinjaDeployOptionsResponse:
+    """CORE tells A.C.O.R.N which NinjaOne roles, organisations and locations the Devices page can offer for installing the agent. The whole list replaces the last one."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    value = {"roles": [r.model_dump() for r in body.roles], "organizations": [o.model_dump() for o in body.organizations]}
+    await db.execute(
+        update(Tenant)
+        .where(Tenant.id == tenant_id)
+        .values(
+            settings=func.jsonb_set(
+                func.coalesce(Tenant.settings, cast({}, JSONB)), cast(["ninja_deploy"], ARRAY(Text)), cast(value, JSONB), True
+            )
+        )
+    )
+    await db.commit()
+    return NinjaDeployOptionsResponse(roles=len(body.roles), organizations=len(body.organizations))
 
 
 class ClientItem(BaseModel):
