@@ -373,6 +373,29 @@ def test_a_display_name_on_another_domain_joins_nothing_even_when_that_address_e
     assert len(build(users)) == 2
 
 
+def test_the_microsoft_address_still_joins_its_real_address_when_another_domains_account_holds_the_same_name():
+    """Xstreme MD, 2026-11-14: mkerkeni@xstrememd.com (Marwane Kerkeni), mkerkeni@xstrememdtemp.onmicrosoft.com and mkerkeni@lltec.com were three rows; the second and third are both named
+    "mkerkeni@xstrememd.com", and that shared name stopped the Microsoft address joining. The other-domain account is still left to the owner."""
+    users = [
+        acct(A, "mkerkeni@xstrememd.com", display_name="Marwane Kerkeni"),
+        acct(A, "mkerkeni@xstrememdtemp.onmicrosoft.com", display_name="mkerkeni@xstrememd.com"),
+        acct(A, "mkerkeni@lltec.com", display_name="mkerkeni@xstrememd.com"),
+    ]
+    people = build(users)
+    assert len(people) == 2
+    assert set(one(people, "mkerkeni@xstrememd.com").addresses) == {"mkerkeni@xstrememd.com", "mkerkeni@xstrememdtemp.onmicrosoft.com"}
+    assert one(people, "mkerkeni@lltec.com").addresses == ["mkerkeni@lltec.com"]
+
+
+def test_a_name_held_by_accounts_with_other_local_parts_still_joins_nothing_for_the_microsoft_pair():
+    users = [
+        acct(A, "mk@acme.com", display_name="Marwane Kerkeni"),
+        acct(A, "mk@acmetemp.onmicrosoft.com", display_name="mk@acme.com"),
+        acct(A, "someoneelse@acme.com", display_name="mk@acme.com"),
+    ]
+    assert len(build(users)) == 3
+
+
 def test_the_same_name_on_two_domains_is_left_to_the_owner():
     users = [acct(A, "bgeha@grcooling.com", display_name="bgeha@minimusservers.com"), acct(A, "bgeha@minimusservers.com")]
     assert len(build(users)) == 2

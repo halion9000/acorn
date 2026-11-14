@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
@@ -179,3 +179,43 @@ describe('the score in the report', () => {
   });
 });
 
+
+describe('signals about the whole tenant are kept apart from the ones about the person', () => {
+  const breakdown = JSON.stringify([
+    { Count: 53, Signal: 'ForeignSuccessfulSignIns', Weight: 3, Applied: true, Description: 'Successful sign-ins from outside the usage location' },
+    { Count: 12, Signal: 'PermissionChanges', Weight: 1, Applied: true, Description: 'Mailbox permission changes elsewhere in the tenant (not on system mailboxes)' },
+    { Count: 1, Signal: 'MaliciousApps', Weight: 5, Applied: true, Description: 'Applications match the known-malicious catalog' },
+    { Count: 2, Signal: 'OtherAccountsReached', Weight: 3, Applied: true, Description: 'Another account in the tenant signed in or acted from an attacker address' },
+    { Count: 0, Signal: 'SuspiciousRules', Weight: 4, Applied: false, Description: 'x' },
+  ]);
+  const report = { Score: { Level: 'High', Value: 12, Breakdown: breakdown }, MailboxPermissionChanges: [{ ObjectId: 'someone-else' }], ForeignSignIns: [] };
+
+  it('says what the score is without the tenant-wide weights, and which signals those are', () => {
+    const score = scoreOf(report)!;
+    expect(score.value).toBe(12);
+    expect(score.ownValue).toBe(3);
+    expect(score.fired.map((s) => s.signal)).toEqual(['ForeignSuccessfulSignIns']);
+    expect(score.tenant.map((s) => s.signal)).toEqual(['PermissionChanges', 'MaliciousApps', 'OtherAccountsReached']);
+  });
+
+  it('shows the tenant-wide ones in their own part, marks their report sections, and keeps the signals about the person in the main table', async () => {
+    api.becCases.mockResolvedValue({ items: [item({ status: 'done' })] });
+    api.becCase.mockResolvedValue({ ...item({ status: 'done' }), report });
+    show();
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'View report' }));
+    expect(await screen.findByTestId('bec-own-score')).toHaveTextContent('Without them the score is 3');
+    const tenant = screen.getByTestId('bec-tenant-signals');
+    expect(within(tenant).getByTestId('signal-PermissionChanges')).toBeTruthy();
+    expect(within(tenant).queryByTestId('signal-ForeignSuccessfulSignIns')).toBeNull();
+    const summary = screen.getByTestId('bec-score-summary');
+    expect(summary).toHaveTextContent('1 signal fired about this person');
+    expect(screen.getByText('Mailbox Permission Changes').closest('summary')).toHaveTextContent('whole tenant, not only this person');
+  });
+
+  it('with only tenant-wide signals, says no signal about this person fired', () => {
+    const only = { Score: { Level: 'Medium', Value: 5, Breakdown: JSON.stringify([{ Count: 1, Signal: 'MaliciousApps', Weight: 5, Applied: true, Description: 'd' }]) } };
+    const score = scoreOf(only)!;
+    expect(score.fired).toEqual([]);
+    expect(score.ownValue).toBe(0);
+  });
+});

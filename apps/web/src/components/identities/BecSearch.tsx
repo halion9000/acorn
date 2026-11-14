@@ -82,8 +82,16 @@ export interface ScoreSignal {
   description: string;
 }
 
-/** CIPP's score for the mailbox, split into the signals that fired and the ones that were checked and found nothing (pure). Null when the report has no readable score. */
-export function scoreOf(report: Record<string, unknown> | null | undefined): { level: string; value: number | null; fired: ScoreSignal[]; quiet: ScoreSignal[] } | null {
+/**
+ * Signals CIPP counts that are about the whole tenant, not about the person searched: permission changes on other mailboxes, new service principals, a burst of new users, a known-malicious app, and other accounts the attacker
+ * addresses reached. They add to CIPP's score whoever the search is for, so the page shows them apart and says what the score is without them.
+ */
+export const TENANT_WIDE_SIGNALS: ReadonlySet<string> = new Set(['PermissionChanges', 'NewApps', 'NewUsers', 'MaliciousApps', 'OtherAccountsReached']);
+/** The parts of the report that hold those tenant-wide findings. */
+export const TENANT_WIDE_SECTIONS: ReadonlySet<string> = new Set(['MailboxPermissionChanges', 'AddedApps', 'NewUsers', 'MaliciousSPs', 'BlastRadius']);
+
+/** CIPP's score for the mailbox, split into the signals that fired about this person, the ones that fired about the tenant, and the ones checked and found nothing (pure). `ownValue` is the score without the tenant-wide weights. Null when the report has no readable score. */
+export function scoreOf(report: Record<string, unknown> | null | undefined): { level: string; value: number | null; ownValue: number | null; fired: ScoreSignal[]; tenant: ScoreSignal[]; quiet: ScoreSignal[] } | null {
   const raw = report ? (report.Score ?? report.score) : undefined;
   if (!isRecord(raw)) return null;
   const parsed = maybeParse(raw.Breakdown ?? raw.breakdown);
@@ -96,7 +104,37 @@ export function scoreOf(report: Record<string, unknown> | null | undefined): { l
     description: String(s.Description ?? s.description ?? ''),
   }));
   const value = Number(raw.Value ?? raw.value);
-  return { level: String(raw.Level ?? raw.level ?? ''), value: Number.isFinite(value) ? value : null, fired: signals.filter((s) => s.applied), quiet: signals.filter((s) => !s.applied) };
+  const applied = signals.filter((s) => s.applied);
+  const tenant = applied.filter((s) => TENANT_WIDE_SIGNALS.has(s.signal));
+  const fired = applied.filter((s) => !TENANT_WIDE_SIGNALS.has(s.signal));
+  const ownValue = Number.isFinite(value) ? value - tenant.reduce((sum, s) => sum + s.weight, 0) : null;
+  return { level: String(raw.Level ?? raw.level ?? ''), value: Number.isFinite(value) ? value : null, ownValue, fired, tenant, quiet: signals.filter((s) => !s.applied) };
+}
+
+function SignalTable({ rows, muted = false }: { rows: ScoreSignal[]; muted?: boolean }) {
+  return (
+    <table className={`mt-2 w-full text-left text-xs ${muted ? 'opacity-70' : ''}`}>
+      <thead className="text-gray-500">
+        <tr>
+          <th scope="col" className="px-2 py-1 font-medium">What CIPP saw</th>
+          <th scope="col" className="px-2 py-1 font-medium">How many</th>
+          <th scope="col" className="px-2 py-1 font-medium">Weight</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-800">
+        {rows.map((s) => (
+          <tr key={s.signal} data-testid={`signal-${s.signal}`}>
+            <td className="px-2 py-1 text-gray-200">
+              {s.description || sectionTitle(s.signal)}
+              <span className="ml-2 text-gray-500">({sectionTitle(s.signal)})</span>
+            </td>
+            <td className="px-2 py-1 text-gray-300">{s.count}</td>
+            <td className="px-2 py-1 text-gray-300">{s.weight}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
 function ScoreSummary({ report }: { report: Record<string, unknown> }) {
@@ -108,36 +146,29 @@ function ScoreSummary({ report }: { report: Record<string, unknown> }) {
         CIPP score: {score.level || 'not given'}
         {score.value !== null ? ` (${score.value})` : ''}
       </p>
+      {score.tenant.length > 0 && score.ownValue !== null ? (
+        <p className="mt-1 text-xs text-amber-300" data-testid="bec-own-score">
+          {score.tenant.length} of the signals below are about the whole tenant, not about this person. Without them the score is {score.ownValue}.
+        </p>
+      ) : null}
       {score.fired.length === 0 ? (
-        <p className="mt-1 text-xs text-gray-400">None of the {score.quiet.length} signals CIPP looks for fired.</p>
+        <p className="mt-1 text-xs text-gray-400">
+          {score.tenant.length === 0 ? `None of the ${score.quiet.length} signals CIPP looks for fired.` : 'No signal about this person fired.'}
+        </p>
       ) : (
         <>
           <p className="mt-1 text-xs text-gray-400">
-            {score.fired.length} signal{score.fired.length === 1 ? '' : 's'} fired. A signal firing is a reason to look, not proof of a takeover; weight is how much it adds to the score.
+            {score.fired.length} signal{score.fired.length === 1 ? '' : 's'} fired about this person. A signal firing is a reason to look, not proof of a takeover; weight is how much it adds to the score.
           </p>
-          <table className="mt-2 w-full text-left text-xs">
-            <thead className="text-gray-500">
-              <tr>
-                <th scope="col" className="px-2 py-1 font-medium">What CIPP saw</th>
-                <th scope="col" className="px-2 py-1 font-medium">How many</th>
-                <th scope="col" className="px-2 py-1 font-medium">Weight</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800">
-              {score.fired.map((s) => (
-                <tr key={s.signal} data-testid={`signal-${s.signal}`}>
-                  <td className="px-2 py-1 text-gray-200">
-                    {s.description || sectionTitle(s.signal)}
-                    <span className="ml-2 text-gray-500">({sectionTitle(s.signal)})</span>
-                  </td>
-                  <td className="px-2 py-1 text-gray-300">{s.count}</td>
-                  <td className="px-2 py-1 text-gray-300">{s.weight}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <SignalTable rows={score.fired} />
         </>
       )}
+      {score.tenant.length > 0 ? (
+        <div className="mt-3" data-testid="bec-tenant-signals">
+          <p className="text-xs font-medium text-gray-400">Elsewhere in the tenant (not about this person)</p>
+          <SignalTable rows={score.tenant} muted />
+        </div>
+      ) : null}
       {score.quiet.length > 0 ? (
         <details className="mt-2">
           <summary className="cursor-pointer text-xs text-gray-400">Checked and found nothing ({score.quiet.length})</summary>
@@ -221,6 +252,7 @@ export function Section({ name, value }: { name: string; value: unknown }) {
       <summary className="cursor-pointer text-xs font-medium text-gray-200">
         {sectionTitle(name)}
         {Array.isArray(value) ? <span className="ml-2 text-gray-500">({value.length})</span> : null}
+        {TENANT_WIDE_SECTIONS.has(name) ? <span className="ml-2 rounded border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-normal text-amber-300">whole tenant, not only this person</span> : null}
       </summary>
       <div className="mt-2">{body}</div>
     </details>

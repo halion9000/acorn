@@ -86,10 +86,15 @@ def find_links(people: dict[str, Any]) -> list[Link]:
     by_addr: dict[tuple[uuid.UUID, str], Any] = {(p.tenant_id, p.email): p for p in people.values()}
     links: list[Link] = []
     named_by: dict[tuple[uuid.UUID, str], int] = {}
+    # The same, counting only the accounts whose own name before the @ is NOT the named address's: another account with that same name before the @ (the client's second domain, say) holds the same name
+    # without making it any less one account's, so it must not stop the Microsoft pair below being joined.
+    named_by_other: dict[tuple[uuid.UUID, str], int] = {}
     for p in people.values():
         n = (p.display_name or "").strip().lower()
         if "@" in n:
             named_by[(p.tenant_id, n)] = named_by.get((p.tenant_id, n), 0) + 1
+            if p.email.partition("@")[0] != n.partition("@")[0]:
+                named_by_other[(p.tenant_id, n)] = named_by_other.get((p.tenant_id, n), 0) + 1
 
     def link(p: Any, q: Any, reason: str, named: bool = False) -> None:
         if q is None or q is p or p.kind == "shared" or q.kind == "shared":
@@ -99,10 +104,13 @@ def find_links(people: dict[str, Any]) -> list[Link]:
     for p in people.values():
         t, e = p.tenant_id, p.email
         name = (p.display_name or "").strip().lower()
-        if "@" in name and name != e and named_by.get((t, name)) == 1:
+        if "@" in name and name != e:
             # The Microsoft address and the real one, the same name before the @: one account under its two names.
             microsoft_pair = name.partition("@")[0] == e.partition("@")[0] and is_onmicrosoft(name) != is_onmicrosoft(e)
-            if microsoft_pair or name.partition("@")[2] == e.partition("@")[2]:
+            sole = named_by.get((t, name)) == 1
+            if (sole and (microsoft_pair or name.partition("@")[2] == e.partition("@")[2])) or (
+                microsoft_pair and named_by_other.get((t, name), 0) == 0
+            ):
                 link(p, by_addr.get((t, name)), "display_name", named=microsoft_pair)
         m = _EXT.match(e)
         if m:
