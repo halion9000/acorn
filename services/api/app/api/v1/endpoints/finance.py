@@ -17,8 +17,10 @@ from sqlalchemy import delete, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.billing import BILLED_SOURCE, _all_client_counts
+from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.finance_price import FinanceItemPrice
 from app.services import finance as fin
+from app.services import finance_halo as fh
 from app.services.audit import emit_audit
 
 router = APIRouter(prefix="/finance", tags=["finance"])
@@ -133,6 +135,15 @@ async def delete_price(
         request=request,
     )
     await db.commit()
+
+
+@router.get("/halo", dependencies=[Depends(require_permission("finance:view"))])
+async def halo_finance(user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """Margin per client from HaloPSA's recurring invoices, and the invoices still owed grouped by how late they are: all from the snapshot CORE sends about once a day. ``received_at`` is None until the first one arrives."""
+    row = (await db.execute(select(FinanceHaloSnapshot).where(FinanceHaloSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    if row is None:
+        return {"received_at": None, "margin": None, "aging": None}
+    return {"received_at": row.received_at, "margin": fh.margin_from_halo(row.payload), "aging": fh.aging_from_halo(row.payload)}
 
 
 @router.get("/margin", dependencies=[Depends(require_permission("finance:view"))])

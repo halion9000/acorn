@@ -29,6 +29,7 @@ from app.db.rls_scope import acting_as_tenant, cross_tenant_reads
 from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.connector import Connector
+from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.tenant import Tenant
 from app.models.vendor_action import VendorAction
 from app.services import core_approvals
@@ -1025,6 +1026,59 @@ async def report_core_feed_risk_ticket_statuses(tenant_token: str, body: RiskTic
     updated = sum(await _across(db, tenant_id, lambda tid: vcio_tickets.apply_statuses(db, tid, statuses, now)))
     await db.commit()
     return RiskTicketStatusesOut(updated=updated)
+
+
+class FinanceLineIn(BaseModel):
+    item: str = Field(max_length=200)
+    qty: float
+    unit_price: float
+    unit_cost: float
+
+
+class FinanceRecurringIn(BaseModel):
+    id: str = Field(default="", max_length=20)
+    client_id: str = Field(min_length=1, max_length=20)
+    client_name: str = Field(default="", max_length=200)
+    # HaloPSA's own period code and next invoice date, kept as sent.
+    period: int | None = None
+    next: str | None = Field(default=None, max_length=40)
+    lines: list[FinanceLineIn] = Field(max_length=300)
+
+
+class FinanceInvoiceIn(BaseModel):
+    client_id: str = Field(min_length=1, max_length=20)
+    client_name: str = Field(default="", max_length=200)
+    number: str = Field(default="", max_length=40)
+    invoice_date: str | None = Field(default=None, max_length=40)
+    due: str | None = Field(default=None, max_length=40)
+    total: float
+    amount_due: float
+
+
+class FinanceSnapshotIn(BaseModel):
+    recurring: list[FinanceRecurringIn] = Field(max_length=1000)
+    invoices: list[FinanceInvoiceIn] = Field(max_length=10000)
+
+
+class FinanceSnapshotOut(BaseModel):
+    recurring: int
+    invoices: int
+
+
+@router.post("/core-feed/{tenant_token}/finance", response_model=FinanceSnapshotOut)
+async def report_core_feed_finance(tenant_token: str, body: FinanceSnapshotIn, db: DBSession) -> FinanceSnapshotOut:
+    """Keep the latest HaloPSA money snapshot CORE read (recurring invoices with their lines, invoices still owed). It replaces the one before; margin and ageing are worked out from it when a person with the finance permissions asks."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    row = (await db.execute(select(FinanceHaloSnapshot).where(FinanceHaloSnapshot.tenant_id == tenant_id))).scalar_one_or_none()
+    payload = body.model_dump()
+    if row is None:
+        db.add(FinanceHaloSnapshot(tenant_id=tenant_id, payload=payload, received_at=now))
+    else:
+        row.payload, row.received_at = payload, now
+    await db.commit()
+    return FinanceSnapshotOut(recurring=len(body.recurring), invoices=len(body.invoices))
 
 
 class DeviceItem(BaseModel):

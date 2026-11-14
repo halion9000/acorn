@@ -2233,6 +2233,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/halo:
+    get:
+      tags:
+      - finance
+      summary: Halo Finance
+      description: 'Margin per client from HaloPSA''s recurring invoices, and the
+        invoices still owed grouped by how late they are: all from the snapshot CORE
+        sends about once a day. ``received_at`` is None until the first one arrives.'
+      operationId: halo_finance_api_v1_finance_halo_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Halo Finance Api V1 Finance Halo Get
+      security:
+      - HTTPBearer: []
   /api/v1/finance/margin:
     get:
       tags:
@@ -25312,6 +25332,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/finance:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Finance
+      description: Keep the latest HaloPSA money snapshot CORE read (recurring invoices
+        with their lines, invoices still owed). It replaces the one before; margin
+        and ageing are worked out from it when a person with the finance permissions
+        asks.
+      operationId: report_core_feed_finance_api_v1_inbox_core_feed__tenant_token__finance_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinanceSnapshotIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinanceSnapshotOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/device-names:
     post:
       tags:
@@ -37384,6 +37440,140 @@ components:
       - active_nodes
       title: FimSummaryOut
       description: The console's FimSummary.
+    FinanceInvoiceIn:
+      properties:
+        client_id:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Client Id
+        client_name:
+          type: string
+          maxLength: 200
+          title: Client Name
+          default: ''
+        number:
+          type: string
+          maxLength: 40
+          title: Number
+          default: ''
+        invoice_date:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Invoice Date
+        due:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Due
+        total:
+          type: number
+          title: Total
+        amount_due:
+          type: number
+          title: Amount Due
+      type: object
+      required:
+      - client_id
+      - total
+      - amount_due
+      title: FinanceInvoiceIn
+    FinanceLineIn:
+      properties:
+        item:
+          type: string
+          maxLength: 200
+          title: Item
+        qty:
+          type: number
+          title: Qty
+        unit_price:
+          type: number
+          title: Unit Price
+        unit_cost:
+          type: number
+          title: Unit Cost
+      type: object
+      required:
+      - item
+      - qty
+      - unit_price
+      - unit_cost
+      title: FinanceLineIn
+    FinanceRecurringIn:
+      properties:
+        id:
+          type: string
+          maxLength: 20
+          title: Id
+          default: ''
+        client_id:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Client Id
+        client_name:
+          type: string
+          maxLength: 200
+          title: Client Name
+          default: ''
+        period:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Period
+        next:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Next
+        lines:
+          items:
+            $ref: '#/components/schemas/FinanceLineIn'
+          type: array
+          maxItems: 300
+          title: Lines
+      type: object
+      required:
+      - client_id
+      - lines
+      title: FinanceRecurringIn
+    FinanceSnapshotIn:
+      properties:
+        recurring:
+          items:
+            $ref: '#/components/schemas/FinanceRecurringIn'
+          type: array
+          maxItems: 1000
+          title: Recurring
+        invoices:
+          items:
+            $ref: '#/components/schemas/FinanceInvoiceIn'
+          type: array
+          maxItems: 10000
+          title: Invoices
+      type: object
+      required:
+      - recurring
+      - invoices
+      title: FinanceSnapshotIn
+    FinanceSnapshotOut:
+      properties:
+        recurring:
+          type: integer
+          title: Recurring
+        invoices:
+          type: integer
+          title: Invoices
+      type: object
+      required:
+      - recurring
+      - invoices
+      title: FinanceSnapshotOut
     Finding:
       properties:
         status:

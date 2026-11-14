@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { authFetch } from "@/lib/auth-session";
+import { HaloFinancePanel } from "./HaloFinancePanel";
 
 interface Price {
   invoice_item: string;
@@ -151,6 +152,7 @@ export function FinancePanel() {
           </tr>
         </tbody>
       </table>
+      <HaloFinancePanel />
     </div>
   );
 }

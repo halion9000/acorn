@@ -44,6 +44,7 @@ MODELS = {
     "remote-tools": rtools.RemoteToolsReport,
     "tickets": feed.TicketsReport,
     "risk-tickets-status": feed.RiskTicketStatuses,
+    "finance": feed.FinanceSnapshotIn,
     "state": feed.StateReport,
     "actions-claim-huntress": feed.ClaimRequest,
     "actions-claim-blumira": feed.ClaimRequest,
