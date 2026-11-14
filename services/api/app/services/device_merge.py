@@ -21,6 +21,8 @@ from app.services.device_identity import (
     is_virtual_machine,
     loose_name_key,
     mac_key,
+    real_serial,
+    serial_is_name,
 )
 
 
@@ -97,8 +99,8 @@ async def merge_devices(
     kept on the device that stays (``alt_serials``), so the next report that carries it does not split the line off again."""
     keep, remove = await _both(db, tenant_id, keep_id, remove_id)
     # Auvik keeps a MAC as the serial of a device with none; that is not a serial, so it neither proves two devices differ nor beats a real serial.
-    real_keep = None if mac_key(keep.serial_number) else keep.serial_number
-    real_remove = None if mac_key(remove.serial_number) else remove.serial_number
+    real_keep = real_serial(keep)
+    real_remove = real_serial(remove)
     differing = bool(real_keep and real_remove and real_keep != real_remove)
     if differing and not same_machine:
         raise DifferentSerials("These have different serial numbers, so they are different machines.")
@@ -366,15 +368,21 @@ async def auto_merge_by_mac(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID |
         if (va & vb) - DUPLICATING_TOOLS or not could_be_same_machine(va, vb):
             continue
         # Auvik keeps a MAC as the serial of a device with none: that is not a serial, so only real serials can show two machines apart.
-        real_a = None if mac_key(a.serial_number) else a.serial_number
-        real_b = None if mac_key(b.serial_number) else b.serial_number
+        real_a = real_serial(a)
+        real_b = real_serial(b)
         if real_a and real_b and real_a != real_b:
             continue
         if _ordered(first, second) in dismissed:
             continue
         # The device with a real serial is kept, so the machine does not end up identified by a MAC.
         keep, remove = sorted(
-            (a, b), key=lambda d: (1 if mac_key(d.serial_number) else 0, -len(vendors.get(d.id, set())), d.first_seen, str(d.id))
+            (a, b),
+            key=lambda d: (
+                1 if (mac_key(d.serial_number) or serial_is_name(d.serial_number, d.hostname)) else 0,
+                -len(vendors.get(d.id, set())),
+                d.first_seen,
+                str(d.id),
+            ),
         )
         await merge_devices(db, tenant_id, keep.id, remove.id, actor_id)
         gone.add(remove.id)
@@ -444,8 +452,8 @@ async def auto_merge_by_ip(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUID | 
         found_dev, agent_dev = devices[found_id], devices[agent_id]
         if abs(found_dev.last_seen - agent_dev.last_seen) > IP_MATCH_WINDOW:
             continue
-        real_found = None if mac_key(found_dev.serial_number) else found_dev.serial_number
-        if real_found and agent_dev.serial_number and real_found != agent_dev.serial_number:
+        real_found = real_serial(found_dev)
+        if real_found and real_serial(agent_dev) and real_found != real_serial(agent_dev):
             continue
         if _ordered(found_id, agent_id) in dismissed or not could_be_same_machine(vendors[found_id], vendors[agent_id]):
             continue
@@ -532,12 +540,12 @@ async def auto_merge_rediscovered(db: Any, tenant_id: uuid.UUID, actor_id: uuid.
         ordered = sorted(group, key=lambda d: (facts[d.id][2], str(d.id)), reverse=True)
         keep = ordered[0]
         newest = facts[keep.id][2]
-        real_keep = None if mac_key(keep.serial_number) else keep.serial_number
+        real_keep = real_serial(keep)
         for other in ordered[1:]:
             _computer, online, when = facts[other.id]
             if online or when is None or newest is None or newest - when < REDISCOVERY_GAP:
                 continue
-            real_other = None if mac_key(other.serial_number) else other.serial_number
+            real_other = real_serial(other)
             if real_keep and real_other and real_keep != real_other:
                 continue
             if _ordered(keep.id, other.id) in dismissed:
@@ -597,7 +605,7 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
         keep = ordered[0]
         # What the kept device holds, tracked here because each merge fills in what it was missing.
         held = set(vendors.get(keep.id, set()))
-        serial = keep.serial_number
+        serial = real_serial(keep)
         kind = os_kind(keep.os)
         for other in ordered[1:]:
             vo = vendors.get(other.id, set())
@@ -606,8 +614,9 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
             # Two real serials that differ keep two devices apart, except for two virtual machines: a guest's serial depends on which tool read it (Hyper-V's own or the guest operating system's),
             # so the same name from different tools is the same machine, and the merge keeps both serials (same_machine).
             both_virtual = is_virtual_machine(keep.manufacturer, keep.model) and is_virtual_machine(other.manufacturer, other.model)
-            differing = bool(serial and other.serial_number and serial != other.serial_number)
-            if serial and other.serial_number and not (differing and both_virtual):
+            other_serial = real_serial(other)
+            differing = bool(serial and other_serial and serial != other_serial)
+            if serial and other_serial and not (differing and both_virtual):
                 continue
             if not could_be_same_machine(held, vo):
                 continue
@@ -620,6 +629,6 @@ async def auto_merge_same_name(db: Any, tenant_id: uuid.UUID, actor_id: uuid.UUI
             await drop_legacy_screenconnect(db, tenant_id)
             merged += 1
             held |= vo
-            serial = serial or other.serial_number
+            serial = serial or other_serial
             kind = kind or ko
     return by_mac + merged

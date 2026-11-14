@@ -189,3 +189,26 @@ async def test_the_serial_still_keeps_apart_what_is_not_plainly_one_virtual_mach
     await report(t, "ninjaone", "n-4", "CLONE", "SERIAL-FFF6", "Virtual Machine")
     assert await auto(t) == 0
     assert len(await devices_of(t)) == 6
+
+
+# ---- a "serial number" that is only the machine's name (found 2026-11-13: K2405N0041321-W reported with the serial K2405N0041321) ----------------------------
+
+
+async def test_a_serial_that_is_only_the_machines_name_does_not_keep_two_lines_of_one_machine_apart(world):
+    t = world["acme"]
+    # NinjaOne knows the machine by its real serial; another tool fills the serial field with the host name.
+    await run(t, lambda db: upsert_device(db, t, DeviceReport("ninjaone", "n-1", "K2405N0041321-W", serial="24PN056040")))
+    await run(t, lambda db: upsert_device(db, t, DeviceReport("screenconnect", "s-1", "K2405N0041321-W", serial="K2405N0041321")))
+    assert len(await devices_of(t)) == 2, "two lines before the automatic merge"
+    merged = await run(t, lambda db: auto_merge_same_name(db, t))
+    assert merged == 1
+    assert await devices_of(t) == [("K2405N0041321-W", "24PN056040", [])], "one line, and it carries the real serial, not the name"
+    assert sorted(v for v, _d in await sources_of(t)) == ["ninjaone", "screenconnect"]
+
+
+async def test_two_different_real_serials_with_the_same_name_are_still_two_machines(world):
+    t = world["acme"]
+    await run(t, lambda db: upsert_device(db, t, DeviceReport("ninjaone", "n-1", "FRONT-DESK-PC", serial="24PN056040")))
+    await run(t, lambda db: upsert_device(db, t, DeviceReport("huntress", "h-1", "FRONT-DESK-PC", serial="99XX123456")))
+    assert await run(t, lambda db: auto_merge_same_name(db, t)) == 0
+    assert len(await devices_of(t)) == 2

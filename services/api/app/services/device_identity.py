@@ -64,6 +64,22 @@ def normalize_serial(raw: object) -> str | None:
     return text[:100]
 
 
+def serial_is_name(serial: object, hostname: object) -> bool:
+    """True when a "serial number" is really the machine's own name: some tools fill the serial field with the host name (``K2405N0041321`` for ``K2405N0041321-W``). Such a value says nothing about
+    the hardware, so it neither proves two devices differ nor beats the real serial another tool holds. The name must be the serial or the serial followed by at most three more characters."""
+    ns = re.sub(r"[^A-Z0-9]", "", str(serial or "").upper())
+    hk = re.sub(r"[^A-Z0-9]", "", hostname_key(hostname).upper())
+    return len(ns) >= 8 and bool(hk) and hk.startswith(ns) and len(hk) - len(ns) <= 3
+
+
+def real_serial(device: Any) -> str | None:
+    """A device's serial number when it can tell two machines apart: not empty, not a MAC address (Auvik keeps one as the serial of a device with none) and not the machine's own name."""
+    serial = getattr(device, "serial_number", None)
+    if not serial or mac_key(serial) or serial_is_name(serial, getattr(device, "hostname", None)):
+        return None
+    return serial  # type: ignore[no-any-return]
+
+
 _ENDS_IN_IPV4 = re.compile(r"(^|[^0-9])\d{1,3}(\.\d{1,3}){3}$")
 
 
@@ -173,7 +189,7 @@ def netbios_truncated_pairs(
         for b, key_b in by_prefix.get(key_a[: _NETBIOS_LENGTHS[0]], ()):
             if b.id == a.id or len(key_b) <= len(key_a) or not key_b.startswith(key_a):
                 continue
-            if getattr(a, "serial_number", None) and getattr(b, "serial_number", None):
+            if real_serial(a) and real_serial(b):
                 continue
             ta, tb = tools.get(a.id, set()), tools.get(b.id, set())
             if ta & tb or not could_be_same_machine(ta, tb):
@@ -213,7 +229,7 @@ def ip_brand_pairs(
                 continue
             if not same_brand(a.manufacturer, b.manufacturer):
                 continue
-            if a.serial_number and b.serial_number:
+            if real_serial(a) and real_serial(b):
                 continue
             if not could_be_same_machine(tools.get(a.id, set()), tools.get(b.id, set())):
                 continue
@@ -243,7 +259,8 @@ def pair_confidence(a: Any, b: Any) -> tuple[int, list[str]]:
     elif any(len(x) in _NETBIOS_LENGTHS and y != x and y.startswith(x) for x, y in ((ka, kb), (kb, ka))):
         score += 30
         why.append("one name is the other cut to 15 characters (NetBIOS)")
-    sa, sb = normalize_serial(getattr(a, "serial_number", None)), normalize_serial(getattr(b, "serial_number", None))
+    # A serial that is only the machine's own name says nothing about the hardware (see serial_is_name).
+    sa, sb = normalize_serial(real_serial(a)), normalize_serial(real_serial(b))
     if sa and sb:
         if sa == sb:
             score += 50
@@ -289,14 +306,20 @@ def lookalikes(target: Any, others: list[Any]) -> list[tuple[Any, list[str]]]:
     return found
 
 
-# Auvik lists everything on the network under whatever name DHCP gave it, usually with no serial and often no maker. A pair that involves an Auvik record and rests on one weak sign (the name alone, or an
-# address alone) cannot be told from two machines that share a stock name or reuse an address, so it is not worth a person's time. Name AND address (65) or a serial/maker on top of those clears it.
-THIN_EVIDENCE_BELOW = 65
-
-
-def is_thin_pair(tools_a: set[str], tools_b: set[str], score: int) -> bool:
-    """True when a pair involves an Auvik record and its confidence ``score`` (from ``pair_confidence``) is below ``THIN_EVIDENCE_BELOW``: not enough data to say whether it is a duplicate."""
-    return bool(("auvik" in tools_a or "auvik" in tools_b) and score < THIN_EVIDENCE_BELOW)
+# Auvik lists everything on the network under whatever name DHCP gave it, usually with no serial and often no maker. A pair that involves an Auvik record and rests on ONE weak sign (the name alone, or an
+# address alone) cannot be told from two machines that share a stock name or reuse an address, so it is not worth a person's time. What is enough: the same serial number, a name AND an address in common, or an
+# address in common with a maker both sides state and that agrees (for a device with a made-up name, that is all there is to match on).
+def is_thin_pair(tools_a: set[str], tools_b: set[str], reasons: list[str]) -> bool:
+    """True when a pair involves an Auvik record and what ``pair_confidence`` found (its ``reasons``) is not enough to say it may be one machine."""
+    if "auvik" not in tools_a and "auvik" not in tools_b:
+        return False
+    shares_address = any(r.startswith("shares the address") for r in reasons)
+    named = any(r.startswith("same name") or r.startswith("one name is the other") for r in reasons)
+    if "same serial number" in reasons:
+        return False
+    if shares_address and (named or "same maker" in reasons):
+        return False
+    return True
 
 
 def confidence_label(score: int) -> str:

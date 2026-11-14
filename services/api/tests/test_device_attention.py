@@ -752,3 +752,36 @@ async def test_the_elsewhere_lookup_names_the_client_and_tools_of_each_lookalike
     with pytest.raises(HTTPException) as err:
         await devices_module.device_elsewhere(uuid.uuid4(), user, Db())
     assert err.value.status_code == 404
+
+
+def test_a_serial_that_is_only_the_machines_name_is_not_a_serial():
+    from app.services.device_identity import real_serial, serial_is_name
+
+    assert serial_is_name("K2405N0041321", "K2405N0041321-W")
+    assert serial_is_name("K2405N0041321", "k2405n0041321-w.corp.local")
+    assert serial_is_name("K2405N0041321-W", "K2405N0041321-W")
+    assert not serial_is_name("24PN056040", "K2405N0041321-W")
+    assert not serial_is_name("ABC1234", "ABC1234-LAPTOP-OF-MEGAN")  # too short, and the name goes on
+    assert not serial_is_name(None, "PC-1")
+    d = SimpleNamespace(serial_number="K2405N0041321", hostname="K2405N0041321-W")
+    assert real_serial(d) is None
+    assert real_serial(SimpleNamespace(serial_number="24PN056040", hostname="K2405N0041321-W")) == "24PN056040"
+    assert real_serial(SimpleNamespace(serial_number="1c:6a:1b:49:04:8d", hostname="X")) is None
+
+
+@pytest.mark.asyncio
+async def test_an_auvik_device_with_a_made_up_name_is_offered_on_an_address_and_a_maker_both_sides_state_and_not_on_an_address_alone(
+    monkeypatch,
+):
+    t = uuid.uuid4()
+    auvik = _named(t, "auvik", "Device@10.0.0.9", ["10.0.0.9"])
+    auvik.manufacturer = "Dell"
+    agent = _named(t, "ninjaone", "OFFICE-PC-3", ["10.0.0.9"])
+    agent.manufacturer = "Dell Inc."
+    out = await _duplicates_of(monkeypatch, [auvik, agent])
+    assert len(out.items) == 1 and out.not_enough_data == 0
+
+    auvik2 = _named(t, "auvik", "Device@10.0.0.9", ["10.0.0.9"])  # no maker stated on either side
+    agent2 = _named(t, "ninjaone", "OFFICE-PC-3", ["10.0.0.9"])
+    out = await _duplicates_of(monkeypatch, [auvik2, agent2])
+    assert out.items == [] and out.not_enough_data == 1

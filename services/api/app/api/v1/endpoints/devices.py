@@ -1197,7 +1197,7 @@ async def list_duplicates(
         for a, b in pairs:
             if a in by_id and b in by_id:
                 score, why = pair_confidence(by_id[a], by_id[b])
-                if is_thin_pair(tools.get(a, set()), tools.get(b, set()), score):
+                if is_thin_pair(tools.get(a, set()), tools.get(b, set()), why):
                     thin += 1
                     continue
                 items.append(

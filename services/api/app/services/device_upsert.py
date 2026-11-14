@@ -27,6 +27,7 @@ from app.services.device_identity import (
     loose_name_key,
     netbios_truncated_pairs,
     normalize_serial,
+    real_serial,
 )
 
 
@@ -257,7 +258,7 @@ def duplicate_pairs(
             continue
         for i, a in enumerate(group):
             for b in group[i + 1 :]:
-                if a.serial_number and b.serial_number:  # two different serials: not the same machine
+                if real_serial(a) and real_serial(b):  # two different serials: not the same machine
                     continue
                 if not could_be_same_machine(tools.get(a.id, set()), tools.get(b.id, set())):
                     continue
