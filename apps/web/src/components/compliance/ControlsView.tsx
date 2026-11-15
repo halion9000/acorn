@@ -7,7 +7,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
-import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
+import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
+import { SecureframeCard } from './SecureframeCard';
 import { saveText } from '@/lib/saveFile';
 import { apiErrorDetail, controlsApi, downloadCsv, type ControlList } from '@/lib/api';
 
@@ -22,6 +23,7 @@ const STATE_CLASS: Record<string, string> = {
 
 export function ControlsView() {
   const [clientId, setClientId] = useState('');
+  const isHome = useIsHomeClient(clientId);
   const [state, setState] = useState<State>('all');
   const [framework, setFramework] = useState('');
   const [search, setSearch] = useState('');
@@ -67,6 +69,7 @@ export function ControlsView() {
           <ClientPicker value={clientId} onChange={setClientId} label="Whose controls" />
         </div>
       </div>
+      {(!clientId || isHome) && <SecureframeCard />}
       <div role="tablist" className="flex flex-wrap items-center gap-1 border-b border-gray-800">
         {tab('all', 'All', data ? all : undefined)}
         {(Object.keys(STATE_LABEL) as Exclude<State, 'all'>[]).map((s) => tab(s, STATE_LABEL[s], data?.counts[s]))}

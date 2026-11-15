@@ -7,11 +7,9 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
+import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 import { authFetch } from '@/lib/auth-session';
 import { complianceDashboardApi } from '@/lib/api';
-import { SecureframeCard } from './SecureframeCard';
-import { SecureframeRegisters } from './SecureframeRegisters';
 
 export interface FrameworkCard {
   id: string;
@@ -78,9 +76,6 @@ function Progress({ value }: { value: Completion | null | undefined }) {
 
 export function FrameworkIndex({ frameworks }: { frameworks: FrameworkCard[] }) {
   const [clientId, setClientId] = useState('');
-  const isHome = useIsHomeClient(clientId);
-  // The organization's own Secureframe is shown for the organization itself (no client, or its own company).
-  const ownView = !clientId || isHome;
   // A link can open on one client; read once, after the first paint so the server and browser markup agree.
   useEffect(() => {
     setClientId(clientFromAddress(window.location.search));
@@ -141,19 +136,6 @@ export function FrameworkIndex({ frameworks }: { frameworks: FrameworkCard[] }) 
         <div className="mt-3">
           <ClientPicker value={clientId} onChange={choose} label="Whose compliance" />
         </div>
-      </div>
-
-      {ownView && <SecureframeCard />}
-      {ownView && <SecureframeRegisters />}
-
-      <div>
-        <Link
-          href={clientId ? `/compliance/risk-register?client=${encodeURIComponent(clientId)}` : '/compliance/risk-register'}
-          className="inline-block rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-white hover:border-blue-500"
-        >
-          <span className="font-semibold">Risk register</span>
-          <span className="ml-2 text-gray-400">risks, how they are treated, and the tasks that treat them</span>
-        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

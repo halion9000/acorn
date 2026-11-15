@@ -6,7 +6,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
-import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
+import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
+import { SecureframeRegisters } from './SecureframeRegisters';
 import { saveText } from '@/lib/saveFile';
 import { apiErrorDetail, downloadCsv, riskRegisterApi, type RiskDetail, type RiskInput, type RiskItem, type RiskLibraryItem, type RiskRegister } from '@/lib/api';
 
@@ -377,6 +378,7 @@ function Library({ clientId, onAdded, onClose }: { clientId: string; onAdded: (r
 
 export function RiskRegisterView() {
   const [clientId, setClientId] = useState('');
+  const isHome = useIsHomeClient(clientId);
   const [tab, setTab] = useState<Tab>('dashboard');
   const [data, setData] = useState<RiskRegister | null>(null);
   const [problem, setProblem] = useState('');
@@ -427,6 +429,7 @@ export function RiskRegisterView() {
           <ClientPicker value={clientId} onChange={choose} label="Whose risks" />
         </div>
       </div>
+      {(!clientId || isHome) && <SecureframeRegisters show="risks" />}
       <div role="tablist" className="flex gap-1 border-b border-gray-800">
         {(['dashboard', 'register', 'archive'] as Tab[]).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} type="button" onClick={() => setTab(t)} className={`px-3 py-1.5 text-sm capitalize ${tab === t ? 'border-b-2 border-blue-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}>

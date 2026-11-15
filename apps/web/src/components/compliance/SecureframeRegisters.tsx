@@ -58,11 +58,12 @@ export function riskRating(impact: number | null | undefined, likelihood: number
 
 const word = (v: string | null | undefined): string => (v ? v.replace(/_/g, ' ') : '—');
 
-export function SecureframeRegisters() {
+/** The organization's own policies and risks as Secureframe holds them. `show` picks one of the two for the page it sits on (Policies, Risk register); both when left out. */
+export function SecureframeRegisters({ show = 'both' }: { show?: 'policies' | 'risks' | 'both' } = {}) {
   const { data, error } = useSWR('secureframe-registers', read, { revalidateOnFocus: false, shouldRetryOnError: false });
   if (error || !data?.report) return null;
-  const policies = data.report.policy_list ?? [];
-  const risks = data.report.risk_list ?? [];
+  const policies = show === 'risks' ? [] : (data.report.policy_list ?? []);
+  const risks = show === 'policies' ? [] : (data.report.risk_list ?? []);
   if (policies.length === 0 && risks.length === 0) return null;
   const waiting = policies.filter((p) => (acceptancePercent(p) ?? 100) < 100).length;
   const unpublished = policies.filter((p) => p.status !== 'published').length;
