@@ -579,8 +579,10 @@
     "key": "r7-ci-28",
     "title": "Doctor script checks Node and pnpm versions against the pinned ones",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit",
+    "note": "CORE doctor: node and pnpm version checks"
   },
   {
     "key": "r7-ci-29",
