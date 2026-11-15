@@ -283,9 +283,10 @@
     "title": "Remove the Huntress move tool (scripts/huntress-move.mjs) since the API does not move agents",
     "detail": "Removing it takes its 5 tests with it, which lowers the verify test baseline that I may not edit.",
     "area": "Devices",
-    "status": "not_started",
-    "needs": "signoff",
-    "note": "Needs your OK, and the baseline lowered by you or with your word."
+    "status": "completed",
+    "needs": "claude",
+    "note": "",
+    "completed_ref": "CORE de2ea6e"
   },
   {
     "key": "auto-tool-exclusions",
