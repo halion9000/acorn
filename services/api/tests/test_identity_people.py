@@ -795,3 +795,30 @@ def test_function_addresses_are_not_listed_as_missing_from_halo_but_ordinary_nam
     got = _checks(users, [_halo(A, "ann@acme.com")])
     assert got["info@acme.com"] is None and got["itadmin@acme.com"] is None
     assert got["scanlon@acme.com"] == "cloud_not_in_halo", "a person whose name only starts with scan is still checked"
+
+
+def test_a_mailbox_inky_scans_marks_the_person_but_an_address_only_inky_knows_is_not_a_person():
+    people = ip.build_people(
+        NAMES,
+        [ms(A, "amy@acme.com")],
+        [
+            src(A, "inky", "amy@acme.com", details={"scanned_messages": 40}),
+            src(A, "inky", "distribution-list@acme.com"),
+            src(B, "inky", "amy@acme.com"),
+        ],
+        NOW,
+    )
+    assert [(p.tenant_id, p.email) for p in people] == [
+        (A, "amy@acme.com")
+    ], "no person for an address only INKY has, and none for another client's mailbox"
+    assert people[0].vendors == ["cipp", "inky"]
+    inky = [r for r in people[0].sources if r.vendor == "inky"]
+    assert len(inky) == 1 and inky[0].details == {"scanned_messages": 40}
+
+
+def test_a_mailbox_inky_has_not_been_seen_scanning_for_a_long_time_is_not_shown_as_protected():
+    old = NOW - timedelta(days=ip.STALE_DAYS + 5)
+    people = ip.build_people(NAMES, [ms(A, "amy@acme.com")], [src(A, "inky", "amy@acme.com", refreshed_at=old)], NOW)
+    assert all(
+        r.vendor != "inky" for r in people[0].sources
+    ), "a mailbox INKY has not been seen scanning for a long time is not shown as protected"

@@ -27,6 +27,9 @@ _SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
 BACKUP_TOOLS = ("dropsuite", "datto-saas")
 # Tools that say where a person's address turned up in a breach. They describe people other tools know; an exposed address no directory knows is not made into a person.
 EXPOSURE_TOOLS = ("threatmate", "liongard")
+# Tools that only SAY a mailbox is theirs (INKY: the mailboxes it has scanned mail for). They are attached to a person that another tool or the directory already knows; an address only they know (an alias, a
+# distribution list, a mailbox of someone who left) never becomes a person of its own.
+PRESENCE_TOOLS = ("inky",)
 # A Dropsuite mailbox with no backup in this long is stale.
 FRESH_HOURS = 48
 
@@ -241,10 +244,14 @@ def build_people(
 
     cutoff = now - timedelta(days=stale_days)
     exposure_rows: dict[str, list[Any]] = {}
+    presence_rows: dict[str, list[Any]] = {}
     for s in sources:
         email = normalize_email(s.email)
         refreshed = s.refreshed_at if s.refreshed_at.tzinfo else s.refreshed_at.replace(tzinfo=now.tzinfo)
         if email is None or refreshed < cutoff:
+            continue
+        if s.vendor in PRESENCE_TOOLS:
+            presence_rows.setdefault(f"{s.tenant_id}:{email}", []).append(s)
             continue
         if s.vendor in EXPOSURE_TOOLS:
             exposure_rows.setdefault(f"{s.tenant_id}:{email}", []).append(s)
@@ -263,6 +270,13 @@ def build_people(
             _apply_directory(p, s)
     # One human, one person: fold the addresses that are the same human (the rules and the owner's own merges are in identity_merge).
     out = merge_people(people, merges, separate)
+    for p in out:
+        for address in p.addresses:
+            for row in presence_rows.get(f"{p.tenant_id}:{address}", []):
+                if not any(r.vendor == row.vendor and r.external_id == row.external_id for r in p.sources):
+                    p.sources.append(
+                        SourceRef(vendor=row.vendor, external_id=row.external_id, enabled=row.enabled, details=dict(row.details or {}))
+                    )
     for p in out:
         p.sources.sort(key=lambda r: (r.vendor != MICROSOFT, r.vendor, r.external_id))
         p.backups = backup_infos(p.sources, now)

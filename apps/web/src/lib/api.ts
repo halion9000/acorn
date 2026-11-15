@@ -1428,9 +1428,15 @@ export const playbookDryRunsApi = {
   },
 };
 
+/** Clients in name order: case does not matter and "Client 2" comes before "Client 10" (pure). */
+export function sortClientsByName<T extends { name: string }>(clients: T[]): T[] {
+  return [...clients].sort((x, y) => x.name.localeCompare(y.name, undefined, { sensitivity: 'base', numeric: true }));
+}
+
 export const msspApi = {
   async listChildren(): Promise<ChildTenant[]> {
-    return request<ChildTenant[]>('/api/v1/mssp/children');
+    // Every client list in the console comes from here, so it is sorted once: by name, ignoring case, numbers in their natural order.
+    return sortClientsByName(await request<ChildTenant[]>('/api/v1/mssp/children'));
   },
   async overview(): Promise<MsspOverview> {
     return request<MsspOverview>('/api/v1/mssp/overview');
