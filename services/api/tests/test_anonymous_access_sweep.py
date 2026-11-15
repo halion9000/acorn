@@ -113,6 +113,12 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/finance"): (
         "CORE's daily snapshot of HaloPSA's recurring invoices and owed invoices: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own snapshot, which only people with the finance permissions can read."
     ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/ticket-stats"): (
+        "CORE's daily summary of HaloPSA ticket statistics (counts per client per month and what is open, no ticket text): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own summary."
+    ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/csat"): (
+        "CORE's daily summary of SimpleSat customer satisfaction responses (counts per company per month and each company's newest comments): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own summary."
+    ),
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/profitability"): (
         "CORE's daily summary of HaloPSA's invoiced revenue per client per month, hours worked and agents: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own summary, readable only with the finance permissions."
     ),

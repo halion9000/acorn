@@ -411,6 +411,12 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: 'Metrics',
+    items: [
+      { label: 'Tickets and satisfaction', href: '/metrics/tickets', icon: <ScanIcon /> },
+    ],
+  },
+  {
     title: 'Sales and Finance',
     items: [
       { label: 'Profitability', href: '/finance/profitability', icon: <ScanIcon /> },

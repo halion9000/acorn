@@ -1,0 +1,41 @@
+{
+  "route": "ticket-stats",
+  "method": "POST",
+  "body": {
+    "months": [
+      "2026-07",
+      "2026-08",
+      "2026-09",
+      "2026-10",
+      "2026-11"
+    ],
+    "rows": [
+      {
+        "client_id": "12",
+        "client_name": "Acme Dental",
+        "month": "2026-10",
+        "created": 1,
+        "resolved": 1,
+        "responded": 1,
+        "response_minutes": 20,
+        "created_by_type": {
+          "Incident": 1
+        },
+        "resolved_by_agent": {
+          "40": 1
+        },
+        "critical": 1,
+        "high": 0
+      }
+    ],
+    "open_now": [
+      {
+        "client_id": "12",
+        "client_name": "Acme Dental",
+        "total": 1,
+        "critical": 0,
+        "high": 1
+      }
+    ]
+  }
+}

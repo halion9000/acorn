@@ -125,6 +125,14 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's list of the NinjaOne roles, organizations and locations the Devices page offers when it installs the agent (names and numeric ids only): authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own list.",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/ticket-stats",
+    ): "CORE's daily summary of HaloPSA ticket statistics (counts, no ticket text): authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own summary.",
+    (
+        "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/csat",
+    ): "CORE's daily summary of SimpleSat customer satisfaction responses: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own summary.",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/profitability",
     ): "CORE's daily summary of HaloPSA's invoiced revenue per client per month, hours worked and agents: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own summary, readable only with the finance permissions.",
     (

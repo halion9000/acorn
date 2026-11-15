@@ -2457,6 +2457,96 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/ticket-metrics:
+    get:
+      tags:
+      - reports
+      summary: Ticket Metrics
+      description: The summary for the newest ``months`` months, for one HaloPSA client
+        (``client_id``) or all. ``received_at`` is None until CORE has sent the first
+        one.
+      operationId: ticket_metrics_api_v1_reports_ticket_metrics_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 12
+          minimum: 1
+          default: 3
+          title: Months
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 20
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Ticket Metrics Api V1 Reports Ticket Metrics Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/ticket-metrics/csat:
+    get:
+      tags:
+      - reports
+      summary: Csat
+      description: Customer satisfaction from SimpleSat for the newest ``months``
+        months, for one company (by name) or all. ``received_at`` is None until CORE
+        has sent the first summary.
+      operationId: csat_api_v1_reports_ticket_metrics_csat_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 12
+          minimum: 1
+          default: 3
+          title: Months
+      - name: company
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Company
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Csat Api V1 Reports Ticket Metrics Csat Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/nist-coverage/{client_id}:
     get:
       tags:
@@ -28818,6 +28908,76 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/ticket-stats:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Ticket Stats
+      description: Keep the latest HaloPSA ticket statistics CORE read (per client
+        per month, and what is open now). They replace the ones before; averages are
+        worked out when a person asks.
+      operationId: report_core_feed_ticket_stats_api_v1_inbox_core_feed__tenant_token__ticket_stats_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketStatsIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketStatsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/csat:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Csat
+      description: Keep the latest SimpleSat customer satisfaction summary CORE read
+        (per company per month, and each company's newest comments). It replaces the
+        one before.
+      operationId: report_core_feed_csat_api_v1_inbox_core_feed__tenant_token__csat_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CsatIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CsatOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/device-names:
     post:
       tags:
@@ -37977,6 +38137,128 @@ components:
       - status
       - created_at
       title: CrossTenantIncident
+    CsatIn:
+      properties:
+        months:
+          items:
+            type: string
+          type: array
+          maxItems: 24
+          title: Months
+        rows:
+          items:
+            $ref: '#/components/schemas/CsatMonthIn'
+          type: array
+          maxItems: 20000
+          title: Rows
+        recent:
+          items:
+            $ref: '#/components/schemas/CsatRecentIn'
+          type: array
+          maxItems: 5000
+          title: Recent
+      type: object
+      required:
+      - months
+      - rows
+      - recent
+      title: CsatIn
+    CsatMonthIn:
+      properties:
+        company:
+          type: string
+          maxLength: 200
+          title: Company
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        positive:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: Positive
+        neutral:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: Neutral
+        negative:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: Negative
+        total:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: Total
+      type: object
+      required:
+      - company
+      - month
+      - positive
+      - neutral
+      - negative
+      - total
+      title: CsatMonthIn
+    CsatOut:
+      properties:
+        rows:
+          type: integer
+          title: Rows
+        recent:
+          type: integer
+          title: Recent
+      type: object
+      required:
+      - rows
+      - recent
+      title: CsatOut
+    CsatRecentIn:
+      properties:
+        company:
+          type: string
+          maxLength: 200
+          title: Company
+        date:
+          type: string
+          maxLength: 30
+          title: Date
+        contact:
+          type: string
+          maxLength: 120
+          title: Contact
+          default: ''
+        sentiment:
+          anyOf:
+          - type: string
+            enum:
+            - positive
+            - neutral
+            - negative
+          - type: 'null'
+          title: Sentiment
+        rating:
+          type: string
+          maxLength: 80
+          title: Rating
+          default: ''
+        comment:
+          type: string
+          maxLength: 400
+          title: Comment
+          default: ''
+        ticket_id:
+          type: string
+          maxLength: 40
+          title: Ticket Id
+          default: ''
+      type: object
+      required:
+      - company
+      - date
+      title: CsatRecentIn
     CspmScanRequest:
       properties:
         resources:
@@ -57989,6 +58271,108 @@ components:
       required:
       - items
       title: TicketList
+    TicketMonthIn:
+      properties:
+        client_id:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Client Id
+        client_name:
+          type: string
+          maxLength: 200
+          title: Client Name
+          default: ''
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        created:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: Created
+        resolved:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: Resolved
+        responded:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: Responded
+        response_minutes:
+          type: number
+          minimum: 0.0
+          title: Response Minutes
+        created_by_type:
+          additionalProperties:
+            type: integer
+          type: object
+          maxProperties: 100
+          title: Created By Type
+        resolved_by_agent:
+          additionalProperties:
+            type: integer
+          type: object
+          maxProperties: 300
+          title: Resolved By Agent
+        critical:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: Critical
+        high:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: High
+      type: object
+      required:
+      - client_id
+      - month
+      - created
+      - resolved
+      - responded
+      - response_minutes
+      - critical
+      - high
+      title: TicketMonthIn
+    TicketOpenIn:
+      properties:
+        client_id:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Client Id
+        client_name:
+          type: string
+          maxLength: 200
+          title: Client Name
+          default: ''
+        total:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: Total
+        critical:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: Critical
+        high:
+          type: integer
+          maximum: 1000000.0
+          minimum: 0.0
+          title: High
+      type: object
+      required:
+      - client_id
+      - total
+      - critical
+      - high
+      title: TicketOpenIn
     TicketOut:
       properties:
         id:
@@ -58132,6 +58516,45 @@ components:
       title: TicketSettings
       description: '``close_status`` is the status in force; ``is_default`` says it
         is the platform''s, not this organization''s own choice.'
+    TicketStatsIn:
+      properties:
+        months:
+          items:
+            type: string
+          type: array
+          maxItems: 24
+          title: Months
+        rows:
+          items:
+            $ref: '#/components/schemas/TicketMonthIn'
+          type: array
+          maxItems: 60000
+          title: Rows
+        open_now:
+          items:
+            $ref: '#/components/schemas/TicketOpenIn'
+          type: array
+          maxItems: 5000
+          title: Open Now
+      type: object
+      required:
+      - months
+      - rows
+      - open_now
+      title: TicketStatsIn
+    TicketStatsOut:
+      properties:
+        rows:
+          type: integer
+          title: Rows
+        open_clients:
+          type: integer
+          title: Open Clients
+      type: object
+      required:
+      - rows
+      - open_clients
+      title: TicketStatsOut
     TicketStatusOut:
       properties:
         state:

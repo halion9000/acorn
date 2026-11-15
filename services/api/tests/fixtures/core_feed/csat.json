@@ -1,0 +1,36 @@
+{
+  "route": "csat",
+  "method": "POST",
+  "body": {
+    "months": [
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+      "2026-10",
+      "2026-11"
+    ],
+    "rows": [
+      {
+        "company": "Acme Dental",
+        "month": "2026-10",
+        "positive": 1,
+        "neutral": 0,
+        "negative": 0,
+        "total": 1
+      }
+    ],
+    "recent": [
+      {
+        "company": "Acme Dental",
+        "date": "2026-10-12T10:00:00Z",
+        "contact": "Amy",
+        "sentiment": "positive",
+        "rating": "Great",
+        "comment": "Fast and friendly",
+        "ticket_id": "5001"
+      }
+    ]
+  }
+}

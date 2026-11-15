@@ -145,6 +145,7 @@ from app.api.v1.endpoints import (
     tenant_triage_settings,
     tenants,
     threat_intel,
+    ticket_metrics,
     tool_deploy_rules,
     totp,
     translation,
@@ -172,6 +173,7 @@ api_router.include_router(standing_approvals.router)
 api_router.include_router(client_status.router)
 api_router.include_router(client_status.public_router)
 api_router.include_router(finance.router)
+api_router.include_router(ticket_metrics.router)
 api_router.include_router(nist_coverage.router)
 api_router.include_router(governance.router)
 api_router.include_router(agent_proposals.router)

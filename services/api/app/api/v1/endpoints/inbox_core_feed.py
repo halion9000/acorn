@@ -32,6 +32,7 @@ from app.models.connector import Connector
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.finance_profit import FinanceProfitSnapshot
 from app.models.tenant import Tenant
+from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
 from app.models.vendor_action import VendorAction
 from app.services import core_approvals
 from app.services import vcio_risk_tickets as vcio_tickets
@@ -1183,6 +1184,101 @@ async def report_core_feed_profitability(tenant_token: str, body: ProfitSnapshot
         row.payload, row.received_at = payload, now
     await db.commit()
     return ProfitSnapshotOut(invoices=len(body.invoices), hours=len(body.hours), agents=len(body.agents))
+
+
+class TicketMonthIn(BaseModel):
+    client_id: str = Field(min_length=1, max_length=20)
+    client_name: str = Field(default="", max_length=200)
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    created: int = Field(ge=0, le=1000000)
+    resolved: int = Field(ge=0, le=1000000)
+    responded: int = Field(ge=0, le=1000000)
+    response_minutes: float = Field(ge=0)
+    created_by_type: dict[str, int] = Field(default_factory=dict, max_length=100)
+    resolved_by_agent: dict[str, int] = Field(default_factory=dict, max_length=300)
+    critical: int = Field(ge=0, le=1000000)
+    high: int = Field(ge=0, le=1000000)
+
+
+class TicketOpenIn(BaseModel):
+    client_id: str = Field(min_length=1, max_length=20)
+    client_name: str = Field(default="", max_length=200)
+    total: int = Field(ge=0, le=1000000)
+    critical: int = Field(ge=0, le=1000000)
+    high: int = Field(ge=0, le=1000000)
+
+
+class TicketStatsIn(BaseModel):
+    months: list[str] = Field(max_length=24)
+    rows: list[TicketMonthIn] = Field(max_length=60000)
+    open_now: list[TicketOpenIn] = Field(max_length=5000)
+
+
+class TicketStatsOut(BaseModel):
+    rows: int
+    open_clients: int
+
+
+@router.post("/core-feed/{tenant_token}/ticket-stats", response_model=TicketStatsOut)
+async def report_core_feed_ticket_stats(tenant_token: str, body: TicketStatsIn, db: DBSession) -> TicketStatsOut:
+    """Keep the latest HaloPSA ticket statistics CORE read (per client per month, and what is open now). They replace the ones before; averages are worked out when a person asks."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    row = (await db.execute(select(TicketStatsSnapshot).where(TicketStatsSnapshot.tenant_id == tenant_id))).scalar_one_or_none()
+    payload = body.model_dump()
+    if row is None:
+        db.add(TicketStatsSnapshot(tenant_id=tenant_id, payload=payload, received_at=now))
+    else:
+        row.payload, row.received_at = payload, now
+    await db.commit()
+    return TicketStatsOut(rows=len(body.rows), open_clients=len(body.open_now))
+
+
+class CsatMonthIn(BaseModel):
+    company: str = Field(max_length=200)
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    positive: int = Field(ge=0, le=1000000)
+    neutral: int = Field(ge=0, le=1000000)
+    negative: int = Field(ge=0, le=1000000)
+    total: int = Field(ge=0, le=1000000)
+
+
+class CsatRecentIn(BaseModel):
+    company: str = Field(max_length=200)
+    date: str = Field(max_length=30)
+    contact: str = Field(default="", max_length=120)
+    sentiment: Literal["positive", "neutral", "negative"] | None = None
+    rating: str = Field(default="", max_length=80)
+    comment: str = Field(default="", max_length=400)
+    ticket_id: str = Field(default="", max_length=40)
+
+
+class CsatIn(BaseModel):
+    months: list[str] = Field(max_length=24)
+    rows: list[CsatMonthIn] = Field(max_length=20000)
+    recent: list[CsatRecentIn] = Field(max_length=5000)
+
+
+class CsatOut(BaseModel):
+    rows: int
+    recent: int
+
+
+@router.post("/core-feed/{tenant_token}/csat", response_model=CsatOut)
+async def report_core_feed_csat(tenant_token: str, body: CsatIn, db: DBSession) -> CsatOut:
+    """Keep the latest SimpleSat customer satisfaction summary CORE read (per company per month, and each company's newest comments). It replaces the one before."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    row = (await db.execute(select(CsatSnapshot).where(CsatSnapshot.tenant_id == tenant_id))).scalar_one_or_none()
+    payload = body.model_dump()
+    if row is None:
+        db.add(CsatSnapshot(tenant_id=tenant_id, payload=payload, received_at=now))
+    else:
+        row.payload, row.received_at = payload, now
+    await db.commit()
+    return CsatOut(rows=len(body.rows), recent=len(body.recent))
 
 
 class DeviceItem(BaseModel):
