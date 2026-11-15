@@ -1060,3 +1060,52 @@ def test_a_country_lists_at_most_five_addresses_the_busiest_ones():
     (us,) = run(body).countries
     assert [a.ip for a in us.addresses] == ["8.8.8.8", "8.8.8.7", "8.8.8.6", "8.8.8.5", "8.8.8.4"]
     assert us.emails == sum(10 + i for i in range(1, 9)), "the country total still counts every address, not only the five listed"
+
+
+def test_an_unknown_sender_comes_with_its_detail_and_a_known_address_range_names_it():
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        acme = await tenant(s, "Acme", owner.id)
+        rows = [
+            {**line_row("2a01:111:f403:c112::5", 40), "spf_domains": [], "dkim_domains": []},
+            {
+                **line_row("203.0.113.7", 12, ok=False),
+                "spf_domains": ["bounce.vendor.example"],
+                "spf_results": ["softfail"],
+                "dkim_domains": ["vendor.example"],
+                "dkim_results": ["pass"],
+            },
+        ]
+        s.add(rep(acme.id, "acme.com", 52, 40, rows=rows))
+        await s.commit()
+        return await ep.insights(caller(owner), s, days=30, domain=None, client_id=None)
+
+    out = run(body)
+    by_name = {x.name: x for x in out.senders}
+    assert "Microsoft 365 mail servers" in by_name and by_name["Microsoft 365 mail servers"].identified
+    unknown = by_name["Unknown (203.0.113.7)"]
+    assert not unknown.identified and unknown.failed == 12
+    d = unknown.detail
+    assert d is not None and d.addresses == ["203.0.113.7"] and d.spf_domains == ["bounce.vendor.example"]
+    assert [(c.text, c.count) for c in d.causes] == [
+        ("SPF softfail for bounce.vendor.example", 12),
+        ("DKIM passed for vendor.example, not for acme.com (not aligned)", 12),
+    ]
+    assert out.at_risk and out.at_risk[0].detail is not None
+
+
+def test_the_address_lookup_answers_for_public_addresses_only():
+    async def fake(ip):
+        return ep.AddressInfo(ip=ip, reverse_dns="mail.vendor.example", owner="Vendor Inc")
+
+    async def body():
+        got = await ep.address_info("8.8.8.8", caller(SimpleNamespace(id=uuid.uuid4())), fake)
+        errors = []
+        for bad in ("10.0.0.5", "not-an-ip", "127.0.0.1"):
+            with pytest.raises(HTTPException) as e:
+                await ep.address_info(bad, caller(SimpleNamespace(id=uuid.uuid4())), fake)
+            errors.append(e.value.status_code)
+        return got, errors
+
+    got, errors = asyncio.run(body())
+    assert (got.reverse_dns, got.owner) == ("mail.vendor.example", "Vendor Inc") and errors == [422, 422, 422]

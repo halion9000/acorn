@@ -28,7 +28,7 @@ from app.models.tenant import Tenant
 from app.services import bimi as bimi_check
 from app.services import blocklist, mta_sts, safe_fetch
 from app.services import reputation as reputation_service
-from app.services.dmarc_senders import identify_sender
+from app.services.dmarc_senders import SenderStats, identify_by_address, identify_sender, parse_ip_rdap
 from app.services.domain_posture import DohResolver, DomainPosture, Resolver, candidate_domains, check_domain
 from app.services.ip_country import country_of
 from app.services.lookalike import generate as generate_lookalikes
@@ -416,6 +416,27 @@ class RatePoint(BaseModel):
     spf_fail: int
 
 
+class SenderCause(BaseModel):
+    text: str
+    count: int
+
+
+class SenderDetail(BaseModel):
+    """What a person opens on a sender: how it authenticated, who it said it was, and exactly how its failing mail failed."""
+
+    spf_domains: list[str]
+    dkim_domains: list[str]
+    envelope_from: list[str]
+    header_from: list[str]
+    causes: list[SenderCause]  # why the failing mail failed, most messages first
+    spf_only_failed: int  # failing mail where only SPF did not line up
+    dkim_only_failed: int
+    both_failed: int
+    dispositions: dict[str, int]  # what receivers did: none, quarantine, reject
+    reasons: list[str]  # why a receiver set the policy aside (forwarded, mailing_list...)
+    addresses: list[str]
+
+
 class SenderRow(BaseModel):
     name: str
     identified: bool  # False: not a service we recognise, shown by its address
@@ -423,6 +444,7 @@ class SenderRow(BaseModel):
     passed: int
     failed: int
     status: str  # passing (nothing failed), failing (nothing passed) or partly
+    detail: SenderDetail | None = None
 
 
 class SendingDomainRow(BaseModel):
@@ -944,6 +966,69 @@ async def tls_overview(
     return TlsOverview(days=days, domains=out)
 
 
+class AddressInfo(BaseModel):
+    ip: str
+    reverse_dns: str | None  # the name the address's own owner gave it, when it gave one
+    owner: str | None  # who the public registry says holds the address block
+
+
+_ADDRESS_CACHE: dict[str, AddressInfo] = {}
+
+
+def get_address_lookup() -> Callable[[str], Awaitable[AddressInfo]]:
+    """How an address is looked up (replaced in tests): its reverse DNS name, and its owner from the public registry. Either can be missing; neither is ever an error."""
+
+    async def lookup(ip: str) -> AddressInfo:
+        import asyncio  # noqa: PLC0415
+        import socket  # noqa: PLC0415
+
+        if ip in _ADDRESS_CACHE:
+            return _ADDRESS_CACHE[ip]
+        loop = asyncio.get_running_loop()
+        rdns: str | None = None
+        owner: str | None = None
+        try:
+            rdns = (await asyncio.wait_for(loop.run_in_executor(None, socket.gethostbyaddr, ip), 3.0))[0][:255]
+        except (OSError, TimeoutError):
+            pass
+        try:
+            owner = parse_ip_rdap(
+                await safe_fetch.fetch(
+                    f"https://rdap.org/ip/{ip}", max_bytes=500_000, max_redirects=3, accept="application/rdap+json, application/json"
+                )
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        info = AddressInfo(ip=ip, reverse_dns=rdns, owner=owner)
+        if len(_ADDRESS_CACHE) > 500:
+            _ADDRESS_CACHE.clear()
+        _ADDRESS_CACHE[ip] = info
+        return info
+
+    return lookup
+
+
+@router.get(
+    "/address/{ip}",
+    response_model=AddressInfo,
+    summary="Who an address that sent mail belongs to: its reverse DNS name and the owner of its address block",
+)
+async def address_info(
+    ip: str,
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    lookup: Annotated[Callable[[str], Awaitable[AddressInfo]], Depends(get_address_lookup)],
+) -> AddressInfo:
+    import ipaddress  # noqa: PLC0415
+
+    try:
+        addr = ipaddress.ip_address(ip.strip())
+    except ValueError:
+        raise HTTPException(status_code=422, detail="That is not an IP address.") from None
+    if not addr.is_global:
+        raise HTTPException(status_code=422, detail="Only public addresses are looked up.")
+    return await lookup(str(addr))
+
+
 @router.get("/insights", response_model=Insights, summary="Delivery, failure rates over time, top senders and top sending domains")
 async def insights(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
@@ -958,6 +1043,7 @@ async def insights(
     delivery: Counter[str] = Counter()
     daily: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0, 0])
     senders: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0])
+    sender_stats: dict[tuple[str, str], SenderStats] = defaultdict(SenderStats)
     from_domains: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     total = dmarc_fail = dkim_fail = spf_fail = 0
     for r in reports:
@@ -978,9 +1064,12 @@ async def insights(
             if not row.get("spf"):
                 spf_fail += count
                 d[3] += count
-            name = identify_sender(list(row.get("spf_domains") or []), list(row.get("dkim_domains") or []))
+            name = identify_sender(list(row.get("spf_domains") or []), list(row.get("dkim_domains") or [])) or identify_by_address(
+                str(row.get("ip") or "")
+            )
             key = (name, "named") if name else (str(row.get("ip") or "unknown"), "address")
             senders[key][0 if ok else 1] += count
+            sender_stats[key].add(row, count, r.domain)
             from_domains[str(row.get("header_from") or r.domain)][0 if ok else 1] += count
 
     sender_rows = [
@@ -991,6 +1080,12 @@ async def insights(
             passed=p,
             failed=f,
             status=_health(p, f),
+            detail=SenderDetail(
+                **{
+                    **sender_stats[(name, kind)].detail(),
+                    "causes": [SenderCause(**c) for c in sender_stats[(name, kind)].detail()["causes"]],
+                }
+            ),
         )
         for (name, kind), (p, f) in senders.items()
     ]

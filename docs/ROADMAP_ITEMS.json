@@ -286,5 +286,22 @@
     "status": "not_started",
     "needs": "signoff",
     "note": "Needs your OK, and the baseline lowered by you or with your word."
+  },
+  {
+    "key": "auto-tool-exclusions",
+    "title": "Client posture: tools a client has nothing from tick themselves as not used",
+    "area": "Devices",
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "55e39e0c"
+  },
+  {
+    "key": "dmarc-sender-detail",
+    "title": "DMARC: detail on unknown senders and why mail fails",
+    "detail": "Details and Why it fails on senders, address ranges name Microsoft and Google mail servers, owner and reverse DNS of an unknown address. SPF and DKIM results are kept for reports received from now on.",
+    "area": "Security",
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
   }
 ]

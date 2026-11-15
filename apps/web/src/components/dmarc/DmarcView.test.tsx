@@ -53,6 +53,7 @@ beforeEach(() => {
   authFetch.mockReset();
   authFetch.mockImplementation(async (url: string) => {
     if (url.startsWith('/api/v1/dmarc/overview')) return json(200, overview);
+    if (url.startsWith('/api/v1/dmarc/address/')) return json(200, { ip: decodeURIComponent(url.split('/').pop()!), reverse_dns: 'mail.vendor.example', owner: 'Vendor Inc' });
     if (url.startsWith('/api/v1/dmarc/countries')) return countries ? json(200, countries) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/insights')) return insights ? json(200, insights) : json(404, {});
     if (url.startsWith('/api/v1/dmarc/setup')) return json(200, setup);
@@ -403,6 +404,33 @@ describe('DMARC mail overview', () => {
     expect(within(senders[0]).getByText('Microsoft 365')).toBeInTheDocument();
     expect(within(senders[1]).getByText('failing')).toHaveClass('text-red-300');
     expect(within(screen.getByTestId('sending-domain-row')).getByText('partly')).toBeInTheDocument();
+  });
+
+  it('opens the detail of an unknown sender: how it authenticated, why its mail failed, what receivers did, and who owns the address', async () => {
+    const detail = {
+      spf_domains: ['bounce.vendor.example'], dkim_domains: [], envelope_from: ['bounce.vendor.example'], header_from: ['acme.com'],
+      causes: [{ text: 'SPF softfail for bounce.vendor.example', count: 9 }, { text: 'no DKIM signature', count: 9 }],
+      spf_only_failed: 0, dkim_only_failed: 0, both_failed: 9, dispositions: { none: 4, quarantine: 9 }, reasons: ['forwarded'], addresses: ['203.0.113.7'],
+    };
+    insights = { ...(insights as Record<string, unknown>), senders: [{ name: 'Unknown (203.0.113.7)', identified: false, emails: 13, passed: 4, failed: 9, status: 'partly', detail }], at_risk: [] };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'Details of Unknown (203.0.113.7)' }));
+    const panel = await screen.findByTestId('sender-detail');
+    expect(panel).toHaveTextContent('bounce.vendor.example');
+    expect(within(screen.getByTestId('sender-causes')).getByText('SPF softfail for bounce.vendor.example (9)')).toBeInTheDocument();
+    expect(panel).toHaveTextContent('9 quarantined');
+    expect(panel).toHaveTextContent('policy set aside because forwarded');
+    expect(await screen.findByTestId('address-who')).toHaveTextContent('owner Vendor Inc; reverse DNS mail.vendor.example');
+    await userEvent.click(screen.getByRole('button', { name: 'Details of Unknown (203.0.113.7)' }));
+    expect(screen.queryByTestId('sender-detail')).toBeNull();
+  });
+
+  it('a named sender opens without any address lookup, and an older server without detail says so', async () => {
+    insights = { ...(insights as Record<string, unknown>), senders: [{ name: 'Microsoft 365', identified: true, emails: 5, passed: 5, failed: 0, status: 'passing' }], at_risk: [] };
+    render(view());
+    await userEvent.click(await screen.findByRole('button', { name: 'Details of Microsoft 365' }));
+    expect(await screen.findByText(/did not send the detail/)).toBeInTheDocument();
+    expect(authFetch.mock.calls.some((c) => String(c[0]).startsWith('/api/v1/dmarc/address/'))).toBe(false);
   });
 
   it('shows nothing extra when the server has no insights, and the table still appears', async () => {

@@ -18238,6 +18238,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dmarc/address/{ip}:
+    get:
+      tags:
+      - dmarc
+      summary: 'Who an address that sent mail belongs to: its reverse DNS name and
+        the owner of its address block'
+      operationId: address_info_api_v1_dmarc_address__ip__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: ip
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Ip
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddressInfo'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/dmarc/insights:
     get:
       tags:
@@ -27844,6 +27873,27 @@ components:
       - emails
       - results
       title: AddressBlocklists
+    AddressInfo:
+      properties:
+        ip:
+          type: string
+          title: Ip
+        reverse_dns:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reverse Dns
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+      type: object
+      required:
+      - ip
+      - reverse_dns
+      - owner
+      title: AddressInfo
     AdminActionResponse:
       properties:
         done:
@@ -51791,6 +51841,86 @@ components:
           default: false
       type: object
       title: Selection
+    SenderCause:
+      properties:
+        text:
+          type: string
+          title: Text
+        count:
+          type: integer
+          title: Count
+      type: object
+      required:
+      - text
+      - count
+      title: SenderCause
+    SenderDetail:
+      properties:
+        spf_domains:
+          items:
+            type: string
+          type: array
+          title: Spf Domains
+        dkim_domains:
+          items:
+            type: string
+          type: array
+          title: Dkim Domains
+        envelope_from:
+          items:
+            type: string
+          type: array
+          title: Envelope From
+        header_from:
+          items:
+            type: string
+          type: array
+          title: Header From
+        causes:
+          items:
+            $ref: '#/components/schemas/SenderCause'
+          type: array
+          title: Causes
+        spf_only_failed:
+          type: integer
+          title: Spf Only Failed
+        dkim_only_failed:
+          type: integer
+          title: Dkim Only Failed
+        both_failed:
+          type: integer
+          title: Both Failed
+        dispositions:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Dispositions
+        reasons:
+          items:
+            type: string
+          type: array
+          title: Reasons
+        addresses:
+          items:
+            type: string
+          type: array
+          title: Addresses
+      type: object
+      required:
+      - spf_domains
+      - dkim_domains
+      - envelope_from
+      - header_from
+      - causes
+      - spf_only_failed
+      - dkim_only_failed
+      - both_failed
+      - dispositions
+      - reasons
+      - addresses
+      title: SenderDetail
+      description: 'What a person opens on a sender: how it authenticated, who it
+        said it was, and exactly how its failing mail failed.'
     SenderRow:
       properties:
         name:
@@ -51811,6 +51941,10 @@ components:
         status:
           type: string
           title: Status
+        detail:
+          anyOf:
+          - $ref: '#/components/schemas/SenderDetail'
+          - type: 'null'
       type: object
       required:
       - name

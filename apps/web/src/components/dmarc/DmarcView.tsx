@@ -4,7 +4,7 @@
  * DMARC reports per client. Results: what mail receivers saw being sent as each client's domains (worst first), one domain's trend and the sources failing. Setup: for each client domain, the
  * address to put in its DMARC record and the one DNS line, in your own zone, that lets receivers send its reports to the shared mailbox. Read only: nothing here sends mail or changes DNS.
  */
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { domainFromSearch } from '@/lib/dmarcLink';
 import useSWR from 'swr';
 
@@ -60,6 +60,29 @@ export interface DmarcDetail {
   series: { day: string; total: number; passed: number; failed: number }[];
   failing_sources: { ip: string; count: number; header_from: string; envelope_from: string; disposition: string }[];
 }
+/** What a person opens on a sender (absent from an older server). */
+export interface DmarcSenderDetail {
+  spf_domains: string[];
+  dkim_domains: string[];
+  envelope_from: string[];
+  header_from: string[];
+  causes: { text: string; count: number }[];
+  spf_only_failed: number;
+  dkim_only_failed: number;
+  both_failed: number;
+  dispositions: Record<string, number>;
+  reasons: string[];
+  addresses: string[];
+}
+export interface DmarcSender {
+  name: string;
+  identified: boolean;
+  emails: number;
+  passed: number;
+  failed: number;
+  status: string;
+  detail?: DmarcSenderDetail | null;
+}
 export interface DmarcInsights {
   days: number;
   domain: string | null;
@@ -67,9 +90,9 @@ export interface DmarcInsights {
   delivery: { passed: number; failed_delivered: number; overridden: number; quarantined: number; rejected: number };
   rates: { dmarc: number | null; dkim: number | null; spf: number | null };
   series: { day: string; total: number; dmarc_fail: number; dkim_fail: number; spf_fail: number }[];
-  senders: { name: string; identified: boolean; emails: number; passed: number; failed: number; status: string }[];
+  senders: DmarcSender[];
   /** Absent from an older server. */
-  at_risk?: { name: string; identified: boolean; emails: number; passed: number; failed: number; status: string }[];
+  at_risk?: DmarcSender[];
   sending_domains: { domain: string; emails: number; passed: number; failed: number; status: string }[];
 }
 export interface DmarcCountries {
@@ -664,9 +687,63 @@ function Countries({ days }: { days: number }) {
   );
 }
 
+
+/** Who an address belongs to (reverse DNS name and the owner of its address block). Looked up only when a person opens an unknown sender. */
+function AddressWho({ ip }: { ip: string }) {
+  const { data, error } = useSWR<{ ip: string; reverse_dns: string | null; owner: string | null }>(`/api/v1/dmarc/address/${encodeURIComponent(ip)}`, fetcher, { shouldRetryOnError: false });
+  if (error) return <p className="text-xs text-gray-500">Could not look up {ip}.</p>;
+  if (!data) return <p className="text-xs text-gray-500">Looking up {ip}...</p>;
+  return (
+    <p className="text-xs text-gray-300" data-testid="address-who">
+      <span className="font-mono">{data.ip}</span>: owner {data.owner ?? 'not named in the public registry'}; reverse DNS {data.reverse_dns ?? 'none'}
+    </p>
+  );
+}
+
+const DISPOSITION_LABEL: Record<string, string> = { none: 'delivered', quarantine: 'quarantined', reject: 'rejected' };
+
+/** The detail of one sender: how it authenticated, who it said it was, how its failing mail failed and what receivers did with it. */
+export function SenderDetailPanel({ sender }: { sender: DmarcSender }) {
+  const d = sender.detail;
+  if (!d) return <p className="text-xs text-gray-500">This server did not send the detail. It arrives after the next update.</p>;
+  const list = (items: string[]) => (items.length > 0 ? items.join(', ') : 'none');
+  const failedAll = d.spf_only_failed + d.dkim_only_failed + d.both_failed;
+  return (
+    <div className="space-y-1.5 rounded border border-gray-800 bg-gray-950/50 p-2 text-xs text-gray-300" data-testid="sender-detail">
+      <p>
+        Authenticated with SPF domains: <span className="font-mono">{list(d.spf_domains)}</span>; DKIM domains: <span className="font-mono">{list(d.dkim_domains)}</span>
+      </p>
+      <p>
+        Said it was from: <span className="font-mono">{list(d.header_from)}</span>; bounce address: <span className="font-mono">{list(d.envelope_from)}</span>
+      </p>
+      {failedAll > 0 && (
+        <div data-testid="sender-causes">
+          <p>
+            {failedAll.toLocaleString()} failed: {d.both_failed.toLocaleString()} on both SPF and DKIM, {d.spf_only_failed.toLocaleString()} on SPF only, {d.dkim_only_failed.toLocaleString()} on DKIM only. Why:
+          </p>
+          <ul className="ml-4 list-disc">
+            {d.causes.map((c) => (
+              <li key={c.text}>
+                {c.text} ({c.count.toLocaleString()})
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p>
+        Receivers: {Object.entries(d.dispositions).map(([k, v]) => `${v.toLocaleString()} ${DISPOSITION_LABEL[k] ?? k}`).join(', ') || 'no data'}
+        {d.reasons.length > 0 ? `; policy set aside because ${d.reasons.join(', ').replace(/_/g, ' ')}` : ''}
+      </p>
+      {!sender.identified && d.addresses.slice(0, 1).map((ip) => <AddressWho key={ip} ip={ip} />)}
+    </div>
+  );
+}
+
 /** What happened to the mail, how often it failed, who sends it. Shown only when the server has insights and there is mail to show: a failure here never hides the table below. */
 function Insights({ days }: { days: number }) {
   const { data } = useSWR<DmarcInsights>(`/api/v1/dmarc/insights?days=${days}`, fetcher, { shouldRetryOnError: false });
+  const [openSender, setOpenSender] = useState<string | null>(null);
+  const [openRisk, setOpenRisk] = useState<string | null>(null);
   if (!data || data.emails === 0) return null;
   const pct = (v: number | null) => (v === null ? '—' : `${v}%`);
   return (
@@ -696,11 +773,25 @@ function Insights({ days }: { days: number }) {
           </thead>
           <tbody>
             {data.senders.map((s) => (
-              <tr key={s.name} data-testid="sender-row" className="border-t border-gray-800">
-                <td className={`py-1 ${s.identified ? 'text-gray-100' : 'font-mono text-gray-400'}`}>{s.name}</td>
-                <td className="py-1 text-gray-300">{s.emails.toLocaleString()}</td>
-                <td className={`py-1 ${statusTone(s.status)}`}>{s.status}</td>
-              </tr>
+              <Fragment key={s.name}>
+                <tr data-testid="sender-row" className="border-t border-gray-800">
+                  <td className={`py-1 ${s.identified ? 'text-gray-100' : 'font-mono text-gray-400'}`}>
+                    {s.name}{' '}
+                    <button type="button" aria-label={`Details of ${s.name}`} aria-expanded={openSender === s.name} onClick={() => setOpenSender(openSender === s.name ? null : s.name)} className="ml-1 font-sans text-xs text-blue-300 hover:underline">
+                      {openSender === s.name ? 'Hide' : 'Details'}
+                    </button>
+                  </td>
+                  <td className="py-1 text-gray-300">{s.emails.toLocaleString()}</td>
+                  <td className={`py-1 ${statusTone(s.status)}`}>{s.status}</td>
+                </tr>
+                {openSender === s.name && (
+                  <tr>
+                    <td colSpan={3} className="pb-2">
+                      <SenderDetailPanel sender={s} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -729,11 +820,23 @@ function Insights({ days }: { days: number }) {
           <p className="mt-1 text-xs text-gray-400">Mail from these fails DMARC today. A quarantine or reject policy would start blocking it, so fix real senders first (add them to SPF or sign with DKIM).</p>
           <ul className="mt-2 space-y-1 text-sm">
             {data.at_risk.map((s) => (
-              <li key={s.name} data-testid="at-risk-row" className="flex justify-between gap-3">
-                <span className={s.identified ? 'text-gray-100' : 'font-mono text-gray-400'}>{s.name}</span>
-                <span className="text-amber-300">
-                  {s.failed.toLocaleString()} of {s.emails.toLocaleString()} failing
-                </span>
+              <li key={s.name} data-testid="at-risk-row">
+                <div className="flex justify-between gap-3">
+                  <span className={s.identified ? 'text-gray-100' : 'font-mono text-gray-400'}>
+                    {s.name}{' '}
+                    <button type="button" aria-label={`Why ${s.name} fails`} aria-expanded={openRisk === s.name} onClick={() => setOpenRisk(openRisk === s.name ? null : s.name)} className="ml-1 font-sans text-xs text-blue-300 hover:underline">
+                      {openRisk === s.name ? 'Hide' : 'Why it fails'}
+                    </button>
+                  </span>
+                  <span className="text-amber-300">
+                    {s.failed.toLocaleString()} of {s.emails.toLocaleString()} failing
+                  </span>
+                </div>
+                {openRisk === s.name && (
+                  <div className="mt-1">
+                    <SenderDetailPanel sender={s} />
+                  </div>
+                )}
               </li>
             ))}
           </ul>
