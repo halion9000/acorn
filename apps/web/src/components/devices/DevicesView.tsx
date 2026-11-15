@@ -12,6 +12,7 @@ import { MergeDeviceInto } from './MergeDeviceInto';
 import { WhereElse } from './WhereElse';
 import { CommandPrompt } from './CommandPrompt';
 import { DeployNinja } from './DeployNinja';
+import DeployNinjaBar from './DeployNinjaBar';
 import UnmappedDevices from './UnmappedDevices';
 import { ClientRollupTable } from './ClientRollupTable';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
@@ -635,6 +636,7 @@ export default function DevicesView() {
       )}
 
       <DeviceScriptBar deviceIds={[...picked]} onClear={() => setPicked(new Set())} />
+      <DeployNinjaBar deviceIds={[...picked]} onClear={() => setPicked(new Set())} />
 
       <div className={`overflow-x-auto rounded-lg border border-gray-800 transition-opacity ${loading && data ? "opacity-50" : ""}`} aria-busy={loading} data-testid="devices-table">
         <table className="w-full text-left text-sm">

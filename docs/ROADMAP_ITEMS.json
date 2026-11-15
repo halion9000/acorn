@@ -130,7 +130,7 @@
     "area": "Devices",
     "status": "not_started",
     "needs": "hal",
-    "note": "Needs a decision: move agents by hand in the Huntress console (A.C.O.R.N can list exactly which, from and to), or ask Huntress support whether an API route exists. Nothing was changed on BHRC-FM-01."
+    "note": "Decision made: move the agents by hand in the Huntress console. List sent (141 machines; 22 have no target organization mapped yet, mostly the 21 Texas Subs machines)."
   },
   {
     "key": "name-only-follow",
@@ -269,5 +269,22 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit"
+  },
+  {
+    "key": "ninja-deploy-bulk",
+    "title": "Deploy NinjaOne from the multi-select bar on the Devices page",
+    "area": "Devices",
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
+  },
+  {
+    "key": "remove-huntress-move-tool",
+    "title": "Remove the Huntress move tool (scripts/huntress-move.mjs) since the API does not move agents",
+    "detail": "Removing it takes its 5 tests with it, which lowers the verify test baseline that I may not edit.",
+    "area": "Devices",
+    "status": "not_started",
+    "needs": "signoff",
+    "note": "Needs your OK, and the baseline lowered by you or with your word."
   }
 ]
