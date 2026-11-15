@@ -47,6 +47,7 @@ export const TOOL_CHECK_LABELS: Record<string, string> = {
   autoelevate: "AutoElevate",
   huntress: "Huntress",
   dnsfilter: "DNSFilter",
+  inky: "INKY",
   "datto-saas-seats": "Datto SaaS Protection",
 };
 

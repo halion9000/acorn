@@ -13,6 +13,7 @@ SOURCE_NAMES: dict[str, str] = {
     "threatmate": "ThreatMate",
     "fieldeffect": "Field Effect",
     "dnsfilter": "DNSFilter",
+    "inky": "INKY",
     "auvik": "Auvik",
     "unifi": "UniFi",
     "slide": "Slide",

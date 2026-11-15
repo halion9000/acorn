@@ -133,6 +133,13 @@ TESTS: tuple[ControlTest, ...] = (
         "SPF, DKIM and DMARC are published so nobody can send as the organization.",
     ),
     ControlTest(
+        "email-protection",
+        "Email is filtered for phishing and malware",
+        ("inky_active", "inky_mail_flow"),
+        (("SOC2", "CC6.8"), ("NIST-CSF", "DE.CM-01"), ("ISO27001", "A.8.7"), ("HIPAA", "164.308(a)(5)(ii)(B)")),
+        "A mail filter is switched on and is scanning the organization's mail, so phishing and malware are stopped before users see them.",
+    ),
+    ControlTest(
         "certificates",
         "Certificates and domains do not lapse",
         ("itglue_domain_expiry", "itglue_certificate_expiry", "liongard_iis_certificates"),

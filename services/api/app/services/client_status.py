@@ -35,6 +35,7 @@ TOOL_LABELS = {
     "addigy": "Mac management (Addigy)",
     "cipp": "Microsoft 365 management (CIPP)",
     "dnsfilter": "Web filtering (DNSFilter)",
+    "inky": "Email protection (INKY)",
     "fieldeffect": "Managed detection and response (Field Effect)",
     "threatmate": "Security assessment (ThreatMate)",
     "liongard": "Configuration monitoring (Liongard)",

@@ -253,6 +253,7 @@ TOOL_CHECK_SOURCES = {
     "autoelevate": "autoelevate",
     "huntress": "huntress",
     "dnsfilter": "dnsfilter",
+    "inky": "inky",
     "datto-saas-seats": "datto-saas",
 }
 _BACKUP_OS = {"windows", "mac", "linux"}

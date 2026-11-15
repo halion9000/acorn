@@ -85,6 +85,8 @@ export const CHECK_HELP: Record<string, CheckHelp> = {
   huntress_extra_coverage: { why: "This notes that Huntress also watches identity or logs for the client.", fix: "Nothing to do." },
   dnsfilter_threat_blocking: { why: "DNS filtering only protects if malware, phishing and botnet categories are blocked.", fix: "Add the missing categories to each policy in DNSFilter." },
   dnsfilter_org_mfa: { why: "DNSFilter logins without two-step verification can be used to switch the filtering off.", fix: "Turn on the organization's MFA requirement in DNSFilter." },
+  inky_active: { why: "INKY is the email phishing filter. A disabled team, or one with no protected mailboxes, means mail is arriving unchecked.", fix: "Re-enable the team in the INKY console, or confirm the client no longer buys INKY and tick it as a tool they do not use." },
+  inky_mail_flow: { why: "If INKY has scanned no mail for a week, mail is probably no longer routed through it (a changed MX record or connector), so the filter is on but protects nothing.", fix: "Check the client's MX records and mail connectors still point at INKY." },
   dnsfilter_traffic: { why: "No DNS queries in a week means the filtering is not in use on that network.", fix: "Check that the roaming agents or the router still point at DNSFilter." },
   datto_saas_seats: { why: "A mailbox that is not selected for backup cannot be restored if it is deleted or encrypted.", fix: "Turn on protection for the mailboxes listed, or archive those that are gone." },
   saas_backup_microsoft: { why: "Microsoft does not back up the client's mail and files for restore; a separate backup does.", fix: "Fix the Datto SaaS Protection backup for the services that are behind." },

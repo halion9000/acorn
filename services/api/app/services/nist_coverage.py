@@ -78,6 +78,8 @@ MAPPING: dict[str, tuple[str, ...]] = {
         "meraki_wan",
         "meraki_dual_wan",
         "anti_phishing",
+        "inky_active",
+        "inky_mail_flow",
         "safe_links",
         "safe_attachments",
         "safe_attachments_collab",

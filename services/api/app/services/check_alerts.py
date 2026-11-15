@@ -39,6 +39,7 @@ WATCHED: dict[str, tuple[str, str, str]] = {
     "threatmate_deep_dark_web": ("New deep and dark web findings for this client", "high", "partly"),
     "meraki_admin_2fa": ("Meraki administrators without two-factor sign-in", "high", "not_met"),
     "dnsfilter_org_mfa": ("DNSFilter organization without multi-factor sign-in", "medium", "not_met"),
+    "inky_active": ("INKY email protection is off for this client", "high", "not_met"),
     "autoelevate_enforcing": ("AutoElevate stopped enforcing for this client", "medium", "not_met"),
     "huntress_protection": ("Huntress protection fell below target for this client", "high", "not_met"),
     "slide_verification": ("A Slide backup failed verification", "medium", "not_met"),
