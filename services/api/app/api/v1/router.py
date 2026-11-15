@@ -27,6 +27,7 @@ from app.api.v1.endpoints import (
     assets,
     attack_chain,
     audit,
+    audits,
     auth,
     autonomy_policy,
     billing,
@@ -146,6 +147,7 @@ from app.api.v1.endpoints import (
     tool_deploy_rules,
     totp,
     translation,
+    trust_center,
     vcio_proposals,
     vcio_risk_scoring,
     vendor_management,
@@ -289,6 +291,8 @@ api_router.include_router(vendor_management.router)
 api_router.include_router(detected_applications.router)
 api_router.include_router(detected_applications.ingest_router)
 api_router.include_router(access_reviews.router)
+api_router.include_router(audits.router)
+api_router.include_router(trust_center.router)
 api_router.include_router(compliance_controls.router)
 api_router.include_router(compliance_dashboard.router)
 api_router.include_router(questionnaires.router)

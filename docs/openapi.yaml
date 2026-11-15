@@ -2645,6 +2645,8 @@ paths:
         schema:
           anyOf:
           - type: integer
+            maximum: 100000
+            minimum: 1
           - type: 'null'
           title: Version
       responses:
@@ -13637,7 +13639,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DocumentIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__vendor_management__DocumentIn'
       responses:
         '201':
           description: Successful Response
@@ -14217,6 +14219,392 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/audits:
+    get:
+      tags:
+      - compliance
+      summary: The audits, newest first
+      operationId: list_audits_api_v1_compliance_audits_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Start an audit
+      operationId: start_audit_api_v1_compliance_audits_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/audits/{audit_id}:
+    get:
+      tags:
+      - compliance
+      summary: One audit with its requests
+      operationId: get_audit_api_v1_compliance_audits__audit_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - compliance
+      summary: Change an audit, or move it to its next stage
+      operationId: patch_audit_api_v1_compliance_audits__audit_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/audits/{audit_id}/requests:
+    post:
+      tags:
+      - compliance
+      summary: Add something the auditor asks for
+      operationId: add_request_api_v1_compliance_audits__audit_id__requests_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/audits/{audit_id}/requests/from-controls:
+    post:
+      tags:
+      - compliance
+      summary: Add a request for each control of the framework that is unhealthy or
+        not tested and has none yet
+      operationId: requests_from_controls_api_v1_compliance_audits__audit_id__requests_from_controls_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/audits/{audit_id}/requests/{request_id}:
+    patch:
+      tags:
+      - compliance
+      summary: 'Answer a request: who owns it, what was provided, and whether the
+        auditor accepted it'
+      operationId: patch_request_api_v1_compliance_audits__audit_id__requests__request_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Request Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/trust-center:
+    get:
+      tags:
+      - compliance
+      summary: The trust center as it is shown, and what can be chosen for it
+      operationId: get_trust_center_api_v1_compliance_trust_center_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustCenterOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - compliance
+      summary: Choose what the trust center shows
+      operationId: put_trust_center_api_v1_compliance_trust_center_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__trust_center__SettingsIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustCenterOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/controls:
     get:
       tags:
@@ -14586,6 +14974,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 100
+          minimum: 0
           default: 80
           title: Min Score
       - name: client_id
@@ -20539,7 +20929,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SettingsIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__vcio_risk_scoring__SettingsIn'
         required: true
       responses:
         '200':
@@ -31663,6 +32053,79 @@ components:
       - node_count
       - edge_count
       title: AttackPathResponse
+    AuditDetail:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        framework:
+          type: string
+          title: Framework
+        auditor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Auditor
+        period_start:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Period Start
+        period_end:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Period End
+        status:
+          type: string
+          title: Status
+        requests:
+          type: integer
+          title: Requests
+        open:
+          type: integer
+          title: Open
+        provided:
+          type: integer
+          title: Provided
+        accepted:
+          type: integer
+          title: Accepted
+        overdue:
+          type: integer
+          title: Overdue
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        items:
+          items:
+            $ref: '#/components/schemas/RequestOut'
+          type: array
+          title: Items
+      type: object
+      required:
+      - id
+      - name
+      - framework
+      - auditor
+      - period_start
+      - period_end
+      - status
+      - requests
+      - open
+      - provided
+      - accepted
+      - overdue
+      - created_at
+      - items
+      title: AuditDetail
     AuditEntry:
       properties:
         at:
@@ -31789,6 +32252,41 @@ components:
       - changes
       - created_at
       title: AuditEventOut
+    AuditIn:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 3
+          title: Name
+        framework:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Framework
+        auditor:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Auditor
+        period_start:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Period Start
+        period_end:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Period End
+      type: object
+      required:
+      - name
+      - framework
+      title: AuditIn
     AuditKind:
       properties:
         prefix:
@@ -31813,6 +32311,23 @@ components:
       required:
       - kinds
       title: AuditKindsResponse
+    AuditList:
+      properties:
+        audits:
+          items:
+            $ref: '#/components/schemas/AuditOut'
+          type: array
+          title: Audits
+        frameworks:
+          items:
+            type: string
+          type: array
+          title: Frameworks
+      type: object
+      required:
+      - audits
+      - frameworks
+      title: AuditList
     AuditListResponse:
       properties:
         items:
@@ -31840,6 +32355,112 @@ components:
       - page_size
       - total_pages
       title: AuditListResponse
+    AuditOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        framework:
+          type: string
+          title: Framework
+        auditor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Auditor
+        period_start:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Period Start
+        period_end:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Period End
+        status:
+          type: string
+          title: Status
+        requests:
+          type: integer
+          title: Requests
+        open:
+          type: integer
+          title: Open
+        provided:
+          type: integer
+          title: Provided
+        accepted:
+          type: integer
+          title: Accepted
+        overdue:
+          type: integer
+          title: Overdue
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - name
+      - framework
+      - auditor
+      - period_start
+      - period_end
+      - status
+      - requests
+      - open
+      - provided
+      - accepted
+      - overdue
+      - created_at
+      title: AuditOut
+    AuditPatch:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 3
+          - type: 'null'
+          title: Name
+        auditor:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Auditor
+        period_start:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Period Start
+        period_end:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Period End
+        status:
+          anyOf:
+          - type: string
+            enum:
+            - planning
+            - fieldwork
+            - review
+            - complete
+          - type: 'null'
+          title: Status
+      type: object
+      title: AuditPatch
     AuthenticateBeginRequest:
       properties:
         account_name:
@@ -38687,27 +39308,22 @@ components:
       - kinds
       - refreshed_at
       title: DocSummary
-    DocumentIn:
+    DocumentIn-Output:
       properties:
         name:
           type: string
-          maxLength: 300
+          maxLength: 200
           minLength: 2
           title: Name
-        doc_type:
-          type: string
-          maxLength: 40
-          title: Doc Type
-          default: Other
         url:
-          anyOf:
-          - type: string
-            maxLength: 1000
-          - type: 'null'
+          type: string
+          maxLength: 1000
+          minLength: 8
           title: Url
       type: object
       required:
       - name
+      - url
       title: DocumentIn
     DocumentOut:
       properties:
@@ -41356,6 +41972,29 @@ components:
       - framework
       - health
       title: FrameworkHealth
+    FrameworkLine:
+      properties:
+        framework:
+          type: string
+          title: Framework
+        controls:
+          type: integer
+          title: Controls
+        healthy:
+          type: integer
+          title: Healthy
+        percent_healthy:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Percent Healthy
+      type: object
+      required:
+      - framework
+      - controls
+      - healthy
+      - percent_healthy
+      title: FrameworkLine
     FrameworkMapping:
       properties:
         framework:
@@ -47764,7 +48403,21 @@ components:
       - loaded_at
       - error
       title: PluginOut
-    PolicyLine:
+    PolicyChoice:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        title:
+          type: string
+          title: Title
+      type: object
+      required:
+      - id
+      - title
+      title: PolicyChoice
+    PolicyLine-Input:
       properties:
         name:
           type: string
@@ -49828,6 +50481,135 @@ components:
       - text
       - tone
       title: ReputationFact
+    RequestIn:
+      properties:
+        title:
+          type: string
+          maxLength: 300
+          minLength: 3
+          title: Title
+        control_id:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Control Id
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+      type: object
+      required:
+      - title
+      title: RequestIn
+    RequestOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        title:
+          type: string
+          title: Title
+        control_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Control Id
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        status:
+          type: string
+          title: Status
+        overdue:
+          type: boolean
+          title: Overdue
+        note:
+          type: string
+          title: Note
+        link:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Link
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - id
+      - title
+      - control_id
+      - owner
+      - due_date
+      - status
+      - overdue
+      - note
+      - link
+      - updated_at
+      title: RequestOut
+    RequestPatch:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 300
+            minLength: 3
+          - type: 'null'
+          title: Title
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        status:
+          anyOf:
+          - type: string
+            enum:
+            - open
+            - provided
+            - accepted
+          - type: 'null'
+          title: Status
+        note:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Note
+        link:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          title: Link
+      type: object
+      title: RequestPatch
     RequirementControl:
       properties:
         key:
@@ -53327,7 +54109,7 @@ components:
       - taken_at
       - refreshed_at
       title: SecureScoreSummary
-    SecureframeBody:
+    SecureframeBody-Input:
       properties:
         tests:
           $ref: '#/components/schemas/TestCounts'
@@ -53371,7 +54153,65 @@ components:
           title: Controls
         policy_list:
           items:
-            $ref: '#/components/schemas/PolicyLine'
+            $ref: '#/components/schemas/PolicyLine-Input'
+          type: array
+          maxItems: 500
+          title: Policy List
+        risk_list:
+          items:
+            $ref: '#/components/schemas/RiskLine'
+          type: array
+          maxItems: 500
+          title: Risk List
+      type: object
+      required:
+      - tests
+      title: SecureframeBody
+    SecureframeBody-Output:
+      properties:
+        tests:
+          $ref: '#/components/schemas/TestCounts'
+        frameworks:
+          items:
+            $ref: '#/components/schemas/FrameworkCounts'
+          type: array
+          maxItems: 60
+          title: Frameworks
+        failing:
+          items:
+            $ref: '#/components/schemas/FailingTest'
+          type: array
+          maxItems: 100
+          title: Failing
+        risks:
+          anyOf:
+          - type: integer
+            maximum: 10000000.0
+            minimum: 0.0
+          - type: 'null'
+          title: Risks
+        policies:
+          anyOf:
+          - type: integer
+            maximum: 10000000.0
+            minimum: 0.0
+          - type: 'null'
+          title: Policies
+        requirements:
+          items:
+            $ref: '#/components/schemas/MappedRequirement'
+          type: array
+          maxItems: 400
+          title: Requirements
+        controls:
+          items:
+            $ref: '#/components/schemas/ControlDetail'
+          type: array
+          maxItems: 600
+          title: Controls
+        policy_list:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__secureframe__PolicyLine'
           type: array
           maxItems: 500
           title: Policy List
@@ -53389,7 +54229,7 @@ components:
       properties:
         report:
           anyOf:
-          - $ref: '#/components/schemas/SecureframeBody'
+          - $ref: '#/components/schemas/SecureframeBody-Output'
           - type: 'null'
         received_at:
           anyOf:
@@ -53742,18 +54582,6 @@ components:
       required:
       - close_status
       title: SetTicketSettings
-    SettingsIn:
-      properties:
-        settings:
-          additionalProperties: true
-          type: object
-          title: Settings
-          description: The settings to use. Anything missing or not valid keeps its
-            default; an empty object goes back to the defaults.
-      type: object
-      required:
-      - settings
-      title: SettingsIn
     SettingsOut:
       properties:
         settings:
@@ -57274,6 +58102,85 @@ components:
       - fix_steps
       title: TroubleshootResponse
       description: Structured guidance the wizard renders next to a failed test.
+    TrustCenterOut:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+        headline:
+          type: string
+          title: Headline
+        about:
+          type: string
+          title: About
+        contact_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Contact Email
+        documents:
+          items:
+            $ref: '#/components/schemas/DocumentIn-Output'
+          type: array
+          title: Documents
+        frameworks:
+          items:
+            $ref: '#/components/schemas/FrameworkLine'
+          type: array
+          title: Frameworks
+        policies:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__trust_center__PolicyLine'
+          type: array
+          title: Policies
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Updated At
+        updated_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated By
+        available_frameworks:
+          items:
+            type: string
+          type: array
+          title: Available Frameworks
+        available_policies:
+          items:
+            $ref: '#/components/schemas/PolicyChoice'
+          type: array
+          title: Available Policies
+        chosen_frameworks:
+          items:
+            type: string
+          type: array
+          title: Chosen Frameworks
+        chosen_policy_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Chosen Policy Ids
+      type: object
+      required:
+      - enabled
+      - headline
+      - about
+      - contact_email
+      - documents
+      - frameworks
+      - policies
+      - updated_at
+      - updated_by
+      - available_frameworks
+      - available_policies
+      - chosen_frameworks
+      - chosen_policy_ids
+      title: TrustCenterOut
     TuningEntry:
       properties:
         rule_id:
@@ -60726,6 +61633,7 @@ components:
           - risk_task
           - vendor_review
           - access_review
+          - audit_request
           title: Kind
         name:
           type: string
@@ -62976,6 +63884,50 @@ components:
           title: Note
       type: object
       title: ItemPatch
+    app__api__v1__endpoints__secureframe__PolicyLine:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+        status:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Status
+        published_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Published At
+        accepted:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Accepted
+          default: 0
+        eligible:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Eligible
+          default: 0
+        frameworks:
+          items:
+            type: string
+            maxLength: 80
+          type: array
+          maxItems: 20
+          title: Frameworks
+      type: object
+      required:
+      - name
+      title: PolicyLine
+      description: 'One policy as Secureframe lists it: its name, whether it is published
+        and how many of the people who must accept it have. Never its text.'
     app__api__v1__endpoints__secureframe__ReportIn:
       properties:
         vendor:
@@ -62984,11 +63936,93 @@ components:
           title: Vendor
           default: secureframe
         report:
-          $ref: '#/components/schemas/SecureframeBody'
+          $ref: '#/components/schemas/SecureframeBody-Input'
       type: object
       required:
       - report
       title: ReportIn
+    app__api__v1__endpoints__trust_center__DocumentIn:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 2
+          title: Name
+        url:
+          type: string
+          maxLength: 1000
+          minLength: 8
+          title: Url
+      type: object
+      required:
+      - name
+      - url
+      title: DocumentIn
+    app__api__v1__endpoints__trust_center__PolicyLine:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        title:
+          type: string
+          title: Title
+        last_reviewed_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Last Reviewed At
+      type: object
+      required:
+      - id
+      - title
+      - last_reviewed_at
+      title: PolicyLine
+    app__api__v1__endpoints__trust_center__SettingsIn:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+          default: false
+        headline:
+          type: string
+          maxLength: 200
+          title: Headline
+          default: ''
+        about:
+          type: string
+          maxLength: 5000
+          title: About
+          default: ''
+        contact_email:
+          anyOf:
+          - type: string
+            maxLength: 320
+          - type: 'null'
+          title: Contact Email
+        frameworks:
+          items:
+            type: string
+            maxLength: 20
+          type: array
+          maxItems: 12
+          title: Frameworks
+        policy_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 100
+          title: Policy Ids
+        documents:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__trust_center__DocumentIn'
+          type: array
+          maxItems: 30
+          title: Documents
+      type: object
+      title: SettingsIn
     app__api__v1__endpoints__vcio_proposals__ProposalOut:
       properties:
         id:
@@ -63164,6 +64198,18 @@ components:
       - vendor_answers
       - defaults
       title: LibraryOut
+    app__api__v1__endpoints__vcio_risk_scoring__SettingsIn:
+      properties:
+        settings:
+          additionalProperties: true
+          type: object
+          title: Settings
+          description: The settings to use. Anything missing or not valid keeps its
+            default; an empty object goes back to the defaults.
+      type: object
+      required:
+      - settings
+      title: SettingsIn
     app__api__v1__endpoints__vcio_risk_scoring__TrendPoint:
       properties:
         id:
@@ -63219,6 +64265,28 @@ components:
       - rating
       - answered
       title: TrendPoint
+    app__api__v1__endpoints__vendor_management__DocumentIn:
+      properties:
+        name:
+          type: string
+          maxLength: 300
+          minLength: 2
+          title: Name
+        doc_type:
+          type: string
+          maxLength: 40
+          title: Doc Type
+          default: Other
+        url:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          title: Url
+      type: object
+      required:
+      - name
+      title: DocumentIn
     app__api__v1__endpoints__vendor_management__ReviewIn:
       properties:
         title:

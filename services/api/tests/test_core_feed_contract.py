@@ -19,6 +19,7 @@ from app.api.v1.endpoints import cipp_actions as cipp_act
 from app.api.v1.endpoints import client_documents as cdocs
 from app.api.v1.endpoints import client_review as cr
 from app.api.v1.endpoints import client_vulnerabilities as cvuln
+from app.api.v1.endpoints import detected_applications as dapps
 from app.api.v1.endpoints import devices as dev
 from app.api.v1.endpoints import identities as idn
 from app.api.v1.endpoints import identity as ident
@@ -71,6 +72,7 @@ MODELS = {
     "tools": cr.CoreToolsReport,
     "license-counts": billing.LicenseCountsReport,
     "vulnerabilities": cvuln.VulnerabilitiesReport,
+    "detected-applications": dapps.AppsReport,
     "identities": idn.IdentitiesReport,
 }
 

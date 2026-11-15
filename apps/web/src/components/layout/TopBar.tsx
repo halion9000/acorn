@@ -58,6 +58,8 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/compliance/controls': { title: 'Controls', description: 'Every control of the frameworks that are on, and how healthy it is' },
   '/compliance/access-reviews': { title: 'Access reviews', description: 'Check that the people with access to a system should still have it' },
   '/compliance/questionnaires': { title: 'Questionnaires', description: 'Answer customer security questionnaires from answers you already gave' },
+  '/compliance/audits': { title: 'Audits', description: 'An audit of a framework and what the auditor asks for' },
+  '/compliance/trust-center': { title: 'Trust center', description: 'What you show your customers about your security' },
   '/compliance/policies': { title: 'Policies', description: 'Written policies and what must be reviewed again' },
   '/compliance/vendors': { title: 'Vendors', description: 'Third parties you depend on, their risk and reviews' },
   '/compliance/frameworks': { title: 'Frameworks', description: 'Controls and evidence for each framework' },

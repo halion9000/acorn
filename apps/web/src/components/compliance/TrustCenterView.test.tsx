@@ -1,0 +1,70 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }));
+vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), trustCenterApi: api, msspApi: { listChildren: async () => [] } }));
+
+import { TrustCenterView } from './TrustCenterView';
+
+const center = (over: Record<string, unknown> = {}) => ({
+  enabled: true, headline: 'Security at Acme', about: 'We take it seriously.', contact_email: 'security@acme.com', documents: [{ name: 'SOC 2 report', url: 'https://acme.example/soc2.pdf' }],
+  frameworks: [{ framework: 'SOC2', controls: 60, healthy: 45, percent_healthy: 75 }], policies: [{ id: 'p1', title: 'Acceptable use', last_reviewed_at: '2026-10-01' }], updated_at: '2026-11-14T10:00:00Z', updated_by: 'hal@goliveoak.com',
+  available_frameworks: ['SOC2', 'HIPAA'], available_policies: [{ id: 'p1', title: 'Acceptable use' }, { id: 'p2', title: 'Access control' }], chosen_frameworks: ['SOC2'], chosen_policy_ids: ['p1'], ...over,
+});
+
+beforeEach(() => {
+  api.get.mockReset();
+  api.put.mockReset();
+  api.get.mockResolvedValue(center());
+  window.history.replaceState(null, '', '/compliance/trust-center');
+});
+
+describe('TrustCenterView', () => {
+  it('shows the page as a customer would read it: the headline, the health of each chosen framework as it is now, the policies and the documents', async () => {
+    render(<TrustCenterView />);
+    const preview = await screen.findByTestId('trust-preview');
+    expect(preview).toHaveTextContent('Security at Acme');
+    expect(screen.getByTestId('trust-frameworks')).toHaveTextContent('75% of 60 controls healthy');
+    expect(screen.getByTestId('trust-policies')).toHaveTextContent('Acceptable use');
+    expect(screen.getByTestId('trust-policies')).toHaveTextContent('reviewed 2026-10-01');
+    expect(within(screen.getByTestId('trust-documents')).getByRole('link', { name: 'SOC 2 report' })).toHaveAttribute('href', 'https://acme.example/soc2.pdf');
+    expect(preview).toHaveTextContent('security@acme.com');
+  });
+
+  it('says when it is not switched on and when no controls are tested yet', async () => {
+    api.get.mockResolvedValue(center({ enabled: false, frameworks: [{ framework: 'SOC2', controls: 60, healthy: 0, percent_healthy: 0 }], policies: [], documents: [] }));
+    render(<TrustCenterView />);
+    expect(await screen.findByTestId('trust-preview')).toHaveTextContent('(not switched on)');
+    api.get.mockResolvedValue(center({ frameworks: [{ framework: 'HIPAA', controls: 0, healthy: 0, percent_healthy: null }] }));
+  });
+
+  it('saves what was chosen: the switch, the text, the frameworks, the policies and the documents', async () => {
+    api.put.mockResolvedValue(center());
+    render(<TrustCenterView />);
+    const editor = await screen.findByTestId('trust-editor');
+    await userEvent.click(within(editor).getByLabelText('Show HIPAA'));
+    await userEvent.click(within(editor).getByLabelText('List Access control'));
+    await userEvent.type(within(editor).getByLabelText('Document name'), 'Pen test summary');
+    await userEvent.type(within(editor).getByLabelText('Document link'), 'https://acme.example/pt.pdf');
+    await userEvent.click(within(editor).getByRole('button', { name: 'Add document' }));
+    await userEvent.click(within(editor).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith('', {
+        enabled: true, headline: 'Security at Acme', about: 'We take it seriously.', contact_email: 'security@acme.com', frameworks: ['SOC2', 'HIPAA'], policy_ids: ['p1', 'p2'],
+        documents: [{ name: 'SOC 2 report', url: 'https://acme.example/soc2.pdf' }, { name: 'Pen test summary', url: 'https://acme.example/pt.pdf' }],
+      }),
+    );
+    expect(await within(editor).findByText('Saved.')).toBeTruthy();
+  });
+
+  it('says to turn a framework on when none is, and shows the reason when saving is refused', async () => {
+    api.get.mockResolvedValue(center({ available_frameworks: [], chosen_frameworks: [], frameworks: [] }));
+    api.put.mockRejectedValue(new Error('The link for Oops must start with https://'));
+    render(<TrustCenterView />);
+    const editor = await screen.findByTestId('trust-editor');
+    expect(editor).toHaveTextContent('No framework is turned on');
+    await userEvent.click(within(editor).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('must start with https://');
+  });
+});

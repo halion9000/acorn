@@ -7794,6 +7794,77 @@ export type VendorInput = Partial<Omit<VendorRow, 'id' | 'status' | 'review_stat
   clear_review_schedule?: boolean;
 };
 
+/** The trust center (GET/PUT /api/v1/compliance/trust-center). */
+export interface TrustCenter {
+  enabled: boolean;
+  headline: string;
+  about: string;
+  contact_email: string | null;
+  documents: { name: string; url: string }[];
+  frameworks: { framework: string; controls: number; healthy: number; percent_healthy: number | null }[];
+  policies: { id: string; title: string; last_reviewed_at: string | null }[];
+  updated_at: string | null;
+  updated_by: string | null;
+  available_frameworks: string[];
+  available_policies: { id: string; title: string }[];
+  chosen_frameworks: string[];
+  chosen_policy_ids: string[];
+}
+export const trustCenterApi = {
+  get: (clientId: string) => request<TrustCenter>(`/api/v1/compliance/trust-center?${riskQs(clientId)}`),
+  put: (clientId: string, body: { enabled: boolean; headline: string; about: string; contact_email: string | null; frameworks: string[]; policy_ids: string[]; documents: { name: string; url: string }[] }) =>
+    request<TrustCenter>(`/api/v1/compliance/trust-center?${riskQs(clientId)}`, { method: 'PUT', body: JSON.stringify(body) }),
+};
+
+/** Audits and their evidence requests (/api/v1/compliance/audits). */
+export interface AuditRequestRow {
+  id: string;
+  title: string;
+  control_id: string | null;
+  owner: string | null;
+  due_date: string | null;
+  status: 'open' | 'provided' | 'accepted';
+  overdue: boolean;
+  note: string;
+  link: string | null;
+  updated_at: string;
+}
+export interface AuditRow {
+  id: string;
+  name: string;
+  framework: string;
+  auditor: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  status: 'planning' | 'fieldwork' | 'review' | 'complete';
+  requests: number;
+  open: number;
+  provided: number;
+  accepted: number;
+  overdue: number;
+  created_at: string;
+}
+export interface AuditDetail extends AuditRow {
+  items: AuditRequestRow[];
+}
+export interface AuditList {
+  audits: AuditRow[];
+  frameworks: string[];
+}
+export const auditsApi = {
+  list: (clientId: string) => request<AuditList>(`/api/v1/compliance/audits?${riskQs(clientId)}`),
+  get: (clientId: string, id: string) => request<AuditDetail>(`/api/v1/compliance/audits/${encodeURIComponent(id)}?${riskQs(clientId)}`),
+  start: (clientId: string, body: { name: string; framework: string; auditor?: string | null; period_start?: string | null; period_end?: string | null }) =>
+    request<AuditDetail>(`/api/v1/compliance/audits?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  patch: (clientId: string, id: string, body: { name?: string; auditor?: string | null; status?: AuditRow['status'] }) =>
+    request<AuditDetail>(`/api/v1/compliance/audits/${encodeURIComponent(id)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  addRequest: (clientId: string, id: string, body: { title: string; control_id?: string | null; owner?: string | null; due_date?: string | null }) =>
+    request<AuditDetail>(`/api/v1/compliance/audits/${encodeURIComponent(id)}/requests?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  fromControls: (clientId: string, id: string) => request<AuditDetail>(`/api/v1/compliance/audits/${encodeURIComponent(id)}/requests/from-controls?${riskQs(clientId)}`, { method: 'POST' }),
+  patchRequest: (clientId: string, id: string, requestId: string, body: { status?: AuditRequestRow['status']; owner?: string | null; note?: string; link?: string | null; due_date?: string | null }) =>
+    request<AuditDetail>(`/api/v1/compliance/audits/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+};
+
 /** Security questionnaires and the answer library (/api/v1/compliance/questionnaires, /api/v1/compliance/answer-library). */
 export interface LibraryAnswer {
   id: string;
@@ -7994,7 +8065,7 @@ export interface ComplianceHealth {
   percent_healthy: number | null;
 }
 export interface ComplianceActionItem {
-  kind: 'evidence_expired' | 'risk_task' | 'vendor_review' | 'access_review';
+  kind: 'evidence_expired' | 'risk_task' | 'vendor_review' | 'access_review' | 'audit_request';
   name: string;
   event: string;
   owner: string | null;

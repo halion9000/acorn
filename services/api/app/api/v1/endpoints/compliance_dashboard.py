@@ -22,6 +22,7 @@ from app.api.v1.endpoints.compliance import FRAMEWORKS, ScopeTenant
 from app.models.access_review import AccessReview
 from app.models.compliance_enabled_framework import ComplianceEnabledFramework
 from app.models.risk_register import RiskRegisterItem, RiskRegisterTask
+from app.models.trust_audit import Audit, AuditRequest
 from app.models.vendor_management import Vendor, VendorReview
 from app.services import compliance_health, evidence_age, vendor_management
 from app.services.audit import emit_audit
@@ -73,7 +74,7 @@ class VendorLevels(BaseModel):
 
 
 class ActionItem(BaseModel):
-    kind: Literal["evidence_expired", "risk_task", "vendor_review", "access_review"]
+    kind: Literal["evidence_expired", "risk_task", "vendor_review", "access_review", "audit_request"]
     name: str
     event: str
     owner: str | None = None
@@ -276,6 +277,29 @@ async def dashboard(
                 owner=rev.reviewer,
                 due=datetime(rev.due_date.year, rev.due_date.month, rev.due_date.day, tzinfo=UTC),
                 link="/compliance/access-reviews",
+            )
+        )
+    for req, audit in (
+        await db.execute(
+            select(AuditRequest, Audit)
+            .join(Audit, Audit.id == AuditRequest.audit_id)
+            .where(
+                AuditRequest.tenant_id == tenant,
+                AuditRequest.status == "open",
+                AuditRequest.due_date.is_not(None),
+                Audit.status != "complete",
+            )
+        )
+    ).all():
+        assert req.due_date is not None
+        action_items.append(
+            ActionItem(
+                kind="audit_request",
+                name=f"Audit {audit.name}: {req.title}",
+                event="Request overdue" if req.due_date < today else "Request due",
+                owner=req.owner,
+                due=datetime(req.due_date.year, req.due_date.month, req.due_date.day, tzinfo=UTC),
+                link="/compliance/audits",
             )
         )
     action_items.sort(key=lambda a: (a.due is None, a.due or now))

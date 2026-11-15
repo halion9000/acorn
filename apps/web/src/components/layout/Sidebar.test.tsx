@@ -67,6 +67,8 @@ describe('Sidebar', () => {
       ['Vendors', '/compliance/vendors'],
       ['Access Reviews', '/compliance/access-reviews'],
       ['Questionnaires', '/compliance/questionnaires'],
+      ['Audits', '/compliance/audits'],
+      ['Trust Center', '/compliance/trust-center'],
       ['Asset Inventory', '/inventory'],
     ]);
     const vcio = screen.getByText('vCIO').closest('div')!;

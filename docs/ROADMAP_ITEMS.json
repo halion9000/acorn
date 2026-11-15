@@ -58,19 +58,21 @@
   },
   {
     "key": "audits-data-room",
-    "title": "Audits: auditor sign-in and a data room",
-    "detail": "An auditor role that signs in and sees only the evidence shared with it.",
+    "title": "Audits: auditor sign-in and a data room (the audit tracker is built)",
+    "detail": "Built: audits with evidence requests, from controls or typed, with owners, due dates, provided and accepted. Not built: a sign-in for the auditor, and a data room of files.",
     "area": "Compliance",
-    "status": "not_started",
-    "needs": "signoff"
+    "status": "in_progress",
+    "needs": "signoff",
+    "note": "Decision: does the auditor get their own sign-in (a role that sees only one audit), and where should the files live?"
   },
   {
     "key": "trust-center",
-    "title": "Trust center (sign-in first, optional public link later)",
-    "detail": "A page clients share with their customers showing their compliance posture and documents.",
+    "title": "Trust center: a public share link (the signed-in trust center is built)",
+    "detail": "Built: the trust center behind sign-in. Not built: a public link.",
     "area": "Compliance",
-    "status": "not_started",
-    "needs": "signoff"
+    "status": "in_progress",
+    "needs": "signoff",
+    "note": "Decision: do you want a public link at all, and if so one per client with a way to turn it off?"
   },
   {
     "key": "questionnaires",
@@ -88,7 +90,8 @@
     "detail": "Offer the Compliance section to clients, after it works for Live Oak itself.",
     "area": "Compliance",
     "status": "not_started",
-    "needs": "signoff"
+    "needs": "signoff",
+    "note": "The Compliance section is built for Live Oak and for clients chosen with the client picker. Showing it to clients in their own sign-in needs your decision on who sees what."
   },
   {
     "key": "vendor-management",
@@ -356,6 +359,22 @@
   {
     "key": "access-reviews",
     "title": "Access reviews in the Compliance sidebar",
+    "area": "Compliance",
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
+  },
+  {
+    "key": "audits-tracker",
+    "title": "Audits and evidence requests in the Compliance sidebar",
+    "area": "Compliance",
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
+  },
+  {
+    "key": "trust-center-page",
+    "title": "Trust center page (behind sign-in)",
     "area": "Compliance",
     "status": "completed",
     "needs": "claude",

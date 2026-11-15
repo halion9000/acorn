@@ -196,3 +196,20 @@ async def test_an_open_access_review_with_a_due_date_is_an_action_item_and_a_com
         ("Access review: Door badges", "Review overdue", "Hal", "/compliance/access-reviews")
     ]
     assert late.overdue
+
+
+async def test_an_open_audit_request_with_a_due_date_is_an_action_item_until_it_is_answered(world):
+    from app.api.v1.endpoints import audits as au
+
+    w = world
+    past = datetime.now(UTC).date() - timedelta(days=4)
+    audit = await run(w.acme, lambda db: au.start_audit(au.AuditIn(name="SOC 2 2026", framework="SOC2"), w.acme, db, w.user))
+    made = await run(
+        w.acme, lambda db: au.add_request(audit.id, au.RequestIn(title="Org chart", owner="Dana", due_date=past), w.acme, db, w.user)
+    )
+    items = [i for i in (await dash(w)).action_items if i.kind == "audit_request"]
+    assert [(i.name, i.event, i.owner, i.link) for i in items] == [
+        ("Audit SOC 2 2026: Org chart", "Request overdue", "Dana", "/compliance/audits")
+    ]
+    await run(w.acme, lambda db: au.patch_request(audit.id, made.items[0].id, au.RequestPatch(status="provided"), w.acme, db, w.user))
+    assert not [i for i in (await dash(w)).action_items if i.kind == "audit_request"]

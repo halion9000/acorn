@@ -80,6 +80,37 @@ def build_rows(frameworks: list[str], evidence: dict[str, dict[str, dict[str, An
     return out
 
 
+async def evidence_by_control(db: Any, tenant: Any, frameworks: list[str]) -> dict[str, dict[str, dict[str, Any]]]:
+    """The evidence held for each control of the given frameworks: ``{framework: {control id: {accepted, pending, rejected, newest}}}``."""
+    out: dict[str, dict[str, dict[str, Any]]] = {}
+    if not frameworks:
+        return out
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT framework, control_id,
+                       COUNT(*) FILTER (WHERE status = 'accepted') AS accepted,
+                       COUNT(*) FILTER (WHERE status = 'pending')  AS pending,
+                       COUNT(*) FILTER (WHERE status = 'rejected') AS rejected,
+                       MAX(collected_at) FILTER (WHERE status = 'accepted') AS newest
+                FROM aisoc_compliance_evidence
+                WHERE tenant_id = :t AND framework = ANY(CAST(:fws AS TEXT[]))
+                GROUP BY framework, control_id
+                """
+            ).bindparams(t=tenant, fws=frameworks)
+        )
+    ).all()
+    for r in rows:
+        out.setdefault(r.framework, {})[r.control_id] = {
+            "accepted": r.accepted,
+            "pending": r.pending,
+            "rejected": r.rejected,
+            "newest": r.newest,
+        }
+    return out
+
+
 _ORDER = {"unhealthy": 0, "at_risk": 1, "not_tested": 2, "healthy": 3}
 
 
@@ -97,31 +128,7 @@ async def list_controls(
         (await db.execute(select(ComplianceEnabledFramework.framework).where(ComplianceEnabledFramework.tenant_id == tenant))).scalars()
     )
     shown = [framework] if framework and framework in FRAMEWORKS else ([] if framework else [f for f in enabled if f in FRAMEWORKS])
-    evidence: dict[str, dict[str, dict[str, Any]]] = {}
-    if shown:
-        rows = (
-            await db.execute(
-                text(
-                    """
-                    SELECT framework, control_id,
-                           COUNT(*) FILTER (WHERE status = 'accepted') AS accepted,
-                           COUNT(*) FILTER (WHERE status = 'pending')  AS pending,
-                           COUNT(*) FILTER (WHERE status = 'rejected') AS rejected,
-                           MAX(collected_at) FILTER (WHERE status = 'accepted') AS newest
-                    FROM aisoc_compliance_evidence
-                    WHERE tenant_id = :t AND framework = ANY(CAST(:fws AS TEXT[]))
-                    GROUP BY framework, control_id
-                    """
-                ).bindparams(t=tenant, fws=shown)
-            )
-        ).all()
-        for r in rows:
-            evidence.setdefault(r.framework, {})[r.control_id] = {
-                "accepted": r.accepted,
-                "pending": r.pending,
-                "rejected": r.rejected,
-                "newest": r.newest,
-            }
+    evidence = await evidence_by_control(db, tenant, shown)
     everything = build_rows(shown, evidence, now, q)
     counts = dict.fromkeys(compliance_health.STATES, 0)
     for r in everything:

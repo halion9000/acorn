@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -401,7 +401,7 @@ async def approve_drafts(
     tenant: ScopeTenant,
     db: DBSession,
     user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
-    min_score: int = 80,
+    min_score: Annotated[int, Query(ge=0, le=100)] = 80,
 ) -> QuestionnaireDetail:
     q = await _questionnaire(db, tenant, questionnaire_id)
     if q.status == "complete":

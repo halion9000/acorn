@@ -27,6 +27,8 @@ export const PAGE_WORDS: Record<string, string[]> = {
   '/compliance/controls': ['controls', 'control health', 'evidence', 'healthy', 'unhealthy'],
   '/compliance/access-reviews': ['access review', 'who has access', 'user access', 'least privilege', 'recertification'],
   '/compliance/questionnaires': ['questionnaire', 'security questionnaire', 'vendor assessment', 'answer library', 'caiq', 'sig'],
+  '/compliance/audits': ['audit', 'auditor', 'evidence request', 'pbc', 'soc 2 audit'],
+  '/compliance/trust-center': ['trust center', 'trust page', 'security page', 'customers', 'share compliance'],
   '/compliance/policies': ['policy', 'policies', 'review calendar', 'procedures'],
   '/compliance/vendors': ['vendors', 'third party', 'suppliers', 'vendor risk', 'vendor review'],
   '/compliance/risk-register': ['risks', 'risk register', 'treatment', 'residual', 'likelihood'],

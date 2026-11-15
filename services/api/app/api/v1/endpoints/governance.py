@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
@@ -416,7 +416,9 @@ async def create_from_template(
 
 
 @router.get("/{item_id}/rendered", response_model=RenderedOut, dependencies=[Depends(require_permission("reports:read"))])
-async def rendered_version(item_id: uuid.UUID, user: AuthUser, db: DBSession, version: int | None = None) -> RenderedOut:
+async def rendered_version(
+    item_id: uuid.UUID, user: AuthUser, db: DBSession, version: Annotated[int | None, Query(ge=1, le=100_000)] = None
+) -> RenderedOut:
     """A policy's text (the newest version, or the one asked for) with the organization, owner, version, dates filled in."""
     item = await _item(db, user.tenant_id, item_id)
     q = select(GovernanceVersion).where(GovernanceVersion.item_id == item_id, GovernanceVersion.tenant_id == user.tenant_id)
