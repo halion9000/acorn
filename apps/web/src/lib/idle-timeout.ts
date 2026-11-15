@@ -9,7 +9,7 @@
  * person goes to the login page with a note saying why.
  */
 
-import { AUTH_ACTIVITY_KEY, AUTH_TOKEN_KEY, clearSession, revokeServerSession, sessionHooks } from './auth-session';
+import { AUTH_ACTIVITY_KEY, clearSession, isSignedIn, revokeServerSession, sessionHooks } from './auth-session';
 
 /** Four hours. */
 export const IDLE_LIMIT_MS = 4 * 60 * 60 * 1000;
@@ -120,9 +120,5 @@ export function markActive(at: number = Date.now()): void {
 
 /** Whether this browser holds a saved sign-in (so there is something to time out). */
 export function hasSignIn(): boolean {
-  try {
-    return Boolean(window.localStorage.getItem(AUTH_TOKEN_KEY));
-  } catch {
-    return false;
-  }
+  return isSignedIn();
 }

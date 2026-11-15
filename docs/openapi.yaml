@@ -117,7 +117,8 @@ paths:
       tags:
       - auth
       summary: Refresh Token
-      description: Refresh access token using a valid refresh token.
+      description: Refresh access token using a valid refresh token (in the body,
+        or in the console's cookie).
       operationId: refresh_token_api_v1_auth_refresh_post
       requestBody:
         content:
@@ -2566,6 +2567,93 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/governance/templates:
+    get:
+      tags:
+      - compliance
+      summary: List Templates
+      description: The policy templates, and whether each is already in the library.
+      operationId: list_templates_api_v1_governance_templates_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/app__api__v1__endpoints__governance__TemplateOut'
+                type: array
+                title: Response List Templates Api V1 Governance Templates Get
+      security:
+      - HTTPBearer: []
+  /api/v1/governance/from-template:
+    post:
+      tags:
+      - compliance
+      summary: Create From Template
+      description: 'Add a policy to the library from a template: its text becomes
+        version 1 with the fields left as fields.'
+      operationId: create_from_template_api_v1_governance_from_template_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FromTemplate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__governance__ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/governance/{item_id}/rendered:
+    get:
+      tags:
+      - compliance
+      summary: Rendered Version
+      description: A policy's text (the newest version, or the one asked for) with
+        the organization, owner, version, dates filled in.
+      operationId: rendered_version_api_v1_governance__item_id__rendered_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: version
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Version
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RenderedOut'
         '422':
           description: Validation Error
           content:
@@ -24377,7 +24465,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/TemplateOut'
+                  $ref: '#/components/schemas/app__api__v1__endpoints__reports__TemplateOut'
                 type: array
                 title: Response List Templates Api V1 Reports Templates Get
       security:
@@ -24399,7 +24487,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TemplateOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__reports__TemplateOut'
         '422':
           description: Validation Error
           content:
@@ -24430,7 +24518,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TemplateOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__reports__TemplateOut'
         '422':
           description: Validation Error
           content:
@@ -40022,6 +40110,22 @@ components:
         5 min, last event 12 min ago"). ``category`` is echoed back for
 
         client-side grouping without re-deriving it.'
+    FromTemplate:
+      properties:
+        key:
+          type: string
+          maxLength: 60
+          minLength: 1
+          title: Key
+        owner:
+          type: string
+          maxLength: 120
+          title: Owner
+          default: ''
+      type: object
+      required:
+      - key
+      title: FromTemplate
     FrontendDetectionRule:
       properties:
         id:
@@ -47845,11 +47949,11 @@ components:
     RefreshRequest:
       properties:
         refresh_token:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: Refresh Token
       type: object
-      required:
-      - refresh_token
       title: RefreshRequest
     RefreshResponse:
       properties:
@@ -48061,6 +48165,29 @@ components:
       required:
       - name
       title: RenameWorkspaceRequest
+    RenderedOut:
+      properties:
+        title:
+          type: string
+          title: Title
+        version:
+          type: integer
+          title: Version
+        text:
+          type: string
+          title: Text
+        missing:
+          items:
+            type: string
+          type: array
+          title: Missing
+      type: object
+      required:
+      - title
+      - version
+      - text
+      - missing
+      title: RenderedOut
     ReplaceRulesRequest:
       properties:
         yaml:
@@ -54065,75 +54192,6 @@ components:
       - name
       - report_type
       title: TemplateCreate
-    TemplateOut:
-      properties:
-        name:
-          type: string
-          title: Name
-        report_type:
-          type: string
-          title: Report Type
-        cron_schedule:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Cron Schedule
-        timezone:
-          type: string
-          title: Timezone
-          default: UTC
-        sections:
-          items:
-            additionalProperties: true
-            type: object
-          type: array
-          title: Sections
-        recipients:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Recipients
-        output_format:
-          type: string
-          title: Output Format
-          default: pdf
-        id:
-          type: string
-          format: uuid
-          title: Id
-        tenant_id:
-          type: string
-          format: uuid
-          title: Tenant Id
-        is_enabled:
-          type: boolean
-          title: Is Enabled
-        last_run_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Last Run At
-        created_at:
-          type: string
-          format: date-time
-          title: Created At
-        updated_at:
-          type: string
-          format: date-time
-          title: Updated At
-      type: object
-      required:
-      - name
-      - report_type
-      - id
-      - tenant_id
-      - is_enabled
-      - created_at
-      - updated_at
-      title: TemplateOut
     TenantHeaderResponse:
       properties:
         id:
@@ -59345,6 +59403,37 @@ components:
           title: Next Due
       type: object
       title: ItemPatch
+    app__api__v1__endpoints__governance__TemplateOut:
+      properties:
+        key:
+          type: string
+          title: Key
+        title:
+          type: string
+          title: Title
+        summary:
+          type: string
+          title: Summary
+        interval_days:
+          type: integer
+          title: Interval Days
+        fields:
+          items:
+            type: string
+          type: array
+          title: Fields
+        added:
+          type: boolean
+          title: Added
+      type: object
+      required:
+      - key
+      - title
+      - summary
+      - interval_days
+      - fields
+      - added
+      title: TemplateOut
     app__api__v1__endpoints__hunt_alert_search__HuntResponse:
       properties:
         total:
@@ -60727,6 +60816,75 @@ components:
       - unmapped
       - alerts_raised
       title: ReportOut
+    app__api__v1__endpoints__reports__TemplateOut:
+      properties:
+        name:
+          type: string
+          title: Name
+        report_type:
+          type: string
+          title: Report Type
+        cron_schedule:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cron Schedule
+        timezone:
+          type: string
+          title: Timezone
+          default: UTC
+        sections:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Sections
+        recipients:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Recipients
+        output_format:
+          type: string
+          title: Output Format
+          default: pdf
+        id:
+          type: string
+          format: uuid
+          title: Id
+        tenant_id:
+          type: string
+          format: uuid
+          title: Tenant Id
+        is_enabled:
+          type: boolean
+          title: Is Enabled
+        last_run_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Run At
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - name
+      - report_type
+      - id
+      - tenant_id
+      - is_enabled
+      - created_at
+      - updated_at
+      title: TemplateOut
     app__api__v1__endpoints__risk_register__Summary:
       properties:
         total:

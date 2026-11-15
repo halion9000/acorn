@@ -28,6 +28,14 @@ export const AUTH_REFRESH_KEY = 'aisoc.responder.refreshToken';
 export const AUTH_USER_KEY = 'aisoc.responder.user';
 /** When a person last did something in the console (see idle-timeout.ts); forgotten with the sign-in, so a new login starts a fresh clock. */
 export const AUTH_ACTIVITY_KEY = 'aisoc.responder.lastActive';
+/**
+ * "The sign-in lives in httpOnly cookies the server set": the only thing kept here for it, and not a secret. When it is set no token is kept in browser storage at all, so a script running in the page cannot read one.
+ * It is set only after a request WITHOUT any token has been answered as signed in, so a sign-in whose cookies did not stick (a proxy stripping them) falls back to keeping the tokens, as before.
+ */
+export const AUTH_COOKIE_SESSION_KEY = 'aisoc.responder.cookieSession';
+/** Every console request carries this; a request that changes data and is authenticated by the cookie alone is refused by the server without it. */
+const CONSOLE_HEADER = 'X-Requested-With';
+const CONSOLE_VALUE = 'aisoc-console';
 
 /** Replaceable in tests (jsdom cannot intercept window.location.assign). */
 export const sessionHooks = {
@@ -67,6 +75,42 @@ const setItem = (key: string, value: string): void => {
   }
 };
 
+/** Whether this browser's sign-in is carried by cookies (see AUTH_COOKIE_SESSION_KEY). */
+export function hasCookieSession(): boolean {
+  return getItem(AUTH_COOKIE_SESSION_KEY) === '1';
+}
+
+/** Whether there is any sign-in here at all: a cookie sign-in, or tokens kept the older way. */
+export function isSignedIn(): boolean {
+  return hasCookieSession() || Boolean(getItem(AUTH_TOKEN_KEY)) || Boolean(getItem(AUTH_REFRESH_KEY));
+}
+
+/**
+ * Right after a sign-in (or a refresh that used a stored token): ask the server who this is WITHOUT presenting any token. If it answers, the cookies it just set work: remember that, and keep no token.
+ * If it does not, keep the tokens the older way so the person can still use the console. Returns true when the sign-in is carried by cookies.
+ */
+export async function establishSession(tokens: { access_token?: string; refresh_token?: string } | null): Promise<boolean> {
+  try {
+    const probe = await fetch(ME_PATH, { headers: { [CONSOLE_HEADER]: CONSOLE_VALUE }, cache: 'no-store' });
+    if (probe.ok) {
+      setItem(AUTH_COOKIE_SESSION_KEY, '1');
+      try {
+        const s = store();
+        s?.removeItem(AUTH_TOKEN_KEY);
+        s?.removeItem(AUTH_REFRESH_KEY);
+      } catch {
+        /* storage unavailable */
+      }
+      return true;
+    }
+  } catch {
+    /* the probe failed: keep the tokens */
+  }
+  if (tokens?.access_token) setItem(AUTH_TOKEN_KEY, tokens.access_token);
+  if (tokens?.refresh_token) setItem(AUTH_REFRESH_KEY, tokens.refresh_token);
+  return false;
+}
+
 export function clearSession(): void {
   try {
     const s = store();
@@ -74,6 +118,7 @@ export function clearSession(): void {
     s?.removeItem(AUTH_REFRESH_KEY);
     s?.removeItem(AUTH_USER_KEY);
     s?.removeItem(AUTH_ACTIVITY_KEY);
+    s?.removeItem(AUTH_COOKIE_SESSION_KEY);
   } catch {
     /* storage unavailable */
   }
@@ -99,14 +144,14 @@ export interface ServerSignOut {
  */
 export async function revokeServerSession(timeoutMs = 4000): Promise<ServerSignOut> {
   const access = getItem(AUTH_TOKEN_KEY);
-  if (!access) return { ended: true, message: null };
+  if (!access && !hasCookieSession()) return { ended: true, message: null };
   const refresh = getItem(AUTH_REFRESH_KEY);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(LOGOUT_PATH, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${access}` },
+      headers: { 'Content-Type': 'application/json', [CONSOLE_HEADER]: CONSOLE_VALUE, ...(access ? { Authorization: `Bearer ${access}` } : {}) },
       body: JSON.stringify(refresh ? { refresh_token: refresh } : {}),
       signal: controller.signal,
     });
@@ -144,6 +189,13 @@ function apiPathOf(input: RequestInfo | URL): string | null {
   } catch {
     return null;
   }
+}
+
+function withConsole(init: RequestInit | undefined): RequestInit | undefined {
+  const headers = new Headers(init?.headers);
+  if (headers.has(CONSOLE_HEADER)) return init;
+  headers.set(CONSOLE_HEADER, CONSOLE_VALUE);
+  return { ...init, headers };
 }
 
 function withBearer(init: RequestInit | undefined, token: string | null): RequestInit | undefined {
@@ -185,20 +237,23 @@ let inflight: Promise<SessionState> | null = null;
 
 async function checkSession(): Promise<SessionState> {
   const refreshToken = getItem(AUTH_REFRESH_KEY);
+  const cookies = hasCookieSession();
   let refreshed = false;
-  if (refreshToken) {
+  if (refreshToken || cookies) {
     try {
       const r = await fetch(REFRESH_PATH, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        headers: { 'Content-Type': 'application/json', [CONSOLE_HEADER]: CONSOLE_VALUE },
+        body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {}),
       });
       if (r.ok) {
         const tokens = (await r.json()) as { access_token?: string; refresh_token?: string };
-        if (tokens.access_token) {
-          setItem(AUTH_TOKEN_KEY, tokens.access_token);
-          if (tokens.refresh_token) setItem(AUTH_REFRESH_KEY, tokens.refresh_token);
-          refreshed = true;
+        refreshed = true;
+        if (cookies) {
+          // The server set new cookies; there is nothing to keep here.
+        } else if (tokens.access_token) {
+          // An older sign-in that kept its tokens: the refresh also set cookies, so move to them when they work (and keep the tokens when they do not).
+          await establishSession(tokens);
         }
       } else if (r.status !== 401) {
         return 'unknown'; // server trouble: do not log anyone out over it
@@ -209,7 +264,7 @@ async function checkSession(): Promise<SessionState> {
   }
   try {
     const token = getItem(AUTH_TOKEN_KEY);
-    const me = await fetch(ME_PATH, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    const me = await fetch(ME_PATH, { headers: { [CONSOLE_HEADER]: CONSOLE_VALUE, ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
     if (me.status === 401) return 'dead';
     return refreshed ? 'refreshed' : 'valid';
   } catch {
@@ -229,7 +284,7 @@ function sharedSessionCheck(): Promise<SessionState> {
  */
 export function redirectIfSignedOut(production: boolean): boolean {
   if (!production || typeof window === 'undefined') return false;
-  if (getItem(AUTH_TOKEN_KEY) || getItem(AUTH_REFRESH_KEY)) return false;
+  if (isSignedIn()) return false;
   const here = window.location.pathname;
   if (OWN_AUTH_PREFIXES.some((p) => here === p || here.startsWith(`${p}/`))) return false;
   sessionHooks.redirectToLogin(`${here}${window.location.search}`);
@@ -257,7 +312,7 @@ export async function authFetch(input: RequestInfo | URL, init?: RequestInit): P
   const callerSetAuth = new Headers(init?.headers).has('Authorization');
   const replay = input instanceof Request ? input.clone() : input;
   const replayable = !(init?.body instanceof ReadableStream);
-  const res = await fetch(input, withViewAs(withBearer(init, getItem(AUTH_TOKEN_KEY)), path));
+  const res = await fetch(input, withConsole(withViewAs(withBearer(init, getItem(AUTH_TOKEN_KEY)), path)));
   dropRefusedView(res);
   if (res.status !== 401 || callerSetAuth || NO_RETRY_PATHS.includes(path) || !replayable) return res;
 
@@ -267,7 +322,7 @@ export async function authFetch(input: RequestInfo | URL, init?: RequestInit): P
     return res;
   }
   if (state === 'refreshed') {
-    const again = await fetch(replay, withViewAs(withBearer(init, getItem(AUTH_TOKEN_KEY)), path));
+    const again = await fetch(replay, withConsole(withViewAs(withBearer(init, getItem(AUTH_TOKEN_KEY)), path)));
     dropRefusedView(again);
     return again;
   }

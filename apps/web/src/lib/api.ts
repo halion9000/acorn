@@ -262,7 +262,7 @@ async function request<T>(path: string, options: FetchOptions = {}): Promise<T> 
 
 
 export { AUTH_TOKEN_KEY, AUTH_REFRESH_KEY, AUTH_USER_KEY } from './auth-session';
-import { AUTH_TOKEN_KEY, AUTH_REFRESH_KEY, AUTH_USER_KEY, authFetch, clearSession } from './auth-session';
+import { AUTH_TOKEN_KEY, AUTH_REFRESH_KEY, AUTH_USER_KEY, authFetch, clearSession, establishSession, isSignedIn } from './auth-session';
 import { rangeToInstants, type AlertDateRange } from './alert-date-range';
 import { getViewedTenantId, homeTenantId, setViewedTenantId, VIEW_AS_ERROR_HEADER } from './tenant-view';
 
@@ -292,13 +292,10 @@ export interface LoginResult extends TokenResponse {
   user: AuthUser;
 }
 
-function persistAuth(tokens: TokenResponse, user: AuthUser): void {
+/** Keep who the person is (not a secret). The tokens themselves are handled by establishSession: in httpOnly cookies the page cannot read, or, only when those did not work, in storage. */
+function persistAuth(_tokens: TokenResponse, user: AuthUser): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(AUTH_TOKEN_KEY, tokens.access_token);
-    if (tokens.refresh_token) {
-      window.localStorage.setItem(AUTH_REFRESH_KEY, tokens.refresh_token);
-    }
     window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
   } catch {
     /* localStorage unavailable; ignore */
@@ -322,15 +319,8 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ account_name: accountName, password, ...(totpCode ? { totp_code: totpCode } : {}) }),
     });
-    // Stash the access token now so the `me` request flows through the
-    // standard `Authorization: Bearer …` path in `request()`.
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.setItem(AUTH_TOKEN_KEY, tokens.access_token);
-      } catch {
-        /* ignore */
-      }
-    }
+    // The server set httpOnly cookies. If they work, no token is kept in the browser; if they do not, the tokens are kept as before so the person can still use the console.
+    await establishSession(tokens);
     const user = await request<AuthUser>('/api/v1/auth/me');
     persistAuth(tokens, user);
     return { ...tokens, user };
@@ -356,13 +346,7 @@ export const authApi = {
 
   /** Finish a passkey sign-in: the tokens the passkey check returns become the same login a password sign-in gives. */
   async completeWithTokens(tokens: TokenResponse): Promise<LoginResult> {
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.setItem(AUTH_TOKEN_KEY, tokens.access_token);
-      } catch {
-        /* ignore */
-      }
-    }
+    await establishSession(tokens);
     const user = await request<AuthUser>('/api/v1/auth/me');
     persistAuth(tokens, user);
     return { ...tokens, user };
@@ -391,11 +375,7 @@ export const authApi = {
 
   isAuthenticated(): boolean {
     if (typeof window === 'undefined') return false;
-    try {
-      return Boolean(window.localStorage.getItem(AUTH_TOKEN_KEY));
-    } catch {
-      return false;
-    }
+    return isSignedIn();
   },
 
   /** Merge user preferences on the server (theme, layout, etc.). */

@@ -47,7 +47,7 @@ import logging
 import os
 import uuid
 from typing import Annotated, Any
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import quote, urlparse, urlsplit, urlunsplit
 
 import httpx
 from fastapi import (
@@ -71,6 +71,7 @@ from app.api.v1.dev_auth import (
     DEMO_USER_ROLE,
     is_dev_mode,
 )
+from app.auth import session_cookies
 from app.core.internal_auth import ingest_service_headers
 from app.core.security import decode_token
 from app.core.token_revocation import is_revoked, signed_out_everywhere
@@ -172,6 +173,17 @@ async def _authenticate_ws(
     )
 
 
+def cookie_token_for_ws(websocket: WebSocket) -> str | None:
+    """The console's sign-in cookie, for a socket opened without a ``?token=``. Browsers send cookies on a WebSocket open from any site, so the cookie counts only when the page that opened the socket is
+    this site (the Origin header names the same host as the Host header). A socket with no Origin is not a browser page and gets no cookie authentication."""
+    token = websocket.cookies.get(session_cookies.ACCESS_COOKIE)
+    origin = websocket.headers.get("origin")
+    host = websocket.headers.get("host")
+    if not token or not origin or not host:
+        return None
+    return token if urlparse(origin).netloc.lower() == host.lower() else None
+
+
 @router.websocket("/stream")
 async def graph_updates_stream(
     websocket: WebSocket,
@@ -192,7 +204,7 @@ async def graph_updates_stream(
     """
 
     await websocket.accept()
-    user = await _authenticate_ws(websocket, token, db)
+    user = await _authenticate_ws(websocket, token or cookie_token_for_ws(websocket), db)
     if user is None:
         return
 

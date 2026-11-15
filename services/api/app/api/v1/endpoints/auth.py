@@ -7,13 +7,14 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Request, Security, status
+from fastapi import APIRouter, HTTPException, Request, Response, Security, status
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select, update
 
 from app.api.v1.deps import AuthUser, DBSession, SessionUser, bearer_scheme, custom_role_grants, get_current_user
 from app.api.v1.endpoints.sso_microsoft import password_login_allowed
+from app.auth import session_cookies
 
 __all__ = ["router", "get_current_user"]
 from app.core.config import settings
@@ -68,7 +69,8 @@ class TokenResponse(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    # Absent when the console refreshes by cookie.
+    refresh_token: str | None = None
 
 
 class LogoutRequest(BaseModel):
@@ -156,6 +158,7 @@ async def login(
     request: LoginRequest,
     db: DBSession,
     http_request: Request = None,  # type: ignore[assignment]  # injected by FastAPI; None for a direct call
+    response: Response = None,  # type: ignore[assignment]  # injected by FastAPI; None for a direct call
 ) -> TokenResponse:
     """Authenticate with email/password, return JWT tokens.
 
@@ -220,6 +223,8 @@ async def login(
     }
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
+    if response is not None:
+        session_cookies.set_session_cookies(response, http_request, access_token, refresh_token)
 
     return TokenResponse(
         access_token=access_token,
@@ -232,13 +237,17 @@ async def logout(
     current_user: AuthUser,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_scheme)],
     body: LogoutRequest | None = None,
+    http_request: Request = None,  # type: ignore[assignment]  # injected by FastAPI; None for a direct call
+    response: Response = None,  # type: ignore[assignment]  # injected by FastAPI; None for a direct call
 ) -> LogoutResponse:
     """End this session on the server: revoke the access token (and the refresh token, if given) so neither works again, even if copied.
 
     Honest about what it did: ``revoked`` is false, with the reason, when there was nothing it could revoke (an API key, or a token issued before revocation existed);
     and if the revocation store is down it answers 503 rather than claiming the session ended.
     """
-    token = credentials.credentials if credentials else None
+    if response is not None:
+        session_cookies.clear_session_cookies(response)
+    token = credentials.credentials if credentials else session_cookies.access_token_from_cookie(http_request)
     if token is None:
         return LogoutResponse(revoked=False, detail="There is no session token to revoke.")
     if token.startswith("aisoc_"):
@@ -251,9 +260,10 @@ async def logout(
     to_revoke: list[tuple[str, Any]] = []
     if access.get("jti"):
         to_revoke.append((access["jti"], access["exp"]))
-    if body and body.refresh_token:
+    refresh_value = (body.refresh_token if body and body.refresh_token else None) or session_cookies.refresh_token_from_cookie(http_request)
+    if refresh_value:
         try:
-            refresh = decode_token(body.refresh_token)
+            refresh = decode_token(refresh_value)
         except Exception:
             refresh = {}
         # Only this user's own refresh token: a body must not be a way to sign someone else out.
@@ -307,10 +317,22 @@ async def change_own_password(body: ChangePasswordRequest, current_user: Session
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(request: RefreshRequest, db: DBSession) -> TokenResponse:
-    """Refresh access token using a valid refresh token."""
+async def refresh_token(
+    request: RefreshRequest,
+    db: DBSession,
+    http_request: Request = None,  # type: ignore[assignment]  # injected by FastAPI; None for a direct call
+    response: Response = None,  # type: ignore[assignment]  # injected by FastAPI; None for a direct call
+) -> TokenResponse:
+    """Refresh access token using a valid refresh token (in the body, or in the console's cookie)."""
+    presented = request.refresh_token or session_cookies.refresh_token_from_cookie(http_request)
+    if not presented:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    if not request.refresh_token and not session_cookies.csrf_ok(http_request):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="This request must come from the console (missing X-Requested-With)."
+        )
     try:
-        payload = decode_token(request.refresh_token)
+        payload = decode_token(presented)
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
         user_id = payload.get("sub")
@@ -335,7 +357,10 @@ async def refresh_token(request: RefreshRequest, db: DBSession) -> TokenResponse
     if claim == "replay":
         pair = await spent_pair(jti)
         if pair:
-            return TokenResponse(**json.loads(pair))
+            replayed = TokenResponse(**json.loads(pair))
+            if response is not None:
+                session_cookies.set_session_cookies(response, http_request, replayed.access_token, replayed.refresh_token or "")
+            return replayed
         logger.warning("auth.refresh_token_replayed user=%s", user.id)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has already been used")
 
@@ -352,6 +377,8 @@ async def refresh_token(request: RefreshRequest, db: DBSession) -> TokenResponse
     )
     if claim == "fresh":
         await remember_refresh_pair(jti, issued.model_dump_json(include={"access_token", "refresh_token"}))
+    if response is not None:
+        session_cookies.set_session_cookies(response, http_request, issued.access_token, issued.refresh_token or "")
     return issued
 
 

@@ -118,9 +118,9 @@ describe('asking for the viewed tenant', () => {
     viewing('c1');
     window.localStorage.setItem(AUTH_REFRESH_KEY, 'r1');
     let first = true;
-    install((url) => {
+    install((url, init) => {
       if (url === '/api/v1/auth/refresh') return json(200, { access_token: 'tok2', refresh_token: 'r2' });
-      if (url === '/api/v1/auth/me') return json(200);
+      if (url === '/api/v1/auth/me') return new Headers(init?.headers).get('Authorization') ? json(200) : json(401);
       if (first) {
         first = false;
         return json(401);
@@ -191,9 +191,9 @@ describe('when the API refuses the view', () => {
     viewing('c1');
     window.localStorage.setItem(AUTH_REFRESH_KEY, 'r1');
     let first = true;
-    install((url) => {
+    install((url, init) => {
       if (url === '/api/v1/auth/refresh') return json(200, { access_token: 'tok2', refresh_token: 'r2' });
-      if (url === '/api/v1/auth/me') return json(200);
+      if (url === '/api/v1/auth/me') return new Headers(init?.headers).get('Authorization') ? json(200) : json(401);
       if (first) {
         first = false;
         return json(401); // the token had expired: refresh, then retry

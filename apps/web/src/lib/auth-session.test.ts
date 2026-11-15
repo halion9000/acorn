@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  AUTH_COOKIE_SESSION_KEY,
   AUTH_REFRESH_KEY,
   AUTH_TOKEN_KEY,
   AUTH_USER_KEY,
   authFetch,
+  establishSession,
+  hasCookieSession,
+  isSignedIn,
   redirectIfSignedOut,
+  revokeServerSession,
   sessionHooks,
 } from './auth-session';
 
@@ -56,12 +61,17 @@ describe('authFetch: attaching the token', () => {
     await authFetch('/api/v1/cases');
     expect(calls[0].auth).toBeNull();
   });
-  it('with no token the call is passed through completely untouched (development unchanged)', async () => {
+  it('with no token the call goes out with no Authorization and only the console header added (development unchanged)', async () => {
     let seen: RequestInit | undefined;
     install((_url, init) => { seen = init; return json(200); });
     const init: RequestInit = { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: '{}' };
     await authFetch('/api/v1/marketplace/install', init);
-    expect(seen).toBe(init); // the very same object, not a rebuilt copy
+    // Only the console header is added; everything the caller set is carried over as it was.
+    expect(seen).toMatchObject({ method: 'POST', credentials: 'include', body: '{}' });
+    const headers = new Headers(seen?.headers);
+    expect(headers.get('Content-Type')).toBe('application/json');
+    expect(headers.get('X-Requested-With')).toBe('aisoc-console');
+    expect(headers.get('Authorization')).toBeNull();
   });
   it('never sends the token to another origin or a non-API path', async () => {
     window.localStorage.setItem(AUTH_TOKEN_KEY, 'tok1');
@@ -77,9 +87,9 @@ describe('authFetch: a 401', () => {
     window.localStorage.setItem(AUTH_TOKEN_KEY, 'old');
     window.localStorage.setItem(AUTH_REFRESH_KEY, 'r1');
     let cases = 0;
-    install((url) => {
+    install((url, init) => {
       if (url === '/api/v1/auth/refresh') return json(200, tokens('new', 'r2'));
-      if (url === '/api/v1/auth/me') return json(200);
+      if (url === '/api/v1/auth/me') return (new Headers(init?.headers).get('Authorization') ? json(200) : json(401));
       return ++cases === 1 ? json(401) : json(200, { ok: true });
     });
     const res = await authFetch('/api/v1/cases');
@@ -96,7 +106,7 @@ describe('authFetch: a 401', () => {
     window.localStorage.setItem(AUTH_REFRESH_KEY, 'r1');
     install(async (url, init) => {
       if (url === '/api/v1/auth/refresh') { await new Promise((r) => setTimeout(r, 20)); return json(200, tokens('new', 'r2')); }
-      if (url === '/api/v1/auth/me') return json(200);
+      if (url === '/api/v1/auth/me') return (new Headers(init?.headers).get('Authorization') ? json(200) : json(401));
       return new Headers(init?.headers).get('Authorization') === 'Bearer new' ? json(200) : json(401);
     });
     const all = await Promise.all([1, 2, 3, 4, 5].map((i) => authFetch(`/api/v1/things/${i}`)));
@@ -128,9 +138,9 @@ describe('authFetch: a 401', () => {
   it('an UNRELATED 401 (upstream passthrough) does not log you out', async () => {
     window.localStorage.setItem(AUTH_TOKEN_KEY, 'good');
     window.localStorage.setItem(AUTH_REFRESH_KEY, 'r1');
-    install((url) => {
+    install((url, init) => {
       if (url === '/api/v1/auth/refresh') return json(200, tokens('good2', 'r2'));
-      if (url === '/api/v1/auth/me') return json(200); // the session itself is fine
+      if (url === '/api/v1/auth/me') return (new Headers(init?.headers).get('Authorization') ? json(200) : json(401)); // the session itself is fine
       return json(401, { detail: 'vendor rejected your API key' });
     });
     const res = await authFetch('/api/v1/connectors/test', { method: 'POST', body: '{}' });
@@ -217,5 +227,80 @@ describe('redirectIfSignedOut: no saved sign-in goes straight to the login page'
     window.history.replaceState({}, '', '/login?next=%2Fcases');
     expect(redirectIfSignedOut(true)).toBe(false);
     expect(redirect).not.toHaveBeenCalled();
+  });
+});
+
+describe('sign-in carried by httpOnly cookies', () => {
+  it('after a sign-in the cookies work when a request with NO token is answered as signed in: no token is kept, and the marker is set', async () => {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, 'stale');
+    install((url) => (url === '/api/v1/auth/me' ? json(200, { id: 'u' }) : json(404)));
+    expect(await establishSession(tokens('A', 'R'))).toBe(true);
+    expect(onlyPath('/api/v1/auth/me')[0]!.auth).toBeNull();
+    expect(window.localStorage.getItem(AUTH_COOKIE_SESSION_KEY)).toBe('1');
+    expect(window.localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+    expect(window.localStorage.getItem(AUTH_REFRESH_KEY)).toBeNull();
+    expect(hasCookieSession() && isSignedIn()).toBe(true);
+  });
+
+  it('when the cookies did not stick (the tokenless request is refused) the tokens are kept the older way, so nobody is locked out', async () => {
+    install(() => json(401));
+    expect(await establishSession(tokens('A', 'R'))).toBe(false);
+    expect(window.localStorage.getItem(AUTH_TOKEN_KEY)).toBe('A');
+    expect(window.localStorage.getItem(AUTH_REFRESH_KEY)).toBe('R');
+    expect(hasCookieSession()).toBe(false);
+    install(() => 'network-error');
+    expect(await establishSession(tokens('B', 'S'))).toBe(false);
+    expect(window.localStorage.getItem(AUTH_TOKEN_KEY)).toBe('B');
+  });
+
+  it('a cookie sign-in sends no Authorization, carries the console header, and refreshes by cookie with an empty body', async () => {
+    window.localStorage.setItem(AUTH_COOKIE_SESSION_KEY, '1');
+    let first = true;
+    let refreshBody = '';
+    install((url, init) => {
+      if (url === '/api/v1/auth/refresh') {
+        refreshBody = String(init?.body);
+        return json(200, tokens('x', 'y'));
+      }
+      if (url === '/api/v1/auth/me') return json(200);
+      if (first) {
+        first = false;
+        return json(401);
+      }
+      return json(200, { ok: true });
+    });
+    const res = await authFetch('/api/v1/cases', { method: 'POST', body: '{}' });
+    expect(res.status).toBe(200);
+    expect(onlyPath('/api/v1/cases').every((c) => c.auth === null)).toBe(true);
+    expect(refreshBody).toBe('{}');
+    expect(window.localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it('an older sign-in that kept its tokens moves to cookies at its next refresh, and drops the stored tokens', async () => {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, 'old');
+    window.localStorage.setItem(AUTH_REFRESH_KEY, 'r1');
+    let n = 0;
+    install((url, init) => {
+      if (url === '/api/v1/auth/refresh') return json(200, tokens('new', 'r2'));
+      if (url === '/api/v1/auth/me') return new Headers(init?.headers).get('Authorization') ? json(200) : json(200, { cookies: true });
+      return ++n === 1 ? json(401) : json(200);
+    });
+    expect((await authFetch('/api/v1/cases')).status).toBe(200);
+    expect(window.localStorage.getItem(AUTH_COOKIE_SESSION_KEY)).toBe('1');
+    expect(window.localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+    expect(window.localStorage.getItem(AUTH_REFRESH_KEY)).toBeNull();
+  });
+
+  it('signing out of a cookie sign-in asks the server to end it with no Authorization header, and a person with no sign-in at all is already out', async () => {
+    window.localStorage.setItem(AUTH_COOKIE_SESSION_KEY, '1');
+    install(() => json(200, { revoked: true, detail: 'Session ended.' }));
+    expect(await revokeServerSession()).toEqual({ ended: true, message: null });
+    expect(onlyPath('/api/v1/auth/logout')).toHaveLength(1);
+    expect(onlyPath('/api/v1/auth/logout')[0]!.auth).toBeNull();
+    window.localStorage.clear();
+    install(() => json(500));
+    expect(await revokeServerSession()).toEqual({ ended: true, message: null });
+    expect(calls).toHaveLength(0);
   });
 });

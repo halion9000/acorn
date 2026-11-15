@@ -187,8 +187,10 @@
     "title": "A15: keep sign-in tokens out of browser storage",
     "detail": "Every person signs in again once.",
     "area": "Platform",
-    "status": "not_started",
-    "needs": "signoff"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built with a fallback. Please sign in once after the deploy and tell me if anything looks wrong.",
+    "completed_ref": "this commit"
   },
   {
     "key": "weekly-briefing",
@@ -322,5 +324,13 @@
     "status": "not_started",
     "needs": "signoff",
     "note": "Not urgent: clients will not see Compliance for a while."
+  },
+  {
+    "key": "a15-live-check",
+    "title": "Check sign-in after the cookie change: sign in, sign out, and open Live graph",
+    "detail": "Open the console, sign in (password, and Microsoft sign-in if you use it), reload, sign out. In the browser's developer tools the Application tab should show no aisoc.responder.accessToken in local storage and two cookies (aisoc_access, aisoc_refresh).",
+    "area": "Platform",
+    "status": "not_started",
+    "needs": "hal"
   }
 ]

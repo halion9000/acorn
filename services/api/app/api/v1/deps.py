@@ -39,6 +39,7 @@ from app.api.v1.dev_auth import (
     DEMO_USER_ROLE,
     is_dev_mode,
 )
+from app.auth import session_cookies
 from app.core.security import decode_token, has_permission, hash_api_key, permission_in
 from app.core.token_revocation import is_revoked, signed_out_everywhere
 from app.db.database import get_db
@@ -283,6 +284,22 @@ async def _resolve_api_key(raw_key: str, db: AsyncSession) -> CurrentUser:
     )
 
 
+def _credentials_or_cookie(
+    credentials: HTTPAuthorizationCredentials | None, request: Request | None
+) -> HTTPAuthorizationCredentials | None:
+    """The Authorization header when there is one (always preferred); otherwise the access cookie a console sign-in set. A request that changes data and is authenticated by the cookie alone must carry the console header."""
+    if credentials is not None or request is None:
+        return credentials
+    token = session_cookies.access_token_from_cookie(request)
+    if token is None:
+        return None
+    if not session_cookies.csrf_ok(request):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="This request must come from the console (missing X-Requested-With)."
+        )
+    return HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+
+
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_scheme)],
     db: AsyncSession = Depends(get_db),
@@ -293,6 +310,7 @@ async def get_current_user(
 
     That is the caller's own tenant, unless the request carries `X-View-As-Tenant` and the caller may view that tenant (read-only): see app.services.view_as for the rule, and why a bad or unauthorised value is an error and never ignored.
     """
+    credentials = _credentials_or_cookie(credentials, request)
     user = await _authenticate(credentials, db)
     requested = None if request is None or credentials is None else request.headers.get(VIEW_AS_HEADER)
     if not requested or not requested.strip() or is_account_level(request.url.path):
