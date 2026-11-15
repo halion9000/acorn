@@ -28,6 +28,7 @@ export const PAGE_WORDS: Record<string, string[]> = {
   '/compliance/access-reviews': ['access review', 'who has access', 'user access', 'least privilege', 'recertification'],
   '/compliance/questionnaires': ['questionnaire', 'security questionnaire', 'vendor assessment', 'answer library', 'caiq', 'sig'],
   '/metrics/tickets': ['tickets', 'metrics', 'csat', 'satisfaction', 'survey', 'response time', 'created', 'resolved'],
+  '/metrics/labor-hours': ['labor hours', 'hours', 'time entries', 'engineer', 'utilization', 'metrics'],
   '/finance/profitability': ['profit', 'margin', 'revenue', 'labor cost', 'money', 'finance'],
   '/finance/net-income': ['net income', 'profit', 'overhead', 'industry', 'utilization', 'hours', 'ranking', 'cost', 'finance'],
   '/compliance/audits': ['audit', 'auditor', 'evidence request', 'pbc', 'soc 2 audit'],

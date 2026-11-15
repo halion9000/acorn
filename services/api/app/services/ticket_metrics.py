@@ -133,3 +133,47 @@ def summarize(
             "high": sum(int(o.get("high") or 0) for o in open_rows),
         },
     }
+
+
+def labor_hours(payload: dict[str, Any], months: int, client: str | None = None) -> dict[str, Any]:
+    """Hours worked on tickets from the HaloPSA profitability summary: for the newest ``months`` months (counting back from the latest in the data), by month, by engineer, by client and by ticket type, for all
+    clients or one (matched by name). Hours only: no rates or money, so this is readable with ``metrics:view``. Hours are rounded to two decimals."""
+    all_months = sorted({str(m) for m in payload.get("months") or []})
+    chosen = all_months[-months:] if months > 0 else []
+    want = set(chosen)
+    agents = {str(a.get("id")): str(a.get("name") or "") for a in payload.get("agents") or []}
+    key = name_key(client) if client else ""
+    clients: dict[str, str] = {}
+    by_month: dict[str, float] = {m: 0.0 for m in chosen}
+    by_agent: dict[str, float] = {}
+    by_client: dict[str, float] = {}
+    by_type: dict[str, float] = {}
+    for h in payload.get("hours") or []:
+        month, name = str(h.get("month")), str(h.get("client") or "")
+        if month not in want:
+            continue
+        clients.setdefault(name_key(name), name)
+        if key and name_key(name) != key:
+            continue
+        hours = float(h.get("hours") or 0)
+        agent = str(h.get("agent_id") or "")
+        by_month[month] += hours
+        by_agent[agent] = by_agent.get(agent, 0.0) + hours
+        by_client[name] = by_client.get(name, 0.0) + hours
+        charge = str(h.get("charge_type") or "(none)")
+        by_type[charge] = by_type.get(charge, 0.0) + hours
+
+    def top(d: dict[str, float]) -> list[tuple[str, float]]:
+        return sorted(d.items(), key=lambda kv: (-kv[1], kv[0].lower()))
+
+    total = sum(by_month.values())
+    return {
+        "months": chosen,
+        "total_hours": round(total, 2),
+        "hours_per_month": round(total / len(chosen), 2) if chosen else None,
+        "clients": sorted(clients.values(), key=str.lower),
+        "by_month": [{"month": m, "hours": round(by_month[m], 2)} for m in chosen],
+        "by_agent": [{"agent_id": a, "name": agents.get(a) or f"Agent {a}", "hours": round(v, 2)} for a, v in top(by_agent)],
+        "by_client": [{"client": c, "hours": round(v, 2)} for c, v in top(by_client)],
+        "by_type": [{"type": t, "hours": round(v, 2)} for t, v in top(by_type)],
+    }

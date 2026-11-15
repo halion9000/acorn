@@ -414,6 +414,7 @@ const navSections: NavSection[] = [
     title: 'Metrics',
     items: [
       { label: 'Tickets and satisfaction', href: '/metrics/tickets', icon: <ScanIcon /> },
+      { label: 'Labor hours', href: '/metrics/labor-hours', icon: <ScanIcon /> },
     ],
   },
   {

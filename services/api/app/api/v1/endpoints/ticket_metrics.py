@@ -50,3 +50,17 @@ async def csat(
         return {"received_at": None, "companies": [], "summary": None}
     companies = sorted({str(r.get("company") or "") for r in row.payload.get("rows") or []} - {""}, key=str.lower)
     return {"received_at": row.received_at, "companies": companies, "summary": tm.csat_for(row.payload, months, company)}
+
+
+@router.get("/labor-hours", dependencies=[Depends(require_permission("metrics:view"))])
+async def labor_hours(
+    user: AuthUser,
+    db: DBSession,
+    months: Annotated[int, Query(ge=1, le=12)] = 3,
+    client: Annotated[str | None, Query(max_length=200)] = None,
+) -> dict[str, Any]:
+    """Hours worked on tickets for the newest ``months`` months, by month, engineer, client and ticket type, for one client (by name) or all. Hours only, no rates or money. ``received_at`` is None until CORE has sent the first HaloPSA summary."""
+    row = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    if row is None:
+        return {"received_at": None, "summary": None}
+    return {"received_at": row.received_at, "summary": tm.labor_hours(row.payload, months, client)}

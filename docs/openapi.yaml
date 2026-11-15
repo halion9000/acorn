@@ -2739,6 +2739,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/ticket-metrics/labor-hours:
+    get:
+      tags:
+      - reports
+      summary: Labor Hours
+      description: Hours worked on tickets for the newest ``months`` months, by month,
+        engineer, client and ticket type, for one client (by name) or all. Hours only,
+        no rates or money. ``received_at`` is None until CORE has sent the first HaloPSA
+        summary.
+      operationId: labor_hours_api_v1_reports_ticket_metrics_labor_hours_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 12
+          minimum: 1
+          default: 3
+          title: Months
+      - name: client
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Client
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Labor Hours Api V1 Reports Ticket Metrics Labor Hours
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/nist-coverage/{client_id}:
     get:
       tags:
