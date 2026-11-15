@@ -380,5 +380,1154 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit"
+  },
+  {
+    "key": "r7-ci-01",
+    "title": "Startup self-test names the connectors whose key could not be read",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-02",
+    "title": "One shared retry-with-backoff-and-jitter helper for every vendor read",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-03",
+    "title": "Keep the last 14 durations of each sweep and flag one that doubles",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-04",
+    "title": "Redact secrets in every log line through one function, tested with known key shapes",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-05",
+    "title": "update_core keeps the last three builds and offers a one-command rollback",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-06",
+    "title": "A script that simulates a bad update so the watchdog rollback is proven, not assumed",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-07",
+    "title": "Per-connector circuit breaker: pause a failing vendor for an hour and say so",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-08",
+    "title": "A single status page of what CORE is doing now: running sweeps and when each started",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-09",
+    "title": "scripts/slowest-tests.mjs listing the ten slowest hud tests",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-10",
+    "title": "One module reads environment keys by name, replacing scattered process.env reads",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-11",
+    "title": "Check A.C.O.R.N answers against the expected shape and log drift",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-12",
+    "title": "A test that every tool named in any skill exists in the tool catalog",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-13",
+    "title": "A table of every cron job with its last result and duration",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-14",
+    "title": "scripts/export-settings-names.mjs: list setting names (never values) for support",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-15",
+    "title": "Move secrets from the .env file into the Windows credential store",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-ci-16",
+    "title": "A shared CIPP read cache keyed by tenant and endpoint to cut 429 answers",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-17",
+    "title": "Show each vendor's remaining daily read budget on the health page",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-18",
+    "title": "scripts/deploy-check.mjs: pushed, verify passed, no BEC search running",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-19",
+    "title": "Warn when CORE's clock is more than a minute from A.C.O.R.N's",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-20",
+    "title": "A size cap and rotation check for hud/logs",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-21",
+    "title": "A dead-letter file for feed posts A.C.O.R.N refused with 4xx, counted on the health page",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-22",
+    "title": "Idempotency keys on action results so a restart cannot apply one twice",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-23",
+    "title": "Every sweep command-line entry accepts --dry-run",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-24",
+    "title": "Delay heavy sweeps two minutes after start so the window stays responsive",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-25",
+    "title": "Sample memory use hourly into the log and flag steady growth",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-26",
+    "title": "List the modules whose Windows-only paths have no path.win32 test, then add them",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-27",
+    "title": "Replace silent catch blocks in sweeps with counted dropped metrics",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-28",
+    "title": "Doctor script checks Node and pnpm versions against the pinned ones",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-29",
+    "title": "Doctor script checks ports, disk space and Docker and prints one verdict per line",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-30",
+    "title": "A module dependency graph doc and a test that fails on an import cycle",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-31",
+    "title": "The heartbeat carries commit, uptime and sweep count; A.C.O.R.N shows them",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-32",
+    "title": "A test that every shell command call site is on a reviewed allowlist",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-33",
+    "title": "Merge the duplicated connector descriptions into one source",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-ci-34",
+    "title": "A vendor error taxonomy (auth, rate, shape, network) used by the health page",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-35",
+    "title": "Show the age of each vendor's last successful read on the health page",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-36",
+    "title": "Rotate the CORE feed token and update both sides",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "hal",
+    "note": "Needs you to do or provide something."
+  },
+  {
+    "key": "r7-ci-37",
+    "title": "Install CORE on a clean Windows machine from the installer and note what breaks",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "hal",
+    "note": "Needs you to do or provide something."
+  },
+  {
+    "key": "r7-ci-38",
+    "title": "Rename the old aisoc-* files to acorn-* in one reviewed batch",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-ci-39",
+    "title": "A test that finds two file names differing only in case",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ci-40",
+    "title": "Make the hud test count part of the health page so a drop is visible",
+    "area": "Round 7: CORE improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-01",
+    "title": "Say license in every text the API and CORE produce, not only in the console",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-02",
+    "title": "Query-plan tests for the devices list on a table with many rows",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-03",
+    "title": "Every list endpoint is tested to cap its page size and its response size",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-04",
+    "title": "ETag and If-None-Match on the heavy fleet boards",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-05",
+    "title": "Skeleton placeholders instead of the word Loading on the main pages",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-06",
+    "title": "A keyboard shortcut help dialog opened with the question mark key",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-07",
+    "title": "Keep table sort and filters in the address on Devices and Alerts",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-08",
+    "title": "Audit-log entries for access reviews, questionnaires, audits, the trust center and the roadmap",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-09",
+    "title": "CSV export for vendors, risks, controls and audits",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-10",
+    "title": "The Compliance overview shows when it was worked out and has a refresh button",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-11",
+    "title": "Record the automated control tests nightly when a setting turns it on",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-12",
+    "title": "More control tests from checks that exist: DMARC enforcement, admin multi-factor, monitoring coverage",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-13",
+    "title": "Keep the history of SPF and DKIM results for failing senders to show a trend",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-14",
+    "title": "DMARC: a what-to-fix-next list per domain from the failure causes",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-15",
+    "title": "An accessibility test (labels and roles) over the key pages",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-16",
+    "title": "A script that checks text contrast in both themes",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-17",
+    "title": "Card layout for the Devices table on a phone",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-18",
+    "title": "Settings search also finds words inside the user guide",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-19",
+    "title": "A What's new page built from the guide bullets marked new",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-20",
+    "title": "An undo notice after a bulk alert action",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-21",
+    "title": "Platform health lists the five busiest callers under the request limit",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-22",
+    "title": "A retention job for old sweep runs and check history",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-23",
+    "title": "OpenAPI examples for the new compliance endpoints",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-24",
+    "title": "A render smoke test for every page file with mocked data, to catch a crash",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-25",
+    "title": "Vendor contract end dates inside 60 days appear as action items",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-26",
+    "title": "Link risks to the controls and vendors they concern",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-27",
+    "title": "Policy acceptance: who accepted which version, from the people A.C.O.R.N holds",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-28",
+    "title": "Access reviews that start themselves every quarter",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-29",
+    "title": "Questionnaires: import the questions from a CSV file",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-30",
+    "title": "Trust center: a print and PDF view",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-31",
+    "title": "Audit request templates for each framework (the usual evidence list)",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-32",
+    "title": "Add a piece of evidence to a control from the Controls page",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-33",
+    "title": "Give each control an owner",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-34",
+    "title": "Detected applications also from Google Workspace",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-ai-35",
+    "title": "A per-client switch that requires single sign-on",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-ai-36",
+    "title": "Review the mobile app plan and say what to keep",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "hal",
+    "note": "Needs you to do or provide something."
+  },
+  {
+    "key": "r7-ai-37",
+    "title": "A weekly email of the compliance action items",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-38",
+    "title": "The Devices page suggests the not-used tool tick when a client has none of it",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-39",
+    "title": "Roadmap page: sort by priority, filter by area, show a count for each tag",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-ai-40",
+    "title": "Decide how long audit logs are kept by default",
+    "area": "Round 7: A.C.O.R.N improvement",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-cf-01",
+    "title": "A weekly report of every device whose Huntress organization differs from its NinjaOne client, sent to A.C.O.R.N",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-02",
+    "title": "Deploy NinjaOne: remember the last organization, location and role chosen",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-03",
+    "title": "Deploy NinjaOne to a Mac: try the package path on a test Mac",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "hal",
+    "note": "Needs you to do or provide something."
+  },
+  {
+    "key": "r7-cf-04",
+    "title": "Send a ScreenConnect command to several machines at once with each answer listed",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-05",
+    "title": "Saved ScreenConnect commands (reboot, flush DNS, gpupdate) with a confirm step",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-06",
+    "title": "A Huntress agent report: version spread and agents more than two releases old",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-07",
+    "title": "A NinjaOne report of machines with no recent patch scan",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-08",
+    "title": "CIPP: list guest users older than a year for each client",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-09",
+    "title": "CIPP: list shared mailboxes with a sign-in enabled",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-10",
+    "title": "CIPP: list mailboxes with a forwarding rule to an outside address (extend the existing check to a list)",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-11",
+    "title": "Liongard: turn the disk and backup inspections into per-device lines with names",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-cf-12",
+    "title": "Auvik: report switches and firewalls with a firmware older than the vendor's current",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-13",
+    "title": "Meraki: list SSIDs with no encryption and clients that use them",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-14",
+    "title": "UniFi: report devices offline for more than a week",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-15",
+    "title": "ThreatMate: weekly change report (new exposed services and vulnerabilities)",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-16",
+    "title": "IT Glue: find clients with no documented backup or no network diagram",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-17",
+    "title": "HaloPSA: ticket-to-alert round trip: closing the ticket resolves the alert",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-cf-18",
+    "title": "HaloPSA: create a ticket for a failing automated control test",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-cf-19",
+    "title": "Slack: post the morning summary of new critical alerts to a channel",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-cf-20",
+    "title": "A daily CORE self-report: what ran, what failed, what changed",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-21",
+    "title": "A Cipher job that drafts the weekly client review paragraph from the data",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-22",
+    "title": "A Jax job that lists integrations whose last read is older than a day",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-23",
+    "title": "A Vera job that checks every client has a Halo contact for security notices",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-24",
+    "title": "An agent skill for answering a customer security questionnaire from the answer library",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-25",
+    "title": "An agent skill for writing the evidence note for an access review",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-26",
+    "title": "An agent skill for the quarterly vendor review",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-27",
+    "title": "An agent skill that explains an automated control test failure and the fix",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-28",
+    "title": "Agent memory of which alerts a person always closes as noise (per client), proposed as rules",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-cf-29",
+    "title": "Windows: a tray menu entry showing sweep status and the last update",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-30",
+    "title": "Windows: start with the machine as a service option",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-cf-31",
+    "title": "A local read-only page listing the connectors and when each last read",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-32",
+    "title": "Export the integration health as a CSV",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-33",
+    "title": "Offline mode: queue feed posts while A.C.O.R.N is unreachable and send them in order",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-34",
+    "title": "A command to replay one sweep for one client for debugging",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-35",
+    "title": "A command that prints what CORE would send for one client without sending it",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-36",
+    "title": "Support bundle: a zip of logs and settings names with secrets masked",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-cf-37",
+    "title": "A first-run wizard that checks each connector and says what is missing",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-cf-38",
+    "title": "Test the Cloudflare canary with a real honeytoken visit from outside",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "hal",
+    "note": "Needs you to do or provide something."
+  },
+  {
+    "key": "r7-cf-39",
+    "title": "Approve the weekly VM snapshot role command",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "hal",
+    "note": "Needs you to do or provide something."
+  },
+  {
+    "key": "r7-cf-40",
+    "title": "Add a second CORE VM for failover",
+    "area": "Round 7: CORE feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-af-01",
+    "title": "Compliance: a calendar of everything due (reviews, audits, contracts, policies)",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-02",
+    "title": "Compliance: a client-ready PDF of the overview",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-03",
+    "title": "Compliance: framework gap report listing controls with no evidence and no owner",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-04",
+    "title": "Compliance: map one control to several frameworks and show the overlap",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-05",
+    "title": "Compliance: evidence collection reminders by owner",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-06",
+    "title": "Vendors: a questionnaire sent to the vendor as a form with a link",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-af-07",
+    "title": "Vendors: a spend field and a total by category",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-08",
+    "title": "Vendors: shared owner view (my vendors)",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-09",
+    "title": "Risk register: a heat map over time",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-10",
+    "title": "Risk register: risk acceptance with an expiry and a reminder",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-11",
+    "title": "Policies: a diff between two versions",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-12",
+    "title": "Policies: a review workflow with an approver and an approval record",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-13",
+    "title": "Policies: a staff acceptance page with a link per person",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-af-14",
+    "title": "Personnel: a people list with onboarding and offboarding checklists",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-15",
+    "title": "Personnel: training completion from Huntress awareness training",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-16",
+    "title": "Audits: a read-only auditor view limited to one audit",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-af-17",
+    "title": "Audits: a data room of uploaded files per audit",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-af-18",
+    "title": "Trust center: a public share link with an off switch",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-af-19",
+    "title": "Alerts: a similar-alerts panel on an alert",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-20",
+    "title": "Alerts: notes that become a case timeline entry",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-21",
+    "title": "Alerts: a per-client noise report listing the rules that close the most",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-22",
+    "title": "Devices: a lifecycle view (age by purchase date, warranty, replacement plan)",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-23",
+    "title": "Devices: a saved view shared with the team",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-24",
+    "title": "Devices: a printable inventory per client",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-25",
+    "title": "Identities: a joiner and leaver report from the directory",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-26",
+    "title": "Identities: privileged account list with last sign-in",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-27",
+    "title": "DMARC: a one-click DNS record generator for the recommended policy",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-28",
+    "title": "DMARC: alerts when a new sender appears for a domain",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-29",
+    "title": "Posture: a client scorecard history chart",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-30",
+    "title": "Posture: a client comparison against the fleet median",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-31",
+    "title": "Reports: a quarterly business review pack per client",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-32",
+    "title": "Reports: schedule any report by email",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-33",
+    "title": "Search: one box that finds alerts, devices, people, vendors and controls",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-34",
+    "title": "Settings: an export and import of settings between organizations",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-af-35",
+    "title": "Roles: a role for read-only compliance viewers",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-af-36",
+    "title": "An in-app announcement banner a person can post for the team",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-37",
+    "title": "A client-facing portal with only the compliance pages",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "signoff",
+    "note": "Needs your decision before it is built."
+  },
+  {
+    "key": "r7-af-38",
+    "title": "Billing: a margin forecast from the license counts",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "r7-af-39",
+    "title": "Mobile: push notification for a critical alert",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "hal",
+    "note": "Needs you to do or provide something."
+  },
+  {
+    "key": "r7-af-40",
+    "title": "Webhook out: send compliance action items to any URL",
+    "area": "Round 7: A.C.O.R.N feature",
+    "status": "new",
+    "needs": "claude"
   }
 ]
