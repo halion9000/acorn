@@ -143,7 +143,7 @@ export function QuestionnairesView() {
   const [open, setOpen] = useState<QuestionnaireDetail | null>(null);
   const [problem, setProblem] = useState('');
   const [starting, setStarting] = useState(false);
-  const [form, setForm] = useState({ name: '', customer: '', due: '', questions: '' });
+  const [form, setForm] = useState({ name: '', due: '', questions: '' });
 
   useEffect(() => {
     setClientId(clientFromAddress(window.location.search));
@@ -202,18 +202,17 @@ export function QuestionnairesView() {
           onSubmit={async (e) => {
             e.preventDefault();
             try {
-              const made = await questionnairesApi.start(clientId, { name: form.name.trim(), customer: form.customer.trim() || null, due_date: form.due || null, questions: form.questions });
+              const made = await questionnairesApi.start(clientId, { name: form.name.trim(), due_date: form.due || null, questions: form.questions });
               setStarting(false);
-              setForm({ name: '', customer: '', due: '', questions: '' });
+              setForm({ name: '', due: '', questions: '' });
               changed(made);
             } catch (x) {
               fail(x);
             }
           }}
         >
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2">
             <input aria-label="Name of the questionnaire" required minLength={3} placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={field} />
-            <input aria-label="Customer" placeholder="Customer" value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })} className={field} />
             <input aria-label="Due" type="date" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} className={field} />
           </div>
           <textarea aria-label="Questions" required rows={6} placeholder="Paste the questions, one to a line" value={form.questions} onChange={(e) => setForm({ ...form, questions: e.target.value })} className={`${field} block w-full`} />
@@ -234,7 +233,6 @@ export function QuestionnairesView() {
             <thead className="bg-gray-900/60 text-xs uppercase text-gray-500">
               <tr>
                 <th className="px-3 py-2">Questionnaire</th>
-                <th className="px-3 py-2">Customer</th>
                 <th className="px-3 py-2">Due</th>
                 <th className="px-3 py-2">Progress</th>
                 <th className="px-3 py-2">Status</th>
@@ -248,7 +246,6 @@ export function QuestionnairesView() {
                       {q.name}
                     </button>
                   </td>
-                  <td className="px-3 py-2 text-gray-300">{q.customer ?? '—'}</td>
                   <td className={`px-3 py-2 ${q.overdue ? 'text-red-300' : 'text-gray-300'}`}>{q.due_date ?? '—'}</td>
                   <td className="px-3 py-2 text-xs text-gray-400">
                     {q.approved} of {q.questions} approved; {q.drafted} drafted, {q.blank} blank
@@ -286,6 +283,22 @@ export function QuestionnairesView() {
             )}
             <button type="button" className={btn} onClick={() => void questionnairesApi.exportCsv(clientId, open.id).then((csv) => downloadText(`${open.name.replace(/[^A-Za-z0-9._-]+/g, '-')}.csv`, csv)).catch(fail)}>
               Export CSV
+            </button>
+            <button
+              type="button"
+              className="rounded border border-red-500/40 px-3 py-1 text-xs text-red-300 hover:bg-red-500/10"
+              onClick={() => {
+                if (!window.confirm(`Delete "${open.name}" and all its questions? Answers kept in the library stay. This cannot be undone.`)) return;
+                void questionnairesApi
+                  .remove(clientId, open.id)
+                  .then(() => {
+                    setOpen(null);
+                    void load();
+                  })
+                  .catch(fail);
+              }}
+            >
+              Delete
             </button>
           </div>
           <ul className="space-y-2">

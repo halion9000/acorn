@@ -15143,6 +15143,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - compliance
+      summary: Delete a questionnaire and its questions (answers kept in the library
+        stay)
+      operationId: delete_questionnaire_api_v1_compliance_questionnaires__questionnaire_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: questionnaire_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Questionnaire Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/questionnaires/{questionnaire_id}/items/{item_id}:
     patch:
       tags:

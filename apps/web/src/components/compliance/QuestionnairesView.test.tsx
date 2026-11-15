@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const api = vi.hoisted(() => ({
-  list: vi.fn(), get: vi.fn(), start: vi.fn(), patchItem: vi.fn(), approveDrafts: vi.fn(), complete: vi.fn(), exportCsv: vi.fn(),
+  list: vi.fn(), get: vi.fn(), start: vi.fn(), patchItem: vi.fn(), approveDrafts: vi.fn(), complete: vi.fn(), exportCsv: vi.fn(), remove: vi.fn(),
   library: vi.fn(), addLibrary: vi.fn(), patchLibrary: vi.fn(), removeLibrary: vi.fn(),
 }));
 vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), questionnairesApi: api, msspApi: { listChildren: async () => [] } }));
@@ -75,7 +75,24 @@ describe('QuestionnairesView', () => {
     await userEvent.type(screen.getByLabelText('Name of the questionnaire'), 'Birch review');
     await userEvent.type(screen.getByLabelText('Questions'), 'Do you encrypt data?');
     await userEvent.click(screen.getByRole('button', { name: 'Draft the answers' }));
-    await waitFor(() => expect(api.start).toHaveBeenCalledWith('', { name: 'Birch review', customer: null, due_date: null, questions: 'Do you encrypt data?' }));
+    await waitFor(() => expect(api.start).toHaveBeenCalledWith('', { name: 'Birch review', due_date: null, questions: 'Do you encrypt data?' }));
+  });
+
+  it('asks the form for no customer name, and deletes a questionnaire only after a yes', async () => {
+    api.remove.mockResolvedValue(undefined);
+    render(<QuestionnairesView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Start a questionnaire' }));
+    expect(screen.queryByLabelText('Customer')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Start a questionnaire' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Acme vendor review' }));
+    const ask = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    expect(api.remove).not.toHaveBeenCalled();
+    ask.mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(api.remove).toHaveBeenCalledWith('', 'q1'));
+    await waitFor(() => expect(screen.queryByTestId('questionnaire-detail')).toBeNull());
+    ask.mockRestore();
   });
 
   it('the library lists the answers, adds one, and confirms or removes one', async () => {

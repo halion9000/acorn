@@ -439,6 +439,20 @@ async def complete_questionnaire(
     return await _detail(db, tenant, q)
 
 
+@router.delete(
+    "/{questionnaire_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a questionnaire and its questions (answers kept in the library stay)",
+)
+async def delete_questionnaire(
+    questionnaire_id: uuid.UUID, tenant: ScopeTenant, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("reports:write"))]
+) -> None:
+    q = await _questionnaire(db, tenant, questionnaire_id)
+    await audit.note(db, tenant, user, "questionnaire:deleted", "questionnaire", questionnaire_id)
+    await db.delete(q)
+    await db.commit()
+
+
 @router.get("/{questionnaire_id}/export.csv", summary="The questions and answers as a CSV file for the customer")
 async def export_questionnaire(
     questionnaire_id: uuid.UUID, tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]

@@ -7949,6 +7949,7 @@ export const questionnairesApi = {
     if (!res.ok) throw new ApiError(`API ${res.status} ${res.statusText} — export`, res.status, await res.text().catch(() => ''));
     return res.text();
   },
+  remove: (clientId: string, id: string) => request<void>(`/api/v1/compliance/questionnaires/${encodeURIComponent(id)}?${riskQs(clientId)}`, { method: 'DELETE' }),
   library: (clientId: string) => request<LibraryAnswer[]>(`/api/v1/compliance/answer-library?${riskQs(clientId)}`),
   addLibrary: (clientId: string, body: { question: string; answer: string; category?: string }) =>
     request<LibraryAnswer>(`/api/v1/compliance/answer-library?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),

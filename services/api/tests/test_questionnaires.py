@@ -188,3 +188,35 @@ async def test_the_library_keeps_answers_confirms_them_and_archives_without_dele
     with pytest.raises(HTTPException) as empty:
         await run(w.acme, lambda db: ep.start_questionnaire(ep.QuestionnaireIn(name="Empty one", questions="ok\n\n--"), w.acme, db, w.user))
     assert empty.value.status_code == 422
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_a_questionnaire_can_be_deleted_with_its_questions_but_the_library_and_other_clients_stay(world):
+    w = world
+    make = lambda tenant, name: run(  # noqa: E731
+        tenant,
+        lambda db: ep.start_questionnaire(
+            ep.QuestionnaireIn(name=name, questions="1. What is your EDR?\n2. What is your DNS filter?"),
+            tenant,
+            db,
+            SimpleNamespace(tenant_id=tenant, user_id=None, email="hal@goliveoak.com"),
+        ),
+    )
+    mine, theirs = await make(w.acme, "mine"), await make(w.birch, "theirs")
+    await run(w.acme, lambda db: ep.delete_questionnaire(mine.id, w.acme, db, w.user))
+    assert [x.name for x in (await run(w.acme, lambda db: ep.list_questionnaires(w.acme, db, w.user))).questionnaires] == []
+    with pytest.raises(HTTPException) as gone:
+        await run(w.acme, lambda db: ep.get_questionnaire(mine.id, w.acme, db, w.user))
+    assert gone.value.status_code == 404
+    async with w.engine.begin() as conn:
+        left = (await conn.execute(text("select count(*) from questionnaire_items where questionnaire_id = :q"), {"q": mine.id})).scalar()
+    assert left == 0, "its questions went with it"
+    with pytest.raises(HTTPException) as other:
+        await run(w.acme, lambda db: ep.delete_questionnaire(theirs.id, w.acme, db, w.user))
+    assert other.value.status_code == 404, "another client's questionnaire cannot be deleted from here"
+    assert (
+        await run(
+            w.birch, lambda db: ep.get_questionnaire(theirs.id, w.birch, db, SimpleNamespace(tenant_id=w.birch, user_id=None, email="x"))
+        )
+    ).name == "theirs"
