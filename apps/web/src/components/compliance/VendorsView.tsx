@@ -7,7 +7,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
-import { apiErrorDetail, detectedAppsApi, vendorApi, type VendorDetail, type VendorInput, type VendorList, type VendorRow } from '@/lib/api';
+import { saveText } from '@/lib/saveFile';
+import { apiErrorDetail, detectedAppsApi, downloadCsv, vendorApi, type VendorDetail, type VendorInput, type VendorList, type VendorRow } from '@/lib/api';
 
 type Tab = 'dashboard' | 'register' | 'archive';
 const RISK_CLASS: Record<string, string> = {
@@ -460,7 +461,10 @@ export function VendorsView() {
         ))}
         <span className="flex-1" />
         {tab !== 'archive' && (
-          <div className="pb-1">
+          <div className="flex gap-2 pb-1">
+            <button type="button" onClick={() => void downloadCsv('/api/v1/compliance/vendors/export.csv', clientId).then((csv) => saveText('vendors.csv', csv)).catch((e) => setProblem(apiErrorDetail(e) ?? 'Could not export.'))} className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800">
+              Export CSV
+            </button>
             <button type="button" onClick={() => setAdding(true)} className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">
               Add vendor
             </button>

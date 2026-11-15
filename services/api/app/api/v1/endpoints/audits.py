@@ -12,7 +12,7 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -21,6 +21,7 @@ from app.api.v1.endpoints.compliance import FRAMEWORKS, ScopeTenant
 from app.api.v1.endpoints.compliance_controls import build_rows, evidence_by_control
 from app.models.trust_audit import Audit, AuditRequest
 from app.services import compliance_audit as audit
+from app.services import csv_export
 
 router = APIRouter(prefix="/compliance/audits", tags=["compliance"])
 
@@ -198,6 +199,40 @@ async def start_audit(
     await audit.note(db, tenant, user, "audit:started", "audit", a.id, name=a.name, framework=a.framework)
     await db.commit()
     return await _detail(db, tenant, a)
+
+
+@router.get("/export.csv", summary="Every audit request, with the audit it belongs to, as a CSV file")
+async def export_audits(
+    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+) -> Response:
+    today = datetime.now(UTC).date()
+    audits = {a.id: a for a in (await db.execute(select(Audit).where(Audit.tenant_id == tenant))).scalars()}
+    rows = []
+    for r in (await db.execute(select(AuditRequest).where(AuditRequest.tenant_id == tenant))).scalars():
+        a = audits.get(r.audit_id)
+        if a is not None:
+            rows.append(
+                [
+                    a.name,
+                    a.framework,
+                    a.auditor,
+                    a.status,
+                    r.title,
+                    r.control_id,
+                    r.owner,
+                    r.due_date,
+                    r.status,
+                    r.due_date is not None and r.status == "open" and r.due_date < today,
+                    r.note,
+                    r.link,
+                ]
+            )
+    rows.sort(key=lambda x: (str(x[0]), str(x[4])))
+    return csv_export.response(
+        "audits.csv",
+        ["Audit", "Framework", "Auditor", "Audit stage", "Request", "Control", "Owner", "Due", "Request status", "Overdue", "Note", "Link"],
+        rows,
+    )
 
 
 @router.get("/{audit_id}", response_model=AuditDetail, summary="One audit with its requests")

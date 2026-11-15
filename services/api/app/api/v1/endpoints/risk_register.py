@@ -12,13 +12,14 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.risk_register import RiskRegisterHistory, RiskRegisterItem, RiskRegisterTask
+from app.services import csv_export
 from app.services.audit import emit_audit
 from app.services.risk_register import CATEGORIES, LIBRARY, TREATMENTS, describe_changes, level, library_item, matrix, score
 
@@ -392,6 +393,54 @@ async def _detail(db: Any, tenant: uuid.UUID, risk_id: uuid.UUID) -> RiskDetail:
         **base.model_dump(),
         tasks=[_task(t, today) for t in tasks],
         history=[HistoryOut(actor=h.actor, action=h.action, detail=h.detail, created_at=h.created_at) for h in history],
+    )
+
+
+@router.get("/export.csv", summary="The risks as a CSV file")
+async def export_risks(
+    tenant: ScopeTenant,
+    db: DBSession,
+    user: Annotated[AuthUser, Depends(require_permission("reports:read"))],
+    archived: bool = Query(False),
+) -> Response:
+    out = await list_risks(tenant, db, user, archived)
+    return csv_export.response(
+        "risks.csv",
+        [
+            "Ref",
+            "Risk",
+            "Category",
+            "Owner",
+            "Likelihood",
+            "Impact",
+            "Score before",
+            "Level before",
+            "Treatment",
+            "Residual score",
+            "Residual level",
+            "Status",
+            "Open tasks",
+            "Updated",
+        ],
+        [
+            [
+                r.ref,
+                r.title,
+                r.category,
+                r.owner,
+                r.likelihood,
+                r.impact,
+                r.inherent_score,
+                r.inherent_level,
+                r.treatment,
+                r.residual_score,
+                r.residual_level,
+                r.status,
+                r.open_tasks,
+                r.updated_at,
+            ]
+            for r in out.risks
+        ],
     )
 
 

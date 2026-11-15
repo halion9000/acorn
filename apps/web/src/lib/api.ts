@@ -7794,6 +7794,13 @@ export type VendorInput = Partial<Omit<VendorRow, 'id' | 'status' | 'review_stat
   clear_review_schedule?: boolean;
 };
 
+/** A CSV the server makes (the compliance lists' export.csv routes), as text. `clientId` reads one client; `extra` adds filters. */
+export async function downloadCsv(path: string, clientId = '', extra = ''): Promise<string> {
+  const res = await authFetch(`${path}?${riskQs(clientId, extra)}`);
+  if (!res.ok) throw new ApiError(`API ${res.status} ${res.statusText} — export`, res.status, await res.text().catch(() => ''));
+  return res.text();
+}
+
 /** Automated control tests (GET /api/v1/compliance/tests, POST /api/v1/compliance/tests/record). */
 export interface ControlTestResult {
   id: string;

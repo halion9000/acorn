@@ -4,7 +4,11 @@ import userEvent from '@testing-library/user-event';
 
 const vendorApi = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), archive: vi.fn(), restore: vi.fn(), startReview: vi.fn(), completeReview: vi.fn(), addDocument: vi.fn(), removeDocument: vi.fn() }));
 const detected = vi.hoisted(() => ({ list: vi.fn() }));
-vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), vendorApi, detectedAppsApi: detected, msspApi: { listChildren: async () => [] } }));
+const csv = vi.hoisted(() => vi.fn());
+const save = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/saveFile', () => ({ saveText: save }));
+vi.mock('@/lib/api', () => ({
+  downloadCsv: csv, apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), vendorApi, detectedAppsApi: detected, msspApi: { listChildren: async () => [] } }));
 
 import { VendorsView } from './VendorsView';
 
@@ -21,6 +25,9 @@ const detail = (over: Record<string, unknown> = {}) => ({ ...vendor(), applicati
 const waitingApps = (n: number) => ({ apps: [], counts: { new: n, added: 0, linked: 0, ignored: 0 }, vendors: [] });
 
 beforeEach(() => {
+  csv.mockReset();
+  save.mockReset();
+  csv.mockResolvedValue('a,b\n1,2\n');
   Object.values(vendorApi).forEach((m) => m.mockReset());
   detected.list.mockReset();
   vendorApi.list.mockResolvedValue(lists());
@@ -87,5 +94,22 @@ describe('VendorsView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save vendor' }));
     await waitFor(() => expect(vendorApi.create).toHaveBeenCalledWith('', expect.objectContaining({ name: 'Zoom', risk_level: 'unassessed' })));
     expect(await screen.findByTestId('vendor-detail')).toHaveTextContent('Zoom');
+  });
+});
+
+describe('VendorsView export', () => {
+  it('Export CSV fetches the file from the server and hands it to the browser as vendors.csv', async () => {
+    render(<VendorsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith('vendors.csv', 'a,b\n1,2\n'));
+    expect(csv.mock.calls[0]![0]).toBe('/api/v1/compliance/vendors/export.csv');
+  });
+
+  it('says why when the export is refused', async () => {
+    csv.mockRejectedValue(new Error('Forbidden'));
+    render(<VendorsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
+    expect(save).not.toHaveBeenCalled();
   });
 });

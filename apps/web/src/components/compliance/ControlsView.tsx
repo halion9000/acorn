@@ -8,7 +8,8 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
-import { apiErrorDetail, controlsApi, type ControlList } from '@/lib/api';
+import { saveText } from '@/lib/saveFile';
+import { apiErrorDetail, controlsApi, downloadCsv, type ControlList } from '@/lib/api';
 
 type State = 'all' | 'unhealthy' | 'at_risk' | 'not_tested' | 'healthy';
 export const STATE_LABEL: Record<Exclude<State, 'all'>, string> = { unhealthy: 'Unhealthy', at_risk: 'At risk', not_tested: 'Not tested', healthy: 'Healthy' };
@@ -79,6 +80,9 @@ export function ControlsView() {
               </option>
             ))}
           </select>
+<button type="button" onClick={() => void downloadCsv('/api/v1/compliance/controls/export.csv', clientId, `framework=${encodeURIComponent(framework)}&state=${state === 'all' ? '' : state}&q=${encodeURIComponent(debounced)}`).then((csv) => saveText('controls.csv', csv)).catch((e) => setProblem(apiErrorDetail(e) ?? 'Could not export.'))} className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800">
+              Export CSV
+            </button>
           <input aria-label="Search controls" placeholder="Search controls" value={search} onChange={(e) => setSearch(e.target.value)} className={`${field} w-56`} />
         </div>
       </div>

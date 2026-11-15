@@ -3,7 +3,11 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const api = vi.hoisted(() => ({ list: vi.fn() }));
-vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), controlsApi: api, msspApi: { listChildren: async () => [] } }));
+const csv = vi.hoisted(() => vi.fn());
+const save = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/saveFile', () => ({ saveText: save }));
+vi.mock('@/lib/api', () => ({
+  downloadCsv: csv, apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), controlsApi: api, msspApi: { listChildren: async () => [] } }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
 import { ControlsView } from './ControlsView';
@@ -17,6 +21,9 @@ const list = (rows = [row()], over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
+  csv.mockReset();
+  save.mockReset();
+  csv.mockResolvedValue('a,b\n1,2\n');
   api.list.mockReset();
   api.list.mockResolvedValue(list());
   window.history.replaceState(null, '', '/compliance/controls');
@@ -67,5 +74,22 @@ describe('ControlsView', () => {
     api.list.mockRejectedValue(new Error('Forbidden'));
     render(<ControlsView />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
+  });
+});
+
+describe('ControlsView export', () => {
+  it('Export CSV fetches the file from the server and hands it to the browser as controls.csv', async () => {
+    render(<ControlsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith('controls.csv', 'a,b\n1,2\n'));
+    expect(csv.mock.calls[0]![0]).toBe('/api/v1/compliance/controls/export.csv');
+  });
+
+  it('says why when the export is refused', async () => {
+    csv.mockRejectedValue(new Error('Forbidden'));
+    render(<ControlsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
+    expect(save).not.toHaveBeenCalled();
   });
 });

@@ -727,8 +727,9 @@
     "key": "r7-ai-09",
     "title": "CSV export for vendors, risks, controls and audits",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
   },
   {
     "key": "r7-ai-10",

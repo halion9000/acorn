@@ -9,14 +9,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import select, text
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import FRAMEWORKS, ScopeTenant
 from app.models.compliance_enabled_framework import ComplianceEnabledFramework
-from app.services import compliance_health, evidence_age
+from app.services import compliance_health, csv_export, evidence_age
 from app.services.compliance_catalog import CATALOGS
 
 router = APIRouter(prefix="/compliance/controls", tags=["compliance"])
@@ -136,3 +136,34 @@ async def list_controls(
     matching = [r for r in everything if state is None or r.state == state]
     matching.sort(key=lambda r: (_ORDER[r.state], r.framework, r.control_id))
     return ControlList(enabled=enabled, frameworks=shown, counts=counts, total=len(matching), rows=matching[:MAX_ROWS])
+
+
+@router.get("/export.csv", summary="The controls (every one that matches the filters) as a CSV file")
+async def export_controls(
+    tenant: ScopeTenant,
+    db: DBSession,
+    user: Annotated[AuthUser, Depends(require_permission("reports:read"))],
+    framework: str | None = Query(default=None, max_length=20),
+    state: str | None = Query(default=None, pattern="^(healthy|at_risk|unhealthy|not_tested)$"),
+    q: str = Query(default="", max_length=100),
+) -> Response:
+    out = await list_controls(tenant, db, user, framework, state, q)
+    return csv_export.response(
+        "controls.csv",
+        [
+            "Framework",
+            "Control",
+            "Title",
+            "Group",
+            "Health",
+            "Accepted evidence",
+            "Pending evidence",
+            "Rejected evidence",
+            "Newest accepted evidence",
+            "Age in days",
+        ],
+        [
+            [r.framework, r.control_id, r.title, r.group, r.state, r.accepted, r.pending, r.rejected, r.newest_evidence, r.age_days]
+            for r in out.rows
+        ],
+    )

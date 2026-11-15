@@ -7,7 +7,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
-import { apiErrorDetail, riskRegisterApi, type RiskDetail, type RiskInput, type RiskItem, type RiskLibraryItem, type RiskRegister } from '@/lib/api';
+import { saveText } from '@/lib/saveFile';
+import { apiErrorDetail, downloadCsv, riskRegisterApi, type RiskDetail, type RiskInput, type RiskItem, type RiskLibraryItem, type RiskRegister } from '@/lib/api';
 
 type Tab = 'dashboard' | 'register' | 'archive';
 const LEVEL_CLASS: Record<string, string> = {
@@ -435,6 +436,9 @@ export function RiskRegisterView() {
         <span className="flex-1" />
         {tab !== 'archive' && (
           <div className="flex gap-2 pb-1">
+            <button type="button" onClick={() => void downloadCsv('/api/v1/risk-register/export.csv', clientId).then((csv) => saveText('risks.csv', csv)).catch((e) => setProblem(apiErrorDetail(e) ?? 'Could not export.'))} className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800">
+              Export CSV
+            </button>
             <button type="button" onClick={() => { setLibrary(true); setAdding(false); }} className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800">
               Common risks
             </button>

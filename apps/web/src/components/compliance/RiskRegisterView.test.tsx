@@ -15,7 +15,11 @@ const api = vi.hoisted(() => ({
   updateTask: vi.fn(),
   deleteTask: vi.fn(),
 }));
-vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), riskRegisterApi: api, msspApi: { listChildren: async () => [] } }));
+const csv = vi.hoisted(() => vi.fn());
+const save = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/saveFile', () => ({ saveText: save }));
+vi.mock('@/lib/api', () => ({
+  downloadCsv: csv, apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), riskRegisterApi: api, msspApi: { listChildren: async () => [] } }));
 
 import { RiskRegisterView, cellLevel } from './RiskRegisterView';
 
@@ -32,6 +36,9 @@ const register = (risks = [risk()], over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
+  csv.mockReset();
+  save.mockReset();
+  csv.mockResolvedValue('a,b\n1,2\n');
   Object.values(api).forEach((m) => m.mockReset());
   api.list.mockResolvedValue(register());
   api.get.mockResolvedValue(detail());
@@ -135,5 +142,22 @@ describe('RiskRegisterView', () => {
     render(<RiskRegisterView />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Client not found');
     await waitFor(() => expect(api.list).toHaveBeenCalledWith('c9', false));
+  });
+});
+
+describe('RiskRegisterView export', () => {
+  it('Export CSV fetches the file from the server and hands it to the browser as risks.csv', async () => {
+    render(<RiskRegisterView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith('risks.csv', 'a,b\n1,2\n'));
+    expect(csv.mock.calls[0]![0]).toBe('/api/v1/risk-register/export.csv');
+  });
+
+  it('says why when the export is refused', async () => {
+    csv.mockRejectedValue(new Error('Forbidden'));
+    render(<RiskRegisterView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
+    expect(save).not.toHaveBeenCalled();
   });
 });

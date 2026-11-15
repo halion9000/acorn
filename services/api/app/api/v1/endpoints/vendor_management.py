@@ -13,13 +13,14 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.vendor_management import DetectedApplication, Vendor, VendorDocument, VendorHistory, VendorReview
+from app.services import csv_export
 from app.services.audit import emit_audit
 from app.services.vendor_management import CATEGORIES, DOC_TYPES, RISK_LEVELS, describe_changes, review_state
 
@@ -398,6 +399,54 @@ async def create_vendor(
     await _audit(db, tenant, user, request, "created", v)
     await db.commit()
     return await _detail(db, tenant, v.id)
+
+
+@router.get("/export.csv", summary="The vendors as a CSV file")
+async def export_vendors(
+    tenant: ScopeTenant,
+    db: DBSession,
+    user: Annotated[AuthUser, Depends(require_permission("reports:read"))],
+    archived: bool = Query(False),
+) -> Response:
+    out = await list_vendors(tenant, db, user, archived)
+    return csv_export.response(
+        "vendors.csv",
+        [
+            "Vendor",
+            "Category",
+            "Service",
+            "Owner",
+            "Risk level",
+            "Data it can reach",
+            "Two-factor",
+            "Contract start",
+            "Contract end",
+            "Review state",
+            "Next review",
+            "Last reviewed",
+            "Documents",
+            "Status",
+        ],
+        [
+            [
+                v.name,
+                v.category,
+                v.service,
+                v.owner,
+                v.risk_level,
+                v.data_access,
+                v.mfa,
+                v.contract_start,
+                v.contract_end,
+                v.review_state,
+                v.next_review_due,
+                v.last_reviewed,
+                v.document_count,
+                v.status,
+            ]
+            for v in out.vendors
+        ],
+    )
 
 
 @router.get("/{vendor_id}", response_model=VendorDetail, summary="One vendor with its reviews, documents and history")

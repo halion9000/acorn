@@ -3,7 +3,11 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const api = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), start: vi.fn(), patch: vi.fn(), addRequest: vi.fn(), fromControls: vi.fn(), patchRequest: vi.fn() }));
-vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), auditsApi: api, msspApi: { listChildren: async () => [] } }));
+const csv = vi.hoisted(() => vi.fn());
+const save = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/saveFile', () => ({ saveText: save }));
+vi.mock('@/lib/api', () => ({
+  downloadCsv: csv, apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), auditsApi: api, msspApi: { listChildren: async () => [] } }));
 
 import { AuditsView } from './AuditsView';
 
@@ -14,6 +18,9 @@ const request = (over: Record<string, unknown> = {}) => ({ id: 'r1', title: 'Org
 const detail = (over: Record<string, unknown> = {}) => ({ ...audit(), items: [request(), request({ id: 'r2', title: 'Backup test', status: 'provided', overdue: false, link: 'https://x.example/f' })], ...over });
 
 beforeEach(() => {
+  csv.mockReset();
+  save.mockReset();
+  csv.mockResolvedValue('a,b\n1,2\n');
   Object.values(api).forEach((m) => m.mockReset());
   api.list.mockResolvedValue({ audits: [audit()], frameworks: ['SOC2', 'ISO27001'] });
   api.get.mockResolvedValue(detail());
@@ -84,5 +91,22 @@ describe('AuditsView', () => {
     api.list.mockRejectedValue(new Error('Forbidden'));
     render(<AuditsView />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
+  });
+});
+
+describe('AuditsView export', () => {
+  it('Export CSV fetches the file from the server and hands it to the browser as audits.csv', async () => {
+    render(<AuditsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith('audits.csv', 'a,b\n1,2\n'));
+    expect(csv.mock.calls[0]![0]).toBe('/api/v1/compliance/audits/export.csv');
+  });
+
+  it('says why when the export is refused', async () => {
+    csv.mockRejectedValue(new Error('Forbidden'));
+    render(<AuditsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
+    expect(save).not.toHaveBeenCalled();
   });
 });

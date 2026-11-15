@@ -7,7 +7,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
-import { apiErrorDetail, auditsApi, type AuditDetail, type AuditList } from '@/lib/api';
+import { saveText } from '@/lib/saveFile';
+import { apiErrorDetail, auditsApi, downloadCsv, type AuditDetail, type AuditList } from '@/lib/api';
 
 const field = 'rounded border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100';
 const btn = 'rounded border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800 disabled:opacity-40';
@@ -160,9 +161,14 @@ export function AuditsView() {
           <ClientPicker value={clientId} onChange={setClientId} label="Whose audits" />
         </div>
       </div>
-      <button type="button" onClick={() => setStarting((v) => !v)} className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">
-        Start an audit
-      </button>
+      <div className="flex gap-2">
+        <button type="button" onClick={() => setStarting((v) => !v)} className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">
+          Start an audit
+        </button>
+        <button type="button" onClick={() => void downloadCsv('/api/v1/compliance/audits/export.csv', clientId).then((csv) => saveText('audits.csv', csv)).catch((e) => setProblem(apiErrorDetail(e) ?? 'Could not export.'))} className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800">
+              Export CSV
+            </button>
+      </div>
       {starting && data && (
         <form
           className="flex flex-wrap items-end gap-2 rounded-lg border border-gray-700 bg-gray-900/60 p-3"
