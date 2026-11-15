@@ -18,7 +18,15 @@ AREAS = ("workspace", "deployment", "clients", "automation", "tickets", "data", 
 
 # (method, path under /api/v1) -> the area it belongs to; the read routes need View, the writes Manage.
 ROUTES: dict[str, list[tuple[str, str]]] = {
-    "workspace": [("GET", "/tenants/me"), ("PATCH", "/tenants/me/name"), ("PATCH", "/tenants/me/settings")],
+    "workspace": [
+        ("GET", "/tenants/me"),
+        ("PATCH", "/tenants/me/name"),
+        ("PATCH", "/tenants/me/settings"),
+        ("GET", "/roadmap"),
+        ("POST", "/roadmap"),
+        ("PATCH", "/roadmap/{item_id}"),
+        ("DELETE", "/roadmap/{item_id}"),
+    ],
     "deployment": [
         ("GET", "/airgap/status"),
         ("GET", "/deployment/airgap/status"),

@@ -14390,6 +14390,476 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/questionnaires:
+    get:
+      tags:
+      - compliance
+      summary: The questionnaires, newest first
+      operationId: list_questionnaires_api_v1_compliance_questionnaires_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Start a questionnaire from pasted questions, drafting answers from
+        the library
+      operationId: start_questionnaire_api_v1_compliance_questionnaires_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionnaireIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/questionnaires/{questionnaire_id}:
+    get:
+      tags:
+      - compliance
+      summary: One questionnaire with every question and its answer
+      operationId: get_questionnaire_api_v1_compliance_questionnaires__questionnaire_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: questionnaire_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Questionnaire Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/questionnaires/{questionnaire_id}/items/{item_id}:
+    patch:
+      tags:
+      - compliance
+      summary: Write or change an answer, approve it, and keep it in the library for
+        next time
+      operationId: patch_item_api_v1_compliance_questionnaires__questionnaire_id__items__item_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: questionnaire_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Questionnaire Id
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__questionnaires__ItemPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/questionnaires/{questionnaire_id}/approve-drafts:
+    post:
+      tags:
+      - compliance
+      summary: Approve every drafted answer that came from the library with a close
+        match
+      operationId: approve_drafts_api_v1_compliance_questionnaires__questionnaire_id__approve_drafts_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: questionnaire_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Questionnaire Id
+      - name: min_score
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 80
+          title: Min Score
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/questionnaires/{questionnaire_id}/complete:
+    post:
+      tags:
+      - compliance
+      summary: Complete the questionnaire once every question is approved
+      operationId: complete_questionnaire_api_v1_compliance_questionnaires__questionnaire_id__complete_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: questionnaire_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Questionnaire Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/questionnaires/{questionnaire_id}/export.csv:
+    get:
+      tags:
+      - compliance
+      summary: The questions and answers as a CSV file for the customer
+      operationId: export_questionnaire_api_v1_compliance_questionnaires__questionnaire_id__export_csv_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: questionnaire_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Questionnaire Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/answer-library:
+    get:
+      tags:
+      - compliance
+      summary: The answers kept for next time
+      operationId: list_library_api_v1_compliance_answer_library_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/app__api__v1__endpoints__questionnaires__LibraryOut'
+                title: Response List Library Api V1 Compliance Answer Library Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Add an answer to the library
+      operationId: add_library_api_v1_compliance_answer_library_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LibraryIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__questionnaires__LibraryOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/answer-library/{answer_id}:
+    patch:
+      tags:
+      - compliance
+      summary: Change an answer, or confirm it is still true
+      operationId: patch_library_api_v1_compliance_answer_library__answer_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: answer_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Answer Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LibraryPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__questionnaires__LibraryOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - compliance
+      summary: Remove an answer from the library (it is archived, not deleted)
+      operationId: archive_library_api_v1_compliance_answer_library__answer_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: answer_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Answer Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/devices/settings:
     get:
       tags:
@@ -20182,7 +20652,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LibraryOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__vcio_risk_scoring__LibraryOut'
       security:
       - HTTPBearer: []
   /api/v1/vcio-risk-scoring/assessments:
@@ -43186,6 +43656,28 @@ components:
       - days_ago
       - silent
       title: LastReportedRow
+    LibraryIn:
+      properties:
+        question:
+          type: string
+          maxLength: 2000
+          minLength: 3
+          title: Question
+        answer:
+          type: string
+          maxLength: 10000
+          minLength: 1
+          title: Answer
+        category:
+          type: string
+          maxLength: 80
+          title: Category
+          default: General
+      type: object
+      required:
+      - question
+      - answer
+      title: LibraryIn
     LibraryItem:
       properties:
         id:
@@ -43219,53 +43711,34 @@ components:
       - description
       - added
       title: LibraryItem
-    LibraryOut:
+    LibraryPatch:
       properties:
-        questions:
-          items:
-            additionalProperties: true
-            type: object
-          type: array
-          title: Questions
-        categories:
-          items:
-            type: string
-          type: array
-          title: Categories
-        csf_functions:
-          items:
-            type: string
-          type: array
-          title: Csf Functions
-        severities:
-          items:
-            type: string
-          type: array
-          title: Severities
-        yesno_answers:
-          items:
-            type: string
-          type: array
-          title: Yesno Answers
-        vendor_answers:
-          items:
-            type: string
-          type: array
-          title: Vendor Answers
-        defaults:
-          additionalProperties: true
-          type: object
-          title: Defaults
+        question:
+          anyOf:
+          - type: string
+            maxLength: 2000
+            minLength: 3
+          - type: 'null'
+          title: Question
+        answer:
+          anyOf:
+          - type: string
+            maxLength: 10000
+            minLength: 1
+          - type: 'null'
+          title: Answer
+        category:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Category
+        confirm:
+          type: boolean
+          title: Confirm
+          default: false
       type: object
-      required:
-      - questions
-      - categories
-      - csf_functions
-      - severities
-      - yesno_answers
-      - vendor_answers
-      - defaults
-      title: LibraryOut
+      title: LibraryPatch
     LibraryPick:
       properties:
         library_id:
@@ -48291,6 +48764,188 @@ components:
       - rows
       - total_rows
       title: QueryResult
+    QuestionnaireDetail:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        customer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Customer
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        status:
+          type: string
+          title: Status
+        overdue:
+          type: boolean
+          title: Overdue
+        questions:
+          type: integer
+          title: Questions
+        approved:
+          type: integer
+          title: Approved
+        drafted:
+          type: integer
+          title: Drafted
+        blank:
+          type: integer
+          title: Blank
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        completed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Completed At
+        items:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__questionnaires__ItemOut'
+          type: array
+          title: Items
+      type: object
+      required:
+      - id
+      - name
+      - customer
+      - due_date
+      - status
+      - overdue
+      - questions
+      - approved
+      - drafted
+      - blank
+      - created_at
+      - completed_at
+      - items
+      title: QuestionnaireDetail
+    QuestionnaireIn:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 3
+          title: Name
+        customer:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Customer
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        questions:
+          type: string
+          maxLength: 200000
+          minLength: 3
+          title: Questions
+      type: object
+      required:
+      - name
+      - questions
+      title: QuestionnaireIn
+    QuestionnaireList:
+      properties:
+        questionnaires:
+          items:
+            $ref: '#/components/schemas/QuestionnaireOut'
+          type: array
+          title: Questionnaires
+        library_size:
+          type: integer
+          title: Library Size
+        categories:
+          items:
+            type: string
+          type: array
+          title: Categories
+      type: object
+      required:
+      - questionnaires
+      - library_size
+      - categories
+      title: QuestionnaireList
+    QuestionnaireOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        customer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Customer
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        status:
+          type: string
+          title: Status
+        overdue:
+          type: boolean
+          title: Overdue
+        questions:
+          type: integer
+          title: Questions
+        approved:
+          type: integer
+          title: Approved
+        drafted:
+          type: integer
+          title: Drafted
+        blank:
+          type: integer
+          title: Blank
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        completed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Completed At
+      type: object
+      required:
+      - id
+      - name
+      - customer
+      - due_date
+      - status
+      - overdue
+      - questions
+      - approved
+      - drafted
+      - blank
+      - created_at
+      - completed_at
+      title: QuestionnaireOut
     QueueAction:
       properties:
         priority:
@@ -61895,6 +62550,99 @@ components:
       - target
       - remapped
       title: MergeOut
+    app__api__v1__endpoints__questionnaires__ItemOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        position:
+          type: integer
+          title: Position
+        question:
+          type: string
+          title: Question
+        answer:
+          type: string
+          title: Answer
+        source:
+          type: string
+          title: Source
+        match_score:
+          type: integer
+          title: Match Score
+        approved:
+          type: boolean
+          title: Approved
+        approved_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Approved By
+      type: object
+      required:
+      - id
+      - position
+      - question
+      - answer
+      - source
+      - match_score
+      - approved
+      - approved_by
+      title: ItemOut
+    app__api__v1__endpoints__questionnaires__ItemPatch:
+      properties:
+        answer:
+          anyOf:
+          - type: string
+            maxLength: 10000
+          - type: 'null'
+          title: Answer
+        approved:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Approved
+        save_to_library:
+          type: boolean
+          title: Save To Library
+          default: false
+      type: object
+      title: ItemPatch
+    app__api__v1__endpoints__questionnaires__LibraryOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        question:
+          type: string
+          title: Question
+        answer:
+          type: string
+          title: Answer
+        category:
+          type: string
+          title: Category
+        last_reviewed:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Last Reviewed
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - id
+      - question
+      - answer
+      - category
+      - last_reviewed
+      - updated_at
+      title: LibraryOut
     app__api__v1__endpoints__rbac__RoleOut:
       properties:
         id:
@@ -62369,6 +63117,53 @@ components:
       required:
       - deleted
       title: DeletedOut
+    app__api__v1__endpoints__vcio_risk_scoring__LibraryOut:
+      properties:
+        questions:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Questions
+        categories:
+          items:
+            type: string
+          type: array
+          title: Categories
+        csf_functions:
+          items:
+            type: string
+          type: array
+          title: Csf Functions
+        severities:
+          items:
+            type: string
+          type: array
+          title: Severities
+        yesno_answers:
+          items:
+            type: string
+          type: array
+          title: Yesno Answers
+        vendor_answers:
+          items:
+            type: string
+          type: array
+          title: Vendor Answers
+        defaults:
+          additionalProperties: true
+          type: object
+          title: Defaults
+      type: object
+      required:
+      - questions
+      - categories
+      - csf_functions
+      - severities
+      - yesno_answers
+      - vendor_answers
+      - defaults
+      title: LibraryOut
     app__api__v1__endpoints__vcio_risk_scoring__TrendPoint:
       properties:
         id:

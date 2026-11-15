@@ -42,6 +42,7 @@ from app.models.oauth import OAuthAppCredential, OAuthState
 from app.models.outcome_suppression import OutcomeSuppression
 from app.models.posture import PostureDriftEvent, PostureFinding, PostureScanRun
 from app.models.published_replay import PublishedReplay
+from app.models.questionnaire import Questionnaire, QuestionnaireAnswer, QuestionnaireItem
 from app.models.remediation import RemediationGateLog, RemediationMaturity, RemediationWhitelist
 from app.models.report import ReportArtefact, ReportTemplate
 from app.models.responder import (
@@ -154,6 +155,9 @@ __all__ = [
     "AccessReview",
     "AccessReviewEntry",
     "DetectedApplication",
+    "Questionnaire",
+    "QuestionnaireAnswer",
+    "QuestionnaireItem",
     "RiskRegisterTask",
     "RoadmapItem",
     "Vendor",

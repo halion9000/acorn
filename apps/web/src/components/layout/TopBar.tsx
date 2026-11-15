@@ -57,6 +57,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/settings/roadmap': { title: 'Upcoming improvements', description: 'What is waiting to be built, who it waits on, and its priority' },
   '/compliance/controls': { title: 'Controls', description: 'Every control of the frameworks that are on, and how healthy it is' },
   '/compliance/access-reviews': { title: 'Access reviews', description: 'Check that the people with access to a system should still have it' },
+  '/compliance/questionnaires': { title: 'Questionnaires', description: 'Answer customer security questionnaires from answers you already gave' },
   '/compliance/policies': { title: 'Policies', description: 'Written policies and what must be reviewed again' },
   '/compliance/vendors': { title: 'Vendors', description: 'Third parties you depend on, their risk and reviews' },
   '/compliance/frameworks': { title: 'Frameworks', description: 'Controls and evidence for each framework' },

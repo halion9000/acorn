@@ -93,6 +93,10 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's vendor client list: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only add or rename that tenant's own client-mapping rows",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/detected-applications",
+    ): "CORE's list of the apps found in a client's Microsoft 365 tenant: authenticated by the core-feed token in the path, checked in the handler (401 without it); can only add or update that tenant's own detected-application rows",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/canary-tunnel",
     ): "CORE's Cloudflare canary card sends its tunnel token: authenticated by the core-feed token in the path, checked in the handler (401 without it); the token is checked, kept for the update script and never echoed",
     (

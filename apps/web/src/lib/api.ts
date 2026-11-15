@@ -7794,6 +7794,69 @@ export type VendorInput = Partial<Omit<VendorRow, 'id' | 'status' | 'review_stat
   clear_review_schedule?: boolean;
 };
 
+/** Security questionnaires and the answer library (/api/v1/compliance/questionnaires, /api/v1/compliance/answer-library). */
+export interface LibraryAnswer {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
+  last_reviewed: string | null;
+  updated_at: string;
+}
+export interface QuestionnaireItemRow {
+  id: string;
+  position: number;
+  question: string;
+  answer: string;
+  source: 'none' | 'library' | 'manual';
+  match_score: number;
+  approved: boolean;
+  approved_by: string | null;
+}
+export interface QuestionnaireRow {
+  id: string;
+  name: string;
+  customer: string | null;
+  due_date: string | null;
+  status: 'open' | 'complete';
+  overdue: boolean;
+  questions: number;
+  approved: number;
+  drafted: number;
+  blank: number;
+  created_at: string;
+  completed_at: string | null;
+}
+export interface QuestionnaireDetail extends QuestionnaireRow {
+  items: QuestionnaireItemRow[];
+}
+export interface QuestionnaireList {
+  questionnaires: QuestionnaireRow[];
+  library_size: number;
+  categories: string[];
+}
+export const questionnairesApi = {
+  list: (clientId: string) => request<QuestionnaireList>(`/api/v1/compliance/questionnaires?${riskQs(clientId)}`),
+  get: (clientId: string, id: string) => request<QuestionnaireDetail>(`/api/v1/compliance/questionnaires/${encodeURIComponent(id)}?${riskQs(clientId)}`),
+  start: (clientId: string, body: { name: string; customer?: string | null; due_date?: string | null; questions: string }) =>
+    request<QuestionnaireDetail>(`/api/v1/compliance/questionnaires?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  patchItem: (clientId: string, id: string, itemId: string, body: { answer?: string; approved?: boolean; save_to_library?: boolean }) =>
+    request<QuestionnaireDetail>(`/api/v1/compliance/questionnaires/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  approveDrafts: (clientId: string, id: string) => request<QuestionnaireDetail>(`/api/v1/compliance/questionnaires/${encodeURIComponent(id)}/approve-drafts?${riskQs(clientId)}`, { method: 'POST' }),
+  complete: (clientId: string, id: string) => request<QuestionnaireDetail>(`/api/v1/compliance/questionnaires/${encodeURIComponent(id)}/complete?${riskQs(clientId)}`, { method: 'POST' }),
+  exportCsv: async (clientId: string, id: string): Promise<string> => {
+    const res = await authFetch(`/api/v1/compliance/questionnaires/${encodeURIComponent(id)}/export.csv?${riskQs(clientId)}`);
+    if (!res.ok) throw new ApiError(`API ${res.status} ${res.statusText} — export`, res.status, await res.text().catch(() => ''));
+    return res.text();
+  },
+  library: (clientId: string) => request<LibraryAnswer[]>(`/api/v1/compliance/answer-library?${riskQs(clientId)}`),
+  addLibrary: (clientId: string, body: { question: string; answer: string; category?: string }) =>
+    request<LibraryAnswer>(`/api/v1/compliance/answer-library?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  patchLibrary: (clientId: string, id: string, body: { question?: string; answer?: string; category?: string; confirm?: boolean }) =>
+    request<LibraryAnswer>(`/api/v1/compliance/answer-library/${encodeURIComponent(id)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  removeLibrary: (clientId: string, id: string) => request<void>(`/api/v1/compliance/answer-library/${encodeURIComponent(id)}?${riskQs(clientId)}`, { method: 'DELETE' }),
+};
+
 /** Access reviews (GET/POST /api/v1/compliance/access-reviews ...). */
 export interface AccessReviewEntry {
   id: string;

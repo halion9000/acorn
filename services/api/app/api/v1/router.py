@@ -117,6 +117,7 @@ from app.api.v1.endpoints import (
     plugins,
     posture,
     push,
+    questionnaires,
     rbac,
     realtime,
     remediation,
@@ -290,6 +291,8 @@ api_router.include_router(detected_applications.ingest_router)
 api_router.include_router(access_reviews.router)
 api_router.include_router(compliance_controls.router)
 api_router.include_router(compliance_dashboard.router)
+api_router.include_router(questionnaires.router)
+api_router.include_router(questionnaires.library_router)
 api_router.include_router(devices.router)
 api_router.include_router(devices.ingest_router)
 api_router.include_router(remote_tools.router)

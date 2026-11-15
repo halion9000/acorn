@@ -1,7 +1,7 @@
 """The roadmap (Settings > Upcoming improvements): what is waiting to be built or fixed, who it waits on, how urgent it is and where it stands.
 
 The person sets priority, adds items of their own, and may move an item's status. Items kept in step from the repository file (see ``services/roadmap_sync.py``) have their wording, status and "needs" rewritten by that
-sync, never their priority. Nothing is deleted. Permission: ``settings:read`` to see, ``settings:write`` to change. The roadmap belongs to the caller's own organization.
+sync, never their priority. Nothing is deleted. Permission: the Workspace area of Settings (``settings_workspace:view`` to see, ``settings_workspace:manage`` to change). The roadmap belongs to the caller's own organization.
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ def _out(r: RoadmapItem) -> ItemOut:
 
 
 @router.get("", response_model=RoadmapOut, summary="Everything on the roadmap with the count in each status")
-async def list_items(db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings:read"))]) -> RoadmapOut:
+async def list_items(db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings_workspace:view"))]) -> RoadmapOut:
     rows = list(
         (await db.execute(select(RoadmapItem).where(RoadmapItem.tenant_id == user.tenant_id, RoadmapItem.removed_at.is_(None)))).scalars()
     )
@@ -85,7 +85,9 @@ async def list_items(db: DBSession, user: Annotated[AuthUser, Depends(require_pe
 
 
 @router.post("", response_model=ItemOut, status_code=status.HTTP_201_CREATED, summary="Add an item of your own")
-async def add_item(body: ItemIn, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings:write"))]) -> ItemOut:
+async def add_item(
+    body: ItemIn, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings_workspace:manage"))]
+) -> ItemOut:
     now = datetime.now(UTC)
     row = RoadmapItem(
         id=uuid.uuid4(),
@@ -106,7 +108,7 @@ async def add_item(body: ItemIn, db: DBSession, user: Annotated[AuthUser, Depend
 
 @router.patch("/{item_id}", response_model=ItemOut, summary="Set an item's priority, move its status, or change who it waits on")
 async def update_item(
-    item_id: uuid.UUID, body: ItemPatch, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings:write"))]
+    item_id: uuid.UUID, body: ItemPatch, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings_workspace:manage"))]
 ) -> ItemOut:
     row = (
         await db.execute(select(RoadmapItem).where(RoadmapItem.id == item_id, RoadmapItem.tenant_id == user.tenant_id))
@@ -129,7 +131,9 @@ async def update_item(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove an item from the list (it is hidden, not deleted, and the sync does not bring it back)",
 )
-async def remove_item(item_id: uuid.UUID, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings:write"))]) -> None:
+async def remove_item(
+    item_id: uuid.UUID, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings_workspace:manage"))]
+) -> None:
     row = (
         await db.execute(
             select(RoadmapItem).where(RoadmapItem.id == item_id, RoadmapItem.tenant_id == user.tenant_id, RoadmapItem.removed_at.is_(None))

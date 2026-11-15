@@ -77,8 +77,10 @@
     "title": "Security questionnaires",
     "detail": "Answer customer security questionnaires from the controls, policies and evidence held.",
     "area": "Compliance",
-    "status": "not_started",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built: answers are drafted from your own library by shared words, never from a language model, and are never final until you approve them. Drafting with an AI model is a possible next step.",
+    "completed_ref": "this commit"
   },
   {
     "key": "client-facing-compliance",

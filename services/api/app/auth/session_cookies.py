@@ -66,14 +66,12 @@ def csrf_ok(request: Request) -> bool:
 
 def access_token_from_cookie(request: Request | None) -> str | None:
     """The access token in the cookie, when there is one."""
-    if request is None:
-        return None
-    value = request.cookies.get(ACCESS_COOKIE)
+    cookies = getattr(request, "cookies", None) if request is not None else None
+    value = cookies.get(ACCESS_COOKIE) if cookies else None
     return value or None
 
 
 def refresh_token_from_cookie(request: Request | None) -> str | None:
-    if request is None:
-        return None
-    value = request.cookies.get(REFRESH_COOKIE)
+    cookies = getattr(request, "cookies", None) if request is not None else None
+    value = cookies.get(REFRESH_COOKIE) if cookies else None
     return value or None
