@@ -31,9 +31,10 @@
     "title": "Policies: templates with auto-filled fields (client name, date, last updated)",
     "detail": "Policy text written for A.C.O.R.N (not copied from Secureframe) with merge fields that fill in per client, kept in numbered versions with an approval and acceptance trail.",
     "area": "Compliance",
-    "status": "not_started",
-    "needs": "signoff",
-    "note": "Needs your review of the policy wording before it is offered to clients."
+    "status": "completed",
+    "needs": "claude",
+    "note": "Six templates built. Your review of the wording is still wanted before any is shown to a client.",
+    "completed_ref": "this commit"
   },
   {
     "key": "personnel-access-reviews",
@@ -312,5 +313,14 @@
     "area": "Compliance",
     "status": "not_started",
     "needs": "claude"
+  },
+  {
+    "key": "policy-wording-review",
+    "title": "Read the six policy templates and say what to change",
+    "detail": "Information Security, Acceptable Use, Access Control, Incident Response, Vendor Management, Backup and Disaster Recovery. Open Compliance, Policies, Start a policy from a template.",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "signoff",
+    "note": "Not urgent: clients will not see Compliance for a while."
   }
 ]

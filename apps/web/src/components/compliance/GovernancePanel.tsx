@@ -21,6 +21,20 @@ export interface GovItem {
   days_until: number;
   versions: number;
 }
+export interface PolicyTemplate {
+  key: string;
+  title: string;
+  summary: string;
+  interval_days: number;
+  fields: string[];
+  added: boolean;
+}
+interface Filled {
+  id: string;
+  version: number;
+  text: string;
+  missing: string[];
+}
 interface Version {
   version: number;
   body: string;
@@ -48,6 +62,9 @@ export function GovernancePanel() {
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState<{ id: string; versions: Version[] } | null>(null);
   const [draft, setDraft] = useState('');
+  const [templates, setTemplates] = useState<PolicyTemplate[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [filled, setFilled] = useState<Filled | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -59,9 +76,20 @@ export function GovernancePanel() {
       /* shows nothing */
     }
   }, []);
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/v1/governance/templates');
+      if (!res.ok) return;
+      const body = (await res.json()) as unknown;
+      if (Array.isArray(body)) setTemplates(body as PolicyTemplate[]);
+    } catch {
+      /* shows no templates */
+    }
+  }, []);
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadTemplates();
+  }, [load, loadTemplates]);
 
   const send = async (url: string, method: string, body?: unknown): Promise<Response | null> => {
     setBusy(true);
@@ -87,6 +115,13 @@ export function GovernancePanel() {
     setDraft('');
   };
   const toggleVersions = async (id: string) => (open?.id === id ? setOpen(null) : loadVersions(id));
+  const showFilled = async (id: string, version: number) => {
+    if (filled?.id === id && filled.version === version) return setFilled(null);
+    const res = await authFetch(`/api/v1/governance/${id}/rendered?version=${version}`);
+    if (!res.ok) return setProblem(`The text could not be filled in (${res.status}).`);
+    const body = (await res.json()) as { text: string; missing: string[] };
+    setFilled({ id, version, text: body.text, missing: body.missing });
+  };
 
   if (!items) return null;
   return (
@@ -131,6 +166,45 @@ export function GovernancePanel() {
           Add
         </button>
       </div>
+      {templates.length > 0 ? (
+        <div className="mt-3" data-testid="policy-templates">
+          <button type="button" className={ghost} aria-expanded={showTemplates} onClick={() => setShowTemplates((v) => !v)}>
+            {showTemplates ? 'Hide policy templates' : 'Start a policy from a template'}
+          </button>
+          {showTemplates ? (
+            <ul className="mt-2 divide-y divide-gray-800 rounded border border-gray-800 text-sm">
+              {templates.map((t) => (
+                <li key={t.key} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2" data-testid={`template-${t.key}`}>
+                  <span className="min-w-0">
+                    <span className="text-gray-100">{t.title}</span>
+                    <span className="block text-xs text-gray-500">{t.summary} Fills in: {t.fields.join(', ')}.</span>
+                  </span>
+                  {t.added ? (
+                    <span className="text-xs text-emerald-300">In the library</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className={ghost}
+                      disabled={busy}
+                      aria-label={`Add ${t.title}`}
+                      onClick={() =>
+                        void (async () => {
+                          if (await send('/api/v1/governance/from-template', 'POST', { key: t.key, owner: owner.trim() })) {
+                            await load();
+                            await loadTemplates();
+                          }
+                        })()
+                      }
+                    >
+                      Add to the library
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
       {problem ? <p className="mt-2 text-sm text-amber-300" data-testid="governance-problem">{problem}</p> : null}
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-gray-500" data-testid="governance-empty">Nothing on the calendar yet.</p>
@@ -155,7 +229,13 @@ export function GovernancePanel() {
                   {open.versions.map((v) => (
                     <div key={v.version} className="mb-2 text-xs text-gray-300">
                       <div className="font-semibold text-gray-100">Version {v.version} · {v.created_at.slice(0, 10)}{v.change_note ? ` · ${v.change_note}` : ''}</div>
-                      <pre className="mt-1 whitespace-pre-wrap font-sans">{v.body}</pre>
+                      <button type="button" className={`${ghost} mt-1`} onClick={() => void showFilled(i.id, v.version)}>
+                        {filled?.id === i.id && filled.version === v.version ? 'Show as written' : 'Show filled in'}
+                      </button>
+                      {filled?.id === i.id && filled.version === v.version && filled.missing.length > 0 ? (
+                        <p className="mt-1 text-amber-300" data-testid="filled-missing">Still blank: {filled.missing.join(', ')}. Set them on the policy.</p>
+                      ) : null}
+                      <pre className="mt-1 whitespace-pre-wrap font-sans">{filled?.id === i.id && filled.version === v.version ? filled.text : v.body}</pre>
                     </div>
                   ))}
                   <textarea className={`${input} mt-2 block w-full`} rows={4} placeholder="Paste the new text of this policy" value={draft} onChange={(e) => setDraft(e.target.value)} />

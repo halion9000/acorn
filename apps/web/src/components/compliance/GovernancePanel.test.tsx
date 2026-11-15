@@ -14,6 +14,8 @@ beforeEach(() => {
   authFetch.mockReset();
   authFetch.mockImplementation((url: string, init?: RequestInit) => {
     if (url === '/api/v1/governance' && !init?.method) return json([item(), item({ id: 'i2', kind: 'vendor', title: 'Vendor review: Pax8', state: 'overdue', days_until: -3, next_due: '2026-11-05', versions: 0 })]);
+    if (url === '/api/v1/governance/templates') return json([{ key: 'access-control', title: 'Access Control Policy', summary: 'Who gets access to Acme.', interval_days: 365, fields: ['client_name', 'owner'], added: false }, { key: 'acceptable-use', title: 'Acceptable Use Policy', summary: 'What people may do.', interval_days: 365, fields: ['client_name'], added: true }]);
+    if (url.includes('/rendered')) return json({ title: 'Acceptable use', version: 1, text: 'Organization: Acme Dental', missing: ['owner'] });
     if (url.endsWith('/versions') && !init?.method) return json([{ version: 1, body: 'The policy text', change_note: 'initial', created_at: '2026-10-01T00:00:00Z' }]);
     return json({});
   });
@@ -75,5 +77,29 @@ describe('GovernancePanel', () => {
     render(<GovernancePanel />);
     await waitFor(() => expect(authFetch).toHaveBeenCalled());
     expect(screen.queryByTestId('governance')).toBeNull();
+  });
+
+  it('offers the policy templates, adds one to the library, and says which are already in it', async () => {
+    const user = userEvent.setup();
+    render(<GovernancePanel />);
+    await user.click(await screen.findByRole('button', { name: 'Start a policy from a template' }));
+    expect(screen.getByTestId('template-acceptable-use')).toHaveTextContent('In the library');
+    expect(screen.getByTestId('template-access-control')).toHaveTextContent('Fills in: client_name, owner');
+    await user.click(screen.getByRole('button', { name: 'Add Access Control Policy' }));
+    await waitFor(() => {
+      const post = authFetch.mock.calls.find((c) => c[0] === '/api/v1/governance/from-template');
+      expect(JSON.parse(post![1].body)).toEqual({ key: 'access-control', owner: '' });
+    });
+  });
+
+  it('shows a version with its fields filled in, says which are still blank, and goes back to the text as written', async () => {
+    const user = userEvent.setup();
+    render(<GovernancePanel />);
+    await user.click(await screen.findByRole('button', { name: 'Versions (1)' }));
+    await user.click(await screen.findByRole('button', { name: 'Show filled in' }));
+    expect(await screen.findByText('Organization: Acme Dental')).toBeInTheDocument();
+    expect(screen.getByTestId('filled-missing')).toHaveTextContent('Still blank: owner');
+    await user.click(screen.getByRole('button', { name: 'Show as written' }));
+    expect(screen.getByText('The policy text')).toBeInTheDocument();
   });
 });

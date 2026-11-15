@@ -16,7 +16,9 @@ from sqlalchemy import func, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.models.governance import GovernanceItem, GovernanceVersion
+from app.models.tenant import Tenant
 from app.services import governance as gov
+from app.services import policy_templates as pt
 from app.services.audit import emit_audit
 
 router = APIRouter(prefix="/governance", tags=["compliance"])
@@ -298,3 +300,130 @@ async def add_version(
     await db.commit()
     await db.refresh(v)
     return VersionOut(version=v.version, body=v.body, change_note=v.change_note, created_at=v.created_at)
+
+
+# ---- policy templates --------------------------------------------------------------------------------------------------------------------------------------
+
+
+class TemplateOut(BaseModel):
+    key: str
+    title: str
+    summary: str
+    interval_days: int
+    fields: list[str]  # the fields the text fills in by itself
+    added: bool  # a policy with this title is already in the library
+
+
+class FromTemplate(BaseModel):
+    key: str = Field(min_length=1, max_length=60)
+    owner: str = Field(default="", max_length=120)
+
+
+class RenderedOut(BaseModel):
+    title: str
+    version: int
+    text: str  # the version's text with the fields filled in
+    missing: list[str]  # fields still showing as written because they have no value yet
+
+
+async def _client_name(db: DBSession, tenant: uuid.UUID) -> str:
+    row = await db.get(Tenant, tenant)
+    return (getattr(row, "name", "") or "").strip()
+
+
+@router.get("/templates", response_model=list[TemplateOut], dependencies=[Depends(require_permission("reports:read"))])
+async def list_templates(user: AuthUser, db: DBSession) -> list[TemplateOut]:
+    """The policy templates, and whether each is already in the library."""
+    name = await _client_name(db, user.tenant_id)
+    have = set(
+        (
+            await db.execute(
+                select(GovernanceItem.title).where(
+                    GovernanceItem.tenant_id == user.tenant_id, GovernanceItem.kind == "policy", GovernanceItem.archived_at.is_(None)
+                )
+            )
+        ).scalars()
+    )
+    return [
+        TemplateOut(
+            key=t.key,
+            title=t.title,
+            summary=pt.render(t.summary, {"client_name": name}),
+            interval_days=t.interval_days,
+            fields=pt.fields_used(t.body),
+            added=t.title in have,
+        )
+        for t in pt.TEMPLATES
+    ]
+
+
+@router.post("/from-template", response_model=ItemOut, status_code=status.HTTP_201_CREATED)
+async def create_from_template(
+    body: FromTemplate, request: Request, user: Annotated[AuthUser, Depends(require_permission("reports:write"))], db: DBSession
+) -> ItemOut:
+    """Add a policy to the library from a template: its text becomes version 1 with the fields left as fields."""
+    template = pt.BY_KEY.get(body.key)
+    if template is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such template.")
+    exists = (
+        await db.execute(
+            select(GovernanceItem.id).where(
+                GovernanceItem.tenant_id == user.tenant_id,
+                GovernanceItem.kind == "policy",
+                GovernanceItem.title == template.title,
+                GovernanceItem.archived_at.is_(None),
+            )
+        )
+    ).first()
+    if exists is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="That policy is already in the library.")
+    today = _today()
+    row = GovernanceItem(
+        tenant_id=user.tenant_id,
+        kind="policy",
+        title=template.title,
+        owner=body.owner.strip(),
+        notes="Made from the A.C.O.R.N template. Read it and adapt it before it is relied on.",
+        interval_days=template.interval_days,
+        next_due=gov.next_due_after_review(today, template.interval_days),
+        created_by=user.user_id,
+    )
+    db.add(row)
+    await db.flush()
+    db.add(
+        GovernanceVersion(
+            tenant_id=user.tenant_id,
+            item_id=row.id,
+            version=1,
+            body=template.body,
+            change_note="From the template",
+            created_by=user.user_id,
+        )
+    )
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="governance_item:created_from_template",
+        resource="governance_item",
+        resource_id=str(row.id),
+        changes={"template": template.key, "title": template.title},
+        request=request,
+    )
+    await db.commit()
+    await db.refresh(row)
+    return _out(row, 1, today)
+
+
+@router.get("/{item_id}/rendered", response_model=RenderedOut, dependencies=[Depends(require_permission("reports:read"))])
+async def rendered_version(item_id: uuid.UUID, user: AuthUser, db: DBSession, version: int | None = None) -> RenderedOut:
+    """A policy's text (the newest version, or the one asked for) with the organization, owner, version, dates filled in."""
+    item = await _item(db, user.tenant_id, item_id)
+    q = select(GovernanceVersion).where(GovernanceVersion.item_id == item_id, GovernanceVersion.tenant_id == user.tenant_id)
+    q = q.where(GovernanceVersion.version == version) if version is not None else q.order_by(GovernanceVersion.version.desc()).limit(1)
+    v = (await db.execute(q)).scalars().first()
+    if v is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That policy has no such version.")
+    values = pt.field_values(await _client_name(db, user.tenant_id), item.owner, v.version, v.created_at.date(), item.next_due, _today())
+    text = pt.render(v.body, values)
+    return RenderedOut(title=item.title, version=v.version, text=text, missing=[f for f in pt.fields_used(text) if f in pt.FIELDS])
