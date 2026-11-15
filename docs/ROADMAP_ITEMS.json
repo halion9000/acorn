@@ -480,8 +480,10 @@
     "key": "r7-ci-14",
     "title": "scripts/export-settings-names.mjs: list setting names (never values) for support",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit",
+    "note": "CORE scripts/export-settings-names.mjs"
   },
   {
     "key": "r7-ci-15",
