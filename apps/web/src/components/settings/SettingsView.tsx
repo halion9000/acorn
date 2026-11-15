@@ -285,7 +285,7 @@ export const SETTINGS_GROUPS: { title: string; items: string[] }[] = [
   { title: 'Tools & integrations', items: ['/settings/connectors', '/settings/cipp-actions', '/settings/tickets'] },
   { title: 'Detection & AI', items: ['autonomy', '/settings/triage', 'deployment', '/settings/costs'] },
   { title: 'Platform', items: ['/settings/platform-health', 'software-update', 'azure-spend', 'alert-email', '/settings/retention'] },
-  { title: 'Help', items: ['/settings/guide', '/settings/revisions', 'about'] },
+  { title: 'Help', items: ['/settings/guide', '/settings/roadmap', '/settings/revisions', 'about'] },
 ];
 
 export type SettingsEntry = { kind: 'tab'; id: TabId; label: string; description: string } | { kind: 'link'; href: string; label: string; description: string };

@@ -1,0 +1,121 @@
+"""The roadmap (Settings > Upcoming improvements): what is waiting to be built or fixed, who it waits on, how urgent it is and where it stands.
+
+The person sets priority, adds items of their own, and may move an item's status. Items kept in step from the repository file (see ``services/roadmap_sync.py``) have their wording, status and "needs" rewritten by that
+sync, never their priority. Nothing is deleted. Permission: ``settings:read`` to see, ``settings:write`` to change. The roadmap belongs to the caller's own organization.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+from typing import Annotated, Literal
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+
+from app.api.v1.deps import AuthUser, DBSession, require_permission
+from app.models.roadmap import RoadmapItem
+
+router = APIRouter(prefix="/roadmap", tags=["roadmap"])
+
+Status = Literal["new", "not_started", "in_progress", "completed"]
+Needs = Literal["claude", "signoff", "hal"]
+Priority = Literal["high", "normal", "low"]
+ORDER = {"in_progress": 0, "new": 1, "not_started": 2, "completed": 3}
+RANK = {"high": 0, "normal": 1, "low": 2}
+
+
+class ItemOut(BaseModel):
+    id: uuid.UUID
+    key: str | None
+    title: str
+    detail: str
+    area: str
+    status: Status
+    needs: Needs
+    priority: Priority
+    note: str
+    completed_ref: str | None
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None
+
+
+class ItemIn(BaseModel):
+    title: str = Field(min_length=3, max_length=200)
+    detail: str = Field(default="", max_length=4000)
+    area: str = Field(default="General", max_length=60)
+    needs: Needs = "claude"
+    priority: Priority = "normal"
+
+
+class ItemPatch(BaseModel):
+    priority: Priority | None = None
+    status: Status | None = None
+    needs: Needs | None = None
+    note: str | None = Field(default=None, max_length=4000)
+
+
+class RoadmapOut(BaseModel):
+    items: list[ItemOut]
+    counts: dict[str, int]
+
+
+def _sorted(rows: list[RoadmapItem]) -> list[RoadmapItem]:
+    """Open work first (in progress, new, not started), the most urgent first, then the finished, newest finish first."""
+    done = sorted((r for r in rows if r.status == "completed"), key=lambda r: r.completed_at or r.updated_at, reverse=True)
+    open_ = sorted((r for r in rows if r.status != "completed"), key=lambda r: (ORDER[r.status], RANK[r.priority], r.created_at))
+    return open_ + done
+
+
+def _out(r: RoadmapItem) -> ItemOut:
+    return ItemOut.model_validate(r, from_attributes=True)
+
+
+@router.get("", response_model=RoadmapOut, summary="Everything on the roadmap with the count in each status")
+async def list_items(db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings:read"))]) -> RoadmapOut:
+    rows = list((await db.execute(select(RoadmapItem).where(RoadmapItem.tenant_id == user.tenant_id))).scalars())
+    counts = dict.fromkeys(("new", "not_started", "in_progress", "completed"), 0)
+    for r in rows:
+        counts[r.status] += 1
+    return RoadmapOut(items=[_out(r) for r in _sorted(rows)], counts=counts)
+
+
+@router.post("", response_model=ItemOut, status_code=status.HTTP_201_CREATED, summary="Add an item of your own")
+async def add_item(body: ItemIn, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings:write"))]) -> ItemOut:
+    now = datetime.now(UTC)
+    row = RoadmapItem(
+        id=uuid.uuid4(),
+        tenant_id=user.tenant_id,
+        title=body.title.strip(),
+        detail=body.detail,
+        area=body.area.strip() or "General",
+        needs=body.needs,
+        priority=body.priority,
+        created_by=getattr(user, "email", None),
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(row)
+    await db.commit()
+    return _out(row)
+
+
+@router.patch("/{item_id}", response_model=ItemOut, summary="Set an item's priority, move its status, or change who it waits on")
+async def update_item(
+    item_id: uuid.UUID, body: ItemPatch, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings:write"))]
+) -> ItemOut:
+    row = (
+        await db.execute(select(RoadmapItem).where(RoadmapItem.id == item_id, RoadmapItem.tenant_id == user.tenant_id))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    changes = body.model_dump(exclude_none=True)
+    for key, value in changes.items():
+        setattr(row, key, value)
+    if "status" in changes:
+        row.completed_at = datetime.now(UTC) if changes["status"] == "completed" else None
+    row.updated_at = datetime.now(UTC)
+    await db.commit()
+    return _out(row)

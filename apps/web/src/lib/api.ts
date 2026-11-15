@@ -7718,6 +7718,34 @@ export const riskRegisterApi = {
     request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}?${riskQs(clientId)}`, { method: 'DELETE' }),
 };
 
+/** The roadmap at Settings > Upcoming improvements (GET/POST /api/v1/roadmap, PATCH /api/v1/roadmap/{id}). */
+export interface RoadmapItem {
+  id: string;
+  key: string | null;
+  title: string;
+  detail: string;
+  area: string;
+  status: 'new' | 'not_started' | 'in_progress' | 'completed';
+  needs: 'claude' | 'signoff' | 'hal';
+  priority: 'high' | 'normal' | 'low';
+  note: string;
+  completed_ref: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+export interface Roadmap {
+  items: RoadmapItem[];
+  counts: Record<RoadmapItem['status'], number>;
+}
+export const roadmapApi = {
+  list: () => request<Roadmap>('/api/v1/roadmap'),
+  add: (body: { title: string; detail?: string; area?: string; needs?: RoadmapItem['needs']; priority?: RoadmapItem['priority'] }) =>
+    request<RoadmapItem>('/api/v1/roadmap', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: string, body: { priority?: RoadmapItem['priority']; status?: RoadmapItem['status']; needs?: RoadmapItem['needs']; note?: string }) =>
+    request<RoadmapItem>(`/api/v1/roadmap/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+};
+
 /** Vendor management (GET/POST /api/v1/compliance/vendors ...). `clientId` reads or writes one client. */
 export interface VendorReviewRow {
   id: string;

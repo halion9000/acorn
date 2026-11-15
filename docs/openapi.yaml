@@ -13054,6 +13054,82 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/roadmap:
+    get:
+      tags:
+      - roadmap
+      summary: Everything on the roadmap with the count in each status
+      operationId: list_items_api_v1_roadmap_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoadmapOut'
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - roadmap
+      summary: Add an item of your own
+      operationId: add_item_api_v1_roadmap_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__roadmap__ItemIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__roadmap__ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/roadmap/{item_id}:
+    patch:
+      tags:
+      - roadmap
+      summary: Set an item's priority, move its status, or change who it waits on
+      operationId: update_item_api_v1_roadmap__item_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__roadmap__ItemPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__roadmap__ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/vendors:
     get:
       tags:
@@ -49065,6 +49141,23 @@ components:
       required:
       - tickets
       title: RiskTicketsOut
+    RoadmapOut:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__roadmap__ItemOut'
+          type: array
+          title: Items
+        counts:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Counts
+      type: object
+      required:
+      - items
+      - counts
+      title: RoadmapOut
     RoleChangeOut:
       properties:
         at:
@@ -60505,6 +60598,161 @@ components:
       - overdue_tasks
       - untreated
       title: Summary
+    app__api__v1__endpoints__roadmap__ItemIn:
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 3
+          title: Title
+        detail:
+          type: string
+          maxLength: 4000
+          title: Detail
+          default: ''
+        area:
+          type: string
+          maxLength: 60
+          title: Area
+          default: General
+        needs:
+          type: string
+          enum:
+          - claude
+          - signoff
+          - hal
+          title: Needs
+          default: claude
+        priority:
+          type: string
+          enum:
+          - high
+          - normal
+          - low
+          title: Priority
+          default: normal
+      type: object
+      required:
+      - title
+      title: ItemIn
+    app__api__v1__endpoints__roadmap__ItemOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Key
+        title:
+          type: string
+          title: Title
+        detail:
+          type: string
+          title: Detail
+        area:
+          type: string
+          title: Area
+        status:
+          type: string
+          enum:
+          - new
+          - not_started
+          - in_progress
+          - completed
+          title: Status
+        needs:
+          type: string
+          enum:
+          - claude
+          - signoff
+          - hal
+          title: Needs
+        priority:
+          type: string
+          enum:
+          - high
+          - normal
+          - low
+          title: Priority
+        note:
+          type: string
+          title: Note
+        completed_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Completed Ref
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        completed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Completed At
+      type: object
+      required:
+      - id
+      - key
+      - title
+      - detail
+      - area
+      - status
+      - needs
+      - priority
+      - note
+      - completed_ref
+      - created_at
+      - updated_at
+      - completed_at
+      title: ItemOut
+    app__api__v1__endpoints__roadmap__ItemPatch:
+      properties:
+        priority:
+          anyOf:
+          - type: string
+            enum:
+            - high
+            - normal
+            - low
+          - type: 'null'
+          title: Priority
+        status:
+          anyOf:
+          - type: string
+            enum:
+            - new
+            - not_started
+            - in_progress
+            - completed
+          - type: 'null'
+          title: Status
+        needs:
+          anyOf:
+          - type: string
+            enum:
+            - claude
+            - signoff
+            - hal
+          - type: 'null'
+          title: Needs
+        note:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Note
+      type: object
+      title: ItemPatch
     app__api__v1__endpoints__secureframe__ReportIn:
       properties:
         vendor:

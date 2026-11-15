@@ -91,6 +91,7 @@ export const CURATED_PAGES: PaletteNavItem[] = [
   { label: 'Client mapping',  href: '/settings/client-mapping', keywords: ['map', 'unmapped', 'clients', 'tools'] },
   { label: 'Audit Log',       href: '/settings/audit', keywords: ['activity', 'events'] },
   { label: 'Settings',        href: '/settings',     keywords: ['preferences', 'profile', 'tenant'] },
+  { label: 'Upcoming improvements', href: '/settings/roadmap', keywords: ['roadmap', 'features', 'backlog', 'priorities', 'pending', 'todo'] },
   { label: 'ACORN Setup Guide', href: '/settings/guide', keywords: ['help', 'how to', 'docs', 'documentation', 'manual', 'user guide', 'setup'] },
 ];
 

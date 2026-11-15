@@ -1,0 +1,273 @@
+[
+  {
+    "key": "vendor-detected-apps",
+    "title": "Vendors: Detected applications from the Microsoft tenant, with Add, Ignore and Link",
+    "detail": "Scan each client Microsoft 365 tenant (through CIPP) for enterprise applications and list them as detected applications with the date detected, source and number of accounts. Add makes a vendor, Ignore hides it, Link merges several detected applications (for example two LastPass apps) into one vendor so they show as one on the vendor page.",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "claude",
+    "note": "Needs a CIPP read route for service principals to be confirmed first."
+  },
+  {
+    "key": "vendor-dashboard-ring",
+    "title": "Compliance Overview: vendor risk ring and vendor review action items",
+    "detail": "A fourth ring for vendors by risk level and overdue vendor reviews in the action items table.",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "claude"
+  },
+  {
+    "key": "control-health-own-tenant",
+    "title": "Bring Live Oak's own control health over from Secureframe",
+    "detail": "The Overview computes control health from evidence held in A.C.O.R.N. For our own organization that evidence has to come from Secureframe (control tests are already read). Decide the source: tests report per control, or an export.",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "signoff",
+    "note": "Which Secureframe data should become evidence, and should it overwrite manual evidence?"
+  },
+  {
+    "key": "policy-templates",
+    "title": "Policies: templates with auto-filled fields (client name, date, last updated)",
+    "detail": "Policy text written for A.C.O.R.N (not copied from Secureframe) with merge fields that fill in per client, kept in numbered versions with an approval and acceptance trail.",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "signoff",
+    "note": "Needs your review of the policy wording before it is offered to clients."
+  },
+  {
+    "key": "personnel-access-reviews",
+    "title": "Personnel and access reviews",
+    "detail": "People list with onboarding, offboarding, training and access review tasks per client.",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "claude"
+  },
+  {
+    "key": "tests-controls-engine",
+    "title": "Controls and tests engine",
+    "detail": "Automated tests from connected tools mapped to controls, with a Controls page of its own in the Compliance section.",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "claude"
+  },
+  {
+    "key": "audits-data-room",
+    "title": "Audits: auditor sign-in and a data room",
+    "detail": "An auditor role that signs in and sees only the evidence shared with it.",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "signoff"
+  },
+  {
+    "key": "trust-center",
+    "title": "Trust center (sign-in first, optional public link later)",
+    "detail": "A page clients share with their customers showing their compliance posture and documents.",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "signoff"
+  },
+  {
+    "key": "questionnaires",
+    "title": "Security questionnaires",
+    "detail": "Answer customer security questionnaires from the controls, policies and evidence held.",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "claude"
+  },
+  {
+    "key": "client-facing-compliance",
+    "title": "Compliance in the client-facing part of A.C.O.R.N",
+    "detail": "Offer the Compliance section to clients, after it works for Live Oak itself.",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "signoff"
+  },
+  {
+    "key": "vendor-management",
+    "title": "Vendor management",
+    "detail": "Vendor register with reviews, documents and history.",
+    "area": "Compliance",
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "4fd4d03e"
+  },
+  {
+    "key": "risk-register",
+    "title": "Risk register",
+    "detail": "Risks with likelihood, impact, treatment, tasks and history.",
+    "area": "Compliance",
+    "status": "completed",
+    "needs": "claude"
+  },
+  {
+    "key": "compliance-section",
+    "title": "Compliance as its own sidebar section with a dashboard and framework toggles",
+    "area": "Compliance",
+    "status": "completed",
+    "needs": "claude"
+  },
+  {
+    "key": "policies-section",
+    "title": "Policies in its own sidebar item",
+    "area": "Compliance",
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "4fd4d03e"
+  },
+  {
+    "key": "huntress-family",
+    "title": "Parent and child clients (families) so New Waterloo and its NW - clients share group records",
+    "detail": "A family lets group-level records follow to the child client where the tools file same-named machines under siblings.",
+    "area": "Devices",
+    "status": "not_started",
+    "needs": "signoff",
+    "note": "Choose: families in A.C.O.R.N, or one-time realignment only."
+  },
+  {
+    "key": "huntress-moves",
+    "title": "Move Huntress agents to the organization that matches their NinjaOne client",
+    "detail": "About 141 machines are filed in a different Huntress organization than the client NinjaOne files them under. The Huntress API has a move call that has not been proven live.",
+    "area": "Devices",
+    "status": "not_started",
+    "needs": "hal",
+    "note": "Needs a live round-trip test on a real machine (move, then move back). DESKTOP-RF5RQSP is already in the matching organization (New Waterloo), so there is nothing to move; another machine is needed."
+  },
+  {
+    "key": "name-only-follow",
+    "title": "Follow a machine by name alone when it has a random Windows default name",
+    "area": "Devices",
+    "status": "not_started",
+    "needs": "signoff"
+  },
+  {
+    "key": "merge-search-sibling",
+    "title": "Device merge search that finds a machine filed under a sibling client",
+    "area": "Devices",
+    "status": "not_started",
+    "needs": "claude"
+  },
+  {
+    "key": "ninja-deploy-test",
+    "title": "Test Deploy NinjaOne on SCHKNOWCROSS",
+    "detail": "The download fix is live (curl.exe first, browser user agent otherwise).",
+    "area": "Devices",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Fixed again (the install now runs detached; ScreenConnect killed the last attempt after 10 seconds). Press Deploy NinjaOne on SCHKNOWCROSS and report what the machine printed."
+  },
+  {
+    "key": "ninja-console",
+    "title": "NinjaOne command console (CMD and PowerShell)",
+    "area": "Devices",
+    "status": "not_started",
+    "needs": "signoff",
+    "note": "On hold at your request."
+  },
+  {
+    "key": "liongard-device-names",
+    "title": "Device names on Liongard disk tickets",
+    "detail": "The Liongard API does not render the dynamic content that carries the device name.",
+    "area": "Alerts",
+    "status": "not_started",
+    "needs": "hal",
+    "note": "Needs a Liongard-side change or another source for the name."
+  },
+  {
+    "key": "google-bec-scan",
+    "title": "Google Workspace BEC: full mailbox scan",
+    "detail": "ThreatMate cannot scan mailboxes; the light Google check is on hold.",
+    "area": "Security",
+    "status": "not_started",
+    "needs": "signoff"
+  },
+  {
+    "key": "tokens-out-of-storage",
+    "title": "A15: keep sign-in tokens out of browser storage",
+    "detail": "Every person signs in again once.",
+    "area": "Platform",
+    "status": "not_started",
+    "needs": "signoff"
+  },
+  {
+    "key": "weekly-briefing",
+    "title": "A6: weekly briefing paragraph",
+    "area": "Reports",
+    "status": "not_started",
+    "needs": "claude"
+  },
+  {
+    "key": "agent-tools",
+    "title": "A8: agent tools (one-page proposal exists)",
+    "area": "Platform",
+    "status": "not_started",
+    "needs": "signoff"
+  },
+  {
+    "key": "real-playbooks",
+    "title": "12.18: real playbooks",
+    "area": "Automation",
+    "status": "not_started",
+    "needs": "claude"
+  },
+  {
+    "key": "fim-baselines",
+    "title": "12.19: file integrity monitoring baselines",
+    "area": "Security",
+    "status": "not_started",
+    "needs": "claude"
+  },
+  {
+    "key": "threat-hunting",
+    "title": "12.14: threat hunting",
+    "area": "Security",
+    "status": "not_started",
+    "needs": "claude"
+  },
+  {
+    "key": "qdrant-upgrade",
+    "title": "Qdrant server upgrade (6A39)",
+    "detail": "After the Sunday 2026-11-15 snapshot.",
+    "area": "Platform",
+    "status": "not_started",
+    "needs": "hal",
+    "note": "Waiting on the calendar."
+  },
+  {
+    "key": "rate-limits-enforce",
+    "title": "Enforce the API rate limits (6FA39)",
+    "detail": "Log-only mode has run for over a week; look at the Platform health line and decide.",
+    "area": "Platform",
+    "status": "not_started",
+    "needs": "signoff"
+  },
+  {
+    "key": "licences-spelling",
+    "title": "US spelling: the Licences label",
+    "area": "Polish",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "cases-work-permission-test",
+    "title": "Fix the cases-work permission route test that already fails (expects ten routes, finds twelve)",
+    "area": "Quality",
+    "status": "new",
+    "needs": "claude",
+    "note": "Fails without my changes too."
+  },
+  {
+    "key": "index-plan-tests",
+    "title": "Two index-plan tests fail on an empty local database",
+    "area": "Quality",
+    "status": "new",
+    "needs": "claude"
+  },
+  {
+    "key": "roadmap-page",
+    "title": "Settings: Upcoming improvements page",
+    "area": "Platform",
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
+  }
+]

@@ -50,6 +50,7 @@ from app.models.responder import (
     PasskeyCredential,
 )
 from app.models.risk_register import RiskRegisterHistory, RiskRegisterItem, RiskRegisterTask
+from app.models.roadmap import RoadmapItem
 from app.models.saved_hunt import SavedHunt
 from app.models.saved_hunt_search import SavedHuntSearch
 from app.models.saved_view import SavedView
@@ -150,6 +151,7 @@ __all__ = [
     "RiskRegisterHistory",
     "RiskRegisterItem",
     "RiskRegisterTask",
+    "RoadmapItem",
     "Vendor",
     "VendorDocument",
     "VendorHistory",

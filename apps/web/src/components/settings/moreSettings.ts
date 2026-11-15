@@ -12,6 +12,7 @@ export const MORE_SETTINGS: { href: string; label: string; description: string; 
   { href: '/settings/costs', label: 'Cost dashboard', description: 'AI spend, automation activity and savings from bringing your own key' },
   { href: '/settings/triage', label: 'Auto-close', description: 'How sure AI triage must be to close an alert itself', requires: 'settings_automation' },
   { href: '/settings/cipp-actions', label: 'CIPP actions', description: 'What CORE can do to client Microsoft 365 tenants through CIPP, whether it is switched on, and what it has been asked to do' },
+  { href: '/settings/roadmap', label: 'Upcoming improvements', description: 'Everything waiting to be built or fixed, who it waits on, and the priority you give it' },
   { href: '/settings/revisions', label: 'Revisions', description: 'Every revision of A.C.O.R.N so far, newest first, and the current version number' },
   { href: '/settings/guide', label: 'ACORN Setup Guide', description: 'How to set up and use A.C.O.R.N, page by page (the former User guide)' },
   { href: '/settings/business-context', label: 'Business context rules', description: "Rules that adjust an alert's importance for a client before it is triaged" },
