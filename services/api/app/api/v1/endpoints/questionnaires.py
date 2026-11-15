@@ -18,6 +18,7 @@ from sqlalchemy import select
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.questionnaire import Questionnaire, QuestionnaireAnswer, QuestionnaireItem
+from app.services import compliance_audit as audit
 from app.services import questionnaires as rules
 
 router = APIRouter(prefix="/compliance/questionnaires", tags=["compliance"])
@@ -322,6 +323,7 @@ async def start_questionnaire(
                 match_score=pct,
             )
         )
+    await audit.note(db, tenant, user, "questionnaire:started", "questionnaire", q.id, name=q.name, questions=len(questions))
     await db.commit()
     return await _detail(db, tenant, q)
 
@@ -409,6 +411,7 @@ async def approve_drafts(
     for i in await _items(db, tenant, questionnaire_id):
         if not i.approved and i.source == "library" and i.match_score >= min_score and i.answer.strip():
             i.approved, i.approved_by = True, _actor(user)
+    await audit.note(db, tenant, user, "questionnaire:drafts_approved", "questionnaire", questionnaire_id, min_score=min_score)
     await db.commit()
     return await _detail(db, tenant, q)
 
@@ -420,7 +423,7 @@ async def complete_questionnaire(
     questionnaire_id: uuid.UUID,
     tenant: ScopeTenant,
     db: DBSession,
-    _user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
 ) -> QuestionnaireDetail:
     q = await _questionnaire(db, tenant, questionnaire_id)
     if q.status == "complete":
@@ -431,6 +434,7 @@ async def complete_questionnaire(
             status_code=status.HTTP_409_CONFLICT, detail=f"{waiting} question{' is' if waiting == 1 else 's are'} not approved yet."
         )
     q.status, q.completed_at = "complete", datetime.now(UTC)
+    await audit.note(db, tenant, user, "questionnaire:completed", "questionnaire", questionnaire_id)
     await db.commit()
     return await _detail(db, tenant, q)
 

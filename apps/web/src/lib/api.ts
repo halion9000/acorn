@@ -8087,7 +8087,7 @@ export interface ComplianceHealth {
   percent_healthy: number | null;
 }
 export interface ComplianceActionItem {
-  kind: 'evidence_expired' | 'risk_task' | 'vendor_review' | 'access_review' | 'audit_request';
+  kind: 'evidence_expired' | 'risk_task' | 'vendor_review' | 'access_review' | 'audit_request' | 'vendor_contract';
   name: string;
   event: string;
   owner: string | null;

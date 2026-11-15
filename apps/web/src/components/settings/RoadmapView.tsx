@@ -26,9 +26,29 @@ const STATUS_CLASS: Record<RoadmapItem['status'], string> = {
 };
 const select = 'rounded border border-gray-700 bg-gray-900 px-2 py-1 text-xs text-gray-100';
 
-/** The items to show for the two filters (pure). */
-export function visibleItems(items: RoadmapItem[], status: StatusFilter, needs: NeedsFilter): RoadmapItem[] {
-  return items.filter((i) => (status === 'all' || i.status === status) && (needs === 'all' || i.needs === needs));
+/** The items to show for the filters (pure): where it stands, who it waits on and the area ('' for every area). */
+export function visibleItems(items: RoadmapItem[], status: StatusFilter, needs: NeedsFilter, area = ''): RoadmapItem[] {
+  return items.filter((i) => (status === 'all' || i.status === status) && (needs === 'all' || i.needs === needs) && (area === '' || i.area === area));
+}
+
+/** How many items carry each tag and each area, over the items that match the status tab (pure), so a filter shows what choosing it would leave. */
+export function tagCounts(items: RoadmapItem[], status: StatusFilter): { needs: Record<RoadmapItem['needs'], number>; areas: [string, number][] } {
+  const inStatus = items.filter((i) => status === 'all' || i.status === status);
+  const needs = { claude: 0, signoff: 0, hal: 0 };
+  const areas = new Map<string, number>();
+  for (const i of inStatus) {
+    needs[i.needs] += 1;
+    areas.set(i.area, (areas.get(i.area) ?? 0) + 1);
+  }
+  return { needs, areas: [...areas.entries()].sort((a, b) => a[0].localeCompare(b[0])) };
+}
+
+export type SortKey = 'order' | 'newest' | 'area';
+/** The visible items in the chosen order (pure). 'order' is the server's: open work first, the most urgent first. */
+export function sortedItems(items: RoadmapItem[], sort: SortKey): RoadmapItem[] {
+  if (sort === 'newest') return [...items].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  if (sort === 'area') return [...items].sort((a, b) => a.area.localeCompare(b.area) || a.title.localeCompare(b.title));
+  return items;
 }
 
 function Row({ item, onSave, onRemove }: { item: RoadmapItem; onSave: (id: string, body: Parameters<typeof roadmapApi.update>[1]) => Promise<void>; onRemove: (id: string) => Promise<void> }) {
@@ -86,6 +106,8 @@ export function RoadmapView() {
   const [problem, setProblem] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [needs, setNeeds] = useState<NeedsFilter>('all');
+  const [area, setArea] = useState('');
+  const [sort, setSort] = useState<SortKey>('order');
   const [draft, setDraft] = useState({ title: '', detail: '' });
   const [adding, setAdding] = useState(false);
 
@@ -117,7 +139,8 @@ export function RoadmapView() {
       setProblem(apiErrorDetail(e) ?? 'Could not remove that.');
     }
   };
-  const shown = useMemo(() => (data ? visibleItems(data.items, status, needs) : []), [data, status, needs]);
+  const shown = useMemo(() => (data ? sortedItems(visibleItems(data.items, status, needs, area), sort) : []), [data, status, needs, area, sort]);
+  const counts = useMemo(() => (data ? tagCounts(data.items, status) : null), [data, status]);
   const tab = (value: StatusFilter, label: string, n?: number) => (
     <button key={value} role="tab" aria-selected={status === value} type="button" onClick={() => setStatus(value)} className={`px-3 py-1.5 text-sm ${status === value ? 'border-b-2 border-blue-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
       {label}
@@ -144,9 +167,28 @@ export function RoadmapView() {
           Waiting on{' '}
           <select aria-label="Waiting on" value={needs} onChange={(e) => setNeeds(e.target.value as NeedsFilter)} className={select}>
             <option value="all">Anyone</option>
-            <option value="claude">{NEEDS_LABEL.claude}</option>
-            <option value="signoff">{NEEDS_LABEL.signoff}</option>
-            <option value="hal">{NEEDS_LABEL.hal}</option>
+            <option value="claude">{NEEDS_LABEL.claude}{counts ? ` (${counts.needs.claude})` : ''}</option>
+            <option value="signoff">{NEEDS_LABEL.signoff}{counts ? ` (${counts.needs.signoff})` : ''}</option>
+            <option value="hal">{NEEDS_LABEL.hal}{counts ? ` (${counts.needs.hal})` : ''}</option>
+          </select>
+        </label>
+        <label className="ml-2 pb-1 text-xs text-gray-400">
+          Area{' '}
+          <select aria-label="Area" value={area} onChange={(e) => setArea(e.target.value)} className={select}>
+            <option value="">Every area</option>
+            {(counts?.areas ?? []).map(([a, n]) => (
+              <option key={a} value={a}>
+                {a} ({n})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="ml-2 pb-1 text-xs text-gray-400">
+          Sort{' '}
+          <select aria-label="Sort" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className={select}>
+            <option value="order">By urgency</option>
+            <option value="newest">Newest first</option>
+            <option value="area">By area</option>
           </select>
         </label>
         <button type="button" onClick={() => setAdding((a) => !a)} className="mb-1 ml-2 rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">

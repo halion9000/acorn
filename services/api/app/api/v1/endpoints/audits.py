@@ -20,6 +20,7 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import FRAMEWORKS, ScopeTenant
 from app.api.v1.endpoints.compliance_controls import build_rows, evidence_by_control
 from app.models.trust_audit import Audit, AuditRequest
+from app.services import compliance_audit as audit
 
 router = APIRouter(prefix="/compliance/audits", tags=["compliance"])
 
@@ -194,6 +195,7 @@ async def start_audit(
         created_by=getattr(user, "email", None),
     )
     db.add(a)
+    await audit.note(db, tenant, user, "audit:started", "audit", a.id, name=a.name, framework=a.framework)
     await db.commit()
     return await _detail(db, tenant, a)
 
@@ -211,7 +213,7 @@ async def patch_audit(
     body: AuditPatch,
     tenant: ScopeTenant,
     db: DBSession,
-    _user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
 ) -> AuditDetail:
     a = await _audit(db, tenant, audit_id)
     if a.status == "complete":
@@ -228,6 +230,7 @@ async def patch_audit(
             continue
         setattr(a, k, v)
     a.updated_at = datetime.now(UTC)
+    await audit.note(db, tenant, user, "audit:changed", "audit", audit_id, changes=sorted(changes))
     await db.commit()
     return await _detail(db, tenant, a)
 

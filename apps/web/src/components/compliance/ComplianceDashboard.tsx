@@ -120,6 +120,11 @@ export function ComplianceDashboard() {
         <div>
           <h1 className="text-2xl font-bold text-white">Compliance</h1>
           <p className="mt-1 text-sm text-gray-400">Where the frameworks you turn on stand: tests, control health, risks and what needs doing.</p>
+          {data?.generated_at && (
+            <p className="mt-0.5 text-xs text-gray-500" data-testid="worked-out">
+              Worked out {data.generated_at.slice(0, 10)} {data.generated_at.slice(11, 16)} UTC. Refresh to work it out again.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <ClientPicker value={clientId} onChange={setClientId} label="Whose compliance" />

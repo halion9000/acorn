@@ -21,6 +21,7 @@ from app.api.v1.endpoints.compliance_controls import build_rows, evidence_by_con
 from app.models.compliance_enabled_framework import ComplianceEnabledFramework
 from app.models.governance import GovernanceItem
 from app.models.trust_audit import TrustCenterSettings
+from app.services import compliance_audit as audit
 from app.services import compliance_health
 
 router = APIRouter(prefix="/compliance/trust-center", tags=["compliance"])
@@ -183,5 +184,17 @@ async def put_trust_center(
     row.documents = docs
     row.updated_by = getattr(user, "email", None)
     row.updated_at = datetime.now(UTC)
+    await audit.note(
+        db,
+        tenant,
+        user,
+        "trust_center:changed",
+        "trust_center",
+        tenant,
+        enabled=row.enabled,
+        frameworks=row.frameworks,
+        policies=len(row.policy_ids),
+        documents=len(row.documents),
+    )
     await db.commit()
     return await _build(db, tenant)

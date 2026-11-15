@@ -16,6 +16,7 @@ from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.models.roadmap import RoadmapItem
+from app.services import compliance_audit as audit
 
 router = APIRouter(prefix="/roadmap", tags=["roadmap"])
 
@@ -102,6 +103,7 @@ async def add_item(
         updated_at=now,
     )
     db.add(row)
+    await audit.note(db, user.tenant_id, user, "roadmap:added", "roadmap_item", row.id, title=row.title)
     await db.commit()
     return _out(row)
 
@@ -122,6 +124,7 @@ async def update_item(
         row.completed_at = datetime.now(UTC) if changes["status"] == "completed" else None
         row.person_status = row.key is not None
     row.updated_at = datetime.now(UTC)
+    await audit.note(db, user.tenant_id, user, "roadmap:changed", "roadmap_item", item_id, changes=sorted(changes))
     await db.commit()
     return _out(row)
 
@@ -142,4 +145,5 @@ async def remove_item(
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
     row.removed_at = row.updated_at = datetime.now(UTC)
+    await audit.note(db, user.tenant_id, user, "roadmap:removed", "roadmap_item", item_id, title=row.title)
     await db.commit()

@@ -26,6 +26,7 @@ from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
 from app.db.rls_scope import acting_as_tenant
 from app.db.rls_sessions import adopt_tenant
 from app.models.vendor_management import DetectedApplication, Vendor, VendorHistory
+from app.services import compliance_audit as audit
 
 router = APIRouter(prefix="/compliance/detected-applications", tags=["vendors"])
 ingest_router = APIRouter(prefix="/inbox", tags=["vendors"])
@@ -252,6 +253,7 @@ async def add_application(
         await db.flush()
         await _note(db, tenant, vendor.id, user, "created", "added from a detected application")
         _mark(row, user, "added", vendor.id)
+    await audit.note(db, tenant, user, "detected_application:added", "detected_application", app_id, name=row.name)
     await db.commit()
     return await _one(db, tenant, row)
 
@@ -276,6 +278,7 @@ async def link_application(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor not found")
     _mark(row, user, "linked", vendor.id)
     await _note(db, tenant, vendor.id, user, "application_linked", f"{row.name} ({row.accounts} accounts)")
+    await audit.note(db, tenant, user, "detected_application:linked", "detected_application", app_id, name=row.name, vendor=str(vendor.id))
     await db.commit()
     return await _one(db, tenant, row)
 
@@ -286,6 +289,7 @@ async def ignore_application(
 ) -> AppOut:
     row = await _get(db, tenant, app_id)
     _mark(row, user, "ignored", None)
+    await audit.note(db, tenant, user, "detected_application:ignored", "detected_application", app_id, name=row.name)
     await db.commit()
     return await _one(db, tenant, row)
 
@@ -298,5 +302,6 @@ async def restore_application(
     if row.status == "added":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="That application became a vendor; archive the vendor instead.")
     _mark(row, user, "new", None)
+    await audit.note(db, tenant, user, "detected_application:restored", "detected_application", app_id, name=row.name)
     await db.commit()
     return await _one(db, tenant, row)

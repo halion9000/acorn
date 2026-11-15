@@ -719,8 +719,9 @@
     "key": "r7-ai-08",
     "title": "Audit-log entries for access reviews, questionnaires, audits, the trust center and the roadmap",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
   },
   {
     "key": "r7-ai-09",
@@ -733,8 +734,9 @@
     "key": "r7-ai-10",
     "title": "The Compliance overview shows when it was worked out and has a refresh button",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
   },
   {
     "key": "r7-ai-11",
@@ -838,8 +840,9 @@
     "key": "r7-ai-25",
     "title": "Vendor contract end dates inside 60 days appear as action items",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
   },
   {
     "key": "r7-ai-26",
@@ -939,8 +942,9 @@
     "key": "r7-ai-39",
     "title": "Roadmap page: sort by priority, filter by area, show a count for each tag",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
   },
   {
     "key": "r7-ai-40",

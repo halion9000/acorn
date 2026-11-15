@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const api = vi.hoisted(() => ({ list: vi.fn(), add: vi.fn(), update: vi.fn(), remove: vi.fn() }));
 vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), roadmapApi: api }));
 
-import { RoadmapView, visibleItems } from './RoadmapView';
+import { RoadmapView, sortedItems, tagCounts, visibleItems } from './RoadmapView';
 
 const item = (over: Record<string, unknown> = {}) => ({
   id: 'i1', key: 'a', title: 'Vendor detected apps', detail: 'Scan the tenant', area: 'Compliance', status: 'not_started', needs: 'claude', priority: 'normal', note: '',
@@ -106,3 +106,40 @@ describe('RoadmapView', () => {
     await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
   });
 });
+
+describe('roadmap filters and sorting', () => {
+  const items = [
+    item({ id: 'x1', key: 'x1', title: 'B item', area: 'Devices', created_at: '2026-11-10T00:00:00Z' }),
+    item({ id: 'x2', key: 'x2', title: 'A item', area: 'Compliance', needs: 'hal', created_at: '2026-11-12T00:00:00Z' }),
+    item({ id: 'x3', key: 'x3', title: 'C item', area: 'Compliance', status: 'completed', created_at: '2026-11-11T00:00:00Z' }),
+  ] as never[];
+
+  it('filters by area as well, and counts each tag and area over the items on the chosen status tab', () => {
+    expect(visibleItems(items, 'all', 'all', 'Compliance').map((i: { title: string }) => i.title)).toEqual(['A item', 'C item']);
+    expect(visibleItems(items, 'completed', 'all', 'Devices')).toEqual([]);
+    const all = tagCounts(items, 'all');
+    expect(all.needs).toEqual({ claude: 2, signoff: 0, hal: 1 });
+    expect(all.areas).toEqual([['Compliance', 2], ['Devices', 1]]);
+    expect(tagCounts(items, 'completed').areas).toEqual([['Compliance', 1]]);
+  });
+
+  it('sorts newest first or by area, and leaves the server order alone otherwise', () => {
+    expect(sortedItems(items, 'order')).toBe(items);
+    expect(sortedItems(items, 'newest').map((i: { title: string }) => i.title)).toEqual(['A item', 'C item', 'B item']);
+    expect(sortedItems(items, 'area').map((i: { title: string }) => i.title)).toEqual(['A item', 'C item', 'B item']);
+  });
+
+  it('the area and sort choices narrow and reorder the list on the page', async () => {
+    api.list.mockResolvedValue(roadmap([item({ id: 'a', key: 'a', title: 'Zed', area: 'Devices' }), item({ id: 'b', key: 'b', title: 'Alpha', area: 'Compliance' })]));
+    render(<RoadmapView />);
+    await screen.findByTestId('roadmap-list');
+    await userEvent.selectOptions(screen.getByLabelText('Area'), 'Compliance');
+    expect(within(screen.getByTestId('roadmap-list')).getAllByRole('listitem')).toHaveLength(1);
+    await userEvent.selectOptions(screen.getByLabelText('Area'), '');
+    await userEvent.selectOptions(screen.getByLabelText('Sort'), 'area');
+    const titles = within(screen.getByTestId('roadmap-list')).getAllByRole('listitem').map((li) => li.textContent ?? '');
+    expect(titles[0]).toContain('Alpha');
+    expect(screen.getByRole('option', { name: 'Can do without you (2)' })).toBeTruthy();
+  });
+});
+

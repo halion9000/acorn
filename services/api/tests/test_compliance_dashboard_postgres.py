@@ -213,3 +213,20 @@ async def test_an_open_audit_request_with_a_due_date_is_an_action_item_until_it_
     ]
     await run(w.acme, lambda db: au.patch_request(audit.id, made.items[0].id, au.RequestPatch(status="provided"), w.acme, db, w.user))
     assert not [i for i in (await dash(w)).action_items if i.kind == "audit_request"]
+
+
+async def test_a_vendor_contract_ending_within_sixty_days_or_already_ended_is_an_action_item_and_a_distant_one_is_not(world):
+    from app.api.v1.endpoints import vendor_management as vm
+
+    w = world
+    today = datetime.now(UTC).date()
+
+    async def add(name, end):
+        return await run(w.acme, lambda db: vm.create_vendor(vm.VendorIn(name=name, contract_end=end), w.request, w.acme, db, w.user))
+
+    await add("Ends soon", today + timedelta(days=30))
+    await add("Already ended", today - timedelta(days=5))
+    await add("Far off", today + timedelta(days=200))
+    await add("No contract date", None)
+    items = [(i.name, i.event) for i in (await dash(w)).action_items if i.kind == "vendor_contract"]
+    assert sorted(items) == [("Vendor Already ended: contract", "Contract ended"), ("Vendor Ends soon: contract", "Contract ends soon")]

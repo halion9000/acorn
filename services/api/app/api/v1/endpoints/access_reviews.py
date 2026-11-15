@@ -21,6 +21,7 @@ from app.models.access_review import AccessReview, AccessReviewEntry
 from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
 from app.services import access_reviews as rules
+from app.services import compliance_audit as audit
 
 router = APIRouter(prefix="/compliance/access-reviews", tags=["compliance"])
 
@@ -240,6 +241,9 @@ async def start_review(
                 flags=ln["flags"],
             )
         )
+    await audit.note(
+        db, tenant, user, "access_review:started", "access_review", review.id, name=review.name, system=review.system, people=len(lines)
+    )
     await db.commit()
     return await _detail(db, tenant, review)
 
@@ -300,6 +304,16 @@ async def decide_all(
         if e.decision != "pending" or (body.only_unflagged and e.flags):
             continue
         e.decision, e.decided_by, e.decided_at = body.decision, _actor(user), now
+    await audit.note(
+        db,
+        tenant,
+        user,
+        "access_review:decided_all",
+        "access_review",
+        review_id,
+        decision=body.decision,
+        only_unflagged=body.only_unflagged,
+    )
     await db.commit()
     return await _detail(db, tenant, review)
 
@@ -324,5 +338,6 @@ async def complete(
     review.summary = rules.summarize(decisions)
     review.completed_at = datetime.now(UTC)
     review.completed_by = _actor(user)
+    await audit.note(db, tenant, user, "access_review:completed", "access_review", review_id, summary=review.summary)
     await db.commit()
     return await _detail(db, tenant, review)

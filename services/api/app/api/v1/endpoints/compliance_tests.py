@@ -17,6 +17,7 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.compliance_enabled_framework import ComplianceEnabledFramework
 from app.models.signin import ClientM365Check
+from app.services import compliance_audit as audit
 from app.services import compliance_tests as engine
 
 router = APIRouter(prefix="/compliance/tests", tags=["compliance"])
@@ -104,11 +105,14 @@ async def list_tests(
 
 @router.post("/record", response_model=RecordOut, summary="Write the results as evidence for the controls of the frameworks that are on")
 async def record_tests(
-    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:write"))]
+    tenant: ScopeTenant, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("reports:write"))]
 ) -> RecordOut:
     checks = await _checks(db, tenant)
     enabled = await _enabled(db, tenant)
     results = engine.evaluate_all(checks)
     done = await engine.record(db, tenant, engine.evidence_rows(results, set(enabled)), datetime.now(UTC))
+    await audit.note(
+        db, tenant, user, "compliance_tests:recorded", "compliance_tests", tenant, written=done["written"], replaced=done["replaced"]
+    )
     await db.commit()
     return RecordOut(**done, results=_out(results, enabled, len(checks)))

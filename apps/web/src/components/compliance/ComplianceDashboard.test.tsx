@@ -55,6 +55,13 @@ describe('arcs', () => {
 });
 
 describe('ComplianceDashboard', () => {
+  it('says when the overview was worked out, and works it out again on Refresh', async () => {
+    show();
+    expect(await screen.findByTestId('worked-out')).toHaveTextContent('Worked out 2026-11-14 12:00 UTC');
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(api.dashboard).toHaveBeenCalledTimes(2));
+  });
+
   it('shows the vendors by risk level as a fourth ring that opens the vendor page for the client, and not at all from an older server', async () => {
     window.history.replaceState(null, '', '/compliance?client=c9');
     show();

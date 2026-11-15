@@ -74,7 +74,7 @@ class VendorLevels(BaseModel):
 
 
 class ActionItem(BaseModel):
-    kind: Literal["evidence_expired", "risk_task", "vendor_review", "access_review", "audit_request"]
+    kind: Literal["evidence_expired", "risk_task", "vendor_review", "access_review", "audit_request", "vendor_contract"]
     name: str
     event: str
     owner: str | None = None
@@ -251,6 +251,17 @@ async def dashboard(
         reviews_by_vendor.setdefault(r.vendor_id, []).append(r)
     for v in vendors:
         vendor_levels[v.risk_level if v.risk_level in vendor_levels else "unassessed"] += 1
+        if v.contract_end is not None and v.contract_end <= today + timedelta(days=vendor_management.CONTRACT_NOTICE_DAYS):
+            action_items.append(
+                ActionItem(
+                    kind="vendor_contract",
+                    name=f"Vendor {v.name}: contract",
+                    event="Contract ended" if v.contract_end < today else "Contract ends soon",
+                    owner=v.owner,
+                    due=datetime(v.contract_end.year, v.contract_end.month, v.contract_end.day, tzinfo=UTC),
+                    link="/compliance/vendors",
+                )
+            )
         st = vendor_management.review_state(v.review_interval_months, reviews_by_vendor.get(v.id, []), v.created_at.date(), today)
         if st["state"] in ("overdue", "due") and st["next_due"] is not None:
             action_items.append(

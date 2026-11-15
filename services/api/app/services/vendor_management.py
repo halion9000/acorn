@@ -30,6 +30,8 @@ DOC_TYPES = (
 )
 RISK_LEVELS = ("unassessed", "low", "medium", "high", "critical")
 DUE_SOON_DAYS = 30
+# A contract ending within this many days (or already ended) is an action item on the Compliance overview.
+CONTRACT_NOTICE_DAYS = 60
 
 
 def add_months(d: date, months: int) -> date:
