@@ -4,6 +4,7 @@
  * One client's posture on a page you can print for a review: devices, Multi-Factor coverage, open alerts and cases side by side. Read-only; the same numbers as the Devices, Multi-factor status,
  * Alerts and Cases pages. Backed by GET /api/v1/client-posture/{client_id}.
  */
+import { TOOL_CHECK_LABELS } from "@/lib/toolCheckLabels";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
@@ -33,23 +34,7 @@ export interface Posture {
 }
 
 /** How each tool that sends checks is named on the page, in the order shown. A tool not listed here is shown under its source name. */
-export const TOOL_CHECK_LABELS: Record<string, string> = {
-  threatmate: "ThreatMate",
-  "threatmate-google": "Google Workspace (ThreatMate)",
-  liongard: "Liongard",
-  itglue: "IT Glue",
-  fieldeffect: "Field Effect",
-  "cipp-health": "Microsoft 365 health (CIPP)",
-  ninjaone: "NinjaOne",
-  halopsa: "HaloPSA",
-  meraki: "Meraki",
-  slide: "Slide",
-  autoelevate: "AutoElevate",
-  huntress: "Huntress",
-  dnsfilter: "DNSFilter",
-  inky: "INKY",
-  "datto-saas-seats": "Datto SaaS Protection",
-};
+export { TOOL_CHECK_LABELS };
 
 /** The tools that sent checks, in a steady order: the named ones first as listed above, then any other by name. */
 export function toolCheckEntries(tc: NonNullable<Posture["tool_checks"]> | undefined): [string, { checks: PostureCheck[]; refreshed_at?: string | null }][] {

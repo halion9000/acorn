@@ -47,6 +47,7 @@ MODELS = {
     "tickets": feed.TicketsReport,
     "risk-tickets-status": feed.RiskTicketStatuses,
     "finance": feed.FinanceSnapshotIn,
+    "profitability": feed.ProfitSnapshotIn,
     "state": feed.StateReport,
     "actions-claim-huntress": feed.ClaimRequest,
     "actions-claim-blumira": feed.ClaimRequest,

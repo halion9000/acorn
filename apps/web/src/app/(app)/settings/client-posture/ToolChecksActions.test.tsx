@@ -6,7 +6,7 @@ const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
 
 import { ToolChecks, isStale, STALE_HOURS } from './ToolChecks';
-import { SourceHealth, failureKind, sortRuns, type SweepRun } from './SourceHealth';
+import { SourceHealth, failureKind, sortRuns, type SweepRun } from '@/components/settings/SourceHealth';
 
 const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
 

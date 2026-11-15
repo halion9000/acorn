@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
-import { TOOL_CHECK_LABELS } from './ClientPosture';
+import { TOOL_CHECK_LABELS } from '@/lib/toolCheckLabels';
 
 export interface SweepRun {
   source: string;

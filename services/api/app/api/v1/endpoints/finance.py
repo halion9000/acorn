@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 
@@ -19,8 +19,11 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.billing import BILLED_SOURCE, _all_client_counts
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.finance_price import FinanceItemPrice
+from app.models.finance_profit import FinanceLaborRate, FinanceProfitSnapshot
+from app.services import csv_export
 from app.services import finance as fin
 from app.services import finance_halo as fh
+from app.services import profitability as profit
 from app.services.audit import emit_audit
 
 router = APIRouter(prefix="/finance", tags=["finance"])
@@ -158,3 +161,134 @@ async def margin(user: AuthUser, db: DBSession) -> dict[str, Any]:
         "An estimate: only invoice lines with both a price and a cost are counted, using the quantities each client is billed for. Lines billed but not priced are listed per client."
     )
     return out
+
+
+# ---- Profitability --------------------------------------------------------------------------------------------------------------------------------------
+
+
+class RateIn(BaseModel):
+    scope: str = Field(pattern="^(agent|team|default)$")
+    key: str = Field(default="", max_length=120)
+    hourly_rate: Decimal = Field(ge=0, le=10000, max_digits=10, decimal_places=2)
+
+
+async def _rates(db: DBSession, tenant: Any) -> list[dict[str, Any]]:
+    rows = (await db.execute(select(FinanceLaborRate).where(FinanceLaborRate.tenant_id == tenant))).scalars().all()
+    return [{"scope": r.scope, "key": r.key, "hourly_rate": r.hourly_rate} for r in rows]
+
+
+@router.get("/profitability", dependencies=[Depends(require_permission("finance:view"))])
+async def profitability(user: AuthUser, db: DBSession, month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$")) -> dict[str, Any]:
+    """Revenue, hours, labor cost and what is left after labor per client for one month, from the summary CORE sends about once a day. ``received_at`` is None until the first one arrives."""
+    row = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    if row is None:
+        return {"received_at": None, "months": [], "report": None, "rates": await _rates(db, user.tenant_id)}
+    months = profit.available_months(row.payload)
+    chosen = month if month in months else (months[-2] if len(months) > 1 else (months[-1] if months else None))
+    halo = (await db.execute(select(FinanceHaloSnapshot).where(FinanceHaloSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    rates = await _rates(db, user.tenant_id)
+    report = (
+        profit.profit_for_month(row.payload, rates, chosen, profit.software_per_run(halo.payload if halo else None)) if chosen else None
+    )
+    return {
+        "received_at": row.received_at,
+        "months": months,
+        "report": report,
+        "rates": rates,
+        "agents": row.payload.get("agents") or [],
+        "note": (
+            "Revenue is what HaloPSA invoiced in the month, before tax. Labor is the hours worked on tickets times each agent's hourly cost (set below; 65.00 until you set one). Software, hardware, travel, "
+            "equipment, sales and marketing and overhead are not in this number. Software per invoice run comes from the recurring invoices and is shown for information only."
+        ),
+    }
+
+
+@router.get("/profitability/export.csv", dependencies=[Depends(require_permission("finance:view"))])
+async def profitability_csv(user: AuthUser, db: DBSession, month: str = Query(pattern=r"^\d{4}-\d{2}$")) -> Response:
+    row = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    if row is None or month not in profit.available_months(row.payload):
+        raise HTTPException(status_code=404, detail="No profitability data for that month yet")
+    report = profit.profit_for_month(row.payload, await _rates(db, user.tenant_id), month)
+    body = csv_export.to_csv(
+        ["Client", "Revenue", "Invoices", "Hours", "Labor cost", "After labor", "Margin after labor %"],
+        [
+            [r["client_name"], r["revenue"], r["invoices"], r["hours"], r["labor"], r["after_labor"], r["margin_percent"]]
+            for r in report["rows"]
+        ],
+    )
+    return Response(
+        content=body, media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="profitability-{month}.csv"'}
+    )
+
+
+@router.put("/labor-rates", status_code=status.HTTP_204_NO_CONTENT)
+async def save_labor_rate(
+    body: RateIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession
+) -> None:
+    key = " ".join(body.key.split())
+    if body.scope != "default" and not key:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Name the agent or team")
+    if body.scope == "default":
+        key = ""
+    row = (
+        await db.execute(
+            select(FinanceLaborRate).where(
+                FinanceLaborRate.tenant_id == user.tenant_id, FinanceLaborRate.scope == body.scope, FinanceLaborRate.key == key
+            )
+        )
+    ).scalar_one_or_none()
+    now = datetime.now(UTC)
+    if row is None:
+        db.add(
+            FinanceLaborRate(
+                tenant_id=user.tenant_id,
+                scope=body.scope,
+                key=key,
+                hourly_rate=body.hourly_rate,
+                updated_by=str(user.user_id) if user.user_id else None,
+                updated_at=now,
+            )
+        )
+    else:
+        row.hourly_rate, row.updated_by, row.updated_at = body.hourly_rate, (str(user.user_id) if user.user_id else None), now
+    await db.flush()
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="finance_labor_rate:saved",
+        resource="finance_labor_rate",
+        resource_id=f"{body.scope}:{key}",
+        changes={"scope": body.scope, "key": key},
+        request=request,
+    )
+    await db.commit()
+
+
+@router.delete("/labor-rates", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_labor_rate(
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("finance:write"))],
+    db: DBSession,
+    scope: str = Query(pattern="^(agent|team|default)$"),
+    key: str = Query(default="", max_length=120),
+) -> None:
+    key = "" if scope == "default" else " ".join(key.split())
+    result = await db.execute(
+        delete(FinanceLaborRate).where(
+            FinanceLaborRate.tenant_id == user.tenant_id, FinanceLaborRate.scope == scope, FinanceLaborRate.key == key
+        )
+    )
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="No such rate")
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="finance_labor_rate:deleted",
+        resource="finance_labor_rate",
+        resource_id=f"{scope}:{key}",
+        changes={"scope": scope, "key": key},
+        request=request,
+    )
+    await db.commit()

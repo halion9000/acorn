@@ -12,7 +12,7 @@ import { authFetch } from "@/lib/auth-session";
 import { RetentionPreview } from "./RetentionPreview";
 import { LoginAbusePanel } from "./LoginAbusePanel";
 import { CredentialReminders } from "./CredentialReminders";
-import { SourceHealth } from "../client-posture/SourceHealth";
+import { SourceHealth } from "@/components/settings/SourceHealth";
 import { agoMinutes } from "@/lib/ago";
 
 /** A restarted CORE takes about this long to finish its first round and report; a quiet spell shorter than the grace period is shown as a note, not a warning. */

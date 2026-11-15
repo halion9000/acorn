@@ -2338,6 +2338,125 @@ paths:
                 title: Response Margin Api V1 Finance Margin Get
       security:
       - HTTPBearer: []
+  /api/v1/finance/profitability:
+    get:
+      tags:
+      - finance
+      summary: Profitability
+      description: Revenue, hours, labor cost and what is left after labor per client
+        for one month, from the summary CORE sends about once a day. ``received_at``
+        is None until the first one arrives.
+      operationId: profitability_api_v1_finance_profitability_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: month
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^\d{4}-\d{2}$
+          - type: 'null'
+          title: Month
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Profitability Api V1 Finance Profitability Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/profitability/export.csv:
+    get:
+      tags:
+      - finance
+      summary: Profitability Csv
+      operationId: profitability_csv_api_v1_finance_profitability_export_csv_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: month
+        in: query
+        required: true
+        schema:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/labor-rates:
+    put:
+      tags:
+      - finance
+      summary: Save Labor Rate
+      operationId: save_labor_rate_api_v1_finance_labor_rates_put
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateIn'
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - finance
+      summary: Delete Labor Rate
+      operationId: delete_labor_rate_api_v1_finance_labor_rates_delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: scope
+        in: query
+        required: true
+        schema:
+          type: string
+          pattern: ^(agent|team|default)$
+          title: Scope
+      - name: key
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 120
+          default: ''
+          title: Key
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/nist-coverage/{client_id}:
     get:
       tags:
@@ -28663,6 +28782,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/profitability:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Profitability
+      description: Keep the latest HaloPSA profitability summary CORE read (invoiced
+        revenue per client per month, hours per client, the agents). It replaces the
+        one before; profit is worked out when a person with the finance permissions
+        asks.
+      operationId: report_core_feed_profitability_api_v1_inbox_core_feed__tenant_token__profitability_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfitSnapshotIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfitSnapshotOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/device-names:
     post:
       tags:
@@ -49171,6 +49326,148 @@ components:
       - prices
       - billed_items
       title: PricesOut
+    ProfitAgentIn:
+      properties:
+        id:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Id
+        name:
+          type: string
+          maxLength: 200
+          title: Name
+        team:
+          type: string
+          maxLength: 80
+          title: Team
+          default: ''
+        active:
+          type: boolean
+          title: Active
+          default: true
+        charge_rate:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Charge Rate
+      type: object
+      required:
+      - id
+      - name
+      title: ProfitAgentIn
+    ProfitHoursIn:
+      properties:
+        client:
+          type: string
+          maxLength: 200
+          title: Client
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        agent_id:
+          type: string
+          maxLength: 20
+          title: Agent Id
+          default: ''
+        charge_type:
+          type: string
+          maxLength: 80
+          title: Charge Type
+          default: ''
+        hours:
+          type: number
+          maximum: 100000.0
+          minimum: 0.0
+          title: Hours
+      type: object
+      required:
+      - client
+      - month
+      - hours
+      title: ProfitHoursIn
+    ProfitInvoiceMonthIn:
+      properties:
+        client_id:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Client Id
+        client_name:
+          type: string
+          maxLength: 200
+          title: Client Name
+          default: ''
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        revenue:
+          type: number
+          title: Revenue
+        invoices:
+          type: integer
+          maximum: 100000.0
+          minimum: 0.0
+          title: Invoices
+      type: object
+      required:
+      - client_id
+      - month
+      - revenue
+      - invoices
+      title: ProfitInvoiceMonthIn
+    ProfitSnapshotIn:
+      properties:
+        months:
+          items:
+            type: string
+          type: array
+          maxItems: 24
+          title: Months
+        invoices:
+          items:
+            $ref: '#/components/schemas/ProfitInvoiceMonthIn'
+          type: array
+          maxItems: 20000
+          title: Invoices
+        hours:
+          items:
+            $ref: '#/components/schemas/ProfitHoursIn'
+          type: array
+          maxItems: 60000
+          title: Hours
+        agents:
+          items:
+            $ref: '#/components/schemas/ProfitAgentIn'
+          type: array
+          maxItems: 500
+          title: Agents
+      type: object
+      required:
+      - months
+      - invoices
+      - hours
+      - agents
+      title: ProfitSnapshotIn
+    ProfitSnapshotOut:
+      properties:
+        invoices:
+          type: integer
+          title: Invoices
+        hours:
+          type: integer
+          title: Hours
+        agents:
+          type: integer
+          title: Agents
+      type: object
+      required:
+      - invoices
+      - hours
+      - agents
+      title: ProfitSnapshotOut
     ProposalIn:
       properties:
         agent:
@@ -50132,6 +50429,29 @@ components:
         SLA remaining — the frontend can drift its own clock from this
 
         so multiple analysts on different boxes see the same countdowns.'
+    RateIn:
+      properties:
+        scope:
+          type: string
+          pattern: ^(agent|team|default)$
+          title: Scope
+        key:
+          type: string
+          maxLength: 120
+          title: Key
+          default: ''
+        hourly_rate:
+          anyOf:
+          - type: number
+            maximum: 10000.0
+            minimum: 0.0
+          - type: string
+          title: Hourly Rate
+      type: object
+      required:
+      - scope
+      - hourly_rate
+      title: RateIn
     RatePoint:
       properties:
         day:

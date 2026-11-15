@@ -1,0 +1,42 @@
+{
+  "route": "profitability",
+  "method": "POST",
+  "body": {
+    "months": [
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+      "2026-10",
+      "2026-11"
+    ],
+    "invoices": [
+      {
+        "client_id": "12",
+        "client_name": "Acme Dental",
+        "month": "2026-10",
+        "revenue": 1000,
+        "invoices": 1
+      }
+    ],
+    "hours": [
+      {
+        "client": "Acme Dental",
+        "month": "2026-10",
+        "agent_id": "40",
+        "charge_type": "Remote Support",
+        "hours": 2.5
+      }
+    ],
+    "agents": [
+      {
+        "id": "40",
+        "name": "Dan Kemp",
+        "team": "Support",
+        "active": true,
+        "charge_rate": 150
+      }
+    ]
+  }
+}

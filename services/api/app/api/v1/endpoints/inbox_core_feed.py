@@ -30,6 +30,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
+from app.models.finance_profit import FinanceProfitSnapshot
 from app.models.tenant import Tenant
 from app.models.vendor_action import VendorAction
 from app.services import core_approvals
@@ -1129,6 +1130,59 @@ async def report_core_feed_finance(tenant_token: str, body: FinanceSnapshotIn, d
         row.payload, row.received_at = payload, now
     await db.commit()
     return FinanceSnapshotOut(recurring=len(body.recurring), invoices=len(body.invoices))
+
+
+class ProfitInvoiceMonthIn(BaseModel):
+    client_id: str = Field(min_length=1, max_length=20)
+    client_name: str = Field(default="", max_length=200)
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    revenue: float
+    invoices: int = Field(ge=0, le=100000)
+
+
+class ProfitHoursIn(BaseModel):
+    client: str = Field(max_length=200)
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    agent_id: str = Field(default="", max_length=20)
+    charge_type: str = Field(default="", max_length=80)
+    hours: float = Field(ge=0, le=100000)
+
+
+class ProfitAgentIn(BaseModel):
+    id: str = Field(min_length=1, max_length=20)
+    name: str = Field(max_length=200)
+    team: str = Field(default="", max_length=80)
+    active: bool = True
+    charge_rate: float | None = None
+
+
+class ProfitSnapshotIn(BaseModel):
+    months: list[str] = Field(max_length=24)
+    invoices: list[ProfitInvoiceMonthIn] = Field(max_length=20000)
+    hours: list[ProfitHoursIn] = Field(max_length=60000)
+    agents: list[ProfitAgentIn] = Field(max_length=500)
+
+
+class ProfitSnapshotOut(BaseModel):
+    invoices: int
+    hours: int
+    agents: int
+
+
+@router.post("/core-feed/{tenant_token}/profitability", response_model=ProfitSnapshotOut)
+async def report_core_feed_profitability(tenant_token: str, body: ProfitSnapshotIn, db: DBSession) -> ProfitSnapshotOut:
+    """Keep the latest HaloPSA profitability summary CORE read (invoiced revenue per client per month, hours per client, the agents). It replaces the one before; profit is worked out when a person with the finance permissions asks."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    row = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == tenant_id))).scalar_one_or_none()
+    payload = body.model_dump()
+    if row is None:
+        db.add(FinanceProfitSnapshot(tenant_id=tenant_id, payload=payload, received_at=now))
+    else:
+        row.payload, row.received_at = payload, now
+    await db.commit()
+    return ProfitSnapshotOut(invoices=len(body.invoices), hours=len(body.hours), agents=len(body.agents))
 
 
 class DeviceItem(BaseModel):

@@ -411,6 +411,12 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: 'Sales and Finance',
+    items: [
+      { label: 'Profitability', href: '/finance/profitability', icon: <ScanIcon /> },
+    ],
+  },
+  {
     items: [
       {
         label: 'Settings',

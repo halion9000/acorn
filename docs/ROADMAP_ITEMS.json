@@ -1567,12 +1567,12 @@
     "note": "Read live 2026-11-15: 73 teams, usage, statistics all answer"
   },
   {
-    "status": "not_started",
+    "status": "in_progress",
     "needs": "hal",
     "area": "Sales and Finance",
     "key": "rw-profitability",
     "title": "Sales and Finance > Profitability: client profit by month from QuickBooks, Halo hours and burdened labor rates",
-    "detail": "Emulates the finance spreadsheets (Revenue to Net Income): revenue from QuickBooks sales by customer, direct labor from Halo time entries x burdened rate by role, labor true-up, add-on and support software, travel, hardware, equipment, sales and marketing for new clients, overhead spread by MRR; summary by industry and size ranking. Needs Hal: burdened labor rates by role, software cost per license per vendor, hardware COGS source, client master fields (industry, non-profit, target)."
+    "detail": "Version 1 built (Halo only): Sales and Finance > Profitability shows per client per month revenue (Halo invoices before tax), hours, labor cost at a rate per agent, team or default (65.00), and what is left after labor, with unmatched hours, CSV and rates. Still to add: QuickBooks cost lines (software bills, hardware, travel, payroll true-up), overhead and sales and marketing allocation, industry and size summaries, net income. Needs Hal: burdened rates by role (until then the 65.00 default), hardware COGS source, client master fields."
   },
   {
     "status": "not_started",
