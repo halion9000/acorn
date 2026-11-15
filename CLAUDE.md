@@ -29,4 +29,4 @@
 
 ## The roadmap (Settings, Upcoming improvements)
 - docs/ROADMAP_ITEMS.json mirrors everything pending. Keep it current as work goes on: add an item when one is agreed, move its status (new, not_started, in_progress, completed), set needs (claude, signoff, hal) and a note saying what it waits for. Never write a priority: that is Hal's.
-- Bring the live page up to date after a deploy: pipe the file into the API container, `cat docs/ROADMAP_ITEMS.json | python -m app.scripts.roadmap_sync --tenant-name Default` (Default is the tenant the people sign in to; the roadmap belongs to it) (send it base64 through `az vm run-command` into `docker exec -i aisoc-api`).
+- Bring the live page up to date AFTER a deploy (the VM gets the file only through a deploy; the file is too long to send through `az`): run on the VM `cd /srv/acorn/AiSOC && docker exec -i aisoc-api python -m app.scripts.roadmap_sync --tenant-name Default < docs/ROADMAP_ITEMS.json` with `az vm run-command` (Default is the tenant the people sign in to).
