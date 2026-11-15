@@ -16,7 +16,6 @@ import { NistCoverage } from "./NistCoverage";
 import { ConfigChanges } from "./ConfigChanges";
 import { ToolChecks, checkTitle, type PostureCheck } from "./ToolChecks";
 import { ClientSummary } from "./ClientSummary";
-import { SourceHealth } from "./SourceHealth";
 import { ToolExclusions } from "./ToolExclusions";
 
 export interface Posture {
@@ -223,7 +222,6 @@ export function ClientPosture() {
           ))}
         </select>
       </label>
-      <SourceHealth />
       {error && (
         <p role="alert" className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
           {error}
@@ -244,6 +242,17 @@ export function ClientPosture() {
             </Link>
           </div>
           <LinkedTools tools={shown.tools ?? []} />
+          <section>
+            <h3 className="mb-2 text-sm uppercase text-gray-500">Alerts and cases</h3>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+              <Stat label="Open alerts" value={shown.alerts.open} href={links.alerts} />
+              <Stat label="Critical" value={shown.alerts.critical} bad={shown.alerts.critical > 0} href={links.critical} />
+              <Stat label="High" value={shown.alerts.high} bad={shown.alerts.high > 0} href={links.high} />
+              <Stat label="Open, no ticket" value={shown.alerts.without_ticket} bad={shown.alerts.without_ticket > 0} href={links.noTicket} />
+              <Stat label="Open cases" value={shown.open_cases} href={links.cases} />
+            </div>
+          </section>
+          <ClientSummary posture={shown} labelFor={labelFor} />
           <ToolExclusions
             clientId={shown.client_id}
             onLoaded={(tools) => setExcludedTools(tools)}
@@ -292,17 +301,6 @@ export function ClientPosture() {
           <DomainChecks clientId={shown.client_id} />
           <NistCoverage clientId={shown.client_id} />
           <ConfigChanges clientId={shown.client_id} labelFor={labelFor} />
-          <ClientSummary posture={shown} labelFor={labelFor} />
-          <section>
-            <h3 className="mb-2 text-sm uppercase text-gray-500">Alerts and cases</h3>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-              <Stat label="Open alerts" value={shown.alerts.open} href={links.alerts} />
-              <Stat label="Critical" value={shown.alerts.critical} bad={shown.alerts.critical > 0} href={links.critical} />
-              <Stat label="High" value={shown.alerts.high} bad={shown.alerts.high > 0} href={links.high} />
-              <Stat label="Open, no ticket" value={shown.alerts.without_ticket} bad={shown.alerts.without_ticket > 0} href={links.noTicket} />
-              <Stat label="Open cases" value={shown.open_cases} href={links.cases} />
-            </div>
-          </section>
         </div>
       )}
     </div>

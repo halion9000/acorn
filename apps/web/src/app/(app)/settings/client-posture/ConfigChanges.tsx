@@ -25,6 +25,7 @@ export const PERIODS: { days: number; label: string }[] = [
   { days: 90, label: "Last 90 days" },
   { days: 365, label: "Last year" },
 ];
+export const SHOWN_FIRST = 10;
 const KINDS = ["all", "added", "worsened", "improved"] as const;
 type Kind = (typeof KINDS)[number];
 
@@ -47,11 +48,13 @@ export function ConfigChanges({ clientId, labelFor }: { clientId: string; labelF
   const [kind, setKind] = useState<Kind>("all");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     let live = true;
     setRows(null);
     setProblem(null);
+    setShowAll(false);
     const q = new URLSearchParams({ days: String(days), limit: "500" });
     if (kind !== "all") q.set("change", kind);
     authFetch(`/api/v1/client-posture/${clientId}/check-history?${q.toString()}`)
@@ -97,7 +100,7 @@ export function ConfigChanges({ clientId, labelFor }: { clientId: string; labelF
       {rows !== null && rows.length === 0 && <p className="text-sm text-gray-400" data-testid="config-changes-empty">Nothing changed in this period.</p>}
       {rows !== null && rows.length > 0 && (
         <ul className="space-y-1" data-testid="config-changes-list">
-          {rows.map((r, i) => (
+          {(showAll ? rows : rows.slice(0, SHOWN_FIRST)).map((r, i) => (
             <li key={`${r.source}-${r.key}-${r.observed_at}-${i}`} className="rounded border border-gray-800 bg-gray-900/50 px-3 py-1.5 text-sm">
               <span className={`mr-2 rounded border px-1.5 py-0.5 text-[11px] ${CHANGE_CLASS[r.change]}`}>{r.change}</span>
               <span className="text-gray-100">{labelFor(r.source, r.key)}</span>
@@ -107,6 +110,11 @@ export function ConfigChanges({ clientId, labelFor }: { clientId: string; labelF
             </li>
           ))}
         </ul>
+      )}
+      {rows !== null && rows.length > SHOWN_FIRST && (
+        <button type="button" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll} data-testid="config-changes-more" className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800">
+          {showAll ? `Show only the latest ${SHOWN_FIRST}` : `Show all ${rows.length} changes`}
+        </button>
       )}
     </section>
   );

@@ -439,4 +439,14 @@ describe('the health report download', () => {
     expect(saved.snapshot.services[0].service).toBe('fusion');
     click.mockRestore();
   });
+
+  it('lists the data sources, the tools that report into A.C.O.R.N for every client', async () => {
+    authFetch.mockImplementation((url: string) =>
+      String(url).includes('sweeps/latest')
+        ? Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([{ source: 'ninjaone', title: 'NinjaOne', ran_at: '2026-10-25T00:00:00Z', accounts: 10, sent: 10, failed: 0, waiting: 0, skipped: 0, first_error: '', health: 'ok' }]) })
+        : Promise.resolve(snapshot()),
+    );
+    render(<PlatformHealth />);
+    expect(await screen.findByTestId('source-health')).toBeInTheDocument();
+  });
 });

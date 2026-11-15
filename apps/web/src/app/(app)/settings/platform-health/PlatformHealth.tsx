@@ -12,6 +12,7 @@ import { authFetch } from "@/lib/auth-session";
 import { RetentionPreview } from "./RetentionPreview";
 import { LoginAbusePanel } from "./LoginAbusePanel";
 import { CredentialReminders } from "./CredentialReminders";
+import { SourceHealth } from "../client-posture/SourceHealth";
 import { agoMinutes } from "@/lib/ago";
 
 /** A restarted CORE takes about this long to finish its first round and report; a quiet spell shorter than the grace period is shown as a note, not a warning. */
@@ -185,7 +186,7 @@ export function PlatformHealth() {
   }, [load]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-6">
+    <div className="mx-auto max-w-5xl space-y-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold text-gray-100">Platform health</h1>
         {snapshot && (
@@ -457,6 +458,7 @@ export function PlatformHealth() {
           </table>
         </>
       )}
+      <div className="overflow-x-auto"><SourceHealth /></div>
       <RetentionPreview />
     </div>
   );

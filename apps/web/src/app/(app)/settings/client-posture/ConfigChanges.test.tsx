@@ -36,6 +36,23 @@ describe('ConfigChanges', () => {
     expect(authFetch).toHaveBeenCalledWith('/api/v1/client-posture/c1/check-history?days=30&limit=500');
   });
 
+  it('shows the latest ten changes and a button for the rest', async () => {
+    authFetch.mockImplementation(() => json({ rows: Array.from({ length: 14 }, (_, i) => row({ key: `check_${i}` })) }));
+    render(<ConfigChanges clientId="c1" labelFor={labelFor} />);
+    const list = await screen.findByTestId('config-changes-list');
+    expect(within(list).getAllByRole('listitem')).toHaveLength(10);
+    await userEvent.click(screen.getByTestId('config-changes-more'));
+    expect(within(list).getAllByRole('listitem')).toHaveLength(14);
+    await userEvent.click(screen.getByTestId('config-changes-more'));
+    expect(within(list).getAllByRole('listitem')).toHaveLength(10);
+  });
+
+  it('has no button when there are ten changes or fewer', async () => {
+    render(<ConfigChanges clientId="c1" labelFor={labelFor} />);
+    await screen.findByTestId('config-changes-list');
+    expect(screen.queryByTestId('config-changes-more')).toBeNull();
+  });
+
   it('asks for the period and the kind of change the person picks', async () => {
     render(<ConfigChanges clientId="c1" labelFor={labelFor} />);
     await screen.findByTestId('config-changes-list');

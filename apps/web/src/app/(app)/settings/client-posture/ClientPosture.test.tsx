@@ -55,6 +55,19 @@ describe('ClientPosture', () => {
     expect(page.textContent?.toLowerCase()).not.toContain('second factor');
   });
 
+  it('puts alerts and cases and the update for the client above the devices, and leaves the data sources to Platform health', async () => {
+    serve(posture());
+    render(<ClientPosture />);
+    await userEvent.selectOptions(await screen.findByLabelText('Client'), 'c1');
+    const page = await screen.findByTestId('posture');
+    const text = page.textContent ?? '';
+    const at = (t: string) => text.indexOf(t);
+    expect(at('Alerts and cases')).toBeGreaterThan(-1);
+    expect(at('Update for the client')).toBeGreaterThan(at('Alerts and cases'));
+    expect(at('Devices')).toBeGreaterThan(at('Update for the client'));
+    expect(screen.queryByTestId('source-health')).toBeNull();
+  });
+
   it('every number is a link to the list behind it, for this client', async () => {
     serve(posture());
     render(<ClientPosture />);
