@@ -12,25 +12,25 @@ export const REVISIONS: Revision[] = [
   {
     "version": "1.23",
     "weekOf": "2026-11-09",
-    "lastChange": "2026-11-10",
-    "commits": 65,
+    "lastChange": "2026-11-15",
+    "commits": 219,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
-      "Autonomy: proposals:log permission for the proposal log; test fixtures brought current",
-      "Vulnerabilities: macOS support check from Addigy; two guard fixtures declare the public client status page",
-      "Autonomy page: last-24-hours view of what the agents did, and a since-hours filter on the proposal log",
-      "Readable BEC report, delete for revoked status links, QR code for authenticator setup, manual hunt hit counts",
-      "Inventory: technicians can check a device out and in (new inventory:checkout permission)",
-      "Audit role changes; Reset MFA also removes the authenticator app",
+      "Hunts: a manual run of a saved hunt stores its hit count, shown beside Last run",
       "Change password: show the rule while typing",
-      "Software update: a history of earlier runs",
-      "Client environment: Download drawing",
-      "Guide: the features added on 2026-11-10",
-      "Docs/openapi.yaml as CI generates it",
-      "MTTR tile: the slow end per severity where there are enough alerts",
-      "Members: Export CSV with the second-factor column"
+      "Detection truth table: the generator says A.C.O.R.N, as the committed file does",
+      "Agent proposal log: filter by agent and outcome, export CSV",
+      "Command palette: settings pages too",
+      "Audit log: the CSV file name says how many rows it holds",
+      "Alerts: an alert forwarded through the inbox is named by its tool, not \"Generic Generic JSON\"",
+      "Compliance: Secureframe's controls and tests under each NIST CSF and CIS IG1 requirement",
+      "Roles: See all clients is a checkbox (clients:view), on for every existing role",
+      "BEC report: tenant-wide signals shown apart; Microsoft address joins its real address when another domain holds the same name",
+      "Inventory: no separate Live Oak own-stock line; Live Oak IT Partners is one of the clients",
+      "Compliance: vendor risk ring and review action items; Detected applications (Add, Ignore, Link) from CORE's CIPP read; Controls page; US spelling of license in the console",
+      "Client posture: alerts and update for the client first, What changed shows 10 with a button for more; Data sources moved to Platform health"
     ],
-    "fixes": 5
+    "fixes": 9
   },
   {
     "version": "1.22",

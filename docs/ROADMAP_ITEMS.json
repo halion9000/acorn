@@ -1563,8 +1563,9 @@
     "area": "Security",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit",
-    "note": "Read live 2026-11-15: 73 teams, usage, statistics all answer"
+    "completed_ref": "5749ef77, 92a3c732",
+    "note": "Read live 2026-11-15: 73 teams, usage, statistics all answer",
+    "detail": "INKY is mapped per client with mailbox counts, two checks (active, mail flow), an alert, the email-protection control test, and an INKY badge on each person whose mailbox it scans (never creates a person)."
   },
   {
     "status": "in_progress",
@@ -1576,12 +1577,12 @@
     "note": "Needs from Hal: burdened hourly rates by role (until then the 65.00 default), where hardware cost comes from, and the industry and non-profit status of each client (typed on the Inputs tab)."
   },
   {
-    "status": "not_started",
+    "status": "in_progress",
     "needs": "claude",
     "area": "Reports",
     "key": "rw-metrics",
     "title": "Metrics dashboards (from Rewst): tickets, staff, finance and customer-insight pages",
-    "detail": "20 pages in Rewst: ticket volume, resolution, updates, summary; staff metrics, hours distribution, utilization, pods; monthly invoicing and licensing; scorecard; Dialpad; meetings; customer experience. Data is HaloPSA."
+    "detail": "Built: Metrics > Tickets and satisfaction (HaloPSA tickets created and resolved, first response, by type and engineer, what is open, per client or all; SimpleSat satisfaction with the written comments), fed by CORE's daily summaries (migration 192). CORE's agents read both through aisoc_ticket_metrics and aisoc_csat under the narrow metrics:view permission (migration 193). Still to build: staff metrics, scorecard, pods, labor-hours, monthly invoicing and licensing pages, Dialpad and meetings."
   },
   {
     "status": "not_started",
@@ -1615,5 +1616,95 @@
     "title": "QuickBooks Online: authorize and test the new connector live",
     "detail": "Create the Intuit app keys, authorize once in the OAuth Playground, save the four settings in CORE, then I read one profit and loss by customer to check the shapes.",
     "note": "Needs Hal: the Intuit app keys and the one-time authorization; then the connector is read once against the real account."
+  },
+  {
+    "status": "in_progress",
+    "needs": "hal",
+    "area": "Metrics",
+    "key": "simplesat-connector",
+    "title": "SimpleSat: customer satisfaction in CORE and A.C.O.R.N, with reviews on each person",
+    "detail": "CORE reads SimpleSat (responses with the written comments), sends a daily CSAT summary, maps its companies as clients and its respondents as people with their newest reviews; A.C.O.R.N shows them on Metrics and on the person (Customer reviews). Built from SimpleSat's published API file, NOT yet read against the live account.",
+    "note": "Needs Hal: confirm the first daily read works once CORE restarts, and send the SimpleSat logo in a new message so it can be added.",
+    "completed_ref": null
+  },
+  {
+    "status": "completed",
+    "needs": "claude",
+    "area": "Compliance",
+    "key": "secureframe-home-client",
+    "title": "Secureframe health also written to Live Oak IT Partners so its controls map",
+    "detail": "Secureframe control tests, policies and risks are now also stored against the home client so Live Oak's own controls fill in.",
+    "note": "",
+    "completed_ref": "9499b2d7"
+  },
+  {
+    "status": "completed",
+    "needs": "claude",
+    "area": "Cases",
+    "key": "case-investigation-fix",
+    "title": "Case Investigation tab keeps its earlier run after a refresh; client cases open Attack Chain and Attack Path",
+    "detail": "The tab falls back to the durable investigation ledger when the in-memory run is gone, and the attack chain and path routes now accept a client's case.",
+    "note": "",
+    "completed_ref": "4146e9f0"
+  },
+  {
+    "status": "completed",
+    "needs": "claude",
+    "area": "Compliance",
+    "key": "frameworks-split",
+    "title": "Frameworks lists only frameworks; Secureframe controls, policies and risks moved to their own pages",
+    "detail": "Controls, Policies and Risk Management hold what Secureframe sent; the Frameworks page lists frameworks only.",
+    "note": "",
+    "completed_ref": "db53eea1"
+  },
+  {
+    "status": "completed",
+    "needs": "claude",
+    "area": "Client posture",
+    "key": "client-posture-reorder",
+    "title": "Client posture: alerts and update first, What changed shows 10 with More, Data sources moved to Platform health",
+    "detail": "Reordered as asked; Data sources now live under Settings > Platform health.",
+    "note": "",
+    "completed_ref": "b7458f9f"
+  },
+  {
+    "status": "completed",
+    "needs": "claude",
+    "area": "Compliance",
+    "key": "questionnaire-delete",
+    "title": "Questionnaires: delete one, and no customer field on a new one",
+    "detail": "A questionnaire can be deleted, and a new one no longer asks for a customer name since it is made under the client.",
+    "note": "",
+    "completed_ref": "aab2ea89"
+  },
+  {
+    "status": "in_progress",
+    "needs": "hal",
+    "area": "Platform",
+    "key": "acorn-rename",
+    "title": "Rename AiSOC and Jarvis to A.C.O.R.N and CORE (steps 3 to 6)",
+    "detail": "Steps 1 and 2 are done (text and the 251 CORE hud modules). Steps 3 to 6 of docs/RENAME_AUDIT_2026-11-15.md change names other things depend on.",
+    "note": "Needs Hal's go-ahead, one step at a time.",
+    "completed_ref": null
+  },
+  {
+    "status": "not_started",
+    "needs": "hal",
+    "area": "Devices",
+    "key": "ninja-warranty",
+    "title": "NinjaOne warranty dates on devices",
+    "detail": "The device detail API has no warranty field; the option is the serial number from computer-systems plus a vendor lookup.",
+    "note": "Needs Hal: re-enable the NinjaOne connection that turned itself off, or choose the vendor lookup.",
+    "completed_ref": null
+  },
+  {
+    "status": "not_started",
+    "needs": "hal",
+    "area": "Sales and Finance",
+    "key": "qbo-cost-sync",
+    "title": "QuickBooks sync that fills the Net income cost lines",
+    "detail": "Once QuickBooks is authorized (qbo-live-check), a daily read of the P&L by customer fills finance_cost_entries (source quickbooks) for payroll COGS, travel, hardware and overhead; typed entries are never overwritten.",
+    "note": "Waits on qbo-live-check.",
+    "completed_ref": null
   }
 ]
