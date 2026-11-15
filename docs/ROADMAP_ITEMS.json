@@ -1554,9 +1554,9 @@
   {
     "key": "inky-link",
     "title": "INKY linked everywhere: client mapping, mailbox counts, checks, alert, control test",
-    "area": "A.C.O.R.N",
+    "area": "Security",
     "status": "completed",
-    "needs": "can-do",
+    "needs": "claude",
     "completed_ref": "this commit",
     "note": "Read live 2026-11-15: 73 teams, usage, statistics all answer"
   }
