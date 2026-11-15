@@ -2065,7 +2065,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LinkIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__client_status__LinkIn'
         required: true
       responses:
         '201':
@@ -13694,6 +13694,320 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VendorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/detected-applications:
+    get:
+      tags:
+      - vendors
+      summary: The applications found in the Microsoft 365 tenant, with how many are
+        waiting for a decision
+      operationId: list_applications_api_v1_compliance_detected_applications_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: show
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(new|added|linked|ignored|all)$
+          default: new
+          title: Show
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/detected-applications/{app_id}/add:
+    post:
+      tags:
+      - vendors
+      summary: Add the application as a vendor (or link it to the vendor of the same
+        name that is already listed)
+      operationId: add_application_api_v1_compliance_detected_applications__app_id__add_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: app_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: App Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/detected-applications/{app_id}/link:
+    post:
+      tags:
+      - vendors
+      summary: Link the application to a vendor already listed, so several apps of
+        one vendor show as one
+      operationId: link_application_api_v1_compliance_detected_applications__app_id__link_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: app_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: App Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__detected_applications__LinkIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/detected-applications/{app_id}/ignore:
+    post:
+      tags:
+      - vendors
+      summary: Hide the application (it can be brought back)
+      operationId: ignore_application_api_v1_compliance_detected_applications__app_id__ignore_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: app_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: App Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/detected-applications/{app_id}/restore:
+    post:
+      tags:
+      - vendors
+      summary: Bring an ignored or linked application back to the waiting list
+      operationId: restore_application_api_v1_compliance_detected_applications__app_id__restore_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: app_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: App Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/detected-applications:
+    post:
+      tags:
+      - vendors
+      summary: Report Core Feed Applications
+      description: Record the apps found in one client's Microsoft 365 tenant.
+      operationId: report_core_feed_applications_api_v1_inbox_core_feed__tenant_token__detected_applications_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppsReport'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/controls:
+    get:
+      tags:
+      - compliance
+      summary: Every control of the frameworks that are on, with its health
+      operationId: list_controls_api_v1_compliance_controls_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: framework
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 20
+          - type: 'null'
+          title: Framework
+      - name: state
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(healthy|at_risk|unhealthy|not_tested)$
+          - type: 'null'
+          title: State
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+          default: ''
+          title: Q
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlList'
         '422':
           description: Validation Error
           content:
@@ -29302,6 +29616,132 @@ components:
       - last_used_at
       - created_at
       title: ApiKeyOut
+    AppIn:
+      properties:
+        app_id:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: App Id
+        name:
+          type: string
+          maxLength: 300
+          minLength: 1
+          title: Name
+        accounts:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: Accounts
+          default: 0
+        scopes:
+          items:
+            type: string
+            maxLength: 200
+          type: array
+          maxItems: 60
+          title: Scopes
+        risky:
+          type: boolean
+          title: Risky
+          default: false
+        first_seen:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: First Seen
+      type: object
+      required:
+      - app_id
+      - name
+      title: AppIn
+    AppList:
+      properties:
+        apps:
+          items:
+            $ref: '#/components/schemas/AppOut'
+          type: array
+          title: Apps
+        counts:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Counts
+        vendors:
+          items:
+            $ref: '#/components/schemas/VendorChoice'
+          type: array
+          title: Vendors
+      type: object
+      required:
+      - apps
+      - counts
+      - vendors
+      title: AppList
+    AppOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        source:
+          type: string
+          title: Source
+        source_label:
+          type: string
+          title: Source Label
+        accounts:
+          type: integer
+          title: Accounts
+        scopes:
+          items:
+            type: string
+          type: array
+          title: Scopes
+        risky:
+          type: boolean
+          title: Risky
+        first_seen:
+          type: string
+          format: date-time
+          title: First Seen
+        last_seen:
+          type: string
+          format: date-time
+          title: Last Seen
+        status:
+          type: string
+          title: Status
+        vendor_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Vendor Id
+        vendor_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Vendor Name
+      type: object
+      required:
+      - id
+      - name
+      - source
+      - source_label
+      - accounts
+      - scopes
+      - risky
+      - first_seen
+      - last_seen
+      - status
+      - vendor_id
+      - vendor_name
+      title: AppOut
     ApplyTuningRequest:
       properties:
         action:
@@ -29655,6 +30095,45 @@ components:
       required:
       - items
       title: ApprovedResponse
+    AppsReport:
+      properties:
+        vendor:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+          title: Vendor
+        vendor_client_id:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Vendor Client Id
+        items:
+          items:
+            $ref: '#/components/schemas/AppIn'
+          type: array
+          maxItems: 2000
+          title: Items
+      type: object
+      required:
+      - vendor
+      - items
+      title: AppsReport
+    AppsResponse:
+      properties:
+        accepted:
+          type: integer
+          title: Accepted
+          default: 0
+        unmapped:
+          type: integer
+          title: Unmapped
+          default: 0
+        ignored:
+          type: integer
+          title: Ignored
+          default: 0
+      type: object
+      title: AppsResponse
     ArtefactOut:
       properties:
         id:
@@ -34361,6 +34840,93 @@ components:
       - control_id
       - title
       title: ControlItem
+    ControlList:
+      properties:
+        enabled:
+          items:
+            type: string
+          type: array
+          title: Enabled
+        frameworks:
+          items:
+            type: string
+          type: array
+          title: Frameworks
+        counts:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Counts
+        total:
+          type: integer
+          title: Total
+        rows:
+          items:
+            $ref: '#/components/schemas/ControlRow'
+          type: array
+          title: Rows
+      type: object
+      required:
+      - enabled
+      - frameworks
+      - counts
+      - total
+      - rows
+      title: ControlList
+    ControlRow:
+      properties:
+        framework:
+          type: string
+          title: Framework
+        control_id:
+          type: string
+          title: Control Id
+        title:
+          type: string
+          title: Title
+        group:
+          type: string
+          title: Group
+        state:
+          type: string
+          title: State
+        accepted:
+          type: integer
+          title: Accepted
+        pending:
+          type: integer
+          title: Pending
+        rejected:
+          type: integer
+          title: Rejected
+        newest_evidence:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Newest Evidence
+        age_days:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Age Days
+        link:
+          type: string
+          title: Link
+      type: object
+      required:
+      - framework
+      - control_id
+      - title
+      - group
+      - state
+      - accepted
+      - pending
+      - rejected
+      - newest_evidence
+      - age_days
+      - link
+      title: ControlRow
     ControlTest:
       properties:
         key:
@@ -35833,6 +36399,8 @@ components:
           title: By Framework
         risks:
           $ref: '#/components/schemas/RiskLevels'
+        vendors:
+          $ref: '#/components/schemas/VendorLevels'
         action_items:
           items:
             $ref: '#/components/schemas/app__api__v1__endpoints__compliance_dashboard__ActionItem'
@@ -35848,6 +36416,7 @@ components:
       - health
       - by_framework
       - risks
+      - vendors
       - action_items
       - generated_at
       title: DashboardOut
@@ -42562,27 +43131,6 @@ components:
       - state
       - token
       title: LinkCreated
-    LinkIn:
-      properties:
-        client_id:
-          type: string
-          format: uuid
-          title: Client Id
-        label:
-          type: string
-          maxLength: 80
-          title: Label
-          default: ''
-        days:
-          type: integer
-          maximum: 365.0
-          minimum: 1.0
-          title: Days
-          default: 90
-      type: object
-      required:
-      - client_id
-      title: LinkIn
     LinkOut:
       properties:
         id:
@@ -42687,6 +43235,40 @@ components:
       - title
       - severity
       title: LinkedAlertOut
+    LinkedApplication:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        source_label:
+          type: string
+          title: Source Label
+        accounts:
+          type: integer
+          title: Accounts
+        risky:
+          type: boolean
+          title: Risky
+        first_seen:
+          type: string
+          format: date-time
+          title: First Seen
+      type: object
+      required:
+      - id
+      - name
+      - source_label
+      - accounts
+      - risky
+      - first_seen
+      title: LinkedApplication
+      description: 'An application detected in the Microsoft 365 tenant that was added
+        or linked to this vendor: several apps of one vendor show as one vendor with
+        their accounts added up.'
     LinkedTicket:
       properties:
         id:
@@ -57093,6 +57675,20 @@ components:
       - supported
       - actions
       title: VendorActionsResponse
+    VendorChoice:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+      type: object
+      required:
+      - id
+      - name
+      title: VendorChoice
     VendorDetail:
       properties:
         id:
@@ -57206,6 +57802,12 @@ components:
             format: date-time
           - type: 'null'
           title: Archived At
+        applications:
+          items:
+            $ref: '#/components/schemas/LinkedApplication'
+          type: array
+          title: Applications
+          default: []
         reviews:
           items:
             $ref: '#/components/schemas/ReviewOut'
@@ -57407,6 +58009,35 @@ components:
       required:
       - name
       title: VendorIn
+    VendorLevels:
+      properties:
+        critical:
+          type: integer
+          title: Critical
+        high:
+          type: integer
+          title: High
+        medium:
+          type: integer
+          title: Medium
+        low:
+          type: integer
+          title: Low
+        unassessed:
+          type: integer
+          title: Unassessed
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - critical
+      - high
+      - medium
+      - low
+      - unassessed
+      - total
+      title: VendorLevels
     VendorList:
       properties:
         vendors:
@@ -58897,6 +59528,27 @@ components:
       - section
       - key
       title: AnswerOut
+    app__api__v1__endpoints__client_status__LinkIn:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        label:
+          type: string
+          maxLength: 80
+          title: Label
+          default: ''
+        days:
+          type: integer
+          maximum: 365.0
+          minimum: 1.0
+          title: Days
+          default: 90
+      type: object
+      required:
+      - client_id
+      title: LinkIn
     app__api__v1__endpoints__client_vulnerabilities__VulnerabilityOut:
       properties:
         client_id:
@@ -58974,6 +59626,7 @@ components:
           enum:
           - evidence_expired
           - risk_task
+          - vendor_review
           title: Kind
         name:
           type: string
@@ -59003,6 +59656,16 @@ components:
       - name
       - event
       title: ActionItem
+    app__api__v1__endpoints__detected_applications__LinkIn:
+      properties:
+        vendor_id:
+          type: string
+          format: uuid
+          title: Vendor Id
+      type: object
+      required:
+      - vendor_id
+      title: LinkIn
     app__api__v1__endpoints__detection_rules__HuntResponse:
       properties:
         hunt_id:

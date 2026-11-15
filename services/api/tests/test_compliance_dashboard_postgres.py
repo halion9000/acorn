@@ -151,3 +151,24 @@ async def test_the_dashboard_counts_risks_by_level_and_lists_open_risk_tasks_wit
     assert d.risks.critical == 1 and d.risks.low == 1 and d.risks.total == 2
     tasks = [a for a in d.action_items if a.kind == "risk_task"]
     assert len(tasks) == 1 and tasks[0].event == "Task overdue" and tasks[0].name == "Risk R-1: Turn on MFA" and tasks[0].owner == "Hal"
+
+
+async def test_vendors_are_counted_by_risk_level_and_a_review_that_is_overdue_or_due_soon_is_an_action_item(world):
+    from app.api.v1.endpoints import vendor_management as vm
+
+    w = world
+    user = w.user
+
+    async def add(name, level, months=None):
+        body = vm.VendorIn(name=name, risk_level=level, review_interval_months=months)
+        return await run(w.acme, lambda db: vm.create_vendor(body, w.request, w.acme, db, user))
+
+    await add("Microsoft", "high", 12)  # never reviewed and scheduled: due from the day it was added
+    await add("Zoom", "low")  # no schedule: nothing to do
+    await add("Legacy Fax", "unassessed")
+    out = await dash(w)
+    assert (out.vendors.total, out.vendors.high, out.vendors.low, out.vendors.unassessed) == (3, 1, 1, 1)
+    items = [i for i in out.action_items if i.kind == "vendor_review"]
+    assert [(i.name, i.event, i.link) for i in items] == [("Vendor Microsoft: security review", "Review due soon", "/compliance/vendors")]
+    other = await dash(w, w.birch)
+    assert other.vendors.total == 0 and not [i for i in other.action_items if i.kind == "vendor_review"], "another client sees none of it"

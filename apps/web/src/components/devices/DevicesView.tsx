@@ -345,7 +345,7 @@ export default function DevicesView() {
             setPage(1);
           }}
           aria-pressed={staleOnly}
-          title="Protection agents that have not checked in for two weeks: often a retired machine that still holds a licence"
+          title="Protection agents that have not checked in for two weeks: often a retired machine that still holds a license"
           className={`rounded-lg border p-3 text-left ${staleOnly ? 'border-amber-500 bg-amber-500/10' : 'border-gray-800 bg-gray-900/60'}`}
         >
           <div className="text-xs text-gray-400">Stale agents</div>

@@ -23,7 +23,7 @@ beforeEach(() => {
           { client_id: 'c2', client_name: 'Beta', score: null, met: 0, partly: 0, not_met: 0, accepted: 2, stale_tools: [] },
         ],
       });
-    if (url.includes('/fleet/boards/renewals')) return json({ board: 'renewals', title: 'Renewals', keys: [], rows: [{ client_id: 'c1', client_name: 'Acme', source: 'meraki', key: 'meraki_licence', status: 'not_met', evidence: 'The Meraki licence has expired', accepted: false, owner: 'Dana R', due_date: '2026-10-01', overdue: true }] });
+    if (url.includes('/fleet/boards/renewals')) return json({ board: 'renewals', title: 'Renewals', keys: [], rows: [{ client_id: 'c1', client_name: 'Acme', source: 'meraki', key: 'meraki_licence', status: 'not_met', evidence: 'The Meraki license has expired', accepted: false, owner: 'Dana R', due_date: '2026-10-01', overdue: true }] });
     if (url.endsWith('/c1/score-breakdown'))
       return json({ client_id: 'c1', score: 40, lost: 60, rows: [{ source: 'ninjaone', key: 'ninjaone_antivirus', status: 'not_met', weight: 3, points_lost: 45 }, { source: 'ninjaone', key: 'ninjaone_patching', status: 'partly', weight: 1, points_lost: 7.5 }] });
     if (url.endsWith('/c1/compare')) return json({ client_id: 'c1', score: 40, fleet_average: 72, size: 50, similar_average: 65, similar_clients: 14 });
@@ -278,7 +278,7 @@ describe('FleetPosture', () => {
     render(<FleetPosture />);
     await userEvent.click(await screen.findByRole('tab', { name: 'Renewals and expiries' }));
     const table = await screen.findByTestId('fleet-board-renewals');
-    expect(within(table).getByText('The Meraki licence has expired')).toBeInTheDocument();
+    expect(within(table).getByText('The Meraki license has expired')).toBeInTheDocument();
     expect(within(table).getByText('Problem')).toBeInTheDocument();
   });
 
@@ -372,7 +372,7 @@ describe('FleetPosture downloads', () => {
     await screen.findByTestId('fleet-board-renewals');
     await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
     const text = await blobs[0].text();
-    expect(text).toContain('Acme,meraki,meraki_licence,not_met,The Meraki licence has expired');
+    expect(text).toContain('Acme,meraki,meraki_licence,not_met,The Meraki license has expired');
     expect(text).toContain('Dana R,2026-10-01,yes');
   });
 });

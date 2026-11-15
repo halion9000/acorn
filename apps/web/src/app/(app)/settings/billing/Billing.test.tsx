@@ -337,13 +337,13 @@ describe('spreadsheet safety', () => {
   });
 });
 
-const WASTE_CSV = ['Client,Tool,Licence,Bought,Unassigned,Percent unassigned,Number is old', 'Acme,cipp,Business Premium,50,5,10,yes', ''].join(String.fromCharCode(10));
+const WASTE_CSV = ['Client,Tool,License,Bought,Unassigned,Percent unassigned,Number is old', 'Acme,cipp,Business Premium,50,5,10,yes', ''].join(String.fromCharCode(10));
 
-describe('licence waste tab', () => {
-  it('says how many licences are unassigned, lists them biggest first as quantities, and marks an old count', async () => {
+describe('license waste tab', () => {
+  it('says how many licenses are unassigned, lists them biggest first as quantities, and marks an old count', async () => {
     render(<Billing />);
-    await userEvent.setup().click(screen.getByRole('tab', { name: 'Licence waste' }));
-    expect(await screen.findByTestId('waste-summary')).toHaveTextContent('5 of 50 licences are not assigned to anyone, across 1 client.');
+    await userEvent.setup().click(screen.getByRole('tab', { name: 'License waste' }));
+    expect(await screen.findByTestId('waste-summary')).toHaveTextContent('5 of 50 licenses are not assigned to anyone, across 1 client.');
     const table = screen.getByTestId('waste-table');
     expect(within(table).getByText('Business Premium')).toBeInTheDocument();
     expect(within(table).getByText('(old count)')).toBeInTheDocument();
@@ -352,7 +352,7 @@ describe('licence waste tab', () => {
   });
 });
 
-describe('exporting the licence waste', () => {
+describe('exporting the license waste', () => {
   it('asks the server for the file and downloads it', async () => {
     const made: Blob[] = [];
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
@@ -360,7 +360,7 @@ describe('exporting the licence waste', () => {
     (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL = () => {};
     render(<Billing />);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('tab', { name: 'Licence waste' }));
+    await user.click(screen.getByRole('tab', { name: 'License waste' }));
     await screen.findByTestId('waste-summary');
     await user.click(screen.getByRole('button', { name: 'Export CSV' }));
     await waitFor(() => expect(click).toHaveBeenCalledTimes(1));

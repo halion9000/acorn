@@ -22,6 +22,7 @@ const dash = (over: Record<string, unknown> = {}) => ({
   health: health(),
   by_framework: [{ framework: 'SOC2', health: health() }],
   risks: { critical: 1, high: 2, medium: 3, low: 4, total: 10 },
+  vendors: { critical: 0, high: 2, medium: 1, low: 3, unassessed: 4, total: 10 },
   action_items: Array.from({ length: 7 }, (_, i) => ({ kind: 'evidence_expired', name: `SOC2 CC1.${i}: control ${i}`, event: 'Evidence expired', owner: i === 0 ? 'Hal' : null, due: '2026-09-10T00:00:00Z', link: '/compliance/soc2' })),
   generated_at: '2026-11-14T12:00:00Z',
   ...over,
@@ -54,6 +55,22 @@ describe('arcs', () => {
 });
 
 describe('ComplianceDashboard', () => {
+  it('shows the vendors by risk level as a fourth ring that opens the vendor page for the client, and not at all from an older server', async () => {
+    window.history.replaceState(null, '', '/compliance?client=c9');
+    show();
+    const card = await screen.findByTestId('card-vendors');
+    expect(card).toHaveTextContent('2 High');
+    expect(card).toHaveTextContent('4 Unassessed');
+    expect(within(card).getByRole('link', { name: 'Open' })).toHaveAttribute('href', '/compliance/vendors?client=c9');
+  });
+
+  it('an older server without the vendor figures just has no vendor ring', async () => {
+    api.dashboard.mockResolvedValue(dash({ vendors: undefined }));
+    show();
+    await screen.findByTestId('card-health');
+    expect(screen.queryByTestId('card-vendors')).toBeNull();
+  });
+
   it('shows the three rings with their counts: the control tests, control health and risk levels', async () => {
     show();
     expect(await screen.findByTestId('card-health')).toHaveTextContent('16%');

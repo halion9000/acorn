@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The numbers a bill is made from: what each tool counts for each client (licences bought, machines managed, people covered), the total across clients, how every count moved, and a log of each change.
+ * The numbers a bill is made from: what each tool counts for each client (licenses bought, machines managed, people covered), the total across clients, how every count moved, and a log of each change.
  * CORE reads the counts from the tools once a day. Backed by GET /api/v1/billing/clients/{id}, /billing/summary and /billing/changes.
  */
 import { Fragment, useEffect, useState } from "react";
@@ -809,7 +809,7 @@ export interface WasteRow {
   stale: boolean;
 }
 
-/** Licences a client pays for that nobody has been given: a quantity to hand back or reassign (never a price), biggest first. A count that has not refreshed for a week is marked, so it is not read as today's. */
+/** Licenses a client pays for that nobody has been given: a quantity to hand back or reassign (never a price), biggest first. A count that has not refreshed for a week is marked, so it is not read as today's. */
 export function LicenceWaste() {
   const [exportError, setExportError] = useState<string | null>(null);
   const exportCsv = async () => {
@@ -834,17 +834,17 @@ export function LicenceWaste() {
             Export CSV
           </button>
           <p className="text-sm text-gray-300" data-testid="waste-summary">
-            {waste.data.total_unassigned} of {waste.data.total_bought} licences are not assigned to anyone, across {waste.data.clients} client{waste.data.clients === 1 ? "" : "s"}.
+            {waste.data.total_unassigned} of {waste.data.total_bought} licenses are not assigned to anyone, across {waste.data.clients} client{waste.data.clients === 1 ? "" : "s"}.
           </p>
-          <p className="text-xs text-gray-500">Only licences the tool says the unassigned number for are listed: a tool that does not say is left out, not counted as zero.</p>
+          <p className="text-xs text-gray-500">Only licenses the tool says the unassigned number for are listed: a tool that does not say is left out, not counted as zero.</p>
           {waste.data.rows.length === 0 ? (
-            <p className="text-sm text-gray-400">No unassigned licences found.</p>
+            <p className="text-sm text-gray-400">No unassigned licenses found.</p>
           ) : (
             <table className="w-full text-left text-sm" data-testid="waste-table">
               <thead className="text-xs uppercase text-gray-500">
                 <tr>
                   <th scope="col" className="py-1 pr-3">Client</th>
-                  <th scope="col" className="pr-3">Licence</th>
+                  <th scope="col" className="pr-3">License</th>
                   <th scope="col" className="pr-3 text-right">Bought</th>
                   <th scope="col" className="pr-3 text-right">Unassigned</th>
                   <th scope="col" className="text-right">Share</th>
@@ -873,12 +873,12 @@ export function LicenceWaste() {
 
 export function Billing() {
   const [tab, setTab] = useState<"totals" | "client" | "changes" | "reconcile" | "mapping" | "quality" | "waste" | "finance">("totals");
-  const tabs: [typeof tab, string][] = [["totals", "Totals by tool"], ["client", "By client"], ["changes", "Changes"], ["reconcile", "Billed vs counted"], ["mapping", "Invoice mapping"], ["quality", "Data quality"], ["waste", "Licence waste"], ["finance", "Margin"]];
+  const tabs: [typeof tab, string][] = [["totals", "Totals by tool"], ["client", "By client"], ["changes", "Changes"], ["reconcile", "Billed vs counted"], ["mapping", "Invoice mapping"], ["quality", "Data quality"], ["waste", "License waste"], ["finance", "Margin"]];
   return (
     <div className="space-y-4 p-6">
       <div>
         <div className="flex items-start justify-between gap-4">
-          <h1 className="text-xl font-semibold text-gray-100">Licences and counts</h1>
+          <h1 className="text-xl font-semibold text-gray-100">Licenses and counts</h1>
           <button type="button" onClick={() => window.print()} className="rounded border border-gray-600 px-3 py-1 text-sm text-gray-200 print:hidden">
             Print
           </button>

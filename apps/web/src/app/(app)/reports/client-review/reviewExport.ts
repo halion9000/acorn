@@ -31,7 +31,7 @@ export function openLabel(open: number, total: number): string {
   return open === 0 ? "all answered" : `${open} of ${total} open`;
 }
 
-const CSV_HEADER = ["Section", "Group", "Question", "Status", "Answered by", "Evidence", "Note", "Licence"];
+const CSV_HEADER = ["Section", "Group", "Question", "Status", "Answered by", "Evidence", "Note", "License"];
 
 /** One CSV cell. A cell that a spreadsheet would run as a formula (it starts with = + - @ or a control character) gets a leading apostrophe; quotes, commas and line breaks are quoted. */
 export function csvCell(value: unknown): string {
@@ -52,7 +52,7 @@ export function reviewCsv(review: Review): string {
   for (const a of review.tech_stack ?? []) {
     rows.push(["Technology stack", a.group, a.question, a.status === "unknown" ? "ask the client" : (a.suggested ?? a.status), answeredBy(a.status, a.manual), a.evidence, a.note ?? "", ""]);
   }
-  for (const a of review.m365 ?? []) rows.push(["Microsoft 365", a.group, a.question, a.status, answeredBy(a.status, a.manual), a.evidence, a.note ?? "", a.license ?? ""]);
+  for (const a of review.m365 ?? []) rows.push(["Microsoft 365", a.group, a.question, a.status, answeredBy(a.status, a.manual), a.evidence, a.note ?? "", a.licence ?? ""]);
   for (const a of review.assess ?? []) rows.push(["Infrastructure and security assessment", `${a.sheet} / ${a.group}`, a.question, a.status, answeredBy(a.status, a.manual), a.evidence, a.note ?? "", ""]);
   return [CSV_HEADER, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }

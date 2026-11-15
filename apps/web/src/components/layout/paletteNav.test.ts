@@ -7,8 +7,8 @@ const curated = [{ label: 'Cases', href: '/cases', keywords: ['tickets'] }];
 describe('paletteNavItems', () => {
   it('keeps the curated entries first, adds each other sidebar page once with its other words, and adds words to a curated page too', () => {
     const sections = [
-      { items: [{ label: 'Cases', href: '/cases' }, { label: 'Licences & Counts', href: '/settings/billing' }] },
-      { items: [{ label: 'Licences & Counts', href: '/settings/billing' }, { label: 'Odd page', href: '/odd' }] },
+      { items: [{ label: 'Cases', href: '/cases' }, { label: 'Licenses & Counts', href: '/settings/billing' }] },
+      { items: [{ label: 'Licenses & Counts', href: '/settings/billing' }, { label: 'Odd page', href: '/odd' }] },
     ];
     const out = paletteNavItems(curated, sections);
     expect(out.map((o) => o.href)).toEqual(['/cases', '/settings/billing', '/odd']);
@@ -63,7 +63,7 @@ describe('rememberSearch', () => {
 describe('every page can be found by more than its one name', () => {
   it('searchWords gives each distinct word of the name and the other words, in lower case, without one-letter words', async () => {
     const { searchWords } = await import('./paletteNav');
-    expect(searchWords({ label: 'Licences & Counts', href: '/x', keywords: ['billing', 'Counts', 'a b'] })).toEqual(['licences', 'counts', 'billing']);
+    expect(searchWords({ label: 'Licenses & Counts', href: '/x', keywords: ['billing', 'Counts', 'a b'] })).toEqual(['licenses', 'counts', 'billing']);
   });
 
   it('every page the palette lists (curated, sidebar and settings pages) answers to at least two words', async () => {

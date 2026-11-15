@@ -73,8 +73,8 @@ export interface M365Answer {
   /** From a check CORE read through CIPP (or the multi-factor list); needs_person when A.C.O.R.N has nothing that answers it. */
   status: 'met' | 'partly' | 'not_met' | 'needs_person';
   evidence: string;
-  /** The licence this question's setting needs, when it has one. */
-  license?: string | null;
+  /** The license this question's setting needs, when it has one. */
+  licence?: string | null;
   /** A typed status or answer replaces the worked-out one (manual); what A.C.O.R.N had worked out is kept in auto_*. A note changes no answer. */
   manual?: boolean;
   note?: string | null;
@@ -460,9 +460,9 @@ export function ClientReview() {
                         </td>
                         <td className="text-xs text-slate-500">
                           {a.evidence}
-                          {a.license && (
-                            <span data-testid="licence-note" className="block text-amber-300/80">
-                              {a.license}
+                          {a.licence && (
+                            <span data-testid="license-note" className="block text-amber-300/80">
+                              {a.licence}
                             </span>
                           )}
                           <AnswerMarks manual={a.manual} note={a.note} suggested={a.auto_status ? (a.auto_status === 'needs_person' ? 'Needs a person' : STATUS[a.auto_status as ReadinessItem['status']]?.label) : null} />

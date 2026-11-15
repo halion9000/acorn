@@ -70,9 +70,9 @@ describe('ToolChecks with history and accepted risks', () => {
   });
 
   it('shows a check\'s comment count, loads the thread on request, and adds a comment then reloads', async () => {
-    vi.spyOn(window, 'prompt').mockImplementation(() => 'Licence ordered');
+    vi.spyOn(window, 'prompt').mockImplementation(() => 'License ordered');
     authFetch.mockImplementation((url: string, init?: { method?: string }) =>
-      init?.method === 'POST' ? json({ id: 2, author: 'a@b.c', body: 'Licence ordered', created_at: '2026-10-26T00:00:00Z' }, 201) : json({ client_id: 'c1', key: 'ninjaone_antivirus', comments: [{ id: 1, author: 'dana@example.com', body: 'Waiting on the client', created_at: '2026-10-25T00:00:00Z' }] }),
+      init?.method === 'POST' ? json({ id: 2, author: 'a@b.c', body: 'License ordered', created_at: '2026-10-26T00:00:00Z' }, 201) : json({ client_id: 'c1', key: 'ninjaone_antivirus', comments: [{ id: 1, author: 'dana@example.com', body: 'Waiting on the client', created_at: '2026-10-25T00:00:00Z' }] }),
     );
     const onChanged = vi.fn();
     const withCount = [{ ...checks[0], comments: 1 }, checks[1], checks[2]];
@@ -85,7 +85,7 @@ describe('ToolChecks with history and accepted risks', () => {
     await userEvent.click(within(screen.getByTestId('check-ninjaone_antivirus')).getByText('Add comment'));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     const post = authFetch.mock.calls.find((c) => c[1]?.method === 'POST')!;
-    expect(JSON.parse(post[1].body)).toEqual({ body: 'Licence ordered' });
+    expect(JSON.parse(post[1].body)).toEqual({ body: 'License ordered' });
     expect(screen.queryByTestId('comments-ninjaone_antivirus')).toBeNull();
   });
 

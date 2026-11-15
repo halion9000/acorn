@@ -31,7 +31,7 @@ const review: Review = {
     ],
   },
   m365: [
-    { group: 'Entra', question: 'Block legacy authentication', status: 'needs_person', evidence: '', license: 'Needs Microsoft Entra ID P1.' },
+    { group: 'Entra', question: 'Block legacy authentication', status: 'needs_person', evidence: '', licence: 'Needs Microsoft Entra ID P1.' },
     { group: 'Entra', question: 'Admins have Multi-Factor', status: 'met', evidence: 'Every administrator has Multi-Factor.' },
     { group: 'Entra', question: 'Typed by someone', status: 'met', evidence: '', manual: true },
   ],
@@ -59,10 +59,10 @@ describe('the review sections', () => {
     expect(within(m365).getAllByTestId('auto-answered')).toHaveLength(1);
   });
 
-  it('shows the licence a question needs, only on the questions that have one', async () => {
+  it('shows the license a question needs, only on the questions that have one', async () => {
     render(<ClientReview />);
     const m365 = await screen.findByTestId('m365');
-    const notes = within(m365).getAllByTestId('licence-note');
+    const notes = within(m365).getAllByTestId('license-note');
     expect(notes).toHaveLength(1);
     expect(notes[0]).toHaveTextContent('Needs Microsoft Entra ID P1.');
   });
@@ -108,7 +108,7 @@ describe('the review sections', () => {
       reader.onload = () => resolve(String(reader.result));
       reader.readAsText(created[0]);
     });
-    expect(text.split('\r\n')[0]).toBe('Section,Group,Question,Status,Answered by,Evidence,Note,Licence');
+    expect(text.split('\r\n')[0]).toBe('Section,Group,Question,Status,Answered by,Evidence,Note,License');
     expect(text).toContain('Block legacy authentication,needs_person,not answered,,,Needs Microsoft Entra ID P1.');
     vi.restoreAllMocks();
     vi.unstubAllGlobals();

@@ -112,6 +112,7 @@ export function ComplianceDashboard() {
   const h = data?.health ?? null;
   const t = tests?.tests ?? null;
   const risks = data?.risks ?? null;
+  const vendors = data?.vendors ?? null;
 
   return (
     <div className="space-y-6 p-6">
@@ -170,7 +171,7 @@ export function ComplianceDashboard() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
         <Card title="Testing" testId="card-testing" href={open('/compliance/frameworks')}>
           {ownView && t ? (
             <div className="flex items-center gap-4">
@@ -256,6 +257,33 @@ export function ComplianceDashboard() {
             <p className="text-sm text-gray-400">Loading...</p>
           )}
         </Card>
+        {vendors ? (
+          <Card title="Vendor risk levels" testId="card-vendors" href={open('/compliance/vendors')}>
+            <div className="flex items-center gap-4">
+              <Donut
+                label={`${vendors.total} vendors`}
+                center={String(vendors.total)}
+                caption="Total vendors"
+                parts={[
+                  { value: vendors.critical, color: RED },
+                  { value: vendors.high, color: '#f97316' },
+                  { value: vendors.medium, color: AMBER },
+                  { value: vendors.low, color: GREEN },
+                  { value: vendors.unassessed, color: '#6b7280' },
+                ]}
+              />
+              <Legend
+                rows={[
+                  { label: 'Critical', value: vendors.critical, className: 'bg-red-500/15 text-red-300' },
+                  { label: 'High', value: vendors.high, className: 'bg-orange-500/15 text-orange-300' },
+                  { label: 'Medium', value: vendors.medium, className: 'bg-amber-500/15 text-amber-300' },
+                  { label: 'Low', value: vendors.low, className: 'bg-emerald-500/15 text-emerald-300' },
+                  { label: 'Unassessed', value: vendors.unassessed, className: 'bg-gray-500/15 text-gray-300' },
+                ]}
+              />
+            </div>
+          </Card>
+        ) : null}
       </div>
 
       <section className="rounded-xl border border-gray-800 bg-gray-900/60 p-4" data-testid="action-items">

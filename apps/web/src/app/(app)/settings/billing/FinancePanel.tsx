@@ -2,7 +2,7 @@
 
 /**
  * Billing > "Margin": what each invoice line sells and costs per unit (typed in here), and the estimated revenue, cost and margin per client from the quantities each client is billed for.
- * Needs the finance permission, which is not held by anyone who only holds the licence-count permissions; without it the API answers 403 and this says so instead of showing money.
+ * Needs the finance permission, which is not held by anyone who only holds the license-count permissions; without it the API answers 403 and this says so instead of showing money.
  */
 import { useCallback, useEffect, useState } from "react";
 

@@ -900,7 +900,7 @@ export interface IdentityDuplicate {
   score: number;
   confidence: 'high' | 'medium' | string;
   reasons: string[];
-  /** Both hold a licence: two paid seats, so merging is a deliberate choice. */
+  /** Both hold a license: two paid seats, so merging is a deliberate choice. */
   both_licensed: boolean;
 }
 
@@ -7777,6 +7777,8 @@ export interface VendorRow {
   archived_at: string | null;
 }
 export interface VendorDetail extends VendorRow {
+  /** Apps detected in the Microsoft 365 tenant that were added or linked to this vendor (absent from an older server). */
+  applications?: { id: string; name: string; source_label: string; accounts: number; risky: boolean; first_seen: string }[];
   reviews: VendorReviewRow[];
   documents: VendorDocumentRow[];
   history: { actor: string | null; action: string; detail: string; created_at: string }[];
@@ -7790,6 +7792,66 @@ export interface VendorList {
 export type VendorInput = Partial<Omit<VendorRow, 'id' | 'status' | 'review_state' | 'next_review_due' | 'last_reviewed' | 'document_count' | 'created_at' | 'updated_at' | 'archived_at'>> & {
   name: string;
   clear_review_schedule?: boolean;
+};
+
+/** Controls of the frameworks that are on, with their health (GET /api/v1/compliance/controls). */
+export interface ControlRowT {
+  framework: string;
+  control_id: string;
+  title: string;
+  group: string;
+  state: 'healthy' | 'at_risk' | 'unhealthy' | 'not_tested';
+  accepted: number;
+  pending: number;
+  rejected: number;
+  newest_evidence: string | null;
+  age_days: number | null;
+  link: string;
+}
+export interface ControlList {
+  enabled: string[];
+  frameworks: string[];
+  counts: Record<ControlRowT['state'], number>;
+  total: number;
+  rows: ControlRowT[];
+}
+export const controlsApi = {
+  list: (clientId: string, f: { framework?: string; state?: string; q?: string } = {}) => {
+    const extra = new URLSearchParams();
+    if (f.framework) extra.set('framework', f.framework);
+    if (f.state) extra.set('state', f.state);
+    if (f.q) extra.set('q', f.q);
+    return request<ControlList>(`/api/v1/compliance/controls?${riskQs(clientId, extra.toString())}`);
+  },
+};
+
+/** Detected applications: the apps found in a client's Microsoft 365 tenant (GET /api/v1/compliance/detected-applications ...). */
+export interface DetectedApp {
+  id: string;
+  name: string;
+  source: string;
+  source_label: string;
+  accounts: number;
+  scopes: string[];
+  risky: boolean;
+  first_seen: string;
+  last_seen: string;
+  status: 'new' | 'added' | 'linked' | 'ignored';
+  vendor_id: string | null;
+  vendor_name: string | null;
+}
+export interface DetectedAppList {
+  apps: DetectedApp[];
+  counts: Record<DetectedApp['status'], number>;
+  vendors: { id: string; name: string }[];
+}
+export const detectedAppsApi = {
+  list: (clientId: string, show: 'new' | 'added' | 'linked' | 'ignored' | 'all' = 'new') => request<DetectedAppList>(`/api/v1/compliance/detected-applications?${riskQs(clientId, `show=${show}`)}`),
+  add: (clientId: string, id: string) => request<DetectedApp>(`/api/v1/compliance/detected-applications/${encodeURIComponent(id)}/add?${riskQs(clientId)}`, { method: 'POST' }),
+  link: (clientId: string, id: string, vendorId: string) =>
+    request<DetectedApp>(`/api/v1/compliance/detected-applications/${encodeURIComponent(id)}/link?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify({ vendor_id: vendorId }) }),
+  ignore: (clientId: string, id: string) => request<DetectedApp>(`/api/v1/compliance/detected-applications/${encodeURIComponent(id)}/ignore?${riskQs(clientId)}`, { method: 'POST' }),
+  restore: (clientId: string, id: string) => request<DetectedApp>(`/api/v1/compliance/detected-applications/${encodeURIComponent(id)}/restore?${riskQs(clientId)}`, { method: 'POST' }),
 };
 
 export const vendorApi = {
@@ -7820,7 +7882,7 @@ export interface ComplianceHealth {
   percent_healthy: number | null;
 }
 export interface ComplianceActionItem {
-  kind: 'evidence_expired' | 'risk_task';
+  kind: 'evidence_expired' | 'risk_task' | 'vendor_review';
   name: string;
   event: string;
   owner: string | null;
@@ -7832,6 +7894,8 @@ export interface ComplianceDashboard {
   health: ComplianceHealth | null;
   by_framework: { framework: string; health: ComplianceHealth }[];
   risks: { critical: number; high: number; medium: number; low: number; total: number };
+  /** Absent from an older server. */
+  vendors?: { critical: number; high: number; medium: number; low: number; unassessed: number; total: number };
   action_items: ComplianceActionItem[];
   generated_at: string;
 }

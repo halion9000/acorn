@@ -322,7 +322,7 @@ const navSections: NavSection[] = [
         icon: <FolderIcon />,
       },
       {
-        label: 'Licences & Counts',
+        label: 'Licenses & Counts',
         href: '/settings/billing',
         icon: <ShieldIcon />,
       },
@@ -378,6 +378,7 @@ const navSections: NavSection[] = [
         icon: <DocumentReportIcon />,
         match: (p) => p === '/compliance/frameworks' || /^\/compliance\/(soc2|iso27001|nist_csf|pci_dss|hipaa|cis_ig1)(\/|$)/.test(p),
       },
+      { label: 'Controls', href: '/compliance/controls', icon: <ShieldIcon /> },
       { label: 'Policies', href: '/compliance/policies', icon: <DocumentReportIcon /> },
       { label: 'Risk Management', href: '/compliance/risk-register', icon: <ScanIcon /> },
       { label: 'Vendors', href: '/compliance/vendors', icon: <InboxIcon /> },

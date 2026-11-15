@@ -28,7 +28,7 @@ const base = (): Review => ({
     { key: 'siem', group: 'Security', question: 'SIEM', status: 'unknown', suggested: null, evidence: '' },
   ],
   m365: [
-    { group: 'Entra', question: 'Block legacy authentication', status: 'needs_person', evidence: '', license: 'Needs Microsoft Entra ID P1.' },
+    { group: 'Entra', question: 'Block legacy authentication', status: 'needs_person', evidence: '', licence: 'Needs Microsoft Entra ID P1.' },
     { group: 'Entra', question: 'MFA for admins', status: 'met', evidence: 'Every administrator has Multi-Factor.', manual: true, note: '=HYPERLINK("http://x")' },
   ],
   assess: [
@@ -83,9 +83,9 @@ describe('csvCell', () => {
 });
 
 describe('reviewCsv', () => {
-  it('has a header and a row per question in every section, saying who answered and the licence', () => {
+  it('has a header and a row per question in every section, saying who answered and the license', () => {
     const rows = reviewCsv(base()).trimEnd().split('\r\n');
-    expect(rows[0]).toBe('Section,Group,Question,Status,Answered by,Evidence,Note,Licence');
+    expect(rows[0]).toBe('Section,Group,Question,Status,Answered by,Evidence,Note,License');
     expect(rows).toHaveLength(1 + 2 + 2 + 2 + 2);
     expect(rows[1]).toBe('Cyber-insurance readiness,,EDR on every computer?,met,automatic,20 of 20 report Huntress,,');
     expect(rows[2]).toContain('not answered');

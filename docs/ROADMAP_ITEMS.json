@@ -4,17 +4,19 @@
     "title": "Vendors: Detected applications from the Microsoft tenant, with Add, Ignore and Link",
     "detail": "Scan each client Microsoft 365 tenant (through CIPP) for enterprise applications and list them as detected applications with the date detected, source and number of accounts. Add makes a vendor, Ignore hides it, Link merges several detected applications (for example two LastPass apps) into one vendor so they show as one on the vendor page.",
     "area": "Compliance",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Needs a CIPP read route for service principals to be confirmed first."
+    "status": "completed",
+    "needs": "hal",
+    "note": "Built and tested. NOT checked against a live tenant: after the next CORE read of a client's Microsoft 365 tenant, open Compliance, Vendors and see whether the banner and the list look right.",
+    "completed_ref": "this commit"
   },
   {
     "key": "vendor-dashboard-ring",
     "title": "Compliance Overview: vendor risk ring and vendor review action items",
     "detail": "A fourth ring for vendors by risk level and overdue vendor reviews in the action items table.",
     "area": "Compliance",
-    "status": "not_started",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
   },
   {
     "key": "control-health-own-tenant",
@@ -46,11 +48,12 @@
   },
   {
     "key": "tests-controls-engine",
-    "title": "Controls and tests engine",
-    "detail": "Automated tests from connected tools mapped to controls, with a Controls page of its own in the Compliance section.",
+    "title": "Controls page (built) and the automated tests engine (still to build)",
+    "detail": "The Controls page lists every control of the frameworks that are on with its health. The automated tests engine (tests run against connected tools, mapped to controls) is the part still to do.",
     "area": "Compliance",
     "status": "not_started",
-    "needs": "claude"
+    "needs": "claude",
+    "note": "Controls page done (this commit). The tests engine is next."
   },
   {
     "key": "audits-data-room",
@@ -123,7 +126,7 @@
     "area": "Devices",
     "status": "not_started",
     "needs": "signoff",
-    "note": "Choose: families in A.C.O.R.N, or one-time realignment only."
+    "note": "Held for later at your request. Covers every system, not only Huntress."
   },
   {
     "key": "huntress-moves",
@@ -146,7 +149,8 @@
     "title": "Device merge search that finds a machine filed under a sibling client",
     "area": "Devices",
     "status": "not_started",
-    "needs": "claude"
+    "needs": "signoff",
+    "note": "Held with the families design: a merge across clients moves a record between clients, so it is decided together with Huntress families (which also covers every other tool)."
   },
   {
     "key": "ninja-deploy-test",
@@ -250,8 +254,10 @@
     "key": "licences-spelling",
     "title": "US spelling: the Licences label",
     "area": "Polish",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "The console and the user guide now say license. Texts that come from CORE and from the API (check evidence, some reports) still say licence.",
+    "completed_ref": "this commit"
   },
   {
     "key": "cases-work-permission-test",
@@ -333,6 +339,15 @@
     "detail": "Open the console, sign in (password, and Microsoft sign-in if you use it), reload, sign out. In the browser's developer tools the Application tab should show no aisoc.responder.accessToken in local storage and two cookies (aisoc_access, aisoc_refresh).",
     "area": "Platform",
     "status": "not_started",
-    "needs": "hal"
+    "needs": "hal",
+    "note": "Needs you to try it and say what you see."
+  },
+  {
+    "key": "controls-page",
+    "title": "Controls page in the Compliance sidebar",
+    "area": "Compliance",
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
   }
 ]

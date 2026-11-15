@@ -61,6 +61,7 @@ describe('Sidebar', () => {
     expect(links).toEqual([
       ['Overview', '/compliance'],
       ['Frameworks', '/compliance/frameworks'],
+      ['Controls', '/compliance/controls'],
       ['Policies', '/compliance/policies'],
       ['Risk Management', '/compliance/risk-register'],
       ['Vendors', '/compliance/vendors'],

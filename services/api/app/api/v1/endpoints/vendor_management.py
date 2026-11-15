@@ -19,7 +19,7 @@ from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
-from app.models.vendor_management import Vendor, VendorDocument, VendorHistory, VendorReview
+from app.models.vendor_management import DetectedApplication, Vendor, VendorDocument, VendorHistory, VendorReview
 from app.services.audit import emit_audit
 from app.services.vendor_management import CATEGORIES, DOC_TYPES, RISK_LEVELS, describe_changes, review_state
 
@@ -165,7 +165,19 @@ class VendorOut(BaseModel):
     archived_at: datetime | None
 
 
+class LinkedApplication(BaseModel):
+    """An application detected in the Microsoft 365 tenant that was added or linked to this vendor: several apps of one vendor show as one vendor with their accounts added up."""
+
+    id: uuid.UUID
+    name: str
+    source_label: str
+    accounts: int
+    risky: bool
+    first_seen: datetime
+
+
 class VendorDetail(VendorOut):
+    applications: list[LinkedApplication] = []
     reviews: list[ReviewOut]
     documents: list[DocumentOut]
     history: list[HistoryOut]
@@ -313,9 +325,31 @@ async def _detail(db: Any, tenant: uuid.UUID, vendor_id: uuid.UUID) -> VendorDet
         .scalars()
         .all()
     )
+    apps = (
+        (
+            await db.execute(
+                select(DetectedApplication)
+                .where(DetectedApplication.vendor_id == vendor_id, DetectedApplication.tenant_id == tenant)
+                .order_by(DetectedApplication.name)
+            )
+        )
+        .scalars()
+        .all()
+    )
     base = _out(v, list(reviews), len(docs), today)
     return VendorDetail(
         **base.model_dump(),
+        applications=[
+            LinkedApplication(
+                id=x.id,
+                name=x.name,
+                source_label={"cipp": "Microsoft 365"}.get(x.source, x.source),
+                accounts=x.accounts,
+                risky=x.risky,
+                first_seen=x.first_seen,
+            )
+            for x in apps
+        ],
         reviews=[
             ReviewOut(
                 id=r.id,

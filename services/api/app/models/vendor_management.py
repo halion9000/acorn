@@ -5,8 +5,8 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, SmallInteger, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -89,3 +89,24 @@ class VendorHistory(Base):
     action: Mapped[str] = mapped_column(String(40), nullable=False)
     detail: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class DetectedApplication(Base):
+    """An application found in a client's Microsoft 365 tenant, waiting for a person to Add, Ignore or Link it (migration 186)."""
+
+    __tablename__ = "detected_applications"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), _fk("tenants"), nullable=False)
+    source: Mapped[str] = mapped_column(String(40), nullable=False)
+    app_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    name: Mapped[str] = mapped_column(String(300), nullable=False)
+    accounts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    scopes: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    risky: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="new")
+    vendor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True)
+    actioned_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    actioned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

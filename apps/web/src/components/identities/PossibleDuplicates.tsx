@@ -61,7 +61,7 @@ function PairCard({ pair, onDone }: { pair: IdentityDuplicate; onDone: () => voi
           <li key={r}>{r}</li>
         ))}
       </ul>
-      {pair.both_licensed ? <p className="mt-1 text-xs text-amber-300">Both hold a licence: that is two paid seats. Merge only if one of them is really a spare.</p> : null}
+      {pair.both_licensed ? <p className="mt-1 text-xs text-amber-300">Both hold a license: that is two paid seats. Merge only if one of them is really a spare.</p> : null}
       {error ? (
         <p role="alert" className="mt-1 text-xs text-red-300">
           {error}

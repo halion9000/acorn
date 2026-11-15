@@ -21,7 +21,8 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import FRAMEWORKS, ScopeTenant
 from app.models.compliance_enabled_framework import ComplianceEnabledFramework
 from app.models.risk_register import RiskRegisterItem, RiskRegisterTask
-from app.services import compliance_health, evidence_age
+from app.models.vendor_management import Vendor, VendorReview
+from app.services import compliance_health, evidence_age, vendor_management
 from app.services.audit import emit_audit
 from app.services.risk_register import level
 
@@ -61,8 +62,17 @@ class RiskLevels(BaseModel):
     total: int
 
 
+class VendorLevels(BaseModel):
+    critical: int
+    high: int
+    medium: int
+    low: int
+    unassessed: int
+    total: int
+
+
 class ActionItem(BaseModel):
-    kind: Literal["evidence_expired", "risk_task"]
+    kind: Literal["evidence_expired", "risk_task", "vendor_review"]
     name: str
     event: str
     owner: str | None = None
@@ -75,6 +85,7 @@ class DashboardOut(BaseModel):
     health: Health | None
     by_framework: list[FrameworkHealth]
     risks: RiskLevels
+    vendors: VendorLevels
     action_items: list[ActionItem]
     generated_at: datetime
 
@@ -231,12 +242,32 @@ async def dashboard(
                 link="/compliance/risk-register",
             )
         )
+    vendors = (await db.execute(select(Vendor).where(Vendor.tenant_id == tenant, Vendor.status != "archived"))).scalars().all()
+    vendor_levels = dict.fromkeys(("critical", "high", "medium", "low", "unassessed"), 0)
+    reviews_by_vendor: dict[uuid.UUID, list[VendorReview]] = {}
+    for r in (await db.execute(select(VendorReview).where(VendorReview.tenant_id == tenant))).scalars():
+        reviews_by_vendor.setdefault(r.vendor_id, []).append(r)
+    for v in vendors:
+        vendor_levels[v.risk_level if v.risk_level in vendor_levels else "unassessed"] += 1
+        st = vendor_management.review_state(v.review_interval_months, reviews_by_vendor.get(v.id, []), v.created_at.date(), today)
+        if st["state"] in ("overdue", "due") and st["next_due"] is not None:
+            action_items.append(
+                ActionItem(
+                    kind="vendor_review",
+                    name=f"Vendor {v.name}: security review",
+                    event="Review overdue" if st["state"] == "overdue" else "Review due soon",
+                    owner=v.owner,
+                    due=datetime(st["next_due"].year, st["next_due"].month, st["next_due"].day, tzinfo=UTC),
+                    link="/compliance/vendors",
+                )
+            )
     action_items.sort(key=lambda a: (a.due is None, a.due or now))
     return DashboardOut(
         enabled=enabled,
         health=_health(totals, total_controls) if enabled else None,
         by_framework=by_framework,
         risks=RiskLevels(**levels, total=len(risks)),
+        vendors=VendorLevels(**vendor_levels, total=len(vendors)),
         action_items=action_items[:MAX_ITEMS],
         generated_at=now,
     )

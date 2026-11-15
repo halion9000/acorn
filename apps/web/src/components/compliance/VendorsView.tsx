@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
-import { apiErrorDetail, vendorApi, type VendorDetail, type VendorInput, type VendorList, type VendorRow } from '@/lib/api';
+import { apiErrorDetail, detectedAppsApi, vendorApi, type VendorDetail, type VendorInput, type VendorList, type VendorRow } from '@/lib/api';
 
 type Tab = 'dashboard' | 'register' | 'archive';
 const RISK_CLASS: Record<string, string> = {
@@ -291,6 +291,22 @@ function Detail({ clientId, vendor, data, onChange, onClose }: { clientId: strin
           </div>
         )}
       </div>
+      {(vendor.applications?.length ?? 0) > 0 && (
+        <div data-testid="vendor-applications">
+          <h4 className="mb-1 text-xs font-semibold uppercase text-gray-400">Applications found in Microsoft 365</h4>
+          <p className="text-xs text-gray-500">
+            {vendor.applications!.length} app{vendor.applications!.length === 1 ? '' : 's'}, {vendor.applications!.reduce((n, x) => n + x.accounts, 0).toLocaleString()} accounts in all
+          </p>
+          <ul className="mt-1 space-y-0.5 text-sm text-gray-300">
+            {vendor.applications!.map((x) => (
+              <li key={x.id}>
+                {x.name} <span className="text-xs text-gray-500">({x.accounts.toLocaleString()} account{x.accounts === 1 ? '' : 's'}, first seen {x.first_seen.slice(0, 10)})</span>
+                {x.risky ? <span className="ml-1 text-xs text-amber-300">holds a risky permission</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div data-testid="vendor-documents">
         <h4 className="mb-1 text-xs font-semibold uppercase text-gray-400">Documents</h4>
         <ul className="space-y-1 text-sm text-gray-300">
@@ -369,10 +385,23 @@ export function VendorsView() {
   const [problem, setProblem] = useState('');
   const [open, setOpen] = useState<VendorDetail | null>(null);
   const [adding, setAdding] = useState(false);
+  const [waiting, setWaiting] = useState(0);
 
   useEffect(() => {
     setClientId(clientFromAddress(window.location.search));
   }, []);
+
+  // How many detected applications are waiting for a decision (an older server, or nothing reported yet, shows no banner).
+  useEffect(() => {
+    let live = true;
+    detectedAppsApi
+      .list(clientId, 'new')
+      .then((r) => live && setWaiting(r.counts.new))
+      .catch(() => live && setWaiting(0));
+    return () => {
+      live = false;
+    };
+  }, [clientId, open]);
 
   const load = useCallback(async () => {
     setProblem('');
@@ -410,6 +439,19 @@ export function VendorsView() {
           <ClientPicker value={clientId} onChange={setClientId} label="Whose vendors" />
         </div>
       </div>
+      {waiting > 0 && (
+        <div role="status" data-testid="detected-banner" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-100">
+          <span>
+            <strong>
+              {waiting} new application{waiting === 1 ? '' : 's'} detected.
+            </strong>{' '}
+            New applications have been found in the Microsoft 365 tenant. Please review and action them.
+          </span>
+          <a href={clientId ? `/compliance/vendors/detected?client=${encodeURIComponent(clientId)}` : '/compliance/vendors/detected'} className="text-sky-300 hover:underline">
+            Detected applications
+          </a>
+        </div>
+      )}
       <div role="tablist" className="flex gap-1 border-b border-gray-800">
         {(['dashboard', 'register', 'archive'] as Tab[]).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} type="button" onClick={() => setTab(t)} className={`px-3 py-1.5 text-sm capitalize ${tab === t ? 'border-b-2 border-blue-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}>

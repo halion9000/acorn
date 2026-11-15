@@ -42,6 +42,7 @@ from app.api.v1.endpoints import (
     client_status,
     client_vulnerabilities,
     compliance,
+    compliance_controls,
     compliance_dashboard,
     connectors,
     copilot,
@@ -49,6 +50,7 @@ from app.api.v1.endpoints import (
     data_lifecycle,
     data_retention,
     deployment,
+    detected_applications,
     detection_compat,
     detection_loop,
     detection_proposals,
@@ -282,6 +284,9 @@ api_router.include_router(devices_ninja_deploy.router)
 api_router.include_router(risk_register.router)
 api_router.include_router(roadmap.router)
 api_router.include_router(vendor_management.router)
+api_router.include_router(detected_applications.router)
+api_router.include_router(detected_applications.ingest_router)
+api_router.include_router(compliance_controls.router)
 api_router.include_router(compliance_dashboard.router)
 api_router.include_router(devices.router)
 api_router.include_router(devices.ingest_router)
