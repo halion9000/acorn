@@ -143,3 +143,35 @@ async def test_a_person_can_move_status_and_needs_and_one_organization_never_see
     with pytest.raises(HTTPException) as e:
         await run(w.birch, lambda db: ep.update_item(made.id, ep.ItemPatch(priority="low"), db, user(w.birch)))
     assert e.value.status_code == 404
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_a_removed_item_is_hidden_and_never_brought_back_and_a_status_a_person_set_is_kept(world):
+    w = world
+    entries = [{"key": "a", "title": "Item A", "status": "in_progress"}, {"key": "b", "title": "Item B", "status": "not_started"}]
+    await run(w.acme, lambda db: rs.sync(db, w.acme, entries))
+    items = (await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items
+    a = next(i for i in items if i.key == "a")
+    b = next(i for i in items if i.key == "b")
+    await run(w.acme, lambda db: ep.remove_item(b.id, db, user(w.acme)))
+    await run(w.acme, lambda db: ep.update_item(a.id, ep.ItemPatch(status="completed"), db, user(w.acme)))
+    out = await run(w.acme, lambda db: rs.sync(db, w.acme, entries))
+    assert out == {
+        "added": 0,
+        "changed": 0,
+        "unchanged": 2,
+    }, "the file still says in progress and not started, and neither is brought back or reset"
+    listed = await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))
+    assert [(i.key, i.status) for i in listed.items] == [("a", "completed")]
+    assert listed.counts["not_started"] == 0
+    with pytest.raises(HTTPException) as e:
+        await run(w.acme, lambda db: ep.remove_item(b.id, db, user(w.acme)))
+    assert e.value.status_code == 404, "already removed"
+    with pytest.raises(HTTPException) as e2:
+        await run(w.birch, lambda db: ep.remove_item(a.id, db, user(w.birch)))
+    assert e2.value.status_code == 404, "another organization cannot remove it"
+    done = [{"key": "a", "title": "Item A", "status": "in_progress"}]
+    await run(w.acme, lambda db: rs.sync(db, w.acme, [{**done[0], "status": "completed", "completed_ref": "abc"}]))
+    again = (await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items[0]
+    assert again.status == "completed" and again.completed_ref == "abc"

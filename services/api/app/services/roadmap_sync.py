@@ -1,7 +1,7 @@
 """Keeps the roadmap in step with the repository file docs/ROADMAP_ITEMS.json (the assistant that does the work maintains that file as work goes on).
 
 An item with a ``key`` is owned by the file: its title, detail, area, status, needs, note and finish reference follow it. Its ``priority`` is the person's and is never touched. An item with no key (added on the page)
-is never touched. An item whose key leaves the file stays as it is. Nothing is deleted.
+is never touched. An item whose key leaves the file stays as it is. A status a person set is kept (unless the file says completed), and an item a person removed is never brought back. Nothing is deleted.
 """
 
 from __future__ import annotations
@@ -72,7 +72,12 @@ async def sync(db: AsyncSession, tenant: uuid.UUID, entries: list[dict[str, Any]
             )
             added += 1
             continue
-        diff = {k: w[k] for k in OWNED if getattr(row, k) != w[k]}
+        if row.removed_at is not None:
+            same += 1
+            continue
+        # A status a person set on the page is theirs, unless the file now says the work is finished.
+        keep_status = row.person_status and w["status"] != "completed"
+        diff = {k: w[k] for k in OWNED if not (k == "status" and keep_status) and getattr(row, k) != w[k]}
         if not diff:
             same += 1
             continue
@@ -80,6 +85,7 @@ async def sync(db: AsyncSession, tenant: uuid.UUID, entries: list[dict[str, Any]
             setattr(row, k, v)
         if "status" in diff:
             row.completed_at = now if w["status"] == "completed" else None
+            row.person_status = False
         row.updated_at = now
         changed += 1
     await db.commit()

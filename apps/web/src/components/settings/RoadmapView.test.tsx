@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), add: vi.fn(), update: vi.fn() }));
+const api = vi.hoisted(() => ({ list: vi.fn(), add: vi.fn(), update: vi.fn(), remove: vi.fn() }));
 vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), roadmapApi: api }));
 
 import { RoadmapView, visibleItems } from './RoadmapView';
@@ -26,6 +26,7 @@ beforeEach(() => {
   api.list.mockResolvedValue(roadmap(three));
   api.update.mockResolvedValue(item());
   api.add.mockResolvedValue(item());
+  api.remove.mockResolvedValue(undefined);
 });
 
 describe('visibleItems', () => {
@@ -81,5 +82,27 @@ describe('RoadmapView', () => {
     api.list.mockRejectedValue(new Error('Forbidden'));
     render(<RoadmapView />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
+  });
+
+  it('marks an item complete, and reopens a completed one', async () => {
+    render(<RoadmapView />);
+    await screen.findByTestId('roadmap-list');
+    await userEvent.click(within(screen.getByTestId('item-b')).getByRole('button', { name: 'Mark complete' }));
+    await waitFor(() => expect(api.update).toHaveBeenCalledWith('i2', { status: 'completed' }));
+    await userEvent.click(within(screen.getByTestId('item-c')).getByRole('button', { name: 'Reopen' }));
+    await waitFor(() => expect(api.update).toHaveBeenCalledWith('i3', { status: 'not_started' }));
+  });
+
+  it('removes an item only after a second click confirms it', async () => {
+    render(<RoadmapView />);
+    await screen.findByTestId('roadmap-list');
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Test Ninja deploy' }));
+    expect(api.remove).not.toHaveBeenCalled();
+    await userEvent.click(within(screen.getByTestId('item-b')).getByRole('button', { name: 'Keep' }));
+    expect(api.remove).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Test Ninja deploy' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, remove' }));
+    await waitFor(() => expect(api.remove).toHaveBeenCalledWith('i2'));
+    await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
   });
 });

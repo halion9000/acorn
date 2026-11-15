@@ -75,7 +75,9 @@ def _out(r: RoadmapItem) -> ItemOut:
 
 @router.get("", response_model=RoadmapOut, summary="Everything on the roadmap with the count in each status")
 async def list_items(db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings:read"))]) -> RoadmapOut:
-    rows = list((await db.execute(select(RoadmapItem).where(RoadmapItem.tenant_id == user.tenant_id))).scalars())
+    rows = list(
+        (await db.execute(select(RoadmapItem).where(RoadmapItem.tenant_id == user.tenant_id, RoadmapItem.removed_at.is_(None)))).scalars()
+    )
     counts = dict.fromkeys(("new", "not_started", "in_progress", "completed"), 0)
     for r in rows:
         counts[r.status] += 1
@@ -116,6 +118,24 @@ async def update_item(
         setattr(row, key, value)
     if "status" in changes:
         row.completed_at = datetime.now(UTC) if changes["status"] == "completed" else None
+        row.person_status = row.key is not None
     row.updated_at = datetime.now(UTC)
     await db.commit()
     return _out(row)
+
+
+@router.delete(
+    "/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove an item from the list (it is hidden, not deleted, and the sync does not bring it back)",
+)
+async def remove_item(item_id: uuid.UUID, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings:write"))]) -> None:
+    row = (
+        await db.execute(
+            select(RoadmapItem).where(RoadmapItem.id == item_id, RoadmapItem.tenant_id == user.tenant_id, RoadmapItem.removed_at.is_(None))
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    row.removed_at = row.updated_at = datetime.now(UTC)
+    await db.commit()

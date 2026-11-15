@@ -31,8 +31,9 @@ export function visibleItems(items: RoadmapItem[], status: StatusFilter, needs: 
   return items.filter((i) => (status === 'all' || i.status === status) && (needs === 'all' || i.needs === needs));
 }
 
-function Row({ item, onSave }: { item: RoadmapItem; onSave: (id: string, body: Parameters<typeof roadmapApi.update>[1]) => Promise<void> }) {
+function Row({ item, onSave, onRemove }: { item: RoadmapItem; onSave: (id: string, body: Parameters<typeof roadmapApi.update>[1]) => Promise<void>; onRemove: (id: string) => Promise<void> }) {
   const done = item.status === 'completed';
+  const [confirming, setConfirming] = useState(false);
   return (
     <li className="space-y-1 rounded-lg border border-gray-800 bg-gray-900/40 p-3" data-testid={`item-${item.key ?? item.id}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -54,6 +55,24 @@ function Row({ item, onSave }: { item: RoadmapItem; onSave: (id: string, body: P
               <option value="low">Low priority</option>
             </select>
           </label>
+          <button type="button" onClick={() => void onSave(item.id, { status: done ? 'not_started' : 'completed' })} className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800">
+            {done ? 'Reopen' : 'Mark complete'}
+          </button>
+          {confirming ? (
+            <span className="flex items-center gap-1 text-xs text-gray-300">
+              Remove this item?
+              <button type="button" onClick={() => void onRemove(item.id)} className="rounded bg-red-700 px-2 py-1 text-white hover:bg-red-600">
+                Yes, remove
+              </button>
+              <button type="button" onClick={() => setConfirming(false)} className="rounded border border-gray-700 px-2 py-1 hover:bg-gray-800">
+                Keep
+              </button>
+            </span>
+          ) : (
+            <button type="button" aria-label={`Remove ${item.title}`} onClick={() => setConfirming(true)} className="text-xs text-gray-500 hover:text-red-300">
+              Remove
+            </button>
+          )}
         </div>
       </div>
       {item.detail && <p className="whitespace-pre-wrap text-sm text-gray-300">{item.detail}</p>}
@@ -88,6 +107,14 @@ export function RoadmapView() {
       await load();
     } catch (e) {
       setProblem(apiErrorDetail(e) ?? 'Could not save that change.');
+    }
+  };
+  const remove = async (id: string) => {
+    try {
+      await roadmapApi.remove(id);
+      await load();
+    } catch (e) {
+      setProblem(apiErrorDetail(e) ?? 'Could not remove that.');
     }
   };
   const shown = useMemo(() => (data ? visibleItems(data.items, status, needs) : []), [data, status, needs]);
@@ -161,7 +188,7 @@ export function RoadmapView() {
       )}
       <ul className="space-y-2" data-testid="roadmap-list">
         {shown.map((i) => (
-          <Row key={i.id} item={i} onSave={save} />
+          <Row key={i.id} item={i} onSave={save} onRemove={remove} />
         ))}
       </ul>
     </div>

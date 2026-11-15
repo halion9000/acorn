@@ -7744,6 +7744,7 @@ export const roadmapApi = {
     request<RoadmapItem>('/api/v1/roadmap', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: { priority?: RoadmapItem['priority']; status?: RoadmapItem['status']; needs?: RoadmapItem['needs']; note?: string }) =>
     request<RoadmapItem>(`/api/v1/roadmap/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  remove: (id: string) => request<void>(`/api/v1/roadmap/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
 
 /** Vendor management (GET/POST /api/v1/compliance/vendors ...). `clientId` reads or writes one client. */
