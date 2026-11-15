@@ -71,7 +71,7 @@ def test_the_multifactor_list_answers_admin_everyone_per_user_and_capable_questi
     ] == ["met", "met", "met"]
 
 
-# Every check key CORE can emit (hud/src/aisoc-m365-reads.test.ts pins the same list: change both together).
+# Every check key CORE can emit (hud/src/acorn-m365-reads.test.ts pins the same list: change both together).
 CORE_CHECK_KEYS = [
     "ga_count",
     "safe_attachments",

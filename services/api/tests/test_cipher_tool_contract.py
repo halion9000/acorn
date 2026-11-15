@@ -1,8 +1,8 @@
 """Cipher (CORE's agent) operates AiSOC through 58 tools: 17 written out by hand and 41 read-only tools (12 detection engineering, 5
 hunting, 5 threat intelligence, 16 estate: assets, vulnerabilities, cloud posture, identity graph, client devices) declared as a table in CORE
-(hud/src/aisoc-read-tools.ts). Every call they make must be one this API actually accepts.
+(hud/src/acorn-read-tools.ts). Every call they make must be one this API actually accepts.
 
-CORE builds the requests in hud/src/aisoc-requests.ts and pins them in hud/src/aisoc-requests.test.ts. Comparing every call with this API's own
+CORE builds the requests in hud/src/acorn-requests.ts and pins them in hud/src/acorn-requests.test.ts. Comparing every call with this API's own
 OpenAPI schema on 2026-10-08 found six tools sending requests AiSOC did not understand, which no test on either side had noticed because nothing
 ever looked at what was actually sent:
 
@@ -15,7 +15,7 @@ ever looked at what was actually sent:
   aisoc_escalate_alert        sends {reason}; the route takes no body                          -> the reason is not stored
 
 CIPHER_CALLS below is what CORE sends. If this API changes a route Cipher depends on, this fails HERE, not as a confusing error the first time an
-analyst agent tries the tool. If CORE changes a request, update this table together with hud/src/aisoc-requests.test.ts.
+analyst agent tries the tool. If CORE changes a request, update this table together with hud/src/acorn-requests.test.ts.
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ CIPHER_CALLS = [
     ("aisoc_update_case", "PATCH", "/cases/{id}", [], ["status"], False),
     ("aisoc_escalate_alert", "POST", "/alerts/{id}/escalate", [], ["reason"], True),
     ("aisoc_close_investigation", "POST", "/investigations/{id}/close", [], ["analyst_note"], False),
-    # The read-only tools declared in CORE's hud/src/aisoc-read-tools.ts (detection engineering). Same names, paths and query parameters as
+    # The read-only tools declared in CORE's hud/src/acorn-read-tools.ts (detection engineering). Same names, paths and query parameters as
     # that table; a path parameter is written
     # with the route's own name so the lookup below finds exactly that route and not a literal sibling (/detection-proposals/baselines also
     # fits /detection-proposals/{id}).
@@ -174,7 +174,7 @@ CIPHER_CALLS = [
     ("aisoc_entity_risk_queue", "GET", "/fusion/entity-risk/queue", ["tenant_id", "limit", "promoted_only"], None, False),
 ]
 CALL_IDS = [c[0] for c in CIPHER_CALLS]
-MAX_PAGE_SIZE_CORE_SENDS = 200  # hud/src/aisoc-requests.ts: MAX_PAGE_SIZE
+MAX_PAGE_SIZE_CORE_SENDS = 200  # hud/src/acorn-requests.ts: MAX_PAGE_SIZE
 
 
 def _walk(routes, include_prefix=""):

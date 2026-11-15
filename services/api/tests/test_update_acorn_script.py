@@ -100,7 +100,7 @@ def test_every_service_that_gets_the_database_address_also_gets_ssl_required_thr
     assert compose.count("PGSSLMODE: require") == with_url, "one PGSSLMODE for each service that gets the address"
 
 
-# The statuses the script's last line can carry. CORE (hud/src/aisoc-remote-deploy.test.ts) keeps the same list and reads exactly these: change both together.
+# The statuses the script's last line can carry. CORE (hud/src/acorn-remote-deploy.test.ts) keeps the same list and reads exactly these: change both together.
 RESULT_STATUSES = ["ok", "up_to_date", "verify_ok", "rollback_ok", "rolled_back", "failed", "verify_failed", "rollback_failed", "busy"]
 
 

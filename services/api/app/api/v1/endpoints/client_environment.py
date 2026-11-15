@@ -1,6 +1,6 @@
 """One client's environment on a page: the devices every tool reports, what sort each is, which tools cover it, and (from Auvik) what each network device is plugged into.
 
-Built only from what is already stored: the merged device list (see ``devices.py``) and the ``connected_to`` list CORE sends with each Auvik device (see ``hud/src/aisoc-auvik.ts``).
+Built only from what is already stored: the merged device list (see ``devices.py``) and the ``connected_to`` list CORE sends with each Auvik device (see ``hud/src/acorn-auvik.ts``).
 A client with no Auvik has the devices and the coverage but no cabling, and the page says so.
 """
 

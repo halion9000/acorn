@@ -212,7 +212,7 @@ class TestRotation:
 
 class TestTheContractWithCore:
     def test_the_status_for_core_is_one_core_does_not_branch_on(self):
-        """CORE's setup (hud/src/aisoc-production.ts) branches on `core_api_key` (a newly issued secret) and on the AGENTS key's status
+        """CORE's setup (hud/src/acorn-production.ts) branches on `core_api_key` (a newly issued secret) and on the AGENTS key's status
         'kept-existing'; it ignores the core key's status string, so 'scopes-updated' is harmless there."""
         import inspect
 

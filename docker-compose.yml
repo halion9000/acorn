@@ -641,7 +641,7 @@ services:
       # the same key (curl against openrouter.ai, real completion came back).
       # Root cause: this block only ever listed OPENAI_API_KEY and
       # ANTHROPIC_API_KEY — three of the five providers
-      # hud/src/aisoc-provider-bridge.ts's readCoreProviderConfig actually
+      # hud/src/acorn-provider-bridge.ts's readCoreProviderConfig actually
       # supports (openrouter, azure, vertex_ai) were never passed into this
       # container at all. syncAisocProviderConfig correctly writes
       # OPENROUTER_API_KEY into AiSOC's own .env on disk, and the generated
@@ -677,7 +677,7 @@ services:
       AISOC_UPSTREAM_API_KEY: ${AISOC_UPSTREAM_API_KEY:-}
       # NOT GEMINI_API_KEY - setup/src/steps/model.ts's own Google AI
       # Studio entry stores the key under envKey: "GOOGLE_API_KEY", and
-      # hud/src/aisoc-provider-bridge.ts's envKeyMap was fixed to match
+      # hud/src/acorn-provider-bridge.ts's envKeyMap was fixed to match
       # that exactly (same review pass) rather than the generic
       # ${PROVIDER}_API_KEY guess GEMINI_API_KEY would have produced from
       # configProvider "gemini". LiteLLM's gemini/ provider doesn't care
