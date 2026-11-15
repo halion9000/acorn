@@ -62,6 +62,7 @@ describe('Sidebar', () => {
       ['Overview', '/compliance'],
       ['Frameworks', '/compliance/frameworks'],
       ['Controls', '/compliance/controls'],
+      ['Tests', '/compliance/tests'],
       ['Policies', '/compliance/policies'],
       ['Risk Management', '/compliance/risk-register'],
       ['Vendors', '/compliance/vendors'],

@@ -49,12 +49,13 @@
   },
   {
     "key": "tests-controls-engine",
-    "title": "Controls page (built) and the automated tests engine (still to build)",
-    "detail": "The Controls page lists every control of the frameworks that are on with its health. The automated tests engine (tests run against connected tools, mapped to controls) is the part still to do.",
+    "title": "Controls page and automated tests (built); more tests and a schedule (to do)",
+    "detail": "Controls page and ten automated tests built, worked out from the checks the connected tools report. Possible next steps: more tests, and recording them on a schedule instead of by a button.",
     "area": "Compliance",
-    "status": "not_started",
+    "status": "completed",
     "needs": "claude",
-    "note": "Controls page done (this commit). The tests engine is next."
+    "note": "Recording is by a button for now so you can see what it writes before it moves control health.",
+    "completed_ref": "this commit"
   },
   {
     "key": "audits-data-room",

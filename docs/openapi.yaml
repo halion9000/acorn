@@ -14778,6 +14778,77 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/tests:
+    get:
+      tags:
+      - compliance
+      summary: How the client's checks answer each security practice, worked out now
+      operationId: list_tests_api_v1_compliance_tests_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/tests/record:
+    post:
+      tags:
+      - compliance
+      summary: Write the results as evidence for the controls of the frameworks that
+        are on
+      operationId: record_tests_api_v1_compliance_tests_record_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/questionnaires:
     get:
       tags:
@@ -34499,6 +34570,19 @@ components:
       - evidence
       - observed_at
       title: CheckHistoryRow
+    CheckSeen:
+      properties:
+        key:
+          type: string
+          title: Key
+        status:
+          type: string
+          title: Status
+      type: object
+      required:
+      - key
+      - status
+      title: CheckSeen
     ChildTenantOut:
       properties:
         id:
@@ -36182,6 +36266,23 @@ components:
       - total
       - rows
       title: ControlList
+    ControlRef:
+      properties:
+        framework:
+          type: string
+          title: Framework
+        control_id:
+          type: string
+          title: Control Id
+        'on':
+          type: boolean
+          title: 'On'
+      type: object
+      required:
+      - framework
+      - control_id
+      - 'on'
+      title: ControlRef
     ControlRow:
       properties:
         framework:
@@ -50058,6 +50159,22 @@ components:
       title: RecordHitsRequest
       description: How many hits a person's own run of the hunt found (the page runs
         the search itself; the scheduler stores its own count).
+    RecordOut:
+      properties:
+        written:
+          type: integer
+          title: Written
+        replaced:
+          type: integer
+          title: Replaced
+        results:
+          $ref: '#/components/schemas/TestsOut'
+      type: object
+      required:
+      - written
+      - replaced
+      - results
+      title: RecordOut
     RedispositionApplyRequest:
       properties:
         alert_ids:
@@ -56955,6 +57072,74 @@ components:
       - matches
       - preview
       title: TestResponse
+    TestResult:
+      properties:
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        why:
+          type: string
+          title: Why
+        state:
+          type: string
+          title: State
+        met:
+          type: integer
+          title: Met
+        total:
+          type: integer
+          title: Total
+        checks:
+          items:
+            $ref: '#/components/schemas/CheckSeen'
+          type: array
+          title: Checks
+        controls:
+          items:
+            $ref: '#/components/schemas/ControlRef'
+          type: array
+          title: Controls
+      type: object
+      required:
+      - id
+      - title
+      - why
+      - state
+      - met
+      - total
+      - checks
+      - controls
+      title: TestResult
+    TestsOut:
+      properties:
+        results:
+          items:
+            $ref: '#/components/schemas/TestResult'
+          type: array
+          title: Results
+        counts:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Counts
+        enabled:
+          items:
+            type: string
+          type: array
+          title: Enabled
+        checks_held:
+          type: integer
+          title: Checks Held
+      type: object
+      required:
+      - results
+      - counts
+      - enabled
+      - checks_held
+      title: TestsOut
     ThreatActorCreate:
       properties:
         name:

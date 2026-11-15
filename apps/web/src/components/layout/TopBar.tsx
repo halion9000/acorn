@@ -60,6 +60,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/compliance/questionnaires': { title: 'Questionnaires', description: 'Answer customer security questionnaires from answers you already gave' },
   '/compliance/audits': { title: 'Audits', description: 'An audit of a framework and what the auditor asks for' },
   '/compliance/trust-center': { title: 'Trust center', description: 'What you show your customers about your security' },
+  '/compliance/tests': { title: 'Tests', description: 'Automated tests of security practices from the checks your tools report' },
   '/compliance/policies': { title: 'Policies', description: 'Written policies and what must be reviewed again' },
   '/compliance/vendors': { title: 'Vendors', description: 'Third parties you depend on, their risk and reviews' },
   '/compliance/frameworks': { title: 'Frameworks', description: 'Controls and evidence for each framework' },

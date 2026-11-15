@@ -7794,6 +7794,28 @@ export type VendorInput = Partial<Omit<VendorRow, 'id' | 'status' | 'review_stat
   clear_review_schedule?: boolean;
 };
 
+/** Automated control tests (GET /api/v1/compliance/tests, POST /api/v1/compliance/tests/record). */
+export interface ControlTestResult {
+  id: string;
+  title: string;
+  why: string;
+  state: 'pass' | 'fail' | 'partly' | 'not_tested';
+  met: number;
+  total: number;
+  checks: { key: string; status: string }[];
+  controls: { framework: string; control_id: string; on: boolean }[];
+}
+export interface ControlTests {
+  results: ControlTestResult[];
+  counts: Record<ControlTestResult['state'], number>;
+  enabled: string[];
+  checks_held: number;
+}
+export const controlTestsApi = {
+  list: (clientId: string) => request<ControlTests>(`/api/v1/compliance/tests?${riskQs(clientId)}`),
+  record: (clientId: string) => request<{ written: number; replaced: number; results: ControlTests }>(`/api/v1/compliance/tests/record?${riskQs(clientId)}`, { method: 'POST' }),
+};
+
 /** The trust center (GET/PUT /api/v1/compliance/trust-center). */
 export interface TrustCenter {
   enabled: boolean;

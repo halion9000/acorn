@@ -29,6 +29,7 @@ export const PAGE_WORDS: Record<string, string[]> = {
   '/compliance/questionnaires': ['questionnaire', 'security questionnaire', 'vendor assessment', 'answer library', 'caiq', 'sig'],
   '/compliance/audits': ['audit', 'auditor', 'evidence request', 'pbc', 'soc 2 audit'],
   '/compliance/trust-center': ['trust center', 'trust page', 'security page', 'customers', 'share compliance'],
+  '/compliance/tests': ['tests', 'automated tests', 'control tests', 'continuous monitoring', 'passing', 'failing'],
   '/compliance/policies': ['policy', 'policies', 'review calendar', 'procedures'],
   '/compliance/vendors': ['vendors', 'third party', 'suppliers', 'vendor risk', 'vendor review'],
   '/compliance/risk-register': ['risks', 'risk register', 'treatment', 'residual', 'likelihood'],

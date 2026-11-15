@@ -379,6 +379,7 @@ const navSections: NavSection[] = [
         match: (p) => p === '/compliance/frameworks' || /^\/compliance\/(soc2|iso27001|nist_csf|pci_dss|hipaa|cis_ig1)(\/|$)/.test(p),
       },
       { label: 'Controls', href: '/compliance/controls', icon: <ShieldIcon /> },
+      { label: 'Tests', href: '/compliance/tests', icon: <ScanIcon /> },
       { label: 'Policies', href: '/compliance/policies', icon: <DocumentReportIcon /> },
       { label: 'Risk Management', href: '/compliance/risk-register', icon: <ScanIcon /> },
       { label: 'Vendors', href: '/compliance/vendors', icon: <InboxIcon /> },

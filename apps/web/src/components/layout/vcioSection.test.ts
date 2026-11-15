@@ -23,7 +23,7 @@ describe('the Compliance and vCIO sidebar sections', () => {
   const labels = (title: string) => NAV_CATALOG.find((s) => s.title === title)?.items.map((i) => i.label);
 
   it('Compliance is a section of its own with the pages that are built, and vCIO no longer holds it', () => {
-    expect(labels('Compliance')).toEqual(['Overview', 'Frameworks', 'Controls', 'Policies', 'Risk Management', 'Vendors', 'Access Reviews', 'Questionnaires', 'Audits', 'Trust Center', 'Asset Inventory']);
+    expect(labels('Compliance')).toEqual(['Overview', 'Frameworks', 'Controls', 'Tests', 'Policies', 'Risk Management', 'Vendors', 'Access Reviews', 'Questionnaires', 'Audits', 'Trust Center', 'Asset Inventory']);
     expect(labels('vCIO')).toEqual(['Executive Digest', 'Client Review', 'Client Risk Score']);
     const platform = labels('Platform') ?? [];
     for (const moved of ['Compliance', 'Executive Digest', 'Client Review', 'Client Risk Score']) expect(platform).not.toContain(moved);
@@ -33,7 +33,7 @@ describe('the Compliance and vCIO sidebar sections', () => {
     const titles = NAV_CATALOG.map((s) => s.title);
     expect(titles.indexOf('Compliance')).toBe(titles.indexOf('Automation') + 1);
     expect(titles.indexOf('vCIO')).toBe(titles.indexOf('Compliance') + 1);
-    expect(NAV_CATALOG.find((s) => s.title === 'Compliance')?.items.map((i) => i.href)).toEqual(['/compliance', '/compliance/frameworks', '/compliance/controls', '/compliance/policies', '/compliance/risk-register', '/compliance/vendors', '/compliance/access-reviews', '/compliance/questionnaires', '/compliance/audits', '/compliance/trust-center', '/inventory']);
+    expect(NAV_CATALOG.find((s) => s.title === 'Compliance')?.items.map((i) => i.href)).toEqual(['/compliance', '/compliance/frameworks', '/compliance/controls', '/compliance/tests', '/compliance/policies', '/compliance/risk-register', '/compliance/vendors', '/compliance/access-reviews', '/compliance/questionnaires', '/compliance/audits', '/compliance/trust-center', '/inventory']);
     expect(NAV_CATALOG.find((s) => s.title === 'vCIO')?.items.map((i) => i.href)).toEqual(['/reports/digest', '/reports/client-review', '/vcio-risk-scoring']);
   });
 });
