@@ -1582,15 +1582,16 @@
     "area": "Reports",
     "key": "rw-metrics",
     "title": "Metrics dashboards (from Rewst): tickets, staff, finance and customer-insight pages",
-    "detail": "Built: Metrics > Tickets and satisfaction (HaloPSA tickets created and resolved, first response, by type and engineer, what is open, per client or all; SimpleSat satisfaction with the written comments), fed by CORE's daily summaries (migration 192). CORE's agents read both through aisoc_ticket_metrics and aisoc_csat under the narrow metrics:view permission (migration 193). Still to build: staff metrics, scorecard, pods, labor-hours, monthly invoicing and licensing pages, Dialpad and meetings."
+    "detail": "Built: Metrics > Tickets and satisfaction, Labor hours and Client summary (printable), all read from A.C.O.R.N's own database that CORE fills daily (never HaloPSA live). CORE's agents read tickets and satisfaction through aisoc_ticket_metrics and aisoc_csat under metrics:view. Still to build: staff metrics, scorecard, pods, monthly invoicing and licensing pages, Dialpad and meetings."
   },
   {
-    "status": "not_started",
+    "status": "in_progress",
     "needs": "signoff",
     "area": "Reports",
     "key": "rw-customer-dashboard",
     "title": "Customer-facing dashboard (from Rewst End User Dashboard): summary, labor hours, customer satisfaction per client",
-    "detail": "Per-customer pages with ticket totals and averages, open tickets by priority, first response time, volume and hours by type, tickets resolved by engineer, and CSAT with survey responses. Clients will not see it for a while; build it behind the existing client login when ready."
+    "detail": "Built the staff-side version: Metrics > Client summary (tickets, hours and satisfaction for one client on a printable page). Not built: a client sign-in so the client's own people see only their own summary.",
+    "note": "Needs Hal's sign-off on how clients sign in (a client user role, per-client scoping, MFA) before it is built."
   },
   {
     "status": "not_started",
