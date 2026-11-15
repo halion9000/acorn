@@ -345,6 +345,16 @@
     "numbers": {}
   },
   {
+    "tool": "aisoc_client_onboarding",
+    "method": "GET",
+    "path": "/client-onboarding",
+    "query": [
+      "client_id"
+    ],
+    "enums": {},
+    "numbers": {}
+  },
+  {
     "tool": "aisoc_mfa_summary",
     "method": "GET",
     "path": "/identity/mfa-summary",

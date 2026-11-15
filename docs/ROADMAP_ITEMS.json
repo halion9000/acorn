@@ -203,8 +203,10 @@
     "key": "agent-tools",
     "title": "A8: agent tools (one-page proposal exists)",
     "area": "Platform",
-    "status": "not_started",
-    "needs": "signoff"
+    "status": "completed",
+    "needs": "claude",
+    "note": "The person and client filters and the device-attention skill already existed; the onboarding tool is now added (aisoc_client_onboarding).",
+    "completed_ref": "CORE commit"
   },
   {
     "key": "real-playbooks",
