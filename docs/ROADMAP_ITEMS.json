@@ -406,8 +406,10 @@
     "key": "r7-ci-04",
     "title": "Redact secrets in every log line through one function, tested with known key shapes",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit",
+    "note": "CORE: log scrubbing table covers labelled and unlabelled key shapes; clock skew per host (A.C.O.R.N included) already on the health report; case-clash test"
   },
   {
     "key": "r7-ci-05",
@@ -518,8 +520,10 @@
     "key": "r7-ci-19",
     "title": "Warn when CORE's clock is more than a minute from A.C.O.R.N's",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit",
+    "note": "CORE: log scrubbing table covers labelled and unlabelled key shapes; clock skew per host (A.C.O.R.N included) already on the health report; case-clash test"
   },
   {
     "key": "r7-ci-20",
@@ -668,8 +672,10 @@
     "key": "r7-ci-39",
     "title": "A test that finds two file names differing only in case",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit",
+    "note": "CORE: log scrubbing table covers labelled and unlabelled key shapes; clock skew per host (A.C.O.R.N included) already on the health report; case-clash test"
   },
   {
     "key": "r7-ci-40",
