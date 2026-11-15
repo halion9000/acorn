@@ -464,8 +464,10 @@
     "key": "r7-ci-12",
     "title": "A test that every tool named in any skill exists in the tool catalog",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit",
+    "note": "CORE test skill-tools-exist: every aisoc_ and hud_ tool a skill names is offered by the real MCP server"
   },
   {
     "key": "r7-ci-13",
