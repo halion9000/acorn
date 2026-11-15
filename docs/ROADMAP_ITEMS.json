@@ -525,8 +525,10 @@
     "key": "r7-ci-20",
     "title": "A size cap and rotation check for hud/logs",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit",
+    "note": "CORE doctor log size check"
   },
   {
     "key": "r7-ci-21",
