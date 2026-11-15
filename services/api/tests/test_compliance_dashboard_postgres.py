@@ -172,3 +172,27 @@ async def test_vendors_are_counted_by_risk_level_and_a_review_that_is_overdue_or
     assert [(i.name, i.event, i.link) for i in items] == [("Vendor Microsoft: security review", "Review due soon", "/compliance/vendors")]
     other = await dash(w, w.birch)
     assert other.vendors.total == 0 and not [i for i in other.action_items if i.kind == "vendor_review"], "another client sees none of it"
+
+
+async def test_an_open_access_review_with_a_due_date_is_an_action_item_and_a_completed_one_is_not(world):
+    from app.api.v1.endpoints import access_reviews as ar
+
+    w = world
+    past = datetime.now(UTC).date() - timedelta(days=3)
+    late = await run(
+        w.acme,
+        lambda db: ar.start_review(
+            ar.ReviewIn(name="Door badges", system="Door badges", people=["Dana"], reviewer="Hal", due_date=past), w.acme, db, w.user
+        ),
+    )
+    done = await run(
+        w.acme,
+        lambda db: ar.start_review(ar.ReviewIn(name="Old one", system="Door badges", people=["Lee"], due_date=past), w.acme, db, w.user),
+    )
+    await run(w.acme, lambda db: ar.decide_all(done.id, ar.BulkIn(decision="keep"), w.acme, db, w.user))
+    await run(w.acme, lambda db: ar.complete(done.id, w.acme, db, w.user))
+    items = [i for i in (await dash(w)).action_items if i.kind == "access_review"]
+    assert [(i.name, i.event, i.owner, i.link) for i in items] == [
+        ("Access review: Door badges", "Review overdue", "Hal", "/compliance/access-reviews")
+    ]
+    assert late.overdue

@@ -7794,6 +7794,55 @@ export type VendorInput = Partial<Omit<VendorRow, 'id' | 'status' | 'review_stat
   clear_review_schedule?: boolean;
 };
 
+/** Access reviews (GET/POST /api/v1/compliance/access-reviews ...). */
+export interface AccessReviewEntry {
+  id: string;
+  person: string;
+  name: string | null;
+  access: string;
+  flags: string[];
+  decision: 'pending' | 'keep' | 'remove';
+  note: string;
+  decided_by: string | null;
+  decided_at: string | null;
+}
+export interface AccessReviewRow {
+  id: string;
+  name: string;
+  system: string;
+  reviewer: string | null;
+  due_date: string | null;
+  status: 'open' | 'complete';
+  overdue: boolean;
+  summary: string;
+  people: number;
+  pending: number;
+  keep: number;
+  remove: number;
+  flagged: number;
+  created_at: string;
+  completed_at: string | null;
+  completed_by: string | null;
+}
+export interface AccessReviewDetail extends AccessReviewRow {
+  entries: AccessReviewEntry[];
+}
+export interface AccessReviewList {
+  reviews: AccessReviewRow[];
+  systems: { system: string; people: number }[];
+}
+export const accessReviewsApi = {
+  list: (clientId: string) => request<AccessReviewList>(`/api/v1/compliance/access-reviews?${riskQs(clientId)}`),
+  get: (clientId: string, id: string) => request<AccessReviewDetail>(`/api/v1/compliance/access-reviews/${encodeURIComponent(id)}?${riskQs(clientId)}`),
+  start: (clientId: string, body: { name: string; system: string; reviewer?: string | null; due_date?: string | null; people?: string[] }) =>
+    request<AccessReviewDetail>(`/api/v1/compliance/access-reviews?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  decide: (clientId: string, id: string, entryId: string, decision: 'pending' | 'keep' | 'remove', note = '') =>
+    request<AccessReviewDetail>(`/api/v1/compliance/access-reviews/${encodeURIComponent(id)}/entries/${encodeURIComponent(entryId)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify({ decision, note }) }),
+  decideAll: (clientId: string, id: string, decision: 'keep' | 'remove', onlyUnflagged = true) =>
+    request<AccessReviewDetail>(`/api/v1/compliance/access-reviews/${encodeURIComponent(id)}/decide-all?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify({ decision, only_unflagged: onlyUnflagged }) }),
+  complete: (clientId: string, id: string) => request<AccessReviewDetail>(`/api/v1/compliance/access-reviews/${encodeURIComponent(id)}/complete?${riskQs(clientId)}`, { method: 'POST' }),
+};
+
 /** Controls of the frameworks that are on, with their health (GET /api/v1/compliance/controls). */
 export interface ControlRowT {
   framework: string;
@@ -7882,7 +7931,7 @@ export interface ComplianceHealth {
   percent_healthy: number | null;
 }
 export interface ComplianceActionItem {
-  kind: 'evidence_expired' | 'risk_task' | 'vendor_review';
+  kind: 'evidence_expired' | 'risk_task' | 'vendor_review' | 'access_review';
   name: string;
   event: string;
   owner: string | null;

@@ -13534,7 +13534,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ReviewIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__vendor_management__ReviewIn'
       responses:
         '201':
           description: Successful Response
@@ -13947,6 +13947,270 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AppsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/access-reviews:
+    get:
+      tags:
+      - compliance
+      summary: The access reviews, newest first, and the systems whose people can
+        be snapshotted
+      operationId: list_reviews_api_v1_compliance_access_reviews_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: 'Start a review: snapshot the people with access to a system'
+      operationId: start_review_api_v1_compliance_access_reviews_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__access_reviews__ReviewIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/access-reviews/{review_id}:
+    get:
+      tags:
+      - compliance
+      summary: One review with every person and the decision for each
+      operationId: get_review_api_v1_compliance_access_reviews__review_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: review_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Review Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/access-reviews/{review_id}/entries/{entry_id}:
+    patch:
+      tags:
+      - compliance
+      summary: 'Decide for one person: keep or remove their access'
+      operationId: decide_api_v1_compliance_access_reviews__review_id__entries__entry_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: review_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Review Id
+      - name: entry_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Entry Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/access-reviews/{review_id}/decide-all:
+    post:
+      tags:
+      - compliance
+      summary: Decide for everyone still pending (by default only the people with
+        no flag)
+      operationId: decide_all_api_v1_compliance_access_reviews__review_id__decide_all_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: review_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Review Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__access_reviews__BulkIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/access-reviews/{review_id}/complete:
+    post:
+      tags:
+      - compliance
+      summary: Complete the review once everyone is decided
+      operationId: complete_api_v1_compliance_access_reviews__review_id__complete_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: review_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Review Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewDetail'
         '422':
           description: Validation Error
           content:
@@ -16887,7 +17151,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BulkIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__inventory__BulkIn'
         required: true
       responses:
         '200':
@@ -32152,52 +32416,6 @@ components:
       - ioc
       - error
       title: BulkError
-    BulkIn:
-      properties:
-        ids:
-          items:
-            type: string
-            format: uuid
-          type: array
-          maxItems: 500
-          minItems: 1
-          title: Ids
-        client_id:
-          anyOf:
-          - type: string
-            format: uuid
-          - type: 'null'
-          title: Client Id
-        move_to_own:
-          type: boolean
-          title: Move To Own
-          default: false
-        category:
-          anyOf:
-          - type: string
-            maxLength: 80
-          - type: 'null'
-          title: Category
-        site:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Site
-        add_tags:
-          items:
-            type: string
-            maxLength: 40
-            minLength: 1
-          type: array
-          maxItems: 12
-          title: Add Tags
-      type: object
-      required:
-      - ids
-      title: BulkIn
-      description: 'The same change for many items: move them to a client (or to Live
-        Oak''s own), and/or set a category or site, and/or add tags.'
     BulkMoveIn:
       properties:
         person:
@@ -36521,6 +36739,24 @@ components:
       - kind
       - created_at
       title: Decision
+    DecisionIn:
+      properties:
+        decision:
+          type: string
+          enum:
+          - pending
+          - keep
+          - remove
+          title: Decision
+        note:
+          type: string
+          maxLength: 1000
+          title: Note
+          default: ''
+      type: object
+      required:
+      - decision
+      title: DecisionIn
     DecisionList:
       properties:
         items:
@@ -38900,6 +39136,57 @@ components:
       - name
       - expires_on
       title: Entry
+    EntryOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        person:
+          type: string
+          title: Person
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        access:
+          type: string
+          title: Access
+        flags:
+          items:
+            type: string
+          type: array
+          title: Flags
+        decision:
+          type: string
+          title: Decision
+        note:
+          type: string
+          title: Note
+        decided_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Decided By
+        decided_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Decided At
+      type: object
+      required:
+      - id
+      - person
+      - name
+      - access
+      - flags
+      - decision
+      - note
+      - decided_by
+      - decided_at
+      title: EntryOut
     EntryRow:
       properties:
         name:
@@ -49172,6 +49459,93 @@ components:
       required:
       - comment
       title: ReviewCommentRequest
+    ReviewDetail:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        system:
+          type: string
+          title: System
+        reviewer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reviewer
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        status:
+          type: string
+          title: Status
+        overdue:
+          type: boolean
+          title: Overdue
+        summary:
+          type: string
+          title: Summary
+        people:
+          type: integer
+          title: People
+        pending:
+          type: integer
+          title: Pending
+        keep:
+          type: integer
+          title: Keep
+        remove:
+          type: integer
+          title: Remove
+        flagged:
+          type: integer
+          title: Flagged
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        completed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Completed At
+        completed_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Completed By
+        entries:
+          items:
+            $ref: '#/components/schemas/EntryOut'
+          type: array
+          title: Entries
+      type: object
+      required:
+      - id
+      - name
+      - system
+      - reviewer
+      - due_date
+      - status
+      - overdue
+      - summary
+      - people
+      - pending
+      - keep
+      - remove
+      - flagged
+      - created_at
+      - completed_at
+      - completed_by
+      - entries
+      title: ReviewDetail
     ReviewDone:
       properties:
         outcome:
@@ -49212,100 +49586,23 @@ components:
       required:
       - decision
       title: ReviewEvidenceRequest
-    ReviewIn:
+    ReviewList:
       properties:
-        title:
-          anyOf:
-          - type: string
-            maxLength: 300
-          - type: 'null'
-          title: Title
-        kind:
-          type: string
-          enum:
-          - recurring
-          - one_time
-          title: Kind
-          default: one_time
-        start_date:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Start Date
-        due_date:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Due Date
-        reviewer:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Reviewer
-      type: object
-      title: ReviewIn
-    ReviewOut:
-      properties:
-        id:
-          type: string
-          format: uuid
-          title: Id
-        kind:
-          type: string
-          title: Kind
-        title:
-          type: string
-          title: Title
-        start_date:
-          type: string
-          format: date
-          title: Start Date
-        due_date:
-          type: string
-          format: date
-          title: Due Date
-        status:
-          type: string
-          title: Status
-        reviewer:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Reviewer
-        outcome:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Outcome
-        findings:
-          type: string
-          title: Findings
-        completed_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Completed At
-        overdue:
-          type: boolean
-          title: Overdue
+        reviews:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__access_reviews__ReviewOut'
+          type: array
+          title: Reviews
+        systems:
+          items:
+            $ref: '#/components/schemas/SystemChoice'
+          type: array
+          title: Systems
       type: object
       required:
-      - id
-      - kind
-      - title
-      - start_date
-      - due_date
-      - status
-      - reviewer
-      - outcome
-      - findings
-      - completed_at
-      - overdue
-      title: ReviewOut
+      - reviews
+      - systems
+      title: ReviewList
     ReviewScore:
       properties:
         percent:
@@ -54445,6 +54742,19 @@ components:
       - refreshed
       - no_serial
       title: SyncOut
+    SystemChoice:
+      properties:
+        system:
+          type: string
+          title: System
+        people:
+          type: integer
+          title: People
+      type: object
+      required:
+      - system
+      - people
+      title: SystemChoice
     TAXIICollection:
       properties:
         id:
@@ -57810,7 +58120,7 @@ components:
           default: []
         reviews:
           items:
-            $ref: '#/components/schemas/ReviewOut'
+            $ref: '#/components/schemas/app__api__v1__endpoints__vendor_management__ReviewOut'
           type: array
           title: Reviews
         documents:
@@ -59074,6 +59384,139 @@ components:
       required:
       - id
       title: _Remediation
+    app__api__v1__endpoints__access_reviews__BulkIn:
+      properties:
+        decision:
+          type: string
+          enum:
+          - keep
+          - remove
+          title: Decision
+        only_unflagged:
+          type: boolean
+          title: Only Unflagged
+          default: true
+      type: object
+      required:
+      - decision
+      title: BulkIn
+    app__api__v1__endpoints__access_reviews__ReviewIn:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 3
+          title: Name
+        system:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: System
+        reviewer:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Reviewer
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        people:
+          items:
+            type: string
+            maxLength: 320
+          type: array
+          maxItems: 2000
+          title: People
+      type: object
+      required:
+      - name
+      - system
+      title: ReviewIn
+    app__api__v1__endpoints__access_reviews__ReviewOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        system:
+          type: string
+          title: System
+        reviewer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reviewer
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        status:
+          type: string
+          title: Status
+        overdue:
+          type: boolean
+          title: Overdue
+        summary:
+          type: string
+          title: Summary
+        people:
+          type: integer
+          title: People
+        pending:
+          type: integer
+          title: Pending
+        keep:
+          type: integer
+          title: Keep
+        remove:
+          type: integer
+          title: Remove
+        flagged:
+          type: integer
+          title: Flagged
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        completed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Completed At
+        completed_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Completed By
+      type: object
+      required:
+      - id
+      - name
+      - system
+      - reviewer
+      - due_date
+      - status
+      - overdue
+      - summary
+      - people
+      - pending
+      - keep
+      - remove
+      - flagged
+      - created_at
+      - completed_at
+      - completed_by
+      title: ReviewOut
     app__api__v1__endpoints__agent_proposals__ProposalOut:
       properties:
         id:
@@ -59627,6 +60070,7 @@ components:
           - evidence_expired
           - risk_task
           - vendor_review
+          - access_review
           title: Kind
         name:
           type: string
@@ -60625,6 +61069,52 @@ components:
       - occurred_at
       - acknowledged_at
       title: IndicatorOut
+    app__api__v1__endpoints__inventory__BulkIn:
+      properties:
+        ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 500
+          minItems: 1
+          title: Ids
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        move_to_own:
+          type: boolean
+          title: Move To Own
+          default: false
+        category:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Category
+        site:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Site
+        add_tags:
+          items:
+            type: string
+            maxLength: 40
+            minLength: 1
+          type: array
+          maxItems: 12
+          title: Add Tags
+      type: object
+      required:
+      - ids
+      title: BulkIn
+      description: 'The same change for many items: move them to a client (or to Live
+        Oak''s own), and/or set a category or site, and/or add tags.'
     app__api__v1__endpoints__inventory__DeletedOut:
       properties:
         deleted:
@@ -61934,6 +62424,100 @@ components:
       - rating
       - answered
       title: TrendPoint
+    app__api__v1__endpoints__vendor_management__ReviewIn:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Title
+        kind:
+          type: string
+          enum:
+          - recurring
+          - one_time
+          title: Kind
+          default: one_time
+        start_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Start Date
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        reviewer:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Reviewer
+      type: object
+      title: ReviewIn
+    app__api__v1__endpoints__vendor_management__ReviewOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        kind:
+          type: string
+          title: Kind
+        title:
+          type: string
+          title: Title
+        start_date:
+          type: string
+          format: date
+          title: Start Date
+        due_date:
+          type: string
+          format: date
+          title: Due Date
+        status:
+          type: string
+          title: Status
+        reviewer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reviewer
+        outcome:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Outcome
+        findings:
+          type: string
+          title: Findings
+        completed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Completed At
+        overdue:
+          type: boolean
+          title: Overdue
+      type: object
+      required:
+      - id
+      - kind
+      - title
+      - start_date
+      - due_date
+      - status
+      - reviewer
+      - outcome
+      - findings
+      - completed_at
+      - overdue
+      title: ReviewOut
     app__api__v1__endpoints__vendor_management__Summary:
       properties:
         total:

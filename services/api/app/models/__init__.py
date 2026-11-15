@@ -1,6 +1,7 @@
 """ORM models package - imports all models for Alembic and SQLAlchemy."""
 
 from app.db.database import Base
+from app.models.access_review import AccessReview, AccessReviewEntry
 from app.models.alert import Alert
 from app.models.alert_email import AlertEmailLog, PlatformAlertEmailSettings
 from app.models.asset import AlertAssetCorrelation, Asset, AssetVulnerability
@@ -150,6 +151,8 @@ __all__ = [
     "ComplianceEnabledFramework",
     "RiskRegisterHistory",
     "RiskRegisterItem",
+    "AccessReview",
+    "AccessReviewEntry",
     "DetectedApplication",
     "RiskRegisterTask",
     "RoadmapItem",

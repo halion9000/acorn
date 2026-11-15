@@ -40,11 +40,12 @@
   },
   {
     "key": "personnel-access-reviews",
-    "title": "Personnel and access reviews",
-    "detail": "People list with onboarding, offboarding, training and access review tasks per client.",
+    "title": "Personnel: onboarding, offboarding and training tasks per person (access reviews are built)",
+    "detail": "Access reviews are built (start a review for a system, decide keep or remove for each person, complete it). Still to do: a people list with onboarding, offboarding and security-training tasks per person.",
     "area": "Compliance",
     "status": "not_started",
-    "needs": "claude"
+    "needs": "claude",
+    "note": "Access reviews done (this commit). The people tasks need to know where training completion comes from (Huntress awareness training is already read)."
   },
   {
     "key": "tests-controls-engine",
@@ -345,6 +346,14 @@
   {
     "key": "controls-page",
     "title": "Controls page in the Compliance sidebar",
+    "area": "Compliance",
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit"
+  },
+  {
+    "key": "access-reviews",
+    "title": "Access reviews in the Compliance sidebar",
     "area": "Compliance",
     "status": "completed",
     "needs": "claude",

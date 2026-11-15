@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import FRAMEWORKS, ScopeTenant
+from app.models.access_review import AccessReview
 from app.models.compliance_enabled_framework import ComplianceEnabledFramework
 from app.models.risk_register import RiskRegisterItem, RiskRegisterTask
 from app.models.vendor_management import Vendor, VendorReview
@@ -72,7 +73,7 @@ class VendorLevels(BaseModel):
 
 
 class ActionItem(BaseModel):
-    kind: Literal["evidence_expired", "risk_task", "vendor_review"]
+    kind: Literal["evidence_expired", "risk_task", "vendor_review", "access_review"]
     name: str
     event: str
     owner: str | None = None
@@ -261,6 +262,22 @@ async def dashboard(
                     link="/compliance/vendors",
                 )
             )
+    for rev in (
+        await db.execute(
+            select(AccessReview).where(AccessReview.tenant_id == tenant, AccessReview.status == "open", AccessReview.due_date.is_not(None))
+        )
+    ).scalars():
+        assert rev.due_date is not None
+        action_items.append(
+            ActionItem(
+                kind="access_review",
+                name=f"Access review: {rev.name}",
+                event="Review overdue" if rev.due_date < today else "Review due",
+                owner=rev.reviewer,
+                due=datetime(rev.due_date.year, rev.due_date.month, rev.due_date.day, tzinfo=UTC),
+                link="/compliance/access-reviews",
+            )
+        )
     action_items.sort(key=lambda a: (a.due is None, a.due or now))
     return DashboardOut(
         enabled=enabled,

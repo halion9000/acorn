@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     abuse,
+    access_reviews,
     agent_proposals,
     agents,
     airgap,
@@ -286,6 +287,7 @@ api_router.include_router(roadmap.router)
 api_router.include_router(vendor_management.router)
 api_router.include_router(detected_applications.router)
 api_router.include_router(detected_applications.ingest_router)
+api_router.include_router(access_reviews.router)
 api_router.include_router(compliance_controls.router)
 api_router.include_router(compliance_dashboard.router)
 api_router.include_router(devices.router)
