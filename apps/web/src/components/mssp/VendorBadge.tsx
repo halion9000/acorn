@@ -27,7 +27,7 @@ const BADGES: Record<string, { text: string; className: string }> = {
   vciotoolbox: { text: 'vC', className: 'bg-blue-800/80 text-white' },
 };
 
-const LOGOS = new Set(['halopsa', 'ninjaone', 'huntress', 'petra', 'addigy', 'liongard', 'threatmate', 'blumira', 'fieldeffect', 'dnsfilter', 'autoelevate', 'cipp', 'screenconnect', 'vciotoolbox', 'itglue', 'unifi', 'auvik', 'slide', 'huntress-sat', 'datto-bcdr', 'datto-saas', 'meraki', 'timus', 'dropsuite', 'secureframe']);
+const LOGOS = new Set(['simplesat', 'halopsa', 'ninjaone', 'huntress', 'petra', 'addigy', 'liongard', 'threatmate', 'blumira', 'fieldeffect', 'dnsfilter', 'autoelevate', 'cipp', 'screenconnect', 'vciotoolbox', 'itglue', 'unifi', 'auvik', 'slide', 'huntress-sat', 'datto-bcdr', 'datto-saas', 'meraki', 'timus', 'dropsuite', 'secureframe']);
 
 /** Halo first, then the rest in one fixed order so every row lines up; tools not listed follow alphabetically. */
 export const VENDOR_ORDER = ['halopsa', 'ninjaone', 'huntress', 'threatmate', 'addigy', 'petra', 'liongard', 'blumira', 'fieldeffect', 'dnsfilter', 'inky', 'simplesat', 'auvik', 'unifi', 'slide', 'huntress-sat', 'itglue', 'meraki', 'datto-bcdr', 'datto-saas', 'dropsuite', 'autoelevate', 'cipp', 'screenconnect', 'vciotoolbox'];
