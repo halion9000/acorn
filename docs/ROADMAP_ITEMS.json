@@ -126,11 +126,11 @@
   {
     "key": "huntress-moves",
     "title": "Move Huntress agents to the organization that matches their NinjaOne client",
-    "detail": "About 141 machines are filed in a different Huntress organization than the client NinjaOne files them under. The Huntress API has a move call that has not been proven live.",
+    "detail": "About 141 machines are filed in a different Huntress organization than the client NinjaOne files them under. Live test 2026-11-14 on BHRC-FM-01 (agent 6486864, from ESW - Beverly Hills Rejuvenation Center, org 229426, to Beverly Hills Med Spas, org 718712): Huntress answers 200 to PATCH /v1/agents/{id} with organization_id (top level and nested) but the agent stays in its organization. The API does not move agents.",
     "area": "Devices",
     "status": "not_started",
     "needs": "hal",
-    "note": "Needs a live round-trip test on a real machine (move, then move back). DESKTOP-RF5RQSP is already in the matching organization (New Waterloo), so there is nothing to move; another machine is needed."
+    "note": "Needs a decision: move agents by hand in the Huntress console (A.C.O.R.N can list exactly which, from and to), or ask Huntress support whether an API route exists. Nothing was changed on BHRC-FM-01."
   },
   {
     "key": "name-only-follow",
@@ -153,7 +153,7 @@
     "area": "Devices",
     "status": "in_progress",
     "needs": "hal",
-    "note": "Fixed again (the install now runs detached; ScreenConnect killed the last attempt after 10 seconds). Press Deploy NinjaOne on SCHKNOWCROSS and report what the machine printed."
+    "note": "Fixed again: the install now runs detached (CORE bc25a2c). Press Deploy NinjaOne on SCHKNOWCROSS and report what the machine printed."
   },
   {
     "key": "ninja-console",

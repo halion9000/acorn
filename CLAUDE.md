@@ -26,3 +26,7 @@
 ## Shipping
 - Commit and push in two separate calls. Deploy with the script in CORE's `docs/DEPLOY.md`; it rolls itself back when the build or health check fails.
 - Don't edit shell text with backslashes or apostrophes through a heredoc: use the Edit or Write tool.
+
+## The roadmap (Settings, Upcoming improvements)
+- docs/ROADMAP_ITEMS.json mirrors everything pending. Keep it current as work goes on: add an item when one is agreed, move its status (new, not_started, in_progress, completed), set needs (claude, signoff, hal) and a note saying what it waits for. Never write a priority: that is Hal's.
+- Bring the live page up to date after a deploy: pipe the file into the API container, `cat docs/ROADMAP_ITEMS.json | python -m app.scripts.roadmap_sync --tenant-name "Live Oak IT Partners"` (send it base64 through `az vm run-command` into `docker exec -i aisoc-api`).
