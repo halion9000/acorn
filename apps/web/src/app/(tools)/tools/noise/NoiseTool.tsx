@@ -40,7 +40,7 @@ export function NoiseTool() {
       </div>
 
       <p style={{ color: "#6b7394", fontSize: 12, margin: 0 }}>
-        Uses the AiSOC verdict engine&apos;s published deterministic-tier suppression rate (85.5%). This is a substrate
+        Uses the A.C.O.R.N verdict engine&apos;s published deterministic-tier suppression rate (85.5%). This is a substrate
         self-consistency figure, not a claim about live-LLM accuracy — see the{" "}
         <a href="https://github.com/halion9000/ACORN/blob/main/docs/benchmark.md" style={{ color: "#8b93b7" }}>
           benchmark methodology

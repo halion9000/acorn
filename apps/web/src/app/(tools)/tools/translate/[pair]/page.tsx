@@ -45,11 +45,11 @@ export function generateStaticParams(): { pair: string }[] {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { pair } = await params;
   const parsed = parsePair(pair);
-  if (!parsed) return { title: "Detection translator | AiSOC" };
+  if (!parsed) return { title: "Detection translator | A.C.O.R.N" };
   const fromL = FORMAT_LABELS[parsed.from];
   const toL = FORMAT_LABELS[parsed.to];
-  const title = `${fromL} to ${toL} — free detection rule converter | AiSOC`;
-  const description = `Convert ${fromL} detection rules to ${toL} instantly and for free, in your browser. Open source, no login. Part of AiSOC.`;
+  const title = `${fromL} to ${toL} — free detection rule converter | A.C.O.R.N`;
+  const description = `Convert ${fromL} detection rules to ${toL} instantly and for free, in your browser. Open source, no login. Part of A.C.O.R.N.`;
   const url = `${getPublicSiteUrl()}/tools/translate/${pair}`;
   return { title, description, alternates: { canonical: url }, openGraph: { title, description, url } };
 }

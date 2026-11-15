@@ -4,7 +4,7 @@ import Link from "next/link";
 import { getPublicSiteUrl } from "../../../lib/site";
 
 export const metadata: Metadata = {
-  title: "Free SOC tools — detection translator, ATT&CK coverage grader, noise calculator | AiSOC",
+  title: "Free SOC tools — detection translator, ATT&CK coverage grader, noise calculator | A.C.O.R.N",
   description:
     "Free, open-source tools for security analysts: translate detection rules across Sigma/SPL/KQL/ES|QL, grade your ATT&CK coverage, generate Sigma from plain English, and calculate alert-noise savings. Runs in your browser.",
   alternates: { canonical: `${getPublicSiteUrl()}/tools` },
@@ -40,7 +40,7 @@ export default function ToolsIndex() {
       <p style={{ color: "#8b93b7", fontSize: 17, marginTop: 12, maxWidth: 640 }}>
         No login, no upload, no catch. Everything runs in your browser and is open source. Part of{" "}
         <a href="https://github.com/beenuar/AiSOC" style={{ color: "#c4cae0" }}>
-          AiSOC
+          A.C.O.R.N
         </a>
         .
       </p>

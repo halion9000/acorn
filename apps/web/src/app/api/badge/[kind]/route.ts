@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
  * shields.io-compatible endpoint badges (v8 W3.4).
  *
  * Embed anywhere shields renders, e.g. in a README:
- *   ![AiSOC](https://img.shields.io/endpoint?url=https://tryaisoc.com/api/badge/triaged)
+ *   ![A.C.O.R.N](https://img.shields.io/endpoint?url=https://tryaisoc.com/api/badge/triaged)
  *
  * Badges are backlinks that live in other people's READMEs. The GitHub Action
  * (W4) links its "triaged" badge here with a per-run `?message=` override; the
@@ -24,11 +24,11 @@ interface BadgeSpec {
 }
 
 const DEFAULTS: Record<string, BadgeSpec> = {
-  triaged: { label: "AiSOC", message: "alerts triaged", color: "7b2bbe" },
-  "noise-suppressed": { label: "AiSOC noise", message: "suppressed", color: "22c55e" },
-  benchmark: { label: "AiSOC benchmark", message: "see scoreboard", color: "3b82f6" },
-  "verified-detection": { label: "AiSOC", message: "verified detection", color: "22c55e" },
-  "self-play": { label: "AiSOC self-play", message: "nightly", color: "ec4899" },
+  triaged: { label: "A.C.O.R.N", message: "alerts triaged", color: "7b2bbe" },
+  "noise-suppressed": { label: "A.C.O.R.N noise", message: "suppressed", color: "22c55e" },
+  benchmark: { label: "A.C.O.R.N benchmark", message: "see scoreboard", color: "3b82f6" },
+  "verified-detection": { label: "A.C.O.R.N", message: "verified detection", color: "22c55e" },
+  "self-play": { label: "A.C.O.R.N self-play", message: "nightly", color: "ec4899" },
 };
 
 const ALLOWED_COLOR = /^[0-9a-zA-Z]+$/;
@@ -38,7 +38,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
   const spec = DEFAULTS[kind];
   if (!spec) {
     return NextResponse.json(
-      { schemaVersion: 1, label: "AiSOC", message: "unknown badge", color: "inactive", isError: true },
+      { schemaVersion: 1, label: "A.C.O.R.N", message: "unknown badge", color: "inactive", isError: true },
       { status: 404 },
     );
   }

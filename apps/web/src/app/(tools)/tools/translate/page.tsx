@@ -4,12 +4,12 @@ import { getPublicSiteUrl } from "../../../../lib/site";
 import { TranslateTool } from "./TranslateTool";
 
 export const metadata: Metadata = {
-  title: "Detection rule translator — Sigma ↔ SPL ↔ KQL ↔ ES|QL ↔ YARA-L | AiSOC",
+  title: "Detection rule translator — Sigma ↔ SPL ↔ KQL ↔ ES|QL ↔ YARA-L | A.C.O.R.N",
   description:
     "Free, in-browser detection-rule translator. Paste a Sigma, Splunk SPL, Microsoft Sentinel KQL, Elastic ES|QL, or Chronicle YARA-L rule and get every other dialect at once. No login, no upload, open source.",
   alternates: { canonical: `${getPublicSiteUrl()}/tools/translate` },
   openGraph: {
-    title: "Detection rule translator — Sigma ↔ SPL ↔ KQL ↔ ES|QL | AiSOC",
+    title: "Detection rule translator — Sigma ↔ SPL ↔ KQL ↔ ES|QL | A.C.O.R.N",
     description: "Translate detection rules across every major SIEM dialect, in your browser. Free & open source.",
     url: `${getPublicSiteUrl()}/tools/translate`,
   },
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 const JSON_LD = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "AiSOC Detection Rule Translator",
+  name: "A.C.O.R.N Detection Rule Translator",
   applicationCategory: "SecurityApplication",
   operatingSystem: "Web",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },

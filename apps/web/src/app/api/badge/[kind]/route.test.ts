@@ -16,7 +16,7 @@ describe("shields.io badge endpoint", () => {
     const { status, body } = await call("triaged", "https://tryaisoc.com/api/badge/triaged");
     expect(status).toBe(200);
     expect(body.schemaVersion).toBe(1);
-    expect(body.label).toBe("AiSOC");
+    expect(body.label).toBe("A.C.O.R.N");
     expect(body.color).toBe("7b2bbe");
   });
 
