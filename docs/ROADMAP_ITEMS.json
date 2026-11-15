@@ -21,9 +21,10 @@
     "title": "Bring Live Oak's own control health over from Secureframe",
     "detail": "The Overview computes control health from evidence held in A.C.O.R.N. For our own organization that evidence has to come from Secureframe (control tests are already read). Decide the source: tests report per control, or an export.",
     "area": "Compliance",
-    "status": "not_started",
-    "needs": "signoff",
-    "note": "Which Secureframe data should become evidence, and should it overwrite manual evidence?"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Done for NIST CSF 2.0 and CIS IG1 (the frameworks CORE sends requirements for). SOC 2, ISO, PCI and HIPAA need CORE to send their requirements too.",
+    "completed_ref": "this commit"
   },
   {
     "key": "policy-templates",
@@ -304,5 +305,12 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit"
+  },
+  {
+    "key": "secureframe-other-frameworks",
+    "title": "Send SOC 2, ISO 27001, PCI DSS and HIPAA requirements from CORE so their control health comes from Secureframe too",
+    "area": "Compliance",
+    "status": "not_started",
+    "needs": "claude"
   }
 ]
