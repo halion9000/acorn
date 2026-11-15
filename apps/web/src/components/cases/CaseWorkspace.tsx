@@ -27,7 +27,7 @@ import { clsx } from 'clsx';
 import { safeDistance, safeFormat } from '@/lib/safe-date';
 import toast from 'react-hot-toast';
 import { caseTicketNote, loadNoteAlerts } from './ticketNote';
-import { alertsApi } from '@/lib/api';
+import { alertsApi, ledgerApi } from '@/lib/api';
 import {
   apiErrorDetail,
   casesApi,
@@ -275,24 +275,41 @@ export function CaseWorkspace({ caseId }: { caseId: string }) {
 
   useEffect(() => () => { stopPolling(); closeWs(); }, [stopPolling, closeWs]);
 
-  // An investigation made earlier (here, or from the AI investigation on the alert) is shown when the case opens: the panel used to start empty every visit and say nothing had run.
+  // An investigation made earlier (here, or from the AI investigation on the alert) is shown when the case opens. The agents service keeps its runs in memory only, so after a restart they are gone from
+  // there; the investigation ledger keeps every run and its events for good, so when the agents service has nothing the newest ledger run is shown instead (status, steps and findings from its events).
   useEffect(() => {
     let live = true;
     (async () => {
       try {
         const list = await casesApi.listInvestigations(caseId);
         const run = pickLatestRun(list.runs ?? []);
-        if (!run || !live) return;
-        const inv = await casesApi.getInvestigation(caseId, run);
-        if (!live) return;
-        setInvestigationRunId(run);
-        setInvestigationData(inv as Record<string, unknown>);
-        setInvestigationStatus(inv.status);
-        if (inv.audit_log) setLiveSteps(inv.audit_log);
-        if (inv.status === 'completed') {
-          const resp = await authFetch(`/api/v1/cases/${caseId}/investigations/${run}/report.md`);
-          if (resp.ok && live) setReportMd(await resp.text());
+        if (run && live) {
+          const inv = await casesApi.getInvestigation(caseId, run);
+          if (!live) return;
+          setInvestigationRunId(run);
+          setInvestigationData(inv as Record<string, unknown>);
+          setInvestigationStatus(inv.status);
+          if (inv.audit_log) setLiveSteps(inv.audit_log);
+          if (inv.status === 'completed') {
+            const resp = await authFetch(`/api/v1/cases/${caseId}/investigations/${run}/report.md`);
+            if (resp.ok && live) setReportMd(await resp.text());
+          }
+          return;
         }
+      } catch {
+        // the agents service has nothing: try the ledger
+      }
+      try {
+        const runs = await ledgerApi.listRuns({ caseId, limit: 10 });
+        const latest = [...(runs ?? [])].sort((a, b) => String(b.started_at).localeCompare(String(a.started_at)))[0];
+        if (!latest || !live) return;
+        const events = await ledgerApi.listEvents(latest.id, { limit: 500 });
+        if (!live) return;
+        const view = ledgerRunView(latest, events.items ?? []);
+        setInvestigationRunId(latest.id);
+        setInvestigationData(view.data);
+        setInvestigationStatus(view.status);
+        setLiveSteps(view.steps);
       } catch {
         // nothing earlier to show: the panel stays as it was
       }
@@ -1002,6 +1019,25 @@ export function CaseWorkspace({ caseId }: { caseId: string }) {
 // ─── Investigation panel ──────────────────────────────────────────────────────
 
 type LiveStep = { kind: string; agent: string; summary: string; ts: string };
+
+/** What an investigation panel needs from a ledger run and its events (pure): the status the panel knows, the steps in order, and the findings of each agent when an event carries them. */
+export function ledgerRunView(
+  run: { status: string; error: string | null },
+  events: Array<{ seq: number; ts: string; kind: string; agent: string; summary: string; payload: Record<string, unknown> | null }>,
+): { status: string; steps: LiveStep[]; data: Record<string, unknown> } {
+  const ordered = [...events].sort((a, b) => a.seq - b.seq);
+  const status = run.status === 'completed' ? 'completed' : run.status === 'running' ? 'running' : 'failed';
+  const data: Record<string, unknown> = { status, error: run.error ?? undefined };
+  const FINDING_KEYS = ['summary', 'iocs', 'mitre_techniques', 'root_cause_hypothesis', 'confidence', 'recommended_actions'];
+  for (const e of ordered) {
+    const agent = e.agent.toLowerCase();
+    const name = agent.includes('recon') ? 'recon' : agent.includes('forensic') ? 'forensic' : agent.includes('respond') ? 'responder' : null;
+    if (!name || !e.payload) continue;
+    const inner = [e.payload, e.payload.output, e.payload.result].find((c): c is Record<string, unknown> => !!c && typeof c === 'object' && FINDING_KEYS.some((k) => k in (c as object)));
+    if (inner) data[name] = inner;
+  }
+  return { status, steps: ordered.map((e) => ({ kind: e.kind, agent: e.agent, summary: e.summary, ts: e.ts })), data };
+}
 
 /** The id of the newest run in a case's list (by start time when it has one, else the last listed), or null when there is none (pure). */
 export function pickLatestRun(runs: Array<{ run_id?: string; id?: string; started_at?: string; created_at?: string }>): string | null {

@@ -118,6 +118,24 @@ export function CopyAddress({ email }: { email: string }) {
   );
 }
 
+export interface Review {
+  date: string;
+  rating: string;
+  sentiment: string | null;
+  comment: string;
+  ticket_id: string;
+}
+
+/** The person's newest survey reviews from what SimpleSat said about them (pure); none when it said nothing or the shape is not as expected. */
+export function reviewsOf(details: Record<string, unknown> | null | undefined): Review[] {
+  const raw = details?.reviews;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
+    .map((r) => ({ date: String(r.date ?? ''), rating: String(r.rating ?? ''), sentiment: typeof r.sentiment === 'string' ? r.sentiment : null, comment: String(r.comment ?? ''), ticket_id: String(r.ticket_id ?? '') }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
 function Detail({ person }: { person: IdentityPerson }) {
   const { data, error } = useSWR(['identity', person.client_id, person.email], () => identitiesApi.detail(person.client_id, person.email), { revalidateOnFocus: false });
   if (error) return <p className="text-sm text-red-300">Could not load this person.</p>;
@@ -165,6 +183,34 @@ function Detail({ person }: { person: IdentityPerson }) {
             </ul>
           </div>
         )}
+        {(() => {
+          const sat = data.person.sources.find((s) => s.vendor === 'simplesat');
+          const reviews = reviewsOf(sat?.details);
+          if (!sat) return null;
+          return (
+            <div className="mt-3" data-testid="review-detail">
+              <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">
+                Customer reviews{typeof sat.details?.responses === 'number' ? ` (${sat.details.responses} answered)` : ''}
+              </h4>
+              {reviews.length === 0 ? (
+                <p className="text-sm text-gray-500">No reviews to show.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {reviews.map((r, i) => (
+                    <li key={`${r.date}-${i}`} className="text-sm text-gray-200">
+                      <span className={r.sentiment === 'negative' ? 'text-red-300' : r.sentiment === 'positive' ? 'text-emerald-300' : 'text-gray-300'}>{r.rating || r.sentiment || 'No rating'}</span>
+                      <span className="ml-2 text-xs text-gray-500">
+                        {r.date.slice(0, 10)}
+                        {r.ticket_id ? `, ticket ${r.ticket_id}` : ''}
+                      </span>
+                      {r.comment && <span className="block text-xs text-gray-300">{r.comment}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })()}
         {(data.person.backups ?? []).length > 0 && (
           <div className="mt-3" data-testid="backup-detail">
             <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">Backups</h4>

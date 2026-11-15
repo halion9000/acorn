@@ -29,7 +29,7 @@ BACKUP_TOOLS = ("dropsuite", "datto-saas")
 EXPOSURE_TOOLS = ("threatmate", "liongard")
 # Tools that only SAY a mailbox is theirs (INKY: the mailboxes it has scanned mail for). They are attached to a person that another tool or the directory already knows; an address only they know (an alias, a
 # distribution list, a mailbox of someone who left) never becomes a person of its own.
-PRESENCE_TOOLS = ("inky",)
+PRESENCE_TOOLS = ("inky", "simplesat")
 # A Dropsuite mailbox with no backup in this long is stale.
 FRESH_HOURS = 48
 

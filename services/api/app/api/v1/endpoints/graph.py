@@ -20,6 +20,7 @@ from app.db.rls_scope import acting_as_tenant
 from app.models.alert import Alert
 from app.models.tenant import Tenant
 from app.services import graph_service
+from app.services.case_scope import case_scoped
 
 logger = logging.getLogger(__name__)
 
@@ -490,13 +491,12 @@ async def get_overview(
     "/attack-path/{case_id}",
     response_model=AttackPathResponse,
     summary="Get attack path graph for a case",
-    dependencies=[Depends(require_permission("alerts:read"))],
 )
 async def get_attack_path(
     case_id: str,
     db: DBSession,
+    current_user: Annotated[CurrentUser, Depends(case_scoped("alerts:read"))],
     max_depth: Annotated[int, Query(ge=1, le=10)] = 6,
-    current_user: CurrentUser = Depends(get_current_user),
 ) -> AttackPathResponse:
     """
     Traverse the knowledge graph from a Case node to reconstruct the full

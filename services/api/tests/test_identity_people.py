@@ -822,3 +822,16 @@ def test_a_mailbox_inky_has_not_been_seen_scanning_for_a_long_time_is_not_shown_
     assert all(
         r.vendor != "inky" for r in people[0].sources
     ), "a mailbox INKY has not been seen scanning for a long time is not shown as protected"
+
+
+def test_a_contact_who_answered_a_survey_gets_their_reviews_but_one_nobody_else_knows_is_not_a_person():
+    reviews = [{"date": "2026-10-08T10:00:00Z", "rating": "Great", "sentiment": "positive", "comment": "Fast!", "ticket_id": "509"}]
+    people = ip.build_people(
+        NAMES,
+        [ms(A, "amy@acme.com")],
+        [src(A, "simplesat", "amy@acme.com", details={"responses": 3, "reviews": reviews}), src(A, "simplesat", "stranger@elsewhere.com")],
+        NOW,
+    )
+    assert [p.email for p in people] == ["amy@acme.com"]
+    sat = [r for r in people[0].sources if r.vendor == "simplesat"]
+    assert len(sat) == 1 and sat[0].details["reviews"] == reviews and sat[0].details["responses"] == 3

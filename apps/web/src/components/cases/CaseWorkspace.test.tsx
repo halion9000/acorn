@@ -103,8 +103,8 @@ vi.mock('@/components/copilot/ContextualActions', () => ({
   ContextualActions: () => <div data-testid="contextual-actions" />,
 }));
 
-import { CaseWorkspace, pickLatestRun } from './CaseWorkspace';
-import { casesApi } from '@/lib/api';
+import { CaseWorkspace, ledgerRunView, pickLatestRun } from './CaseWorkspace';
+import { casesApi, ledgerApi } from '@/lib/api';
 
 const fakeCase: Case = {
   id: 'INC-001',
@@ -350,5 +350,37 @@ describe('an investigation made earlier', () => {
     expect(list).toHaveBeenCalledWith('INC-001');
     expect(await screen.findByText(/the agents service timed out/)).toBeInTheDocument();
     expect(screen.queryByText(/Use .Investigate with agent. in the header/)).toBeNull();
+  });
+
+  it('maps a ledger run and its events to what the panel shows: the status, the steps in order and the findings of each agent', () => {
+    const view = ledgerRunView(
+      { status: 'completed', error: null },
+      [
+        { seq: 3, ts: 't3', kind: 'done', agent: 'responder', summary: 'drafted actions', payload: { result: { summary: 'Reset the password', recommended_actions: ['Revoke sessions'] } } },
+        { seq: 1, ts: 't1', kind: 'step', agent: 'Recon Agent', summary: 'looked up the sign-in', payload: { iocs: [{ type: 'ip', value: '1.2.3.4' }], summary: 'Sign-in from a new country' } },
+        { seq: 2, ts: 't2', kind: 'step', agent: 'forensic', summary: 'timeline', payload: { note: 'nothing the panel knows' } },
+      ],
+    );
+    expect(view.status).toBe('completed');
+    expect(view.steps.map((x) => x.summary)).toEqual(['looked up the sign-in', 'timeline', 'drafted actions']);
+    expect((view.data.recon as { summary: string }).summary).toBe('Sign-in from a new country');
+    expect((view.data.responder as { recommended_actions: string[] }).recommended_actions).toEqual(['Revoke sessions']);
+    expect(view.data.forensic).toBeUndefined();
+    expect(ledgerRunView({ status: 'error', error: 'timed out' }, []).status).toBe('failed');
+    expect(ledgerRunView({ status: 'running', error: null }, []).status).toBe('running');
+  });
+
+  it('falls back to the investigation ledger when the agents service has no run, so a refresh no longer empties the tab', async () => {
+    Element.prototype.scrollIntoView = vi.fn(); // the steps feed scrolls itself into view; the test browser has no such method
+    vi.spyOn(casesApi, 'listInvestigations').mockResolvedValue({ runs: [] });
+    vi.spyOn(ledgerApi, 'listRuns').mockResolvedValue([
+      { id: 'old', case_id: 'INC-001', status: 'failed', started_at: '2026-11-01T00:00:00Z', completed_at: null, error: 'old', model_used: null, iterations: 0, total_tokens: 0, total_cost_usd: 0 },
+      { id: 'new', case_id: 'INC-001', status: 'failed', started_at: '2026-11-14T00:00:00Z', completed_at: null, error: 'the model timed out', model_used: null, iterations: 1, total_tokens: 0, total_cost_usd: 0 },
+    ]);
+    const events = vi.spyOn(ledgerApi, 'listEvents').mockResolvedValue({ items: [{ id: 'e1', run_id: 'new', seq: 1, ts: '2026-11-14T00:00:01Z', kind: 'step', agent: 'recon', summary: 'started reading the alert', payload: null, input_hash: null, output_hash: null, duration_ms: 5 }], total: 1, since: null, next_seq: null });
+    render(<CaseWorkspace caseId="INC-001" />);
+    await waitFor(() => expect(events).toHaveBeenCalledWith('new', expect.anything()));
+    expect(await screen.findByText(/the model timed out/)).toBeInTheDocument();
+    expect(screen.getByText(/started reading the alert/)).toBeInTheDocument();
   });
 });
