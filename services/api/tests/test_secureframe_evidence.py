@@ -145,3 +145,53 @@ async def test_the_dashboard_counts_the_secureframe_verdicts_as_control_health(t
     out = await with_db(tenant, work)
     assert out.health is not None and out.health.healthy == 2 and out.health.unhealthy == 1
     assert out.health.total > 3 and out.health.not_tested == out.health.total - 3
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_the_organizations_own_company_is_found_as_its_child_and_gets_the_same_control_health(tenant):
+    from app.db.rls_scope import acting_as_tenant
+
+    home, other = uuid.uuid4(), uuid.uuid4()
+    engine = create_async_engine(PG_URL, poolclass=NullPool)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            for tid, name in ((home, " Live Oak IT Partners "), (other, "Acme Dental")):
+                await conn.execute(
+                    text("insert into tenants (id, name, slug, parent_tenant_id) values (:i, :n, :s, :p)"),
+                    {"i": tid, "n": name, "s": f"sfh-{tid.hex[:8]}", "p": tenant},
+                )
+
+        async def work(db):
+            found = await se.home_client_id(db, tenant)
+            async with acting_as_tenant(db, found):
+                written = await se.sync(db, found, [req("NIST_CSF_2", "GV.OC-01", "healthy")], NOW)
+            await db.commit()
+            return found, written
+
+        found, written = await with_db(tenant, work)
+        assert found == home and written == {"written": 1}
+        async with engine.begin() as conn:
+            rows = (
+                await conn.execute(
+                    text(
+                        "select tenant_id, status from aisoc_compliance_evidence where control_id = 'GV.OC-01' and tenant_id in (:h, :o, :t)"
+                    ),
+                    {"h": home, "o": other, "t": tenant},
+                )
+            ).all()
+        assert [(r.tenant_id, r.status) for r in rows] == [
+            (home, "accepted")
+        ], "evidence is under the home client only: not the organization's other clients"
+
+        async def none(db):
+            return await se.home_client_id(db, other)
+
+        assert await with_db(tenant, none) is None, "a tenant with no such child has none"
+    finally:
+        async with engine.begin() as conn:
+            await conn.execute(text("set local session_replication_role = replica"))
+            await conn.execute(text("delete from aisoc_compliance_evidence where tenant_id = any(:t)"), {"t": [home, other]})
+            await conn.execute(text("delete from tenants where id = any(:t)"), {"t": [home, other]})
+        await engine.dispose()

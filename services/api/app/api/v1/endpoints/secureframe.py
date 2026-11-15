@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
+from app.db.rls_scope import acting_as_tenant
 from app.db.rls_sessions import adopt_tenant
 from app.models.secureframe_report import SecureframeHistory, SecureframeReport
 from app.services import secureframe_evidence
@@ -234,7 +235,14 @@ async def report_core_feed_secureframe(tenant_token: str, body: ReportIn, db: DB
         logger.warning("secureframe alerts not raised", exc_info=True)
     try:
         async with db.begin_nested():  # control health for our own organization; a failure here must not lose the report
-            await secureframe_evidence.sync(db, owner, [r.model_dump(mode="json") for r in body.report.requirements], datetime.now(UTC))
+            requirements = [r.model_dump(mode="json") for r in body.report.requirements]
+            now = datetime.now(UTC)
+            await secureframe_evidence.sync(db, owner, requirements, now)
+            # Compliance pages show the organization as a client of its own, "Live Oak IT Partners", whose evidence lives under that client's tenant: the same health goes there too.
+            home = await secureframe_evidence.home_client_id(db, owner)
+            if home is not None:
+                async with acting_as_tenant(db, home):
+                    await secureframe_evidence.sync(db, home, requirements, now)
     except Exception:  # noqa: BLE001
         logger.warning("secureframe evidence not written", exc_info=True)
     await db.commit()

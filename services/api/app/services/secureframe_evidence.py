@@ -52,6 +52,20 @@ def evidence_rows(requirements: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+HOME_CLIENT_NAME = "live oak it partners"
+
+
+async def home_client_id(db: Any, owner: Any) -> Any:
+    """The id of the owner's own company as a client (its child tenant named Live Oak IT Partners), or None when there is none."""
+    row = (
+        await db.execute(
+            text("SELECT id FROM tenants WHERE parent_tenant_id = :o AND lower(trim(name)) = :n ORDER BY created_at LIMIT 1"),
+            {"o": owner, "n": HOME_CLIENT_NAME},
+        )
+    ).first()
+    return row[0] if row else None
+
+
 async def sync(db: Any, tenant_id: Any, requirements: list[dict[str, Any]], now: datetime) -> dict[str, int]:
     """Replace the records this module made for the tenant with the ones for the report, leaving every other record alone. Returns how many records were written."""
     rows = evidence_rows(requirements)

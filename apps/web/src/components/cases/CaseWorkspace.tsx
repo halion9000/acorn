@@ -275,6 +275,33 @@ export function CaseWorkspace({ caseId }: { caseId: string }) {
 
   useEffect(() => () => { stopPolling(); closeWs(); }, [stopPolling, closeWs]);
 
+  // An investigation made earlier (here, or from the AI investigation on the alert) is shown when the case opens: the panel used to start empty every visit and say nothing had run.
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const list = await casesApi.listInvestigations(caseId);
+        const run = pickLatestRun(list.runs ?? []);
+        if (!run || !live) return;
+        const inv = await casesApi.getInvestigation(caseId, run);
+        if (!live) return;
+        setInvestigationRunId(run);
+        setInvestigationData(inv as Record<string, unknown>);
+        setInvestigationStatus(inv.status);
+        if (inv.audit_log) setLiveSteps(inv.audit_log);
+        if (inv.status === 'completed') {
+          const resp = await authFetch(`/api/v1/cases/${caseId}/investigations/${run}/report.md`);
+          if (resp.ok && live) setReportMd(await resp.text());
+        }
+      } catch {
+        // nothing earlier to show: the panel stays as it was
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [caseId]);
+
   /** Connect to the realtime service WebSocket for this run_id */
   const connectWs = useCallback((runId: string) => {
     closeWs();
@@ -975,6 +1002,14 @@ export function CaseWorkspace({ caseId }: { caseId: string }) {
 // ─── Investigation panel ──────────────────────────────────────────────────────
 
 type LiveStep = { kind: string; agent: string; summary: string; ts: string };
+
+/** The id of the newest run in a case's list (by start time when it has one, else the last listed), or null when there is none (pure). */
+export function pickLatestRun(runs: Array<{ run_id?: string; id?: string; started_at?: string; created_at?: string }>): string | null {
+  const rows = runs.map((r, i) => ({ id: r.run_id ?? r.id ?? '', at: Date.parse(r.started_at ?? r.created_at ?? '') || 0, i })).filter((r) => r.id);
+  if (rows.length === 0) return null;
+  rows.sort((a, b) => b.at - a.at || b.i - a.i);
+  return rows[0]!.id;
+}
 
 function InvestigationPanel({
   status,

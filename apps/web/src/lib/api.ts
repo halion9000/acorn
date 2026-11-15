@@ -3135,6 +3135,9 @@ export const casesApi = {
       },
     ),
 
+  /** The investigation runs already made on a case (newest first as the agents service keeps them); empty when none, or when the agents service is down. */
+  listInvestigations: (caseId: string) => request<{ runs?: Array<{ run_id?: string; id?: string; status?: string; started_at?: string; created_at?: string }> }>(`/api/v1/cases/${caseId}/investigations`),
+
   getInvestigation: (caseId: string, runId: string) =>
     request<{
       run_id: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import type { AttackChainTimeline, Case } from '@/lib/api';
 
 // We mock SWR rather than the real network layer so the test stays
@@ -103,7 +103,8 @@ vi.mock('@/components/copilot/ContextualActions', () => ({
   ContextualActions: () => <div data-testid="contextual-actions" />,
 }));
 
-import { CaseWorkspace } from './CaseWorkspace';
+import { CaseWorkspace, pickLatestRun } from './CaseWorkspace';
+import { casesApi } from '@/lib/api';
 
 const fakeCase: Case = {
   id: 'INC-001',
@@ -323,5 +324,31 @@ describe('CaseWorkspace', () => {
       render(<CaseWorkspace caseId="INC-001" />);
       expect(readActiveWindow()).toBe('24h');
     });
+  });
+});
+
+describe('an investigation made earlier', () => {
+  beforeEach(() => {
+    swrState.caseData = fakeCase;
+    swrState.caseError = undefined;
+    searchParamsState.params = new URLSearchParams('tab=investigation');
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('picks the newest run, by start time when the list has one', () => {
+    expect(pickLatestRun([{ run_id: 'old', started_at: '2026-11-01T00:00:00Z' }, { run_id: 'new', started_at: '2026-11-14T00:00:00Z' }, { id: 'mid', created_at: '2026-11-10T00:00:00Z' }])).toBe('new');
+    expect(pickLatestRun([{ run_id: 'a' }, { run_id: 'b' }])).toBe('b');
+    expect(pickLatestRun([])).toBeNull();
+    expect(pickLatestRun([{}])).toBeNull();
+  });
+
+  it('is loaded when the case opens, so the Investigation tab is not empty after the AI investigation already ran', async () => {
+    const list = vi.spyOn(casesApi, 'listInvestigations').mockResolvedValue({ runs: [{ run_id: 'run-9', started_at: '2026-11-14T00:00:00Z' }] });
+    const get = vi.spyOn(casesApi, 'getInvestigation').mockResolvedValue({ run_id: 'run-9', case_id: 'INC-001', status: 'failed', error: 'the agents service timed out' });
+    render(<CaseWorkspace caseId="INC-001" />);
+    await waitFor(() => expect(get).toHaveBeenCalledWith('INC-001', 'run-9'));
+    expect(list).toHaveBeenCalledWith('INC-001');
+    expect(await screen.findByText(/the agents service timed out/)).toBeInTheDocument();
+    expect(screen.queryByText(/Use .Investigate with agent. in the header/)).toBeNull();
   });
 });
