@@ -25,6 +25,7 @@ export function toggled(current: string[], tool: string, on: boolean): string[] 
 export function ToolExclusions({ clientId, onLoaded, onChanged }: { clientId: string; onLoaded: (excluded: string[]) => void; onChanged: (excluded: string[]) => void }) {
   const [choices, setChoices] = useState<string[]>([]);
   const [excluded, setExcluded] = useState<string[]>([]);
+  const [auto, setAuto] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +36,12 @@ export function ToolExclusions({ clientId, onLoaded, onChanged }: { clientId: st
     authFetch(`/api/v1/client-posture/${encodeURIComponent(clientId)}/tool-exclusions`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`The API answered ${res.status}`);
-        const body = (await res.json()) as { tools: string[]; choices: string[] };
+        const body = (await res.json()) as { tools: string[]; choices: string[]; auto?: string[] };
         if (!live) return;
         const tools = Array.isArray(body.tools) ? body.tools : [];
         setChoices(orderedChoices(Array.isArray(body.choices) ? body.choices : []));
         setExcluded(tools);
+        setAuto(Array.isArray(body.auto) ? body.auto : []);
         setLoaded(true);
         setError(null);
         onLoaded(tools);
@@ -68,8 +70,9 @@ export function ToolExclusions({ clientId, onLoaded, onChanged }: { clientId: st
         const detail = (await res.json().catch(() => null)) as { detail?: string } | null;
         throw new Error(res.status === 403 ? "You need permission to manage clients to change this." : (detail?.detail ?? `The API answered ${res.status}`));
       }
-      const body = (await res.json()) as { tools: string[] };
+      const body = (await res.json()) as { tools: string[]; auto?: string[] };
       setExcluded(body.tools);
+      setAuto(Array.isArray(body.auto) ? body.auto : []);
       onChanged(body.tools);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");
@@ -83,7 +86,7 @@ export function ToolExclusions({ clientId, onLoaded, onChanged }: { clientId: st
     <section aria-label="Tools this client does not use" className="print:hidden" data-testid="tool-exclusions">
       <h3 className="mb-1 text-sm uppercase text-gray-500">Tools this client does not use</h3>
       <p className="mb-2 text-xs text-gray-500">
-        A ticked tool is never reported as missing for this client: not on the Devices page, not here, not in the fleet boards or the score, and its checks raise no alerts.
+        A ticked tool is never reported as missing for this client: not on the Devices page, not here, not in the fleet boards or the score, and its checks raise no alerts. A tool this client has no devices from is ticked automatically, and unticked again by itself if a device appears.
       </p>
       <ul className="flex flex-wrap gap-x-4 gap-y-1">
         {choices.map((tool) => (
@@ -91,6 +94,11 @@ export function ToolExclusions({ clientId, onLoaded, onChanged }: { clientId: st
             <label className="flex items-center gap-2 text-sm text-gray-200">
               <input type="checkbox" checked={excluded.includes(tool)} disabled={saving} onChange={(e) => void change(tool, e.target.checked)} />
               {vendorLabel(tool)}
+              {auto.includes(tool) && excluded.includes(tool) && (
+                <span className="text-xs text-gray-500" title="This client has no devices from this tool, so it was ticked automatically. Untick it if the client does use it; it will not be ticked again.">
+                  (automatic: no devices)
+                </span>
+              )}
             </label>
           </li>
         ))}

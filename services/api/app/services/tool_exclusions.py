@@ -54,6 +54,126 @@ def check_is_excluded(source: str, excluded: frozenset[str]) -> bool:
     return TOOL_CHECK_SOURCES.get(source, source) in excluded
 
 
+# ---- ticked by itself: a client with nothing from a tool ---------------------------------------------------------------------------------------------------
+
+AUTO_KEY = "tool_exclusions_auto"
+DECLINED_KEY = "tool_exclusions_declined"
+
+
+def _names(settings: Any, key: str) -> frozenset[str]:
+    raw = (settings or {}).get(key) if isinstance(settings, dict) else None
+    return frozenset(v for v in raw if isinstance(v, str) and v in EXCLUDABLE) if isinstance(raw, list) else frozenset()
+
+
+def auto_of_settings(settings: Any) -> frozenset[str]:
+    """The tools that are ticked because the system ticked them (a client with nothing from them), as opposed to ticked by a person."""
+    return _names(settings, AUTO_KEY) & of_settings(settings)
+
+
+def auto_changes(
+    settings: Any, counts: dict[str, int], linked: set[str], total_devices: int, working_elsewhere: set[str]
+) -> dict[str, Any] | None:
+    """The tenant settings after the system looks at one client, or None when nothing changes (pure).
+
+    A tool is ticked by itself when the client has NO device from it, is not linked to any of its organizations, and the tool is clearly working (it reports devices for some other client), and the client has
+    devices from other tools (so a client that has not synced yet is not judged). A person's own tick is never touched, and a tool the person unticked after the system ticked it is never ticked again.
+    A tool the system ticked is unticked by itself as soon as the client has a device from it or is linked to it."""
+    excluded = set(of_settings(settings))
+    auto = set(auto_of_settings(settings))
+    declined = set(_names(settings, DECLINED_KEY))
+    before = (set(excluded), set(auto))
+    for tool in EXCLUDABLE:
+        absent = counts.get(tool, 0) == 0 and tool not in linked
+        if tool in auto and not absent:
+            excluded.discard(tool)
+            auto.discard(tool)
+        elif absent and tool not in excluded and tool not in declined and tool in working_elsewhere and total_devices > 0:
+            excluded.add(tool)
+            auto.add(tool)
+    if (excluded, auto) == before:
+        return None
+    out = dict(settings or {})
+    if excluded:
+        out["tool_exclusions"] = sorted(excluded)
+    else:
+        out.pop("tool_exclusions", None)
+    if auto:
+        out[AUTO_KEY] = sorted(auto)
+    else:
+        out.pop(AUTO_KEY, None)
+    return out
+
+
+def with_person_choice(settings: Any, vendors: list[str]) -> dict[str, Any]:
+    """The settings after a person sets the list: like ``with_exclusions``, plus the system's memory. A tool the system had ticked and the person unticked is remembered as declined (never ticked by itself again);
+    a tool the person ticks is theirs (no longer automatic)."""
+    chosen = set(normalize(vendors))
+    before_auto = auto_of_settings(settings)
+    declined = (set(_names(settings, DECLINED_KEY)) | (before_auto - chosen)) - chosen
+    out = with_exclusions(settings, sorted(chosen))
+    keep_auto = before_auto & chosen
+    for key, values in ((AUTO_KEY, keep_auto), (DECLINED_KEY, declined)):
+        if values:
+            out[key] = sorted(values)
+        else:
+            out.pop(key, None)
+    return out
+
+
+async def reconcile_auto(db: Any, owner: Any, tenant_ids: list[Any]) -> int:
+    """Look at each client and tick (or untick) the tools it has nothing from, by itself. Returns how many clients changed. Never raises: it must not fail the sync or the page that triggered it."""
+    import logging  # noqa: PLC0415
+
+    from sqlalchemy import distinct, func, select  # noqa: PLC0415
+
+    from app.db.rls_scope import acting_as_tenant, cross_tenant_reads  # noqa: PLC0415
+    from app.models.client_alias import ClientAlias  # noqa: PLC0415
+    from app.models.device import DeviceSource  # noqa: PLC0415
+    from app.models.tenant import Tenant  # noqa: PLC0415
+
+    changed = 0
+    try:
+        async with cross_tenant_reads(db):
+            working = set(
+                (await db.execute(select(distinct(DeviceSource.vendor)).where(DeviceSource.vendor.in_(EXCLUDABLE)))).scalars().all()
+            )
+        rows = (await db.execute(select(Tenant).where(Tenant.id.in_(tenant_ids), Tenant.parent_tenant_id == owner))).scalars().all()
+        for tenant in rows:
+            aliases = set(
+                (
+                    await db.execute(
+                        select(ClientAlias.vendor).where(
+                            ClientAlias.tenant_id == owner, ClientAlias.child_tenant_id == tenant.id, ClientAlias.ignored.is_(False)
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            async with acting_as_tenant(db, tenant.id):
+                counts = {
+                    k: int(v)
+                    for k, v in (
+                        await db.execute(
+                            select(DeviceSource.vendor, func.count(distinct(DeviceSource.device_id)))
+                            .where(DeviceSource.tenant_id == tenant.id)
+                            .group_by(DeviceSource.vendor)
+                        )
+                    ).all()
+                }
+            total = sum(counts.values())
+            new = auto_changes(tenant.settings, counts, aliases & set(EXCLUDABLE), total, working)
+            if new is not None:
+                tenant.settings = new
+                changed += 1
+        if changed:
+            await db.commit()
+    except Exception:  # noqa: BLE001
+        logging.getLogger("aisoc.tool_exclusions").warning("automatic tool exclusions failed", exc_info=True)
+        return 0
+    return changed
+
+
 # ---- the reverse: marked as not used, but it is there ----------------------------------------------------------------------------------------------------
 
 RULE_ID = "aisoc-tool-excluded-but-present"

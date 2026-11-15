@@ -160,11 +160,11 @@ describe('toolCheckEntries', () => {
 
 describe('tools the client does not use', () => {
   const choices = ['addigy', 'fieldeffect', 'huntress', 'screenconnect'];
-  function serveWith(excluded: string[]) {
+  function serveWith(excluded: string[], auto: string[] = []) {
     authFetch.mockImplementation((url?: string, init?: { method?: string }) => {
       const u = url ?? '';
       if (u.includes('/mssp/children')) return Promise.resolve(reply([{ id: 'c1', name: 'Acme Dental' }]));
-      if (u.endsWith('/tool-exclusions')) return Promise.resolve(reply({ tools: excluded, choices }));
+      if (u.endsWith('/tool-exclusions')) return Promise.resolve(reply({ tools: excluded, choices, auto }));
       return Promise.resolve(reply(posture()));
     });
   }
@@ -188,5 +188,16 @@ describe('tools the client does not use', () => {
     await within(page).findByLabelText('Huntress');
     expect(within(page).getByRole('link', { name: /Not in Huntress: 2/ })).toHaveAttribute('href', '/devices?client=c1&missing=huntress');
     expect(within(page).queryByText('Not used')).toBeNull();
+  });
+
+  it('says which ticks the system made by itself, and only on a tool that is ticked', async () => {
+    serveWith(['huntress', 'screenconnect'], ['huntress']);
+    render(<ClientPosture />);
+    await screen.findByRole('option', { name: 'Acme Dental' });
+    await userEvent.selectOptions(screen.getByLabelText('Client'), 'c1');
+    const box = await screen.findByTestId('tool-exclusions');
+    expect(within(box).getAllByText('(automatic: no devices)')).toHaveLength(1);
+    expect(within(within(box).getByLabelText(/Huntress/).closest('li')!).getByText('(automatic: no devices)')).toBeTruthy();
+    expect(within(within(box).getByLabelText(/ScreenConnect/).closest('li')!).queryByText('(automatic: no devices)')).toBeNull();
   });
 });

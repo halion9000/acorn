@@ -55163,6 +55163,11 @@ components:
             type: string
           type: array
           title: Choices
+        auto:
+          items:
+            type: string
+          type: array
+          title: Auto
       type: object
       required:
       - tools

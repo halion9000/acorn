@@ -1594,6 +1594,9 @@ async def apply_devices(db: Any, owner: uuid.UUID, report: DevicesReport) -> Dev
                 accepted += 1
     # A record that followed its machine is taken away from the client it used to sit under.
     await device_follow.remove_left_behind(db, children, kept, lambda tid: acting_as_tenant(db, tid))
+    await tool_exclusions.reconcile_auto(
+        db, owner, list(by_tenant)
+    )  # tick, by itself, the tools a client has nothing from (and untick them when something appears)
     await tool_exclusions.run_excluded_present(
         db, owner, list(by_tenant)
     )  # a tool marked as not used for a client that is reporting devices for it

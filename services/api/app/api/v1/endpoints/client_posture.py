@@ -422,6 +422,8 @@ class ToolExclusionsIn(BaseModel):
 class ToolExclusionsOut(BaseModel):
     tools: list[str]
     choices: list[str]
+    # The ticked tools the system ticked by itself because the client has nothing from them.
+    auto: list[str] = Field(default_factory=list)
 
 
 @router.get(
@@ -433,7 +435,18 @@ async def get_tool_exclusions(
     client_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
 ) -> ToolExclusionsOut:
     await _client_of_owner(db, current_user.tenant_id, client_id)
-    return ToolExclusionsOut(tools=sorted(await _excluded_for(db, client_id)), choices=list(tool_exclusions.EXCLUDABLE))
+    if client_id != current_user.tenant_id and await tool_exclusions.reconcile_auto(db, current_user.tenant_id, [client_id]):
+        from app.api.v1.endpoints.devices import forget_loaded  # noqa: PLC0415
+
+        forget_loaded()
+        fleet_cache.clear()
+    tenant = await db.get(Tenant, client_id)
+    settings = getattr(tenant, "settings", None)
+    return ToolExclusionsOut(
+        tools=sorted(tool_exclusions.of_settings(settings)),
+        choices=list(tool_exclusions.EXCLUDABLE),
+        auto=sorted(tool_exclusions.auto_of_settings(settings)),
+    )
 
 
 @router.put(
@@ -460,7 +473,7 @@ async def put_tool_exclusions(
     if tenant is None:
         raise HTTPException(status_code=404, detail="Client not found")
     before = sorted(tool_exclusions.of_settings(tenant.settings))
-    tenant.settings = tool_exclusions.with_exclusions(tenant.settings, chosen)
+    tenant.settings = tool_exclusions.with_person_choice(tenant.settings, chosen)
     await db.commit()
     if before != chosen:
         await emit_audit(
@@ -483,7 +496,9 @@ async def put_tool_exclusions(
             db, owner, [client_id]
         )  # marking a tool as not used while it reports devices is itself worth an alert
         await db.commit()
-    return ToolExclusionsOut(tools=chosen, choices=list(tool_exclusions.EXCLUDABLE))
+    return ToolExclusionsOut(
+        tools=chosen, choices=list(tool_exclusions.EXCLUDABLE), auto=sorted(tool_exclusions.auto_of_settings(tenant.settings))
+    )
 
 
 async def _client_of_owner(db: Any, owner: uuid.UUID, client_id: uuid.UUID) -> None:
