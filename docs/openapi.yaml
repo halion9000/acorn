@@ -2457,6 +2457,198 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/profitability/analysis:
+    get:
+      tags:
+      - finance
+      summary: Profitability Analysis
+      description: 'Everything beyond revenue less labor for one month: the full cost-to-net-income
+        table, new clients, the summary by industry, hours by function and utilization,
+        and the twelve-month ranking. Costs that
+
+        have not been entered are zero and named in ``report.missing``. ``received_at``
+        is None until CORE has sent the first Halo summary.'
+      operationId: profitability_analysis_api_v1_finance_profitability_analysis_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: month
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^\d{4}-\d{2}$
+          - type: 'null'
+          title: Month
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Profitability Analysis Api V1 Finance Profitability
+                  Analysis Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/profitability/inputs:
+    get:
+      tags:
+      - finance
+      summary: Profitability Inputs
+      description: The typed or synced cost entries, the client master and the settings.
+      operationId: profitability_inputs_api_v1_finance_profitability_inputs_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Profitability Inputs Api V1 Finance Profitability
+                  Inputs Get
+      security:
+      - HTTPBearer: []
+  /api/v1/finance/profitability/costs:
+    put:
+      tags:
+      - finance
+      summary: Save Cost
+      operationId: save_cost_api_v1_finance_profitability_costs_put
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostIn'
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - finance
+      summary: Delete Cost
+      operationId: delete_cost_api_v1_finance_profitability_costs_delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: month
+        in: query
+        required: true
+        schema:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+      - name: category
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 40
+          title: Category
+      - name: client_name
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 200
+          default: ''
+          title: Client Name
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/profitability/clients:
+    put:
+      tags:
+      - finance
+      summary: Save Client Master
+      operationId: save_client_master_api_v1_finance_profitability_clients_put
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientMasterIn'
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - finance
+      summary: Delete Client Master
+      operationId: delete_client_master_api_v1_finance_profitability_clients_delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_name
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+          title: Client Name
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/profitability/settings:
+    put:
+      tags:
+      - finance
+      summary: Save Finance Settings
+      operationId: save_finance_settings_api_v1_finance_profitability_settings_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__finance__SettingsIn'
+        required: true
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/reports/ticket-metrics:
     get:
       tags:
@@ -35495,6 +35687,34 @@ components:
       - id
       - name
       title: ClientItem
+    ClientMasterIn:
+      properties:
+        client_name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Client Name
+        industry:
+          type: string
+          maxLength: 120
+          title: Industry
+          default: ''
+        non_profit:
+          type: boolean
+          title: Non Profit
+          default: false
+        target_margin:
+          anyOf:
+          - type: number
+            maximum: 100.0
+            minimum: -100.0
+          - type: string
+          - type: 'null'
+          title: Target Margin
+      type: object
+      required:
+      - client_name
+      title: ClientMasterIn
     ClientPosture:
       properties:
         client_id:
@@ -37309,6 +37529,39 @@ components:
       - total_runs
       - avg_cost_per_run_usd
       title: CostHeadline
+    CostIn:
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        category:
+          type: string
+          pattern: ^(payroll_cogs|addon_software|support_software|travel|equipment|hardware|sales_marketing|overhead)$
+          title: Category
+        client_name:
+          type: string
+          maxLength: 200
+          title: Client Name
+          default: ''
+        amount:
+          anyOf:
+          - type: number
+            maximum: 100000000.0
+            minimum: -100000000.0
+          - type: string
+          title: Amount
+        note:
+          type: string
+          maxLength: 300
+          title: Note
+          default: ''
+      type: object
+      required:
+      - month
+      - category
+      - amount
+      title: CostIn
     CountRow:
       properties:
         source:
@@ -63084,6 +63337,19 @@ components:
       title: IndicatorOut
       description: The web console's ThreatIndicator (apps/web/src/lib/api.ts), plus
         the raw provider result.
+    app__api__v1__endpoints__finance__SettingsIn:
+      properties:
+        available_hours_per_month:
+          anyOf:
+          - type: number
+            maximum: 744.0
+            exclusiveMinimum: 0.0
+          - type: string
+          title: Available Hours Per Month
+      type: object
+      required:
+      - available_hours_per_month
+      title: SettingsIn
     app__api__v1__endpoints__governance__ItemIn:
       properties:
         kind:

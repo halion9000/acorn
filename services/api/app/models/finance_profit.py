@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -30,4 +30,41 @@ class FinanceLaborRate(Base):
     key: Mapped[str] = mapped_column(String, primary_key=True, default="")
     hourly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     updated_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
+class FinanceCostEntry(Base):
+    """One cost amount for a month, category and optional client (migration 194)."""
+
+    __tablename__ = "finance_cost_entries"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    month: Mapped[str] = mapped_column(String, primary_key=True)
+    category: Mapped[str] = mapped_column(String, primary_key=True)
+    client_key: Mapped[str] = mapped_column(String, primary_key=True, default="")
+    source: Mapped[str] = mapped_column(String, primary_key=True, default="manual")
+    client_name: Mapped[str] = mapped_column(String, nullable=False, default="")
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    note: Mapped[str] = mapped_column(String, nullable=False, default="")
+    updated_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
+class FinanceClientMaster(Base):
+    __tablename__ = "finance_client_master"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    client_key: Mapped[str] = mapped_column(String, primary_key=True)
+    client_name: Mapped[str] = mapped_column(String, nullable=False)
+    industry: Mapped[str] = mapped_column(String, nullable=False, default="")
+    non_profit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    target_margin: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
+class FinanceSettings(Base):
+    __tablename__ = "finance_settings"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    available_hours_per_month: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False, default=Decimal("160"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)

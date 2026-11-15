@@ -334,6 +334,7 @@ _UNGRANTED_PERMISSIONS = frozenset(
         "cases:work",
         "proposals:log",
         "billing:view",
+        "metrics:view",
         "identities:respond",
         "identities:bec",
         "inventory:write",
@@ -406,6 +407,8 @@ def known_permissions() -> frozenset[str]:
 # `billing:view` (what each tool counts for each client, the changes, billed versus counted, the data quality and last-reported views: the GET routes under /billing) was
 # split out of `alerts:read`, so a role can be given the licence and count pages without the alerts, or the alerts without these pages once the owner removes the implication
 # for that role. Everything that held `alerts:read` still reads these pages exactly as before; a holder of `billing:view` alone can read them and nothing else.
+# `metrics:view` (the ticket metrics and customer satisfaction under /reports/ticket-metrics, with the written comments customers left) was split out of `reports:read` the same way: everything that held
+# `reports:read` still reads them, and a holder of `metrics:view` alone can read them and nothing else (CORE's key holds only this, so its agents can use the numbers and the comments without the other reports).
 IMPLIED_BY: dict[str, tuple[str, ...]] = {
     "hunts:read": ("lake:query",),
     "intel:read": ("threat_intel:read",),
@@ -415,6 +418,7 @@ IMPLIED_BY: dict[str, tuple[str, ...]] = {
     "cases:work": ("cases:write",),
     "proposals:log": ("cases:write",),
     "billing:view": ("alerts:read",),
+    "metrics:view": ("reports:read",),
     "inventory:checkout": (
         "inventory:write",
     ),  # checking a device out and in: held by the technician roles; administrators hold it through inventory:write

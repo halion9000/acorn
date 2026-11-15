@@ -140,6 +140,8 @@ CIPHER_CALLS = [
     ("aisoc_billing_changes", "GET", "/billing/changes", ["days", "limit", "client_id", "source"], None, False),
     ("aisoc_billing_reconcile", "GET", "/billing/reconcile", ["include_matches", "limit", "min_days"], None, False),
     ("aisoc_billing_map", "GET", "/billing/map", [], None, False),
+    ("aisoc_ticket_metrics", "GET", "/reports/ticket-metrics", ["months", "client_id"], None, False),
+    ("aisoc_csat", "GET", "/reports/ticket-metrics/csat", ["months", "company"], None, False),
     ("aisoc_data_quality", "GET", "/billing/data-quality", ["limit"], None, False),
     ("aisoc_last_reported", "GET", "/billing/last-reported", ["only_silent", "limit"], None, False),
     (
@@ -298,7 +300,7 @@ def test_the_page_size_cap_is_at_least_what_core_sends(path):
 
 def test_the_table_covers_all_fifty_three_tools():
     tools = {re.sub(r" \(.*\)$", "", name) for name in CALL_IDS}
-    assert len(tools) == 87, sorted(tools)
+    assert len(tools) == 89, sorted(tools)
 
 
 READ_ONLY_TOOLS = [c for c in CIPHER_CALLS if c[1] == "GET"]
@@ -369,7 +371,7 @@ def test_every_tool_in_the_contract_is_a_get():
 
 def test_the_contract_has_no_tool_listed_twice():
     names = [r["tool"] for r in CONTRACT]
-    assert len(names) == len(set(names)) == 69
+    assert len(names) == len(set(names)) == 71
 
 
 def test_the_copy_is_the_same_as_the_file_in_the_core_checkout_when_one_is_next_to_this_repo():
@@ -564,6 +566,8 @@ ESTATE_TOOLS = [
     "aisoc_billing_changes",
     "aisoc_billing_reconcile",
     "aisoc_billing_map",
+    "aisoc_ticket_metrics",
+    "aisoc_csat",
     "aisoc_data_quality",
     "aisoc_last_reported",
     "aisoc_list_people",
@@ -579,7 +583,8 @@ def test_an_estate_tool_is_a_get_that_needs_exactly_alerts_read_which_the_key_al
 
     needed = set(required_permissions(_route(method, path)))
     # The billing pages need billing:view, which alerts:read implies: the key still holds what they need and gains nothing.
-    assert method == "GET" and len(needed) == 1 and needed <= {"alerts:read", "billing:view"}, f"{name}: {method} {path}"
+    # The ticket metrics and satisfaction pages need metrics:view, which CORE's key holds on its own (it does not hold reports:read).
+    assert method == "GET" and len(needed) == 1 and needed <= {"alerts:read", "billing:view", "metrics:view"}, f"{name}: {method} {path}"
     assert "alerts:read" in CORE_KEY_SCOPES and all(
         permission_in(CORE_KEY_SCOPES, p) for p in needed
     ), f"{name}: the key must already hold {needed}"

@@ -71,6 +71,8 @@ CORE_KEY_NAME = "core-hud"
 # in-place sync below removes that from an existing key, same secret.)
 # Adding a scope here also widens the key on a deployment that already has it:
 # _ensure_key syncs an existing key's scopes in place (same secret).
+# metrics:view is the read-only permission for the ticket metrics and customer satisfaction (GET /reports/ticket-metrics and /csat, including the written comments); it is split out of reports:read the same way, so
+# the key does not hold the other reports.
 # proposals:log is the one-route permission for POST /agent-proposals (the agents' proposal log); it is split out of cases:write the same way.
 CORE_KEY_SCOPES = [
     "alerts:read",
@@ -78,6 +80,7 @@ CORE_KEY_SCOPES = [
     "cases:read",
     "cases:work",
     "proposals:log",
+    "metrics:view",
     "connectors:view",
     "rules:view",
     "hunts:read",

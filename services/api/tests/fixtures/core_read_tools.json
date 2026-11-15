@@ -877,6 +877,38 @@
     "numbers": {}
   },
   {
+    "tool": "aisoc_ticket_metrics",
+    "method": "GET",
+    "path": "/reports/ticket-metrics",
+    "query": [
+      "months",
+      "client_id"
+    ],
+    "enums": {},
+    "numbers": {
+      "months": {
+        "min": 1,
+        "max": 12
+      }
+    }
+  },
+  {
+    "tool": "aisoc_csat",
+    "method": "GET",
+    "path": "/reports/ticket-metrics/csat",
+    "query": [
+      "months",
+      "company"
+    ],
+    "enums": {},
+    "numbers": {
+      "months": {
+        "min": 1,
+        "max": 12
+      }
+    }
+  },
+  {
     "tool": "aisoc_data_quality",
     "method": "GET",
     "path": "/billing/data-quality",

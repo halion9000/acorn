@@ -32,6 +32,7 @@ NEW = [
     "rules:view",
     "hunts:read",
     "intel:read",
+    "metrics:view",
 ]
 OWNER = uuid.uuid4()
 OTHER_TENANT = uuid.uuid4()
@@ -147,7 +148,8 @@ class TestAnExistingKey:
         assert (
             "'core-hud'" in message
             and "same secret" in message
-            and "['alerts:triage', 'cases:work', 'connectors:view', 'hunts:read', 'intel:read', 'proposals:log', 'rules:view']" in message
+            and "['alerts:triage', 'cases:work', 'connectors:view', 'hunts:read', 'intel:read', 'metrics:view', 'proposals:log', 'rules:view']"
+            in message
             and "removed ['alerts:write', 'cases:write', 'connectors:read']" in message
         )
 

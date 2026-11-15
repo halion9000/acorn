@@ -1571,8 +1571,9 @@
     "needs": "hal",
     "area": "Sales and Finance",
     "key": "rw-profitability",
-    "title": "Sales and Finance > Profitability: client profit by month from QuickBooks, Halo hours and burdened labor rates",
-    "detail": "Version 1 built (Halo only): Sales and Finance > Profitability shows per client per month revenue (Halo invoices before tax), hours, labor cost at a rate per agent, team or default (65.00), and what is left after labor, with unmatched hours, CSV and rates. Still to add: QuickBooks cost lines (software bills, hardware, travel, payroll true-up), overhead and sales and marketing allocation, industry and size summaries, net income. Needs Hal: burdened rates by role (until then the 65.00 default), hardware COGS source, client master fields."
+    "title": "Sales and Finance > Profitability and Net income: client profit by month from Halo, typed or QuickBooks costs, and the finance workbook's other sheets",
+    "detail": "Built: Profitability (Halo revenue, hours, labor at a rate per agent, team or default 65.00, what is left after labor) and Net income with six tabs: revenue to net income per client (direct labor, payroll true-up, add-on and support software, travel, equipment, hardware, sales and marketing split across new clients, overhead), new clients, by industry, hours and utilization, a twelve-month ranking with size tiers and the 20% target, and an Inputs tab for the costs, the client master and available hours. Costs are typed until QuickBooks is connected; a missing cost counts as zero and is named. Still to add: the QuickBooks sync that fills the cost lines, and spreading by monthly recurring revenue instead of invoiced revenue.",
+    "note": "Needs from Hal: burdened hourly rates by role (until then the 65.00 default), where hardware cost comes from, and the industry and non-profit status of each client (typed on the Inputs tab)."
   },
   {
     "status": "not_started",
@@ -1612,6 +1613,7 @@
     "area": "Sales and Finance",
     "key": "qbo-live-check",
     "title": "QuickBooks Online: authorize and test the new connector live",
-    "detail": "Create the Intuit app keys, authorize once in the OAuth Playground, save the four settings in CORE, then I read one profit and loss by customer to check the shapes."
+    "detail": "Create the Intuit app keys, authorize once in the OAuth Playground, save the four settings in CORE, then I read one profit and loss by customer to check the shapes.",
+    "note": "Needs Hal: the Intuit app keys and the one-time authorization; then the connector is read once against the real account."
   }
 ]

@@ -1,5 +1,5 @@
 """Ticket metrics (the Rewst metric dashboards, rebuilt): created and resolved tickets, first response, tickets by type and by agent, and what is open, for all clients or one, from the HaloPSA summary CORE
-sends about once a day. Read with ``reports:read``."""
+sends about once a day. Read with ``metrics:view`` (``reports:read`` includes it)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from app.services import ticket_metrics as tm
 router = APIRouter(prefix="/reports/ticket-metrics", tags=["reports"])
 
 
-@router.get("", dependencies=[Depends(require_permission("reports:read"))])
+@router.get("", dependencies=[Depends(require_permission("metrics:view"))])
 async def ticket_metrics(
     user: AuthUser,
     db: DBSession,
@@ -37,7 +37,7 @@ async def ticket_metrics(
     }
 
 
-@router.get("/csat", dependencies=[Depends(require_permission("reports:read"))])
+@router.get("/csat", dependencies=[Depends(require_permission("metrics:view"))])
 async def csat(
     user: AuthUser,
     db: DBSession,

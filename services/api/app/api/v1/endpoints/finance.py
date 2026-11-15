@@ -19,11 +19,12 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.billing import BILLED_SOURCE, _all_client_counts
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.finance_price import FinanceItemPrice
-from app.models.finance_profit import FinanceLaborRate, FinanceProfitSnapshot
+from app.models.finance_profit import FinanceClientMaster, FinanceCostEntry, FinanceLaborRate, FinanceProfitSnapshot, FinanceSettings
 from app.services import csv_export
 from app.services import finance as fin
 from app.services import finance_halo as fh
 from app.services import profitability as profit
+from app.services import profitability_full as pf
 from app.services.audit import emit_audit
 
 router = APIRouter(prefix="/finance", tags=["finance"])
@@ -289,6 +290,287 @@ async def delete_labor_rate(
         resource="finance_labor_rate",
         resource_id=f"{scope}:{key}",
         changes={"scope": scope, "key": key},
+        request=request,
+    )
+    await db.commit()
+
+
+# ---- The full model: cost inputs, client master, analysis ----------------------------------------------------------------------------------------------------
+
+
+class CostIn(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    category: str = Field(pattern="^(payroll_cogs|addon_software|support_software|travel|equipment|hardware|sales_marketing|overhead)$")
+    client_name: str = Field(default="", max_length=200)
+    amount: Decimal = Field(ge=-100_000_000, le=100_000_000, max_digits=14, decimal_places=2)
+    note: str = Field(default="", max_length=300)
+
+
+class ClientMasterIn(BaseModel):
+    client_name: str = Field(min_length=1, max_length=200)
+    industry: str = Field(default="", max_length=120)
+    non_profit: bool = False
+    target_margin: Decimal | None = Field(default=None, ge=-100, le=100, max_digits=5, decimal_places=2)
+
+
+class SettingsIn(BaseModel):
+    available_hours_per_month: Decimal = Field(gt=0, le=744, max_digits=6, decimal_places=2)
+
+
+async def _costs(db: DBSession, tenant: Any) -> list[dict[str, Any]]:
+    rows = (await db.execute(select(FinanceCostEntry).where(FinanceCostEntry.tenant_id == tenant))).scalars().all()
+    return [
+        {
+            "month": r.month,
+            "category": r.category,
+            "client_key": r.client_key,
+            "client_name": r.client_name,
+            "source": r.source,
+            "amount": r.amount,
+            "note": r.note,
+        }
+        for r in sorted(rows, key=lambda r: (r.month, r.category, r.client_key))
+    ]
+
+
+async def _master(db: DBSession, tenant: Any) -> dict[str, dict[str, Any]]:
+    rows = (await db.execute(select(FinanceClientMaster).where(FinanceClientMaster.tenant_id == tenant))).scalars().all()
+    return {
+        r.client_key: {
+            "client_key": r.client_key,
+            "client_name": r.client_name,
+            "industry": r.industry,
+            "non_profit": r.non_profit,
+            "target_margin": r.target_margin,
+        }
+        for r in rows
+    }
+
+
+async def _available_hours(db: DBSession, tenant: Any) -> Decimal:
+    row = (await db.execute(select(FinanceSettings).where(FinanceSettings.tenant_id == tenant))).scalar_one_or_none()
+    return Decimal(row.available_hours_per_month) if row else Decimal("160")
+
+
+@router.get("/profitability/analysis", dependencies=[Depends(require_permission("finance:view"))])
+async def profitability_analysis(
+    user: AuthUser, db: DBSession, month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$")
+) -> dict[str, Any]:
+    """Everything beyond revenue less labor for one month: the full cost-to-net-income table, new clients, the summary by industry, hours by function and utilization, and the twelve-month ranking. Costs that
+    have not been entered are zero and named in ``report.missing``. ``received_at`` is None until CORE has sent the first Halo summary."""
+    row = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    if row is None:
+        return {"received_at": None, "months": [], "report": None, "industries": [], "hours": None, "annual": None}
+    months = profit.available_months(row.payload)
+    chosen = month if month in months else (months[-2] if len(months) > 1 else (months[-1] if months else None))
+    if chosen is None:
+        return {"received_at": row.received_at, "months": months, "report": None, "industries": [], "hours": None, "annual": None}
+    rates, costs, master = await _rates(db, user.tenant_id), await _costs(db, user.tenant_id), await _master(db, user.tenant_id)
+    report = pf.full_month(row.payload, rates, chosen, costs, master)
+    return {
+        "received_at": row.received_at,
+        "months": months,
+        "report": report,
+        "industries": pf.by_industry(report),
+        "hours": pf.hours_report(row.payload, rates, chosen, await _available_hours(db, user.tenant_id)),
+        "annual": pf.annual(row.payload, rates, costs, master, chosen),
+        "note": (
+            "Costs are shared out to the cent: an entry with a client goes to that client, one without is spread by each client's revenue for the month (the workbook spreads by monthly recurring revenue; the Halo summary "
+            "holds invoiced revenue). Sales and marketing is split evenly across clients whose first revenue is this month."
+        ),
+    }
+
+
+@router.get("/profitability/inputs", dependencies=[Depends(require_permission("finance:view"))])
+async def profitability_inputs(user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """The typed or synced cost entries, the client master and the settings."""
+    return {
+        "costs": await _costs(db, user.tenant_id),
+        "master": sorted((await _master(db, user.tenant_id)).values(), key=lambda m: m["client_name"].lower()),
+        "available_hours_per_month": await _available_hours(db, user.tenant_id),
+        "categories": list(pf.CATEGORIES),
+    }
+
+
+@router.put("/profitability/costs", status_code=status.HTTP_204_NO_CONTENT)
+async def save_cost(
+    body: CostIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession
+) -> None:
+    name = " ".join(body.client_name.split())
+    key = profit.name_key(name)
+    if body.category in ("payroll_cogs", "sales_marketing", "overhead"):
+        name, key = "", ""
+    row = (
+        await db.execute(
+            select(FinanceCostEntry).where(
+                FinanceCostEntry.tenant_id == user.tenant_id,
+                FinanceCostEntry.month == body.month,
+                FinanceCostEntry.category == body.category,
+                FinanceCostEntry.client_key == key,
+                FinanceCostEntry.source == "manual",
+            )
+        )
+    ).scalar_one_or_none()
+    now, by = datetime.now(UTC), (str(user.user_id) if user.user_id else None)
+    if row is None:
+        db.add(
+            FinanceCostEntry(
+                tenant_id=user.tenant_id,
+                month=body.month,
+                category=body.category,
+                client_key=key,
+                client_name=name,
+                source="manual",
+                amount=body.amount,
+                note=body.note,
+                updated_by=by,
+                updated_at=now,
+            )
+        )
+    else:
+        row.amount, row.note, row.client_name, row.updated_by, row.updated_at = body.amount, body.note, name, by, now
+    await db.flush()
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="finance_cost:saved",
+        resource="finance_cost_entry",
+        resource_id=f"{body.month}:{body.category}:{key}",
+        changes={"month": body.month, "category": body.category, "client_key": key},
+        request=request,
+    )
+    await db.commit()
+
+
+@router.delete("/profitability/costs", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_cost(
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("finance:write"))],
+    db: DBSession,
+    month: str = Query(pattern=r"^\d{4}-\d{2}$"),
+    category: str = Query(max_length=40),
+    client_name: str = Query(default="", max_length=200),
+) -> None:
+    key = profit.name_key(client_name)
+    result = await db.execute(
+        delete(FinanceCostEntry).where(
+            FinanceCostEntry.tenant_id == user.tenant_id,
+            FinanceCostEntry.month == month,
+            FinanceCostEntry.category == category,
+            FinanceCostEntry.client_key == key,
+            FinanceCostEntry.source == "manual",
+        )
+    )
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="No such cost entry")
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="finance_cost:deleted",
+        resource="finance_cost_entry",
+        resource_id=f"{month}:{category}:{key}",
+        changes={"month": month, "category": category, "client_key": key},
+        request=request,
+    )
+    await db.commit()
+
+
+@router.put("/profitability/clients", status_code=status.HTTP_204_NO_CONTENT)
+async def save_client_master(
+    body: ClientMasterIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession
+) -> None:
+    name = " ".join(body.client_name.split())
+    key = profit.name_key(name)
+    if not key:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Name the client")
+    row = (
+        await db.execute(
+            select(FinanceClientMaster).where(FinanceClientMaster.tenant_id == user.tenant_id, FinanceClientMaster.client_key == key)
+        )
+    ).scalar_one_or_none()
+    now = datetime.now(UTC)
+    industry = " ".join(body.industry.split())
+    if row is None:
+        db.add(
+            FinanceClientMaster(
+                tenant_id=user.tenant_id,
+                client_key=key,
+                client_name=name,
+                industry=industry,
+                non_profit=body.non_profit,
+                target_margin=body.target_margin,
+                updated_at=now,
+            )
+        )
+    else:
+        row.client_name, row.industry, row.non_profit, row.target_margin, row.updated_at = (
+            name,
+            industry,
+            body.non_profit,
+            body.target_margin,
+            now,
+        )
+    await db.flush()
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="finance_client_master:saved",
+        resource="finance_client_master",
+        resource_id=key,
+        changes={"client_key": key, "industry": industry},
+        request=request,
+    )
+    await db.commit()
+
+
+@router.delete("/profitability/clients", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_client_master(
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("finance:write"))],
+    db: DBSession,
+    client_name: str = Query(min_length=1, max_length=200),
+) -> None:
+    key = profit.name_key(client_name)
+    result = await db.execute(
+        delete(FinanceClientMaster).where(FinanceClientMaster.tenant_id == user.tenant_id, FinanceClientMaster.client_key == key)
+    )
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="No such client in the master")
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="finance_client_master:deleted",
+        resource="finance_client_master",
+        resource_id=key,
+        changes={"client_key": key},
+        request=request,
+    )
+    await db.commit()
+
+
+@router.put("/profitability/settings", status_code=status.HTTP_204_NO_CONTENT)
+async def save_finance_settings(
+    body: SettingsIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession
+) -> None:
+    row = (await db.execute(select(FinanceSettings).where(FinanceSettings.tenant_id == user.tenant_id))).scalar_one_or_none()
+    now = datetime.now(UTC)
+    if row is None:
+        db.add(FinanceSettings(tenant_id=user.tenant_id, available_hours_per_month=body.available_hours_per_month, updated_at=now))
+    else:
+        row.available_hours_per_month, row.updated_at = body.available_hours_per_month, now
+    await db.flush()
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="finance_settings:saved",
+        resource="finance_settings",
+        resource_id="available_hours_per_month",
+        changes={"available_hours_per_month": str(body.available_hours_per_month)},
         request=request,
     )
     await db.commit()
