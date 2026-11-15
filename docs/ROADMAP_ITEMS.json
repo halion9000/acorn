@@ -441,8 +441,10 @@
     "key": "r7-ci-09",
     "title": "scripts/slowest-tests.mjs listing the ten slowest hud tests",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit",
+    "note": "CORE e624527 and 7c430bc"
   },
   {
     "key": "r7-ci-10",
@@ -663,8 +665,10 @@
     "key": "r7-ci-40",
     "title": "Make the hud test count part of the health page so a drop is visible",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit",
+    "note": "CORE e624527 and 7c430bc"
   },
   {
     "key": "r7-ai-01",
@@ -750,8 +754,10 @@
     "key": "r7-ai-12",
     "title": "More control tests from checks that exist: DMARC enforcement, admin multi-factor, monitoring coverage",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit",
+    "note": "Four more tests (email domain protection, certificates and domains, network equipment, device health): fourteen in all."
   },
   {
     "key": "r7-ai-13",

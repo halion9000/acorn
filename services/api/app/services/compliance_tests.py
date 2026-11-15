@@ -125,6 +125,34 @@ TESTS: tuple[ControlTest, ...] = (
         (("CIS-IG1", "14.1"),),
         "A security awareness programme is running and people complete it.",
     ),
+    ControlTest(
+        "email-authentication",
+        "Email domains are protected against spoofing",
+        ("threatmate_dmarc", "liongard_email_domain_records"),
+        (("SOC2", "CC6.7"), ("NIST-CSF", "PR.DS-02"), ("ISO27001", "A.5.14"), ("HIPAA", "164.312(e)(1)")),
+        "SPF, DKIM and DMARC are published so nobody can send as the organization.",
+    ),
+    ControlTest(
+        "certificates",
+        "Certificates and domains do not lapse",
+        ("itglue_domain_expiry", "itglue_certificate_expiry", "liongard_iis_certificates"),
+        (("SOC2", "CC6.7"), ("NIST-CSF", "PR.DS-02"), ("ISO27001", "A.8.24"), ("HIPAA", "164.312(e)(1)")),
+        "Encrypted connections keep working because certificates and domains are renewed in time.",
+    ),
+    ControlTest(
+        "network-security",
+        "Network equipment is supported and not left open",
+        ("meraki_open_wifi", "meraki_end_of_support", "liongard_addigy_firewall"),
+        (("SOC2", "CC6.6"), ("NIST-CSF", "PR.IR-01"), ("CIS-IG1", "12.1"), ("ISO27001", "A.8.20")),
+        "Firewalls and switches get vendor updates, and wireless networks are not open to anyone.",
+    ),
+    ControlTest(
+        "asset-health",
+        "Machines and network devices are monitored and healthy",
+        ("ninjaone_disk_health", "ninjaone_disk_space", "ninjaone_reboot", "meraki_devices_offline", "threatmate_agents_online"),
+        (("SOC2", "A1.1"), ("NIST-CSF", "DE.CM-01"), ("ISO27001", "A.8.16")),
+        "Capacity and health are watched so a failing disk or an offline device is noticed.",
+    ),
 )
 BY_ID = {t.id: t for t in TESTS}
 
