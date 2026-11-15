@@ -588,8 +588,10 @@
     "key": "r7-ci-29",
     "title": "Doctor script checks ports, disk space and Docker and prints one verdict per line",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "this commit",
+    "note": "CORE doctor: agent port and docker engine checks"
   },
   {
     "key": "r7-ci-30",
