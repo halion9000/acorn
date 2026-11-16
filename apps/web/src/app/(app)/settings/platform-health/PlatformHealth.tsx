@@ -99,6 +99,15 @@ export interface RateLimitTally {
   checked: number;
   over_limit: number;
   callers_over_limit: number;
+  /** The busiest callers in the last minute (a hashed key or an address, never a token). Absent from an API older than this. */
+  busiest_callers?: { caller: string; requests_last_minute: number; percent_of_limit: number }[];
+}
+
+/** One line naming the busiest callers under the limit and how close each is, or null when none is listed. */
+export function busiestCallersLabel(r: RateLimitTally): string | null {
+  const list = r.busiest_callers ?? [];
+  if (list.length === 0) return null;
+  return `Busiest in the last minute: ${list.map((c) => `${c.caller} ${c.requests_last_minute} (${c.percent_of_limit}% of the limit)`).join(', ')}.`;
 }
 
 /** What the API-wide request limit has done since the API started, in plain words: in log mode it says how many requests it WOULD have refused, so the limit can be judged before it is switched on. */
@@ -304,7 +313,7 @@ export function PlatformHealth() {
           )}
           {snapshot.runtime?.rate_limit && (
             <p data-testid="rate-limit" className="text-sm text-gray-400">
-              {rateLimitLabel(snapshot.runtime.rate_limit)}
+              {rateLimitLabel(snapshot.runtime.rate_limit)} {busiestCallersLabel(snapshot.runtime.rate_limit)}
             </p>
           )}
           {snapshot.runtime?.loop && snapshot.runtime.loop.samples > 0 && (

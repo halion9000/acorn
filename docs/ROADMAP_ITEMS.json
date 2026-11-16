@@ -709,8 +709,9 @@
     "key": "r7-ai-03",
     "title": "Every list endpoint is tested to cap its page size and its response size",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Page size covered 2026-11-16: services/api/tests/test_list_endpoints_cap_page_size.py reads the API schema and fails on any list endpoint without a page-size maximum or one above 10000. The response-size half is not tested."
   },
   {
     "key": "r7-ai-04",
@@ -840,8 +841,9 @@
     "key": "r7-ai-21",
     "title": "Platform health lists the five busiest callers under the request limit",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16: the Platform health request-limit line lists the five busiest callers in the last minute with their share of the limit (hashed key or address, never a token)."
   },
   {
     "key": "r7-ai-22",

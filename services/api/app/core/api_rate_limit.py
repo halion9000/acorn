@@ -23,6 +23,7 @@ from collections import deque
 from typing import Any
 
 WINDOW_SECONDS = 60.0
+TOP_CALLERS = 5
 DEFAULT_PER_MINUTE = 300
 MAX_TRACKED_CALLERS = (
     20_000  # one entry per caller; the oldest idle ones are dropped past this so a flood of addresses cannot use up memory
@@ -81,6 +82,12 @@ class SlidingWindow:
         q.append(now)
         return len(q)
 
+    def busiest(self, now: float, n: int = 5) -> list[tuple[str, int]]:
+        """The ``n`` callers with the most requests in the last minute, as (caller, requests), busiest first. Callers are the hashed key or the address, never a token."""
+        cutoff = now - WINDOW_SECONDS
+        counts = [(k, sum(1 for t in q if t > cutoff)) for k, q in self._hits.items()]
+        return sorted((c for c in counts if c[1] > 0), key=lambda c: (-c[1], c[0]))[:n]
+
     def _drop_idle(self, now: float) -> None:
         cutoff = now - WINDOW_SECONDS
         for k in [k for k, q in self._hits.items() if not q or q[-1] <= cutoff]:
@@ -107,6 +114,9 @@ class Tally:
             "over_limit": self.over,
             "callers_over_limit": len(self.callers_over),
             "last_over_seconds_ago": None if self.last_over_at is None else int(time.time() - self.last_over_at),
+            "busiest_callers": [
+                {"caller": k, "requests_last_minute": n, "percent_of_limit": round(100 * n / per_minute())} for k, n in window.busiest(time.time(), TOP_CALLERS)
+            ],
         }
 
 

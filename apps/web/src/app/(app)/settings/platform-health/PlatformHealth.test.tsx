@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PlatformHealth, agoLabel, migrationsLabel, rateLimitLabel, runningLabel, workerLabel } from './PlatformHealth';
+import { PlatformHealth, agoLabel, busiestCallersLabel, migrationsLabel, rateLimitLabel, runningLabel, workerLabel } from './PlatformHealth';
 
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
@@ -390,6 +390,19 @@ describe('rateLimitLabel', () => {
   it('says when the limit is enforced and when it is off', () => {
     expect(rateLimitLabel({ mode: 'enforce', per_minute: 100, checked: 5, over_limit: 0, callers_over_limit: 0 })).toContain('enforced');
     expect(rateLimitLabel({ mode: 'off', per_minute: 100, checked: 0, over_limit: 0, callers_over_limit: 0 })).toBe('Request limit: off.');
+  });
+});
+
+describe('busiestCallersLabel', () => {
+  const base = { mode: 'log' as const, per_minute: 300, checked: 9, over_limit: 0, callers_over_limit: 0 };
+  it('names each busy caller with its count and share of the limit', () => {
+    expect(busiestCallersLabel({ ...base, busiest_callers: [{ caller: 'k:ab12', requests_last_minute: 240, percent_of_limit: 80 }, { caller: 'ip:10.0.0.7', requests_last_minute: 30, percent_of_limit: 10 }] })).toBe(
+      'Busiest in the last minute: k:ab12 240 (80% of the limit), ip:10.0.0.7 30 (10% of the limit).',
+    );
+  });
+  it('says nothing when none is listed, or the API is older than the list', () => {
+    expect(busiestCallersLabel({ ...base, busiest_callers: [] })).toBeNull();
+    expect(busiestCallersLabel(base)).toBeNull();
   });
 });
 

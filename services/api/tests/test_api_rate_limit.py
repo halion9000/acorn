@@ -100,3 +100,27 @@ def test_the_table_of_callers_cannot_grow_without_bound(monkeypatch):
     for i in range(50):
         w.hit(f"ip:{i}", float(i) / 100)
     assert len(w._hits) <= 10
+
+
+def test_the_busiest_callers_are_listed_with_their_share_of_the_limit_and_never_a_token():
+    w = rl.SlidingWindow()
+    for i in range(6):
+        w.hit("k:aaaa", 100.0 + i)
+    for i in range(2):
+        w.hit("ip:1.2.3.4", 100.0 + i)
+    w.hit("k:old", 10.0)  # more than a minute ago: not counted
+    assert w.busiest(110.0, 5) == [("k:aaaa", 6), ("ip:1.2.3.4", 2)]
+    assert w.busiest(110.0, 1) == [("k:aaaa", 6)]
+
+
+def test_the_health_snapshot_lists_the_busiest_callers_against_the_limit(monkeypatch):
+    now = 1_000_000.0
+    monkeypatch.setattr(rl.time, "time", lambda: now)
+    for i in range(2):
+        rl.decide("/api/v1/things", "Bearer secret-token", None, None, now=now - i)
+    rl.decide("/api/v1/things", None, "9.9.9.9", None, now=now)
+    snap = rl.tally.snapshot()
+    assert snap["busiest_callers"][0]["requests_last_minute"] == 2
+    assert snap["busiest_callers"][0]["percent_of_limit"] == 67  # 2 of 3 a minute
+    assert snap["busiest_callers"][1]["caller"] == "ip:9.9.9.9"
+    assert "secret-token" not in str(snap)
