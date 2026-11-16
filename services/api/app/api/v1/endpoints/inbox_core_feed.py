@@ -308,7 +308,28 @@ async def claim_sync_requests_for(db: Any, tenant_id: Any, now: datetime | None 
         await db.execute(
             update(Connector).where(Connector.id == row.id).values(connector_config=Connector.connector_config.op("-")("sync_requested_at"))
         )
+    vendors.extend(await claim_settings_sync_requests(db, tenant_id, now))
     return sorted(set(vendors))
+
+
+async def claim_settings_sync_requests(db: Any, tenant_id: Any, now: datetime) -> list[str]:
+    """Sync requests left on the organization's settings (the HubSpot automations have no connector card to hold one), recent ones handed over and every one cleared. The caller owns the transaction."""
+    settings = (await db.execute(select(Tenant.settings).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    asked = (settings or {}).get("sync_requests") if isinstance(settings, dict) else None
+    if not isinstance(asked, dict) or not asked:
+        return []
+    out: list[str] = []
+    for vendor, when in asked.items():
+        try:
+            at = datetime.fromisoformat(str(when))
+        except ValueError:
+            continue
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=UTC)
+        if now - at <= SYNC_REQUEST_TTL and isinstance(vendor, str):
+            out.append(vendor)
+    await db.execute(update(Tenant).where(Tenant.id == tenant_id).values(settings=Tenant.settings.op("-")("sync_requests")))
+    return out
 
 
 @router.post("/core-feed/{tenant_token}/sync-requests/claim", response_model=SyncClaimResponse)

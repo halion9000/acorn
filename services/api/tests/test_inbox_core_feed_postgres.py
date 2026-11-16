@@ -7,6 +7,7 @@ Opt in with AISOC_TEST_PG_URL (owner) and AISOC_TEST_PG_APP_URL (aisoc_app), as 
 
 import os
 import uuid
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -451,3 +452,54 @@ async def test_a_tool_that_only_supplies_devices_keeps_how_many_devices_its_last
     )
     again = {r.name: r for r in await rows(world, world["a"])}["DNSFilter (via CORE)"]
     assert again.connector_config["devices"] == 860
+
+
+async def press_hubspot(world, tenant):
+    from app.api.v1.endpoints.automation_hubspot import request_halo_hubspot_sync
+
+    async with world["factory"]() as session:
+        await adopt_tenant(session, tenant)
+        return await request_halo_hubspot_sync(SimpleNamespace(tenant_id=tenant), session)
+
+
+async def settings_of(world, tenant):
+    async with world["owner"].begin() as conn:
+        return (await conn.execute(text("select settings from tenants where id = :t"), {"t": tenant})).scalar_one()
+
+
+async def test_a_pressed_halo_hubspot_sync_is_handed_to_core_once_and_leaves_the_other_settings_alone(world):
+    async with world["owner"].begin() as conn:
+        await conn.execute(text("update tenants set settings = '{\"keep\": 1}'::jsonb where id = :t"), {"t": world["a"]})
+    answer = await press_hubspot(world, world["a"])
+    assert answer["vendor"] == "halo-hubspot" and answer["requested_at"]
+    saved = await settings_of(world, world["a"])
+    assert saved["keep"] == 1 and saved["sync_requests"] == {"halo-hubspot": answer["requested_at"]}
+    assert await claim(world, world["feed_token"]) == ["halo-hubspot"]
+    assert await claim(world, world["feed_token"]) == [], "collected once"
+    assert "sync_requests" not in await settings_of(world, world["a"])
+    assert (await settings_of(world, world["a"]))["keep"] == 1
+
+
+async def test_pressing_twice_is_one_request_and_it_comes_with_a_connector_card_sync(world):
+    await run(world, world["feed_token"], ninja("ok", sent=1))
+    await press_hubspot(world, world["a"])
+    await press_hubspot(world, world["a"])
+    await press_sync(world, world["a"], await connector_id(world, world["a"]))
+    assert await claim(world, world["feed_token"]) == ["halo-hubspot", "ninjaone"]
+
+
+async def test_another_organizations_press_is_not_handed_to_this_ones_core(world):
+    await press_hubspot(world, world["b"])
+    assert await claim(world, world["feed_token"]) == []
+    assert await claim(world, world["b_feed_token"]) == ["halo-hubspot"]
+
+
+async def test_a_request_nobody_collected_for_ten_minutes_is_dropped_not_run_late(world):
+    old = (datetime.now(UTC) - timedelta(minutes=20)).isoformat()
+    async with world["owner"].begin() as conn:
+        await conn.execute(
+            text("update tenants set settings = jsonb_build_object('sync_requests', jsonb_build_object('halo-hubspot', CAST(:at AS text))) where id = :t"),
+            {"t": world["a"], "at": old},
+        )
+    assert await claim(world, world["feed_token"]) == []
+    assert "sync_requests" not in await settings_of(world, world["a"]), "the stale request is cleared too"

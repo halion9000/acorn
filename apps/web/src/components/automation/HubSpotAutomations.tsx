@@ -4,7 +4,7 @@
  * HubSpot automations: every automation that works with HubSpot lives here. The first copies the HaloPSA tickets of one category into HubSpot and keeps their status in step. CORE runs it and
  * reports each pass; this page shows the last one (from GET /api/v1/client-posture/sweeps/latest, source halo-hubspot). It is set up in CORE's HubSpot connector, where the HubSpot token is kept.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { type SweepRun, failureKind } from '@/components/settings/SourceHealth';
 import { authFetch } from '@/lib/auth-session';
@@ -31,30 +31,57 @@ export function passSummary(r: SweepRun): string[] {
   ];
 }
 
-export function HubSpotAutomations() {
+/** After Sync now the page looks again at these delays (CORE takes the request within about 15 seconds, then runs the copy), so the result appears without reloading. */
+const REFRESH_AFTER_SYNC_MS = [20_000, 45_000];
+
+export function HubSpotAutomations({ refreshAfterSyncMs = REFRESH_AFTER_SYNC_MS }: { refreshAfterSyncMs?: number[] } = {}) {
   const [run, setRun] = useState<SweepRun | null | undefined>(undefined);
   const [problem, setProblem] = useState('');
-  useEffect(() => {
-    let live = true;
-    authFetch('/api/v1/client-posture/sweeps/latest')
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`The sweep list answered ${res.status}`);
-        return (await res.json()) as unknown;
-      })
-      .then((body) => {
-        if (!live) return;
-        const found = Array.isArray(body) ? (body as SweepRun[]).find((r) => r.source === HALO_HUBSPOT_SOURCE) : undefined;
-        setRun(found ?? null);
-      })
-      .catch((e) => {
-        if (!live) return;
-        setRun(null);
-        setProblem(e instanceof Error ? e.message : 'Could not read the status.');
-      });
-    return () => {
-      live = false;
-    };
+  const [syncNote, setSyncNote] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const live = useRef(true);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/v1/client-posture/sweeps/latest');
+      if (!res.ok) throw new Error(`The sweep list answered ${res.status}`);
+      const body = (await res.json()) as unknown;
+      if (!live.current) return;
+      const found = Array.isArray(body) ? (body as SweepRun[]).find((r) => r.source === HALO_HUBSPOT_SOURCE) : undefined;
+      setRun(found ?? null);
+      setProblem('');
+    } catch (e) {
+      if (!live.current) return;
+      setRun(null);
+      setProblem(e instanceof Error ? e.message : 'Could not read the status.');
+    }
   }, []);
+
+  useEffect(() => {
+    live.current = true;
+    void load();
+    return () => {
+      live.current = false;
+      timers.current.forEach(clearTimeout);
+    };
+  }, [load]);
+
+  const syncNow = async () => {
+    setSyncing(true);
+    setSyncNote('');
+    try {
+      const res = await authFetch('/api/v1/automation/hubspot/sync', { method: 'POST' });
+      if (!res.ok) throw new Error(res.status === 403 ? 'You can read this but not ask for a sync.' : `The request was not accepted (${res.status}).`);
+      setSyncNote('Asked CORE to run it now. CORE picks the request up within about 15 seconds; this page looks again by itself.');
+      timers.current.forEach(clearTimeout);
+      timers.current = refreshAfterSyncMs.map((ms) => setTimeout(() => void load(), ms));
+    } catch (e) {
+      setSyncNote(e instanceof Error ? e.message : 'Could not ask for a sync.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const status = run ? (STATUS[run.health] ?? STATUS.partly) : null;
   const kind = run?.first_error ? failureKind(run.first_error) : null;
@@ -73,6 +100,16 @@ export function HubSpotAutomations() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-white">HaloPSA tickets to HubSpot</h2>
           {status ? <span className={`text-sm ${status.className}`}>{status.text}</span> : run === null ? <span className="text-sm text-gray-500">Not running</span> : null}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button type="button" onClick={() => void syncNow()} disabled={syncing} className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-500 disabled:opacity-50">
+            {syncing ? 'Asking...' : 'Sync now'}
+          </button>
+          {syncNote && (
+            <p role="status" className="text-sm text-gray-300" data-testid="sync-note">
+              {syncNote}
+            </p>
+          )}
         </div>
         <p className="mt-1 text-sm text-gray-400">
           Tickets in one HaloPSA category are copied into HubSpot as tickets, linked to the HubSpot company with the client&apos;s name, and moved to HubSpot&apos;s closed stage when the Halo ticket is closed. One way only: nothing is written to HaloPSA.

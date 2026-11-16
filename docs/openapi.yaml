@@ -1677,6 +1677,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/automation/hubspot/sync:
+    post:
+      tags:
+      - automation
+      summary: Ask CORE to run the Halo to HubSpot copy now
+      description: Leave a request for CORE to run the copy now. One atomic update
+        of the settings, so it cannot overwrite another change made at the same moment.
+      operationId: request_halo_hubspot_sync_api_v1_automation_hubspot_sync_post
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Request Halo Hubspot Sync Api V1 Automation Hubspot
+                  Sync Post
+      security:
+      - HTTPBearer: []
   /api/v1/alerts/{alert_id}/investigation/open:
     post:
       tags:
