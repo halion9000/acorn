@@ -10,6 +10,7 @@ import useSWR from 'swr';
 
 import { authFetch } from '@/lib/auth-session';
 import CountryMap from './CountryMap';
+import { DmarcNextStep } from './DmarcNextStep';
 
 export interface DmarcStatus {
   configured: boolean;
@@ -556,6 +557,7 @@ function Detail({ domain, days, onClose }: { domain: string; days: number; onClo
           <BimiView domain={domain} />
           <BlocklistsView domain={domain} days={days} />
           <ReputationView domain={domain} days={days} />
+          <DmarcNextStep domain={domain} rollup={{ policy: data.policy, total: data.total, passed: data.passed, failed: data.failed }} sources={data.failing_sources} />
           <h4 className="mt-5 text-sm font-medium text-gray-200">Sources failing DMARC</h4>
           {data.failing_sources.length === 0 ? (
             <p className="mt-1 text-sm text-emerald-300">Nothing failed in this period.</p>
