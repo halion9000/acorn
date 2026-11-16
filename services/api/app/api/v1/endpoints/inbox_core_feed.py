@@ -31,7 +31,7 @@ from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.finance_profit import FinanceProfitSnapshot
-from app.models.metric_dataset import DATASET_KEYS, MetricDataset
+from app.models.metric_dataset import DATASET_KEYS, MetricDataset, merge_dataset
 from app.models.tenant import Tenant
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
 from app.models.vendor_action import VendorAction
@@ -1471,7 +1471,7 @@ async def _keep_metric_dataset(db: Any, tenant_id: Any, key: str, body: MetricDa
     if row is None:
         db.add(MetricDataset(tenant_id=tenant_id, key=key, payload=body.data, received_at=now))
     else:
-        row.payload, row.received_at = body.data, now
+        row.payload, row.received_at = merge_dataset(key, row.payload, body.data), now
     await db.commit()
     return MetricDatasetOut(key=key, rows=rows)
 

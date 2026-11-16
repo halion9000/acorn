@@ -230,3 +230,60 @@ def test_an_unscored_week_still_shows_in_the_detail_with_no_scores():
     assert skipped["score"] is None and skipped["grade"] == "-" and set(skipped["factors"].values()) == {None}
     assert d["average"] == 1.0
     assert ms.scorecard(STAFF, 1, "Nobody")["detail"] is None
+
+
+def test_a_metric_that_is_not_reported_at_all_leaves_the_weighting_instead_of_scoring_zero():
+    # Dialpad is not connected: the week carries no call fields, so Calls Made and Call Time are not scored; it is the other five metrics that count
+    no_calls = {
+        k: v
+        for k, v in row(
+            W1,
+            "Dan",
+            "Pod 1",
+            closed=31,
+            ticket_updates=20,
+            labor_hours=30,
+            weekly_utilization=70,
+            surveys={"total_surveys": 2, "survey_sum": 9},
+        ).items()
+        if not k.startswith("total_call")
+    }
+    assert ms.metric_score("Calls Made", no_calls) is None and ms.metric_score("Call Time", no_calls) is None
+    assert ms.week_score(no_calls) == 4.4, "(15 + 4.5 + 10 + 4 + 10) / 10: the call metrics are not in the weighting"
+    zero_calls = row(
+        W1,
+        "Dan",
+        "Pod 1",
+        closed=31,
+        ticket_updates=20,
+        labor_hours=30,
+        weekly_utilization=70,
+        surveys={"total_surveys": 2, "survey_sum": 9},
+    )
+    assert ms.metric_score("Calls Made", zero_calls) == 0, "a reported zero is still a zero"
+
+
+def test_merging_a_dataset_keeps_older_rows_replaces_the_same_row_and_caps_the_history():
+    from app.models.metric_dataset import merge_dataset
+
+    held = {"weeks": ["a", "b"], "rows": [{"week": "a", "agent_id": "1", "v": 1}, {"week": "b", "agent_id": "1", "v": 2}]}
+    new = {"rows": [{"week": "b", "agent_id": "1", "v": 9}, {"week": "c", "agent_id": "1", "v": 3}]}
+    out = merge_dataset("staff-weekly", held, new)
+    assert [(r["week"], r["v"]) for r in out["rows"]] == [("a", 1), ("b", 9), ("c", 3)] and out["weeks"] == ["a", "b", "c"]
+    assert merge_dataset("ticket-detail", held, new) == new and merge_dataset("staff-weekly", None, new) == new
+    roles = merge_dataset(
+        "m365-roles",
+        {"clients": [{"client_id": "1", "client_name": "A"}, {"client_id": "2", "client_name": "B"}]},
+        {"clients": [{"client_id": "2", "client_name": "B2"}]},
+    )
+    assert sorted((c["client_id"], c["client_name"]) for c in roles["clients"]) == [("1", "A"), ("2", "B2")]
+
+
+def test_a_merged_row_sent_again_keeps_a_field_the_new_row_leaves_out():
+    from app.models.metric_dataset import merge_dataset
+
+    held = {"rows": [{"week": "a", "agent_id": "1", "closed": 4, "ticket_updates": 17}]}
+    out = merge_dataset("staff-weekly", held, {"rows": [{"week": "a", "agent_id": "1", "closed": 5}]})
+    assert out["rows"] == [
+        {"week": "a", "agent_id": "1", "closed": 5, "ticket_updates": 17}
+    ], "the new closed count wins; the updates CORE did not read this time stay"

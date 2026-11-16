@@ -53,7 +53,6 @@ MODELS = {
     "metric-staff-weekly": feed.MetricDatasetIn,
     "metric-ticket-detail": feed.MetricDatasetIn,
     "metric-invoice-lines": feed.MetricDatasetIn,
-    "metric-dialpad-weekly": feed.MetricDatasetIn,
     "metric-m365-roles": feed.MetricDatasetIn,
     "state": feed.StateReport,
     "actions-claim-huntress": feed.ClaimRequest,
@@ -89,7 +88,9 @@ MODELS = {
 PUSH = "generic-json"
 
 # core-feed routes the API has that CORE does not call (and why)
-NOT_CALLED_BY_CORE: dict[str, str] = {}
+NOT_CALLED_BY_CORE: dict[str, str] = {
+    "/core-feed/{tenant_token}/metric-dialpad-weekly": "CORE has no Dialpad connector yet; the route and the DialPad page wait for it",
+}
 
 
 def api_routes() -> set[str]:

@@ -4,17 +4,22 @@
   "body": {
     "data": {
       "months": [
-        "2026-10"
+        "2026-06",
+        "2026-07",
+        "2026-08",
+        "2026-09",
+        "2026-10",
+        "2026-11"
       ],
       "rows": [
         {
           "month": "2026-10",
-          "client_id": "5",
-          "client_name": "Acme Dental, Inc.",
+          "client_id": "12",
+          "client_name": "Acme Dental",
           "item": "Microsoft 365 Business Premium",
           "category": "Licensing",
           "quantity": 12,
-          "amount": 264.0
+          "amount": 264
         }
       ]
     }

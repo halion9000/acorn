@@ -331,6 +331,8 @@ def metric_value(metric: str, row: dict[str, Any]) -> float | None:
         s = row.get("surveys") or {}
         total = _num(s.get("total_surveys"))
         return _num(s.get("survey_sum")) / total if total > 0 else None
+    if row.get(cfg["field"]) is None:
+        return None  # not reported at all (calls when Dialpad is not connected): nothing to score, so it leaves the weighting
     raw = _num(row.get(cfg["field"]))
     return raw * cfg["scale"] if "scale" in cfg else raw
 

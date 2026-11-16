@@ -4,40 +4,51 @@
   "body": {
     "data": {
       "weeks": [
-        "2026-11-02"
+        "2026-08-24",
+        "2026-08-31",
+        "2026-09-07",
+        "2026-09-14",
+        "2026-09-21",
+        "2026-09-28",
+        "2026-10-05",
+        "2026-10-12",
+        "2026-10-19",
+        "2026-10-26",
+        "2026-11-02",
+        "2026-11-09"
       ],
       "rows": [
         {
           "week": "2026-11-02",
-          "client_id": "5",
-          "client_name": "Acme Dental, Inc.",
+          "client_id": "12",
+          "client_name": "Acme Dental",
           "type": "Incident",
           "category": "Email",
-          "priority": "Medium",
-          "created": 4,
-          "resolved": 3,
-          "resolution_hours": 7.5,
-          "resolved_with_time": 3
+          "priority": "High",
+          "created": 1,
+          "resolved": 1,
+          "resolution_hours": 3,
+          "resolved_with_time": 1
         }
       ],
       "open": [
         {
-          "client_id": "5",
-          "client_name": "Acme Dental, Inc.",
+          "client_id": "12",
+          "client_name": "Acme Dental",
           "status": "In Progress",
           "priority": "High",
-          "count": 2
+          "count": 1
         }
       ],
       "stale": [
         {
-          "ticket_id": "12345",
-          "client_name": "Acme Dental, Inc.",
+          "ticket_id": "900",
+          "client_name": "Acme Dental",
           "agent": "Dan Kemp",
-          "title": "Printer offline",
-          "priority": "Low",
-          "status": "Waiting",
-          "age_days": 45
+          "title": "Printer",
+          "priority": "High",
+          "status": "In Progress",
+          "age_days": 74
         }
       ]
     }

@@ -1582,8 +1582,8 @@
     "area": "Reports",
     "key": "rw-metrics",
     "title": "Metrics dashboards (from Rewst): tickets, staff, finance and customer-insight pages",
-    "detail": "Built in A.C.O.R.N: all 13 pages of the Rewst metric dashboards (Ticket summary, Ticket resolution, Ticket volume analysis, DialPad, Labor hours, Pods, Scorecard with Rewst's exact scoring, Staff hours distribution, Staff metrics, Team member ticket updates, Monthly invoicing, Customer experience, Monthly licensing, User roles) plus Client summary, all read from A.C.O.R.N's own database (metric_datasets, migration 196). CORE's collectors that fill the weekly staff, ticket detail, invoice line, Dialpad and Microsoft 365 role facts are the remaining part.",
-    "note": ""
+    "detail": "Built: all 13 pages of the Rewst metric dashboards plus Client summary in A.C.O.R.N, and CORE's daily collectors that fill them (weekly staff facts, weekly ticket facts with stale tickets, invoice lines, Microsoft 365 roles) into A.C.O.R.N's own database. Still to build: the Dialpad connector for the DialPad page and the calls part of the scorecard (until then calls leave the score), and time off so days off and holidays are real.",
+    "note": "NOT VERIFIED against the live HaloPSA: Hal to check the pages once CORE's first daily read has run (about 40 minutes after the CORE restart plus the read time) and tell me which numbers look wrong. Utilization is billable hours over eight-hour days (Rewst's formula is unknown); survey scores are positive 5, neutral 3, negative 1."
   },
   {
     "status": "in_progress",

@@ -130,14 +130,35 @@ async def test_core_feed_keeps_one_row_per_dataset_replaces_it_and_refuses_an_un
     keep = lambda key, data: with_db(
         world.owner, lambda db: feed._keep_metric_dataset(db, world.owner, key, feed.MetricDatasetIn(data=data))
     )  # noqa: E731
-    first = await keep("staff-weekly", {"weeks": [W1], "rows": [{"week": W1, "engineer": "Dan"}]})
+    first = await keep("staff-weekly", {"weeks": [W1], "rows": [{"week": W1, "agent_id": "40", "engineer": "Dan"}]})
     assert first.model_dump() == {"key": "staff-weekly", "rows": 2}
-    await keep("staff-weekly", {"weeks": [], "rows": [{"week": W2, "engineer": "Vic"}]})
+    await keep("ticket-detail", {"rows": [{"week": W1}]})
+    await keep("ticket-detail", {"rows": [{"week": W2}]})
     stored = await with_db(
-        world.owner, lambda db: db.execute(text("select key, payload from metric_datasets where tenant_id = :t"), {"t": world.owner})
+        world.owner,
+        lambda db: db.execute(
+            text("select payload from metric_datasets where tenant_id = :t and key = 'ticket-detail'"), {"t": world.owner}
+        ),
     )
-    rows = stored.all()
-    assert len(rows) == 1 and rows[0][1]["rows"][0]["engineer"] == "Vic", "the second send replaced the first"
+    assert [r["week"] for r in stored.scalar_one()["rows"]] == [W2], "a replaced dataset holds only the last send"
+    await keep("staff-weekly", {"rows": [{"week": W1, "agent_id": "40", "engineer": "Dan", "closed": 1}]})
+    await keep(
+        "staff-weekly",
+        {"rows": [{"week": W2, "agent_id": "40", "engineer": "Dan", "closed": 5}, {"week": W2, "agent_id": "41", "engineer": "Vic"}]},
+    )
+    stored = await with_db(
+        world.owner,
+        lambda db: db.execute(
+            text("select payload from metric_datasets where tenant_id = :t and key = 'staff-weekly'"), {"t": world.owner}
+        ),
+    )
+    merged = stored.scalar_one()
+    assert sorted((r["week"], r["engineer"]) for r in merged["rows"]) == [
+        (W1, "Dan"),
+        (W2, "Dan"),
+        (W2, "Vic"),
+    ], "a merged dataset keeps the older weeks"
+    assert next(r for r in merged["rows"] if (r["week"], r["engineer"]) == (W2, "Dan"))["closed"] == 5 and merged["weeks"] == [W1, W2]
     with pytest.raises(HTTPException) as bad:
         await keep("not-a-dataset", {"rows": []})
     assert bad.value.status_code == 404
