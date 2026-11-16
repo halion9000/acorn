@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
+import { PolicyVersionDiff } from './PolicyVersionDiff';
 import { authFetch } from '@/lib/auth-session';
 
 export interface GovItem {
@@ -71,6 +72,7 @@ export function GovernancePanel({ clientId = '' }: { clientId?: string } = {}) {
   const [templates, setTemplates] = useState<PolicyTemplate[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [filled, setFilled] = useState<Filled | null>(null);
+  const [diffOf, setDiffOf] = useState<{ id: string; version: number } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -244,6 +246,12 @@ export function GovernancePanel({ clientId = '' }: { clientId?: string } = {}) {
                       <button type="button" className={`${ghost} mt-1`} onClick={() => void showFilled(i.id, v.version)}>
                         {filled?.id === i.id && filled.version === v.version ? 'Show as written' : 'Show filled in'}
                       </button>
+                      {v.version > 1 && open.versions.some((o) => o.version === v.version - 1) ? (
+                        <button type="button" className={`${ghost} mt-1 ml-2`} onClick={() => setDiffOf(diffOf?.id === i.id && diffOf.version === v.version ? null : { id: i.id, version: v.version })}>
+                          {diffOf?.id === i.id && diffOf.version === v.version ? 'Hide changes' : `What changed since version ${v.version - 1}`}
+                        </button>
+                      ) : null}
+                      {diffOf?.id === i.id && diffOf.version === v.version ? <PolicyVersionDiff version={v.version} before={open.versions.find((o) => o.version === v.version - 1)?.body ?? ''} after={v.body} /> : null}
                       {filled?.id === i.id && filled.version === v.version && filled.missing.length > 0 ? (
                         <p className="mt-1 text-amber-300" data-testid="filled-missing">Still blank: {filled.missing.join(', ')}. Set them on the policy.</p>
                       ) : null}

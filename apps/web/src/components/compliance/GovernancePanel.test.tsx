@@ -103,3 +103,27 @@ describe('GovernancePanel', () => {
     expect(screen.getByText('The policy text')).toBeInTheDocument();
   });
 });
+
+describe('GovernancePanel: what changed between versions', () => {
+  it('offers the comparison only on a version that has one before it, and shows the added and removed lines', async () => {
+    authFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === '/api/v1/governance' && !init?.method) return json([item({ versions: 2 })]);
+      if (url.endsWith('/versions') && !init?.method) return json([
+        { version: 2, body: 'Keep logs\nReview quarterly', change_note: 'tightened', created_at: '2026-11-01T00:00:00Z' },
+        { version: 1, body: 'Keep logs\nReview yearly', change_note: 'initial', created_at: '2026-10-01T00:00:00Z' },
+      ]);
+      return json({});
+    });
+    const user = userEvent.setup();
+    render(<GovernancePanel />);
+    await user.click(await screen.findByRole('button', { name: 'Versions (2)' }));
+    expect(screen.getAllByRole('button', { name: /What changed since version/ })).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'What changed since version 1' }));
+    const diff = await screen.findByTestId('policy-diff');
+    expect(diff).toHaveTextContent('Version 1 to version 2: 1 line added, 1 removed.');
+    expect(diff).toHaveTextContent('+ Review quarterly');
+    expect(diff).toHaveTextContent('- Review yearly');
+    await user.click(screen.getByRole('button', { name: 'Hide changes' }));
+    expect(screen.queryByTestId('policy-diff')).toBeNull();
+  });
+});
