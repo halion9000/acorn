@@ -1582,17 +1582,17 @@
     "area": "Reports",
     "key": "rw-metrics",
     "title": "Metrics dashboards (from Rewst): tickets, staff, finance and customer-insight pages",
-    "detail": "Built: all 13 pages of the Rewst metric dashboards plus Client summary in A.C.O.R.N, and CORE's daily collectors that fill them (weekly staff facts, weekly ticket facts with stale tickets, invoice lines, Microsoft 365 roles) into A.C.O.R.N's own database. Still to build: the Dialpad connector for the DialPad page and the calls part of the scorecard (until then calls leave the score), and time off so days off and holidays are real.",
-    "note": "NOT VERIFIED against the live HaloPSA: Hal to check the pages once CORE's first daily read has run (about 40 minutes after the CORE restart plus the read time) and tell me which numbers look wrong. Utilization is billable hours over eight-hour days (Rewst's formula is unknown); survey scores are positive 5, neutral 3, negative 1."
+    "detail": "Built: all 13 pages of the Rewst metric dashboards plus Client summary in A.C.O.R.N, and CORE's daily collectors that fill them (weekly staff facts, weekly ticket facts with stale tickets, invoice lines, Microsoft 365 roles, and Dialpad calls per engineer per week) into A.C.O.R.N's own database. CORE's read-only Dialpad connector (2026-11-15) fills the DialPad page and the scorecard's Calls Made and Call Time. Still to build: time off so days off and holidays are real.",
+    "note": "NOT VERIFIED against the live HaloPSA: Hal to check the pages once CORE's first daily read has run (about 40 minutes after the CORE restart plus the read time) and tell me which numbers look wrong. The Dialpad connector is NOT VERIFIED against a live Dialpad: its CSV column names could not be read from Dialpad's docs, so the first export may name a column CORE does not know (the CORE feed log says which and lists the columns); Hal adds the Dialpad API key (and the triage call center id) in CORE first. Utilization is billable hours over eight-hour days (Rewst's formula is unknown); survey scores are positive 5, neutral 3, negative 1."
   },
   {
     "status": "in_progress",
-    "needs": "signoff",
+    "needs": "hal",
     "area": "Reports",
     "key": "rw-customer-dashboard",
     "title": "Customer-facing dashboard (from Rewst End User Dashboard): summary, labor hours, customer satisfaction per client",
-    "detail": "Built the staff-side version: Metrics > Client summary (tickets, hours and satisfaction for one client on a printable page). Not built: a client sign-in so the client's own people see only their own summary.",
-    "note": "Needs Hal's sign-off on how clients sign in (a client user role, per-client scoping, MFA) before it is built."
+    "detail": "Built the staff-side version: Metrics > Client summary (tickets, hours and satisfaction for one client on a printable page). Built the client sign-in (Hal's decision 2026-11-15): the built-in client_viewer role on a user of the client's own tenant, an authenticator app required before anything shows, and /client-portal showing only that company's tickets, hours and satisfaction (the company comes from the HaloPSA link in client_aliases, never from the request). Every other API route refuses that role. Staff create, reset and turn off the sign-ins in Settings > Workspace, Client dashboard sign-ins.",
+    "note": "NOT VERIFIED live: Hal to create one client sign-in for a client linked to HaloPSA, sign in with it, set up the authenticator app and check the numbers match that client's Metrics > Client summary. Reset of a lost second step needs the staff button; no email invite yet (the temporary password is handed over by staff)."
   },
   {
     "status": "in_progress",

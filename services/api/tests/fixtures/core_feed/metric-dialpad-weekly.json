@@ -1,0 +1,25 @@
+{
+  "route": "metric-dialpad-weekly",
+  "method": "POST",
+  "body": {
+    "data": {
+      "weeks": [
+        "2026-10-12",
+        "2026-10-19",
+        "2026-10-26",
+        "2026-11-02",
+        "2026-11-09"
+      ],
+      "rows": [
+        {
+          "week": "2026-11-02",
+          "engineer": "Dan Kemp",
+          "email": "dan@acme.test",
+          "total_calls": 12,
+          "total_call_time": 40,
+          "triage_inbound": 0
+        }
+      ]
+    }
+  }
+}

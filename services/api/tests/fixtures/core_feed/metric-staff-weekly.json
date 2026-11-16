@@ -31,7 +31,9 @@
           "days_worked": 5,
           "closed": 1,
           "created": 1,
-          "ticket_updates": 1
+          "ticket_updates": 1,
+          "total_calls": 12,
+          "total_call_time": 40
         }
       ]
     }
