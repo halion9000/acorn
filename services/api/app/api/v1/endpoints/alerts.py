@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
 from sqlalchemy import Text, and_, cast, false, func, not_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
@@ -72,6 +72,16 @@ def _log_safe(value: str | None) -> str | None:
     return value.replace("\r", "").replace("\n", " ")
 
 
+# Alerts raised by a tool's own check (A.C.O.R.N checks) or reported by a tool (Addigy, Liongard, ThreatMate...) state a fact: a device has MDM off, an account is disabled with a licence. The fusion
+# confidence is a score of how likely a DETECTION is a real threat (anomaly, MITRE, threat intelligence); a fact has none of those signals, so it always came out "low" and told the reader nothing.
+CHECK_CONNECTOR_TYPES = frozenset({"aisoc-checks", "core_feed"})
+
+
+def states_a_fact(connector_type: str | None, source: str | None) -> bool:
+    """True for an alert a tool or a check reported as a fact, which has no detection confidence (pure)."""
+    return bool(source) or connector_type in CHECK_CONNECTOR_TYPES
+
+
 class AlertResponse(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
@@ -119,6 +129,11 @@ class AlertResponse(BaseModel):
     links: dict[str, str] = {}
 
     model_config = {"from_attributes": True}
+
+    @field_serializer("confidence", "confidence_label", "confidence_rationale")
+    def _a_stated_fact_has_no_confidence(self, value: Any) -> Any:
+        # Read when the response is written, after the list has set ``source`` from the raw event.
+        return None if states_a_fact(self.connector_type, self.source) else value
 
 
 class AlertDetailResponse(AlertResponse):
