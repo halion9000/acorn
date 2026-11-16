@@ -16,6 +16,7 @@ from app.api.v1.endpoints import (
     alert_related,
     alert_script_rules,
     alert_scripts,
+    script_runs,
     alert_stale_review,
     alert_suppressions,
     alert_ticket_rules,
@@ -167,6 +168,7 @@ api_router.include_router(api_keys.router)
 api_router.include_router(alerts.router)
 api_router.include_router(alert_vendor_actions.router)
 api_router.include_router(alert_scripts.router)
+api_router.include_router(script_runs.router)
 api_router.include_router(alert_investigation.router)
 api_router.include_router(alert_account.router)
 api_router.include_router(alert_related.router)

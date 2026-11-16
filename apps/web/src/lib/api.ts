@@ -2162,6 +2162,33 @@ export const ticketRulesApi = {
   turnOff: (id: string) => request<TicketRule>(`/api/v1/alert-ticket-rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
 
+/** One line of the script log: a script CORE was asked to run on a machine, and what came of it (GET /api/v1/script-runs). */
+export interface ScriptRun {
+  id: string;
+  requested_at: string;
+  finished_at?: string | null;
+  status: 'done' | 'failed' | 'expired' | 'pending' | 'claimed';
+  outcome: 'done' | 'failed' | 'waiting';
+  script: string;
+  device?: string | null;
+  client_name?: string | null;
+  alert_id?: string | null;
+  alert_title?: string | null;
+  message?: string | null;
+  by: 'person' | 'rule';
+}
+export interface ScriptRunList {
+  items: ScriptRun[];
+  done: number;
+  failed: number;
+  waiting: number;
+  total: number;
+  days: number;
+}
+export const scriptRunsApi = {
+  list: (outcome: '' | 'done' | 'failed' | 'waiting' = '') => request<ScriptRunList>(`/api/v1/script-runs${outcome ? `?outcome=${outcome}` : ''}`),
+};
+
 export interface ScriptRule {
   id: string;
   scope: string;

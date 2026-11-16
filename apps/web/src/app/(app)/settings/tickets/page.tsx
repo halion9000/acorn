@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { TicketRules } from "./TicketRules";
 import { ScriptRules } from "./ScriptRules";
+import { ScriptLog } from "./ScriptLog";
 import { ToolInstalls } from "./ToolInstalls";
 import { TicketSettings } from "./TicketSettings";
 
@@ -15,6 +16,7 @@ export default function TicketSettingsPage() {
       <TicketSettings />
       <TicketRules />
       <ScriptRules />
+      <ScriptLog />
       <ToolInstalls />
     </>
   );
