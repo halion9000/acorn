@@ -386,8 +386,10 @@
     "key": "r7-ci-01",
     "title": "Startup self-test names the connectors whose key could not be read",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "CORE (previous commit)",
+    "note": "2026-11-16: the startup self-test line also names connectors started but missing a required key, and says so when the saved keys cannot be read."
   },
   {
     "key": "r7-ci-02",
@@ -480,8 +482,10 @@
     "key": "r7-ci-13",
     "title": "A table of every cron job with its last result and duration",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "CORE 8d08e72",
+    "note": "2026-11-16: node scripts/jobs.mjs prints every job with last result, duration, last good pass and running-since from CORE's health file."
   },
   {
     "key": "r7-ci-14",
@@ -837,8 +841,10 @@
     "key": "r7-ai-19",
     "title": "A What's new page built from the guide bullets marked new",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 8cc2846a",
+    "note": "2026-11-16: Settings, Help, What's new built from the guide's dated new tags."
   },
   {
     "key": "r7-ai-20",
@@ -1228,8 +1234,10 @@
     "key": "r7-cf-32",
     "title": "Export the integration health as a CSV",
     "area": "Round 7: CORE feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "CORE 8d08e72",
+    "note": "2026-11-16: node scripts/jobs.mjs --csv exports the per-tool job health (result, duration, last ok, line) as CSV. Not a button in A.C.O.R.N."
   },
   {
     "key": "r7-cf-33",
