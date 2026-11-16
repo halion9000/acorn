@@ -916,8 +916,9 @@
     "key": "r7-ai-30",
     "title": "Trust center: a print and PDF view",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16: the Trust center has Print or save as PDF; the editor and page heading stay off the paper so only what a customer sees is printed."
   },
   {
     "key": "r7-ai-31",

@@ -52,12 +52,17 @@ export function TrustCenterView() {
 
   return (
     <div className="space-y-4 p-6">
-      <div>
+      <div className="print:hidden">
         <h1 className="text-2xl font-bold text-white">Trust center</h1>
         <p className="mt-1 text-sm text-gray-400">What you show your customers about your security. It is read by people who sign in; a public link is not built yet. Control health is worked out when the page is read, never typed in.</p>
         <div className="mt-3">
           <ClientPicker value={clientId} onChange={setClientId} label="Whose trust center" />
         </div>
+        {data && (
+          <button type="button" onClick={() => window.print()} className="mt-3 rounded border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800">
+            Print or save as PDF
+          </button>
+        )}
       </div>
       {problem && (
         <p role="alert" className="text-sm text-red-300">
@@ -66,7 +71,7 @@ export function TrustCenterView() {
       )}
       {data === null && !problem && <p className="text-sm text-gray-400">Loading...</p>}
       {data && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2 print:block">
           <section className="space-y-3 rounded-lg border border-gray-800 bg-gray-900/40 p-4" data-testid="trust-preview">
             <p className="text-xs uppercase text-gray-500">As a customer sees it {data.enabled ? '' : '(not switched on)'}</p>
             <h2 className="text-xl font-semibold text-white">{data.headline || 'Security and compliance'}</h2>
@@ -112,7 +117,7 @@ export function TrustCenterView() {
             )}
             {data.contact_email && <p className="text-sm text-gray-300">Questions: {data.contact_email}</p>}
           </section>
-          <section className="space-y-3 rounded-lg border border-gray-700 bg-gray-900/60 p-4" data-testid="trust-editor">
+          <section className="space-y-3 rounded-lg border border-gray-700 bg-gray-900/60 p-4 print:hidden" data-testid="trust-editor">
             <label className="flex items-center gap-2 text-sm text-gray-200">
               <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} />
               Switch the trust center on

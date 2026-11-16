@@ -68,3 +68,20 @@ describe('TrustCenterView', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('must start with https://');
   });
 });
+
+describe('printing the trust center', () => {
+  it('offers Print or save as PDF once loaded, and prints through the browser', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    render(<TrustCenterView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Print or save as PDF' }));
+    expect(print).toHaveBeenCalledTimes(1);
+    print.mockRestore();
+  });
+
+  it('leaves the editor and the page heading off the paper, so only what a customer sees is printed', async () => {
+    render(<TrustCenterView />);
+    expect(await screen.findByTestId('trust-editor')).toHaveClass('print:hidden');
+    expect(screen.getByRole('heading', { name: 'Trust center' }).parentElement).toHaveClass('print:hidden');
+    expect(screen.getByTestId('trust-preview')).not.toHaveClass('print:hidden');
+  });
+});
