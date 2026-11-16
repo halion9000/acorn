@@ -1582,7 +1582,8 @@
     "area": "Reports",
     "key": "rw-metrics",
     "title": "Metrics dashboards (from Rewst): tickets, staff, finance and customer-insight pages",
-    "detail": "Built: Metrics > Tickets and satisfaction, Labor hours and Client summary (printable), all read from A.C.O.R.N's own database that CORE fills daily (never HaloPSA live). CORE's agents read tickets and satisfaction through aisoc_ticket_metrics and aisoc_csat under metrics:view. Still to build: staff metrics, scorecard, pods, monthly invoicing and licensing pages, Dialpad and meetings."
+    "detail": "Built in A.C.O.R.N: all 13 pages of the Rewst metric dashboards (Ticket summary, Ticket resolution, Ticket volume analysis, DialPad, Labor hours, Pods, Scorecard with Rewst's exact scoring, Staff hours distribution, Staff metrics, Team member ticket updates, Monthly invoicing, Customer experience, Monthly licensing, User roles) plus Client summary, all read from A.C.O.R.N's own database (metric_datasets, migration 196). CORE's collectors that fill the weekly staff, ticket detail, invoice line, Dialpad and Microsoft 365 role facts are the remaining part.",
+    "note": ""
   },
   {
     "status": "in_progress",

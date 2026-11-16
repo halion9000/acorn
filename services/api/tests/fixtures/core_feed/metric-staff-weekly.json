@@ -1,0 +1,35 @@
+{
+  "route": "metric-staff-weekly",
+  "method": "POST",
+  "body": {
+    "data": {
+      "weeks": [
+        "2026-11-02"
+      ],
+      "rows": [
+        {
+          "week": "2026-11-02",
+          "agent_id": "40",
+          "engineer": "Dan Kemp",
+          "team": "Pod 1",
+          "labor_hours": 24.5,
+          "billable_hours": 20.0,
+          "weekly_utilization": 61.2,
+          "days_off": 0,
+          "holidays": 0,
+          "days_worked": 5,
+          "closed": 14,
+          "ticket_updates": 33,
+          "comments_added": 41,
+          "created": 9,
+          "total_calls": 6,
+          "total_call_time": 95.5,
+          "surveys": {
+            "total_surveys": 2,
+            "survey_sum": 9
+          }
+        }
+      ]
+    }
+  }
+}

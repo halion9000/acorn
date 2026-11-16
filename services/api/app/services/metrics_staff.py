@@ -1,0 +1,443 @@
+"""The Staff pages of Metrics (Rewst's metric dashboards, rebuilt), worked out from the datasets CORE sends (``metric_datasets``, migration 196). Nothing here reads HaloPSA or Dialpad: it only turns stored rows
+into what a page shows, when a person asks.
+
+``staff-weekly`` (per engineer per week; ``week`` is that week's Monday, YYYY-MM-DD)::
+
+    {"weeks": [...], "rows": [{"week", "agent_id", "engineer", "team", "labor_hours", "billable_hours", "weekly_utilization" (percent), "days_off", "holidays",
+      "days_worked", "closed", "ticket_updates", "comments_added", "created", "total_calls", "total_call_time" (minutes), "surveys": {"total_surveys", "survey_sum"}}]}
+
+``dialpad-weekly``: ``{"weeks": [...], "rows": [{"week", "engineer", "email", "total_calls", "total_call_time" (minutes), "triage_inbound"}]}``.
+
+A team is the HaloPSA team an engineer belongs to; a pod is a team (Rewst named the page "Pods", and its pods are the team names). Periods count whole weeks back from the newest week in the data: a month is 4 weeks
+at most 52 for a year.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+WEEKS_PER_MONTH = 4.345
+
+ZERO_ROW: dict[str, float] = {
+    "labor_hours": 0,
+    "weekly_utilization": 0,
+    "closed": 0,
+    "ticket_updates": 0,
+    "comments_added": 0,
+    "created": 0,
+    "total_calls": 0,
+    "total_call_time": 0,
+}
+
+
+def _num(v: Any) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def weeks_of(payload: dict[str, Any] | None) -> list[str]:
+    """Every week in the data, oldest first."""
+    rows = (payload or {}).get("rows") or []
+    return sorted({str(r.get("week")) for r in rows if r.get("week")})
+
+
+def recent_weeks(payload: dict[str, Any] | None, months: int) -> list[str]:
+    """The newest weeks that make up ``months`` months (rounded up), oldest first."""
+    weeks = weeks_of(payload)
+    keep = max(1, round(months * WEEKS_PER_MONTH))
+    return weeks[-keep:]
+
+
+def _rows_in(payload: dict[str, Any] | None, weeks: list[str]) -> list[dict[str, Any]]:
+    want = set(weeks)
+    return [r for r in (payload or {}).get("rows") or [] if str(r.get("week")) in want]
+
+
+def _active(r: dict[str, Any]) -> bool:
+    return _num(r.get("labor_hours")) > 0 or _num(r.get("weekly_utilization")) > 0
+
+
+def _mean(values: list[float]) -> float | None:
+    return round(sum(values) / len(values), 1) if values else None
+
+
+def teams_of(payload: dict[str, Any] | None) -> list[str]:
+    return sorted({str(r.get("team") or "") for r in (payload or {}).get("rows") or [] if r.get("team")}, key=str.lower)
+
+
+def staff_metrics(payload: dict[str, Any] | None, months: int, team: str | None = None) -> dict[str, Any]:
+    """Utilization by week, tickets closed by week and utilization by team member, for all teams or one."""
+    weeks = recent_weeks(payload, months)
+    rows = [r for r in _rows_in(payload, weeks) if not team or str(r.get("team") or "") == team]
+    by_week: dict[str, dict[str, Any]] = {w: {"week": w, "utils": [], "closed": 0} for w in weeks}
+    members: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        w = by_week[str(r["week"])]
+        w["closed"] += int(_num(r.get("closed")))
+        if _active(r):
+            w["utils"].append(_num(r.get("weekly_utilization")))
+        name = str(r.get("engineer") or "")
+        m = members.setdefault(
+            name, {"engineer": name, "team": str(r.get("team") or ""), "utils": [], "closed": 0, "labor_hours": 0.0, "by_week": {}}
+        )
+        m["closed"] += int(_num(r.get("closed")))
+        m["labor_hours"] += _num(r.get("labor_hours"))
+        if _active(r):
+            m["utils"].append(_num(r.get("weekly_utilization")))
+        m["by_week"][str(r["week"])] = round(_num(r.get("weekly_utilization")), 1)
+    return {
+        "weeks": [{"week": w["week"], "utilization": _mean(w["utils"]), "closed": w["closed"]} for w in by_week.values()],
+        "members": sorted(
+            (
+                {
+                    "engineer": m["engineer"],
+                    "team": m["team"],
+                    "utilization": _mean(m["utils"]),
+                    "closed": m["closed"],
+                    "labor_hours": round(m["labor_hours"], 2),
+                    "by_week": m["by_week"],
+                }
+                for m in members.values()
+            ),
+            key=lambda m: (-(m["utilization"] or 0), m["engineer"].lower()),
+        ),
+        "teams": teams_of(payload),
+    }
+
+
+def pods(payload: dict[str, Any] | None, months: int) -> dict[str, Any]:
+    """Metrics by pod (team): engineers, average utilization, tickets resolved and created, days off and holidays over the period, and each pod's engineers week by week."""
+    weeks = recent_weeks(payload, months)
+    rows = _rows_in(payload, weeks)
+    out: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        pod = str(r.get("team") or "(no team)")
+        p = out.setdefault(
+            pod, {"pod": pod, "engineers": set(), "utils": [], "resolved": 0, "created": 0, "days_off": 0.0, "holidays": 0.0, "weekly": {}}
+        )
+        p["engineers"].add(str(r.get("engineer") or ""))
+        p["resolved"] += int(_num(r.get("closed")))
+        p["created"] += int(_num(r.get("created")))
+        p["days_off"] += _num(r.get("days_off"))
+        p["holidays"] += _num(r.get("holidays"))
+        if _active(r):
+            p["utils"].append(_num(r.get("weekly_utilization")))
+        wk = p["weekly"].setdefault(str(r["week"]), [])
+        wk.append(
+            {
+                "engineer": str(r.get("engineer") or ""),
+                "utilization": round(_num(r.get("weekly_utilization")), 1),
+                "resolved": int(_num(r.get("closed"))),
+                "created": int(_num(r.get("created"))),
+                "days_off": _num(r.get("days_off")),
+                "holidays": _num(r.get("holidays")),
+            }
+        )
+    pods_out = []
+    for p in out.values():
+        pods_out.append(
+            {
+                "pod": p["pod"],
+                "engineers": len(p["engineers"]),
+                "utilization": _mean(p["utils"]),
+                "resolved": p["resolved"],
+                "created": p["created"],
+                "days_off": round(p["days_off"], 1),
+                "holidays": round(p["holidays"], 1),
+                "weekly": [
+                    {"week": w, "engineers": sorted(e, key=lambda x: x["engineer"].lower())} for w, e in sorted(p["weekly"].items())
+                ],
+            }
+        )
+    pods_out.sort(key=lambda p: (-(p["utilization"] or 0), p["pod"].lower()))
+    return {"weeks": weeks, "pods": pods_out}
+
+
+def ticket_updates(payload: dict[str, Any] | None, months: int, members: list[str] | None = None) -> dict[str, Any]:
+    """Ticket updates per team member per week for the period, for the members chosen (all when none are)."""
+    weeks = recent_weeks(payload, months)
+    want = set(members or [])
+    table: dict[str, dict[str, int]] = {}
+    for r in _rows_in(payload, weeks):
+        name = str(r.get("engineer") or "")
+        if want and name not in want:
+            continue
+        row = table.setdefault(name, {})
+        row[str(r["week"])] = row.get(str(r["week"]), 0) + int(_num(r.get("ticket_updates")))
+    everyone = sorted({str(r.get("engineer") or "") for r in (payload or {}).get("rows") or []}, key=str.lower)
+    return {
+        "weeks": weeks,
+        "members": everyone,
+        "rows": [
+            {"engineer": n, "total": sum(v.values()), "by_week": v}
+            for n, v in sorted(table.items(), key=lambda kv: (-sum(kv[1].values()), kv[0].lower()))
+        ],
+        "weekly_total": {w: sum(v.get(w, 0) for v in table.values()) for w in weeks},
+    }
+
+
+def dialpad(payload: dict[str, Any] | None, months: int, engineer: str | None = None) -> dict[str, Any]:
+    """Triage inbound calls by week, hours on call by week, and calls and hours per team member per week."""
+    weeks = recent_weeks(payload, months)
+    rows = [r for r in _rows_in(payload, weeks) if not engineer or str(r.get("engineer") or "") == engineer]
+    by_week = {w: {"week": w, "triage_inbound": 0, "hours_on_call": 0.0, "calls": 0} for w in weeks}
+    people: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        w = by_week[str(r["week"])]
+        w["triage_inbound"] += int(_num(r.get("triage_inbound")))
+        w["hours_on_call"] += _num(r.get("total_call_time")) / 60
+        w["calls"] += int(_num(r.get("total_calls")))
+        name = str(r.get("engineer") or "")
+        p = people.setdefault(name, {"engineer": name, "calls": 0, "hours": 0.0, "by_week": {}})
+        p["calls"] += int(_num(r.get("total_calls")))
+        p["hours"] += _num(r.get("total_call_time")) / 60
+        p["by_week"][str(r["week"])] = {"calls": int(_num(r.get("total_calls"))), "hours": round(_num(r.get("total_call_time")) / 60, 2)}
+    return {
+        "weeks": [{**w, "hours_on_call": round(w["hours_on_call"], 2)} for w in by_week.values()],
+        "people": sorted(
+            ({**p, "hours": round(p["hours"], 2)} for p in people.values()), key=lambda p: (-p["calls"], p["engineer"].lower())
+        ),
+        "engineers": sorted({str(r.get("engineer") or "") for r in (payload or {}).get("rows") or []}, key=str.lower),
+    }
+
+
+def hours_distribution(profit_payload: dict[str, Any] | None, months: int) -> dict[str, Any]:
+    """Hours worked per person by ticket type (the charge type) for the newest ``months`` months of the HaloPSA hours summary, with each person's total and each type's share of all hours."""
+    all_months = sorted({str(m) for m in (profit_payload or {}).get("months") or []})
+    chosen = set(all_months[-months:] if months > 0 else [])
+    agents = {str(a.get("id")): str(a.get("name") or "") for a in (profit_payload or {}).get("agents") or []}
+    cell: dict[str, dict[str, float]] = {}
+    types: dict[str, float] = {}
+    for h in (profit_payload or {}).get("hours") or []:
+        if str(h.get("month")) not in chosen:
+            continue
+        who = agents.get(str(h.get("agent_id") or "")) or f"Agent {h.get('agent_id')}"
+        kind = str(h.get("charge_type") or "(none)")
+        hours = _num(h.get("hours"))
+        cell.setdefault(who, {})[kind] = cell.get(who, {}).get(kind, 0.0) + hours
+        types[kind] = types.get(kind, 0.0) + hours
+    total = sum(types.values())
+    type_names = [t for t, _ in sorted(types.items(), key=lambda kv: (-kv[1], kv[0].lower()))]
+    return {
+        "months": sorted(chosen),
+        "total_hours": round(total, 2),
+        "types": [
+            {"type": t, "hours": round(types[t], 2), "share_percent": round(types[t] / total * 100, 1) if total else None}
+            for t in type_names
+        ],
+        "people": sorted(
+            (
+                {"name": n, "total": round(sum(v.values()), 2), "by_type": {t: round(v.get(t, 0.0), 2) for t in type_names}}
+                for n, v in cell.items()
+            ),
+            key=lambda p: (-p["total"], p["name"].lower()),
+        ),
+    }
+
+
+# ---- The Service Desk Scorecard (the scoring rules Rewst's template used, kept exactly) -----------------------------------------------------------------------------------
+
+METRIC_ORDER = ("Tickets Closed", "Tickets Updated", "Labor Hours", "Calls Made", "Call Time", "CSAT", "Utilization")
+
+_VOLUME_5 = [[30, 5], [24, 4], [19, 3], [13, 2], [1, 1]]
+METRIC_CONFIG: dict[str, dict[str, Any]] = {
+    "Tickets Closed": {
+        "field": "closed",
+        "weight": 3.0,
+        "floor": 0,
+        "by_days": {
+            5: _VOLUME_5,
+            4: [[24, 5], [19, 4], [15, 3], [10, 2], [1, 1]],
+            3: [[18, 5], [14, 4], [11, 3], [8, 2], [1, 1]],
+            2: [[12, 5], [10, 4], [8, 3], [5, 2], [1, 1]],
+            1: [[6, 5], [5, 4], [4, 3], [3, 2], [1, 1]],
+        },
+    },
+    "Tickets Updated": {
+        "field": "ticket_updates",
+        "weight": 1.5,
+        "floor": 0,
+        "by_days": {
+            5: _VOLUME_5,
+            4: [[24, 5], [19, 4], [15, 3], [10, 2], [1, 1]],
+            3: [[18, 5], [14, 4], [11, 3], [8, 2], [1, 1]],
+            2: [[12, 5], [10, 4], [8, 3], [5, 2], [1, 1]],
+            1: [[6, 5], [5, 4], [4, 3], [3, 2], [1, 1]],
+        },
+    },
+    "Labor Hours": {
+        "field": "labor_hours",
+        "weight": 2.0,
+        "floor": 1,
+        "by_days": {
+            5: [[30, 5], [20, 4], [10, 3], [1, 2]],
+            4: [[24, 5], [16, 4], [8, 3], [1, 2]],
+            3: [[18, 5], [12, 4], [6, 3], [1, 2]],
+            2: [[12, 5], [8, 4], [4, 3], [1, 2]],
+            1: [[6, 5], [4, 4], [2, 3], [1, 2]],
+        },
+    },
+    "Calls Made": {
+        "field": "total_calls",
+        "weight": 0.5,
+        "floor": 0,
+        "by_days": {
+            5: [[20, 5], [12, 4], [8, 3], [3, 2], [1, 1]],
+            4: [[16, 5], [10, 4], [6, 3], [2, 2], [1, 1]],
+            3: [[12, 5], [7, 4], [5, 3], [2, 2], [1, 1]],
+            2: [[8, 5], [5, 4], [3, 3], [1, 2]],
+            1: [[4, 5], [2, 4], [1, 2]],
+        },
+    },
+    "Call Time": {
+        "field": "total_call_time",
+        "scale": 1 / 60,  # the data is minutes; the brackets are hours
+        "weight": 0.5,
+        "floor": 1,
+        "by_days": {
+            5: [[5, 5], [4, 4], [3, 3], [2, 2]],
+            4: [[4, 5], [3.2, 4], [2.4, 3], [1.6, 2]],
+            3: [[3, 5], [2.4, 4], [1.8, 3], [1.2, 2]],
+            2: [[2, 5], [1.6, 4], [1.2, 3], [0.8, 2]],
+            1: [[1, 5], [0.8, 4], [0.6, 3], [0.4, 2]],
+        },
+    },
+    "CSAT": {"field": None, "weight": 1.0, "floor": 0, "brackets": [[5, 5], [4, 4], [3, 3], [2, 2], [1, 1]]},
+    "Utilization": {"field": "weekly_utilization", "weight": 2.5, "floor": 0, "brackets": [[75, 5], [60, 4], [45, 3], [30, 2], [1, 1]]},
+}
+
+
+def day_bucket(row: dict[str, Any]) -> int:
+    """Days worked for choosing a bracket row: the (fractional) days worked rounded and held to 0..5; a week with no day count counts as a full five."""
+    dw = row.get("days_worked")
+    if dw is None:
+        return 5
+    return int(min(5, max(0, round(_num(dw)))))
+
+
+def has_activity(row: dict[str, Any]) -> bool:
+    keys = ("labor_hours", "weekly_utilization", "closed", "ticket_updates", "comments_added", "total_calls", "total_call_time")
+    if any(_num(row.get(k)) > 0 for k in keys):
+        return True
+    s = row.get("surveys") or {}
+    return _num(s.get("total_surveys")) > 0
+
+
+def metric_value(metric: str, row: dict[str, Any]) -> float | None:
+    cfg = METRIC_CONFIG[metric]
+    if metric == "CSAT":
+        s = row.get("surveys") or {}
+        total = _num(s.get("total_surveys"))
+        return _num(s.get("survey_sum")) / total if total > 0 else None
+    raw = _num(row.get(cfg["field"]))
+    return raw * cfg["scale"] if "scale" in cfg else raw
+
+
+def metric_score(metric: str, row: dict[str, Any]) -> int | None:
+    """One metric's 1-5 score for a week, or None when there is nothing to score (CSAT with no surveys)."""
+    cfg = METRIC_CONFIG[metric]
+    value = metric_value(metric, row)
+    if value is None:
+        return None
+    if "by_days" in cfg:
+        table = cfg["by_days"].get(max(1, day_bucket(row))) or cfg["by_days"][5]
+    else:
+        table = cfg["brackets"]
+    for threshold, score in table:
+        if value >= threshold:
+            return int(score)
+    return int(cfg["floor"])
+
+
+def week_score(row: dict[str, Any]) -> float | None:
+    """The weighted average of the metric scores for one week, one decimal, or None when the week is not graded (no activity, or a full week off)."""
+    if not has_activity(row) or day_bucket(row) == 0:
+        return None
+    total = weight = 0.0
+    for metric in METRIC_ORDER:
+        s = metric_score(metric, row)
+        if s is None:
+            continue
+        total += s * METRIC_CONFIG[metric]["weight"]
+        weight += METRIC_CONFIG[metric]["weight"]
+    return round(total / weight * 10) / 10 if weight > 0 else None
+
+
+def grade(avg: float | None) -> str:
+    if avg is None:
+        return "-"
+    if avg >= 4.5:
+        return "S"
+    if avg >= 4.0:
+        return "A"
+    if avg >= 3.0:
+        return "B"
+    if avg >= 2.0:
+        return "C"
+    if avg >= 1.0:
+        return "D"
+    return "F"
+
+
+def scorecard(payload: dict[str, Any] | None, months: int, member: str | None = None) -> dict[str, Any]:
+    """The scorecard: every team member's average week score and grade for the period, and, for ``member``, each week's scores per metric, the weekly score trend and the grade."""
+    weeks = recent_weeks(payload, months)
+    by_person: dict[str, dict[str, dict[str, Any]]] = {}
+    for r in _rows_in(payload, weeks):
+        by_person.setdefault(str(r.get("engineer") or ""), {})[str(r["week"])] = r
+    people = []
+    for name, wk in by_person.items():
+        scores = [s for s in (week_score(r) for r in wk.values()) if s is not None]
+        avg = round(sum(scores) / len(scores), 2) if scores else None
+        people.append(
+            {
+                "engineer": name,
+                "team": str(next(iter(wk.values())).get("team") or ""),
+                "weeks_scored": len(scores),
+                "average": avg,
+                "grade": grade(avg),
+            }
+        )
+    people.sort(key=lambda p: (-(p["average"] if p["average"] is not None else -1), p["engineer"].lower()))
+    detail = None
+    if member and member in by_person:
+        rows = []
+        sums = {m: 0 for m in METRIC_ORDER}
+        counts = {m: 0 for m in METRIC_ORDER}
+        for w in sorted(by_person[member], reverse=True):
+            r = by_person[member][w]
+            ws = week_score(r)
+            factors = {m: (metric_score(m, r) if ws is not None else None) for m in METRIC_ORDER}
+            for m, f in factors.items():
+                if f is not None:
+                    sums[m] += f
+                    counts[m] += 1
+            rows.append(
+                {
+                    "week": w,
+                    "score": ws,
+                    "grade": grade(ws),
+                    "factors": factors,
+                    "values": {m: (None if metric_value(m, r) is None else round(metric_value(m, r) or 0, 2)) for m in METRIC_ORDER},
+                    "days_worked": day_bucket(r),
+                }
+            )
+        scored = [r["score"] for r in rows if r["score"] is not None]
+        avg = round(sum(scored) / len(scored), 2) if scored else None
+        detail = {
+            "engineer": member,
+            "average": avg,
+            "grade": grade(avg),
+            "weeks": rows,
+            "metric_averages": {m: (round(sums[m] / counts[m], 2) if counts[m] else None) for m in METRIC_ORDER},
+            "trend": [{"week": r["week"], "score": r["score"]} for r in reversed(rows)],
+        }
+    return {
+        "weeks": weeks,
+        "metrics": list(METRIC_ORDER),
+        "weights": {m: METRIC_CONFIG[m]["weight"] for m in METRIC_ORDER},
+        "people": people,
+        "detail": detail,
+    }

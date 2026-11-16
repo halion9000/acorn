@@ -133,6 +133,26 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's daily summary of SimpleSat customer satisfaction responses: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own summary.",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/metric-staff-weekly",
+    ): "CORE's daily weekly facts per engineer (team, hours, utilization, days off, tickets closed and updated, calls, survey scores): authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own dataset.",
+    (
+        "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/metric-ticket-detail",
+    ): "CORE's daily weekly ticket facts (counts by client, type, category and priority, resolution time, stale tickets; no ticket text beyond a title): authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own dataset.",
+    (
+        "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/metric-invoice-lines",
+    ): "CORE's daily invoiced amounts per client per month per invoice line: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own dataset.",
+    (
+        "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/metric-dialpad-weekly",
+    ): "CORE's daily Dialpad call counts and call time per engineer per week: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own dataset.",
+    (
+        "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/metric-m365-roles",
+    ): "CORE's daily Microsoft 365 directory roles and their members per client: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own dataset.",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/profitability",
     ): "CORE's daily summary of HaloPSA's invoiced revenue per client per month, hours worked and agents: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own summary, readable only with the finance permissions.",
     (

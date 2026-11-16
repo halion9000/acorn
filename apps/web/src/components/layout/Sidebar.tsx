@@ -411,16 +411,38 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: 'Metrics',
+    title: 'Metrics (tickets)',
     items: [
-      { label: 'Tickets and satisfaction', href: '/metrics/tickets', icon: <ScanIcon /> },
-      { label: 'Labor hours', href: '/metrics/labor-hours', icon: <ScanIcon /> },
+      { label: 'Ticket summary', href: '/metrics/tickets', icon: <ScanIcon /> },
+      { label: 'Ticket resolution', href: '/metrics/ticket-resolution', icon: <ScanIcon /> },
+      { label: 'Ticket volume analysis', href: '/metrics/ticket-volume', icon: <ScanIcon /> },
       { label: 'Client summary', href: '/metrics/client-summary', icon: <ScanIcon /> },
+    ],
+  },
+  {
+    title: 'Metrics (staff)',
+    items: [
+      { label: 'DialPad', href: '/metrics/dialpad', icon: <ScanIcon /> },
+      { label: 'Labor hours', href: '/metrics/labor-hours', icon: <ScanIcon /> },
+      { label: 'Pods', href: '/metrics/pods', icon: <ScanIcon /> },
+      { label: 'Scorecard', href: '/metrics/scorecard', icon: <ScanIcon /> },
+      { label: 'Staff hours distribution', href: '/metrics/staff-hours', icon: <ScanIcon /> },
+      { label: 'Staff metrics', href: '/metrics/staff-metrics', icon: <ScanIcon /> },
+      { label: 'Team member ticket updates', href: '/metrics/ticket-updates', icon: <ScanIcon /> },
+    ],
+  },
+  {
+    title: 'Metrics (customers)',
+    items: [
+      { label: 'Customer experience', href: '/metrics/customer-experience', icon: <ScanIcon /> },
+      { label: 'Monthly licensing', href: '/metrics/monthly-licensing', icon: <ScanIcon /> },
+      { label: 'User roles', href: '/metrics/user-roles', icon: <ScanIcon /> },
     ],
   },
   {
     title: 'Sales and Finance',
     items: [
+      { label: 'Monthly invoicing', href: '/metrics/monthly-invoicing', icon: <ScanIcon /> },
       { label: 'Profitability', href: '/finance/profitability', icon: <ScanIcon /> },
       { label: 'Net income', href: '/finance/net-income', icon: <ScanIcon /> },
       { label: 'Billing sync', href: '/finance/billing-sync', icon: <ScanIcon /> },

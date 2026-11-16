@@ -57,8 +57,8 @@ def test_every_role_reads_the_metrics_exactly_when_it_could_before():
         assert has_permission(role, "metrics:view") == has_permission(role, "reports:read"), role
 
 
-def test_a_key_with_only_metrics_view_reaches_exactly_the_two_ticket_metric_reads():
-    expected = {("GET", "/reports/ticket-metrics"), ("GET", "/reports/ticket-metrics/csat"), ("GET", "/reports/ticket-metrics/labor-hours")}
+def test_a_key_with_only_metrics_view_reaches_exactly_the_metrics_reads():
+    expected = {(m, p) for p, r in ALL_ROUTES if p.startswith(("/reports/ticket-metrics", "/reports/metrics/")) for m in ("GET",)}
     assert {(m, p) for p, r in ALL_ROUTES if required(r) == {"metrics:view"} for m in ("GET",)} == expected
     assert _satisfied_by(["metrics:view"]) == expected
 

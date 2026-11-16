@@ -1,0 +1,26 @@
+{
+  "route": "metric-m365-roles",
+  "method": "POST",
+  "body": {
+    "data": {
+      "clients": [
+        {
+          "client_id": "5",
+          "client_name": "Acme Dental, Inc.",
+          "roles": [
+            {
+              "role": "Global Administrator",
+              "members": [
+                {
+                  "name": "Amy Admin",
+                  "upn": "amy@acme.example",
+                  "enabled": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

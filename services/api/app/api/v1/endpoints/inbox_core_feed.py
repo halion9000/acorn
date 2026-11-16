@@ -31,6 +31,7 @@ from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.finance_profit import FinanceProfitSnapshot
+from app.models.metric_dataset import DATASET_KEYS, MetricDataset
 from app.models.tenant import Tenant
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
 from app.models.vendor_action import VendorAction
@@ -1439,3 +1440,72 @@ async def report_core_feed_entities(tenant_token: str, body: EntitiesReport, db:
     )
     await db.commit()
     return DevicesResponse(updated=filled)
+
+
+class MetricDatasetIn(BaseModel):
+    """One Metrics dataset as CORE sends it: the facts under ``data`` (lists of rows and the periods they cover; the shape of each key is described in app/services/metrics_*.py)."""
+
+    data: dict[str, Any]
+
+
+class MetricDatasetOut(BaseModel):
+    key: str
+    rows: int
+
+
+_MAX_DATASET_ROWS = 300000
+
+
+async def _keep_metric_dataset(db: Any, tenant_id: Any, key: str, body: MetricDatasetIn) -> MetricDatasetOut:
+    """Keep the latest facts CORE read for one Metrics dataset. They replace the ones before; the pages are worked out when a person asks."""
+    if key not in DATASET_KEYS:
+        raise HTTPException(status_code=404, detail="Unknown dataset")
+    rows = sum(len(v) for v in body.data.values() if isinstance(v, list))
+    if rows > _MAX_DATASET_ROWS:
+        raise HTTPException(status_code=413, detail="That dataset is too large")
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    row = (
+        await db.execute(select(MetricDataset).where(MetricDataset.tenant_id == tenant_id, MetricDataset.key == key))
+    ).scalar_one_or_none()
+    if row is None:
+        db.add(MetricDataset(tenant_id=tenant_id, key=key, payload=body.data, received_at=now))
+    else:
+        row.payload, row.received_at = body.data, now
+    await db.commit()
+    return MetricDatasetOut(key=key, rows=rows)
+
+
+@router.post("/core-feed/{tenant_token}/metric-staff-weekly", response_model=MetricDatasetOut)
+async def report_core_feed_metric_staff_weekly(tenant_token: str, body: MetricDatasetIn, db: DBSession) -> MetricDatasetOut:
+    """CORE's weekly facts per engineer (team, hours, utilization, days off, tickets closed and updated, calls, survey scores): replaces the ones before."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    return await _keep_metric_dataset(db, tenant_id, "staff-weekly", body)
+
+
+@router.post("/core-feed/{tenant_token}/metric-ticket-detail", response_model=MetricDatasetOut)
+async def report_core_feed_metric_ticket_detail(tenant_token: str, body: MetricDatasetIn, db: DBSession) -> MetricDatasetOut:
+    """CORE's weekly ticket facts (created and resolved by client, type, category and priority, resolution time, stale tickets): replaces the ones before."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    return await _keep_metric_dataset(db, tenant_id, "ticket-detail", body)
+
+
+@router.post("/core-feed/{tenant_token}/metric-invoice-lines", response_model=MetricDatasetOut)
+async def report_core_feed_metric_invoice_lines(tenant_token: str, body: MetricDatasetIn, db: DBSession) -> MetricDatasetOut:
+    """CORE's invoiced amounts per client per month per invoice line and billing category: replaces the ones before."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    return await _keep_metric_dataset(db, tenant_id, "invoice-lines", body)
+
+
+@router.post("/core-feed/{tenant_token}/metric-dialpad-weekly", response_model=MetricDatasetOut)
+async def report_core_feed_metric_dialpad_weekly(tenant_token: str, body: MetricDatasetIn, db: DBSession) -> MetricDatasetOut:
+    """CORE's Dialpad call counts and call time per engineer per week: replaces the ones before."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    return await _keep_metric_dataset(db, tenant_id, "dialpad-weekly", body)
+
+
+@router.post("/core-feed/{tenant_token}/metric-m365-roles", response_model=MetricDatasetOut)
+async def report_core_feed_metric_m365_roles(tenant_token: str, body: MetricDatasetIn, db: DBSession) -> MetricDatasetOut:
+    """CORE's Microsoft 365 directory roles and their members per client: replaces the ones before."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    return await _keep_metric_dataset(db, tenant_id, "m365-roles", body)

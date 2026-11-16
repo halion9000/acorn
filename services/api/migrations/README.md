@@ -67,6 +67,7 @@ Audit of every value-limiting constraint added since 080 (2026-10-23): each colu
 | `187_access_reviews.sql` | `access_reviews`, `access_review_entries`: a periodic check that the people with access to a system should still have it (a snapshot of the people, a keep or remove decision for each, completed when all are decided). Row-level security |
 | `188_questionnaires.sql` | `questionnaire_answers` (the answer library), `questionnaires` and `questionnaire_items`: customer security questionnaires answered from the library, with a person approving each answer. Row-level security |
 | `189_trust_center.sql` | `trust_center_settings`: what an organization shows its customers about its security (headline, about, contact, frameworks, policies, documents), behind sign-in. Row-level security |
+| `196_metric_datasets.sql` | `metric_datasets`: the weekly and monthly facts CORE sends for the Metrics pages (staff-weekly, ticket-detail, invoice-lines, dialpad-weekly, m365-roles) |
 | `195_billing_sync.sql` | `billing:push` permission, the `halo_billing_update` vendor action, and `billing_sync_items` (hidden lines and the last push) for Billing sync and the Billing role |
 | `194_profitability_inputs.sql` | Cost inputs (`finance_cost_entries`), client master (`finance_client_master`) and `finance_settings` for the full profitability model |
 | `193_metrics_view_permission.sql` | `metrics:view` in the permissions catalog: read the ticket metrics and customer satisfaction on its own (`reports:read` implies it) |

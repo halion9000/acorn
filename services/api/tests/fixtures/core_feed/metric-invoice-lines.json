@@ -1,0 +1,22 @@
+{
+  "route": "metric-invoice-lines",
+  "method": "POST",
+  "body": {
+    "data": {
+      "months": [
+        "2026-10"
+      ],
+      "rows": [
+        {
+          "month": "2026-10",
+          "client_id": "5",
+          "client_name": "Acme Dental, Inc.",
+          "item": "Microsoft 365 Business Premium",
+          "category": "Licensing",
+          "quantity": 12,
+          "amount": 264.0
+        }
+      ]
+    }
+  }
+}

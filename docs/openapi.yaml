@@ -21263,6 +21263,508 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/reports/metrics/staff-metrics:
+    get:
+      tags:
+      - reports
+      summary: Staff Metrics
+      description: Utilization by week, tickets closed by week and utilization by
+        team member, for all teams or one.
+      operationId: staff_metrics_api_v1_reports_metrics_staff_metrics_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 3
+          title: Months
+      - name: team
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Team
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Staff Metrics Api V1 Reports Metrics Staff Metrics
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/pods:
+    get:
+      tags:
+      - reports
+      summary: Pods
+      description: 'Metrics by pod (a HaloPSA team): engineers, utilization, tickets
+        resolved and created, days off and holidays.'
+      operationId: pods_api_v1_reports_metrics_pods_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 3
+          title: Months
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Pods Api V1 Reports Metrics Pods Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/ticket-updates:
+    get:
+      tags:
+      - reports
+      summary: Ticket Updates
+      description: Ticket updates per team member per week, for the members chosen
+        (all when none).
+      operationId: ticket_updates_api_v1_reports_metrics_ticket_updates_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 3
+          title: Months
+      - name: members
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: array
+            items:
+              type: string
+            maxItems: 200
+          - type: 'null'
+          title: Members
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Ticket Updates Api V1 Reports Metrics Ticket Updates
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/dialpad:
+    get:
+      tags:
+      - reports
+      summary: Dialpad
+      description: Triage inbound calls and hours on call by week, and calls and hours
+        per team member per week.
+      operationId: dialpad_api_v1_reports_metrics_dialpad_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 3
+          title: Months
+      - name: engineer
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Engineer
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Dialpad Api V1 Reports Metrics Dialpad Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/staff-hours:
+    get:
+      tags:
+      - reports
+      summary: Staff Hours
+      description: Hours worked per person by ticket type, from the HaloPSA hours
+        summary (hours only, no rates).
+      operationId: staff_hours_api_v1_reports_metrics_staff_hours_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 3
+          title: Months
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Staff Hours Api V1 Reports Metrics Staff Hours Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/scorecard:
+    get:
+      tags:
+      - reports
+      summary: Scorecard
+      description: 'The Service Desk Scorecard: every team member''s average week
+        score and grade, and one member''s weeks in detail.'
+      operationId: scorecard_api_v1_reports_metrics_scorecard_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 2
+          title: Months
+      - name: member
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Member
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Scorecard Api V1 Reports Metrics Scorecard Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/ticket-resolution:
+    get:
+      tags:
+      - reports
+      summary: Ticket Resolution
+      description: Resolved tickets per team member per month, and the average hours
+        to resolve by client.
+      operationId: ticket_resolution_api_v1_reports_metrics_ticket_resolution_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 12
+          title: Months
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Ticket Resolution Api V1 Reports Metrics Ticket Resolution
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/ticket-volume:
+    get:
+      tags:
+      - reports
+      summary: Ticket Volume
+      description: Tickets created by type, category, month and client; the priority
+        mix of the last 60 days; stale tickets by tech.
+      operationId: ticket_volume_api_v1_reports_metrics_ticket_volume_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 6
+          title: Months
+      - name: tech
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Tech
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Ticket Volume Api V1 Reports Metrics Ticket Volume
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/open-tickets:
+    get:
+      tags:
+      - reports
+      summary: Open Tickets
+      description: What is open now by status and priority, for all clients or one
+        (by HaloPSA client id).
+      operationId: open_tickets_api_v1_reports_metrics_open_tickets_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 20
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Open Tickets Api V1 Reports Metrics Open Tickets Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/monthly-invoicing:
+    get:
+      tags:
+      - reports
+      summary: Monthly Invoicing
+      description: The monthly revenue trend, the total billed by billing category
+        and each client's revenue by invoice line.
+      operationId: monthly_invoicing_api_v1_reports_metrics_monthly_invoicing_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 12
+          title: Months
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Monthly Invoicing Api V1 Reports Metrics Monthly Invoicing
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/customer-experience:
+    get:
+      tags:
+      - reports
+      summary: Customer Experience
+      description: Customer satisfaction by company, by team member and by month,
+        and the newest written responses.
+      operationId: customer_experience_api_v1_reports_metrics_customer_experience_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 12
+          title: Months
+      - name: sentiment
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(all|positive|neutral|negative)$
+          default: all
+          title: Sentiment
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Customer Experience Api V1 Reports Metrics Customer
+                  Experience Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/user-roles:
+    get:
+      tags:
+      - reports
+      summary: User Roles
+      description: 'A client by Microsoft 365 directory role table: how many people
+        hold each role, and who.'
+      operationId: user_roles_api_v1_reports_metrics_user_roles_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response User Roles Api V1 Reports Metrics User Roles Get
+      security:
+      - HTTPBearer: []
+  /api/v1/reports/metrics/monthly-licensing:
+    get:
+      tags:
+      - reports
+      summary: Monthly Licensing
+      description: 'A client by license-item table for a month: what is counted now
+        for the current month, or as of the end of an earlier month from the history
+        of counts.'
+      operationId: monthly_licensing_api_v1_reports_metrics_monthly_licensing_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: month
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^\d{4}-\d{2}$
+          - type: 'null'
+          title: Month
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Monthly Licensing Api V1 Reports Metrics Monthly Licensing
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/canary-tunnel:
     post:
       tags:
@@ -29411,6 +29913,178 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/app__api__v1__endpoints__inbox_core_feed__DevicesResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/metric-staff-weekly:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Metric Staff Weekly
+      description: 'CORE''s weekly facts per engineer (team, hours, utilization, days
+        off, tickets closed and updated, calls, survey scores): replaces the ones
+        before.'
+      operationId: report_core_feed_metric_staff_weekly_api_v1_inbox_core_feed__tenant_token__metric_staff_weekly_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricDatasetIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDatasetOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/metric-ticket-detail:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Metric Ticket Detail
+      description: 'CORE''s weekly ticket facts (created and resolved by client, type,
+        category and priority, resolution time, stale tickets): replaces the ones
+        before.'
+      operationId: report_core_feed_metric_ticket_detail_api_v1_inbox_core_feed__tenant_token__metric_ticket_detail_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricDatasetIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDatasetOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/metric-invoice-lines:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Metric Invoice Lines
+      description: 'CORE''s invoiced amounts per client per month per invoice line
+        and billing category: replaces the ones before.'
+      operationId: report_core_feed_metric_invoice_lines_api_v1_inbox_core_feed__tenant_token__metric_invoice_lines_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricDatasetIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDatasetOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/metric-dialpad-weekly:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Metric Dialpad Weekly
+      description: 'CORE''s Dialpad call counts and call time per engineer per week:
+        replaces the ones before.'
+      operationId: report_core_feed_metric_dialpad_weekly_api_v1_inbox_core_feed__tenant_token__metric_dialpad_weekly_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricDatasetIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDatasetOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/metric-m365-roles:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Metric M365 Roles
+      description: 'CORE''s Microsoft 365 directory roles and their members per client:
+        replaces the ones before.'
+      operationId: report_core_feed_metric_m365_roles_api_v1_inbox_core_feed__tenant_token__metric_m365_roles_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricDatasetIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDatasetOut'
         '422':
           description: Validation Error
           content:
@@ -46859,6 +47533,32 @@ components:
       - email
       - other
       title: MergeResult
+    MetricDatasetIn:
+      properties:
+        data:
+          additionalProperties: true
+          type: object
+          title: Data
+      type: object
+      required:
+      - data
+      title: MetricDatasetIn
+      description: 'One Metrics dataset as CORE sends it: the facts under ``data``
+        (lists of rows and the periods they cover; the shape of each key is described
+        in app/services/metrics_*.py).'
+    MetricDatasetOut:
+      properties:
+        key:
+          type: string
+          title: Key
+        rows:
+          type: integer
+          title: Rows
+      type: object
+      required:
+      - key
+      - rows
+      title: MetricDatasetOut
     MetricsOut:
       properties:
         tenant_id:

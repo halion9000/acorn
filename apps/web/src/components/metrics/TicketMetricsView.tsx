@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { OpenTicketsPanel } from './TicketPages';
 
 interface Summary {
   months: string[];
@@ -148,6 +149,7 @@ export function TicketMetricsView() {
               </div>
             ))}
           </div>
+          <OpenTicketsPanel clientId={clientId} />
           <section className="rounded-lg border border-gray-700 bg-gray-900/60 p-4" aria-label="Created and resolved">
             <h2 className="mb-2 text-sm font-semibold text-gray-200">Created and resolved by month</h2>
             <div className="space-y-1" data-testid="ticket-series">
