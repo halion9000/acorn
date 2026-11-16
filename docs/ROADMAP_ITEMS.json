@@ -278,8 +278,9 @@
     "key": "index-plan-tests",
     "title": "Two index-plan tests fail on an empty local database",
     "area": "Quality",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Checked 2026-11-16: both index-plan tests pass on an empty, fully migrated local Postgres (they turn sequential scans off, so table size does not matter). The entry was stale."
   },
   {
     "key": "roadmap-page",
@@ -710,7 +711,8 @@
     "title": "Query-plan tests for the devices list on a table with many rows",
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "note": "2026-11-16: not a database query plan: the devices list is built in Python from a cached load of every device, so a plan test does not apply. The scaling question needs a redesign (paging in the database)."
   },
   {
     "key": "r7-ai-03",
@@ -865,8 +867,9 @@
     "key": "r7-ai-23",
     "title": "OpenAPI examples for the new compliance endpoints",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16: all 23 compliance request bodies carry an example in the API document (app/core/openapi_examples.py); a test validates each against the route own model and fails on a compliance body with none."
   },
   {
     "key": "r7-ai-24",

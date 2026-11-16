@@ -8,6 +8,7 @@ import time
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from typing import Any
 
 import structlog
 from fastapi import FastAPI, HTTPException, Request, Response, Security, status
@@ -25,6 +26,7 @@ from app.core.api_rate_limit import RateLimitMiddleware
 from app.core.config import enforce_secure_defaults, is_dev_env, settings
 from app.core.core_feed_token import CoreFeedTokenMiddleware
 from app.core.cors import build_cors_kwargs
+from app.core.openapi_examples import add_request_examples
 from app.core.db_errors import register_db_error_handlers
 from app.core.logging import configure_logging
 from app.core.scheduler_lock import scheduler_lock
@@ -681,6 +683,18 @@ def create_application() -> FastAPI:
     app.include_router(saml_router)
     app.include_router(oidc_router)
     app.include_router(graphql_router, prefix="/graphql", tags=["graphql"])
+
+    # Example request bodies for the compliance routes (app/core/openapi_examples.py), added once when the document is first built.
+    build_openapi = app.openapi
+
+    def openapi_with_examples() -> dict[str, Any]:
+        built = app.openapi_schema is not None
+        schema = build_openapi()
+        if not built:
+            add_request_examples(schema)
+        return schema
+
+    app.openapi = openapi_with_examples  # type: ignore[method-assign]
 
     return app
 
