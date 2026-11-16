@@ -566,3 +566,21 @@ describe('alerts due soon per client', () => {
     expect(screen.getByRole('columnheader', { name: 'Connector health' })).toHaveAttribute('title', expect.stringContaining('tools CORE feeds in that have this client mapped'));
   });
 });
+
+describe('the tenant names are set apart from their neighbours', () => {
+  it('gives each client a name cell with a divider after it, bolder text, and rows that are told apart, without widening the table', async () => {
+    overviewMock.mockResolvedValue(none);
+    tenantsMock.mockResolvedValue([reporting, quiet]);
+    render(<MSSPDashboardView />);
+    const lines = await screen.findAllByTestId('client-line');
+    for (const line of lines) {
+      const name = within(line).getByTestId('client-name');
+      expect(name).toHaveClass('border-r');
+      expect(name).toHaveClass('font-semibold');
+      expect(name).toHaveClass('px-2.5');
+    }
+    expect(lines[0]).toHaveClass('odd:bg-gray-900/30');
+    expect(lines[0]).toHaveClass('even:bg-gray-800/20');
+    expect(screen.getByRole('columnheader', { name: 'Tenant' })).toHaveClass('border-r');
+  });
+});

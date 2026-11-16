@@ -1732,5 +1732,13 @@
     "detail": "Once QuickBooks is authorized (qbo-live-check), a daily read of the P&L by customer fills finance_cost_entries (source quickbooks) for payroll COGS, travel, hardware and overhead; typed entries are never overwritten.",
     "note": "Waits on qbo-live-check.",
     "completed_ref": null
+  },
+  {
+    "key": "hal-updates-2026-11-16",
+    "title": "Hal updates list 2026-11-16: confidence on facts, ticket note, script log, Liongard accounts, ThreatMate individual alerts, tenant name separation",
+    "area": "Hal requests",
+    "status": "completed",
+    "needs": "claude",
+    "note": "All seven built 2026-11-16. Tenant name separation is an interpretation (row dividers, shading, a divider after the name); ThreatMate finding fields and per-address alerts are from the published schema, not verified live."
   }
 ]

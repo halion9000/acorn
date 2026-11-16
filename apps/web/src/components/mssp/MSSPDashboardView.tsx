@@ -347,7 +347,7 @@ export default function MSSPDashboardView() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-800/60 text-left text-gray-400">
-                      <th scope="col" className="sticky left-0 z-10 bg-gray-900 px-2.5 py-3 font-medium">Tenant</th>
+                      <th scope="col" className="sticky left-0 z-10 border-r border-gray-700/70 bg-gray-900 px-2.5 py-3 font-medium">Tenant</th>
                       <th scope="col" className="px-2.5 py-3 font-medium">Integrations</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Open Alerts</th>
                       <th scope="col" className="px-2.5 py-3 font-medium text-right">Critical</th>
@@ -366,7 +366,7 @@ export default function MSSPDashboardView() {
                       <th scope="col" className="px-2.5 py-3 font-medium"><span className="sr-only">Actions</span></th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-700/70">
                     {visible.map((t) => (
                       <tr
                         key={t.tenant_id}
@@ -376,9 +376,9 @@ export default function MSSPDashboardView() {
                           if ((e.target as HTMLElement).closest('a,button,input,select,label')) return;
                           router.push(postureHref(t.tenant_id));
                         }}
-                        className="cursor-pointer border-b border-gray-800/40 hover:bg-gray-800/30 transition-colors"
+                        className="cursor-pointer odd:bg-gray-900/30 even:bg-gray-800/20 hover:bg-gray-800/50 transition-colors"
                       >
-                        <td className={clsx('sticky left-0 z-10 bg-gray-900 px-2.5 py-3 font-medium', t.hidden ? 'text-gray-500' : 'text-white')}>
+                        <td data-testid="client-name" className={clsx('sticky left-0 z-10 max-w-[22rem] border-r border-gray-700/70 bg-gray-900 px-2.5 py-3 font-semibold leading-snug', t.hidden ? 'text-gray-500' : 'text-white')}>
                           <Link href={postureHref(t.tenant_id)} className="hover:text-sky-300 hover:underline" title="Open this client's posture">
                             {t.name}
                           </Link>
