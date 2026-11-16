@@ -568,8 +568,9 @@
     "key": "r7-ci-25",
     "title": "Sample memory use hourly into the log and flag steady growth",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16 (CORE 1e73fad): hourly memory samples in the health file; the doctor warns when memory climbs steadily for six hours."
   },
   {
     "key": "r7-ci-26",
@@ -636,15 +637,17 @@
     "key": "r7-ci-34",
     "title": "A vendor error taxonomy (auth, rate, shape, network) used by the health page",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16 (CORE 6a07a7c): a failing sweep is filed as auth, rate, shape, network, server or other in the health file and the doctor report."
   },
   {
     "key": "r7-ci-35",
     "title": "Show the age of each vendor's last successful read on the health page",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16 (CORE 6a07a7c): the health file keeps when each tool last finished well; the doctor report says how many hours ago."
   },
   {
     "key": "r7-ci-36",
