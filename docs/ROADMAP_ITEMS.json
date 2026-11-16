@@ -551,8 +551,9 @@
     "key": "r7-ci-22",
     "title": "Idempotency keys on action results so a restart cannot apply one twice",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16 (CORE 30b2490): an action result A.C.O.R.N did not get after three tries is kept in aisoc-action-results.json and sent again next round by the action id; the action is never run again (A.C.O.R.N already hands an action over once)."
   },
   {
     "key": "r7-ci-23",
@@ -565,8 +566,9 @@
     "key": "r7-ci-24",
     "title": "Delay heavy sweeps two minutes after start so the window stays responsive",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16 (CORE): no scheduled sweep begins in the first two minutes after CORE starts (each tool also keeps its own offset of up to four minutes)."
   },
   {
     "key": "r7-ci-25",
