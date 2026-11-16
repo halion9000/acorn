@@ -14,6 +14,11 @@ from typing import Any, Final
 from pydantic import AliasChoices, Field, PostgresDsn, RedisDsn, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.env_aliases import apply_acorn_aliases
+
+# ACORN_X settings reach the AISOC_X fields below (the new name wins); done once, before any Settings() is built.
+apply_acorn_aliases()
+
 # Default placeholders shipped in source. Anything matching these in a
 # non-development environment triggers a hard startup warning (see
 # ``warn_if_insecure_defaults`` below). Exposed as a constant so tests
