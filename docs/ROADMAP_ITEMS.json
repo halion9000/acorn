@@ -1319,8 +1319,10 @@
     "key": "r7-af-03",
     "title": "Compliance: framework gap report listing controls with no evidence and no owner",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 33293151",
+    "note": "2026-11-16: Controls page Gap report with per-framework counts and a CSV of controls with neither evidence nor owner."
   },
   {
     "key": "r7-af-04",
