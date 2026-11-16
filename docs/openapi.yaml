@@ -21765,6 +21765,155 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/client-portal/summary:
+    get:
+      tags:
+      - client-portal
+      summary: Portal Summary
+      description: Your company's tickets, hours worked and satisfaction for the newest
+        ``months`` months, from HaloPSA and SimpleSat as of CORE's last daily read.
+        No parameter names a client.
+      operationId: portal_summary_api_v1_client_portal_summary_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 12
+          minimum: 1
+          default: 3
+          title: Months
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Portal Summary Api V1 Client Portal Summary Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/mssp/client-portal-users:
+    get:
+      tags:
+      - client-portal
+      summary: List Portal Users
+      description: Every client dashboard sign-in of the clients you manage, with
+        whether each has set up an authenticator app.
+      operationId: list_portal_users_api_v1_mssp_client_portal_users_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/PortalUserOut'
+                type: array
+                title: Response List Portal Users Api V1 Mssp Client Portal Users
+                  Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - client-portal
+      summary: Create Portal User
+      description: Create a client dashboard sign-in for one of your clients. The
+        client must already be linked to a HaloPSA client (Settings, Clients). A temporary
+        password is made and shown once; give it to the person another way.
+      operationId: create_portal_user_api_v1_mssp_client_portal_users_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePortalUser'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedPortalUser'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/mssp/client-portal-users/{user_id}/reset-mfa:
+    post:
+      tags:
+      - client-portal
+      summary: Reset Portal User Mfa
+      description: Remove the person's authenticator app and passkeys (a lost phone)
+        and end their sessions. The dashboard stays closed to them until they set
+        up a new authenticator app.
+      operationId: reset_portal_user_mfa_api_v1_mssp_client_portal_users__user_id__reset_mfa_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalActionDone'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/mssp/client-portal-users/{user_id}:
+    delete:
+      tags:
+      - client-portal
+      summary: Turn Off Portal User
+      description: Turn the sign-in off (the account is kept, inactive) and end its
+        sessions.
+      operationId: turn_off_portal_user_api_v1_mssp_client_portal_users__user_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalActionDone'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/canary-tunnel:
     post:
       tags:
@@ -36608,6 +36757,7 @@ components:
             maximum: 100.0
             minimum: -100.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*(?:\d{0,3}|(?=[\d.]{1,6}0*$)\d{0,3}\.\d{0,2}0*$)
           - type: 'null'
           title: Target Margin
       type: object
@@ -38449,6 +38599,7 @@ components:
             maximum: 100000000.0
             minimum: -100000000.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*(?:\d{0,12}|(?=[\d.]{1,15}0*$)\d{0,12}\.\d{0,2}0*$)
           title: Amount
         note:
           type: string
@@ -38989,6 +39140,31 @@ components:
       - title
       - hypothesis
       title: CreateHuntRequest
+    CreatePortalUser:
+      properties:
+        child_tenant_id:
+          type: string
+          format: uuid
+          title: Child Tenant Id
+        account_name:
+          type: string
+          title: Account Name
+        email:
+          anyOf:
+          - type: string
+            format: email
+          - type: 'null'
+          title: Email
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+      type: object
+      required:
+      - child_tenant_id
+      - account_name
+      title: CreatePortalUser
     CreateProposalRequest:
       properties:
         name:
@@ -39243,6 +39419,56 @@ components:
 
         `email` is optional contact information: it is not verified and not needed
         to sign in. `username` is a display name and defaults to the account name.'
+    CreatedPortalUser:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        tenant_id:
+          type: string
+          format: uuid
+          title: Tenant Id
+        client_name:
+          type: string
+          title: Client Name
+        account_name:
+          type: string
+          title: Account Name
+        username:
+          type: string
+          title: Username
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Email
+        is_active:
+          type: boolean
+          title: Is Active
+        last_login:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Login
+        mfa_enabled:
+          type: boolean
+          title: Mfa Enabled
+        temporary_password:
+          type: string
+          title: Temporary Password
+      type: object
+      required:
+      - id
+      - tenant_id
+      - client_name
+      - account_name
+      - username
+      - is_active
+      - mfa_enabled
+      - temporary_password
+      title: CreatedPortalUser
     CredentialsListResponse:
       properties:
         items:
@@ -50443,6 +50669,65 @@ components:
       title: PolicyProgress
       description: How far one client's domains have come on the way from monitoring
         to enforcing (none, then quarantine, then reject).
+    PortalActionDone:
+      properties:
+        done:
+          type: boolean
+          title: Done
+          default: true
+        detail:
+          type: string
+          title: Detail
+      type: object
+      required:
+      - detail
+      title: PortalActionDone
+    PortalUserOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        tenant_id:
+          type: string
+          format: uuid
+          title: Tenant Id
+        client_name:
+          type: string
+          title: Client Name
+        account_name:
+          type: string
+          title: Account Name
+        username:
+          type: string
+          title: Username
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Email
+        is_active:
+          type: boolean
+          title: Is Active
+        last_login:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Login
+        mfa_enabled:
+          type: boolean
+          title: Mfa Enabled
+      type: object
+      required:
+      - id
+      - tenant_id
+      - client_name
+      - account_name
+      - username
+      - is_active
+      - mfa_enabled
+      title: PortalUserOut
     PostureAlerts:
       properties:
         open:
@@ -50750,6 +51035,7 @@ components:
             maximum: 1000000.0
             minimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*(?:\d{0,10}|(?=[\d.]{1,13}0*$)\d{0,10}\.\d{0,2}0*$)
           title: Unit Price
         unit_cost:
           anyOf:
@@ -50757,6 +51043,7 @@ components:
             maximum: 1000000.0
             minimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*(?:\d{0,10}|(?=[\d.]{1,13}0*$)\d{0,10}\.\d{0,2}0*$)
           title: Unit Cost
       type: object
       required:
@@ -51910,6 +52197,7 @@ components:
             maximum: 10000.0
             minimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*(?:\d{0,8}|(?=[\d.]{1,11}0*$)\d{0,8}\.\d{0,2}0*$)
           title: Hourly Rate
       type: object
       required:
@@ -64350,6 +64638,7 @@ components:
             maximum: 744.0
             exclusiveMinimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*(?:\d{0,4}|(?=[\d.]{1,7}0*$)\d{0,4}\.\d{0,2}0*$)
           title: Available Hours Per Month
       type: object
       required:

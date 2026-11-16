@@ -40,6 +40,7 @@ from app.api.v1.endpoints import (
     client_documents,
     client_environment,
     client_onboarding,
+    client_portal,
     client_posture,
     client_review,
     client_status,
@@ -330,6 +331,8 @@ api_router.include_router(billing.router)
 api_router.include_router(billing.ingest_router)
 api_router.include_router(billing_sync.router)
 api_router.include_router(metrics_pages.router)
+api_router.include_router(client_portal.router)
+api_router.include_router(client_portal.admin_router)
 api_router.include_router(canary_tunnel.ingest_router)
 api_router.include_router(canary_tunnel.router)
 api_router.include_router(client_review.ingest_router)

@@ -46,6 +46,7 @@ from app.db.database import get_db
 from app.db.rls_hook import tag_session
 from app.db.rls_scope import cross_tenant_reads
 from app.models.tenant import ApiKey, User
+from app.services import client_portal
 from app.services.view_as import (
     ACTING_DENIED_PERMISSIONS,
     SAFE_METHODS,
@@ -312,6 +313,8 @@ async def get_current_user(
     """
     credentials = _credentials_or_cookie(credentials, request)
     user = await _authenticate(credentials, db)
+    # A customer's sign-in (client_viewer) reaches only the client dashboard, whatever a route checks for itself (app/services/client_portal.py).
+    client_portal.enforce_reach(user.role, request)
     requested = None if request is None or credentials is None else request.headers.get(VIEW_AS_HEADER)
     if not requested or not requested.strip() or is_account_level(request.url.path):
         await tag_session(db, user.tenant_id)

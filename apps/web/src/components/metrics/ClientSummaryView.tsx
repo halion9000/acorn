@@ -2,7 +2,7 @@
 
 /**
  * Metrics > Client summary (the Rewst End User Dashboard, rebuilt for staff): one client's tickets, labor hours and satisfaction on one printable page, for a review meeting or to send as a PDF. It reads
- * A.C.O.R.N's own database, filled by CORE once a day, never HaloPSA live. Opening it to the client's own people needs a client sign-in, which is not built: that is the owner's call.
+ * A.C.O.R.N's own database, filled by CORE once a day, never HaloPSA live. The client's own people see the same three sections for their company only, at /client-portal (ClientPortalView).
  */
 import { useCallback, useEffect, useState } from 'react';
 
@@ -46,6 +46,88 @@ export function nameIn(clientName: string, names: string[]): string {
 }
 const pill = (on: boolean) => `rounded border px-2.5 py-1 text-xs ${on ? 'border-blue-500 bg-blue-500/20 text-blue-200' : 'border-gray-700 text-gray-300 hover:bg-gray-800'}`;
 const card = 'rounded-lg border border-gray-700 bg-gray-800 p-3';
+
+type TicketSummary = NonNullable<Tickets['summary']>;
+type LaborSummary = NonNullable<Labor['summary']>;
+type CsatSummary = NonNullable<Csat['summary']>;
+
+/** The three sections of the summary (tickets, hours, satisfaction), shared by the staff page and the client dashboard: it only draws what it is given and fetches nothing. */
+export function ClientSummaryBody({ empty, t, l, sat }: { empty: boolean; t?: TicketSummary | null; l?: LaborSummary | null; sat?: CsatSummary | null }) {
+  return (
+    <>
+      {empty && (
+        <p className="text-sm text-gray-400" data-testid="summary-empty">
+          Nothing has arrived from HaloPSA yet. CORE sends the summaries about once a day once HaloPSA is connected in CORE.
+        </p>
+      )}
+      {t && (
+        <section data-testid="summary-tickets">
+          <h2 className="mb-2 text-sm font-semibold text-white">Tickets</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              ['Created', num(t.created), `${num(t.created_per_month)} a month`],
+              ['Resolved', num(t.resolved), `${num(t.resolved_per_month)} a month`],
+              ['First response', waitText(t.first_response_minutes), 'on average'],
+              ['Open now', num(t.open_now.total), `${t.open_now.critical} critical, ${t.open_now.high} high`],
+            ].map(([label, value, sub]) => (
+              <div key={label} className={card}>
+                <p className="text-xl font-semibold text-white">{value}</p>
+                <p className="text-xs text-gray-400">
+                  {label}
+                  {sub ? `, ${sub}` : ''}
+                </p>
+              </div>
+            ))}
+          </div>
+          {t.by_type.length > 0 && (
+            <p className="mt-2 text-sm text-gray-300">
+              By type: {t.by_type.slice(0, 6).map((r) => `${r.type} ${r.tickets}`).join(', ')}.
+            </p>
+          )}
+          {t.resolved_by_agent.length > 0 && (
+            <p className="mt-1 text-sm text-gray-300">
+              Resolved by: {t.resolved_by_agent.slice(0, 6).map((r) => `${r.name} ${r.tickets}`).join(', ')}.
+            </p>
+          )}
+        </section>
+      )}
+      {l && (
+        <section data-testid="summary-hours">
+          <h2 className="mb-2 text-sm font-semibold text-white">Hours worked</h2>
+          <p className="text-sm text-gray-300">
+            {hoursText(l.total_hours)} in all, {hoursText(l.hours_per_month)} a month. {l.by_month.map((m) => `${monthName(m.month)} ${hoursText(m.hours)}`).join(', ')}.
+          </p>
+          {l.by_type.length > 0 && <p className="mt-1 text-sm text-gray-300">By type: {l.by_type.slice(0, 6).map((r) => `${r.type} ${hoursText(r.hours)}`).join(', ')}.</p>}
+        </section>
+      )}
+      <section data-testid="summary-csat">
+        <h2 className="mb-2 text-sm font-semibold text-white">Customer satisfaction</h2>
+        {!sat || sat.responses === 0 ? (
+          <p className="text-sm text-gray-500">No survey responses in this period.</p>
+        ) : (
+          <>
+            <p className="text-sm text-gray-300">
+              {sat.responses} responses: {sat.positive} positive, {sat.neutral} neutral, {sat.negative} negative
+              {sat.satisfied_percent !== null ? `, ${sat.satisfied_percent}% satisfied` : ''}.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {sat.recent.slice(0, 5).map((r, i) => (
+                <li key={`${r.date}-${i}`} className="text-sm text-gray-200">
+                  <span className={r.sentiment === 'negative' ? 'text-red-300' : r.sentiment === 'positive' ? 'text-emerald-300' : 'text-gray-300'}>{r.rating || r.sentiment || 'No rating'}</span>
+                  <span className="ml-2 text-xs text-gray-500">
+                    {r.date.slice(0, 10)}
+                    {r.contact ? `, ${r.contact}` : ''}
+                  </span>
+                  {r.comment && <span className="block text-xs text-gray-300">{r.comment}</span>}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+    </>
+  );
+}
 
 export function ClientSummaryView() {
   const [denied, setDenied] = useState(false);
@@ -124,76 +206,7 @@ export function ClientSummaryView() {
           ))}
         </div>
       </div>
-      {tickets && tickets.received_at === null && (
-        <p className="text-sm text-gray-400" data-testid="summary-empty">
-          Nothing has arrived from HaloPSA yet. CORE sends the summaries about once a day once HaloPSA is connected in CORE.
-        </p>
-      )}
-      {t && (
-        <section data-testid="summary-tickets">
-          <h2 className="mb-2 text-sm font-semibold text-white">Tickets</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              ['Created', num(t.created), `${num(t.created_per_month)} a month`],
-              ['Resolved', num(t.resolved), `${num(t.resolved_per_month)} a month`],
-              ['First response', waitText(t.first_response_minutes), 'on average'],
-              ['Open now', num(t.open_now.total), `${t.open_now.critical} critical, ${t.open_now.high} high`],
-            ].map(([label, value, sub]) => (
-              <div key={label} className={card}>
-                <p className="text-xl font-semibold text-white">{value}</p>
-                <p className="text-xs text-gray-400">
-                  {label}
-                  {sub ? `, ${sub}` : ''}
-                </p>
-              </div>
-            ))}
-          </div>
-          {t.by_type.length > 0 && (
-            <p className="mt-2 text-sm text-gray-300">
-              By type: {t.by_type.slice(0, 6).map((r) => `${r.type} ${r.tickets}`).join(', ')}.
-            </p>
-          )}
-          {t.resolved_by_agent.length > 0 && (
-            <p className="mt-1 text-sm text-gray-300">
-              Resolved by: {t.resolved_by_agent.slice(0, 6).map((r) => `${r.name} ${r.tickets}`).join(', ')}.
-            </p>
-          )}
-        </section>
-      )}
-      {l && (
-        <section data-testid="summary-hours">
-          <h2 className="mb-2 text-sm font-semibold text-white">Hours worked</h2>
-          <p className="text-sm text-gray-300">
-            {hoursText(l.total_hours)} in all, {hoursText(l.hours_per_month)} a month. {l.by_month.map((m) => `${monthName(m.month)} ${hoursText(m.hours)}`).join(', ')}.
-          </p>
-          {l.by_type.length > 0 && <p className="mt-1 text-sm text-gray-300">By type: {l.by_type.slice(0, 6).map((r) => `${r.type} ${hoursText(r.hours)}`).join(', ')}.</p>}
-        </section>
-      )}
-      <section data-testid="summary-csat">
-        <h2 className="mb-2 text-sm font-semibold text-white">Customer satisfaction</h2>
-        {!sat || sat.responses === 0 ? (
-          <p className="text-sm text-gray-500">No survey responses in this period.</p>
-        ) : (
-          <>
-            <p className="text-sm text-gray-300">
-              {sat.responses} responses: {sat.positive} positive, {sat.neutral} neutral, {sat.negative} negative
-              {sat.satisfied_percent !== null ? `, ${sat.satisfied_percent}% satisfied` : ''}.
-            </p>
-            <ul className="mt-2 space-y-1">
-              {sat.recent.slice(0, 5).map((r, i) => (
-                <li key={`${r.date}-${i}`} className="text-sm text-gray-200">
-                  <span className={r.sentiment === 'negative' ? 'text-red-300' : r.sentiment === 'positive' ? 'text-emerald-300' : 'text-gray-300'}>{r.rating || r.sentiment || 'No rating'}</span>
-                  <span className="ml-2 text-xs text-gray-500">
-                    {r.date.slice(0, 10)}
-                    {r.contact ? `, ${r.contact}` : ''}
-                  </span>
-                  {r.comment && <span className="block text-xs text-gray-300">{r.comment}</span>}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
+      <ClientSummaryBody empty={Boolean(tickets && tickets.received_at === null)} t={t} l={l} sat={sat} />
     </div>
   );
 }

@@ -196,6 +196,9 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "billing:view",
         "billing:push",
     ],
+    # A person at a CUSTOMER of the MSP, signed in to see their own company's summary and nothing else (/client-portal). It holds one permission that no staff role holds and that implies nothing: every other route
+    # refuses this role outright in get_current_user (app/services/client_portal.py), whatever its own permission check says. It needs an authenticator app before the summary is served.
+    "client_viewer": ["client_portal:view"],
     "api_service": [
         "alerts:read",
         "alerts:write",

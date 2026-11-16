@@ -15,6 +15,8 @@ import { DemoAutoLogin } from '@/components/demo/DemoAutoLogin';
 import { ClientOnly } from '@/components/util/ClientOnly';
 import { isDemoMode } from '@/lib/demoMode';
 import { redirectIfSignedOut } from '@/lib/auth-session';
+import { authApi } from '@/lib/api';
+import { CLIENT_PORTAL_PATH, landingFor } from '@/lib/landing';
 import { IdleLogout } from './IdleLogout';
 
 interface AppShellProps {
@@ -32,6 +34,11 @@ export function AppShell({ children }: AppShellProps) {
   // itself, and development builds, where the API may not ask for a login, draw at once.
   const gated = !demo && process.env.NODE_ENV === 'production';
   const [signedIn, setSignedIn] = useState(!gated);
+  // A client dashboard sign-in has no business in the staff console (the server refuses every staff route for it anyway): send it to its own page.
+  useEffect(() => {
+    const target = landingFor(authApi.currentUser()?.role, '');
+    if (target === CLIENT_PORTAL_PATH) window.location.replace(CLIENT_PORTAL_PATH);
+  }, []);
   useEffect(() => {
     if (!gated) return;
     if (redirectIfSignedOut(true)) return; // on its way to the login page: stay blank

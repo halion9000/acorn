@@ -12,6 +12,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { apiErrorDetail, authApi, passkeyApi } from '@/lib/api';
 import { getPasskey, isWebAuthnSupported } from '@/lib/webauthn';
 import { ssoErrorMessage } from '@/lib/sso-messages';
+import { landingFor } from '@/lib/landing';
 
 /**
  * The server refuses further sign-ins (429) after too many failed attempts, and says how long to wait in its own sentence ("Too many failed sign-in attempts. Try again in about
@@ -78,7 +79,7 @@ function LoginInner() {
 
   useEffect(() => {
     if (authApi.isAuthenticated() && !ssoCode) {
-      router.replace(next);
+      router.replace(landingFor(authApi.currentUser()?.role, next));
     }
   }, [next, router, ssoCode]);
 
@@ -98,8 +99,8 @@ function LoginInner() {
     let live = true;
     authApi
       .completeSso(ssoCode)
-      .then(() => {
-        if (live) router.replace(next);
+      .then((result) => {
+        if (live) router.replace(landingFor(result?.user?.role, next));
       })
       .catch((err) => {
         if (!live) return;
@@ -123,9 +124,9 @@ function LoginInner() {
       const begin = await passkeyApi.authenticateBegin(hint);
       const credential = await getPasskey(begin.publicKey as unknown as Parameters<typeof getPasskey>[0]);
       const tokens = await passkeyApi.authenticateFinish(begin.challenge, credential as unknown as Record<string, unknown>);
-      await authApi.completeWithTokens(tokens);
+      const result = await authApi.completeWithTokens(tokens);
       setPhase('success');
-      router.replace(next);
+      router.replace(landingFor(result?.user?.role, next));
     } catch (err) {
       console.error('[login] passkey failed', err);
       setPhase('error');
@@ -143,10 +144,9 @@ function LoginInner() {
     setError(null);
 
     try {
-      if (needCode) await authApi.login(identifier.trim(), password, code.trim());
-      else await authApi.login(identifier.trim(), password);
+      const result = needCode ? await authApi.login(identifier.trim(), password, code.trim()) : await authApi.login(identifier.trim(), password);
       setPhase('success');
-      router.replace(next);
+      router.replace(landingFor(result?.user?.role, next));
     } catch (err) {
       console.error('[login] failed', err);
       setPhase('error');

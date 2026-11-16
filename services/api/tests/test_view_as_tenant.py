@@ -1362,6 +1362,7 @@ class TestCapabilities:
             "threat_hunter": [],
             "viewer": [],
             "billing": [],
+            "client_viewer": [],
             "api_service": [],
         }
 

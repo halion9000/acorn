@@ -18,6 +18,7 @@ vi.mock('@/lib/api', async (original) => ({
   authApi: {
     login: (...args: unknown[]) => login(...args),
     isAuthenticated: () => isAuthenticated(),
+    currentUser: () => null,
     ssoStatus: () => Promise.resolve({ microsoft: false, password_login: 'all' }),
     completeSso: () => Promise.reject(new Error('not used here')),
   },
@@ -73,6 +74,16 @@ describe('the sign-in page', () => {
     await user.type(document.querySelector('input[type="password"]') as HTMLInputElement, 'a-real-password');
     await user.click(screen.getByRole('button', { name: /^sign in$/i }));
     await waitFor(() => expect(login).toHaveBeenCalledWith('hal.liveoak', 'a-real-password'));
+  });
+
+  it('sends a client dashboard sign-in to the client dashboard, not to the staff console', async () => {
+    login.mockResolvedValue({ user: { role: 'client_viewer' } });
+    const user = userEvent.setup();
+    render(<LoginPage />);
+    await user.type(screen.getByLabelText(/account name/i), 'acme.owner');
+    await user.type(document.querySelector('input[type="password"]') as HTMLInputElement, 'pw');
+    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/client-portal'));
   });
 
   describe('the account name field', () => {

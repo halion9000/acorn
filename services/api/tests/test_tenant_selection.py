@@ -187,7 +187,9 @@ class TestSelectableTenants:
         fn = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == "list_selectable_tenants")
         assert "require_permission('alerts:read')" in ast.unparse(fn.args)  # ast.unparse normalises to single quotes
         # A person whose one role is a custom role holds exactly what that role grants, so "custom" (which has no built-in permissions) is not in this list.
-        assert all(has_permission(role, "alerts:read") for role in ROLE_PERMISSIONS if role != "custom")
+        assert all(
+            has_permission(role, "alerts:read") for role in ROLE_PERMISSIONS if role not in {"custom", "client_viewer"}
+        )  # client_viewer is sealed to the client dashboard
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------------------------------

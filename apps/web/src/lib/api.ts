@@ -7620,6 +7620,50 @@ export const totpApi = {
   newRecoveryCodes: (password: string, code: string) => request<{ recovery_codes: string[]; note: string }>('/api/v1/auth/totp/recovery', { method: 'POST', body: JSON.stringify({ password, code }) }),
 };
 
+/** The customer-facing dashboard: a person at a customer sees only their own company (GET /api/v1/client-portal/summary), and the MSP's staff manage those sign-ins (/api/v1/mssp/client-portal-users). */
+export interface ClientPortalSummary {
+  client_name: string;
+  received_at: string | null;
+  tickets: {
+    created: number;
+    resolved: number;
+    created_per_month: number | null;
+    resolved_per_month: number | null;
+    first_response_minutes: number | null;
+    by_type: { type: string; tickets: number }[];
+    resolved_by_agent: { agent_id: string; name: string; tickets: number }[];
+    open_now: { total: number; critical: number; high: number };
+  } | null;
+  hours: { total_hours: number; hours_per_month: number | null; by_month: { month: string; hours: number }[]; by_type: { type: string; hours: number }[] } | null;
+  satisfaction: {
+    responses: number;
+    positive: number;
+    neutral: number;
+    negative: number;
+    satisfied_percent: number | null;
+    recent: { date: string; contact: string; sentiment: string | null; rating: string; comment: string }[];
+  } | null;
+}
+export interface ClientPortalUser {
+  id: string;
+  tenant_id: string;
+  client_name: string;
+  account_name: string;
+  username: string;
+  email: string | null;
+  is_active: boolean;
+  last_login: string | null;
+  mfa_enabled: boolean;
+}
+export const clientPortalApi = {
+  summary: (months: number) => request<ClientPortalSummary>(`/api/v1/client-portal/summary?months=${months}`),
+  users: () => request<ClientPortalUser[]>('/api/v1/mssp/client-portal-users'),
+  create: (body: { child_tenant_id: string; account_name: string; email?: string }) =>
+    request<ClientPortalUser & { temporary_password: string }>('/api/v1/mssp/client-portal-users', { method: 'POST', body: JSON.stringify(body) }),
+  resetMfa: (id: string) => request<{ done: boolean; detail: string }>(`/api/v1/mssp/client-portal-users/${encodeURIComponent(id)}/reset-mfa`, { method: 'POST' }),
+  turnOff: (id: string) => request<{ done: boolean; detail: string }>(`/api/v1/mssp/client-portal-users/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
 /** The risk register (GET/POST /api/v1/risk-register ...). `clientId` reads or writes one of the organization's clients. */
 export interface RiskTask {
   id: string;

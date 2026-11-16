@@ -77,6 +77,7 @@ import { useTheme, type ThemePreference } from '@/components/theme/ThemeProvider
 import { authFetch } from '@/lib/auth-session';
 import { AvatarError, avatarFromFile, avatarOf } from '@/lib/avatar';
 import { AddMemberForm } from './AddMemberForm';
+import { ClientPortalUsers } from './ClientPortalUsers';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -832,6 +833,7 @@ function WorkspacePanel({ canAdd = false }: { canAdd?: boolean }) {
           </>
         ) : null}
       </div>
+      {canAdd ? <ClientPortalUsers /> : null}
     </div>
   );
 }
