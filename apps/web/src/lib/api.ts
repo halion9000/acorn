@@ -7991,7 +7991,7 @@ export interface QuestionnaireList {
 export const questionnairesApi = {
   list: (clientId: string) => request<QuestionnaireList>(`/api/v1/compliance/questionnaires?${riskQs(clientId)}`),
   get: (clientId: string, id: string) => request<QuestionnaireDetail>(`/api/v1/compliance/questionnaires/${encodeURIComponent(id)}?${riskQs(clientId)}`),
-  start: (clientId: string, body: { name: string; customer?: string | null; due_date?: string | null; questions: string }) =>
+  start: (clientId: string, body: { name: string; customer?: string | null; due_date?: string | null; questions: string; format?: 'lines' | 'csv' }) =>
     request<QuestionnaireDetail>(`/api/v1/compliance/questionnaires?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
   patchItem: (clientId: string, id: string, itemId: string, body: { answer?: string; approved?: boolean; save_to_library?: boolean }) =>
     request<QuestionnaireDetail>(`/api/v1/compliance/questionnaires/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),

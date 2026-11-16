@@ -143,7 +143,7 @@ export function QuestionnairesView() {
   const [open, setOpen] = useState<QuestionnaireDetail | null>(null);
   const [problem, setProblem] = useState('');
   const [starting, setStarting] = useState(false);
-  const [form, setForm] = useState({ name: '', due: '', questions: '' });
+  const [form, setForm] = useState({ name: '', due: '', questions: '', csv: false });
 
   useEffect(() => {
     setClientId(clientFromAddress(window.location.search));
@@ -202,9 +202,9 @@ export function QuestionnairesView() {
           onSubmit={async (e) => {
             e.preventDefault();
             try {
-              const made = await questionnairesApi.start(clientId, { name: form.name.trim(), due_date: form.due || null, questions: form.questions });
+              const made = await questionnairesApi.start(clientId, { name: form.name.trim(), due_date: form.due || null, questions: form.questions, format: form.csv ? 'csv' : 'lines' });
               setStarting(false);
-              setForm({ name: '', due: '', questions: '' });
+              setForm({ name: '', due: '', questions: '', csv: false });
               changed(made);
             } catch (x) {
               fail(x);
@@ -215,7 +215,20 @@ export function QuestionnairesView() {
             <input aria-label="Name of the questionnaire" required minLength={3} placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={field} />
             <input aria-label="Due" type="date" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} className={field} />
           </div>
-          <textarea aria-label="Questions" required rows={6} placeholder="Paste the questions, one to a line" value={form.questions} onChange={(e) => setForm({ ...form, questions: e.target.value })} className={`${field} block w-full`} />
+          <textarea aria-label="Questions" required rows={6} placeholder="Paste the questions, one to a line" value={form.questions} onChange={(e) => setForm({ ...form, questions: e.target.value, csv: false })} className={`${field} block w-full`} />
+          <label className="block text-xs text-gray-400">
+            Or load a CSV file (the questions in a column headed Question, or the first column)
+            <input
+              aria-label="CSV file of questions"
+              type="file"
+              accept=".csv,text/csv"
+              className="mt-1 block text-xs"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void file.text().then((text) => setForm((f) => ({ ...f, questions: text, csv: true })));
+              }}
+            />
+          </label>
           <button type="submit" className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-500">
             Draft the answers
           </button>

@@ -220,3 +220,14 @@ async def test_a_questionnaire_can_be_deleted_with_its_questions_but_the_library
             w.birch, lambda db: ep.get_questionnaire(theirs.id, w.birch, db, SimpleNamespace(tenant_id=w.birch, user_id=None, email="x"))
         )
     ).name == "theirs"
+
+
+def test_questions_come_out_of_a_customers_csv_by_the_question_column_or_the_first_column():
+    with_header = 'No.,Question,Notes\n1,Do you encrypt data at rest?,x\n2,"Is MFA required,\nfor admins?",y\n3,Do you encrypt data at rest?,dup\n,,\n'
+    assert rules.questions_from_csv(with_header) == ["Do you encrypt data at rest?", "Is MFA required, for admins?"]
+    assert rules.questions_from_csv("Questions\nHow are backups tested?\n") == ["How are backups tested?"]
+    assert rules.questions_from_csv("How are backups tested?,answer here\nWho approves access?,\n") == ["How are backups tested?", "Who approves access?"]
+    assert rules.questions_from_csv("﻿Question\nIs there a DR plan?\n") == ["Is there a DR plan?"], "a byte-order mark from Excel does not hide the heading"
+    assert rules.questions_from_csv("") == []
+    assert rules.questions_from_csv("No.,Question\n1,\n") == []
+    assert len(rules.questions_from_csv("Question\n" + "\n".join(f"Question number {i} about security?" for i in range(900)))) == rules.MAX_QUESTIONS

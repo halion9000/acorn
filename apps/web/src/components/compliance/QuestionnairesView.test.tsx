@@ -75,7 +75,20 @@ describe('QuestionnairesView', () => {
     await userEvent.type(screen.getByLabelText('Name of the questionnaire'), 'Birch review');
     await userEvent.type(screen.getByLabelText('Questions'), 'Do you encrypt data?');
     await userEvent.click(screen.getByRole('button', { name: 'Draft the answers' }));
-    await waitFor(() => expect(api.start).toHaveBeenCalledWith('', { name: 'Birch review', due_date: null, questions: 'Do you encrypt data?' }));
+    await waitFor(() => expect(api.start).toHaveBeenCalledWith('', { name: 'Birch review', due_date: null, questions: 'Do you encrypt data?', format: 'lines' }));
+  });
+
+  it('starts a questionnaire from a CSV file, sending its text marked as CSV', async () => {
+    api.start.mockResolvedValue(detail());
+    render(<QuestionnairesView />);
+    await screen.findByTestId('questionnaire-row');
+    await userEvent.click(screen.getByRole('button', { name: 'Start a questionnaire' }));
+    await userEvent.type(screen.getByLabelText('Name of the questionnaire'), 'Birch review');
+    const csv = 'No.,Question\n1,Do you encrypt data?\n';
+    await userEvent.upload(screen.getByLabelText('CSV file of questions'), new File([csv], 'q.csv', { type: 'text/csv' }));
+    await waitFor(() => expect((screen.getByLabelText('Questions') as HTMLTextAreaElement).value).toBe(csv));
+    await userEvent.click(screen.getByRole('button', { name: 'Draft the answers' }));
+    await waitFor(() => expect(api.start).toHaveBeenCalledWith('', { name: 'Birch review', due_date: null, questions: csv, format: 'csv' }));
   });
 
   it('asks the form for no customer name, and deletes a questionnaire only after a yes', async () => {

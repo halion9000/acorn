@@ -47,6 +47,9 @@ STAY_ROUTES = {
     ("DELETE", "/ledger/publish/{slug}"),
     # A person recording what they made of an agent proposal (the proposal log, added after this permission was split).
     ("POST", "/agent-proposals/{proposal_id}/outcome"),
+    # Opening or reporting an AI investigation creates a case and a ticket for the alert, so it needs the full cases:write (added after this permission was split).
+    ("POST", "/alerts/{alert_id}/investigation/open"),
+    ("POST", "/alerts/{alert_id}/investigation/report"),
 }
 
 
@@ -121,14 +124,14 @@ class TestTheRoutes:
     def test_a_key_holding_only_cases_work_can_use_exactly_those_four_routes_in_the_whole_application(self):
         assert _satisfied_by(["cases:work"]) == WORK_ROUTES
 
-    def test_exactly_these_ten_routes_still_need_cases_write_and_cases_work_does_not_reach_them(self):
+    def test_exactly_these_routes_still_need_cases_write_and_cases_work_does_not_reach_them(self):
         found = {
             (m, p) for p, r in ALL_ROUTES if "cases:write" in required_permissions(r) for m in r.methods if m not in {"HEAD", "OPTIONS"}
         }
-        assert found == STAY_ROUTES and len(found) == 12
+        assert found == STAY_ROUTES and len(found) == 14
         assert not (_satisfied_by(["cases:work"]) & STAY_ROUTES)
 
-    def test_whoever_held_cases_write_still_reaches_all_fourteen_routes(self):
+    def test_whoever_held_cases_write_still_reaches_every_one_of_these_routes(self):
         assert _satisfied_by(["cases:write"]) >= WORK_ROUTES | STAY_ROUTES
 
     def test_neither_cases_work_nor_cases_write_grants_cases_delete(self):

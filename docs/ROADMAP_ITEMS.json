@@ -270,9 +270,9 @@
     "key": "cases-work-permission-test",
     "title": "Fix the cases-work permission route test that already fails (expects ten routes, finds twelve)",
     "area": "Quality",
-    "status": "new",
+    "status": "completed",
     "needs": "claude",
-    "note": "Fails without my changes too."
+    "note": "Fixed 2026-11-16: the two AI investigation routes that create a case need cases:write; the test now lists them."
   },
   {
     "key": "index-plan-tests",
@@ -849,8 +849,9 @@
     "key": "r7-ai-22",
     "title": "A retention job for old sweep runs and check history",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Already built: the retention sweeper (services/api/app/workers/retention_sweeper.py) deletes old check status changes, count changes and score history (opt-in window); core_sweep_runs holds only the latest pass per source so it does not grow. Checked 2026-11-16."
   },
   {
     "key": "r7-ai-23",
@@ -899,8 +900,9 @@
     "key": "r7-ai-29",
     "title": "Questionnaires: import the questions from a CSV file",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16: a questionnaire can start from a CSV file (the Question column, or the first column); the page has a file picker and the API takes format csv."
   },
   {
     "key": "r7-ai-30",

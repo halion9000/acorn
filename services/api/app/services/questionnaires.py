@@ -38,6 +38,32 @@ def split_questions(text: str) -> list[str]:
     return out[:MAX_QUESTIONS]
 
 
+_QUESTION_HEADERS = ("question", "questions", "question text", "control question", "requirement", "description")
+
+
+def questions_from_csv(text: str) -> list[str]:
+    """The questions in a CSV file a customer sent (pure). The column is the one headed Question (or similar); with no such heading it is the first column, and a first row that is only a heading is skipped.
+    Line breaks inside a cell become spaces. Then the same clean-up as pasted text: numbering removed, blanks and repeats dropped, at most MAX_QUESTIONS."""
+    try:
+        rows = [r for r in csv.reader(io.StringIO(text.lstrip("\ufeff"))) if any(c.strip() for c in r)]
+    except csv.Error:
+        return []
+    if not rows:
+        return []
+    column = 0
+    header = [c.strip().lower() for c in rows[0]]
+    for name in _QUESTION_HEADERS:
+        if name in header:
+            column = header.index(name)
+            rows = rows[1:]
+            break
+    else:
+        if header[0] in _QUESTION_HEADERS:
+            rows = rows[1:]
+    cells = [" ".join(r[column].split()) for r in rows if len(r) > column]
+    return split_questions("\n".join(cells))
+
+
 def score(a: frozenset[str], b: frozenset[str]) -> int:
     """How much of the shorter question's words the other holds, in whole percent (0 when either has none)."""
     if not a or not b:

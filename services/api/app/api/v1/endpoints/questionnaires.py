@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, date, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
@@ -64,6 +64,8 @@ class QuestionnaireIn(BaseModel):
     customer: str | None = Field(default=None, max_length=200)
     due_date: date | None = None
     questions: str = Field(min_length=3, max_length=200_000)
+    # "csv": the text is the contents of a CSV file with the questions in one column (see rules.questions_from_csv).
+    format: Literal["lines", "csv"] = "lines"
 
 
 class ItemPatch(BaseModel):
@@ -299,9 +301,9 @@ async def list_questionnaires(
 async def start_questionnaire(
     body: QuestionnaireIn, tenant: ScopeTenant, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("reports:write"))]
 ) -> QuestionnaireDetail:
-    questions = rules.split_questions(body.questions)
+    questions = rules.questions_from_csv(body.questions) if body.format == "csv" else rules.split_questions(body.questions)
     if not questions:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No questions found. Paste them one to a line.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No questions found. Paste them one to a line, or give a CSV file with a Question column.")
     library = await _library(db, tenant)
     q = Questionnaire(
         id=uuid.uuid4(), tenant_id=tenant, name=body.name.strip(), customer=body.customer, due_date=body.due_date, created_by=_actor(user)
