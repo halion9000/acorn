@@ -32,6 +32,7 @@ export const PAGE_WORDS: Record<string, string[]> = {
   '/metrics/client-summary': ['client summary', 'review', 'qbr', 'print', 'pdf', 'customer dashboard', 'metrics'],
   '/finance/profitability': ['profit', 'margin', 'revenue', 'labor cost', 'money', 'finance'],
   '/finance/net-income': ['net income', 'profit', 'overhead', 'industry', 'utilization', 'hours', 'ranking', 'cost', 'finance'],
+  '/finance/billing-sync': ['billing sync', 'license', 'approve', 'push', 'halo', 'saas billing', 'difference', 'quantity'],
   '/compliance/audits': ['audit', 'auditor', 'evidence request', 'pbc', 'soc 2 audit'],
   '/compliance/trust-center': ['trust center', 'trust page', 'security page', 'customers', 'share compliance'],
   '/compliance/tests': ['tests', 'automated tests', 'control tests', 'continuous monitoring', 'passing', 'failing'],

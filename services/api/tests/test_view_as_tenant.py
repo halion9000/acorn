@@ -1361,6 +1361,7 @@ class TestCapabilities:
             "soc_analyst": [],
             "threat_hunter": [],
             "viewer": [],
+            "billing": [],
             "api_service": [],
         }
 

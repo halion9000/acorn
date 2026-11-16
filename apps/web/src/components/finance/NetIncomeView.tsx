@@ -103,6 +103,40 @@ export function missingNote(missing: string[]): string {
   return `Not entered for this month, so counted as zero: ${missing.map((c) => CATEGORY_LABELS[c] ?? c).join(', ')}.`;
 }
 
+/** The master sheet as rows, from pasted or uploaded CSV text (pure): name, industry, then non-profit (Non-Profit, yes, true or 1). A header row and blank lines are skipped; quoted cells may hold commas. */
+export function parseMasterCsv(text: string): { client_name: string; industry: string; non_profit: boolean; target_margin: null }[] {
+  const cells = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = '';
+    let quoted = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]!;
+      if (quoted) {
+        if (ch === '"' && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else if (ch === '"') quoted = false;
+        else cur += ch;
+      } else if (ch === '"') quoted = true;
+      else if (ch === ',') {
+        out.push(cur.trim());
+        cur = '';
+      } else cur += ch;
+    }
+    out.push(cur.trim());
+    return out;
+  };
+  const rows: { client_name: string; industry: string; non_profit: boolean; target_margin: null }[] = [];
+  text.split(/\r?\n/).forEach((line, i) => {
+    if (line.trim() === '') return;
+    const [name = '', industry = '', status = ''] = cells(line);
+    if (i === 0 && /client|name/i.test(name) && /industry/i.test(industry)) return;
+    if (name === '') return;
+    rows.push({ client_name: name, industry, non_profit: /^(non-?\s?profit|yes|true|y|1)$/i.test(status), target_margin: null });
+  });
+  return rows;
+}
+
 type Tab = 'net' | 'new' | 'industry' | 'hours' | 'rank' | 'inputs';
 const TABS: [Tab, string][] = [
   ['net', 'Revenue to net income'],
@@ -128,6 +162,7 @@ export function NetIncomeView() {
   const [cost, setCost] = useState({ category: 'overhead', client_name: '', amount: '', note: '' });
   const [master, setMaster] = useState({ client_name: '', industry: '', non_profit: false, target_margin: '' });
   const [hoursPer, setHoursPer] = useState('');
+  const [importText, setImportText] = useState('');
 
   const load = useCallback(async (m: string) => {
     try {
@@ -221,7 +256,7 @@ export function NetIncomeView() {
               <thead className="bg-gray-900/60 text-xs uppercase text-gray-500">
                 <tr>
                   <th className="px-3 py-2 text-left">Client</th>
-                  {['Revenue', 'Direct labor', 'True-up', 'Add-on sw', 'Support sw', 'Travel', 'Equipment', 'Hardware', 'Gross profit', 'Gross %', 'Sales/mktg', 'Overhead', 'Net income', 'Net %'].map((h) => (
+                  {['Revenue', 'Direct labor', 'True-up', 'Add-on sw', 'Support sw', 'Travel', 'Equipment', 'Gross profit', 'Gross %', 'Sales/mktg', 'Overhead', 'Net income', 'Net %'].map((h) => (
                     <th key={h} className={th}>
                       {h}
                     </th>
@@ -242,7 +277,6 @@ export function NetIncomeView() {
                     <td className={td}>{money(r.support_software)}</td>
                     <td className={td}>{money(r.travel)}</td>
                     <td className={td}>{money(r.equipment)}</td>
-                    <td className={td}>{money(r.hardware)}</td>
                     <td className={td}>{money(r.gross_profit)}</td>
                     <td className={td}>{pct(r.gross_margin)}</td>
                     <td className={td}>{money(r.sales_marketing)}</td>
@@ -255,7 +289,7 @@ export function NetIncomeView() {
               <tfoot className="border-t border-gray-700 text-gray-100">
                 <tr>
                   <td className="px-3 py-2 text-left font-medium">Total</td>
-                  {(['revenue', 'direct_labor', 'labor_trueup', 'addon_software', 'support_software', 'travel', 'equipment', 'hardware', 'gross_profit'] as const).map((k) => (
+                  {(['revenue', 'direct_labor', 'labor_trueup', 'addon_software', 'support_software', 'travel', 'equipment', 'gross_profit'] as const).map((k) => (
                     <td key={k} className={td}>{money(report.totals[k] as number)}</td>
                   ))}
                   <td className={td}>{pct(report.totals.gross_margin as number | null)}</td>
@@ -418,7 +452,7 @@ export function NetIncomeView() {
             <p className="mb-2 text-xs text-gray-500">Name a client to charge it directly; leave the client empty to spread across the month&apos;s clients by revenue. Payroll, sales and marketing and overhead are always company-wide.</p>
             <div className="flex flex-wrap items-end gap-2">
               <select aria-label="Category" className={input} value={cost.category} onChange={(e) => setCost({ ...cost, category: e.target.value })}>
-                {(inputs?.categories ?? Object.keys(CATEGORY_LABELS)).map((c) => (
+                {(inputs?.categories ?? Object.keys(CATEGORY_LABELS)).filter((c) => c !== 'hardware').map((c) => (
                   <option key={c} value={c}>
                     {CATEGORY_LABELS[c] ?? c}
                   </option>
@@ -486,6 +520,29 @@ export function NetIncomeView() {
                 </li>
               ))}
             </ul>
+          </section>
+          <section>
+            <h2 className="mb-2 text-sm font-semibold text-white">Import the client master</h2>
+            <p className="mb-2 text-xs text-gray-500">Paste or choose a CSV with three columns: client, industry, and Non-Profit or For-Profit. Clients already in the master are updated, never duplicated.</p>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              aria-label="Client master file"
+              className="mb-2 block text-xs text-gray-300"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void f.text().then(setImportText);
+              }}
+            />
+            <textarea aria-label="Client master CSV" className={`${input} h-28 w-full font-mono text-xs`} value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="Client,Industry,Non-profit" />
+            <button
+              type="button"
+              className={`${ghost} mt-2`}
+              disabled={busy || parseMasterCsv(importText).length === 0}
+              onClick={() => void send('/api/v1/finance/profitability/clients/import', 'PUT', { rows: parseMasterCsv(importText) }).then(() => setImportText(''))}
+            >
+              Import {parseMasterCsv(importText).length} clients
+            </button>
           </section>
           <section>
             <h2 className="mb-2 text-sm font-semibold text-white">Hours a person can work in a month</h2>

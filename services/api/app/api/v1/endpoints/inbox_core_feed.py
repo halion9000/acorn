@@ -564,6 +564,7 @@ class ClaimedAction(BaseModel):
         "addigy_push",
         "sc_command",
         "ninja_deploy",
+        "halo_billing_update",
     ]
     incident_uid: str
     params: dict[str, Any]

@@ -107,7 +107,7 @@ def test_what_has_not_been_entered_is_zero_and_named_not_guessed():
     r = pf.full_month(SNAP, [], "2026-10", COSTS, MASTER)
     assert r["missing"] == ["addon_software", "support_software", "equipment"]
     empty = pf.full_month(SNAP, [], "2026-10", [], {})
-    assert empty["missing"] == list(pf.CATEGORIES)
+    assert empty["missing"] == [c for c in pf.CATEGORIES if c != "hardware"], "hardware is billed as passthrough, so it is never missing"
     assert (
         empty["totals"]["labor_trueup"] == D("0.00")
         and empty["totals"]["net_income"] == empty["totals"]["revenue"] - empty["totals"]["direct_labor"]
@@ -255,7 +255,7 @@ async def test_inputs_typed_on_the_page_change_the_analysis_and_replace_rather_t
     out = await with_db(tenant.id, lambda db: ep.profitability_analysis(tenant.user, db, "2026-10"))
     acme = out["report"]["rows"][0]
     assert (acme["travel"], acme["industry"], acme["labor_trueup"]) == (D("50.00"), "Dental", D("80.33"))
-    assert out["report"]["missing"] == ["addon_software", "support_software", "equipment", "hardware", "sales_marketing"]
+    assert out["report"]["missing"] == ["addon_software", "support_software", "equipment", "sales_marketing"]
     assert out["industries"][0]["industry"] == "Dental" and out["annual"]["rows"][0]["rank"] == 1
 
     await with_db(
@@ -286,3 +286,41 @@ async def test_inputs_typed_on_the_page_change_the_analysis_and_replace_rather_t
     with pytest.raises(HTTPException) as bad:
         await with_db(tenant.id, lambda db: ep.save_client_master(ep.ClientMasterIn(client_name="!!!"), req, tenant.user, db))
     assert bad.value.status_code == 422
+
+    imported = await with_db(
+        tenant.id,
+        lambda db: ep.import_client_master(
+            ep.ClientMasterImportIn(
+                rows=[
+                    ep.ClientMasterIn(client_name="Birch Law", industry="Legal", non_profit=False),
+                    ep.ClientMasterIn(client_name="A Glimmer of Hope", industry="Charity", non_profit=True),
+                    ep.ClientMasterIn(client_name="a glimmer of hope", industry="Charity", non_profit=True),
+                    ep.ClientMasterIn(client_name="!!!"),
+                ]
+            ),
+            req,
+            tenant.user,
+            db,
+        ),
+    )
+    assert imported == {"saved": 2, "skipped": 1}, "a repeated name is one client and a nameless row is skipped"
+    after = await with_db(tenant.id, lambda db: ep.profitability_inputs(tenant.user, db))
+    assert {m["client_name"]: (m["industry"], m["non_profit"]) for m in after["master"]} == {
+        "Birch Law": ("Legal", False),
+        "a glimmer of hope": ("Charity", True),
+    }
+    again = await with_db(
+        tenant.id,
+        lambda db: ep.import_client_master(
+            ep.ClientMasterImportIn(rows=[ep.ClientMasterIn(client_name="Birch Law", industry="Law firm")]), req, tenant.user, db
+        ),
+    )
+    assert again["saved"] == 1
+    assert (
+        next(
+            m
+            for m in (await with_db(tenant.id, lambda db: ep.profitability_inputs(tenant.user, db)))["master"]
+            if m["client_name"] == "Birch Law"
+        )["industry"]
+        == "Law firm"
+    ), "importing again updates rather than duplicates"

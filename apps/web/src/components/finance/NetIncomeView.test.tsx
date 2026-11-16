@@ -6,7 +6,7 @@ const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 vi.mock('@/lib/saveFile', () => ({ saveText: vi.fn() }));
 
-import { COMPANY_WIDE, NetIncomeView, missingNote } from './NetIncomeView';
+import { COMPANY_WIDE, NetIncomeView, missingNote, parseMasterCsv } from './NetIncomeView';
 
 const zeros = { labor_trueup: 0, addon_software: 0, support_software: 0, travel: 0, equipment: 0, hardware: 0, sales_marketing: 0, overhead: 0 };
 const row = (over: Record<string, unknown> = {}) => ({
@@ -67,6 +67,15 @@ describe('the pure parts', () => {
   it('names the parts of the number that are not entered, or says all are', () => {
     expect(missingNote(['addon_software', 'equipment'])).toBe('Not entered for this month, so counted as zero: Add-on software, Equipment.');
     expect(missingNote([])).toBe('Every cost category has an entry for this month.');
+  });
+  it('reads the master sheet from CSV: header skipped, quoted commas kept, non-profit recognized', () => {
+    const csv = ['Client,Industry,Non-profit', '"Acme Dental, Inc.",Medical,For-Profit', '', 'A Glimmer of Hope,Charity,Non-Profit', ',Empty,No', 'Birch Law,Legal,yes'].join('\r\n');
+    expect(parseMasterCsv(csv)).toEqual([
+      { client_name: 'Acme Dental, Inc.', industry: 'Medical', non_profit: false, target_margin: null },
+      { client_name: 'A Glimmer of Hope', industry: 'Charity', non_profit: true, target_margin: null },
+      { client_name: 'Birch Law', industry: 'Legal', non_profit: true, target_margin: null },
+    ]);
+    expect(parseMasterCsv('')).toEqual([]);
   });
   it('knows which categories are company-wide', () => {
     expect(COMPANY_WIDE).toEqual(['payroll_cogs', 'sales_marketing', 'overhead']);
@@ -148,6 +157,19 @@ describe('the Net income page', () => {
     await waitFor(() => {
       const put = authFetch.mock.calls.find(([u, i]) => String(u).endsWith('/profitability/clients') && i?.method === 'PUT');
       expect(JSON.parse(put![1].body)).toEqual({ client_name: 'Birch Law', industry: 'Legal', non_profit: false, target_margin: null });
+    });
+  });
+
+  it('imports pasted master rows in one call', async () => {
+    render(<NetIncomeView />);
+    await screen.findByTestId('net-table');
+    await userEvent.click(screen.getByRole('tab', { name: 'Inputs' }));
+    await userEvent.click(screen.getByLabelText('Client master CSV'));
+    await userEvent.paste(['Birch Law,Legal,For-Profit', 'A Glimmer of Hope,Charity,Non-Profit'].join('\n'));
+    await userEvent.click(screen.getByRole('button', { name: 'Import 2 clients' }));
+    await waitFor(() => {
+      const put = authFetch.mock.calls.find(([u, i]) => String(u).endsWith('/profitability/clients/import') && i?.method === 'PUT');
+      expect(JSON.parse(put![1].body).rows).toHaveLength(2);
     });
   });
 });

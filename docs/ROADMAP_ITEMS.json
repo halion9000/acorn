@@ -1574,7 +1574,7 @@
     "key": "rw-profitability",
     "title": "Sales and Finance > Profitability and Net income: client profit by month from Halo, typed or QuickBooks costs, and the finance workbook's other sheets",
     "detail": "Built: Profitability (Halo revenue, hours, labor at a rate per agent, team or default 65.00, what is left after labor) and Net income with six tabs: revenue to net income per client (direct labor, payroll true-up, add-on and support software, travel, equipment, hardware, sales and marketing split across new clients, overhead), new clients, by industry, hours and utilization, a twelve-month ranking with size tiers and the 20% target, and an Inputs tab for the costs, the client master and available hours. Costs are typed until QuickBooks is connected; a missing cost counts as zero and is named. Still to add: the QuickBooks sync that fills the cost lines, and spreading by monthly recurring revenue instead of invoiced revenue.",
-    "note": "Needs from Hal: burdened hourly rates by role (until then the 65.00 default), where hardware cost comes from, and the industry and non-profit status of each client (typed on the Inputs tab)."
+    "note": "Needs from Hal: burdened hourly rates by role (until then the 65.00 default). Hardware is passthrough (no cost line). The client master is imported from the Client Master sheet on the Inputs tab."
   },
   {
     "status": "in_progress",
@@ -1594,12 +1594,13 @@
     "note": "Needs Hal's sign-off on how clients sign in (a client user role, per-client scoping, MFA) before it is built."
   },
   {
-    "status": "not_started",
-    "needs": "signoff",
+    "status": "in_progress",
+    "needs": "hal",
     "area": "Billing",
     "key": "rw-billing-sync",
     "title": "SaaS billing sync (from Rewst saas-billing): approve license-count differences and push them to HaloPSA",
-    "detail": "Rewst shows vendor license counts against Halo billing lines per organization and type, with Approve, Approve Selected, Hide, Hide Zero Differences and Refresh. A.C.O.R.N has the counts (Settings > Billing); missing is the approve-and-push to Halo recurring invoice lines. Writes to Halo billing: needs sign-off on the approval and audit design."
+    "detail": "Built: Sales and Finance > Billing sync (differences list, filters, Approve, Approve selected, Hide, Show hidden, Refresh) and the built-in Billing role (Viewer reads plus billing:push, no second approval). CORE's halo_billing_update sets the client's recurring invoice line to the counted quantity with read-before-write checks and a read-back that restores the lines if Halo did not end up as expected.",
+    "note": "NOT VERIFIED against the live HaloPSA: Hal to give someone the Billing role and watch the first approval in Halo (the quantity, and that the other lines stayed)."
   },
   {
     "status": "not_started",
@@ -1689,13 +1690,13 @@
     "completed_ref": null
   },
   {
-    "status": "not_started",
-    "needs": "hal",
+    "status": "in_progress",
+    "needs": "claude",
     "area": "Devices",
     "key": "ninja-warranty",
     "title": "NinjaOne warranty dates on devices",
-    "detail": "The device detail API has no warranty field; the option is the serial number from computer-systems plus a vendor lookup.",
-    "note": "Needs Hal: re-enable the NinjaOne connection that turned itself off, or choose the vendor lookup.",
+    "detail": "Devices show the warranty end date when NinjaOne's device list carries one, and the maker's own warranty page for Dell and Lenovo from the serial number. Whether NinjaOne's device list really carries a warranty date is not confirmed.",
+    "note": "",
     "completed_ref": null
   },
   {

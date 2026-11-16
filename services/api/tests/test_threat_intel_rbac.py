@@ -46,7 +46,7 @@ from fastapi import HTTPException
 
 
 WRITE_ROLES = ("admin", "platform_admin", "tenant_admin", "soc_lead", "threat_hunter")
-READ_ONLY_ROLES = ("soc_analyst", "viewer", "api_service")
+READ_ONLY_ROLES = ("soc_analyst", "viewer", "billing", "api_service")
 
 
 @pytest.mark.parametrize("role", WRITE_ROLES)

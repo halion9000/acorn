@@ -13,6 +13,7 @@ import typing
 
 import pytest
 from app.api.v1.endpoints import alert_scripts as scripts
+from app.api.v1.endpoints import billing_sync
 from app.api.v1.endpoints import identity_halo_user as halo_user
 from app.api.v1.endpoints.inbox_core_feed import SourceReport
 from app.services import alert_ticket_rules as ticket_rules
@@ -43,6 +44,7 @@ CONTRACT = [
             quarantine_release.ALLOW_ACTION,
             halo_user.ACTION,
             tool_deploy_rules.ACTION_ADDIGY,
+            billing_sync.ACTION,
         ],
         "alert_vendor_actions.py (approve, reject, resolve), alert_scripts.SCRIPT_ACTION and alert_ticket_rules.ACTION",
     ),

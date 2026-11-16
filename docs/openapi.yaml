@@ -2649,6 +2649,40 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/finance/profitability/clients/import:
+    put:
+      tags:
+      - finance
+      summary: Import Client Master
+      description: Add or update many clients at once (the master sheet pasted or
+        uploaded as a CSV on the page). A row with no usable name is skipped; the
+        last row wins when a name repeats. One audit line.
+      operationId: import_client_master_api_v1_finance_profitability_clients_import_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientMasterImportIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: integer
+                type: object
+                title: Response Import Client Master Api V1 Finance Profitability
+                  Clients Import Put
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/reports/ticket-metrics:
     get:
       tags:
@@ -12901,7 +12935,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PushOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__client_environment__PushOut'
         '422':
           description: Validation Error
           content:
@@ -18913,7 +18947,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SyncOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__inventory__SyncOut'
         '422':
           description: Validation Error
           content:
@@ -21133,6 +21167,102 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/sync:
+    get:
+      tags:
+      - billing
+      summary: List Sync
+      description: The differences between what is billed and what is counted, with
+        what has been hidden and the last push of each line.
+      operationId: list_sync_api_v1_billing_sync_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: show_hidden
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Show Hidden
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__billing_sync__SyncOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/sync/approve:
+    post:
+      tags:
+      - billing
+      summary: Approve
+      description: Queue the push of the counted quantity to HaloPSA for each line.
+        The quantity is the one A.C.O.R.N counts NOW (never one the caller sends),
+        so an approval cannot set an arbitrary number.
+      operationId: approve_api_v1_billing_sync_approve_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ApproveResult'
+                type: array
+                title: Response Approve Api V1 Billing Sync Approve Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/billing/sync/hide:
+    post:
+      tags:
+      - billing
+      summary: Hide
+      description: Hide lines from the list (or bring them back). Hiding changes nothing
+        at HaloPSA.
+      operationId: hide_api_v1_billing_sync_hide_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HideIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: integer
+                type: object
+                title: Response Hide Api V1 Billing Sync Hide Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/inbox/core-feed/{tenant_token}/canary-tunnel:
     post:
       tags:
@@ -32013,6 +32143,41 @@ components:
       - created_at
       - updated_at
       title: ApprovalResponse
+    ApproveIn:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__billing_sync__ItemIn'
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Items
+      type: object
+      required:
+      - items
+      title: ApproveIn
+    ApproveResult:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        invoice_item:
+          type: string
+          title: Invoice Item
+        ok:
+          type: boolean
+          title: Ok
+        detail:
+          type: string
+          title: Detail
+      type: object
+      required:
+      - client_id
+      - invoice_item
+      - ok
+      - detail
+      title: ApproveResult
     ApprovedItem:
       properties:
         id:
@@ -35425,6 +35590,7 @@ components:
           - addigy_push
           - sc_command
           - ninja_deploy
+          - halo_billing_update
           title: Action
         incident_uid:
           type: string
@@ -35734,6 +35900,18 @@ components:
       - id
       - name
       title: ClientItem
+    ClientMasterImportIn:
+      properties:
+        rows:
+          items:
+            $ref: '#/components/schemas/ClientMasterIn'
+          type: array
+          maxItems: 2000
+          title: Rows
+      type: object
+      required:
+      - rows
+      title: ClientMasterImportIn
     ClientMasterIn:
       properties:
         client_name:
@@ -43627,6 +43805,23 @@ components:
       required:
       - hidden
       title: HiddenRequest
+    HideIn:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__billing_sync__ItemIn'
+          type: array
+          maxItems: 500
+          minItems: 1
+          title: Items
+        hidden:
+          type: boolean
+          title: Hidden
+          default: true
+      type: object
+      required:
+      - items
+      title: HideIn
     HideOut:
       properties:
         device_id:
@@ -50434,19 +50629,6 @@ components:
       - device_id
       - tool
       title: PushIn
-    PushOut:
-      properties:
-        queued:
-          type: boolean
-          title: Queued
-        message:
-          type: string
-          title: Message
-      type: object
-      required:
-      - queued
-      - message
-      title: PushOut
     QuarantineInfo:
       properties:
         available:
@@ -57410,54 +57592,47 @@ components:
           default: true
       type: object
       title: SyncIn
-    SyncOut:
+    SyncRow:
       properties:
-        dry_run:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        invoice_item:
+          type: string
+          title: Invoice Item
+        billed:
+          type: integer
+          title: Billed
+        counted:
+          type: integer
+          title: Counted
+        difference:
+          type: integer
+          title: Difference
+        hidden:
           type: boolean
-          title: Dry Run
-        devices:
-          type: integer
-          title: Devices
-          description: Workstations and handhelds NinjaOne and Addigy report.
-        by_category:
-          additionalProperties:
-            type: integer
-          type: object
-          title: By Category
-        matched:
-          type: integer
-          title: Matched
-          description: 'Already in the inventory (same serial number): left exactly
-            as they are.'
-        matched_in_stock:
-          type: integer
-          title: Matched In Stock
-          description: 'Of those, how many the inventory says are checked in although
-            a tool reports them: worth a look.'
-        created:
-          type: integer
-          title: Created
-          description: New items, added as checked out at the device's client.
-        refreshed:
-          type: integer
-          title: Refreshed
-          description: Items made by an earlier sync, brought up to date.
-        no_serial:
-          type: integer
-          title: No Serial
-          description: Devices without a usable serial number (added by device id,
-            never matched to a list item).
+          title: Hidden
+        can_push:
+          type: boolean
+          title: Can Push
+        push:
+          $ref: '#/components/schemas/app__api__v1__endpoints__billing_sync__PushOut'
       type: object
       required:
-      - dry_run
-      - devices
-      - by_category
-      - matched
-      - matched_in_stock
-      - created
-      - refreshed
-      - no_serial
-      title: SyncOut
+      - client_id
+      - client_name
+      - invoice_item
+      - billed
+      - counted
+      - difference
+      - hidden
+      - can_push
+      - push
+      title: SyncRow
     SystemChoice:
       properties:
         system:
@@ -62853,6 +63028,76 @@ components:
       - note
       - difference
       title: NoteIn
+    app__api__v1__endpoints__billing_sync__ItemIn:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        invoice_item:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Invoice Item
+      type: object
+      required:
+      - client_id
+      - invoice_item
+      title: ItemIn
+    app__api__v1__endpoints__billing_sync__PushOut:
+      properties:
+        status:
+          type: string
+          title: Status
+        quantity:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Quantity
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: By
+        at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: At
+      type: object
+      required:
+      - status
+      title: PushOut
+    app__api__v1__endpoints__billing_sync__SyncOut:
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        rows:
+          items:
+            $ref: '#/components/schemas/SyncRow'
+          type: array
+          title: Rows
+        hidden:
+          type: integer
+          title: Hidden
+        can_push:
+          type: boolean
+          title: Can Push
+      type: object
+      required:
+      - generated_at
+      - rows
+      - hidden
+      - can_push
+      title: SyncOut
     app__api__v1__endpoints__business_context__UpdateRuleRequest:
       properties:
         yaml:
@@ -62906,6 +63151,19 @@ components:
       required:
       - events
       title: TimelineResponse
+    app__api__v1__endpoints__client_environment__PushOut:
+      properties:
+        queued:
+          type: boolean
+          title: Queued
+        message:
+          type: string
+          title: Message
+      type: object
+      required:
+      - queued
+      - message
+      title: PushOut
     app__api__v1__endpoints__client_review__AnswerIn:
       properties:
         section:
@@ -64762,6 +65020,54 @@ components:
       - categories
       - unmatched_customers
       title: Summary
+    app__api__v1__endpoints__inventory__SyncOut:
+      properties:
+        dry_run:
+          type: boolean
+          title: Dry Run
+        devices:
+          type: integer
+          title: Devices
+          description: Workstations and handhelds NinjaOne and Addigy report.
+        by_category:
+          additionalProperties:
+            type: integer
+          type: object
+          title: By Category
+        matched:
+          type: integer
+          title: Matched
+          description: 'Already in the inventory (same serial number): left exactly
+            as they are.'
+        matched_in_stock:
+          type: integer
+          title: Matched In Stock
+          description: 'Of those, how many the inventory says are checked in although
+            a tool reports them: worth a look.'
+        created:
+          type: integer
+          title: Created
+          description: New items, added as checked out at the device's client.
+        refreshed:
+          type: integer
+          title: Refreshed
+          description: Items made by an earlier sync, brought up to date.
+        no_serial:
+          type: integer
+          title: No Serial
+          description: Devices without a usable serial number (added by device id,
+            never matched to a list item).
+      type: object
+      required:
+      - dry_run
+      - devices
+      - by_category
+      - matched
+      - matched_in_stock
+      - created
+      - refreshed
+      - no_serial
+      title: SyncOut
     app__api__v1__endpoints__investigations__EventOut:
       properties:
         id:

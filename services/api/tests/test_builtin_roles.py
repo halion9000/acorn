@@ -10,8 +10,8 @@ def listed():
     return asyncio.run(rbac.list_builtin_roles(current_user=None))
 
 
-def test_the_five_roles_an_administrator_can_hand_out_are_listed_in_order():
-    assert [r.key for r in listed()] == ["viewer", "soc_analyst", "threat_hunter", "soc_lead", "tenant_admin"]
+def test_the_six_roles_an_administrator_can_hand_out_are_listed_in_order():
+    assert [r.key for r in listed()] == ["viewer", "soc_analyst", "threat_hunter", "soc_lead", "billing", "tenant_admin"]
     assert [r.label for r in listed()][-1] == "Administrator"
 
 

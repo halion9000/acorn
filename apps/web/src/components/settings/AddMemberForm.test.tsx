@@ -35,7 +35,7 @@ describe('memberFormProblems', () => {
   });
 
   it('offers only roles an administrator can reasonably hand out, never a platform or service role', () => {
-    expect(MEMBER_ROLES.map((r) => r.value)).toEqual(['viewer', 'soc_analyst', 'threat_hunter', 'soc_lead', 'tenant_admin']);
+    expect(MEMBER_ROLES.map((r) => r.value)).toEqual(['viewer', 'soc_analyst', 'threat_hunter', 'soc_lead', 'billing', 'tenant_admin']);
   });
 });
 

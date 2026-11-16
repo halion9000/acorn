@@ -11,6 +11,7 @@ export const MEMBER_ROLES: { value: string; label: string; hint: string }[] = [
   { value: 'soc_analyst', label: 'SOC analyst', hint: 'Works alerts and cases.' },
   { value: 'threat_hunter', label: 'Threat hunter', hint: 'Analyst who also runs hunts and queries.' },
   { value: 'soc_lead', label: 'SOC lead', hint: 'Analyst who also manages the team and rules.' },
+  { value: 'billing', label: 'Billing', hint: 'Reads the billing pages and can approve license-count differences and push them to HaloPSA.' },
   { value: 'tenant_admin', label: 'Administrator', hint: 'Manages the workspace, its members and settings.' },
 ];
 

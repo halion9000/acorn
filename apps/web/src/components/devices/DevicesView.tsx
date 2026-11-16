@@ -844,6 +844,7 @@ function DeviceRowView({ d, master, picked, onPick, open, onToggle, onHide, onMe
               <Field label="OS version" value={d.os_version} />
               <Field label="IP addresses" value={d.ip_addresses.join(', ')} />
               <Field label="Last logged-in user" value={lastUserText(d)} />
+              <WarrantyField d={d} />
               <Field label="First seen" value={when(d.first_seen)} />
               {specs(d).map(([label, value]) => (
                 <Field key={label} label={label} value={value} />
@@ -1058,6 +1059,34 @@ export function flatDetails(s: DeviceRow['sources'][number]): [string, string][]
 export function detailRows(s: DeviceRow['sources'][number]): [string, string][] {
   const f = facts(s);
   return f.length > 0 ? f : flatDetails(s);
+}
+
+/** Warranty from the tools that know it: the end date a feed reported (NinjaOne), and the maker's own lookup page when CORE could build one from the make and serial number (Dell, Lenovo). Both null when neither is known. */
+export function warrantyOf(d: DeviceRow): { end: string | null; lookupUrl: string | null } {
+  const pick = (key: string) => d.sources.map((s) => s.details?.[key]).find((v) => typeof v === 'string' && v !== '');
+  const end = pick('warranty_end');
+  const url = pick('warranty_lookup_url');
+  const date = typeof end === 'string' ? end.slice(0, 10) : null;
+  return { end: date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null, lookupUrl: typeof url === 'string' && /^https:\/\/[^\s]+$/i.test(url) && url.length <= 300 ? url : null };
+}
+
+function WarrantyField({ d }: { d: DeviceRow }) {
+  const w = warrantyOf(d);
+  if (!w.end && !w.lookupUrl) return null;
+  return (
+    <div className="flex gap-2">
+      <dt className="w-28 shrink-0 text-gray-500">Warranty</dt>
+      <dd>
+        {w.end ? `ends ${w.end}` : ''}
+        {w.end && w.lookupUrl ? ', ' : ''}
+        {w.lookupUrl && (
+          <a href={w.lookupUrl} target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:underline" onClick={(e) => e.stopPropagation()}>
+            check with the maker
+          </a>
+        )}
+      </dd>
+    </div>
+  );
 }
 
 function Field({ label, value }: { label: string; value: string | null }) {

@@ -184,6 +184,18 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "mssp:read",
         "remediation:read",
     ],
+    # The billing role: everything a Viewer can see (the client pickers and navigation need it) and may approve a license-count difference and push it to HaloPSA (Billing sync). It sees no prices, margins or other finance pages.
+    "billing": [
+        "clients:view",
+        "alerts:read",
+        "cases:read",
+        "reports:read",
+        "threat_intel:read",
+        "mssp:read",
+        "remediation:read",
+        "billing:view",
+        "billing:push",
+    ],
     "api_service": [
         "alerts:read",
         "alerts:write",

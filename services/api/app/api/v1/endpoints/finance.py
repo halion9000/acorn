@@ -574,3 +574,61 @@ async def save_finance_settings(
         request=request,
     )
     await db.commit()
+
+
+class ClientMasterImportIn(BaseModel):
+    rows: list[ClientMasterIn] = Field(max_length=2000)
+
+
+@router.put("/profitability/clients/import")
+async def import_client_master(
+    body: ClientMasterImportIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession
+) -> dict[str, int]:
+    """Add or update many clients at once (the master sheet pasted or uploaded as a CSV on the page). A row with no usable name is skipped; the last row wins when a name repeats. One audit line."""
+    existing = (await db.execute(select(FinanceClientMaster).where(FinanceClientMaster.tenant_id == user.tenant_id))).scalars().all()
+    by_key = {r.client_key: r for r in existing}
+    now = datetime.now(UTC)
+    wanted: dict[str, ClientMasterIn] = {}
+    skipped = 0
+    for row in body.rows:
+        key = profit.name_key(row.client_name)
+        if not key:
+            skipped += 1
+            continue
+        wanted[key] = row
+    for key, row in wanted.items():
+        name, industry = " ".join(row.client_name.split()), " ".join(row.industry.split())
+        found = by_key.get(key)
+        if found is None:
+            db.add(
+                FinanceClientMaster(
+                    tenant_id=user.tenant_id,
+                    client_key=key,
+                    client_name=name,
+                    industry=industry,
+                    non_profit=row.non_profit,
+                    target_margin=row.target_margin,
+                    updated_at=now,
+                )
+            )
+        else:
+            found.client_name, found.industry, found.non_profit, found.target_margin, found.updated_at = (
+                name,
+                industry,
+                row.non_profit,
+                row.target_margin,
+                now,
+            )
+    await db.flush()
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="finance_client_master:imported",
+        resource="finance_client_master",
+        resource_id="import",
+        changes={"saved": len(wanted), "skipped": skipped},
+        request=request,
+    )
+    await db.commit()
+    return {"saved": len(wanted), "skipped": skipped}

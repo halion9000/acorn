@@ -113,6 +113,7 @@ BUILTIN_ASSIGNABLE: tuple[tuple[str, str, str], ...] = (
     ("soc_analyst", "SOC analyst", "Works alerts and cases."),
     ("threat_hunter", "Threat hunter", "Analyst who also runs hunts and queries."),
     ("soc_lead", "SOC lead", "Analyst who also manages the team and rules."),
+    ("billing", "Billing", "Reads the billing pages and can approve license-count differences and push them to HaloPSA."),
     ("tenant_admin", "Administrator", "Manages the workspace, its members and settings."),
 )
 

@@ -423,6 +423,7 @@ const navSections: NavSection[] = [
     items: [
       { label: 'Profitability', href: '/finance/profitability', icon: <ScanIcon /> },
       { label: 'Net income', href: '/finance/net-income', icon: <ScanIcon /> },
+      { label: 'Billing sync', href: '/finance/billing-sync', icon: <ScanIcon /> },
     ],
   },
   {

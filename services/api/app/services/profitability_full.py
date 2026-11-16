@@ -15,6 +15,7 @@ from app.services.finance import money
 from app.services.profitability import ZERO, name_key, profit_for_month, rate_for, resolve_rates
 
 CATEGORIES = ("payroll_cogs", "addon_software", "support_software", "travel", "equipment", "hardware", "sales_marketing", "overhead")
+PASSTHROUGH = ("hardware",)  # billed to the client at cost, so there is no cost line to enter: never reported as missing
 DEFAULT_TARGET = Decimal("20")
 TIERS = (20, 40, 60, 80, 120)
 _ROW_COSTS = ("labor_trueup", "addon_software", "support_software", "travel", "equipment", "hardware", "sales_marketing", "overhead")
@@ -143,7 +144,7 @@ def full_month(
         "month": month,
         "rows": out_rows,
         "totals": totals,
-        "missing": [c for c in CATEGORIES if c not in entered],
+        "missing": [c for c in CATEGORIES if c not in entered and c not in PASSTHROUGH],
         "unmatched_hours": base["unmatched_hours"],
         "agents_on_default_rate": base["agents_on_default_rate"],
         "new_clients": [{"client_key": k, "client_name": rows[k]["client_name"], "revenue": rows[k]["revenue"]} for k in new_keys],
