@@ -400,8 +400,9 @@
     "key": "r7-ci-03",
     "title": "Keep the last 14 durations of each sweep and flag one that doubles",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16 (CORE 189401d): fourteen pass durations kept per tool; the doctor warns when the latest took twice the median of the earlier ones (a pass-line warning already existed)."
   },
   {
     "key": "r7-ci-04",
@@ -430,15 +431,17 @@
     "key": "r7-ci-07",
     "title": "Per-connector circuit breaker: pause a failing vendor for an hour and say so",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16 (CORE 16e7acb): three passes in a row that read nothing pause a tool for an hour (said once); a good pass closes it."
   },
   {
     "key": "r7-ci-08",
     "title": "A single status page of what CORE is doing now: running sweeps and when each started",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16 (CORE 6d46991): the health file lists the passes running now with their start times; the doctor warns on one over 90 minutes."
   },
   {
     "key": "r7-ci-09",
@@ -583,8 +586,9 @@
     "key": "r7-ci-27",
     "title": "Replace silent catch blocks in sweeps with counted dropped metrics",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "in_progress",
+    "needs": "claude",
+    "note": "2026-11-16 (CORE 59f001f): the tool sweeps now count dropped licence counts, vulnerability and application lists and say so in the pass line. Other sweeps (CIPP, sign-ins, Huntress) still have silent catch blocks."
   },
   {
     "key": "r7-ci-28",
