@@ -21,6 +21,78 @@ const STATE_CLASS: Record<string, string> = {
   healthy: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300',
 };
 
+/** The owner of one control: the name, or a link to name one; editing saves on Enter or when the box is left. */
+function OwnerCell({ row, onSave }: { row: ControlList['rows'][number]; onSave: (owner: string) => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(row.owner ?? '');
+  const save = async () => {
+    setEditing(false);
+    if (text.trim() !== (row.owner ?? '')) await onSave(text.trim());
+  };
+  if (editing) {
+    return (
+      <input
+        aria-label={`Owner of ${row.control_id}`}
+        autoFocus
+        maxLength={120}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => void save()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void save();
+          if (e.key === 'Escape') {
+            setText(row.owner ?? '');
+            setEditing(false);
+          }
+        }}
+        className="w-36 rounded border border-gray-700 bg-gray-900 px-1.5 py-0.5 text-xs text-gray-100"
+      />
+    );
+  }
+  return (
+    <button type="button" aria-label={`Set owner of ${row.control_id}`} onClick={() => { setText(row.owner ?? ''); setEditing(true); }} className={`text-xs hover:underline ${row.owner ? 'text-gray-200' : 'text-gray-500'}`}>
+      {row.owner || 'Add owner'}
+    </button>
+  );
+}
+
+/** A small form under a control for adding a piece of evidence; it is saved as pending, to be accepted on the framework page. */
+function AddEvidence({ row, onAdd, onClose }: { row: ControlList['rows'][number]; onAdd: (kind: 'attestation' | 'policy' | 'runbook' | 'log' | 'other', summary: string) => Promise<void>; onClose: () => void }) {
+  const [kind, setKind] = useState<'attestation' | 'policy' | 'runbook' | 'log' | 'other'>('attestation');
+  const [summary, setSummary] = useState('');
+  const [busy, setBusy] = useState(false);
+  const field = 'rounded border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100';
+  return (
+    <form
+      className="flex flex-wrap items-start gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        try {
+          await onAdd(kind, summary.trim());
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <select aria-label={`Kind of evidence for ${row.control_id}`} value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} className={field}>
+        <option value="attestation">Attestation</option>
+        <option value="policy">Policy</option>
+        <option value="runbook">Runbook</option>
+        <option value="log">Log</option>
+        <option value="other">Other</option>
+      </select>
+      <textarea aria-label={`What the evidence for ${row.control_id} shows`} required minLength={5} rows={2} placeholder="What it shows, and where it is kept" value={summary} onChange={(e) => setSummary(e.target.value)} className={`${field} w-80`} />
+      <button type="submit" disabled={busy || summary.trim().length < 5} className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500 disabled:opacity-40">
+        Save evidence
+      </button>
+      <button type="button" onClick={onClose} className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800">
+        Cancel
+      </button>
+    </form>
+  );
+}
+
 export function ControlsView() {
   const [clientId, setClientId] = useState('');
   const isHome = useIsHomeClient(clientId);
@@ -30,6 +102,8 @@ export function ControlsView() {
   const [debounced, setDebounced] = useState('');
   const [data, setData] = useState<ControlList | null>(null);
   const [problem, setProblem] = useState('');
+  const [adding, setAdding] = useState<string | null>(null);
+  const [added, setAdded] = useState('');
 
   useEffect(() => {
     setClientId(clientFromAddress(window.location.search));
@@ -94,6 +168,11 @@ export function ControlsView() {
           {problem}
         </p>
       )}
+      {added && (
+        <p role="status" className="text-sm text-emerald-300">
+          {added}
+        </p>
+      )}
       {data === null && !problem && <p className="text-sm text-gray-400">Loading...</p>}
       {data && data.frameworks.length === 0 && (
         <p className="text-sm text-gray-400" data-testid="controls-none-on">
@@ -114,10 +193,12 @@ export function ControlsView() {
                 <th className="px-3 py-2">Framework</th>
                 <th className="px-3 py-2">Health</th>
                 <th className="px-3 py-2">Evidence</th>
+                <th className="px-3 py-2">Owner</th>
+                <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {data.rows.map((r) => (
+              {data.rows.flatMap((r) => [
                 <tr key={`${r.framework}-${r.control_id}`} data-testid="control-row">
                   <td className="px-3 py-2">
                     <Link href={clientId ? `${r.link}?client=${encodeURIComponent(clientId)}` : r.link} className="text-blue-300 hover:underline">
@@ -134,8 +215,38 @@ export function ControlsView() {
                     {r.accepted} accepted, {r.pending} pending, {r.rejected} rejected
                     {r.age_days !== null ? `; newest ${r.age_days} day${r.age_days === 1 ? '' : 's'} old` : ''}
                   </td>
-                </tr>
-              ))}
+                  <td className="px-3 py-2">
+                    <OwnerCell row={r} onSave={(owner) => controlsApi.setOwner(clientId, r.framework, r.control_id, owner).then(() => load()).catch((e) => setProblem(apiErrorDetail(e) ?? 'Could not save the owner.'))} />
+                  </td>
+                  <td className="px-3 py-2">
+                    <button type="button" aria-label={`Add evidence to ${r.control_id}`} onClick={() => setAdding(adding === `${r.framework}|${r.control_id}` ? null : `${r.framework}|${r.control_id}`)} className="text-xs text-blue-300 hover:underline">
+                      Add evidence
+                    </button>
+                  </td>
+                </tr>,
+                ...(adding === `${r.framework}|${r.control_id}`
+                  ? [
+                      <tr key={`${r.framework}-${r.control_id}-add`} data-testid="add-evidence-row">
+                        <td colSpan={6} className="bg-gray-900/40 px-3 py-3">
+                          <AddEvidence
+                            row={r}
+                            onClose={() => setAdding(null)}
+                            onAdd={(kind, summary) =>
+                              controlsApi
+                                .addEvidence(clientId, { framework: r.framework, control_id: r.control_id, control_title: r.title, evidence_kind: kind, summary })
+                                .then(() => {
+                                  setAdding(null);
+                                  setAdded(`Evidence added to ${r.control_id}. It waits for review on the ${r.framework} page.`);
+                                  return load();
+                                })
+                                .catch((e) => setProblem(apiErrorDetail(e) ?? 'Could not add the evidence.'))
+                            }
+                          />
+                        </td>
+                      </tr>,
+                    ]
+                  : []),
+              ])}
             </tbody>
           </table>
         </div>

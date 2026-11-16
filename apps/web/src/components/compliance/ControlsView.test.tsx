@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ list: vi.fn() }));
+const api = vi.hoisted(() => ({ list: vi.fn(), setOwner: vi.fn(), addEvidence: vi.fn() }));
 const csv = vi.hoisted(() => vi.fn());
 const save = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/saveFile', () => ({ saveText: save }));
@@ -25,6 +25,10 @@ beforeEach(() => {
   save.mockReset();
   csv.mockResolvedValue('a,b\n1,2\n');
   api.list.mockReset();
+  api.setOwner.mockReset();
+  api.addEvidence.mockReset();
+  api.addEvidence.mockResolvedValue({ id: 'e1', status: 'pending' });
+  api.setOwner.mockResolvedValue({});
   api.list.mockResolvedValue(list());
   window.history.replaceState(null, '', '/compliance/controls');
 });
@@ -91,5 +95,83 @@ describe('ControlsView export', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
     expect(save).not.toHaveBeenCalled();
+  });
+});
+
+describe('control owners', () => {
+  it('shows the owner of a control, or a way to add one', async () => {
+    api.list.mockResolvedValue(list([row({ owner: 'Dana Reyes' }), row({ control_id: 'CC1.2' })]));
+    render(<ControlsView />);
+    const rows = await screen.findAllByTestId('control-row');
+    expect(rows[0]).toHaveTextContent('Dana Reyes');
+    expect(rows[1]).toHaveTextContent('Add owner');
+  });
+
+  it('names an owner on Enter, saves it for that control, and reloads the list', async () => {
+    render(<ControlsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Set owner of CC1.1' }));
+    await userEvent.type(screen.getByLabelText('Owner of CC1.1'), 'Lee Park{Enter}');
+    await waitFor(() => expect(api.setOwner).toHaveBeenCalledWith('', 'SOC2', 'CC1.1', 'Lee Park'));
+    await waitFor(() => expect(api.list.mock.calls.length).toBeGreaterThan(1));
+  });
+
+  it('saves nothing when the owner was not changed, and Escape drops the edit', async () => {
+    api.list.mockResolvedValue(list([row({ owner: 'Dana Reyes' })]));
+    render(<ControlsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Set owner of CC1.1' }));
+    await userEvent.type(screen.getByLabelText('Owner of CC1.1'), '{Enter}');
+    expect(api.setOwner).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Set owner of CC1.1' }));
+    await userEvent.type(screen.getByLabelText('Owner of CC1.1'), 'x{Escape}');
+    expect(api.setOwner).not.toHaveBeenCalled();
+  });
+
+  it('clears the owner when the box is emptied', async () => {
+    api.list.mockResolvedValue(list([row({ owner: 'Dana Reyes' })]));
+    render(<ControlsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Set owner of CC1.1' }));
+    await userEvent.clear(screen.getByLabelText('Owner of CC1.1'));
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(api.setOwner).toHaveBeenCalledWith('', 'SOC2', 'CC1.1', ''));
+  });
+});
+
+describe('adding evidence from the Controls page', () => {
+  it('opens a form under the control, saves the evidence for that control and says it waits for review', async () => {
+    render(<ControlsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Add evidence to CC1.1' }));
+    await userEvent.selectOptions(screen.getByLabelText('Kind of evidence for CC1.1'), 'policy');
+    await userEvent.type(screen.getByLabelText('What the evidence for CC1.1 shows'), 'Code of conduct, kept in SharePoint');
+    await userEvent.click(screen.getByRole('button', { name: 'Save evidence' }));
+    await waitFor(() =>
+      expect(api.addEvidence).toHaveBeenCalledWith('', {
+        framework: 'SOC2',
+        control_id: 'CC1.1',
+        control_title: 'Integrity and ethical values',
+        evidence_kind: 'policy',
+        summary: 'Code of conduct, kept in SharePoint',
+      }),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent('Evidence added to CC1.1. It waits for review on the SOC2 page.');
+    expect(screen.queryByTestId('add-evidence-row')).toBeNull();
+  });
+
+  it('will not save a summary that is too short, and Cancel closes the form without saving', async () => {
+    render(<ControlsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Add evidence to CC1.1' }));
+    await userEvent.type(screen.getByLabelText('What the evidence for CC1.1 shows'), 'abc');
+    expect((screen.getByRole('button', { name: 'Save evidence' }) as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByTestId('add-evidence-row')).toBeNull();
+    expect(api.addEvidence).not.toHaveBeenCalled();
+  });
+
+  it('shows the reason when the evidence is refused', async () => {
+    api.addEvidence.mockRejectedValue(new Error('Evidence needs a longer summary.'));
+    render(<ControlsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Add evidence to CC1.1' }));
+    await userEvent.type(screen.getByLabelText('What the evidence for CC1.1 shows'), 'long enough');
+    await userEvent.click(screen.getByRole('button', { name: 'Save evidence' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Evidence needs a longer summary.');
   });
 });

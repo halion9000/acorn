@@ -8073,6 +8073,8 @@ export interface ControlRowT {
   newest_evidence: string | null;
   age_days: number | null;
   link: string;
+  /** Who answers for this control, when someone was named. */
+  owner?: string | null;
 }
 export interface ControlList {
   enabled: string[];
@@ -8089,6 +8091,15 @@ export const controlsApi = {
     if (f.q) extra.set('q', f.q);
     return request<ControlList>(`/api/v1/compliance/controls?${riskQs(clientId, extra.toString())}`);
   },
+  /** Adds a piece of evidence to a control; it waits as pending until a person accepts it. */
+  addEvidence: (clientId: string, body: { framework: string; control_id: string; control_title: string; evidence_kind: 'attestation' | 'policy' | 'runbook' | 'log' | 'screenshot' | 'other'; summary: string }) =>
+    request<{ id: string; status: string }>(`/api/v1/compliance/evidence?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  /** Names who owns a control; an empty owner clears it. */
+  setOwner: (clientId: string, framework: string, controlId: string, owner: string) =>
+    request<{ framework: string; control_id: string; owner: string | null }>(`/api/v1/compliance/controls/${encodeURIComponent(framework)}/${encodeURIComponent(controlId)}/owner?${riskQs(clientId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ owner }),
+    }),
 };
 
 /** Detected applications: the apps found in a client's Microsoft 365 tenant (GET /api/v1/compliance/detected-applications ...). */

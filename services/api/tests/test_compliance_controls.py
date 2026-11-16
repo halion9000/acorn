@@ -133,3 +133,52 @@ async def test_another_client_sees_none_of_it_and_nothing_on_means_nothing_liste
     assert other.enabled == [] and other.rows == [] and other.total == 0
     nonsense = await run(w.acme, lambda db: ep.list_controls(w.acme, db, w.user, "NOPE", None, ""))
     assert nonsense.frameworks == [] and nonsense.rows == []
+
+
+def test_an_owner_shows_on_its_control_and_the_search_finds_a_control_by_owner():
+    owners = {("SOC2", "CC1.1"): "Dana Reyes"}
+    rows = ep.build_rows(["SOC2"], {}, NOW, "", owners)
+    by = {r.control_id: r for r in rows}
+    assert by["CC1.1"].owner == "Dana Reyes" and by["CC1.2"].owner is None
+    found = ep.build_rows(["SOC2"], {}, NOW, "dana", owners)
+    assert [r.control_id for r in found] == ["CC1.1"]
+    assert ep.build_rows(["HIPAA"], {}, NOW, "dana", owners) == [], "an owner of one framework's control does not match another's"
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_an_owner_can_be_named_changed_and_cleared_and_only_that_client_sees_it(world):
+    w = world
+    async with w.engine.begin() as conn:
+        await conn.execute(text("insert into compliance_enabled_frameworks (tenant_id, framework) values (:t, 'SOC2')"), {"t": w.acme})
+    user = SimpleNamespace(tenant_id=w.acme, user_id=None, email="admin@example.test")
+
+    async def listed(tenant=w.acme, who=w.user):
+        out = await run(tenant, lambda db: ep.list_controls(tenant, db, who, None, None, ""))
+        return {r.control_id: r.owner for r in out.rows}
+
+    assert (await listed())["CC1.1"] is None
+    named = await run(w.acme, lambda db: ep.set_owner("SOC2", "CC1.1", ep.OwnerIn(owner="  Dana   Reyes "), w.acme, db, user))
+    assert named.owner == "Dana Reyes", "spacing is tidied"
+    assert (await listed())["CC1.1"] == "Dana Reyes"
+    await run(w.acme, lambda db: ep.set_owner("SOC2", "CC1.1", ep.OwnerIn(owner="Lee Park"), w.acme, db, user))
+    assert (await listed())["CC1.1"] == "Lee Park", "a second owner replaces the first"
+    assert (await run(w.acme, lambda db: ep.owners_by_control(db, w.acme, ["SOC2"]))) == {("SOC2", "CC1.1"): "Lee Park"}
+    other = await run(w.birch, lambda db: ep.owners_by_control(db, w.birch, ["SOC2"]))
+    assert other == {}, "another client sees no owner"
+    cleared = await run(w.acme, lambda db: ep.set_owner("SOC2", "CC1.1", ep.OwnerIn(owner="   "), w.acme, db, user))
+    assert cleared.owner is None
+    assert (await listed())["CC1.1"] is None
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_naming_an_owner_for_a_control_that_does_not_exist_is_refused(world):
+    from fastapi import HTTPException
+
+    w = world
+    user = SimpleNamespace(tenant_id=w.acme, user_id=None, email="admin@example.test")
+    for fw, cid in (("SOC2", "NOPE-1"), ("NOFRAMEWORK", "CC1.1")):
+        with pytest.raises(HTTPException) as err:
+            await run(w.acme, lambda db: ep.set_owner(fw, cid, ep.OwnerIn(owner="x"), w.acme, db, user))
+        assert err.value.status_code == 404

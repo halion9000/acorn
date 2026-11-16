@@ -543,8 +543,9 @@
     "key": "r7-ci-21",
     "title": "A dead-letter file for feed posts A.C.O.R.N refused with 4xx, counted on the health page",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16 (CORE 39da894): reports A.C.O.R.N refuses with 400, 413, 415 or 422 are kept in aisoc-dead-letters.json, counted on the health file and warned on by the doctor."
   },
   {
     "key": "r7-ci-22",
@@ -735,8 +736,9 @@
     "key": "r7-ai-06",
     "title": "A keyboard shortcut help dialog opened with the question mark key",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16: the ? key opens a list of the keyboard shortcuts that exist (Ctrl or Cmd K, ?, Esc) from anywhere that is not a text box."
   },
   {
     "key": "r7-ai-07",
@@ -926,15 +928,17 @@
     "key": "r7-ai-32",
     "title": "Add a piece of evidence to a control from the Controls page",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16: the Controls page has Add evidence on each control (kind and summary); it is saved as pending through the existing evidence route."
   },
   {
     "key": "r7-ai-33",
     "title": "Give each control an owner",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16 (migration 197): each control can have an owner, named on the Controls page, searchable, in the CSV export; tested on a real Postgres including that another client sees none."
   },
   {
     "key": "r7-ai-34",

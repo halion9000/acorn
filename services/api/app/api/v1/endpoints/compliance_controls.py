@@ -9,13 +9,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Response
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import FRAMEWORKS, ScopeTenant
 from app.models.compliance_enabled_framework import ComplianceEnabledFramework
+from app.services import compliance_audit as audit
 from app.services import compliance_health, csv_export, evidence_age
 from app.services.compliance_catalog import CATALOGS
 
@@ -36,6 +37,7 @@ class ControlRow(BaseModel):
     newest_evidence: datetime | None  # when the newest accepted evidence was collected
     age_days: int | None
     link: str  # the framework page that holds this control's evidence
+    owner: str | None = None  # who answers for this control, when someone was named (migration 197)
 
 
 class ControlList(BaseModel):
@@ -50,14 +52,21 @@ def link_for(framework: str) -> str:
     return f"/compliance/{framework.lower().replace('-', '_')}"
 
 
-def build_rows(frameworks: list[str], evidence: dict[str, dict[str, dict[str, Any]]], now: datetime, query: str = "") -> list[ControlRow]:
-    """One row per control of each framework, with its state (pure). ``query`` keeps the controls whose id, title or group contains it (any case)."""
+def build_rows(
+    frameworks: list[str],
+    evidence: dict[str, dict[str, dict[str, Any]]],
+    now: datetime,
+    query: str = "",
+    owners: dict[tuple[str, str], str] | None = None,
+) -> list[ControlRow]:
+    """One row per control of each framework, with its state (pure). ``query`` keeps the controls whose id, title, group or owner contains it (any case). ``owners`` is {(framework, control id): owner}."""
+    owners = owners or {}
     q = query.strip().lower()
     out: list[ControlRow] = []
     for fw in frameworks:
         groups = {cid: group for group, cid, _title in CATALOGS[fw]}
         for cid, title in FRAMEWORKS[fw].items():
-            if q and q not in f"{cid} {title} {groups.get(cid, '')}".lower():
+            if q and q not in f"{cid} {title} {groups.get(cid, '')} {owners.get((fw, cid), '')}".lower():
                 continue
             e = evidence.get(fw, {}).get(cid, {})
             accepted, pending, rejected = int(e.get("accepted", 0)), int(e.get("pending", 0)), int(e.get("rejected", 0))
@@ -75,6 +84,7 @@ def build_rows(frameworks: list[str], evidence: dict[str, dict[str, dict[str, An
                     newest_evidence=newest,
                     age_days=evidence_age.age_days(newest, now) if accepted else None,
                     link=link_for(fw),
+                    owner=owners.get((fw, cid)),
                 )
             )
     return out
@@ -111,6 +121,20 @@ async def evidence_by_control(db: Any, tenant: Any, frameworks: list[str]) -> di
     return out
 
 
+async def owners_by_control(db: Any, tenant: Any, frameworks: list[str]) -> dict[tuple[str, str], str]:
+    """Who owns each control of the given frameworks: {(framework, control id): owner}."""
+    if not frameworks:
+        return {}
+    rows = (
+        await db.execute(
+            text("SELECT framework, control_id, owner FROM compliance_control_owners WHERE tenant_id = :t AND framework = ANY(CAST(:fws AS TEXT[]))").bindparams(
+                t=tenant, fws=frameworks
+            )
+        )
+    ).all()
+    return {(r.framework, r.control_id): r.owner for r in rows}
+
+
 _ORDER = {"unhealthy": 0, "at_risk": 1, "not_tested": 2, "healthy": 3}
 
 
@@ -129,7 +153,7 @@ async def list_controls(
     )
     shown = [framework] if framework and framework in FRAMEWORKS else ([] if framework else [f for f in enabled if f in FRAMEWORKS])
     evidence = await evidence_by_control(db, tenant, shown)
-    everything = build_rows(shown, evidence, now, q)
+    everything = build_rows(shown, evidence, now, q, await owners_by_control(db, tenant, shown))
     counts = dict.fromkeys(compliance_health.STATES, 0)
     for r in everything:
         counts[r.state] += 1
@@ -161,9 +185,49 @@ async def export_controls(
             "Rejected evidence",
             "Newest accepted evidence",
             "Age in days",
+            "Owner",
         ],
         [
-            [r.framework, r.control_id, r.title, r.group, r.state, r.accepted, r.pending, r.rejected, r.newest_evidence, r.age_days]
+            [r.framework, r.control_id, r.title, r.group, r.state, r.accepted, r.pending, r.rejected, r.newest_evidence, r.age_days, r.owner or ""]
             for r in out.rows
         ],
     )
+
+
+class OwnerIn(BaseModel):
+    owner: str | None = Field(default=None, max_length=120)  # empty or null clears the owner
+
+
+class OwnerOut(BaseModel):
+    framework: str
+    control_id: str
+    owner: str | None
+
+
+@router.put("/{framework}/{control_id}/owner", response_model=OwnerOut, summary="Name who owns a control, or clear the owner")
+async def set_owner(
+    framework: str,
+    control_id: str,
+    body: OwnerIn,
+    tenant: ScopeTenant,
+    db: DBSession,
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+) -> OwnerOut:
+    if framework not in FRAMEWORKS or control_id not in FRAMEWORKS[framework]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such control.")
+    owner = " ".join((body.owner or "").split())
+    if owner:
+        await db.execute(
+            text(
+                """
+                INSERT INTO compliance_control_owners (tenant_id, framework, control_id, owner, set_by, updated_at)
+                VALUES (:t, :f, :c, :o, :by, now())
+                ON CONFLICT (tenant_id, framework, control_id) DO UPDATE SET owner = EXCLUDED.owner, set_by = EXCLUDED.set_by, updated_at = now()
+                """
+            ).bindparams(t=tenant, f=framework, c=control_id, o=owner, by=getattr(user, "email", None))
+        )
+    else:
+        await db.execute(text("DELETE FROM compliance_control_owners WHERE tenant_id = :t AND framework = :f AND control_id = :c").bindparams(t=tenant, f=framework, c=control_id))
+    await audit.note(db, tenant, user, "control:owner_set", "control", f"{framework}:{control_id}", framework=framework, control=control_id, owner=owner or None)
+    await db.commit()
+    return OwnerOut(framework=framework, control_id=control_id, owner=owner or None)

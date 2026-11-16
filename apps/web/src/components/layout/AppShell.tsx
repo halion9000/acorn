@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar';
 import { HiddenPageGuard } from './HiddenPageGuard';
 import { TopBar } from './TopBar';
 import { CommandPalette } from './CommandPalette';
+import { ShortcutHelp } from './ShortcutHelp';
 import { TimeWindowProvider } from './TimeWindowProvider';
 import { TenantProvider } from './TenantProvider';
 import { TenantViewBanner } from './TenantViewBanner';
@@ -109,6 +110,7 @@ export function AppShell({ children }: AppShellProps) {
           </ClientOnly>
           <ClientOnly>
             <CommandPalette />
+            <ShortcutHelp />
           </ClientOnly>
         </div>
           </div>
