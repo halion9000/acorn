@@ -52,7 +52,13 @@ export function dueText(i: Pick<GovItem, 'state' | 'days_until' | 'next_due'>): 
   return i.days_until === 0 ? 'due today' : `due in ${i.days_until} day${i.days_until === 1 ? '' : 's'} (${i.next_due})`;
 }
 
-export function GovernancePanel() {
+/** The address with the client named, when one is chosen (the organization's own when not). */
+export function withClient(url: string, clientId: string): string {
+  return clientId ? `${url}${url.includes('?') ? '&' : '?'}client_id=${encodeURIComponent(clientId)}` : url;
+}
+
+export function GovernancePanel({ clientId = '' }: { clientId?: string } = {}) {
+  const scoped = useCallback((url: string, init?: RequestInit) => authFetch(withClient(url, clientId), init), [clientId]);
   const [items, setItems] = useState<GovItem[] | null>(null);
   const [kind, setKind] = useState<GovItem['kind']>('policy');
   const [title, setTitle] = useState('');
@@ -68,25 +74,31 @@ export function GovernancePanel() {
 
   const load = useCallback(async () => {
     try {
-      const res = await authFetch('/api/v1/governance');
+      const res = await scoped('/api/v1/governance');
       if (!res.ok) return;
       const body = (await res.json()) as unknown;
       if (Array.isArray(body)) setItems(body as GovItem[]);
     } catch {
       /* shows nothing */
     }
-  }, []);
+  }, [scoped]);
   const loadTemplates = useCallback(async () => {
     try {
-      const res = await authFetch('/api/v1/governance/templates');
+      const res = await scoped('/api/v1/governance/templates');
       if (!res.ok) return;
       const body = (await res.json()) as unknown;
       if (Array.isArray(body)) setTemplates(body as PolicyTemplate[]);
     } catch {
       /* shows no templates */
     }
-  }, []);
+  }, [scoped]);
   useEffect(() => {
+    // Another client: what was open, drafted or filled in belongs to the one before.
+    setItems(null);
+    setOpen(null);
+    setFilled(null);
+    setDraft('');
+    setProblem(null);
     void load();
     void loadTemplates();
   }, [load, loadTemplates]);
@@ -95,7 +107,7 @@ export function GovernancePanel() {
     setBusy(true);
     setProblem(null);
     try {
-      const res = await authFetch(url, { method, headers: { 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+      const res = await scoped(url, { method, headers: { 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
       if (!res.ok) {
         setProblem(res.status === 403 ? 'You can read this but not change it.' : `The change was not saved (${res.status}).`);
         return null;
@@ -110,14 +122,14 @@ export function GovernancePanel() {
   };
 
   const loadVersions = async (id: string) => {
-    const res = await authFetch(`/api/v1/governance/${id}/versions`);
+    const res = await scoped(`/api/v1/governance/${id}/versions`);
     setOpen({ id, versions: res.ok ? ((await res.json()) as Version[]) : [] });
     setDraft('');
   };
   const toggleVersions = async (id: string) => (open?.id === id ? setOpen(null) : loadVersions(id));
   const showFilled = async (id: string, version: number) => {
     if (filled?.id === id && filled.version === version) return setFilled(null);
-    const res = await authFetch(`/api/v1/governance/${id}/rendered?version=${version}`);
+    const res = await scoped(`/api/v1/governance/${id}/rendered?version=${version}`);
     if (!res.ok) return setProblem(`The text could not be filled in (${res.status}).`);
     const body = (await res.json()) as { text: string; missing: string[] };
     setFilled({ id, version, text: body.text, missing: body.missing });

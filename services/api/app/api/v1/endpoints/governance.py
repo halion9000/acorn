@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
+from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.governance import GovernanceItem, GovernanceVersion
 from app.models.tenant import Tenant
 from app.services import governance as gov
@@ -113,13 +114,13 @@ async def _version_counts(db: DBSession, tenant: uuid.UUID) -> dict[uuid.UUID, i
 
 
 @router.get("", response_model=list[ItemOut], dependencies=[Depends(require_permission("reports:read"))])
-async def list_items(user: AuthUser, db: DBSession) -> list[ItemOut]:
+async def list_items(tenant: ScopeTenant, user: AuthUser, db: DBSession) -> list[ItemOut]:
     today = _today()
     rows = (
         (
             await db.execute(
                 select(GovernanceItem)
-                .where(GovernanceItem.tenant_id == user.tenant_id, GovernanceItem.archived_at.is_(None))
+                .where(GovernanceItem.tenant_id == tenant, GovernanceItem.archived_at.is_(None))
                 .order_by(GovernanceItem.next_due, GovernanceItem.title)
                 .limit(MAX_ITEMS)
             )
@@ -127,26 +128,27 @@ async def list_items(user: AuthUser, db: DBSession) -> list[ItemOut]:
         .scalars()
         .all()
     )
-    counts = await _version_counts(db, user.tenant_id)
+    counts = await _version_counts(db, tenant)
     return [_out(r, counts.get(r.id, 0), today) for r in rows]
 
 
 @router.post("", response_model=ItemOut, status_code=status.HTTP_201_CREATED)
 async def create_item(
+    tenant: ScopeTenant,
     body: ItemIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("reports:write"))], db: DBSession
 ) -> ItemOut:
     count = (
         await db.execute(
             select(func.count())
             .select_from(GovernanceItem)
-            .where(GovernanceItem.tenant_id == user.tenant_id, GovernanceItem.archived_at.is_(None))
+            .where(GovernanceItem.tenant_id == tenant, GovernanceItem.archived_at.is_(None))
         )
     ).scalar_one()
     if count >= MAX_ITEMS:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"There are already {MAX_ITEMS} items; archive some first.")
     today = _today()
     row = GovernanceItem(
-        tenant_id=user.tenant_id,
+        tenant_id=tenant,
         kind=body.kind,
         title=body.title.strip(),
         owner=body.owner.strip(),
@@ -159,7 +161,7 @@ async def create_item(
     await db.flush()
     await emit_audit(
         db=db,
-        tenant_id=user.tenant_id,
+        tenant_id=tenant,
         actor_id=user.user_id,
         action="governance_item:created",
         resource="governance_item",
@@ -174,13 +176,14 @@ async def create_item(
 
 @router.patch("/{item_id}", response_model=ItemOut)
 async def update_item(
+    tenant: ScopeTenant,
     item_id: uuid.UUID,
     body: ItemPatch,
     request: Request,
     user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
     db: DBSession,
 ) -> ItemOut:
-    row = await _item(db, user.tenant_id, item_id)
+    row = await _item(db, tenant, item_id)
     changed = body.model_dump(exclude_unset=True)
     for k, v in changed.items():
         if v is None:
@@ -188,7 +191,7 @@ async def update_item(
         setattr(row, k, v.strip() if isinstance(v, str) else v)
     await emit_audit(
         db=db,
-        tenant_id=user.tenant_id,
+        tenant_id=tenant,
         actor_id=user.user_id,
         action="governance_item:updated",
         resource="governance_item",
@@ -198,21 +201,22 @@ async def update_item(
     )
     await db.commit()
     await db.refresh(row)
-    return _out(row, (await _version_counts(db, user.tenant_id)).get(row.id, 0), _today())
+    return _out(row, (await _version_counts(db, tenant)).get(row.id, 0), _today())
 
 
 @router.post("/{item_id}/reviewed", response_model=ItemOut)
 async def mark_reviewed(
+    tenant: ScopeTenant,
     item_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("reports:write"))], db: DBSession
 ) -> ItemOut:
     """Reviewed today: the last-reviewed date is today and the next one is today plus the interval."""
-    row = await _item(db, user.tenant_id, item_id)
+    row = await _item(db, tenant, item_id)
     today = _today()
     row.last_reviewed_at = today
     row.next_due = gov.next_due_after_review(today, row.interval_days)
     await emit_audit(
         db=db,
-        tenant_id=user.tenant_id,
+        tenant_id=tenant,
         actor_id=user.user_id,
         action="governance_item:reviewed",
         resource="governance_item",
@@ -222,19 +226,20 @@ async def mark_reviewed(
     )
     await db.commit()
     await db.refresh(row)
-    return _out(row, (await _version_counts(db, user.tenant_id)).get(row.id, 0), today)
+    return _out(row, (await _version_counts(db, tenant)).get(row.id, 0), today)
 
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def archive_item(
+    tenant: ScopeTenant,
     item_id: uuid.UUID, request: Request, user: Annotated[AuthUser, Depends(require_permission("reports:write"))], db: DBSession
 ) -> None:
     """Archive (hide), never delete: its versions and audit trail stay."""
-    row = await _item(db, user.tenant_id, item_id)
+    row = await _item(db, tenant, item_id)
     row.archived_at = datetime.now(UTC)
     await emit_audit(
         db=db,
-        tenant_id=user.tenant_id,
+        tenant_id=tenant,
         actor_id=user.user_id,
         action="governance_item:archived",
         resource="governance_item",
@@ -246,13 +251,13 @@ async def archive_item(
 
 
 @router.get("/{item_id}/versions", response_model=list[VersionOut], dependencies=[Depends(require_permission("reports:read"))])
-async def list_versions(item_id: uuid.UUID, user: AuthUser, db: DBSession) -> list[VersionOut]:
-    await _item(db, user.tenant_id, item_id)
+async def list_versions(tenant: ScopeTenant, item_id: uuid.UUID, user: AuthUser, db: DBSession) -> list[VersionOut]:
+    await _item(db, tenant, item_id)
     rows = (
         (
             await db.execute(
                 select(GovernanceVersion)
-                .where(GovernanceVersion.item_id == item_id, GovernanceVersion.tenant_id == user.tenant_id)
+                .where(GovernanceVersion.item_id == item_id, GovernanceVersion.tenant_id == tenant)
                 .order_by(GovernanceVersion.version.desc())
             )
         )
@@ -264,6 +269,7 @@ async def list_versions(item_id: uuid.UUID, user: AuthUser, db: DBSession) -> li
 
 @router.post("/{item_id}/versions", response_model=VersionOut, status_code=status.HTTP_201_CREATED)
 async def add_version(
+    tenant: ScopeTenant,
     item_id: uuid.UUID,
     body: VersionIn,
     request: Request,
@@ -271,14 +277,14 @@ async def add_version(
     db: DBSession,
 ) -> VersionOut:
     """Save a new numbered version of a policy's text. An old version is never changed."""
-    row = await _item(db, user.tenant_id, item_id)
+    row = await _item(db, tenant, item_id)
     if row.kind != "policy":
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only a policy keeps versions of its text.")
     latest = (
         await db.execute(select(func.coalesce(func.max(GovernanceVersion.version), 0)).where(GovernanceVersion.item_id == item_id))
     ).scalar_one()
     v = GovernanceVersion(
-        tenant_id=user.tenant_id,
+        tenant_id=tenant,
         item_id=item_id,
         version=latest + 1,
         body=body.body,
@@ -289,7 +295,7 @@ async def add_version(
     await db.flush()
     await emit_audit(
         db=db,
-        tenant_id=user.tenant_id,
+        tenant_id=tenant,
         actor_id=user.user_id,
         action="governance_version:added",
         resource="governance_item",
@@ -332,14 +338,14 @@ async def _client_name(db: DBSession, tenant: uuid.UUID) -> str:
 
 
 @router.get("/templates", response_model=list[TemplateOut], dependencies=[Depends(require_permission("reports:read"))])
-async def list_templates(user: AuthUser, db: DBSession) -> list[TemplateOut]:
+async def list_templates(tenant: ScopeTenant, user: AuthUser, db: DBSession) -> list[TemplateOut]:
     """The policy templates, and whether each is already in the library."""
-    name = await _client_name(db, user.tenant_id)
+    name = await _client_name(db, tenant)
     have = set(
         (
             await db.execute(
                 select(GovernanceItem.title).where(
-                    GovernanceItem.tenant_id == user.tenant_id, GovernanceItem.kind == "policy", GovernanceItem.archived_at.is_(None)
+                    GovernanceItem.tenant_id == tenant, GovernanceItem.kind == "policy", GovernanceItem.archived_at.is_(None)
                 )
             )
         ).scalars()
@@ -359,6 +365,7 @@ async def list_templates(user: AuthUser, db: DBSession) -> list[TemplateOut]:
 
 @router.post("/from-template", response_model=ItemOut, status_code=status.HTTP_201_CREATED)
 async def create_from_template(
+    tenant: ScopeTenant,
     body: FromTemplate, request: Request, user: Annotated[AuthUser, Depends(require_permission("reports:write"))], db: DBSession
 ) -> ItemOut:
     """Add a policy to the library from a template: its text becomes version 1 with the fields left as fields."""
@@ -368,7 +375,7 @@ async def create_from_template(
     exists = (
         await db.execute(
             select(GovernanceItem.id).where(
-                GovernanceItem.tenant_id == user.tenant_id,
+                GovernanceItem.tenant_id == tenant,
                 GovernanceItem.kind == "policy",
                 GovernanceItem.title == template.title,
                 GovernanceItem.archived_at.is_(None),
@@ -379,7 +386,7 @@ async def create_from_template(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="That policy is already in the library.")
     today = _today()
     row = GovernanceItem(
-        tenant_id=user.tenant_id,
+        tenant_id=tenant,
         kind="policy",
         title=template.title,
         owner=body.owner.strip(),
@@ -392,7 +399,7 @@ async def create_from_template(
     await db.flush()
     db.add(
         GovernanceVersion(
-            tenant_id=user.tenant_id,
+            tenant_id=tenant,
             item_id=row.id,
             version=1,
             body=template.body,
@@ -402,7 +409,7 @@ async def create_from_template(
     )
     await emit_audit(
         db=db,
-        tenant_id=user.tenant_id,
+        tenant_id=tenant,
         actor_id=user.user_id,
         action="governance_item:created_from_template",
         resource="governance_item",
@@ -417,15 +424,16 @@ async def create_from_template(
 
 @router.get("/{item_id}/rendered", response_model=RenderedOut, dependencies=[Depends(require_permission("reports:read"))])
 async def rendered_version(
+    tenant: ScopeTenant,
     item_id: uuid.UUID, user: AuthUser, db: DBSession, version: Annotated[int | None, Query(ge=1, le=100_000)] = None
 ) -> RenderedOut:
     """A policy's text (the newest version, or the one asked for) with the organization, owner, version, dates filled in."""
-    item = await _item(db, user.tenant_id, item_id)
-    q = select(GovernanceVersion).where(GovernanceVersion.item_id == item_id, GovernanceVersion.tenant_id == user.tenant_id)
+    item = await _item(db, tenant, item_id)
+    q = select(GovernanceVersion).where(GovernanceVersion.item_id == item_id, GovernanceVersion.tenant_id == tenant)
     q = q.where(GovernanceVersion.version == version) if version is not None else q.order_by(GovernanceVersion.version.desc()).limit(1)
     v = (await db.execute(q)).scalars().first()
     if v is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That policy has no such version.")
-    values = pt.field_values(await _client_name(db, user.tenant_id), item.owner, v.version, v.created_at.date(), item.next_due, _today())
+    values = pt.field_values(await _client_name(db, tenant), item.owner, v.version, v.created_at.date(), item.next_due, _today())
     text = pt.render(v.body, values)
     return RenderedOut(title=item.title, version=v.version, text=text, missing=[f for f in pt.fields_used(text) if f in pt.FIELDS])
