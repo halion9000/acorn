@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 
-import { TicketRules } from "./TicketRules";
-import { ScriptRules } from "./ScriptRules";
-import { ScriptLog } from "./ScriptLog";
+import Link from "next/link";
+
 import { ToolInstalls } from "./ToolInstalls";
 import { TicketSettings } from "./TicketSettings";
 
@@ -14,9 +13,9 @@ export default function TicketSettingsPage() {
   return (
     <>
       <TicketSettings />
-      <TicketRules />
-      <ScriptRules />
-      <ScriptLog />
+      <p className="mx-auto max-w-2xl px-6 text-sm text-gray-400" data-testid="automation-moved">
+        The automatic ticket rules, the automatic script rules and the script log are now under <Link href="/automation/tickets" className="text-blue-300 hover:underline">Automation</Link> in the menu.
+      </p>
       <ToolInstalls />
     </>
   );

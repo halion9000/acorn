@@ -18,14 +18,14 @@ export const ROLE_PRESETS: RolePreset[] = [
     label: 'Read-only analyst',
     description: 'Sees alerts, cases and clients and can read everything, but changes nothing. Automation and platform administration are hidden.',
     // Platform used to hold only these pages and Settings; it now also holds the dashboards, which this role keeps.
-    hidden: ['section:Automation', 'section:vCIO', '/onboarding', '/mssp', '/analytics/team', '/sla', '/settings'],
+    hidden: ['section:Response & Defense', 'section:Automation', 'section:vCIO', '/onboarding', '/mssp', '/analytics/team', '/sla', '/settings'],
     permissions: ['*:read'],
   },
   {
     key: 'client-reviewer',
     label: 'Client reviewer (vCIO)',
     description: 'Works on client reviews and posture. Threat operations, intelligence, automation and platform settings are hidden.',
-    hidden: ['section:Threat Operations', 'section:Intelligence', 'section:Automation', '/settings', '/onboarding'],
+    hidden: ['section:Threat Operations', 'section:Intelligence', 'section:Response & Defense', 'section:Automation', '/settings', '/onboarding'],
     permissions: ['*:read'],
   },
   {

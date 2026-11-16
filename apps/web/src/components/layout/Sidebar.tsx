@@ -344,7 +344,7 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: 'Automation',
+    title: 'Response & Defense',
     items: [
       {
         label: 'Playbooks',
@@ -366,6 +366,14 @@ const navSections: NavSection[] = [
         href: '/purple-team',
         icon: <ShieldIcon />,
       },
+    ],
+  },
+  {
+    title: 'Automation',
+    items: [
+      { label: 'Auto Tickets', href: '/automation/tickets', icon: <DocumentReportIcon /> },
+      { label: 'Auto Scripts', href: '/automation/scripts', icon: <PlaybookIcon /> },
+      { label: 'HubSpot', href: '/automation/hubspot', icon: <InboxIcon /> },
     ],
   },
   {

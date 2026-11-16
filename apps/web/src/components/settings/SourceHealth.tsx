@@ -36,7 +36,7 @@ const HEALTH: Record<string, { text: string; className: string }> = {
 export function failureKind(message: string): string | null {
   const m = message.toLowerCase();
   if (!m) return null;
-  if (/refused the (api )?(key|token)|\b40[13]\b|unauthori[sz]ed|forbidden|can't read that/.test(m)) return "the tool refused the key";
+  if (/refused the (api |access )?(key|token)|\b40[13]\b|unauthori[sz]ed|forbidden|can't read that/.test(m)) return "the tool refused the key";
   if (/slow down|\b429\b|rate limit/.test(m)) return "the tool is rate limiting CORE";
   if (/didn't answer|timed out|timeout|\b50[234]\b/.test(m)) return "the tool is slow or down";
   if (/fetch failed|econnrefused|couldn't reach|a\.c\.o\.r\.n refused/.test(m)) return "A.C.O.R.N could not be reached";

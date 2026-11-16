@@ -1619,6 +1619,64 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/script-runs:
+    get:
+      tags:
+      - alerts
+      summary: The scripts CORE was asked to run, and what came of each
+      operationId: list_script_runs_api_v1_script_runs_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One client; omit for the organization and every client.
+          title: Client Id
+        description: One client; omit for the organization and every client.
+      - name: outcome
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - done
+            - failed
+            - waiting
+            type: string
+          - type: 'null'
+          description: Only scripts that ran (done), did not run (failed) or are still
+            waiting.
+          title: Outcome
+        description: Only scripts that ran (done), did not run (failed) or are still
+          waiting.
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 90
+          minimum: 1
+          default: 30
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScriptRunList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}/investigation/open:
     post:
       tags:
@@ -2857,29 +2915,65 @@ paths:
       - compliance
       summary: List Items
       operationId: list_items_api_v1_governance_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
+                type: array
                 items:
                   $ref: '#/components/schemas/app__api__v1__endpoints__governance__ItemOut'
-                type: array
                 title: Response List Items Api V1 Governance Get
-      security:
-      - HTTPBearer: []
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     post:
       tags:
       - compliance
       summary: Create Item
       operationId: create_item_api_v1_governance_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/app__api__v1__endpoints__governance__ItemIn'
-        required: true
       responses:
         '201':
           description: Successful Response
@@ -2893,8 +2987,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-      security:
-      - HTTPBearer: []
   /api/v1/governance/{item_id}:
     patch:
       tags:
@@ -2911,6 +3003,19 @@ paths:
           type: string
           format: uuid
           title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       requestBody:
         required: true
         content:
@@ -2946,6 +3051,19 @@ paths:
           type: string
           format: uuid
           title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       responses:
         '204':
           description: Successful Response
@@ -2973,6 +3091,19 @@ paths:
           type: string
           format: uuid
           title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       responses:
         '200':
           description: Successful Response
@@ -3002,6 +3133,19 @@ paths:
           type: string
           format: uuid
           title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       responses:
         '200':
           description: Successful Response
@@ -3036,6 +3180,19 @@ paths:
           type: string
           format: uuid
           title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       requestBody:
         required: true
         content:
@@ -3062,18 +3219,38 @@ paths:
       summary: List Templates
       description: The policy templates, and whether each is already in the library.
       operationId: list_templates_api_v1_governance_templates_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
+                type: array
                 items:
                   $ref: '#/components/schemas/app__api__v1__endpoints__governance__TemplateOut'
-                type: array
                 title: Response List Templates Api V1 Governance Templates Get
-      security:
-      - HTTPBearer: []
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/governance/from-template:
     post:
       tags:
@@ -3082,12 +3259,28 @@ paths:
       description: 'Add a policy to the library from a template: its text becomes
         version 1 with the fields left as fields.'
       operationId: create_from_template_api_v1_governance_from_template_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/FromTemplate'
-        required: true
       responses:
         '201':
           description: Successful Response
@@ -3101,8 +3294,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-      security:
-      - HTTPBearer: []
   /api/v1/governance/{item_id}/rendered:
     get:
       tags:
@@ -3131,6 +3322,19 @@ paths:
             minimum: 1
           - type: 'null'
           title: Version
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
       responses:
         '200':
           description: Successful Response
@@ -3759,6 +3963,43 @@ paths:
       security:
       - HTTPBearer: []
   /api/v1/alert-ticket-rules/{rule_id}:
+    patch:
+      tags:
+      - alerts
+      summary: Change Ticket Rule Note
+      description: Change the note a rule writes into the tickets it opens. It applies
+        to tickets opened from now on; tickets already opened keep what they were
+        given.
+      operationId: change_ticket_rule_note_api_v1_alert_ticket_rules__rule_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: rule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Rule Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketRuleNoteIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketRuleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     delete:
       tags:
       - alerts
@@ -10094,6 +10335,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CollectJobRequest'
+            example:
+              framework: SOC2
       responses:
         '202':
           description: Successful Response
@@ -10135,6 +10378,13 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CollectEvidenceRequest'
+            example:
+              framework: SOC2
+              control_id: CC6.1
+              control_title: Logical access security
+              evidence_kind: attestation
+              summary: Quarterly access review for Microsoft 365 signed off by the
+                owner on 2026-10-01.
       responses:
         '201':
           description: Successful Response
@@ -10313,6 +10563,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ReviewEvidenceRequest'
+            example:
+              decision: accepted
+              reviewer: dana@acme.example
       responses:
         '200':
           description: Successful Response
@@ -13839,6 +14092,16 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/VendorIn'
+            example:
+              name: Acme Backup Co
+              website: https://backup.example.com
+              service: Offsite backup
+              category: Infrastructure
+              owner: Dana Reyes
+              risk_level: medium
+              data_access: sensitive
+              mfa: true
+              review_interval_months: 12
       responses:
         '201':
           description: Successful Response
@@ -13969,6 +14232,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/VendorPatch'
+            example:
+              risk_level: high
+              notes: Breach notice received 2026-10-20; review brought forward.
       responses:
         '200':
           description: Successful Response
@@ -14101,6 +14367,11 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/app__api__v1__endpoints__vendor_management__ReviewIn'
+            example:
+              title: 2026 annual review
+              kind: one_time
+              due_date: '2026-12-15'
+              reviewer: Dana Reyes
       responses:
         '201':
           description: Successful Response
@@ -14156,6 +14427,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ReviewDone'
+            example:
+              outcome: no_concerns
+              findings: SOC 2 Type II report reviewed; no exceptions.
       responses:
         '200':
           description: Successful Response
@@ -14204,6 +14478,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/app__api__v1__endpoints__vendor_management__DocumentIn'
+            example:
+              name: SOC 2 Type II report 2026
+              doc_type: SOC 2
+              url: https://trust.backup.example.com/soc2.pdf
       responses:
         '201':
           description: Successful Response
@@ -14389,6 +14667,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/app__api__v1__endpoints__detected_applications__LinkIn'
+            example:
+              vendor_id: 6f9619ff-8b86-d011-b42d-00cf4fc964ff
       responses:
         '200':
           description: Successful Response
@@ -14582,6 +14862,11 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/app__api__v1__endpoints__access_reviews__ReviewIn'
+            example:
+              name: Q4 2026 Microsoft 365 access review
+              system: Microsoft 365
+              reviewer: Dana Reyes
+              due_date: '2026-12-01'
       responses:
         '201':
           description: Successful Response
@@ -14679,6 +14964,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DecisionIn'
+            example:
+              decision: remove
+              note: Left the company in September.
       responses:
         '200':
           description: Successful Response
@@ -14728,6 +15016,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/app__api__v1__endpoints__access_reviews__BulkIn'
+            example:
+              decision: keep
+              only_unflagged: true
       responses:
         '200':
           description: Successful Response
@@ -14845,6 +15136,12 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AuditIn'
+            example:
+              name: SOC 2 Type II 2026
+              framework: SOC2
+              auditor: Birch Assurance LLP
+              period_start: '2026-01-01'
+              period_end: '2026-12-31'
       responses:
         '201':
           description: Successful Response
@@ -14968,6 +15265,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AuditPatch'
+            example:
+              status: fieldwork
       responses:
         '200':
           description: Successful Response
@@ -15016,6 +15315,11 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/RequestIn'
+            example:
+              title: Provide the list of terminated employees for the period
+              control_id: CC6.2
+              owner: Dana Reyes
+              due_date: '2026-11-30'
       responses:
         '201':
           description: Successful Response
@@ -15115,6 +15419,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/RequestPatch'
+            example:
+              status: provided
+              note: Export attached.
+              link: https://files.acme.example/terminations-2026.csv
       responses:
         '200':
           description: Successful Response
@@ -15190,6 +15498,14 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/app__api__v1__endpoints__trust_center__SettingsIn'
+            example:
+              enabled: true
+              headline: Security at Acme
+              about: We protect customer data with MFA, encryption and a yearly independent
+                audit.
+              contact_email: security@acme.example
+              frameworks:
+              - SOC2
       responses:
         '200':
           description: Successful Response
@@ -15324,6 +15640,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/controls/{framework}/{control_id}/owner:
+    put:
+      tags:
+      - compliance
+      summary: Name who owns a control, or clear the owner
+      operationId: set_owner_api_v1_compliance_controls__framework___control_id__owner_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: framework
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Framework
+      - name: control_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Control Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__compliance_controls__OwnerIn'
+            example:
+              owner: Dana Reyes
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__compliance_controls__OwnerOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/frameworks/enabled:
     get:
       tags:
@@ -15387,6 +15758,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/EnabledIn'
+            example:
+              frameworks:
+              - SOC2
+              - HIPAA
       responses:
         '200':
           description: Successful Response
@@ -15570,6 +15945,14 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/QuestionnaireIn'
+            example:
+              name: Birch Dental security questionnaire
+              customer: Birch Dental
+              due_date: '2026-12-10'
+              questions: 'Do you encrypt data at rest?
+
+                Is MFA required for all staff?'
+              format: lines
       responses:
         '201':
           description: Successful Response
@@ -15706,6 +16089,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/app__api__v1__endpoints__questionnaires__ItemPatch'
+            example:
+              answer: Yes. All laptops use BitLocker and cloud storage uses AES-256.
+              approved: true
+              save_to_library: true
       responses:
         '200':
           description: Successful Response
@@ -15919,6 +16306,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/LibraryIn'
+            example:
+              question: Do you encrypt data at rest?
+              answer: Yes. AES-256 for storage, BitLocker on laptops.
+              category: Data protection
       responses:
         '201':
           description: Successful Response
@@ -15967,6 +16358,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/LibraryPatch'
+            example:
+              confirm: true
       responses:
         '200':
           description: Successful Response
@@ -19458,14 +19851,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OwnerIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__client_posture__OwnerIn'
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OwnerOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__client_posture__OwnerOut'
         '422':
           description: Validation Error
           content:
@@ -31531,20 +31924,10 @@ components:
           type: array
           title: Ai Recommendations
         confidence:
-          anyOf:
-          - type: integer
-          - type: 'null'
           title: Confidence
         confidence_label:
-          anyOf:
-          - type: string
-          - type: 'null'
           title: Confidence Label
         confidence_rationale:
-          anyOf:
-          - items: {}
-            type: array
-          - type: 'null'
           title: Confidence Rationale
         disposition:
           anyOf:
@@ -32091,20 +32474,10 @@ components:
           type: array
           title: Ai Recommendations
         confidence:
-          anyOf:
-          - type: integer
-          - type: 'null'
           title: Confidence
         confidence_label:
-          anyOf:
-          - type: string
-          - type: 'null'
           title: Confidence Label
         confidence_rationale:
-          anyOf:
-          - items: {}
-            type: array
-          - type: 'null'
           title: Confidence Rationale
         disposition:
           anyOf:
@@ -38121,6 +38494,11 @@ components:
         link:
           type: string
           title: Link
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
       type: object
       required:
       - framework
@@ -49699,43 +50077,6 @@ components:
       - status
       - domains
       title: Overview
-    OwnerIn:
-      properties:
-        owner:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Owner
-        due_date:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Due Date
-      type: object
-      title: OwnerIn
-    OwnerOut:
-      properties:
-        key:
-          type: string
-          title: Key
-        owner:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Owner
-        due_date:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Due Date
-      type: object
-      required:
-      - key
-      - owner
-      - due_date
-      title: OwnerOut
     PackAssignmentCreate:
       properties:
         child_tenant_id:
@@ -51873,6 +52214,13 @@ components:
           maxLength: 200000
           minLength: 3
           title: Questions
+        format:
+          type: string
+          enum:
+          - lines
+          - csv
+          title: Format
+          default: lines
       type: object
       required:
       - name
@@ -56068,6 +56416,107 @@ components:
       - status
       - created_at
       title: ScriptRun
+    ScriptRunList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ScriptRunOut'
+          type: array
+          title: Items
+        done:
+          type: integer
+          title: Done
+        failed:
+          type: integer
+          title: Failed
+        waiting:
+          type: integer
+          title: Waiting
+        total:
+          type: integer
+          title: Total
+        days:
+          type: integer
+          title: Days
+      type: object
+      required:
+      - items
+      - done
+      - failed
+      - waiting
+      - total
+      - days
+      title: ScriptRunList
+    ScriptRunOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        requested_at:
+          type: string
+          format: date-time
+          title: Requested At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+        status:
+          type: string
+          title: Status
+        outcome:
+          type: string
+          enum:
+          - done
+          - failed
+          - waiting
+          title: Outcome
+        script:
+          type: string
+          title: Script
+        device:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Device
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        alert_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Alert Id
+        alert_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Alert Title
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        by:
+          type: string
+          enum:
+          - person
+          - rule
+          title: By
+          default: person
+      type: object
+      required:
+      - id
+      - requested_at
+      - status
+      - outcome
+      - script
+      title: ScriptRunOut
     ScriptsReport:
       properties:
         scripts:
@@ -59909,11 +60358,25 @@ components:
           type: boolean
           title: Catch Up
           default: true
+        note:
+          type: string
+          maxLength: 1000
+          title: Note
+          default: ''
       type: object
       required:
       - alert_id
       - scope
       title: TicketRuleIn
+    TicketRuleNoteIn:
+      properties:
+        note:
+          type: string
+          maxLength: 1000
+          title: Note
+          default: ''
+      type: object
+      title: TicketRuleNoteIn
     TicketRuleOut:
       properties:
         id:
@@ -59942,6 +60405,10 @@ components:
         title:
           type: string
           title: Title
+        note:
+          type: string
+          title: Note
+          default: ''
         created_at:
           type: string
           format: date-time
@@ -64152,6 +64619,43 @@ components:
       - queued
       - message
       title: PushOut
+    app__api__v1__endpoints__client_posture__OwnerIn:
+      properties:
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+      type: object
+      title: OwnerIn
+    app__api__v1__endpoints__client_posture__OwnerOut:
+      properties:
+        key:
+          type: string
+          title: Key
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+      type: object
+      required:
+      - key
+      - owner
+      - due_date
+      title: OwnerOut
     app__api__v1__endpoints__client_review__AnswerIn:
       properties:
         section:
@@ -64312,6 +64816,35 @@ components:
       - first_seen
       - last_seen
       title: VulnerabilityOut
+    app__api__v1__endpoints__compliance_controls__OwnerIn:
+      properties:
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Owner
+      type: object
+      title: OwnerIn
+    app__api__v1__endpoints__compliance_controls__OwnerOut:
+      properties:
+        framework:
+          type: string
+          title: Framework
+        control_id:
+          type: string
+          title: Control Id
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+      type: object
+      required:
+      - framework
+      - control_id
+      - owner
+      title: OwnerOut
     app__api__v1__endpoints__compliance_dashboard__ActionItem:
       properties:
         kind:

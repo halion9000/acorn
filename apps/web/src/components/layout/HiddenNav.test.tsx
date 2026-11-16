@@ -29,10 +29,11 @@ describe('the sidebar for a role that hides things', () => {
   });
 
   it('takes out a whole hidden section, title included', () => {
-    state.hidden = new Set(['section:Automation']);
+    state.hidden = new Set(['section:Response & Defense']);
     render(<Sidebar />);
-    expect(screen.queryByText('Automation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Response & Defense')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Playbooks/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Automation')).toBeInTheDocument(); // the new Automation section is a different section
     expect(screen.getByText('Client Security')).toBeInTheDocument();
   });
 
@@ -65,7 +66,7 @@ describe('opening the address of a hidden page', () => {
   });
 
   it('says the role hides it instead of showing the page, for the page or anything under it', () => {
-    state.hidden = new Set(['section:Automation']);
+    state.hidden = new Set(['section:Response & Defense']);
     for (const path of ['/playbooks', '/playbooks/abc']) {
       state.path = path;
       const { unmount } = render(
@@ -101,7 +102,7 @@ describe('opening the address of a hidden page', () => {
   });
 
   it('never hides the dashboard', () => {
-    state.hidden = new Set(['/dashboard', 'section:Automation']);
+    state.hidden = new Set(['/dashboard', 'section:Response & Defense']);
     render(
       <HiddenPageGuard>
         <p>home</p>

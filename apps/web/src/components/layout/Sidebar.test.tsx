@@ -107,3 +107,29 @@ describe('Sidebar wordmark', () => {
     expect(screen.queryByText('open-source')).toBeNull();
   });
 });
+
+describe('Sidebar: Response & Defense and Automation', () => {
+  const linksOf = (title: string) => {
+    const section = screen.getByText(title, { selector: 'h3, h2, p, span, div' }).closest('div')!;
+    return [...section.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')]);
+  };
+
+  it('keeps the old Automation pages under Response & Defense', () => {
+    render(<Sidebar />);
+    expect(linksOf('Response & Defense')).toEqual([
+      ['Playbooks', '/playbooks'],
+      ['File Integrity (FIM)', '/fim'],
+      ['Honeytokens', '/honeytokens'],
+      ['Purple Team', '/purple-team'],
+    ]);
+  });
+
+  it('has a new Automation section with the auto tickets, the auto scripts and HubSpot', () => {
+    render(<Sidebar />);
+    expect(linksOf('Automation')).toEqual([
+      ['Auto Tickets', '/automation/tickets'],
+      ['Auto Scripts', '/automation/scripts'],
+      ['HubSpot', '/automation/hubspot'],
+    ]);
+  });
+});

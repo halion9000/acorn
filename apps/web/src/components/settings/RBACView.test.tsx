@@ -244,7 +244,7 @@ describe('hiding parts of the console from a role', () => {
   it('greys out the pages of a hidden section, and offers no way to hide the home page or the roles page', async () => {
     open();
     await openForm();
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Show the Automation section' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Show the Response & Defense section' }));
     expect(screen.getByRole('checkbox', { name: 'Show Playbooks' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Show SOC Dashboard' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Show SOC Dashboard' })).toBeChecked();
@@ -259,6 +259,7 @@ describe('hiding parts of the console from a role', () => {
     expect(posts).toHaveLength(0);
     expect(screen.getByText('Permissions (2 selected)')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'alerts:write' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Show the Response & Defense section' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Show the Automation section' })).not.toBeChecked();
     // Platform also holds the dashboards, which this role keeps: it hides the admin pages in it one by one.
     expect(screen.getByRole('checkbox', { name: 'Show the Platform section' })).toBeChecked();
