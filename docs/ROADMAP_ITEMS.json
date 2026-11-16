@@ -392,8 +392,9 @@
     "key": "r7-ci-02",
     "title": "One shared retry-with-backoff-and-jitter helper for every vendor read",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Already built: hud/src/acorn-retry.ts (one retry policy for vendor reads: 429 and 502 to 504, Retry-After honored, longer waits for a vendor that pushed back, reads only). Checked 2026-11-16."
   },
   {
     "key": "r7-ci-03",
@@ -513,8 +514,9 @@
     "key": "r7-ci-18",
     "title": "scripts/deploy-check.mjs: pushed, verify passed, no BEC search running",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-16 as scripts/update-core-vm.mjs (CORE 703335c): checks the commit is pushed, no BEC search is running, runs the update and confirms CORE is back on the new commit."
   },
   {
     "key": "r7-ci-19",
