@@ -89,9 +89,14 @@ WATCHED.update(
 )
 
 
+# Checks that stay watched (they count for fix priority) but raise NO group alert. Each is a count of separate things, and a single alert saying "N findings" cannot be worked or ticketed; ThreatMate's own
+# alerts and findings arrive one by one instead: a deep and dark web finding is one alert (CORE, acorn-threatmate.ts), and an internet-facing address or domain gets ThreatMate's alert for it with its issues.
+NOT_ALERTED = frozenset({"threatmate_deep_dark_web", "threatmate_external_exposure"})
+
+
 def raises_alert(key: str) -> bool:
     """Whether a worsening of this check opens an alert (so a page can offer to open it). Most checks are only shown, never alerted on."""
-    return key in WATCHED
+    return key in WATCHED and key not in NOT_ALERTED
 
 
 def worsened(previous: str | None, status: str, least: str) -> bool:
@@ -116,7 +121,7 @@ def alerts_for_changes(changes: list[dict[str, Any]], source: str, now: datetime
     out: list[dict[str, Any]] = []
     for c in changes:
         watched = WATCHED.get(c["key"])
-        if watched is None or not worsened(c.get("previous_status"), c["status"], watched[2]):
+        if watched is None or c["key"] in NOT_ALERTED or not worsened(c.get("previous_status"), c["status"], watched[2]):
             continue
         title, severity, _least = watched
         evidence = str(c.get("evidence") or "").strip()
@@ -144,7 +149,7 @@ def standing_specs(checks: list[dict[str, Any]] | None, source: str) -> list[dic
         key = str(c.get("key") or "")
         watched = WATCHED.get(key)
         status = str(c.get("status") or "")
-        if key not in VULN_CHECK_KEYS or watched is None or status not in RANK or RANK[status] < RANK[watched[2]]:
+        if key not in VULN_CHECK_KEYS or key in NOT_ALERTED or watched is None or status not in RANK or RANK[status] < RANK[watched[2]]:
             continue
         title, severity, _least = watched
         evidence = str(c.get("evidence") or "").strip()

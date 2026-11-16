@@ -42,11 +42,10 @@ def test_the_first_report_of_a_check_and_an_unchanged_or_improving_check_raise_n
     assert specs([check("threatmate_google_admins", "not_met")], [check("threatmate_google_admins", "met")]) == []
 
 
-def test_a_check_nobody_watches_raises_nothing_and_partly_only_matters_for_the_dark_web():
+def test_a_check_nobody_watches_raises_nothing():
     assert specs([check("threatmate_agents_online", "met")], [check("threatmate_agents_online", "not_met")]) == []
     assert specs([check("threatmate_google_admins", "met")], [check("threatmate_google_admins", "partly")]) == []
-    dark = specs([check("threatmate_deep_dark_web", "met")], [check("threatmate_deep_dark_web", "partly", "1 open finding")], "threatmate")
-    assert [a["key"] for a in dark] == ["threatmate_deep_dark_web"]
+    assert specs([check("threatmate_deep_dark_web", "met")], [check("threatmate_deep_dark_web", "partly", "1 open finding")], "threatmate") == [], "each dark web finding is its own alert, not a group alert"
 
 
 def test_worsened_needs_a_known_previous_status():
@@ -149,9 +148,12 @@ def test_a_surge_of_failed_google_sign_ins_raises_a_medium_alert():
 def test_raises_alert_is_true_only_for_checks_that_open_an_alert():
     from app.services.check_alerts import WATCHED, raises_alert
 
-    assert raises_alert("threatmate_deep_dark_web") and raises_alert("huntress_protection")
+    from app.services.check_alerts import NOT_ALERTED
+
+    assert raises_alert("huntress_protection") and raises_alert("threatmate_google_admins")
     assert not raises_alert("meraki_wan") and not raises_alert("")
-    assert all(raises_alert(k) for k in WATCHED)
+    assert all(raises_alert(k) for k in WATCHED if k not in NOT_ALERTED)
+    assert not any(raises_alert(k) for k in NOT_ALERTED)
 
 
 def test_the_fleet_board_rows_say_whether_an_alert_exists_for_the_check():
@@ -269,3 +271,13 @@ def test_a_history_row_is_named_added_worsened_improved_or_changed():
     assert change_label("not_met", "met") == "improved"
     assert change_label("met", "unheard_of") == "changed"
     assert change_label("odd", "met") == "changed"
+
+
+def test_the_two_threatmate_group_checks_raise_no_alert_on_a_change_or_when_standing_but_stay_watched():
+    from app.services.check_alerts import NOT_ALERTED, WATCHED, standing_specs
+
+    assert NOT_ALERTED == {"threatmate_deep_dark_web", "threatmate_external_exposure"}
+    assert all(k in WATCHED for k in NOT_ALERTED), "still watched, so they still count for fix priority"
+    assert specs([check("threatmate_external_exposure", "met")], [check("threatmate_external_exposure", "not_met", "10 critical")], "threatmate") == []
+    assert standing_specs([check("threatmate_external_exposure", "not_met", "10 critical")], "threatmate") == []
+    assert standing_specs([check("threatmate_patching", "not_met", "many machines")], "threatmate"), "another vulnerability check still raises its standing alert"
