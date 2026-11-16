@@ -806,8 +806,10 @@
     "key": "r7-ai-14",
     "title": "DMARC: a what-to-fix-next list per domain from the failure causes",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 2a3a12b9",
+    "note": "2026-11-16: DMARC detail lists the five failing senders to fix first plus the next policy step. Built from the failing sources (From domain and return path), not from the per-cause counts."
   },
   {
     "key": "r7-ai-15",
@@ -1490,8 +1492,10 @@
     "key": "r7-af-27",
     "title": "DMARC: a one-click DNS record generator for the recommended policy",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 2a3a12b9",
+    "note": "2026-11-16: DMARC detail panel builds the recommended TXT line (next policy step, pct, rua) with a Copy button."
   },
   {
     "key": "r7-af-28",
