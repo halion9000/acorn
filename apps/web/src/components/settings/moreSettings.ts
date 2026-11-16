@@ -15,6 +15,7 @@ export const MORE_SETTINGS: { href: string; label: string; description: string; 
   { href: '/settings/roadmap', label: 'Upcoming improvements', description: 'Everything waiting to be built or fixed, who it waits on, and the priority you give it' },
   { href: '/settings/revisions', label: 'Revisions', description: 'Every revision of A.C.O.R.N so far, newest first, and the current version number' },
   { href: '/settings/guide', label: 'ACORN Setup Guide', description: 'How to set up and use A.C.O.R.N, page by page (the former User guide)' },
+  { href: '/settings/whats-new', label: "What's new", description: 'Features added lately, newest first, each linking to its place in the guide' },
   { href: '/settings/business-context', label: 'Business context rules', description: "Rules that adjust an alert's importance for a client before it is triaged" },
   { href: '/settings/tickets', label: 'Tickets', description: 'The HaloPSA status a resolved incident moves its ticket to', requires: 'settings_tickets' },
   { href: '/settings/vcio-risk-scoring', label: 'Client Risk Score', description: 'How every client is scored: severity points, answer credits, the critical-gap cap, rating bands and category weights', requires: 'settings_clients' },

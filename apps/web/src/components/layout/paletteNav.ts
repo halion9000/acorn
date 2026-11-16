@@ -120,6 +120,7 @@ export const CURATED_PAGES: PaletteNavItem[] = [
   { label: 'Settings',        href: '/settings',     keywords: ['preferences', 'profile', 'tenant'] },
   { label: 'Upcoming improvements', href: '/settings/roadmap', keywords: ['roadmap', 'features', 'backlog', 'priorities', 'pending', 'todo'] },
   { label: 'ACORN Setup Guide', href: '/settings/guide', keywords: ['help', 'how to', 'docs', 'documentation', 'manual', 'user guide', 'setup'] },
+  { label: "What's new", href: '/settings/whats-new', keywords: ['new', 'changes', 'release', 'latest', 'added', 'features', 'changelog'] },
 ];
 
 /** Every distinct word that finds a page in the palette: the words of its name and of its other words, in lower case. */
