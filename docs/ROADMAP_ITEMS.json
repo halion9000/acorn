@@ -1378,8 +1378,10 @@
     "key": "r7-af-11",
     "title": "Policies: a diff between two versions",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 93d90065",
+    "note": "2026-11-16: line diff between a policy version and the one before it, in the Versions list."
   },
   {
     "key": "r7-af-12",
