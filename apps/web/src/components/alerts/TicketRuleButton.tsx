@@ -14,13 +14,14 @@ export function TicketRuleButton({ alertId, clientName }: { alertId: string; cli
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<'client' | 'all'>('client');
   const [catchUp, setCatchUp] = useState(true);
+  const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [made, setMade] = useState(false);
 
   async function make() {
     setBusy(true);
     try {
-      const rule = await ticketRulesApi.make(alertId, scope, catchUp);
+      const rule = note.trim() ? await ticketRulesApi.make(alertId, scope, catchUp, note.trim()) : await ticketRulesApi.make(alertId, scope, catchUp);
       setMade(true);
       setOpen(false);
       const n = rule.queued_now ?? 0;
@@ -55,6 +56,10 @@ export function TicketRuleButton({ alertId, clientName }: { alertId: string; cli
             <label className="flex items-center gap-2">
               <input type="radio" name="ticket-rule-scope" checked={scope === 'all'} onChange={() => setScope('all')} />
               <span>for every client</span>
+            </label>
+            <label className="block border-t border-gray-800 pt-3">
+              <span className="text-xs text-gray-400">Note for the ticket (optional): what to do about this type of alert. It is written into every ticket the rule opens, and can be changed under Settings, Tickets.</span>
+              <textarea aria-label="Note for the ticket" rows={3} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} className="mt-1 block w-full rounded border border-gray-700 bg-gray-950 px-2 py-1 text-sm text-gray-100" />
             </label>
             <label className="flex items-start gap-2 border-t border-gray-800 pt-3">
               <input type="checkbox" className="mt-1" checked={catchUp} onChange={(e) => setCatchUp(e.target.checked)} />

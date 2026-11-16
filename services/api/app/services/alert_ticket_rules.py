@@ -114,15 +114,29 @@ def report_note(report: str) -> str:
     return head + text_
 
 
-def ticket_params(alert: Any, halo_client_id: str | None, rule_title: str, release_url: str | None = None) -> dict[str, Any]:
-    """What CORE needs to open the ticket: a summary and details taken from the alert, and the HaloPSA client the alert's client is mapped to (when it is)."""
+NOTE_RULE_MAX = 1000
+
+
+def clean_note(text_: str | None) -> str:
+    """A rule's note as it is kept: each line trimmed, runs of blank lines made one, at most NOTE_RULE_MAX characters (pure)."""
+    lines = [line.strip() for line in (text_ or "").strip().splitlines()]
+    out: list[str] = []
+    for line in lines:
+        if line or (out and out[-1]):
+            out.append(line)
+    return "\n".join(out).strip()[:NOTE_RULE_MAX]
+
+
+def ticket_params(alert: Any, halo_client_id: str | None, rule_title: str, release_url: str | None = None, rule_note: str = "") -> dict[str, Any]:
+    """What CORE needs to open the ticket: a summary and details taken from the alert, and the HaloPSA client the alert's client is mapped to (when it is). ``rule_note`` is the rule's note: it goes into the ticket under \"Instructions\"."""
     title = " ".join(str(alert.title or rule_title or "Alert").split())
     details = str(alert.description or alert.title or "").strip()
     note = f"\n\nOpened automatically by an A.C.O.R.N ticket rule for alert {alert.id}."
     release = f"\n\nIf the message is safe, release it in A.C.O.R.N (you will be asked to confirm): {release_url}" if release_url else ""
+    instructions = f"\n\nInstructions:\n{rule_note.strip()[:NOTE_RULE_MAX]}" if rule_note and rule_note.strip() else ""
     return {
         "summary": title[:TITLE_MAX],
-        "details": details[: DETAILS_MAX - len(note) - len(release)] + note + release,
+        "details": details[: DETAILS_MAX - len(note) - len(release) - len(instructions)] + instructions + note + release,
         "rule": "ticket_rule",
         **({"halo_client_id": str(halo_client_id)} if halo_client_id else {}),
     }
@@ -264,7 +278,7 @@ async def queue_for_rule(
                         vendor=VENDOR,
                         incident_uid=f"ticket-rule:{a.id}"[:200],
                         action=ACTION,
-                        params=ticket_params(a, halo.get(tid), rule.title, _release_url(a)),
+                        params=ticket_params(a, halo.get(tid), rule.title, _release_url(a), getattr(rule, "note", "") or ""),
                         status="pending",
                         requested_by=rule.created_by,
                         created_at=now,
@@ -318,6 +332,29 @@ async def sweep_ticket_rules(db: Any, now: datetime | None = None) -> int:
     return total
 
 
+async def note_for_alert(db: Any, owner: uuid.UUID, tenant_id: uuid.UUID, alert: Any) -> str:
+    """The note of the active rule that covers this alert (the newest such rule), or "" when none does or it has no note. Used when a failed ticket is asked for again."""
+    rules = (
+        (await db.execute(select(AlertTicketRule).where(AlertTicketRule.tenant_id == owner, AlertTicketRule.revoked_at.is_(None)).order_by(AlertTicketRule.created_at.desc())))
+        .scalars()
+        .all()
+    )
+    raw = alert.raw_event if isinstance(getattr(alert, "raw_event", None), dict) else {}
+    for rule in rules:
+        if rule_covers(
+            rule,
+            tenant_id=tenant_id,
+            rule_id=alert.rule_id,
+            title=alert.rule_name if alert.rule_id and alert.rule_name else alert.title,
+            source=source_of(raw, alert.connector_type),
+            created_at=alert.created_at,
+            alert_id=alert.id,
+            catch_up=True,
+        ):
+            return str(rule.note or "")
+    return ""
+
+
 async def retry_ticket(db: Any, owner: uuid.UUID, tenant_id: uuid.UUID, alert: Any, now: datetime | None = None) -> bool:
     """Ask CORE once more for the ticket of an alert whose last request failed (a person pressed Try again). Returns False when it should not: the alert already has a ticket, or its newest request is waiting, done
     or absent. The caller owns the transaction."""
@@ -351,7 +388,7 @@ async def retry_ticket(db: Any, owner: uuid.UUID, tenant_id: uuid.UUID, alert: A
             vendor=VENDOR,
             incident_uid=f"ticket-rule:{alert.id}"[:200],
             action=ACTION,
-            params=ticket_params(alert, halo.get(tenant_id), str(alert.title or ""), _release_url(alert)),
+            params=ticket_params(alert, halo.get(tenant_id), str(alert.title or ""), _release_url(alert), await note_for_alert(db, owner, tenant_id, alert)),
             status="pending",
             created_at=now,
         )

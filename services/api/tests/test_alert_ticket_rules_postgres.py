@@ -611,3 +611,24 @@ async def test_a_rule_opens_one_linked_case_per_alert_it_covers_with_or_without_
     await world.commit()
     await off(world)
     assert {k: r[1] for k, r in (await cases()).items()} == first, "a second pass opens no second case"
+
+
+async def test_a_rule_with_a_note_writes_it_into_every_ticket_it_opens_and_a_rule_without_one_adds_nothing(world):
+    await off(world)
+    rule = make_rule(world, "client")
+    rule.note = "Call the client before releasing anything."
+    await world.flush()
+    await svc.queue_for_rule(world, rule, NOW)
+    await world.commit()
+    got = await queued(world)
+    assert set(got) == {"new_a", "new_b"}
+    for row in got.values():
+        assert "Instructions:\nCall the client before releasing anything." in row.params["details"]
+        assert row.params["details"].index("Instructions:") < row.params["details"].index("Opened automatically")
+    await off(world)
+    await world.execute(text("delete from vendor_actions where tenant_id in (:a, :b, :c)"), {"a": world.info["owner"], "b": world.info["client"], "c": world.info["other"]})
+    rule.note = ""
+    await world.commit()
+    await svc.queue_for_rule(world, rule, NOW)
+    await world.commit()
+    assert all("Instructions" not in row.params["details"] for row in (await queued(world)).values())

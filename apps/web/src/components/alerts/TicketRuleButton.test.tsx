@@ -74,3 +74,25 @@ describe('the catch-up choice', () => {
     await waitFor(() => expect(api.make).toHaveBeenCalledWith('a2', 'client', false));
   });
 });
+
+describe('the note for the ticket', () => {
+  it('sends the note with the rule, trimmed, so every ticket it opens carries it', async () => {
+    api.make.mockResolvedValue({ id: 'r1', queued_now: 1 });
+    const user = userEvent.setup();
+    render(<TicketRuleButton alertId="a1" />);
+    await user.click(screen.getByRole('button', { name: 'Auto-ticket' }));
+    await user.type(screen.getByLabelText('Note for the ticket'), '  Check with the client first.  ');
+    await user.click(screen.getByRole('button', { name: 'Make the rule' }));
+    await waitFor(() => expect(api.make).toHaveBeenCalledWith('a1', 'client', true, 'Check with the client first.'));
+  });
+
+  it('sends no note when the box is left empty or only spaces', async () => {
+    api.make.mockResolvedValue({ id: 'r1', queued_now: 0 });
+    const user = userEvent.setup();
+    render(<TicketRuleButton alertId="a1" />);
+    await user.click(screen.getByRole('button', { name: 'Auto-ticket' }));
+    await user.type(screen.getByLabelText('Note for the ticket'), '   ');
+    await user.click(screen.getByRole('button', { name: 'Make the rule' }));
+    await waitFor(() => expect(api.make).toHaveBeenCalledWith('a1', 'client', true));
+  });
+});

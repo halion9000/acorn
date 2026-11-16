@@ -237,6 +237,7 @@ def test_turning_a_rule_off_sets_the_time_and_audits_and_an_unknown_or_already_o
         client_tenant_id=CLIENT,
         source="cipp",
         title=TITLE,
+        note="",
         created_at=NOW,
         revoked_at=None,
     )
@@ -257,6 +258,7 @@ def test_the_routes_need_the_right_permissions():
     found = {(m, p.replace("/api/v1", "", 1)): r for p, r in walk_routes(app.routes) for m in r.methods}
     assert set(required_permissions(found[("POST", "/alert-ticket-rules")])) == {"connectors:write"}
     assert set(required_permissions(found[("DELETE", "/alert-ticket-rules/{rule_id}")])) == {"connectors:write"}
+    assert set(required_permissions(found[("PATCH", "/alert-ticket-rules/{rule_id}")])) == {"connectors:write"}
     assert set(required_permissions(found[("GET", "/alert-ticket-rules")])) == {"alerts:read"}
 
 
@@ -317,3 +319,66 @@ def test_a_rule_asks_for_the_catch_up_unless_the_person_turns_it_off(wired):
         db = FakeDB(Rows([alert]), Rows([]), Rows([]), Rows([]))
         asyncio.run(ep.make_ticket_rule(body, MagicMock(), user(), db))
         assert queued.catch_ups[-1] is expected and audits[-1]["changes"]["catch_up"] is expected
+
+
+def test_the_rule_note_goes_into_the_ticket_under_instructions_and_a_ticket_without_one_is_unchanged():
+    alert = NS(id=uuid.uuid4(), title="MDM is disabled on Mac-1", description="Addigy shows MDM disabled.")
+    plain = svc.ticket_params(alert, "77", "rule")
+    noted = svc.ticket_params(alert, "77", "rule", None, "Re-enroll the Mac in Addigy.\nAsk the client first.")
+    assert "Instructions" not in plain["details"]
+    assert "Addigy shows MDM disabled." in noted["details"]
+    assert "Instructions:\nRe-enroll the Mac in Addigy.\nAsk the client first." in noted["details"]
+    assert noted["details"].index("Instructions:") < noted["details"].index("Opened automatically"), "the instructions come before the trace line"
+    assert "Instructions" not in svc.ticket_params(alert, "77", "rule", None, "   \n  ")["details"], "a blank note adds nothing"
+
+
+def test_a_long_note_and_a_long_description_still_fit_the_ticket_and_keep_the_note():
+    alert = NS(id=uuid.uuid4(), title="t", description="y" * 20000)
+    p = svc.ticket_params(alert, None, "t", None, "n" * 5000)
+    assert len(p["details"]) <= svc.DETAILS_MAX
+    assert "Instructions:" in p["details"] and "Opened automatically" in p["details"]
+
+
+def test_a_note_is_kept_tidy_and_cut():
+    assert svc.clean_note("  call the client  \n\n\n\n  then close  ") == "call the client\n\nthen close"
+    assert svc.clean_note(None) == "" and svc.clean_note("   ") == ""
+    assert len(svc.clean_note("x" * 5000)) == svc.NOTE_RULE_MAX
+
+
+def test_a_rule_made_with_a_note_stores_it(wired):
+    alert = NS(rule_id=None, rule_name=None, title=TITLE, raw_event={"source": "cipp"}, connector_type=None)
+    db = FakeDB(Rows([alert]), Rows([]), Rows([]), Rows([]))
+    body = ep.TicketRuleIn(alert_id=uuid.uuid4(), scope="client", note="  Release only after the client confirms.  ")
+    out = asyncio.run(ep.make_ticket_rule(body, MagicMock(), user(), db))
+    (stored,) = db.added
+    assert stored.note == "Release only after the client confirms." and out.note == stored.note
+
+
+def test_the_note_of_a_rule_can_be_changed_and_cleared_and_audited_and_an_unknown_rule_is_404(monkeypatch):
+    audits = []
+
+    async def fake_audit(**kw):
+        audits.append(kw)
+
+    monkeypatch.setattr(ep, "emit_audit", fake_audit)
+    rule = NS(id=uuid.uuid4(), tenant_id=OWNER, scope="all", client_tenant_id=None, source="cipp", title=TITLE, note="old", created_at=NOW, revoked_at=None)
+    db = FakeDB(Rows([rule]), Rows([]))
+    out = asyncio.run(ep.change_ticket_rule_note(rule.id, ep.TicketRuleNoteIn(note="  New instructions  "), MagicMock(), user(), db))
+    assert rule.note == "New instructions" and out.note == "New instructions" and db.commits == 1
+    assert audits[0]["action"] == "alert_ticket_rule:note_changed" and audits[0]["changes"]["note_length"] == len("New instructions")
+    assert "New instructions" not in str(audits[0]), "the audit records how long the note is, not its text"
+    db2 = FakeDB(Rows([rule]), Rows([]))
+    cleared = asyncio.run(ep.change_ticket_rule_note(rule.id, ep.TicketRuleNoteIn(note=""), MagicMock(), user(), db2))
+    assert rule.note == "" and cleared.note == ""
+    with pytest.raises(HTTPException) as e:
+        asyncio.run(ep.change_ticket_rule_note(uuid.uuid4(), ep.TicketRuleNoteIn(note="x"), MagicMock(), user(), FakeDB(Rows([]))))
+    assert e.value.status_code == 404
+
+
+def test_a_retried_ticket_gets_the_note_of_the_rule_that_covers_the_alert():
+    alert = NS(id=uuid.uuid4(), rule_id=None, rule_name=None, title=TITLE, raw_event={"source": "cipp"}, connector_type=None, created_at=NOW)
+    covering = NS(tenant_id=OWNER, scope="client", client_tenant_id=CLIENT, source="cipp", signature=f"title:{TITLE}", created_at=NOW, note="Check with the client.")
+    other = NS(tenant_id=OWNER, scope="client", client_tenant_id=CLIENT, source="cipp", signature="title:Something else", created_at=NOW, note="Not this one.")
+    got = asyncio.run(svc.note_for_alert(FakeDB(Rows([other, covering])), OWNER, CLIENT, alert))
+    assert got == "Check with the client."
+    assert asyncio.run(svc.note_for_alert(FakeDB(Rows([other])), OWNER, CLIENT, alert)) == ""

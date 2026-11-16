@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -24,7 +24,7 @@ from app.services.alert_scope import alert_scope
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.alert_suppression import signature_of, source_of
 from app.services.alert_ticket_rules import ACTION as TICKET_ACTION
-from app.services.alert_ticket_rules import has_ticket, queue_for_rule, retry_ticket, rule_covers
+from app.services.alert_ticket_rules import clean_note, has_ticket, queue_for_rule, retry_ticket, rule_covers
 from app.services.audit import emit_audit
 
 router = APIRouter(prefix="/alert-ticket-rules", tags=["alerts"])
@@ -37,6 +37,8 @@ class TicketRuleIn(BaseModel):
     scope: Literal["client", "all"]
     # Also open tickets, once, for the alerts of this type that are already open and have none (at most CATCH_UP_MAX, newest first). A rule alone covers only alerts raised after it was made.
     catch_up: bool = True
+    # Written into every ticket the rule opens, under "Instructions": what to do about this type of alert.
+    note: str = Field(default="", max_length=1000)
 
 
 class TicketRuleOut(BaseModel):
@@ -46,6 +48,7 @@ class TicketRuleOut(BaseModel):
     client_name: str | None = None
     source: str | None = None
     title: str
+    note: str = ""
     created_at: datetime
     active: bool
     # Tickets requested because of the rule the moment it was made (the alert it was made from); later ones are not counted here.
@@ -60,6 +63,7 @@ def _out(rule: AlertTicketRule, names: dict[uuid.UUID, str], queued_now: int = 0
         client_name=names.get(rule.client_tenant_id) if rule.client_tenant_id else None,
         source=rule.source,
         title=rule.title,
+        note=rule.note or "",
         created_at=rule.created_at,
         active=rule.revoked_at is None,
         queued_now=queued_now,
@@ -124,6 +128,7 @@ async def make_ticket_rule(
         source=source,
         signature=signature,
         title=title,
+        note=clean_note(body.note),
         created_by=current_user.user_id,
         created_at=now,
     )
@@ -160,6 +165,39 @@ async def list_ticket_rules(current_user: AuthUser, db: DBSession) -> list[Ticke
     )
     names = await _names(db, current_user.tenant_id)
     return [_out(r, names) for r in rules]
+
+
+class TicketRuleNoteIn(BaseModel):
+    note: str = Field(default="", max_length=1000)  # empty clears it
+
+
+@router.patch("/{rule_id}", response_model=TicketRuleOut)
+async def change_ticket_rule_note(
+    rule_id: uuid.UUID,
+    body: TicketRuleNoteIn,
+    request: Request,
+    current_user: Annotated[AuthUser, Depends(require_permission("connectors:write"))],
+    db: DBSession,
+) -> TicketRuleOut:
+    """Change the note a rule writes into the tickets it opens. It applies to tickets opened from now on; tickets already opened keep what they were given."""
+    rule = (
+        await db.execute(select(AlertTicketRule).where(AlertTicketRule.id == rule_id, AlertTicketRule.tenant_id == current_user.tenant_id))
+    ).scalar_one_or_none()
+    if rule is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket rule not found")
+    rule.note = clean_note(body.note)
+    await emit_audit(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        actor_id=current_user.user_id,
+        action="alert_ticket_rule:note_changed",
+        resource="alert_ticket_rule",
+        resource_id=str(rule.id),
+        changes={"title": (rule.title or "")[:200], "note_length": len(rule.note)},
+        request=request,
+    )
+    await db.commit()
+    return _out(rule, await _names(db, current_user.tenant_id))
 
 
 @router.delete("/{rule_id}", response_model=TicketRuleOut)

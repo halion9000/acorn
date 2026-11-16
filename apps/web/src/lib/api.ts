@@ -2135,6 +2135,8 @@ export interface TicketRule {
   client_name?: string | null;
   source?: string | null;
   title: string;
+  /** Written into every ticket the rule opens, under "Instructions". */
+  note?: string;
   created_at: string;
   active: boolean;
   queued_now?: number;
@@ -2149,7 +2151,10 @@ export interface TicketStatus {
 
 export const ticketRulesApi = {
   /** Make a rule from an alert: its type, for its client or for every client, from now on (and this alert now if it has no ticket). With `catchUp`, also the alerts of the type that are already open and have none (at most 25). */
-  make: (alertId: string, scope: 'client' | 'all', catchUp = true) => request<TicketRule>('/api/v1/alert-ticket-rules', { method: 'POST', body: JSON.stringify({ alert_id: alertId, scope, catch_up: catchUp }) }),
+  make: (alertId: string, scope: 'client' | 'all', catchUp = true, note?: string) =>
+    request<TicketRule>('/api/v1/alert-ticket-rules', { method: 'POST', body: JSON.stringify({ alert_id: alertId, scope, catch_up: catchUp, ...(note ? { note } : {}) }) }),
+  /** Changes the note a rule writes into the tickets it opens from now on; an empty note clears it. */
+  changeNote: (id: string, note: string) => request<TicketRule>(`/api/v1/alert-ticket-rules/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ note }) }),
   statusFor: (alertId: string) => request<TicketStatus>(`/api/v1/alert-ticket-rules/alert/${encodeURIComponent(alertId)}/status`),
   /** Ask CORE once more for the ticket of an alert whose request failed. */
   retry: (alertId: string) => request<TicketStatus>(`/api/v1/alert-ticket-rules/alert/${encodeURIComponent(alertId)}/retry`, { method: 'POST' }),

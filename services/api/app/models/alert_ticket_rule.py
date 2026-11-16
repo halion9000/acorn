@@ -22,6 +22,8 @@ class AlertTicketRule(Base):
     source: Mapped[str | None] = mapped_column(String(100), nullable=True)
     signature: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Written into every ticket the rule opens, under "Instructions" (migration 198). Empty: no note.
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
