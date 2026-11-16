@@ -112,7 +112,7 @@ export function HubSpotAutomations({ refreshAfterSyncMs = REFRESH_AFTER_SYNC_MS 
           )}
         </div>
         <p className="mt-1 text-sm text-gray-400">
-          Tickets in one HaloPSA category are copied into HubSpot as tickets, linked to the HubSpot company with the client&apos;s name, and moved to HubSpot&apos;s closed stage when the Halo ticket is closed. One way only: nothing is written to HaloPSA.
+          Tickets in one HaloPSA category are copied into HubSpot as tickets, linked to the HubSpot company with the client&apos;s name, and, if CORE&apos;s close setting is on, the Halo ticket then gets a private note naming the HubSpot ticket and is closed in Halo while the HubSpot ticket stays open. With that setting off, nothing is written to HaloPSA and the HubSpot ticket follows the Halo ticket&apos;s status.
         </p>
         {run === undefined && <p className="mt-3 text-sm text-gray-500">Loading...</p>}
         {run === null && (
