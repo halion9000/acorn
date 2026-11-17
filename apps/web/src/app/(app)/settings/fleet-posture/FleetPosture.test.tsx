@@ -376,3 +376,21 @@ describe('FleetPosture downloads', () => {
     expect(text).toContain('Dana R,2026-10-01,yes');
   });
 });
+
+describe("Fleet posture: against the median", () => {
+  it("shows the fleet median and each client's points above or below it", async () => {
+    const clients = [
+      { client_id: "a", client_name: "Alpha", score: 90, met: 9, partly: 0, not_met: 1, accepted: 0, stale_tools: [] },
+      { client_id: "b", client_name: "Beta", score: 70, met: 7, partly: 0, not_met: 3, accepted: 0, stale_tools: [] },
+      { client_id: "c", client_name: "Gamma", score: 50, met: 5, partly: 0, not_met: 5, accepted: 0, stale_tools: [] },
+      { client_id: "d", client_name: "Delta", score: null, met: 0, partly: 0, not_met: 0, accepted: 0, stale_tools: [] },
+    ];
+    authFetch.mockImplementation((url: string) => (url.endsWith('/fleet/summary') ? json({ clients, average_score: 70 }) : json({})));
+    render(<FleetPosture />);
+    expect(await screen.findByTestId("fleet-median")).toHaveTextContent("Fleet median: 70%");
+    expect(screen.getByTestId("fleet-vs-a")).toHaveTextContent("+20");
+    expect(screen.getByTestId("fleet-vs-b")).toHaveTextContent("same");
+    expect(screen.getByTestId("fleet-vs-c")).toHaveTextContent("-20");
+    expect(screen.getByTestId("fleet-vs-d")).toBeEmptyDOMElement();
+  });
+});

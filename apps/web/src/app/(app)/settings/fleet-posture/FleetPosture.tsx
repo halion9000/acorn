@@ -4,6 +4,7 @@
  * Every client's tool checks side by side: who is worst, what is about to expire or lapse, who still runs Windows 10, which backups are failing, who has administrators without two-step sign-in, and what
  * changed lately. Read only. Backed by GET /api/v1/client-posture/fleet/summary, /fleet/boards/{board} and /fleet/changes.
  */
+import { fleetMedian, vsMedian, vsMedianText } from "./medianCompare";
 import { useEffect, useState } from "react";
 import { boardCsv, downloadCsv, worstCsv } from "./exportCsv";
 import { addView, loadViews, removeView, storeViews, type SavedView } from "./savedViews";
@@ -171,6 +172,7 @@ function Worst() {
   if (error) return <p role="alert" className="text-sm text-red-300">{error}</p>;
   if (!data) return <p className="text-sm text-gray-500">Loading…</p>;
   if (data.clients.length === 0) return <p className="text-sm text-gray-400">No client has sent checks yet.</p>;
+  const median = fleetMedian(data.clients.map((c) => c.score));
   return (
     <>
     {problem && <p role="alert" className="mb-2 text-sm text-red-300">{problem}</p>}
@@ -178,11 +180,13 @@ function Worst() {
       Download CSV
     </button>
     {data.average_score != null && <p className="mb-2 text-sm text-gray-400" data-testid="fleet-average">Fleet average: {data.average_score}% across {data.clients.filter((c) => c.score !== null).length} clients with a score.</p>}
+    {median !== null && <p className="mb-2 text-sm text-gray-400" data-testid="fleet-median">Fleet median: {median}%. The Vs median column shows each client's points above or below it.</p>}
     <table className="w-full text-left text-sm" data-testid="fleet-worst">
       <thead className="text-xs uppercase text-gray-500">
         <tr>
           <th scope="col" className="py-1 pr-3">Client</th>
           <th scope="col" className="pr-3">Score</th>
+          <th scope="col" className="pr-3">Vs median</th>
           <th scope="col" className="pr-3">Target</th>
           <th scope="col" className="pr-3">Problems</th>
           <th scope="col" className="pr-3">Need attention</th>
@@ -206,6 +210,9 @@ function Worst() {
                 </button>
               ) : null}
               {why === c.client_id ? <WhyRow clientId={c.client_id} /> : null}
+            </td>
+            <td className="pr-3" data-testid={`fleet-vs-${c.client_id}`}>
+              {vsMedianText(vsMedian(c.score, median))}
             </td>
             <td className="pr-3">
               {c.target ? <span className={c.below_target ? "text-red-300" : "text-gray-300"}>{c.target}%{c.below_target ? " (below)" : ""}</span> : <span className="text-gray-600">none</span>}{" "}
