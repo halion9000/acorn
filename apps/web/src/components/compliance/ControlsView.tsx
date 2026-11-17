@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
 import { ControlGapReport } from './ControlGapReport';
+import { OwnerReminders } from './OwnerReminders';
 import { SecureframeCard } from './SecureframeCard';
 import { saveText } from '@/lib/saveFile';
 import { apiErrorDetail, controlsApi, downloadCsv, type ControlList } from '@/lib/api';
@@ -197,6 +198,7 @@ export function ControlsView() {
         </p>
       )}
       {data && data.rows.length > 0 && <ControlGapReport rows={data.rows} />}
+      {data && data.rows.length > 0 && <OwnerReminders rows={data.rows} />}
       {data && data.rows.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-gray-800">
           <table className="w-full text-left text-sm" data-testid="controls-table">
