@@ -55,3 +55,18 @@ def test_the_message_names_each_policy_its_day_and_whether_it_is_overdue_and_lin
     one_subject, one_body = reminder_message(None, [Owed("AUP", TODAY, False)], "")
     assert one_subject == "[A.C.O.R.N] 1 policy to read and accept" and "Hello," in one_body and "go to My policies" in one_body
     assert message_for([row("a@x.com", "AUP", due=TODAY - timedelta(days=1), name="Ann")], TODAY, "")[0].startswith("[A.C.O.R.N] Overdue")
+
+
+def test_accepting_needs_reports_read_which_cores_key_lacks_and_refuses_any_api_key():
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints import me_policies as me
+    from app.scripts.bootstrap_production import CORE_KEY_SCOPES
+    from fastapi import HTTPException
+
+    assert "reports:read" not in CORE_KEY_SCOPES and "reports:read" in __import__("app.core.security", fromlist=["ROLE_PERMISSIONS"]).ROLE_PERMISSIONS["viewer"]
+    key_user = SimpleNamespace(tenant_id=uuid.uuid4(), user_id=uuid.uuid4(), email="core@x", scopes=["reports:read"])
+    with __import__("pytest").raises(HTTPException) as e:
+        asyncio.run(me.accept_policy(uuid.uuid4(), key_user, None))
+    assert e.value.status_code == 403 and "API key" in e.value.detail

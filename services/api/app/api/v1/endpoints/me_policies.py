@@ -1,6 +1,6 @@
 """My policies: the policies assigned to the signed-in person, their text, and a way to accept them.
 
-Open to everyone who can use the console (the viewer permission, alerts:read): a person sees and accepts only what is assigned to their own e-mail address, in their own organization. Accepting records the person's own
+Seeing the list is open to everyone who can use the console (alerts:read); accepting needs reports:read (the viewer role has it, CORE's key does not) and a signed-in person, never an API key. A person sees and accepts only what is assigned to their own e-mail address, in their own organization. Accepting records the person's own
 address, the version and the day; it needs the policy to be assigned to them and is the same record the compliance side reads (``policy_acceptances``). Nothing here changes a policy or who it is assigned to.
 """
 
@@ -113,8 +113,11 @@ async def my_policies(user: Annotated[AuthUser, Depends(require_permission("aler
 
 @router.post("/{item_id}/accept", response_model=MyPolicy, summary="Accept the newest version of a policy assigned to me")
 async def accept_policy(
-    item_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: TenantDBSession
+    item_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("reports:read"))], db: TenantDBSession
 ) -> MyPolicy:
+    # Accepting is a person's own act: an API key (CORE's, an agent's) never accepts on anyone's behalf, even if it were given the permission.
+    if getattr(user, "scopes", None) is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="A policy is accepted by the signed-in person, not by an API key.")
     mine = await _mine(db, user, only=item_id)
     if not mine:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That policy is not assigned to you.")
