@@ -277,14 +277,15 @@ def test_a_client_with_machines_and_no_billed_line_is_listed_largest_first_and_t
 
 
 def test_every_suggestion_rule_has_a_confidence_and_a_line_with_no_suggestion_has_none():
-    from app.services.license_counts import SUGGESTION_CONFIDENCE, SUGGESTIONS, suggestion_confidence
+    from app.services.license_counts import SUGGESTION_CONFIDENCE, SUGGESTIONS, suggest, suggestion_confidence
 
     assert {needle for needle, _ in SUGGESTIONS} == set(SUGGESTION_CONFIDENCE), "a rule without a stated confidence would be applied blind"
     assert set(SUGGESTION_CONFIDENCE.values()) <= {"high", "medium", "low"}
     assert suggestion_confidence("Huntress for Workstations (Included)") == "high"
     assert suggestion_confidence("Huntress SAT (Security Awareness Training) (Included)") == "high"
     assert suggestion_confidence("NinjaOne RMM (Included)") == "medium"
-    assert suggestion_confidence("ThreatMate (Included)") == "low"
+    assert suggestion_confidence("ThreatMate (Included)") == "high"
+    assert suggest("ThreatMate (Included)") == [{"source": "threatmate", "item": "Billable assets"}], "priced on the billing meter count, not the raw asset totals"
     assert suggestion_confidence("DNS Filter (PassThru)") == "high"
     assert suggestion_confidence("Managed Service - taxable portion") is None
 

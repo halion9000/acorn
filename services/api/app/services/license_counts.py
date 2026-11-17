@@ -122,7 +122,8 @@ SUGGESTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     ("huntress m365", (("huntress", "Billable identities"),)),
     ("huntress", (("huntress", "Agents"),)),
     ("ninjaone", (("ninjaone", "Windows workstations"), ("ninjaone", "Windows servers"), ("ninjaone", "Macs"))),
-    ("threatmate", (("threatmate", "Internal assets"),)),
+    # ThreatMate bills on the assets its own billing meter counts (devices plus billable users), which CORE reads from /api/v1/billing/asset; the same number the Rewst billing sync compares with HaloPSA.
+    ("threatmate", (("threatmate", "Billable assets"),)),
     ("datto saas", (("datto-saas", "Billable seats"),)),
     ("autoelevate", (("autoelevate", "Computers"),)),
     ("inky", (("inky", "Protected mailboxes"),)),
@@ -134,7 +135,7 @@ SUGGESTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
 
 
 # How sure a suggestion is. A rule is "high" when its tool counts exactly what the invoice line names (one agent, one seat, one machine); "medium" when the count is made of several items or can include
-# things that are not billed (NinjaOne's workstations, servers and Macs, Slide's protected systems, Field Effect's devices); "low" when the line may be priced on something else (ThreatMate's assets).
+# things that are not billed (NinjaOne's workstations, servers and Macs, Slide's protected systems, Field Effect's devices); "low" when the line may be priced on something else.
 SUGGESTION_CONFIDENCE: dict[str, str] = {
     "huntress sat": "high",
     "huntress siem": "medium",
@@ -143,7 +144,7 @@ SUGGESTION_CONFIDENCE: dict[str, str] = {
     "huntress m365": "medium",
     "huntress": "high",
     "ninjaone": "medium",
-    "threatmate": "low",
+    "threatmate": "high",
     "datto saas": "high",
     "autoelevate": "high",
     "inky": "high",
