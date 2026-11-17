@@ -21703,6 +21703,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/announcements:
+    get:
+      tags:
+      - announcements
+      summary: List Announcements
+      operationId: list_announcements_api_v1_announcements_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/AnnouncementOut'
+                type: array
+                title: Response List Announcements Api V1 Announcements Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - announcements
+      summary: Post Announcement
+      operationId: post_announcement_api_v1_announcements_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnouncementIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnouncementOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/announcements/{announcement_id}:
+    delete:
+      tags:
+      - announcements
+      summary: Remove Announcement
+      operationId: remove_announcement_api_v1_announcements__announcement_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: announcement_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Announcement Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/billing/sync:
     get:
       tags:
@@ -32988,6 +33057,66 @@ components:
           default: false
       type: object
       title: AllowRequest
+    AnnouncementIn:
+      properties:
+        message:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Message
+        tone:
+          type: string
+          enum:
+          - info
+          - warning
+          title: Tone
+          default: info
+        ends_on:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Ends On
+      type: object
+      required:
+      - message
+      title: AnnouncementIn
+    AnnouncementOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        message:
+          type: string
+          title: Message
+        tone:
+          type: string
+          title: Tone
+        ends_on:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Ends On
+        created_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Created By
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - message
+      - tone
+      - ends_on
+      - created_by
+      - created_at
+      title: AnnouncementOut
     AnswersIn:
       properties:
         items:

@@ -38,6 +38,7 @@ The left sidebar groups the console:
 
 **What's new (new, 2026-11-16).** Settings, Help, What's new lists the features added lately, newest first, taken from the entries of this guide that carry a date. Each entry links to its place in the guide.
 **Settings search also looks in the guide (new, 2026-11-16).** Words typed in Settings' Find a setting box also find the guide sections that contain every word, shown under In the guide with a piece of text around the first match, each opening the guide at that section (up to five).
+**Announcements (new, 2026-11-16).** Settings, Announcements lets a workspace manager post a short plain-text message (information or warning, optional end day, up to five at once) that shows above every page for everyone in the organization; each person can dismiss it for their browser session, and a manager can remove it. It ends on its end day by itself. Migration 204 adds it.
 
 ## 3. Connecting tools in CORE
 

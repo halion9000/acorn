@@ -22,6 +22,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/detection/vendor-detections': { title: 'Vendor Detections', description: 'What your connected tools have detected' },
   '/settings/guide': { title: 'ACORN Setup Guide', description: 'How to set up and use A.C.O.R.N, page by page' },
   '/settings/whats-new': { title: "What's new", description: 'Features added lately, newest first' },
+  '/settings/announcements': { title: 'Announcements', description: 'A banner message for the whole team' },
   '/settings/rbac': { title: 'Roles & Permissions', description: 'Access control and team management' },
   '/settings/client-posture': { title: 'Client Posture', description: 'Devices, Multi-Factor, alerts and cases for one client' },
   '/settings/billing': { title: 'Licenses & Counts', description: 'What each tool counts for each client, and every change, to check an invoice against' },

@@ -33,6 +33,7 @@ from app.api.v1.endpoints import (
     auth,
     autonomy_policy,
     billing,
+    announcements,
     billing_sync,
     business_context,
     canary,
@@ -333,6 +334,7 @@ api_router.include_router(client_posture.router)
 api_router.include_router(dmarc.router)
 api_router.include_router(billing.router)
 api_router.include_router(billing.ingest_router)
+api_router.include_router(announcements.router)
 api_router.include_router(billing_sync.router)
 api_router.include_router(metrics_pages.router)
 api_router.include_router(client_portal.router)

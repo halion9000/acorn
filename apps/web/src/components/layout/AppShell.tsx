@@ -10,6 +10,7 @@ import { ShortcutHelp } from './ShortcutHelp';
 import { TimeWindowProvider } from './TimeWindowProvider';
 import { TenantProvider } from './TenantProvider';
 import { TenantViewBanner } from './TenantViewBanner';
+import { AnnouncementBanner } from './AnnouncementBanner';
 import { CopilotDock } from '@/components/copilot/CopilotDock';
 import { DemoBanner } from '@/components/demo/DemoBanner';
 import { DemoAutoLogin } from '@/components/demo/DemoAutoLogin';
@@ -92,6 +93,7 @@ export function AppShell({ children }: AppShellProps) {
           <TopBar demoOffset={demo} />
           <main className={`${topPadClass} min-h-screen`}>
             <div className="p-6">
+              <AnnouncementBanner />
               <TenantViewBanner />
               <HiddenPageGuard>{children}</HiddenPageGuard>
             </div>
