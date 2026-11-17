@@ -261,3 +261,16 @@ async def test_the_client_breakdown_endpoint_reads_this_organizations_snapshot_a
         await with_db(tenant.id, lambda db: ep.profitability_client(tenant.user, db, "5", "2026-01"))
     assert other_month.value.status_code == 404
     await with_db(tenant.id, lambda db: db.execute(text("delete from metric_datasets where tenant_id = :t"), {"t": tenant.id}))
+
+
+def test_the_client_breakdown_route_accepts_a_real_month_and_the_per_client_month_pattern_is_not_a_literal_d():
+    """The month check on the click-through route lost its backslashes once (^d{4}-d{2}$), so every real month answered 422. The published schema is what a caller is held to."""
+    import re
+
+    from app.main import app
+
+    params = app.openapi()["paths"]["/api/v1/finance/profitability/client"]["get"]["parameters"]
+    month = next(p for p in params if p["name"] == "month")
+    pattern = month["schema"]["pattern"]
+    assert re.fullmatch(pattern, "2026-11"), pattern
+    assert not re.fullmatch(pattern, "dddd-dd") and not re.fullmatch(pattern, "2026-1")

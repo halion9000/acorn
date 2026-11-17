@@ -210,7 +210,7 @@ async def profitability_client(
     user: AuthUser,
     db: DBSession,
     client_id: str = Query(max_length=40),
-    month: str = Query(pattern=r"^d{4}-d{2}$"),
+    month: str = Query(pattern=r"^\d{4}-\d{2}$"),
 ) -> dict[str, Any]:
     """What one client's row on the Profitability page is made of for a month: the invoice lines (billed and free), the recurring invoice lines, and the hours by agent with the rate used. Nothing new is worked out; each part adds up to a figure on the row."""
     snap = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
