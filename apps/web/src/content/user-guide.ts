@@ -41,6 +41,7 @@ The left sidebar groups the console:
 **Settings** has tabs (Profile, Notifications, Appearance, Deployment & AI, Audit log, About, and others) and a **More settings** list with **Auto-close** and **Tickets**. The client pages (Client Posture, Multi-Factor, Sign-in Scores, Client Cleanup, Platform Health) have their own **Client Security** section in the left sidebar.
 
 **What's new (new, 2026-11-16).** Settings, Help, What's new lists the features added lately, newest first, taken from the entries of this guide that carry a date. Each entry links to its place in the guide.
+**Settings search also looks in the guide (new, 2026-11-16).** Words typed in Settings' Find a setting box also find the guide sections that contain every word, shown under In the guide with a piece of text around the first match, each opening the guide at that section (up to five).
 
 ## 3. Connecting tools in CORE
 

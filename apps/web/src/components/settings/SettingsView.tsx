@@ -25,6 +25,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { docs } from '@/lib/docs';
 import Link from 'next/link';
+import { USER_GUIDE } from '@/content/user-guide';
+import { guideHits, guideSections } from '@/lib/guide-search';
+import { SettingsGuideHits } from './SettingsGuideHits';
 import { SeededDetections } from './SeededDetections';
 import useSWR from 'swr';
 import { clsx } from 'clsx';
@@ -326,6 +329,7 @@ export function filterSettingsGroups(groups: { title: string; entries: SettingsE
 
 export function SettingsView() {
   const [search, setSearch] = useState('');
+  const inGuide = useMemo(() => guideHits(guideSections(USER_GUIDE), search), [search]);
   const [pickedTab, setPickedTab] = useState<TabId>('profile');
   // The list is long: choosing an entry far down it must show the panel, not leave it above the screen. The panel is brought to the top of the view, and the list scrolls on its own beside it.
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -368,9 +372,10 @@ export function SettingsView() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-1.5 text-sm text-gray-100 placeholder:text-gray-600"
             />
-            {search.trim() && filterSettingsGroups(groupedSettings(visibleTabs, capabilities), search).length === 0 ? (
+            {search.trim() && filterSettingsGroups(groupedSettings(visibleTabs, capabilities), search).length === 0 && inGuide.length === 0 ? (
               <p className="px-3 py-2 text-xs text-gray-500" data-testid="settings-search-empty">Nothing matches &quot;{search.trim()}&quot;.</p>
             ) : null}
+            <SettingsGuideHits hits={inGuide} />
             {filterSettingsGroups(groupedSettings(visibleTabs, capabilities), search).map((g) => (
               <section key={g.title} aria-label={g.title} className="border-t border-gray-700/70 pt-3 first:border-t-0 first:pt-0" data-testid="settings-group">
                 <p className="mb-1 rounded-md bg-gray-800/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-sky-300/90">{g.title}</p>
