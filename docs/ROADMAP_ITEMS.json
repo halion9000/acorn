@@ -1477,8 +1477,10 @@
     "key": "r7-af-20",
     "title": "Alerts: notes that become a case timeline entry",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 711207dd",
+    "note": "2026-11-16: add_note also writes a case_timeline entry (alert_note) when the alert is in a case; earlier notes are not back-filled."
   },
   {
     "key": "r7-af-21",
