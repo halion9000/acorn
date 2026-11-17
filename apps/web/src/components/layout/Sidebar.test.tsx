@@ -69,6 +69,7 @@ describe('Sidebar', () => {
       ['Access Reviews', '/compliance/access-reviews'],
       ['Questionnaires', '/compliance/questionnaires'],
       ['Audits', '/compliance/audits'],
+      ['Calendar', '/compliance/calendar'],
       ['Trust Center', '/compliance/trust-center'],
       ['Asset Inventory', '/inventory'],
     ]);

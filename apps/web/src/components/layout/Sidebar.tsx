@@ -394,6 +394,7 @@ const navSections: NavSection[] = [
       { label: 'Access Reviews', href: '/compliance/access-reviews', icon: <ShieldIcon /> },
       { label: 'Questionnaires', href: '/compliance/questionnaires', icon: <DocumentReportIcon /> },
       { label: 'Audits', href: '/compliance/audits', icon: <ScanIcon /> },
+      { label: 'Calendar', href: '/compliance/calendar', icon: <ScanIcon /> },
       { label: 'Trust Center', href: '/compliance/trust-center', icon: <ShieldIcon /> },
       { label: 'Asset Inventory', href: '/inventory', icon: <InboxIcon /> },
     ],

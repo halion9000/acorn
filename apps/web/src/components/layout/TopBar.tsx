@@ -58,6 +58,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/settings/roadmap': { title: 'Upcoming improvements', description: 'What is waiting to be built, who it waits on, and its priority' },
   '/compliance/controls': { title: 'Controls', description: 'Every control of the frameworks that are on, and how healthy it is' },
   '/compliance/access-reviews': { title: 'Access reviews', description: 'Check that the people with access to a system should still have it' },
+  '/compliance/calendar': { title: 'Compliance calendar', description: 'Everything that falls due: reviews, access reviews and audit periods' },
   '/compliance/questionnaires': { title: 'Questionnaires', description: 'Answer customer security questionnaires from answers you already gave' },
   '/compliance/audits': { title: 'Audits', description: 'An audit of a framework and what the auditor asks for' },
   '/compliance/trust-center': { title: 'Trust center', description: 'What you show your customers about your security' },
