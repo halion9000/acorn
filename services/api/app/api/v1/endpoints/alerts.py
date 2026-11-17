@@ -32,7 +32,7 @@ from app.services.alert_rail import (
     RelatedEntity,
     build_rail_envelope,
 )
-from app.services import alert_similar
+from app.services import alert_noise, alert_similar
 from app.services.alert_scope import alert_scope
 from app.services.alert_status import FINISHED_ALERT_STATUSES, STALE, SUPPRESSED, is_finished
 from app.services.audit import emit_audit
@@ -1090,6 +1090,46 @@ async def get_alert_stats(
 # FastAPI matches routes top-down, so a static path must precede the
 # parametric path of the same depth or the framework will route
 # `GET /alerts/queue` into `get_alert(alert_id="queue")` and 422.
+@router.get("/noise")
+async def noise_report(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    client_id: uuid.UUID | None = Query(default=None),
+    days: int = Query(default=30, ge=1, le=180),
+) -> dict[str, Any]:
+    """The rules that raised the most alerts that ended with nothing done (finished as a false positive or closed with no ticket, hidden, or set aside as stale) for one client, or for the whole organization. Describes only."""
+    clients = {row.id for row in (await db.execute(select(Tenant.id).where(Tenant.parent_tenant_id == current_user.tenant_id))).all()}
+    if client_id is not None and client_id != current_user.tenant_id and client_id not in clients:
+        raise HTTPException(status_code=404, detail="Client not found")
+    scope = [client_id] if client_id is not None else [current_user.tenant_id, *clients]
+    since = datetime.now(UTC) - timedelta(days=days)
+    rule = func.coalesce(func.nullif(Alert.rule_name, ""), Alert.title)
+    ticket = has_ticket_expr()
+    quiet = and_(Alert.status.in_(alert_noise.QUIET_STATUSES), not_(ticket))
+    async with cross_tenant_reads(db):
+        found = (
+            await db.execute(
+                select(
+                    rule.label("rule"),
+                    func.count().label("total"),
+                    func.count().filter(quiet).label("quiet"),
+                    func.count().filter(ticket).label("with_ticket"),
+                )
+                .where(Alert.tenant_id.in_(scope), Alert.created_at >= since)
+                .group_by(rule)
+                .order_by(func.count().filter(quiet).desc())
+                .limit(200)
+            )
+        ).all()
+        total = (await db.execute(select(func.count()).select_from(Alert).where(Alert.tenant_id.in_(scope), Alert.created_at >= since))).scalar_one()
+    return {
+        "days": days,
+        "client_id": str(client_id) if client_id else None,
+        "total_alerts": int(total),
+        "rules": alert_noise.rank([{"rule": r[0], "total": r[1], "quiet": r[2], "with_ticket": r[3]} for r in found]),
+    }
+
+
 @router.get("/queue", response_model=QueueResponse)
 async def get_alert_queue(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],

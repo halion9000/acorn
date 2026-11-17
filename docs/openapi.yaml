@@ -814,6 +814,51 @@ paths:
                 $ref: '#/components/schemas/AlertStatsResponse'
       security:
       - HTTPBearer: []
+  /api/v1/alerts/noise:
+    get:
+      tags:
+      - alerts
+      summary: Noise Report
+      description: The rules that raised the most alerts that ended with nothing done
+        (finished as a false positive or closed with no ticket, hidden, or set aside
+        as stale) for one client, or for the whole organization. Describes only.
+      operationId: noise_report_api_v1_alerts_noise_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 180
+          minimum: 1
+          default: 30
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Noise Report Api V1 Alerts Noise Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/queue:
     get:
       tags:
