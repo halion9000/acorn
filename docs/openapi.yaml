@@ -45228,6 +45228,8 @@ components:
           - device
           - stock
           - nuc
+          - vendor
+          - control
           title: Kind
         id:
           type: string

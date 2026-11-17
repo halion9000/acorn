@@ -1,6 +1,6 @@
 """Search everything from the box at the top of the screen.
 
-One question, answered across alerts, cases, devices, stock and NUCs, and clients. Typing a client's name also finds that client's alerts, cases, devices and stock, which is what people
+One question, answered across alerts, cases, devices, stock and NUCs, clients, people, vendors and compliance controls. Typing a client's name also finds that client's alerts, cases, devices and stock, which is what people
 usually mean. A few best matches per kind, newest first, each saying which client it belongs to; the screen links each one to the page that shows it.
 
 Who can see what is the same as everywhere else here: the caller's own tenant and the clients it manages (an MSP sees its clients; a client's user sees only its own), read with the same
@@ -24,10 +24,12 @@ from app.models.device import Device
 from app.models.inventory import InventoryItem
 from app.models.signin import IdentityMfaUser
 from app.models.tenant import Tenant
+from app.models.vendor_management import Vendor
+from app.services.compliance_catalog import CATALOGS
 
 router = APIRouter(prefix="/search", tags=["search"])
 
-Kind = Literal["client", "person", "alert", "case", "device", "stock", "nuc"]
+Kind = Literal["client", "person", "alert", "case", "device", "stock", "nuc", "vendor", "control"]
 PER_KIND = 5
 
 
@@ -173,4 +175,34 @@ async def search(
         for i in items:
             kind: Kind = "nuc" if i.kind == "nuc" else "stock"
             add(kind, i.id, i.name, " · ".join(x for x in (i.serial, i.person, i.status) if x) or None, i.tenant_id)
+        # Vendors (name, service or category) of the caller's own organization and its clients; archived ones are not offered.
+        vendors = (
+            await db.execute(
+                select(Vendor.id, Vendor.name, Vendor.service, Vendor.category, Vendor.tenant_id)
+                .where(
+                    Vendor.tenant_id.in_(scope),
+                    Vendor.archived_at.is_(None),
+                    or_(
+                        Vendor.name.ilike(pattern, escape="\\"),
+                        Vendor.service.ilike(pattern, escape="\\"),
+                        Vendor.category.ilike(pattern, escape="\\"),
+                        Vendor.tenant_id.in_(by_client or [uuid.UUID(int=0)]),
+                    ),
+                )
+                .order_by(Vendor.name)
+                .limit(limit)
+            )
+        ).all()
+        for v in vendors:
+            add("vendor", v.id, v.name, " · ".join(x for x in (v.service, v.category) if x) or None, v.tenant_id)
+    # Compliance controls are the frameworks' own list, the same for everyone: found by id or title, never tied to a client.
+    needle = text.lower()
+    found = 0
+    for framework, catalog in CATALOGS.items():
+        for _group, control_id, title in catalog:
+            if found >= limit:
+                break
+            if needle in control_id.lower() or needle in title.lower():
+                hits.append(Hit(kind="control", id=f"{framework}:{control_id}", title=f"{control_id} {title}", detail=framework))
+                found += 1
     return SearchOut(query=text, hits=hits)

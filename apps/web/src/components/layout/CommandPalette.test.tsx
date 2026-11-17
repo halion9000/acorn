@@ -295,3 +295,13 @@ describe('CommandPalette: new case and new alert', () => {
     window.removeEventListener('aisoc:new-alert', heard);
   });
 });
+
+describe('hitHref: vendors and controls', () => {
+  const h = (over: Record<string, unknown>) => ({ kind: 'vendor', id: 'v1', title: 'Pax8', detail: null, client: null, client_id: null, ...over });
+  it('opens a vendor on the vendors page for its client, and a control narrowed to that framework and control', () => {
+    expect(hitHref(h({}) as never)).toBe('/compliance/vendors');
+    expect(hitHref(h({ client_id: 'c 1' }) as never)).toBe('/compliance/vendors?client=c%201');
+    expect(hitHref(h({ kind: 'control', id: 'SOC2:CC6.1' }) as never)).toBe('/compliance/controls?framework=SOC2&search=CC6.1');
+    expect(hitHref(h({ kind: 'control', id: 'PCI-DSS:1.2.3' }) as never)).toBe('/compliance/controls?framework=PCI-DSS&search=1.2.3');
+  });
+});

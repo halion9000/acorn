@@ -41,7 +41,7 @@ interface PaletteGroup {
   items: PaletteAction[];
 }
 
-const HIT_LABEL: Record<SearchHit['kind'], string> = { client: 'Client', person: 'Person', alert: 'Alert', case: 'Case', device: 'Device', stock: 'Stock', nuc: 'NUC' };
+const HIT_LABEL: Record<SearchHit['kind'], string> = { client: 'Client', person: 'Person', alert: 'Alert', case: 'Case', device: 'Device', stock: 'Stock', nuc: 'NUC', vendor: 'Vendor', control: 'Control' };
 
 /** The page that shows a search result. Devices and stock open their lists already searching for that item. */
 export function hitHref(hit: SearchHit): string {
@@ -58,6 +58,11 @@ export function hitHref(hit: SearchHit): string {
       return `/inventory?search=${encodeURIComponent(hit.title)}`;
     case 'nuc':
       return `/inventory?kind=nuc&search=${encodeURIComponent(hit.title)}`;
+    case 'vendor':
+      return `/compliance/vendors${hit.client_id ? `?client=${encodeURIComponent(hit.client_id)}` : ''}`;
+    case 'control':
+      // The id is "FRAMEWORK:CONTROL"; the Controls page opens already narrowed to that control.
+      return `/compliance/controls?framework=${encodeURIComponent(hit.id.split(':')[0] ?? '')}&search=${encodeURIComponent(hit.id.split(':').slice(1).join(':'))}`;
     default:
       return `/inventory?client=${encodeURIComponent(hit.id)}`;
   }

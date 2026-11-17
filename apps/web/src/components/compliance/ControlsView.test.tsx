@@ -175,3 +175,16 @@ describe('adding evidence from the Controls page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Evidence needs a longer summary.');
   });
 });
+
+describe('ControlsView: opened from a search result', () => {
+  it('starts narrowed to the framework and control the address names, and ignores a framework it does not know', async () => {
+    window.history.replaceState(null, '', '/compliance/controls?framework=SOC2&search=CC6.1');
+    render(<ControlsView />);
+    await waitFor(() => expect(api.list).toHaveBeenCalledWith('', { framework: 'SOC2', state: '', q: 'CC6.1' }));
+    expect(screen.getByLabelText('Search controls')).toHaveValue('CC6.1');
+    api.list.mockClear();
+    window.history.replaceState(null, '', '/compliance/controls?framework=Nope');
+    render(<ControlsView />);
+    await waitFor(() => expect(api.list).toHaveBeenCalledWith('', { framework: '', state: '', q: '' }));
+  });
+});

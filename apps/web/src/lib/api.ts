@@ -7616,7 +7616,7 @@ export const azureSpendApi = {
 };
 
 export interface SearchHit {
-  kind: 'client' | 'person' | 'alert' | 'case' | 'device' | 'stock' | 'nuc';
+  kind: 'client' | 'person' | 'alert' | 'case' | 'device' | 'stock' | 'nuc' | 'vendor' | 'control';
   id: string;
   title: string;
   detail: string | null;

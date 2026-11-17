@@ -106,6 +106,17 @@ export function ControlsView() {
   const [adding, setAdding] = useState<string | null>(null);
   const [added, setAdded] = useState('');
 
+  // A search result can open the list already narrowed: ?framework=SOC2&search=CC6.1
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const f = q.get('framework') ?? '';
+    if (['SOC2', 'ISO27001', 'NIST-CSF', 'PCI-DSS', 'HIPAA', 'CIS-IG1'].includes(f)) setFramework(f);
+    const t = (q.get('search') ?? '').slice(0, 100);
+    if (t) {
+      setSearch(t);
+      setDebounced(t.trim());
+    }
+  }, []);
   useEffect(() => {
     setClientId(clientFromAddress(window.location.search));
   }, []);
