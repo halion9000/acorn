@@ -1193,28 +1193,32 @@
     "title": "An agent skill for answering a customer security questionnaire from the answer library",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data."
   },
   {
     "key": "r7-cf-25",
     "title": "An agent skill for writing the evidence note for an access review",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data."
   },
   {
     "key": "r7-cf-26",
     "title": "An agent skill for the quarterly vendor review",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data."
   },
   {
     "key": "r7-cf-27",
     "title": "An agent skill that explains an automated control test failure and the fix",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data."
   },
   {
     "key": "r7-cf-28",
