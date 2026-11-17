@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, bindparam, delete, func, not_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -64,6 +64,7 @@ from app.services.fleet_posture import (
     tool_scorecards,
 )
 from app.services.infra_review import TOOL_CHECK_SOURCES, saas_products
+from app.services.etag import not_modified, payload_etag
 from app.services.score_history import load_weights
 from app.services.score_history import trend as score_trend
 from app.services.web_posture import LiveProbe, WebPosture, WebProbe, web_posture
@@ -1181,7 +1182,9 @@ class FleetOut(BaseModel):
 
 
 @router.get("/fleet/summary", response_model=FleetOut, summary="Every client's check score, worst first")
-async def fleet_summary(current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> FleetOut:
+async def fleet_summary(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, request: Request = None, response: Response = None  # type: ignore[assignment]  # None when another handler calls this one directly
+) -> FleetOut | Response:
     owner = current_user.tenant_id
     checks, names, refreshed = await _fleet_checks(db, owner)
     now = datetime.now(UTC)
@@ -1215,7 +1218,20 @@ async def fleet_summary(current_user: Annotated[AuthUser, Depends(require_permis
             }
         )
     ranked = rank_clients(summaries)
-    return FleetOut(generated_at=now, clients=[FleetClient(**s) for s in ranked], average_score=average_score([s["score"] for s in ranked]))
+    out = FleetOut(generated_at=now, clients=[FleetClient(**s) for s in ranked], average_score=average_score([s["score"] for s in ranked]))
+    return conditional(request, response, out)
+
+
+def conditional(request: Request | None, response: Response | None, out: BaseModel) -> Any:
+    """The answer with its ETag, or an empty 304 when the browser already holds this version (see app.services.etag). Called without a request (by another handler) it is the plain answer."""
+    if request is None or response is None:
+        return out
+    tag = payload_etag(out.model_dump(mode="json"))
+    headers = {"ETag": tag, "Cache-Control": "private, no-cache"}
+    if not_modified(request.headers.get("if-none-match"), tag):
+        return Response(status_code=304, headers=headers)
+    response.headers.update(headers)
+    return out
 
 
 class WeightOut(BaseModel):
@@ -1425,15 +1441,17 @@ async def fleet_board(
     board: str,
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
     db: DBSession,
+    request: Request = None,  # type: ignore[assignment]  # None when called directly: no tag, the plain answer
+    response: Response = None,  # type: ignore[assignment]
     include_met: bool = False,
     limit: Annotated[int, Query(ge=1, le=5000)] = 500,
-) -> FleetBoardOut:
+) -> FleetBoardOut | Response:
     if board not in BOARDS:
         raise HTTPException(status_code=404, detail="No such board")
     title, keys = BOARDS[board]
     checks, _names, _refreshed = await _fleet_checks(db, current_user.tenant_id)
     rows = board_rows(checks, keys, include_met=include_met)[: max(1, min(limit, 2000))]
-    return FleetBoardOut(
+    out = FleetBoardOut(
         board=board,
         title=title,
         keys=list(keys),
@@ -1456,6 +1474,7 @@ async def fleet_board(
             for r in rows
         ],
     )
+    return conditional(request, response, out)
 
 
 @router.get(
