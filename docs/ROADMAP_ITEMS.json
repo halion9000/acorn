@@ -1520,8 +1520,10 @@
     "key": "r7-af-29",
     "title": "Posture: a client scorecard history chart",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 43970fdb",
+    "note": "2026-11-16: line chart of the daily score on Client Posture. Not a table of the earlier scorecard, and no target line."
   },
   {
     "key": "r7-af-30",
