@@ -1509,8 +1509,10 @@
     "key": "r7-af-24",
     "title": "Devices: a printable inventory per client",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC ec9a94ad",
+    "note": "2026-11-16: /devices/print?client= and a Print inventory link on Devices when a client is chosen. Not checked on a real printer."
   },
   {
     "key": "r7-af-25",
