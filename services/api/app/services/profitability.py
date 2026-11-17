@@ -107,7 +107,7 @@ def profit_for_month(
         if source == "default":
             d = defaulted.setdefault(
                 agent_id,
-                {"agent_id": agent_id, "name": str((agents.get(agent_id) or {}).get("name") or f"Agent {agent_id}"), "hours": Decimal("0")},
+                {"agent_id": agent_id, "name": str((agents.get(agent_id) or {}).get("name") or f"Former agent {agent_id}"), "hours": Decimal("0")},
             )
             d["hours"] += hours
     rows: list[dict[str, Any]] = []
@@ -166,3 +166,96 @@ def software_per_run(halo_snapshot: dict[str, Any] | None) -> dict[str, Decimal]
         )
         out[key] = out.get(key, ZERO) + total
     return out
+
+
+def _f(v: Any) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def client_breakdown(
+    snapshot: dict[str, Any],
+    lines_payload: dict[str, Any] | None,
+    halo_snapshot: dict[str, Any] | None,
+    rates: list[dict[str, Any]],
+    client_id: str,
+    month: str,
+) -> dict[str, Any] | None:
+    """What one client's Profitability row for a month is made of, or None when the client was not invoiced that month.
+
+    ``revenue`` and ``invoices`` are the invoice totals CORE sent; ``invoice_lines`` are the lines of those invoices (billed, or free when the line cost the client nothing); ``hours`` are the time logged for the
+    client by agent with the hourly cost applied and where each rate came from; ``recurring`` are the lines of the client's recurring invoice (what it bills each run, with the unit cost A.C.O.R.N holds). Nothing
+    here is a new number: each part adds up to a figure on the row, and the parts that cannot be shown yet say so.
+    """
+    table = resolve_rates(rates)
+    agents = {str(a.get("id")): a for a in snapshot.get("agents") or []}
+    revenue = ZERO
+    invoices = 0
+    name = ""
+    for inv in snapshot.get("invoices") or []:
+        if str(inv.get("month")) == month and str(inv.get("client_id") or "") == client_id:
+            revenue += _dec(inv.get("revenue"))
+            invoices += int(inv.get("invoices") or 0)
+            name = str(inv.get("client_name") or name)
+    if not name and not invoices:
+        return None
+    key = name_key(name)
+    lines = [
+        {"item": str(r.get("item") or ""), "category": str(r.get("category") or "Other"), "quantity": _f(r.get("quantity")), "amount": round(_f(r.get("amount")), 2), "free": round(_f(r.get("amount")), 2) == 0}
+        for r in (lines_payload or {}).get("rows") or []
+        if str(r.get("month")) == month and str(r.get("client_id") or "") == client_id
+    ]
+    lines.sort(key=lambda ln: (-ln["amount"], ln["item"].lower()))
+    by_agent: dict[str, dict[str, Any]] = {}
+    by_charge: dict[str, Decimal] = {}
+    for h in snapshot.get("hours") or []:
+        if str(h.get("month")) != month or name_key(h.get("client")) != key:
+            continue
+        hours = Decimal(str(h.get("hours") or 0))
+        aid = str(h.get("agent_id") or "")
+        rate, source = rate_for(aid, agents, table)
+        a = by_agent.setdefault(
+            aid,
+            {"agent_id": aid, "name": str((agents.get(aid) or {}).get("name") or f"Former agent {aid}"), "hours": Decimal("0"), "rate": rate, "rate_source": source, "cost": ZERO},
+        )
+        a["hours"] += hours
+        a["cost"] += money(hours * rate)
+        by_charge[str(h.get("charge_type") or "(none)")] = by_charge.get(str(h.get("charge_type") or "(none)"), Decimal("0")) + hours
+    labor = sum((a["cost"] for a in by_agent.values()), ZERO)
+    hours_total = sum((a["hours"] for a in by_agent.values()), Decimal("0"))
+    recurring = [
+        {
+            "item": str(ln.get("item") or ""),
+            "quantity": _f(ln.get("qty")),
+            "unit_price": _f(ln.get("unit_price")),
+            "unit_cost": _f(ln.get("unit_cost")),
+            "free": _f(ln.get("unit_price")) == 0,
+            "cost_per_run": round(_f(ln.get("qty")) * _f(ln.get("unit_cost")), 2),
+        }
+        for rec in (halo_snapshot or {}).get("recurring") or []
+        if name_key(rec.get("client_name")) == key
+        for ln in rec.get("lines") or []
+    ]
+    return {
+        "client_id": client_id,
+        "client_name": name,
+        "month": month,
+        "revenue": revenue,
+        "invoices": invoices,
+        "invoice_lines": lines,
+        "invoice_lines_total": round(sum(ln["amount"] for ln in lines), 2),
+        "free_lines": sum(1 for ln in lines if ln["free"]),
+        "hours": hours_total.quantize(Decimal("0.01")),
+        "labor": labor,
+        "after_labor": revenue - labor,
+        "by_agent": sorted(
+            ({**a, "hours": a["hours"].quantize(Decimal("0.01"))} for a in by_agent.values()), key=lambda a: (-a["hours"], a["name"].lower())
+        ),
+        "by_charge_type": sorted(
+            ({"charge_type": k, "hours": v.quantize(Decimal("0.01"))} for k, v in by_charge.items()), key=lambda c: (-c["hours"], c["charge_type"])
+        ),
+        "recurring": sorted(recurring, key=lambda r: (-r["quantity"] * r["unit_price"], r["item"].lower())),
+        "tickets": None,
+    }

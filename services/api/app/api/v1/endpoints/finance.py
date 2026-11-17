@@ -18,6 +18,7 @@ from sqlalchemy import delete, select
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.billing import BILLED_SOURCE, _all_client_counts
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
+from app.models.metric_dataset import MetricDataset
 from app.models.finance_price import FinanceItemPrice
 from app.models.finance_profit import FinanceClientMaster, FinanceCostEntry, FinanceLaborRate, FinanceProfitSnapshot, FinanceSettings
 from app.services import csv_export
@@ -202,6 +203,29 @@ async def profitability(user: AuthUser, db: DBSession, month: str | None = Query
             "equipment, sales and marketing and overhead are not in this number. Software per invoice run comes from the recurring invoices and is shown for information only."
         ),
     }
+
+
+@router.get("/profitability/client", dependencies=[Depends(require_permission("finance:view"))])
+async def profitability_client(
+    user: AuthUser,
+    db: DBSession,
+    client_id: str = Query(max_length=40),
+    month: str = Query(pattern=r"^d{4}-d{2}$"),
+) -> dict[str, Any]:
+    """What one client's row on the Profitability page is made of for a month: the invoice lines (billed and free), the recurring invoice lines, and the hours by agent with the rate used. Nothing new is worked out; each part adds up to a figure on the row."""
+    snap = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    if snap is None:
+        raise HTTPException(status_code=404, detail="No profitability data has arrived yet")
+    lines = (
+        await db.execute(select(MetricDataset).where(MetricDataset.tenant_id == user.tenant_id, MetricDataset.key == "invoice-lines"))
+    ).scalar_one_or_none()
+    halo = (await db.execute(select(FinanceHaloSnapshot).where(FinanceHaloSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    out = profit.client_breakdown(
+        snap.payload, lines.payload if lines else None, halo.payload if halo else None, await _rates(db, user.tenant_id), client_id, month
+    )
+    if out is None:
+        raise HTTPException(status_code=404, detail="That client was not invoiced in that month")
+    return {**out, "invoice_lines_received_at": lines.received_at if lines else None, "received_at": snap.received_at}
 
 
 @router.get("/profitability/export.csv", dependencies=[Depends(require_permission("finance:view"))])

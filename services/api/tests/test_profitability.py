@@ -192,3 +192,72 @@ async def test_the_page_is_empty_until_core_sends_then_prices_hours_with_the_rat
     with pytest.raises(HTTPException) as nothing:
         await with_db(tenant.id, lambda db: ep.profitability_csv(tenant.user, db, "2026-01"))
     assert nothing.value.status_code == 404
+
+
+LINES = {
+    "rows": [
+        {"month": "2026-10", "client_id": "5", "client_name": "Acme Dental, Inc.", "item": "Managed Services", "category": "Services", "quantity": 1, "amount": 800},
+        {"month": "2026-10", "client_id": "5", "client_name": "Acme Dental, Inc.", "item": "ThreatMate (Included)", "category": "Software", "quantity": 25, "amount": 0},
+        {"month": "2026-10", "client_id": "5", "client_name": "Acme Dental, Inc.", "item": "Microsoft 365", "category": "Software", "quantity": 20, "amount": 200},
+        {"month": "2026-09", "client_id": "5", "client_name": "Acme Dental, Inc.", "item": "Last month only", "category": "Services", "quantity": 1, "amount": 900},
+        {"month": "2026-10", "client_id": "6", "client_name": "Birch Law", "item": "Someone else's line", "category": "Services", "quantity": 1, "amount": 400.5},
+    ]
+}
+HALO = {
+    "recurring": [
+        {"client_name": "Acme Dental Inc", "lines": [{"item": "ThreatMate (Included)", "qty": 25, "unit_price": 0, "unit_cost": 1.5}, {"item": "Microsoft 365", "qty": 20, "unit_price": 10, "unit_cost": 8}]},
+        {"client_name": "Birch Law", "lines": [{"item": "Other", "qty": 1, "unit_price": 5, "unit_cost": 1}]},
+    ]
+}
+
+
+def test_a_clients_breakdown_adds_up_to_its_row_and_names_the_billed_and_free_lines_the_hours_by_agent_and_the_rate_used():
+    rates = [{"scope": "agent", "key": "40", "hourly_rate": "70.00"}]
+    b = p.client_breakdown(SNAP, LINES, HALO, rates, "5", "2026-10")
+    assert b is not None
+    row = next(r for r in p.profit_for_month(SNAP, rates, "2026-10")["rows"] if r["client_id"] == "5")
+    assert (b["revenue"], b["invoices"], b["hours"], b["labor"], b["after_labor"]) == (row["revenue"], row["invoices"], row["hours"], row["labor"], row["after_labor"]), "the same numbers as the row"
+    assert [(ln["item"], ln["amount"], ln["free"]) for ln in b["invoice_lines"]] == [("Managed Services", 800, False), ("Microsoft 365", 200, False), ("ThreatMate (Included)", 0, True)]
+    assert b["invoice_lines_total"] == 1000 and b["free_lines"] == 1, "the lines of this month and this client only"
+    assert [(a["name"], a["hours"], a["rate"], a["rate_source"], a["cost"]) for a in b["by_agent"]] == [
+        ("Dan Kemp", Decimal("4.00"), Decimal("70.00"), "agent", Decimal("280.00")),
+        ("Vic Cio", Decimal("2.50"), Decimal("65.00"), "default", Decimal("162.50")),
+    ]
+    assert [(c["charge_type"], c["hours"]) for c in b["by_charge_type"]] == [("Remote Support", Decimal("4.00")), ("vCIO", Decimal("2.50"))]
+    assert [(r["item"], r["free"], r["cost_per_run"]) for r in b["recurring"]] == [("Microsoft 365", False, 160.0), ("ThreatMate (Included)", True, 37.5)]
+    assert b["tickets"] is None, "ticket detail is not collected yet and says so"
+
+
+def test_a_client_not_invoiced_that_month_has_no_breakdown_and_an_agent_the_list_lacks_is_a_former_agent():
+    assert p.client_breakdown(SNAP, LINES, HALO, [], "6", "2026-08") is None
+    assert p.client_breakdown(SNAP, LINES, HALO, [], "99", "2026-10") is None
+    snap = {**SNAP, "agents": [], "hours": [{"client": "Birch Law", "month": "2026-10", "agent_id": "93", "charge_type": "x", "hours": 1}]}
+    b = p.client_breakdown(snap, None, None, [], "6", "2026-10")
+    assert b is not None and b["by_agent"][0]["name"] == "Former agent 93"
+    assert b["invoice_lines"] == [] and b["recurring"] == []
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_the_client_breakdown_endpoint_reads_this_organizations_snapshot_and_lines_and_refuses_what_is_not_there(tenant):
+    from app.models.finance_profit import FinanceProfitSnapshot
+    from app.models.metric_dataset import MetricDataset
+
+    with pytest.raises(HTTPException) as none_yet:
+        await with_db(tenant.id, lambda db: ep.profitability_client(tenant.user, db, "5", "2026-10"))
+    assert none_yet.value.status_code == 404
+
+    async def seed(db):
+        db.add(FinanceProfitSnapshot(tenant_id=tenant.id, payload=feed.ProfitSnapshotIn.model_validate(SNAP).model_dump()))
+        db.add(MetricDataset(tenant_id=tenant.id, key="invoice-lines", payload=LINES))
+        await db.commit()
+
+    await with_db(tenant.id, seed)
+    out = await with_db(tenant.id, lambda db: ep.profitability_client(tenant.user, db, "5", "2026-10"))
+    assert out["client_name"] == "Acme Dental, Inc." and out["revenue"] == Decimal("1000.00")
+    assert [ln["item"] for ln in out["invoice_lines"]] == ["Managed Services", "Microsoft 365", "ThreatMate (Included)"]
+    assert out["invoice_lines_received_at"] is not None and out["received_at"] is not None
+    with pytest.raises(HTTPException) as other_month:
+        await with_db(tenant.id, lambda db: ep.profitability_client(tenant.user, db, "5", "2026-01"))
+    assert other_month.value.status_code == 404
+    await with_db(tenant.id, lambda db: db.execute(text("delete from metric_datasets where tenant_id = :t"), {"t": tenant.id}))

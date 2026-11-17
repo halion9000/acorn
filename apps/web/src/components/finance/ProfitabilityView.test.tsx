@@ -104,3 +104,20 @@ describe('ProfitabilityView', () => {
     expect(screen.getByRole('button', { name: 'Save rate' })).toBeEnabled();
   });
 });
+
+describe('Profitability: opening a client', () => {
+  it('opens what a client\u2019s numbers are made of for the month shown, and closes it again', async () => {
+    authFetch.mockImplementation((u: string) =>
+      String(u).includes('/profitability/client')
+        ? answer({ client_id: '5', client_name: 'Acme Dental', month: '2026-10', revenue: 1000, invoices: 2, invoice_lines: [], invoice_lines_total: 0, free_lines: 0, hours: 0, labor: 0, after_labor: 1000, by_agent: [], by_charge_type: [], recurring: [], tickets: null, invoice_lines_received_at: null })
+        : answer(body()),
+    );
+    render(<ProfitabilityView />);
+    await screen.findByTestId('profit-table');
+    await userEvent.click(screen.getAllByRole('button', { name: /Where the numbers of Acme Dental come from/ })[0]!);
+    expect(await screen.findByTestId('client-profit-detail')).toHaveTextContent('Acme Dental: where the numbers come from');
+    expect(authFetch.mock.calls.some(([u]) => String(u).includes('/profitability/client?client_id=5&month=2026-10'))).toBe(true);
+    await userEvent.click(within(screen.getByTestId('client-profit-detail')).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByTestId('client-profit-detail')).toBeNull();
+  });
+});

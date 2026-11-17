@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
 import { saveText } from '@/lib/saveFile';
+import { ClientProfitDetail } from './ClientProfitDetail';
 
 interface Row {
   client_id: string;
@@ -81,6 +82,8 @@ export function ProfitabilityView() {
   const [key, setKey] = useState('');
   const [rate, setRate] = useState('');
   const [busy, setBusy] = useState(false);
+  // The client whose numbers are opened below the table.
+  const [openClient, setOpenClient] = useState<string | null>(null);
 
   const load = useCallback(async (m: string) => {
     try {
@@ -204,7 +207,11 @@ export function ProfitabilityView() {
               <tbody className="divide-y divide-gray-800">
                 {rows.map((r) => (
                   <tr key={r.client_id} data-testid="profit-row">
-                    <td className="px-3 py-2 text-gray-100">{r.client_name}</td>
+                    <td className="px-3 py-2 text-gray-100">
+                      <button type="button" className="text-left text-blue-300 hover:underline" aria-label={`Where the numbers of ${r.client_name} come from`} onClick={() => setOpenClient(r.client_id)}>
+                        {r.client_name}
+                      </button>
+                    </td>
                     <td className="px-3 py-2 text-gray-300">{money(r.revenue)}</td>
                     <td className="px-3 py-2 text-gray-300">{r.hours}</td>
                     <td className="px-3 py-2 text-gray-300">{money(r.labor)}</td>
@@ -216,6 +223,7 @@ export function ProfitabilityView() {
               </tbody>
             </table>
           </div>
+          {openClient && <ClientProfitDetail clientId={openClient} month={data.report.month} onClose={() => setOpenClient(null)} />}
           {data.note && <p className="text-xs text-gray-500">{data.note}</p>}
           {data.report.unmatched_hours.length > 0 && (
             <section className="rounded-lg border border-gray-700 bg-gray-900/60 p-4" data-testid="profit-unmatched">
