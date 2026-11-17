@@ -708,6 +708,20 @@ async def create_case(
 
     response = _row_to_case(row)
 
+    # A case and a HaloPSA ticket go together: ask CORE for a ticket for each alert that has none. A failure here never undoes the case.
+    if body.alert_ids:
+        try:
+            from app.services.alert_ticket_rules import queue_tickets_for_new_case
+
+            queued = await queue_tickets_for_new_case(
+                db, user.tenant_id, body.alert_ids, holders, getattr(user, "email", None) or "a person", getattr(user, "user_id", None), now
+            )
+            if queued:
+                await db.commit()
+        except Exception:
+            await db.rollback()
+            logger.exception("Could not queue the HaloPSA ticket for a new case")
+
     # Workstream 8 — fan out to operator-selected ITSM connectors. The
     # case is already persisted (commit above) so a flaky Jira can't
     # block the create. ``fanout_create_case`` swallows per-backend

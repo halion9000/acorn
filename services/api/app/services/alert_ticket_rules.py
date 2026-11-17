@@ -50,6 +50,7 @@ def _release_url(alert: Any) -> str | None:
 _QUOTED = re.compile(r'"[^"]*"|“[^”]*”')
 _PARENS = re.compile(r"\([^)]*\)")
 _FOUND_ON = re.compile(r"\s+found on\s+.*$", re.IGNORECASE)
+_ON_DEVICE = re.compile(r"(?<=\S)\s+on\s+\S.*$", re.IGNORECASE)  # "MDM is disabled on <device>": the device is the part that changes
 
 
 def type_key(signature: str) -> str:
@@ -59,7 +60,7 @@ def type_key(signature: str) -> str:
     if not signature.startswith("title:"):
         return signature
     title = signature[len("title:") :]
-    stripped = " ".join(_FOUND_ON.sub("", _PARENS.sub(" ", _QUOTED.sub(" ", title))).split()).strip(" :-").lower()
+    stripped = " ".join(_ON_DEVICE.sub("", _FOUND_ON.sub("", _PARENS.sub(" ", _QUOTED.sub(" ", title)))).split()).strip(" :-").lower()
     return f"type:{stripped}" if stripped else signature
 
 
@@ -394,3 +395,52 @@ async def retry_ticket(db: Any, owner: uuid.UUID, tenant_id: uuid.UUID, alert: A
         )
     )
     return True
+
+
+async def queue_tickets_for_new_case(
+    db: Any, owner: uuid.UUID, alert_ids: list[uuid.UUID], holders: dict[str, uuid.UUID], who: str, requested_by: uuid.UUID | None = None, now: datetime | None = None
+) -> int:
+    """A case was just made from these alerts: ask CORE for a HaloPSA ticket for each one that has none, so a case and a ticket go together. Returns how many were queued.
+    An alert that already has a ticket, or already has a waiting or finished ticket request, gets none (so pressing Create Case twice never makes two tickets). The caller owns the transaction."""
+    now = now or datetime.now(UTC)
+    queued = 0
+    for aid in alert_ids:
+        tid = holders.get(str(aid), owner)
+        async with _acting(db, tid, owner):
+            alert = (await db.execute(select(Alert).where(Alert.id == aid, Alert.tenant_id == tid))).scalars().first()
+            if alert is None or has_ticket(alert.enrichment_data):
+                continue
+            earlier = (
+                await db.execute(
+                    select(VendorAction.status).where(
+                        VendorAction.tenant_id == tid,
+                        VendorAction.alert_id == alert.id,
+                        VendorAction.vendor == VENDOR,
+                        VendorAction.action == ACTION,
+                        VendorAction.status.in_(("pending", "claimed", "done")),
+                    )
+                )
+            ).first()
+            if earlier is not None:
+                continue
+            halo = await _halo_clients(db, owner, [tid])
+            params = ticket_params(alert, halo.get(tid), str(alert.title or ""), _release_url(alert))
+            params["rule"] = "case"
+            params["details"] = params["details"].replace("Opened automatically by an A.C.O.R.N ticket rule for", f"Opened by {who} when a case was made in A.C.O.R.N for")
+            db.add(
+                VendorAction(
+                    id=uuid.uuid4(),
+                    tenant_id=tid,
+                    alert_id=alert.id,
+                    vendor=VENDOR,
+                    incident_uid=f"case-ticket:{alert.id}"[:200],
+                    action=ACTION,
+                    params=params,
+                    status="pending",
+                    requested_by=requested_by,
+                    created_at=now,
+                )
+            )
+            queued += 1
+            await db.flush()
+    return queued

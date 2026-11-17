@@ -632,3 +632,19 @@ async def test_a_rule_with_a_note_writes_it_into_every_ticket_it_opens_and_a_rul
     await svc.queue_for_rule(world, rule, NOW)
     await world.commit()
     assert all("Instructions" not in row.params["details"] for row in (await queued(world)).values())
+
+
+async def test_a_new_case_asks_for_a_ticket_for_each_of_its_alerts_that_has_none_and_never_twice(world):
+    s = world
+    ids, owner, client = s.info["ids"], s.info["owner"], s.info["client"]
+    pick = [ids["new_a"], ids["has_halo_ticket"], ids["has_manual_ticket"]]
+    holders = {str(i): client for i in pick}
+    queued = await svc.queue_tickets_for_new_case(s, owner, pick, holders, "hal@example.com", None, NOW)
+    await s.commit()
+    assert queued == 1, "only the alert with no ticket"
+    rows = (await s.execute(text("select alert_id, status, params from vendor_actions where vendor='core' and action='create_ticket' and tenant_id=:t"), {"t": client})).all()
+    assert [(r[0], r[1]) for r in rows] == [(ids["new_a"], "pending")]
+    assert "hal@example.com" in rows[0][2]["details"] and "ticket rule for alert" not in rows[0][2]["details"]
+    assert rows[0][2]["halo_client_id"], "the client's HaloPSA client is passed along"
+    again = await svc.queue_tickets_for_new_case(s, owner, pick, holders, "hal@example.com", None, NOW)
+    assert again == 0, "a second case from the same alert does not ask again"

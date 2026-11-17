@@ -281,3 +281,22 @@ def test_the_two_threatmate_group_checks_raise_no_alert_on_a_change_or_when_stan
     assert specs([check("threatmate_external_exposure", "met")], [check("threatmate_external_exposure", "not_met", "10 critical")], "threatmate") == []
     assert standing_specs([check("threatmate_external_exposure", "not_met", "10 critical")], "threatmate") == []
     assert standing_specs([check("threatmate_patching", "not_met", "many machines")], "threatmate"), "another vulnerability check still raises its standing alert"
+
+
+def test_an_alert_for_a_device_check_lists_the_devices_and_names_them_as_the_alert_hosts():
+    new = [{**check("huntress_protection", "not_met", "3 of 20 Huntress agents have a protection fault"), "items": ["BHRC-FRISCO-02", "BHRC-DALLAS-01", "BHRC-DALLAS-01", ""]}]
+    out = ca.alerts_for_changes(changes([check("huntress_protection", "met")], new, "huntress"), "huntress", NOW, new)
+    assert len(out) == 1
+    assert out[0]["items"] == ["BHRC-FRISCO-02", "BHRC-DALLAS-01"], "each device once, blanks dropped"
+    assert "BHRC-FRISCO-02, BHRC-DALLAS-01" in out[0]["description"]
+    alert = ca.build_alert(uuid.uuid4(), "huntress", out[0], NOW)
+    assert alert.affected_hosts == ["BHRC-FRISCO-02", "BHRC-DALLAS-01"]
+    # A check whose list is people or settings, not machines, lists them but names no host.
+    users = [{**check("threatmate_google_admins", "not_met", "2 admins"), "items": ["a@x.com"]}]
+    spec = ca.alerts_for_changes(changes([check("threatmate_google_admins", "met")], users, "x"), "x", NOW, users)[0]
+    assert "a@x.com" in spec["description"] and ca.build_alert(uuid.uuid4(), "x", spec, NOW).affected_hosts == []
+
+
+def test_the_devices_of_a_standing_vulnerability_alert_are_listed_too():
+    c = [{**check("threatmate_patching", "not_met", "many machines"), "items": ["PC-1"]}]
+    assert "PC-1" in ca.standing_specs(c, "threatmate")[0]["description"]

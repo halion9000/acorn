@@ -28,7 +28,7 @@ vi.mock('@/lib/api', async (original) => {
     mitreTechniques: [],
     rawEvent: {},
   };
-  return { ...real, alertsApi: { ...real.alertsApi, get: vi.fn().mockResolvedValue(alert) }, authFetch: vi.fn().mockResolvedValue(new Response('{}', { status: 404 })) };
+  return { ...real, alertsApi: { ...real.alertsApi, get: vi.fn(async () => ({ ...alert, caseId: (globalThis as { __caseId?: string }).__caseId })) }, authFetch: vi.fn().mockResolvedValue(new Response('{}', { status: 404 })) };
 });
 
 import { AlertDetailView } from './AlertDetailView';
@@ -54,5 +54,29 @@ describe('the alert page header', () => {
     // The title comes before the actions in the page.
     expect(title.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(actions).getByRole('combobox')).toBeInTheDocument();
+  });
+});
+
+describe('the case button', () => {
+  const view = () =>
+    render(
+      <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+        <AlertDetailView alertId="a1" />
+      </SWRConfig>,
+    );
+
+  it('offers Create Case for an alert with no case, and a View case link to the case once there is one', async () => {
+    (globalThis as { __caseId?: string }).__caseId = undefined;
+    const first = view();
+    await screen.findByRole('heading', { level: 1, name: LONG_TITLE });
+    expect(screen.getByRole('button', { name: 'Create Case' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'View case' })).toBeNull();
+    first.unmount();
+    (globalThis as { __caseId?: string }).__caseId = 'c-42';
+    view();
+    const link = await screen.findByRole('link', { name: 'View case' });
+    expect(link).toHaveAttribute('href', '/cases/c-42');
+    expect(screen.queryByRole('button', { name: 'Create Case' })).toBeNull();
+    (globalThis as { __caseId?: string }).__caseId = undefined;
   });
 });

@@ -800,8 +800,46 @@ def _link_statement(db: MagicMock):
     return None
 
 
+def _no_ticket_step(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests are about how the case and its alert links are written; the HaloPSA ticket request that follows a new case is tested on its own."""
+    from app.services import alert_ticket_rules
+
+    async def nothing(*_a: Any, **_k: Any) -> int:
+        return 0
+
+    monkeypatch.setattr(alert_ticket_rules, "queue_tickets_for_new_case", nothing)
+
+
 @pytest.mark.asyncio
-async def test_creating_a_case_with_alerts_links_them_after_the_insert_and_before_the_commit() -> None:
+async def test_a_new_case_asks_for_a_ticket_for_its_alerts_after_the_case_is_saved(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import alert_ticket_rules
+
+    a = uuid.uuid4()
+    seen: list[Any] = []
+
+    async def record(_db: Any, owner: Any, alert_ids: Any, holders: Any, who: Any, requested_by: Any = None, now: Any = None) -> int:
+        seen.append((owner, list(alert_ids), dict(holders), who))
+        return 1
+
+    monkeypatch.setattr(alert_ticket_rules, "queue_tickets_for_new_case", record)
+    user = _user()
+    db = _mk_db([[(a,)], _case_row(alert_ids=[a])])
+    await create_case(body=CreateCaseRequest(title="ticket too", alert_ids=[a]), db=db, user=user)
+    assert seen == [(user.tenant_id, [a], {str(a): user.tenant_id}, getattr(user, "email", None) or "a person")]
+    assert db.commit.await_count == 2, "the case is committed first, then the ticket request"
+
+    async def boom(*_a: Any, **_k: Any) -> int:
+        raise RuntimeError("queue down")
+
+    monkeypatch.setattr(alert_ticket_rules, "queue_tickets_for_new_case", boom)
+    db2 = _mk_db([[(a,)], _case_row(alert_ids=[a])])
+    out = await create_case(body=CreateCaseRequest(title="still made", alert_ids=[a]), db=db2, user=user)
+    assert out.alert_ids == [a], "a failed ticket request never undoes the case"
+
+
+@pytest.mark.asyncio
+async def test_creating_a_case_with_alerts_links_them_after_the_insert_and_before_the_commit(monkeypatch: pytest.MonkeyPatch) -> None:
+    _no_ticket_step(monkeypatch)
     user = _user()
     a, b = uuid.uuid4(), uuid.uuid4()
     db = _mk_db([[(a,), (b,)], _case_row(alert_ids=[a, b])])
@@ -960,6 +998,8 @@ class TestMigration065:
 @pytest.mark.asyncio
 async def test_an_alert_held_by_a_client_tenant_can_be_cited_and_is_linked_as_that_client(monkeypatch: pytest.MonkeyPatch) -> None:
     import contextlib
+
+    _no_ticket_step(monkeypatch)
 
     from app.api.v1.endpoints import cases as cases_mod
 

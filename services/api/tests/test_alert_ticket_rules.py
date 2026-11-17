@@ -382,3 +382,14 @@ def test_a_retried_ticket_gets_the_note_of_the_rule_that_covers_the_alert():
     got = asyncio.run(svc.note_for_alert(FakeDB(Rows([other, covering])), OWNER, CLIENT, alert))
     assert got == "Check with the client."
     assert asyncio.run(svc.note_for_alert(FakeDB(Rows([other])), OWNER, CLIENT, alert)) == ""
+
+
+def test_type_key_treats_a_device_named_after_on_as_the_same_type():
+    """Addigy puts the device in the title ("MDM is disabled on <device>"), so a rule made from one device must cover every device."""
+    from app.services.alert_ticket_rules import type_key
+
+    a = type_key("title:MDM is disabled on Tecovas, Inc.-West-MP-P2V93")
+    b = type_key("title:MDM is disabled on Mikel’s 24\" iMac")
+    assert a == b == "type:mdm is disabled"
+    assert type_key("title:MDM is not enrolled on X") != a, "a different kind of alert stays a different type"
+    assert type_key("title:on call rotation") == "type:on call rotation", "no device after 'on': untouched"

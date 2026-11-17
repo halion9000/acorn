@@ -947,13 +947,22 @@ export function AlertDetailView({ alertId }: { alertId: string }) {
           </button>
           <TicketRuleButton alertId={alertId} clientName={alert.clientName} />
           <ScriptRuleButton alertId={alertId} clientName={alert.clientName} />
-          <button
-            type="button"
-            onClick={() => setCreateCaseOpen(true)}
-            className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors"
-          >
-            Create Case
-          </button>
+          {alert.caseId ? (
+            <a
+              href={`/cases/${alert.caseId}`}
+              className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors"
+            >
+              View case
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCreateCaseOpen(true)}
+              className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors"
+            >
+              Create Case
+            </button>
+          )}
         </div>
       </div>
 

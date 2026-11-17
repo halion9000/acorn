@@ -93,7 +93,7 @@ export function AppShell({ children }: AppShellProps) {
         <div className="md:ml-60">
           <TopBar demoOffset={demo} />
           <main className={`${topPadClass} min-h-screen`}>
-            <div className="p-6">
+            <div className="p-6 pb-24">
               <AnnouncementBanner />
               <PolicyBanner />
               <TenantViewBanner />

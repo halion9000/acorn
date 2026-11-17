@@ -115,7 +115,28 @@ def change_label(previous: str | None, status: str) -> str:
     return "changed"
 
 
-def alerts_for_changes(changes: list[dict[str, Any]], source: str, now: datetime) -> list[dict[str, Any]]:
+ITEMS_SHOWN = 40
+# The checks whose list is MACHINES (the others list people or settings): their items are also the alert's hosts.
+DEVICE_ITEM_CHECKS = frozenset({"huntress_protection", "huntress_quiet_agents", "ninjaone_antivirus", "ninjaone_huntress_service"})
+
+
+def items_of(checks: list[dict[str, Any]] | None, key: str) -> list[str]:
+    """What is behind a check (devices, people), each once, blanks dropped, in the order the check gave them (pure)."""
+    for c in checks or []:
+        if isinstance(c, dict) and c.get("key") == key:
+            return list(dict.fromkeys(str(i).strip() for i in (c.get("items") or []) if str(i).strip()))
+    return []
+
+
+def with_items(description: str, items: list[str]) -> str:
+    """The description followed by the things behind the check, when there are any (pure)."""
+    if not items:
+        return description
+    more = f" and {len(items) - ITEMS_SHOWN} more" if len(items) > ITEMS_SHOWN else ""
+    return f"{description}\n\nAffected ({len(items)}): {', '.join(items[:ITEMS_SHOWN])}{more}"
+
+
+def alerts_for_changes(changes: list[dict[str, Any]], source: str, now: datetime, checks: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """The alerts a report's changes call for, as plain dicts (``title``, ``severity``, ``description``, ``idempotency_key``, ``key``), one per watched check that got worse. ``changes`` come from
     ``check_history.changes``."""
     out: list[dict[str, Any]] = []
@@ -125,12 +146,14 @@ def alerts_for_changes(changes: list[dict[str, Any]], source: str, now: datetime
             continue
         title, severity, _least = watched
         evidence = str(c.get("evidence") or "").strip()
+        items = items_of(checks, c["key"])
         out.append(
             {
                 "key": c["key"],
                 "title": title,
                 "severity": severity,
-                "description": f"{evidence} (was {c['previous_status'].replace('_', ' ')}, now {c['status'].replace('_', ' ')})".strip(),
+                "items": items,
+                "description": with_items(f"{evidence} (was {c['previous_status'].replace('_', ' ')}, now {c['status'].replace('_', ' ')})".strip(), items),
                 "idempotency_key": f"check:{source}:{c['key']}:{now.date().isoformat()}:{c['status']}"[:128],
             }
         )
@@ -153,12 +176,14 @@ def standing_specs(checks: list[dict[str, Any]] | None, source: str) -> list[dic
             continue
         title, severity, _least = watched
         evidence = str(c.get("evidence") or "").strip()
+        items = items_of(checks, key)
         out.append(
             {
                 "key": key,
                 "title": title,
                 "severity": severity,
-                "description": f"{evidence} (found when A.C.O.R.N first saw this check failing)".strip(),
+                "items": items,
+                "description": with_items(f"{evidence} (found when A.C.O.R.N first saw this check failing)".strip(), items),
                 "idempotency_key": f"check:{source}:{key}:standing"[:128],
             }
         )
@@ -182,7 +207,7 @@ def build_alert(tenant_id: uuid.UUID, source: str, spec: dict[str, Any], now: da
         mitre_techniques=[],
         ai_recommendations=[],
         affected_ips=[],
-        affected_hosts=[],
+        affected_hosts=list(spec.get("items") or [])[:ITEMS_SHOWN] if spec["key"] in DEVICE_ITEM_CHECKS else [],
         affected_users=[],
         tags=["posture-change", source, spec["key"]],
         raw_event={"source": CONNECTOR_TYPE, "check": spec["key"], "tool": source},
@@ -206,7 +231,7 @@ async def raise_alerts(
         source, of_settings((await db.execute(select(Tenant.settings).where(Tenant.id == tenant_id))).scalar_one_or_none())
     ):
         return 0  # the client does not use this tool: its checks raise nothing
-    specs = alerts_for_changes(changes, source, now) + standing_specs(checks, source)
+    specs = alerts_for_changes(changes, source, now, checks) + standing_specs(checks, source)
     added = 0
     for spec in specs:
         exists = (
