@@ -1609,8 +1609,10 @@
     "key": "r7-af-36",
     "title": "An in-app announcement banner a person can post for the team",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 8d3d6177",
+    "note": "2026-11-16: announcements table (migration 204), GET/POST/DELETE /announcements (read: alerts:read, post and remove: settings_workspace:manage), banner in the app shell and a Settings, Announcements page."
   },
   {
     "key": "r7-af-37",
