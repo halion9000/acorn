@@ -1820,9 +1820,10 @@
     "title": "Metrics: click into a client to see what its numbers come from (tickets, billed and free invoice lines)",
     "detail": "Hal 2026-11-16, Profitability and the other client tables: click a client and see exactly which tickets and which invoice lines make the numbers.",
     "area": "Metrics",
-    "status": "in_progress",
+    "status": "completed",
     "needs": "claude",
-    "note": "Started 2026-11-16."
+    "note": "2026-11-16 phase 1 done on Profitability: invoice lines billed and free, recurring lines, hours by person with the rate source. NOT DONE: the tickets behind the hours (CORE does not send ticket-level time yet) and the same click-through on the other client tables (Monthly invoicing, Ticket volume, Client summary).",
+    "completed_ref": "AiSOC e087c3cd"
   },
   {
     "key": "metrics-agent-names-and-updates",
