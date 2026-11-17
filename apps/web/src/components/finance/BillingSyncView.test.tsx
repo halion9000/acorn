@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { BillingSyncView, canApprove, filterRows, pushText, signed, type SyncRow } from './BillingSyncView';
+import { BillingSyncView, canApprove, filterRows, nextSort, partsText, pushText, signed, sortRows, type SyncRow } from './BillingSyncView';
 
 const row = (over: Partial<SyncRow> = {}): SyncRow => ({
   client_id: 'c1',
@@ -108,5 +108,62 @@ describe('the Billing sync page', () => {
     expect(within(screen.getByTestId('sync-table')).queryByText('Acme Dental')).toBeNull();
     await userEvent.click(screen.getByLabelText(/Show hidden/));
     await waitFor(() => expect(authFetch.mock.calls.some(([u]) => String(u).includes('show_hidden=true'))).toBe(true));
+  });
+});
+
+describe('sorting the sync rows', () => {
+  const rows = [
+    row({ client_id: 'a', client_name: 'beta', billed: 5, counted: 0, difference: -5 }),
+    row({ client_id: 'b', client_name: 'Alpha', billed: 100, counted: 7, difference: -93, can_push: false }),
+    row({ client_id: 'c', client_name: 'Gamma', billed: 8, counted: 20, difference: 12, push: { status: 'failed', quantity: 20, message: 'no', by: null, at: null } }),
+  ];
+  const names = (key: Parameters<typeof sortRows>[1], dir: 'asc' | 'desc') => sortRows(rows, key, dir).map((r) => r.client_name);
+
+  it('orders by text without regard to case, by number, by the size of the difference, and by status', () => {
+    expect(names('client_name', 'asc')).toEqual(['Alpha', 'beta', 'Gamma']);
+    expect(names('client_name', 'desc')).toEqual(['Gamma', 'beta', 'Alpha']);
+    expect(names('billed', 'desc')).toEqual(['Alpha', 'Gamma', 'beta']);
+    expect(names('counted', 'asc')).toEqual(['beta', 'Alpha', 'Gamma']);
+    expect(names('difference', 'asc')).toEqual(['Alpha', 'beta', 'Gamma']);
+    expect(names('size', 'desc')).toEqual(['Alpha', 'Gamma', 'beta']);
+    expect(names('status', 'asc')).toEqual(['Alpha', 'Gamma', 'beta']);
+  });
+  it('keeps the order given for no column and for equal values, and a header click starts text ascending and numbers largest first, then flips', () => {
+    expect(sortRows(rows, null, 'asc')).toBe(rows);
+    expect(sortRows([row({ client_name: 'x', billed: 1 }), row({ client_name: 'y', billed: 1 })], 'billed', 'asc').map((r) => r.client_name)).toEqual(['x', 'y']);
+    expect(nextSort({ key: null, dir: 'desc' }, 'client_name')).toEqual({ key: 'client_name', dir: 'asc' });
+    expect(nextSort({ key: null, dir: 'desc' }, 'billed')).toEqual({ key: 'billed', dir: 'desc' });
+    expect(nextSort({ key: 'billed', dir: 'desc' }, 'billed')).toEqual({ key: 'billed', dir: 'asc' });
+  });
+  it('writes the counted number out from its parts, or says none is mapped', () => {
+    expect(partsText(row({ parts: [{ source: 'threatmate', item: 'Internal assets', count: 0 }, { source: 'threatmate', item: 'Users', count: 12 }] }))).toBe('threatmate Internal assets: 0 + threatmate Users: 12');
+    expect(partsText(row({ parts: [] }))).toBe('No tool count is mapped to this invoice line.');
+    expect(partsText(row())).toBe('No tool count is mapped to this invoice line.');
+  });
+});
+
+describe('the Billing sync page: sorting and where a number comes from', () => {
+  it('sorts when a header is clicked, marks the column, and flips on a second click', async () => {
+    render(<BillingSyncView />);
+    const table = await screen.findByTestId('sync-table');
+    const order = () => within(table).getAllByRole('row').slice(1).map((r) => r.textContent ?? '').map((t) => (t.match(/Acme Dental|Birch Law|Cedar Co/) ?? [''])[0]);
+    await userEvent.click(screen.getByRole('button', { name: 'Sort by Organization' }));
+    expect(order()).toEqual(['Acme Dental', 'Birch Law', 'Cedar Co']);
+    expect(screen.getByRole('columnheader', { name: /Organization/ })).toHaveAttribute('aria-sort', 'ascending');
+    await userEvent.click(screen.getByRole('button', { name: /Sort by Organization/ }));
+    expect(order()).toEqual(['Cedar Co', 'Birch Law', 'Acme Dental']);
+    expect(screen.getByRole('columnheader', { name: /Organization/ })).toHaveAttribute('aria-sort', 'descending');
+  });
+
+  it('opens a line to show which tool counts make up the counted number', async () => {
+    authFetch.mockImplementation(() => answer(data([row({ parts: [{ source: 'threatmate', item: 'Internal assets', count: 12 }] })])));
+    render(<BillingSyncView />);
+    await screen.findByTestId('sync-table');
+    await userEvent.click(screen.getByRole('button', { name: /Where the counted number of Acme Dental/ }));
+    const detail = screen.getByTestId('sync-detail');
+    expect(detail).toHaveTextContent('HaloPSA bills 10 of Microsoft 365 Business Premium. A.C.O.R.N counts 12 as: threatmate Internal assets: 12.');
+    expect(within(detail).getByRole('link', { name: /Licenses/ })).toHaveAttribute('href', '/settings/billing');
+    await userEvent.click(screen.getByRole('button', { name: /Where the counted number of Acme Dental/ }));
+    expect(screen.queryByTestId('sync-detail')).toBeNull();
   });
 });

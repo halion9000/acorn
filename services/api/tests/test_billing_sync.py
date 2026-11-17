@@ -88,16 +88,16 @@ async def with_db(tid, work):
         await engine.dispose()
 
 
-def row(client, name, item, billed, counted):
+def row(client, name, item, billed, counted, parts=()):
     return SimpleNamespace(
-        client_id=client, client_name=name, invoice_item=item, billed=billed, counted=counted, difference=counted - billed
+        client_id=client, client_name=name, invoice_item=item, billed=billed, counted=counted, difference=counted - billed, parts=list(parts)
     )
 
 
 @pytest.fixture
 def differences(monkeypatch, world):
     rows = [
-        row(world.mapped, "Acme Dental", "Microsoft 365 Business Premium", 10, 12),
+        row(world.mapped, "Acme Dental", "Microsoft 365 Business Premium", 10, 12, [{"source": "cipp", "item": "Business Premium", "count": 9}, {"source": "cipp", "item": "Business Standard", "count": 3}]),
         row(world.mapped, "Acme Dental", "Windows workstations", 20, 20),
         row(world.unmapped, "Birch Law", "Microsoft 365 Business Premium", 5, 4),
     ]
@@ -118,6 +118,8 @@ async def test_the_list_shows_only_differences_and_says_which_clients_can_be_pus
         ("Birch Law", "Microsoft 365 Business Premium", -1, False, "none"),
     ]
     assert out.hidden == 0
+    assert [(p.source, p.item, p.count) for p in out.rows[0].parts] == [("cipp", "Business Premium", 9), ("cipp", "Business Standard", 3)], "the counted number shows what it is made of"
+    assert out.rows[1].parts == []
 
 
 @needs_pg

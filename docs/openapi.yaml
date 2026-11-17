@@ -50358,6 +50358,24 @@ components:
       - event
       - warnings
       title: ParserTestOut
+    PartOut:
+      properties:
+        source:
+          type: string
+          title: Source
+        item:
+          type: string
+          title: Item
+        count:
+          type: integer
+          title: Count
+      type: object
+      required:
+      - source
+      - item
+      - count
+      title: PartOut
+      description: One tool count that is added into the counted number of a line.
     PasskeyCredentialOut:
       properties:
         id:
@@ -59142,6 +59160,12 @@ components:
         difference:
           type: integer
           title: Difference
+        parts:
+          items:
+            $ref: '#/components/schemas/PartOut'
+          type: array
+          title: Parts
+          default: []
         hidden:
           type: boolean
           title: Hidden

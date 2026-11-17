@@ -39,6 +39,14 @@ class PushOut(BaseModel):
     at: datetime | None = None
 
 
+class PartOut(BaseModel):
+    """One tool count that is added into the counted number of a line."""
+
+    source: str
+    item: str
+    count: int
+
+
 class SyncRow(BaseModel):
     client_id: uuid.UUID
     client_name: str
@@ -46,6 +54,8 @@ class SyncRow(BaseModel):
     billed: int
     counted: int
     difference: int
+    # Exactly which tool counts were added to make the counted number (the mapping of this invoice line), so a number can be checked.
+    parts: list[PartOut] = []
     hidden: bool
     # False when the client is not mapped to a HaloPSA client, so there is nothing to push to.
     can_push: bool
@@ -146,6 +156,7 @@ async def list_sync(user: AuthUser, db: DBSession, show_hidden: bool = False) ->
                 billed=r.billed,
                 counted=r.counted,
                 difference=r.difference,
+                parts=[PartOut(source=str(p.get("source", "")), item=str(p.get("item", "")), count=int(p.get("count", 0))) for p in r.parts],
                 hidden=is_hidden,
                 can_push=r.client_id in halo,
                 push=push,
