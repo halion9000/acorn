@@ -815,8 +815,10 @@
     "key": "r7-ai-15",
     "title": "An accessibility test (labels and roles) over the key pages",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 807a47ad",
+    "note": "2026-11-16: src/test/pages.a11y.test.tsx runs axe label/role rules over all 127 pages (API down state) and found 12 unlabelled controls on 11 pages, now fixed. Contrast is r7-ai-16, not done."
   },
   {
     "key": "r7-ai-16",
