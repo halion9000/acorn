@@ -16,14 +16,13 @@ from app.api.v1.endpoints import (
     alert_related,
     alert_script_rules,
     alert_scripts,
-    script_runs,
-    automation_hubspot,
     alert_stale_review,
     alert_suppressions,
     alert_ticket_rules,
     alert_vendor_actions,
     alert_why,
     alerts,
+    announcements,
     api_keys,
     approvals,
     assets,
@@ -31,9 +30,9 @@ from app.api.v1.endpoints import (
     audit,
     audits,
     auth,
+    automation_hubspot,
     autonomy_policy,
     billing,
-    announcements,
     billing_sync,
     business_context,
     canary,
@@ -103,6 +102,7 @@ from app.api.v1.endpoints import (
     lake,
     llm_credentials,
     llm_status,
+    me_policies,
     metrics,
     metrics_pages,
     mssp,
@@ -138,6 +138,7 @@ from app.api.v1.endpoints import (
     rule_tuning,
     saved_hunts,
     saved_views,
+    script_runs,
     secureframe,
     service_gateways,
     shifts,
@@ -335,6 +336,7 @@ api_router.include_router(dmarc.router)
 api_router.include_router(billing.router)
 api_router.include_router(billing.ingest_router)
 api_router.include_router(announcements.router)
+api_router.include_router(me_policies.router)
 api_router.include_router(billing_sync.router)
 api_router.include_router(metrics_pages.router)
 api_router.include_router(client_portal.router)

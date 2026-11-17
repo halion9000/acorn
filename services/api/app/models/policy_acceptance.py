@@ -25,3 +25,21 @@ class PolicyAcceptance(Base):
     accepted_on: Mapped[date] = mapped_column(Date, nullable=False)
     recorded_by: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
+class PolicyAssignment(Base):
+    """A policy a person must accept, with a due day and how often they were reminded (migration 207)."""
+
+    __tablename__ = "policy_assignments"
+    __table_args__ = (UniqueConstraint("item_id", "email"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("governance_items.id", ondelete="CASCADE"), nullable=False)
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    due_on: Mapped[date] = mapped_column(Date, nullable=False)
+    assigned_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    last_reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reminders_sent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

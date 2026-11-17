@@ -3447,6 +3447,153 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/governance/{item_id}/assignments:
+    get:
+      tags:
+      - compliance
+      summary: List Assignments
+      description: Who the policy is assigned to, with whether each has accepted its
+        newest version.
+      operationId: list_assignments_api_v1_governance__item_id__assignments_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssignmentOut'
+                title: Response List Assignments Api V1 Governance  Item Id  Assignments
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Assign Policy
+      description: 'Assign the policy to people (by address and/or everyone active):
+        each must read and accept its newest version, and is reminded by e-mail until
+        they do. Assigning again keeps the earlier due day.'
+      operationId: assign_policy_api_v1_governance__item_id__assignments_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssignmentOut'
+                title: Response Assign Policy Api V1 Governance  Item Id  Assignments
+                  Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/governance/{item_id}/assignments/{email}:
+    delete:
+      tags:
+      - compliance
+      summary: Unassign Policy
+      description: Take the policy off one person (their acceptances stay on record).
+      operationId: unassign_policy_api_v1_governance__item_id__assignments__email__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: email
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Email
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/governance/templates:
     get:
       tags:
@@ -21988,6 +22135,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/me/policies:
+    get:
+      tags:
+      - compliance
+      summary: The policies assigned to me, with their text and whether I have accepted
+        the newest version
+      operationId: my_policies_api_v1_me_policies_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyPolicies'
+      security:
+      - HTTPBearer: []
+  /api/v1/me/policies/{item_id}/accept:
+    post:
+      tags:
+      - compliance
+      summary: Accept the newest version of a policy assigned to me
+      operationId: accept_policy_api_v1_me_policies__item_id__accept_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyPolicy'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/billing/sync:
     get:
       tags:
@@ -34763,6 +34955,26 @@ components:
       description: 'What a PATCH may change. Every field is optional and only the
         ones sent are applied: this used to be the create model, whose defaults ("host",
         "medium", an empty metadata) overwrote whatever the caller left out.'
+    AssignIn:
+      properties:
+        emails:
+          items:
+            type: string
+          type: array
+          maxItems: 500
+          title: Emails
+        everyone:
+          type: boolean
+          title: Everyone
+          default: false
+        due_on:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due On
+      type: object
+      title: AssignIn
     AssignedItem:
       properties:
         id:
@@ -34785,6 +34997,47 @@ components:
       required:
       - id
       title: AssignedItem
+    AssignmentOut:
+      properties:
+        email:
+          type: string
+          title: Email
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        due_on:
+          type: string
+          format: date
+          title: Due On
+        assigned_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Assigned By
+        state:
+          type: string
+          title: State
+        reminders_sent:
+          type: integer
+          title: Reminders Sent
+        last_reminded_on:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Last Reminded On
+      type: object
+      required:
+      - email
+      - name
+      - due_on
+      - assigned_by
+      - state
+      - reminders_sent
+      - last_reminded_on
+      title: AssignmentOut
     AttackHeatmapCell:
       properties:
         tactic:
@@ -49490,6 +49743,59 @@ components:
       required:
       - state
       title: MtaStsOut
+    MyPolicies:
+      properties:
+        policies:
+          items:
+            $ref: '#/components/schemas/MyPolicy'
+          type: array
+          title: Policies
+        to_accept:
+          type: integer
+          title: To Accept
+      type: object
+      required:
+      - policies
+      - to_accept
+      title: MyPolicies
+    MyPolicy:
+      properties:
+        item_id:
+          type: string
+          format: uuid
+          title: Item Id
+        title:
+          type: string
+          title: Title
+        version:
+          type: integer
+          title: Version
+        body:
+          type: string
+          title: Body
+        due_on:
+          type: string
+          format: date
+          title: Due On
+        state:
+          type: string
+          title: State
+        accepted_on:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Accepted On
+      type: object
+      required:
+      - item_id
+      - title
+      - version
+      - body
+      - due_on
+      - state
+      - accepted_on
+      title: MyPolicy
     NLDetectionRequest:
       properties:
         description:

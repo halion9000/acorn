@@ -1868,5 +1868,14 @@
     "status": "completed",
     "needs": "claude",
     "note": "2026-11-17. Other vendors read from Rewst SaaS Billing Count workflows: Inky counts billingSnapshot.childAllocations billableMailboxes split Pro/Advanced (CORE reads usage mailboxes: compare live); Datto SaaS counts User seats split M365/Google; Petra skips paused tenants; Liongard counts systems updated in the last 3 months. Not compared live."
+  },
+  {
+    "key": "policy-assignment-reminders",
+    "title": "Assign a policy to people; they accept it in A.C.O.R.N and are reminded by e-mail",
+    "detail": "Like Secureframe: assign a policy to everyone active or to addresses, each person sees it under My policies and accepts, reminders go out by e-mail until they do.",
+    "area": "compliance",
+    "status": "completed",
+    "needs": "claude",
+    "note": "2026-11-17. Migration 207, routes under /governance/{id}/assignments and /me/policies, an hourly reminder worker (needs the ALERT_EMAIL mail credentials), My policies page and a banner above every page. Client users (a client page of their own) come with the client-facing compliance item."
   }
 ]

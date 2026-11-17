@@ -312,6 +312,10 @@ class Settings(BaseSettings):
     ACCESS_REVIEW_SCHEDULER_ENABLED: bool = True
     ACCESS_REVIEW_SCHEDULER_INTERVAL_SECONDS: int = 3600
     ACCESS_REVIEW_SCHEDULER_INITIAL_DELAY_SECONDS: int = 120
+    # Policy reminders (app/workers/policy_reminder_worker.py): hourly, e-mails people the policies assigned to them they have not accepted. Sends only when the mail credentials (ALERT_EMAIL_*) are set.
+    POLICY_REMINDERS_ENABLED: bool = True
+    POLICY_REMINDER_INTERVAL_SECONDS: int = 3600
+    POLICY_REMINDER_INITIAL_DELAY_SECONDS: int = 300
     RETENTION_DRY_RUN: bool = False
     # The platform watching itself (app/workers/platform_watch_worker.py): every five minutes it checks that CORE is still reporting, that connectors that had events have not gone quiet, and that the server has disk and memory left, and emails the alert-email recipients about changes. On by default;
     # it sends mail only when recipients and the Graph credentials above are set, and always logs changes. A connector counts as quiet after PLATFORM_WATCH_CONNECTOR_SILENT_HOURS without an event (a quiet client can legitimately have none for hours).

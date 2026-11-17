@@ -11,6 +11,7 @@ import { TimeWindowProvider } from './TimeWindowProvider';
 import { TenantProvider } from './TenantProvider';
 import { TenantViewBanner } from './TenantViewBanner';
 import { AnnouncementBanner } from './AnnouncementBanner';
+import { PolicyBanner } from './PolicyBanner';
 import { CopilotDock } from '@/components/copilot/CopilotDock';
 import { DemoBanner } from '@/components/demo/DemoBanner';
 import { DemoAutoLogin } from '@/components/demo/DemoAutoLogin';
@@ -94,6 +95,7 @@ export function AppShell({ children }: AppShellProps) {
           <main className={`${topPadClass} min-h-screen`}>
             <div className="p-6">
               <AnnouncementBanner />
+              <PolicyBanner />
               <TenantViewBanner />
               <HiddenPageGuard>{children}</HiddenPageGuard>
             </div>

@@ -6,6 +6,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
+import { PolicyAssign } from './PolicyAssign';
+
 interface Accepted {
   email: string;
   name: string | null;
@@ -110,6 +112,7 @@ export function PolicyAcceptance({ itemId, scoped }: { itemId: string; scoped: (
           <button type="button" className={`${ghost} mt-2`} disabled={busy || parseEmails(paste).length === 0} onClick={() => void record(parseEmails(paste))}>
             Record {parseEmails(paste).length || ''} accepted
           </button>
+          <PolicyAssign itemId={itemId} scoped={scoped} onChange={() => void load()} />
         </>
       )}
     </div>

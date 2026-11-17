@@ -47,6 +47,7 @@ from app.workers.hunt_scheduler import run_forever as run_hunt_scheduler
 from app.workers.oauth_refresh import run_forever as run_oauth_refresh
 from app.workers.platform_watch_worker import run_platform_watch
 from app.workers.playbook_dry_run_worker import run_playbook_dry_runs
+from app.workers.policy_reminder_worker import run_policy_reminders
 from app.workers.retention_sweeper import run_retention_sweeper
 from app.workers.suppression_sweeper import run_suppression_sweeper
 from app.workers.weekly_digest_task import run_forever as run_weekly_digest
@@ -464,6 +465,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             logger.warning("access_review_scheduler worker failed to start", error=str(exc))
 
+    # Policy reminders: e-mails people the policies assigned to them that they have not accepted (app/workers/policy_reminder_worker.py).
+    policy_reminder_task: asyncio.Task | None = None
+    if settings.POLICY_REMINDERS_ENABLED:
+        try:
+            policy_reminder_task = asyncio.create_task(
+                _run_guarded_scheduler_worker(job_name="policy_reminders", ttl_seconds=_RETENTION_LOCK_TTL_SECONDS, worker=run_policy_reminders),
+                name="policy_reminders_worker",
+            )
+            logger.info("policy_reminders worker started")
+        except Exception as exc:
+            logger.warning("policy_reminders worker failed to start", error=str(exc))
+
     # The platform watching itself: CORE gone quiet, connectors gone quiet, low disk or memory. Emails the alert-email recipients about changes (app/workers/platform_watch_worker.py).
     platform_watch_task: asyncio.Task | None = None
     if settings.PLATFORM_WATCH_ENABLED:
@@ -603,6 +616,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     if dry_run_task is not None and not dry_run_task.done():
         dry_run_task.cancel()
+    if policy_reminder_task is not None and not policy_reminder_task.done():
+        policy_reminder_task.cancel()
+        try:
+            await policy_reminder_task
+        except asyncio.CancelledError:
+            logger.debug("policy_reminders worker cancelled during shutdown")
     if access_review_task is not None and not access_review_task.done():
         access_review_task.cancel()
         try:

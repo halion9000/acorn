@@ -17,10 +17,11 @@ from sqlalchemy import func, select
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.governance import GovernanceItem, GovernanceVersion
-from app.models.policy_acceptance import PolicyAcceptance
+from app.models.policy_acceptance import PolicyAcceptance, PolicyAssignment
 from app.models.tenant import Tenant
 from app.services import governance as gov
 from app.services import policy_acceptance as pa
+from app.services import policy_assignment as pas
 from app.services import policy_templates as pt
 from app.services.audit import emit_audit
 from app.services.identity_people import is_active
@@ -416,6 +417,140 @@ async def record_acceptances(
         )
     await db.commit()
     return await _acceptance_view(db, tenant, item_id)
+
+
+class AssignIn(BaseModel):
+    emails: list[str] = Field(default_factory=list, max_length=500)
+    everyone: bool = False  # every active person the organization holds, as well as the addresses given
+    due_on: date | None = None  # fourteen days from today when left out
+
+
+class AssignmentOut(BaseModel):
+    email: str
+    name: str | None
+    due_on: date
+    assigned_by: str | None
+    state: str  # accepted / pending / overdue
+    reminders_sent: int
+    last_reminded_on: date | None
+
+
+async def _assignment_rows(db: DBSession, tenant: uuid.UUID, item_id: uuid.UUID) -> list[AssignmentOut]:
+    latest = (await db.execute(select(func.max(GovernanceVersion.version)).where(GovernanceVersion.item_id == item_id))).scalar_one()
+    rows = (
+        (await db.execute(select(PolicyAssignment).where(PolicyAssignment.item_id == item_id, PolicyAssignment.tenant_id == tenant).order_by(PolicyAssignment.email)))
+        .scalars()
+        .all()
+    )
+    accepted = set()
+    if latest is not None:
+        accepted = set(
+            (await db.execute(select(PolicyAcceptance.email).where(PolicyAcceptance.item_id == item_id, PolicyAcceptance.version == latest))).scalars().all()
+        )
+    today = _today()
+    return [
+        AssignmentOut(
+            email=r.email,
+            name=r.display_name,
+            due_on=r.due_on,
+            assigned_by=r.assigned_by,
+            state=pas.state_of(r.due_on, r.email in accepted, today),
+            reminders_sent=r.reminders_sent,
+            last_reminded_on=r.last_reminded_at.date() if r.last_reminded_at else None,
+        )
+        for r in rows
+    ]
+
+
+@router.get("/{item_id}/assignments", response_model=list[AssignmentOut], dependencies=[Depends(require_permission("reports:read"))])
+async def list_assignments(tenant: ScopeTenant, item_id: uuid.UUID, user: AuthUser, db: DBSession) -> list[AssignmentOut]:
+    """Who the policy is assigned to, with whether each has accepted its newest version."""
+    row = await _item(db, tenant, item_id)
+    if row.kind != "policy":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only a policy is assigned.")
+    return await _assignment_rows(db, tenant, item_id)
+
+
+@router.post("/{item_id}/assignments", response_model=list[AssignmentOut], status_code=status.HTTP_201_CREATED)
+async def assign_policy(
+    tenant: ScopeTenant,
+    item_id: uuid.UUID,
+    body: AssignIn,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+    db: DBSession,
+) -> list[AssignmentOut]:
+    """Assign the policy to people (by address and/or everyone active): each must read and accept its newest version, and is reminded by e-mail until they do. Assigning again keeps the earlier due day."""
+    row = await _item(db, tenant, item_id)
+    if row.kind != "policy":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only a policy is assigned.")
+    has_text = (await db.execute(select(func.max(GovernanceVersion.version)).where(GovernanceVersion.item_id == item_id))).scalar_one()
+    if has_text is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Save the text of the policy first; there is nothing to read yet.")
+    today = _today()
+    due = body.due_on or pas.default_due(today)
+    if due < today:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The due day has already passed.")
+    people: dict[str, str | None] = {pa.norm(e): None for e in body.emails if "@" in e}
+    if body.everyone:
+        from app.api.v1.endpoints.identities import _people  # late: that module is large and imports compliance helpers
+
+        found, _ = await _people(db, tenant, None)
+        for p in found:
+            if p.tenant_id == tenant and is_active(p):
+                people.setdefault(pa.norm(p.email), p.display_name)
+    if not people:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Give at least one e-mail address, or choose everyone.")
+    if len(people) > 2000:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="That is too many people at once (2000 at most).")
+    have = set((await db.execute(select(PolicyAssignment.email).where(PolicyAssignment.item_id == item_id, PolicyAssignment.email.in_(list(people))))).scalars().all())
+    added = [e for e in sorted(people) if e not in have]
+    for e in added:
+        db.add(PolicyAssignment(id=uuid.uuid4(), tenant_id=tenant, item_id=item_id, email=e, display_name=people[e], due_on=due, assigned_by=getattr(user, "email", None)))
+    await db.flush()
+    if added:
+        await emit_audit(
+            db=db,
+            tenant_id=tenant,
+            actor_id=user.user_id,
+            action="policy_assignment:added",
+            resource="governance_item",
+            resource_id=str(item_id),
+            changes={"people": len(added), "due_on": due.isoformat()},
+            request=request,
+        )
+    await db.commit()
+    return await _assignment_rows(db, tenant, item_id)
+
+
+@router.delete("/{item_id}/assignments/{email}", status_code=status.HTTP_204_NO_CONTENT)
+async def unassign_policy(
+    tenant: ScopeTenant,
+    item_id: uuid.UUID,
+    email: str,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+    db: DBSession,
+) -> None:
+    """Take the policy off one person (their acceptances stay on record)."""
+    await _item(db, tenant, item_id)
+    found = (
+        await db.execute(select(PolicyAssignment).where(PolicyAssignment.item_id == item_id, PolicyAssignment.tenant_id == tenant, PolicyAssignment.email == pa.norm(email)))
+    ).scalar_one_or_none()
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That person is not assigned this policy.")
+    await db.delete(found)
+    await emit_audit(
+        db=db,
+        tenant_id=tenant,
+        actor_id=user.user_id,
+        action="policy_assignment:removed",
+        resource="governance_item",
+        resource_id=str(item_id),
+        changes={"people": 1},
+        request=request,
+    )
+    await db.commit()
 
 
 # ---- policy templates --------------------------------------------------------------------------------------------------------------------------------------
