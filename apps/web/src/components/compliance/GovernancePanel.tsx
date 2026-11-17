@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
+import { PolicyAcceptance } from './PolicyAcceptance';
 import { PolicyVersionDiff } from './PolicyVersionDiff';
 import { authFetch } from '@/lib/auth-session';
 
@@ -72,6 +73,7 @@ export function GovernancePanel({ clientId = '' }: { clientId?: string } = {}) {
   const [templates, setTemplates] = useState<PolicyTemplate[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [filled, setFilled] = useState<Filled | null>(null);
+  const [acceptOf, setAcceptOf] = useState<string | null>(null);
   const [diffOf, setDiffOf] = useState<{ id: string; version: number } | null>(null);
 
   const load = useCallback(async () => {
@@ -233,10 +235,12 @@ export function GovernancePanel({ clientId = '' }: { clientId?: string } = {}) {
                 </span>
                 <span className="flex gap-2">
                   {i.kind === 'policy' ? <button type="button" className={ghost} onClick={() => void toggleVersions(i.id)}>Versions ({i.versions})</button> : null}
+                  {i.kind === 'policy' ? <button type="button" className={ghost} onClick={() => setAcceptOf(acceptOf === i.id ? null : i.id)}>Acceptance</button> : null}
                   <button type="button" className={ghost} disabled={busy} onClick={() => void (async () => { if (await send(`/api/v1/governance/${i.id}/reviewed`, 'POST')) await load(); })()}>Reviewed</button>
                   <button type="button" className={ghost} disabled={busy} onClick={() => void (async () => { if (await send(`/api/v1/governance/${i.id}`, 'DELETE')) await load(); })()}>Archive</button>
                 </span>
               </div>
+              {acceptOf === i.id ? <PolicyAcceptance itemId={i.id} scoped={scoped} /> : null}
               {open?.id === i.id ? (
                 <div className="mt-2 rounded border border-gray-700 bg-gray-950/60 p-3" data-testid="gov-versions">
                   {open.versions.length === 0 ? <p className="text-xs text-gray-500">No text saved yet.</p> : null}

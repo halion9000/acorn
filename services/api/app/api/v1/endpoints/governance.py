@@ -17,10 +17,13 @@ from sqlalchemy import func, select
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.governance import GovernanceItem, GovernanceVersion
+from app.models.policy_acceptance import PolicyAcceptance
 from app.models.tenant import Tenant
 from app.services import governance as gov
+from app.services import policy_acceptance as pa
 from app.services import policy_templates as pt
 from app.services.audit import emit_audit
+from app.services.identity_people import is_active
 
 router = APIRouter(prefix="/governance", tags=["compliance"])
 
@@ -306,6 +309,113 @@ async def add_version(
     await db.commit()
     await db.refresh(v)
     return VersionOut(version=v.version, body=v.body, change_note=v.change_note, created_at=v.created_at)
+
+
+class AcceptanceIn(BaseModel):
+    emails: list[str] = Field(min_length=1, max_length=200)
+    version: int | None = Field(default=None, ge=1)  # the newest version when left out
+    accepted_on: date | None = None  # today when left out
+
+
+class AcceptedOut(BaseModel):
+    email: str
+    name: str | None
+    version: int
+    accepted_on: date
+    recorded_by: str | None
+
+
+class PendingOut(BaseModel):
+    email: str
+    name: str | None
+    older_version: int | None
+
+
+class AcceptanceOut(BaseModel):
+    version: int | None
+    accepted: list[AcceptedOut]
+    pending: list[PendingOut]
+    others: list[AcceptedOut]
+    share: float | None
+
+
+def _accepted_out(a: pa.Accepted) -> AcceptedOut:
+    return AcceptedOut(email=a.email, name=a.name, version=a.version, accepted_on=a.accepted_on, recorded_by=a.recorded_by)
+
+
+async def _acceptance_view(db: DBSession, tenant: uuid.UUID, item_id: uuid.UUID) -> AcceptanceOut:
+    from app.api.v1.endpoints.identities import _people  # late: that module is large and imports compliance helpers
+
+    latest = (await db.execute(select(func.max(GovernanceVersion.version)).where(GovernanceVersion.item_id == item_id))).scalar_one()
+    if latest is None:
+        return AcceptanceOut(version=None, accepted=[], pending=[], others=[], share=None)
+    rows = (await db.execute(select(PolicyAcceptance).where(PolicyAcceptance.item_id == item_id, PolicyAcceptance.tenant_id == tenant))).scalars().all()
+    people, _ = await _people(db, tenant, None)
+    roster = [(p.email, p.display_name) for p in people if p.tenant_id == tenant and is_active(p)]
+    out = pa.summarize(roster, [pa.Accepted(r.email, r.display_name, r.version, r.accepted_on, r.recorded_by) for r in rows], latest)
+    return AcceptanceOut(
+        version=latest,
+        accepted=[_accepted_out(a) for a in out["accepted"]],
+        pending=[PendingOut(**p) for p in out["pending"]],
+        others=[_accepted_out(a) for a in out["others"]],
+        share=out["share"],
+    )
+
+
+@router.get("/{item_id}/acceptances", response_model=AcceptanceOut, dependencies=[Depends(require_permission("reports:read"))])
+async def list_acceptances(tenant: ScopeTenant, item_id: uuid.UUID, user: AuthUser, db: DBSession) -> AcceptanceOut:
+    """Who has accepted the newest version of a policy and who has not (from the organization's active people)."""
+    row = await _item(db, tenant, item_id)
+    if row.kind != "policy":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only a policy is accepted.")
+    return await _acceptance_view(db, tenant, item_id)
+
+
+@router.post("/{item_id}/acceptances", response_model=AcceptanceOut, status_code=status.HTTP_201_CREATED)
+async def record_acceptances(
+    tenant: ScopeTenant,
+    item_id: uuid.UUID,
+    body: AcceptanceIn,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+    db: DBSession,
+) -> AcceptanceOut:
+    """Record that people accepted a version (the newest unless named). Asking twice for the same person and version changes nothing."""
+    row = await _item(db, tenant, item_id)
+    if row.kind != "policy":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only a policy is accepted.")
+    latest = (await db.execute(select(func.max(GovernanceVersion.version)).where(GovernanceVersion.item_id == item_id))).scalar_one()
+    if latest is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Save the policy's text first; there is nothing to accept yet.")
+    version = body.version or latest
+    if version > latest:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="That policy has no such version.")
+    day = body.accepted_on or _today()
+    if day > _today():
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The day of acceptance is in the future.")
+    emails = sorted({pa.norm(e) for e in body.emails if "@" in e})
+    if not emails:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Give at least one e-mail address.")
+    have = set(
+        (await db.execute(select(PolicyAcceptance.email).where(PolicyAcceptance.item_id == item_id, PolicyAcceptance.version == version, PolicyAcceptance.email.in_(emails)))).scalars().all()
+    )
+    added = [e for e in emails if e not in have]
+    for e in added:
+        db.add(PolicyAcceptance(id=uuid.uuid4(), tenant_id=tenant, item_id=item_id, version=version, email=e, accepted_on=day, recorded_by=getattr(user, "email", None)))
+    await db.flush()
+    if added:
+        await emit_audit(
+            db=db,
+            tenant_id=tenant,
+            actor_id=user.user_id,
+            action="policy_acceptance:recorded",
+            resource="governance_item",
+            resource_id=str(item_id),
+            changes={"version": version, "people": len(added)},
+            request=request,
+        )
+    await db.commit()
+    return await _acceptance_view(db, tenant, item_id)
 
 
 # ---- policy templates --------------------------------------------------------------------------------------------------------------------------------------

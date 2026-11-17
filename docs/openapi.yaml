@@ -3354,6 +3354,99 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/governance/{item_id}/acceptances:
+    get:
+      tags:
+      - compliance
+      summary: List Acceptances
+      description: Who has accepted the newest version of a policy and who has not
+        (from the organization's active people).
+      operationId: list_acceptances_api_v1_governance__item_id__acceptances_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptanceOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Record Acceptances
+      description: Record that people accepted a version (the newest unless named).
+        Asking twice for the same person and version changes nothing.
+      operationId: record_acceptances_api_v1_governance__item_id__acceptances_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptanceIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptanceOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/governance/templates:
     get:
       tags:
@@ -31392,6 +31485,96 @@ components:
       required:
       - reason
       title: AcceptIn
+    AcceptanceIn:
+      properties:
+        emails:
+          items:
+            type: string
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Emails
+        version:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Version
+        accepted_on:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Accepted On
+      type: object
+      required:
+      - emails
+      title: AcceptanceIn
+    AcceptanceOut:
+      properties:
+        version:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Version
+        accepted:
+          items:
+            $ref: '#/components/schemas/AcceptedOut'
+          type: array
+          title: Accepted
+        pending:
+          items:
+            $ref: '#/components/schemas/PendingOut'
+          type: array
+          title: Pending
+        others:
+          items:
+            $ref: '#/components/schemas/AcceptedOut'
+          type: array
+          title: Others
+        share:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Share
+      type: object
+      required:
+      - version
+      - accepted
+      - pending
+      - others
+      - share
+      title: AcceptanceOut
+    AcceptedOut:
+      properties:
+        email:
+          type: string
+          title: Email
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        version:
+          type: integer
+          title: Version
+        accepted_on:
+          type: string
+          format: date
+          title: Accepted On
+        recorded_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Recorded By
+      type: object
+      required:
+      - email
+      - name
+      - version
+      - accepted_on
+      - recorded_by
+      title: AcceptedOut
     AccessGrantResponse:
       properties:
         tenant_id:
@@ -50712,6 +50895,27 @@ components:
       description: A destructive action the Copilot asked for and that is WAITING
         for the analyst. Nothing has happened yet. The token is for the UI's confirm
         call only; it is never shown to the model.
+    PendingOut:
+      properties:
+        email:
+          type: string
+          title: Email
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        older_version:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Older Version
+      type: object
+      required:
+      - email
+      - name
+      - older_version
+      title: PendingOut
     PermissionOut:
       properties:
         id:

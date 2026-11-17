@@ -917,8 +917,9 @@
     "key": "r7-ai-27",
     "title": "Policy acceptance: who accepted which version, from the people A.C.O.R.N holds",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-17: Policies, Acceptance on each policy (who accepted the newest version, who has not, older-version acceptances shown, record one or paste several). Migration 205; tests pure + Postgres."
   },
   {
     "key": "r7-ai-28",
@@ -1857,5 +1858,14 @@
     "needs": "claude",
     "note": "2026-11-16: sortable headers and a per-line breakdown of the counted number. The ThreatMate gap itself is most likely the mapping (a ThreatMate line is suggested against Internal assets at low confidence); Hal to check what those lines are billed on.",
     "completed_ref": "AiSOC next commit"
+  },
+  {
+    "key": "metrics-billing-threatmate-basis",
+    "title": "Billing sync: ThreatMate is counted on its billing meter (Billable assets), as Rewst does",
+    "detail": "Rewst compares the HaloPSA license quantity with ThreatMate GET /api/v1/billing/asset total (billable devices plus billable users per segment). CORE now reports that as Billable assets and the suggestion for ThreatMate invoice lines points at it. Lines a person already confirmed against Internal assets keep that choice: change them under Licenses and Counts.",
+    "area": "Metrics",
+    "status": "completed",
+    "needs": "claude",
+    "note": "2026-11-17. Other vendors read from Rewst SaaS Billing Count workflows: Inky counts billingSnapshot.childAllocations billableMailboxes split Pro/Advanced (CORE reads usage mailboxes: compare live); Datto SaaS counts User seats split M365/Google; Petra skips paused tenants; Liongard counts systems updated in the last 3 months. Not compared live."
   }
 ]
