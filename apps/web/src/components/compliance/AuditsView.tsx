@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 import { saveText } from '@/lib/saveFile';
+import { missingRequests } from '@/lib/auditTemplates';
 import { apiErrorDetail, auditsApi, downloadCsv, type AuditDetail, type AuditList } from '@/lib/api';
 
 const field = 'rounded border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100';
@@ -18,6 +19,7 @@ function Detail({ clientId, audit, onChange, onClose }: { clientId: string; audi
   const [err, setErr] = useState('');
   const [req, setReq] = useState({ title: '', owner: '', due: '' });
   const done = audit.status === 'complete';
+  const usual = missingRequests(audit.framework, audit.items.map((i) => i.title));
   const act = async (work: () => Promise<AuditDetail>) => {
     setErr('');
     try {
@@ -54,6 +56,21 @@ function Detail({ clientId, audit, onChange, onClose }: { clientId: string; audi
           <button type="button" className={btn} onClick={() => void act(() => auditsApi.fromControls(clientId, audit.id))}>
             Add requests for the controls that need evidence
           </button>
+          {usual.length > 0 && (
+            <button
+              type="button"
+              className={btn}
+              onClick={() =>
+                void act(async () => {
+                  let out = audit;
+                  for (const r of usual) out = await auditsApi.addRequest(clientId, audit.id, { title: r.title });
+                  return out;
+                })
+              }
+            >
+              Add the usual {audit.framework} requests ({usual.length})
+            </button>
+          )}
           <button type="button" className={btn} onClick={() => void act(() => auditsApi.patch(clientId, audit.id, { status: next }))}>
             Move to {next}
           </button>

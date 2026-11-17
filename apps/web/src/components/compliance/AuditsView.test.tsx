@@ -110,3 +110,28 @@ describe('AuditsView export', () => {
     expect(save).not.toHaveBeenCalled();
   });
 });
+
+describe('AuditsView: the usual requests', () => {
+  it('adds the framework’s usual requests that the audit lacks, one at a time, and offers nothing for an unknown framework', async () => {
+    const { templateFor } = await import('@/lib/auditTemplates');
+    const all = templateFor('SOC2');
+    api.get.mockResolvedValue(detail({ items: [request({ title: all[0]!.title.toUpperCase() })] }));
+    api.addRequest.mockImplementation(async () => detail());
+    render(<AuditsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'SOC 2 Type II 2026' }));
+    const box = await screen.findByTestId('audit-detail');
+    await userEvent.click(within(box).getByRole('button', { name: `Add the usual SOC2 requests (${all.length - 1})` }));
+    await waitFor(() => expect(api.addRequest).toHaveBeenCalledTimes(all.length - 1));
+    const titles = api.addRequest.mock.calls.map((c) => (c[2] as { title: string }).title);
+    expect(titles).toEqual(all.slice(1).map((r) => r.title));
+    expect(api.addRequest.mock.calls.every((c) => c[0] === '' && c[1] === 'a1')).toBe(true);
+  });
+
+  it('shows no such button when the framework has no usual list', async () => {
+    api.get.mockResolvedValue(detail({ framework: 'Custom' }));
+    render(<AuditsView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'SOC 2 Type II 2026' }));
+    const box = await screen.findByTestId('audit-detail');
+    expect(within(box).queryByRole('button', { name: /Add the usual/ })).toBeNull();
+  });
+});
