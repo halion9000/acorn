@@ -13,7 +13,7 @@ const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
-import { ComplianceDashboard } from './ComplianceDashboard';
+import { ComplianceDashboard, printTitle } from './ComplianceDashboard';
 import { arcs } from './Donut';
 
 const health = (over: Record<string, unknown> = {}) => ({ healthy: 25, at_risk: 14, unhealthy: 83, not_tested: 34, total: 156, percent_healthy: 16, ...over });
@@ -153,5 +153,25 @@ describe('ComplianceDashboard', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Client not found');
     await waitFor(() => expect(api.dashboard).toHaveBeenCalledWith('c9'));
     expect(screen.getByTestId('testing-empty')).toHaveTextContent('not set up for this client');
+  });
+});
+
+describe('ComplianceDashboard: print or save as PDF', () => {
+  it('writes the title a printed overview starts with: who, the frameworks on and the day', () => {
+    expect(printTitle('Acme Dental', ['SOC2', 'HIPAA'], '2026-11-16')).toBe('Acme Dental: Compliance overview (SOC2, HIPAA), 2026-11-16');
+    expect(printTitle(null, [], '2026-11-16')).toBe('Compliance overview, 2026-11-16');
+  });
+
+  it('offers Print once the overview is worked out, keeps the controls out of the print, and has a title that shows only on paper', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    show();
+    const button = await screen.findByRole('button', { name: 'Print or save as PDF' });
+    expect(button.closest('[data-print-hide]')).not.toBeNull();
+    expect(screen.getByTestId('print-title')).toHaveTextContent('Compliance overview (SOC2), 2026-11-14');
+    expect(screen.getByTestId('print-title').className).toMatch(/hidden/);
+    expect(screen.getByTestId('print-title').className).toMatch(/print:block/);
+    button.click();
+    expect(print).toHaveBeenCalledTimes(1);
+    print.mockRestore();
   });
 });

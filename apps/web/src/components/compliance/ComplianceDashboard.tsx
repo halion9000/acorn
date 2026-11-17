@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import useSWR from 'swr';
 
 import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
-import { apiErrorDetail, complianceDashboardApi, type ComplianceDashboard } from '@/lib/api';
+import { apiErrorDetail, complianceDashboardApi, msspApi, type ComplianceDashboard } from '@/lib/api';
 import { authFetch } from '@/lib/auth-session';
 import { Donut } from './Donut';
 import { FRAMEWORK_LIST } from './frameworkList';
@@ -60,8 +60,16 @@ function Card({ title, href, children, testId }: { title: string; href?: string;
   );
 }
 
+/** The line a printed overview starts with: who it is for, the frameworks on and the day (pure). */
+export function printTitle(clientName: string | null, frameworks: string[], day: string): string {
+  const who = clientName ? `${clientName}: ` : '';
+  const on = frameworks.length > 0 ? ` (${frameworks.join(', ')})` : '';
+  return `${who}Compliance overview${on}, ${day}`;
+}
+
 export function ComplianceDashboard() {
   const [clientId, setClientId] = useState('');
+  const { data: pickable } = useSWR(['client-picker'], () => msspApi.listChildren().catch(() => []));
   // The pages the cards open show the same client the dashboard is showing.
   const open = (href: string) => (clientId ? `${href}?client=${encodeURIComponent(clientId)}` : href);
   const isHome = useIsHomeClient(clientId);
@@ -119,6 +127,9 @@ export function ComplianceDashboard() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Compliance</h1>
+          <p className="hidden text-sm print:block" data-testid="print-title">
+            {printTitle(pickable?.find((c) => c.id === clientId)?.name ?? null, data?.enabled ?? [], (data?.generated_at ?? new Date().toISOString()).slice(0, 10))}
+          </p>
           <p className="mt-1 text-sm text-gray-400">Where the frameworks you turn on stand: tests, control health, risks and what needs doing.</p>
           {data?.generated_at && (
             <p className="mt-0.5 text-xs text-gray-500" data-testid="worked-out">
@@ -126,11 +137,16 @@ export function ComplianceDashboard() {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" data-print-hide>
           <ClientPicker value={clientId} onChange={setClientId} label="Whose compliance" />
           <button type="button" onClick={() => void load()} className="rounded border border-gray-700 px-3 py-1 text-sm text-gray-200 hover:bg-gray-800">
             Refresh
           </button>
+          {data && (
+            <button type="button" onClick={() => window.print()} className="rounded border border-gray-700 px-3 py-1 text-sm text-gray-200 hover:bg-gray-800">
+              Print or save as PDF
+            </button>
+          )}
         </div>
       </div>
       {problem && (
