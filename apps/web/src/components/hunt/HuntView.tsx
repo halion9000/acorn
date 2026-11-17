@@ -922,6 +922,7 @@ export function HuntView() {
                 </svg>
                 <select
                   value={preset}
+                  aria-label="Time range"
                   onChange={(e) => setPreset(e.target.value)}
                   className="rounded-md border border-slate-700/70 bg-slate-950/40 px-2 py-1 text-xs text-slate-200 focus:border-emerald-500/40 focus:outline-none"
                 >

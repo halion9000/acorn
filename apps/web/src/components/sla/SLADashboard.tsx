@@ -462,6 +462,7 @@ export function SLADashboard() {
         </div>
         <select
           value={days}
+          aria-label="Period"
           onChange={(e) => setDays(Number(e.target.value))}
           className="bg-gray-800 border border-gray-600 text-white text-sm rounded px-3 py-1.5"
         >

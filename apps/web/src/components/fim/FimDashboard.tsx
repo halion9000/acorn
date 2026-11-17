@@ -156,6 +156,7 @@ export function FimDashboard() {
           <label className="text-xs font-medium text-gray-500">Time window</label>
           <select
             value={since}
+            aria-label="Time window"
             onChange={(e) => handleSinceChange(e.target.value)}
             className="rounded-md border border-gray-700 bg-gray-900/60 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
@@ -172,6 +173,7 @@ export function FimDashboard() {
           <label className="text-xs font-medium text-gray-500">Action</label>
           <select
             value={action}
+            aria-label="Action"
             onChange={(e) => handleActionChange(e.target.value)}
             className="rounded-md border border-gray-700 bg-gray-900/60 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >

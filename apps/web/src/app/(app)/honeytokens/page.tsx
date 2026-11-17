@@ -375,6 +375,7 @@ export default function HoneytokensPage() {
       <div className="flex gap-3 mb-4">
         <select
           className="border border-gray-600 bg-gray-800 text-gray-200 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+          aria-label="Filter by status"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -386,6 +387,7 @@ export default function HoneytokensPage() {
         </select>
         <select
           className="border border-gray-600 bg-gray-800 text-gray-200 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+          aria-label="Filter by type"
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
         >

@@ -169,6 +169,7 @@ export function ExecutiveDigest() {
           <ClientPicker value={clientId} onChange={setClientId} label="Digest for" />
           <select
             value={days}
+            aria-label="Period"
             onChange={(e) => setDays(Number(e.target.value))}
             className="rounded border border-gray-600 bg-gray-800 px-3 py-1.5 text-sm text-white"
           >

@@ -65,6 +65,7 @@ export function TranslateTool({ initialRule, initialFormat }: { initialRule?: st
       <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <label style={{ color: "#8b93b7", fontSize: 14 }}>Source format</label>
         <select
+          aria-label="Source format"
           value={source}
           onChange={(e) => setSource(e.target.value as DetectionFormat)}
           style={{ background: "#131a33", color: "#e6e9f5", border: "1px solid #232b4d", borderRadius: 8, padding: "8px 10px" }}
@@ -81,6 +82,7 @@ export function TranslateTool({ initialRule, initialFormat }: { initialRule?: st
       </div>
 
       <textarea
+        aria-label="Rule to translate"
         value={rule}
         onChange={(e) => setRule(e.target.value)}
         spellCheck={false}

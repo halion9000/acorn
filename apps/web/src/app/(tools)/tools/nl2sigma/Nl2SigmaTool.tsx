@@ -29,7 +29,7 @@ export function Nl2SigmaTool() {
     <div style={{ display: "grid", gap: 18 }}>
       <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <label style={{ color: "#8b93b7", fontSize: 14 }}>Severity</label>
-        <select value={severity} onChange={(e) => setSeverity(e.target.value)} style={select}>
+        <select aria-label="Severity" value={severity} onChange={(e) => setSeverity(e.target.value)} style={select}>
           {["informational", "low", "medium", "high", "critical"].map((s) => (
             <option key={s} value={s}>
               {s}

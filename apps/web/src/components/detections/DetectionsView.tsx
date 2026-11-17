@@ -393,6 +393,7 @@ export function DetectionsView() {
 
             <select
               value={language}
+              aria-label="Language"
               onChange={(e) =>
                 setLanguage(e.target.value as DetectionLanguage | 'all')
               }

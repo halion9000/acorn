@@ -58,7 +58,7 @@ describe('every page survives the API being down', () => {
       const name = file.replace('../app/', '').replace('/page.tsx', '') || '/';
       try {
         const mod = (await load()) as { default?: unknown };
-        const Page = mod.default as ((props: Record<string, unknown>) => unknown) | undefined;
+        const Page = mod.default as React.ComponentType<Record<string, unknown>> | undefined;
         if (typeof Page !== 'function') continue;
         // Server pages that wait on data (async) cannot be rendered here; they have no client code to crash.
         if (Page.constructor.name === 'AsyncFunction') continue;

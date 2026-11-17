@@ -264,6 +264,7 @@ const data = isValid ? raw : null;
         />
         <select
           value={actionFilter}
+          aria-label="Action"
           onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
           className="rounded-md border border-gray-600 bg-gray-900 text-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
@@ -276,6 +277,7 @@ const data = isValid ? raw : null;
         </select>
         <select
           value={resourceFilter}
+          aria-label="Resource"
           onChange={(e) => { setResourceFilter(e.target.value); setPage(1); }}
           className="rounded-md border border-gray-600 bg-gray-900 text-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >

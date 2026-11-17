@@ -827,6 +827,7 @@ export function RuleEditor({ mode, ruleId }: RuleEditorProps) {
                       <label className="text-[11px] text-gray-500">days</label>
                       <input
                         type="number"
+                        aria-label="Backtest days"
                         min={1}
                         max={365}
                         value={backtestDays}

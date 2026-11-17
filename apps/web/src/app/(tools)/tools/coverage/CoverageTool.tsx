@@ -41,6 +41,7 @@ export function CoverageTool() {
   return (
     <div style={{ display: "grid", gap: 20 }}>
       <textarea
+        aria-label="Rules to check"
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={8}
