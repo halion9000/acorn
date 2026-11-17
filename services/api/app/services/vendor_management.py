@@ -80,6 +80,7 @@ def describe_changes(before: dict[str, Any], after: dict[str, Any]) -> list[str]
         "contract_start": "Contract start",
         "contract_end": "Contract end",
         "review_interval_months": "Review every (months)",
+        "annual_spend": "Yearly cost",
         "notes": "Notes",
     }
     out: list[str] = []
@@ -95,3 +96,18 @@ def describe_changes(before: dict[str, Any], after: dict[str, Any]) -> list[str]
 
             out.append(f"{label} {show(before.get(key))} to {show(after.get(key))}")
     return out
+
+
+def spend_total(amounts: Any) -> float:
+    """What the vendors cost per year, added up. A vendor with no amount entered counts for nothing; the sum is rounded to cents (pure)."""
+    return round(sum(float(a) for a in amounts if a is not None), 2)
+
+
+def spend_by_category(rows: Any) -> dict[str, float]:
+    """The yearly cost added up by category, the largest category first (ties by name). A category whose vendors have no amount entered is left out (pure). ``rows`` is (category, amount) pairs."""
+    totals: dict[str, float] = {}
+    for category, amount in rows:
+        if amount is None:
+            continue
+        totals[category] = totals.get(category, 0.0) + float(amount)
+    return {k: round(v, 2) for k, v in sorted(totals.items(), key=lambda kv: (-kv[1], kv[0]))}

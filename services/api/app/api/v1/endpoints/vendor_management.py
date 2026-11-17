@@ -22,7 +22,7 @@ from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.vendor_management import DetectedApplication, Vendor, VendorDocument, VendorHistory, VendorReview
 from app.services import csv_export
 from app.services.audit import emit_audit
-from app.services.vendor_management import CATEGORIES, DOC_TYPES, RISK_LEVELS, describe_changes, review_state
+from app.services.vendor_management import CATEGORIES, DOC_TYPES, RISK_LEVELS, describe_changes, review_state, spend_by_category, spend_total
 
 router = APIRouter(prefix="/compliance/vendors", tags=["vendors"])
 
@@ -44,8 +44,12 @@ FIELDS = (
     "contract_start",
     "contract_end",
     "review_interval_months",
+    "annual_spend",
     "notes",
 )
+
+
+SpendAmount = Annotated[float, Field(ge=0, le=999_999_999)]
 
 
 class VendorIn(BaseModel):
@@ -64,6 +68,7 @@ class VendorIn(BaseModel):
     contract_start: date | None = None
     contract_end: date | None = None
     review_interval_months: int | None = Field(default=None, ge=1, le=60)
+    annual_spend: SpendAmount | None = None
     notes: str = Field(default="", max_length=4000)
 
 
@@ -83,6 +88,8 @@ class VendorPatch(BaseModel):
     contract_start: date | None = None
     contract_end: date | None = None
     review_interval_months: int | None = Field(default=None, ge=1, le=60)
+    annual_spend: SpendAmount | None = None
+    clear_annual_spend: bool = False
     notes: str | None = Field(default=None, max_length=4000)
     clear_review_schedule: bool = False
 
@@ -154,6 +161,7 @@ class VendorOut(BaseModel):
     contract_start: date | None
     contract_end: date | None
     review_interval_months: int | None
+    annual_spend: float | None = None
     notes: str
     status: str
     # none: no review open and none scheduled; in_progress; overdue; current (next one more than 30 days off); due (within 30 days).
@@ -190,6 +198,9 @@ class Summary(BaseModel):
     reviews_overdue: int
     reviews_in_progress: int
     unassessed: int
+    # What the vendors cost per year, added up (vendors with no amount entered count for nothing), and the same by category, largest first.
+    spend_total: float = 0
+    spend_by_category: dict[str, float] = {}
 
 
 class VendorList(BaseModel):
@@ -283,6 +294,8 @@ async def list_vendors(
             reviews_overdue=sum(1 for v in out if v.review_state == "overdue"),
             reviews_in_progress=sum(1 for v in out if v.review_state == "in_progress"),
             unassessed=by_risk["unassessed"],
+            spend_total=spend_total((v.annual_spend for v in out)),
+            spend_by_category=spend_by_category((v.category, v.annual_spend) for v in out),
         ),
         categories=list(CATEGORIES),
         document_types=list(DOC_TYPES),
@@ -421,6 +434,7 @@ async def export_vendors(
             "Two-factor",
             "Contract start",
             "Contract end",
+            "Yearly cost",
             "Review state",
             "Next review",
             "Last reviewed",
@@ -438,6 +452,7 @@ async def export_vendors(
                 v.mfa,
                 v.contract_start,
                 v.contract_end,
+                v.annual_spend,
                 v.review_state,
                 v.next_review_due,
                 v.last_reviewed,
@@ -469,7 +484,7 @@ async def update_vendor(
     if v.status == "archived":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An archived vendor cannot be changed. Restore it first.")
     before = _snapshot(v)
-    changes = body.model_dump(exclude_unset=True, exclude={"clear_review_schedule"})
+    changes = body.model_dump(exclude_unset=True, exclude={"clear_review_schedule", "clear_annual_spend"})
     if "category" in changes and changes["category"] not in CATEGORIES:
         changes["category"] = "Other"
     for key, value in changes.items():
@@ -478,6 +493,8 @@ async def update_vendor(
         setattr(v, key, value.strip() if key == "name" and isinstance(value, str) else value)
     if body.clear_review_schedule:
         v.review_interval_months = None
+    if body.clear_annual_spend:
+        v.annual_spend = None
     v.updated_at = datetime.now(UTC)
     lines = describe_changes(before, _snapshot(v))
     if lines:

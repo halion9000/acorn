@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
+import { dollars } from '@/lib/money';
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 import { saveText } from '@/lib/saveFile';
 import { apiErrorDetail, detectedAppsApi, downloadCsv, vendorApi, type VendorDetail, type VendorInput, type VendorList, type VendorRow } from '@/lib/api';
@@ -56,6 +57,20 @@ function Dashboard({ data }: { data: VendorList }) {
         {s.total} vendor{s.total === 1 ? '' : 's'}; {s.reviews_in_progress} review{s.reviews_in_progress === 1 ? '' : 's'} in progress
         {s.reviews_overdue > 0 ? <span className="text-red-300"> ({s.reviews_overdue} overdue)</span> : null}.
       </p>
+      {s.spend_total ? (
+        <div className="text-sm text-gray-300" data-testid="vendor-spend">
+          <p>
+            Yearly cost of the vendors with an amount entered: <span className="font-semibold text-gray-100">{dollars(s.spend_total)}</span>
+          </p>
+          <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
+            {Object.entries(s.spend_by_category ?? {}).map(([cat, n]) => (
+              <li key={cat} data-testid="vendor-spend-category">
+                {cat}: {dollars(n)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -77,6 +92,7 @@ function VendorForm({ categories, initial, onSave, onCancel }: { categories: str
     contract_start: initial.contract_start ?? '',
     contract_end: initial.contract_end ?? '',
     review_interval_months: initial.review_interval_months ? String(initial.review_interval_months) : '',
+    annual_spend: initial.annual_spend != null ? String(initial.annual_spend) : '',
     notes: initial.notes ?? '',
   });
   const [busy, setBusy] = useState(false);
@@ -113,6 +129,8 @@ function VendorForm({ categories, initial, onSave, onCancel }: { categories: str
             contract_end: blank(v.contract_end),
             review_interval_months: v.review_interval_months ? Number(v.review_interval_months) : null,
             clear_review_schedule: !v.review_interval_months && !!initial.review_interval_months,
+            annual_spend: v.annual_spend.trim() === '' ? null : Number(v.annual_spend),
+            clear_annual_spend: v.annual_spend.trim() === '' && initial.annual_spend != null,
             notes: v.notes,
           });
         } catch (x) {
@@ -168,6 +186,10 @@ function VendorForm({ categories, initial, onSave, onCancel }: { categories: str
         {text('account_manager_email', 'Account manager email', 'email')}
         {text('contract_start', 'Contract start', 'date')}
         {text('contract_end', 'Contract end', 'date')}
+        <label className="text-xs text-gray-400">
+          Yearly cost
+          <input aria-label="Yearly cost" type="number" min={0} step="0.01" value={v.annual_spend} onChange={(e) => setV({ ...v, annual_spend: e.target.value })} className={field} />
+        </label>
         <label className="text-xs text-gray-400">
           Review every (months)
           <input aria-label="Review every (months)" type="number" min={1} max={60} value={v.review_interval_months} onChange={(e) => setV({ ...v, review_interval_months: e.target.value })} className={field} />
@@ -243,6 +265,7 @@ function Detail({ clientId, vendor, data, onChange, onClose }: { clientId: strin
           <span>Data: {vendor.data_access}</span>
           <span>Two-factor: {vendor.mfa === null ? 'not known' : vendor.mfa ? 'yes' : 'no'}</span>
           {vendor.contract_end && <span>Contract ends {vendor.contract_end}</span>}
+          {vendor.annual_spend != null && <span>Costs {dollars(vendor.annual_spend)} a year</span>}
           {!archived && (
             <button type="button" onClick={() => setEditing(true)} className="text-xs text-blue-300 hover:underline">
               Edit vendor

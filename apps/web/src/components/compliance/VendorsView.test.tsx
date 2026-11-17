@@ -113,3 +113,33 @@ describe('VendorsView export', () => {
     expect(save).not.toHaveBeenCalled();
   });
 });
+
+describe('VendorsView: the yearly cost', () => {
+  it('shows the total cost and the cost by category on the dashboard, and each vendor’s own cost on its card', async () => {
+    vendorApi.list.mockResolvedValue({ ...lists([vendor({ annual_spend: 1200.5 })]), summary: { ...lists().summary, spend_total: 1500.5, spend_by_category: { 'Security tools': 1200.5, Other: 300 } } });
+    vendorApi.get.mockResolvedValue(detail({ annual_spend: 1200.5 }));
+    render(<VendorsView />);
+    const box = await screen.findByTestId('vendor-spend');
+    expect(box).toHaveTextContent('$1,500.50');
+    expect(screen.getAllByTestId('vendor-spend-category').map((e) => e.textContent)).toEqual(['Security tools: $1,200.50', 'Other: $300']);
+  });
+
+  it('shows no cost line when no vendor has an amount', async () => {
+    render(<VendorsView />);
+    await screen.findByTestId('vcount-high');
+    expect(screen.queryByTestId('vendor-spend')).toBeNull();
+  });
+});
+
+describe('VendorsView: entering the yearly cost', () => {
+  it('sends the amount typed for the yearly cost', async () => {
+    vendorApi.create.mockResolvedValue(detail({ name: 'Zoom', id: 'v2' }));
+    render(<VendorsView />);
+    await screen.findByTestId('vcount-high');
+    await userEvent.click(screen.getByRole('button', { name: 'Add vendor' }));
+    await userEvent.type(await screen.findByLabelText('Vendor name'), 'Zoom');
+    await userEvent.type(screen.getByLabelText('Yearly cost'), '1200.5');
+    await userEvent.click(screen.getByRole('button', { name: 'Save vendor' }));
+    await waitFor(() => expect(vendorApi.create).toHaveBeenCalledWith('', expect.objectContaining({ name: 'Zoom', annual_spend: 1200.5, clear_annual_spend: false })));
+  });
+});

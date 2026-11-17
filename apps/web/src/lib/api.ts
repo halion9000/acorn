@@ -7853,6 +7853,8 @@ export interface VendorRow {
   contract_start: string | null;
   contract_end: string | null;
   review_interval_months: number | null;
+  /** What the vendor costs per year; null when not entered. Absent from an older API. */
+  annual_spend?: number | null;
   notes: string;
   status: 'active' | 'archived';
   review_state: 'none' | 'in_progress' | 'overdue' | 'due' | 'current';
@@ -7872,13 +7874,14 @@ export interface VendorDetail extends VendorRow {
 }
 export interface VendorList {
   vendors: VendorRow[];
-  summary: { total: number; by_risk: Record<string, number>; reviews_overdue: number; reviews_in_progress: number; unassessed: number };
+  summary: { total: number; by_risk: Record<string, number>; reviews_overdue: number; reviews_in_progress: number; unassessed: number; spend_total?: number; spend_by_category?: Record<string, number> };
   categories: string[];
   document_types: string[];
 }
 export type VendorInput = Partial<Omit<VendorRow, 'id' | 'status' | 'review_state' | 'next_review_due' | 'last_reviewed' | 'document_count' | 'created_at' | 'updated_at' | 'archived_at'>> & {
   name: string;
   clear_review_schedule?: boolean;
+  clear_annual_spend?: boolean;
 };
 
 /** A CSV the server makes (the compliance lists' export.csv routes), as text. `clientId` reads one client; `extra` adds filters. */

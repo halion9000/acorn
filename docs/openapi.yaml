@@ -62730,6 +62730,11 @@ components:
           - type: integer
           - type: 'null'
           title: Review Interval Months
+        annual_spend:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Annual Spend
         notes:
           type: string
           title: Notes
@@ -62966,6 +62971,13 @@ components:
             minimum: 1.0
           - type: 'null'
           title: Review Interval Months
+        annual_spend:
+          anyOf:
+          - type: number
+            maximum: 999999999.0
+            minimum: 0.0
+          - type: 'null'
+          title: Annual Spend
         notes:
           type: string
           maxLength: 4000
@@ -63105,6 +63117,11 @@ components:
           - type: integer
           - type: 'null'
           title: Review Interval Months
+        annual_spend:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Annual Spend
         notes:
           type: string
           title: Notes
@@ -63273,6 +63290,17 @@ components:
             minimum: 1.0
           - type: 'null'
           title: Review Interval Months
+        annual_spend:
+          anyOf:
+          - type: number
+            maximum: 999999999.0
+            minimum: 0.0
+          - type: 'null'
+          title: Annual Spend
+        clear_annual_spend:
+          type: boolean
+          title: Clear Annual Spend
+          default: false
         notes:
           anyOf:
           - type: string
@@ -67706,6 +67734,16 @@ components:
         unassessed:
           type: integer
           title: Unassessed
+        spend_total:
+          type: number
+          title: Spend Total
+          default: 0
+        spend_by_category:
+          additionalProperties:
+            type: number
+          type: object
+          title: Spend By Category
+          default: {}
       type: object
       required:
       - total

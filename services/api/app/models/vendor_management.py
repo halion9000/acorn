@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -40,6 +41,8 @@ class Vendor(Base):
     contract_start: Mapped[date | None] = mapped_column(Date, nullable=True)
     contract_end: Mapped[date | None] = mapped_column(Date, nullable=True)
     review_interval_months: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    # What the vendor costs per year (migration 201); none when not entered.
+    annual_spend: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
     status: Mapped[str] = mapped_column(String(10), nullable=False, default="active")
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

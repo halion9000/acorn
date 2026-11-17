@@ -57,3 +57,24 @@ def test_changes_are_described_one_line_each_without_copying_notes():
         "Notes changed",
     }
     assert describe_changes(before, dict(before)) == []
+
+
+def test_the_yearly_cost_adds_up_in_total_and_by_category_largest_first_leaving_out_vendors_with_no_amount():
+    from app.services.vendor_management import spend_by_category, spend_total
+
+    rows = [("Security", 1200.5), ("Security", 99.5), ("Backup", 5000), ("Backup", None), ("Other", None), ("Email", 5000)]
+    assert spend_total(a for _c, a in rows) == 11300.0
+    assert spend_by_category(rows) == {"Backup": 5000.0, "Email": 5000.0, "Security": 1300.0}
+    assert list(spend_by_category(rows)) == ["Backup", "Email", "Security"], "ties are by name, then smaller sums"
+    assert spend_total([]) == 0.0
+    assert spend_by_category([]) == {}
+    assert spend_total([0.1, 0.2]) == 0.3, "rounded to cents, not 0.30000000000000004"
+
+
+def test_a_change_of_yearly_cost_reads_as_one_plain_history_line():
+    from decimal import Decimal
+
+    from app.services.vendor_management import describe_changes
+
+    assert describe_changes({"annual_spend": None}, {"annual_spend": Decimal("1200.00")}) == ["Yearly cost none to 1200.00"]
+    assert describe_changes({"annual_spend": Decimal("1200.00")}, {"annual_spend": Decimal("1200")}) == []

@@ -154,3 +154,35 @@ async def test_documents_are_added_with_a_checked_link_and_removed(world):
     assert e.value.status_code == 422
     gone = await run(w.acme, lambda db: ep.remove_document(v.id, d.documents[0].id, w.acme, db, w.user))
     assert gone.documents == []
+
+
+async def test_the_yearly_cost_is_saved_changed_cleared_and_added_up_by_category(world):
+    w = world
+    a = await add(w, name="Backup One", category="Cloud and hosting", annual_spend=1200.5)
+    await add(w, name="Backup Two", category="Cloud and hosting", annual_spend=300)
+    await add(w, name="Chat", category="Other", annual_spend=99.99)
+    await add(w, name="No amount", category="Other")
+    out = await listing(w)
+    assert out.summary.spend_total == 1600.49
+    assert out.summary.spend_by_category == {"Cloud and hosting": 1500.5, "Other": 99.99}
+    assert next(v for v in out.vendors if v.name == "Backup One").annual_spend == 1200.5
+    changed = await run(w.acme, lambda db: ep.update_vendor(a.id, ep.VendorPatch(annual_spend=2000), w.request, w.acme, db, w.user))
+    assert changed.annual_spend == 2000
+    assert "Yearly cost 1200.50 to 2000" in [h.detail for h in changed.history if h.action == "changed"][0]
+    cleared = await run(w.acme, lambda db: ep.update_vendor(a.id, ep.VendorPatch(clear_annual_spend=True), w.request, w.acme, db, w.user))
+    assert cleared.annual_spend is None
+    assert (await listing(w)).summary.spend_total == 399.99
+
+
+async def test_a_negative_or_absurd_yearly_cost_is_refused_and_one_clients_spend_is_never_in_anothers_total(world):
+    w = world
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        ep.VendorIn(name="Bad", annual_spend=-1)
+    with pytest.raises(ValidationError):
+        ep.VendorIn(name="Bad", annual_spend=10_000_000_000)
+    await add(w, name="Acme thing", annual_spend=500)
+    await add(w, tenant=w.birch, name="Birch thing", annual_spend=7000)
+    assert (await listing(w)).summary.spend_total == 500.0
+    assert (await listing(w, tenant=w.birch)).summary.spend_total == 7000.0
