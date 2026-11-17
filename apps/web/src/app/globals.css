@@ -83,8 +83,8 @@
 
   --fg-primary: #0f172a;         /* slate-900 */
   --fg-secondary: #334155;       /* slate-700 */
-  --fg-muted: #64748b;           /* slate-500 */
-  --fg-subtle: #94a3b8;          /* slate-400 */
+  --fg-muted: #5b6b83;           /* between slate-500 and 600: 4.5:1 on every surface (scripts/check_contrast.py) */
+  --fg-subtle: #7b8aa0;          /* darker than slate-400: 3:1 on every surface, for timestamps and helper text */
   --fg-inverse: #f8fafc;
 
   --background: var(--surface-base);
