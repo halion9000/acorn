@@ -730,8 +730,10 @@
     "key": "r7-ai-04",
     "title": "ETag and If-None-Match on the heavy fleet boards",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 83d3072d",
+    "note": "2026-11-16: ETag and If-None-Match on /client-posture/fleet/summary and /fleet/boards/{board}; the answer is still worked out each time, so it saves what is sent and drawn, not the database work."
   },
   {
     "key": "r7-ai-05",
