@@ -1305,8 +1305,10 @@
     "key": "r7-af-01",
     "title": "Compliance: a calendar of everything due (reviews, audits, contracts, policies)",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 4ab40148",
+    "note": "2026-11-16: Compliance > Calendar. Covers policy/vendor reviews, scheduled items, open access reviews and audit period ends. Contracts are not included (no due date in the contract data)."
   },
   {
     "key": "r7-af-02",
