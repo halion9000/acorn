@@ -183,6 +183,21 @@ const navSections: NavSection[] = [
         href: '/sla',
         icon: <ChartBarIcon />,
       },
+      {
+        label: 'Devices',
+        href: '/devices',
+        icon: <DeviceIcon />,
+      },
+      {
+        label: 'Client environment',
+        href: '/devices/environment',
+        icon: <DeviceIcon />,
+      },
+      {
+        label: 'Identities',
+        href: '/identities',
+        icon: <UserIcon />,
+      },
     ],
   },
   {
@@ -196,24 +211,9 @@ const navSections: NavSection[] = [
         badgeColor: 'bg-red-500',
       },
       {
-        label: 'Devices',
-        href: '/devices',
-        icon: <DeviceIcon />,
-      },
-      {
-        label: 'Client environment',
-        href: '/devices/environment',
-        icon: <DeviceIcon />,
-      },
-      {
         label: 'Remote tools',
         href: '/remote-tools',
         icon: <ShieldIcon />,
-      },
-      {
-        label: 'Identities',
-        href: '/identities',
-        icon: <UserIcon />,
       },
       {
         label: 'Investigation Queue',
