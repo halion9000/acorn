@@ -731,6 +731,8 @@ export interface DeviceRow {
   tenant_id: string;
   client_name: string | null;
   hostname: string;
+  /** The tools this device's client has marked as not used. Absent from an older API. */
+  excluded_tools?: string[];
   serial_number: string | null;
   os: string | null;
   os_version: string | null;
