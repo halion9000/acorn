@@ -1391,8 +1391,10 @@
     "key": "r7-af-10",
     "title": "Risk register: risk acceptance with an expiry and a reminder",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 4e668406",
+    "note": "2026-11-16: accepted_until on risks (migration 202) with an action item on the Compliance overview as the reminder. No email reminder."
   },
   {
     "key": "r7-af-11",
