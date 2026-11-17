@@ -138,11 +138,23 @@ describe('the pages with data', () => {
     expect(within(await screen.findByTestId('pods-table')).getByText('Pod 1')).toBeTruthy();
     expect(screen.getByText(/Pod 1, week by week/)).toBeTruthy();
   });
-  it('Ticket updates lists members as checkboxes and asks for the ones picked', async () => {
+  it('Ticket updates picks members from a searchable list and asks for the ones picked', async () => {
     render(<TicketUpdatesView />);
     await screen.findByTestId('updates-table');
+    await userEvent.click(screen.getByRole('button', { name: /team members/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
     await userEvent.click(screen.getByLabelText('Vic'));
     await waitFor(() => expect(authFetch.mock.calls.some(([u]) => String(u).includes('members=Vic'))).toBe(true));
+  });
+  it('Ticket updates says why when every count is zero, and not otherwise', async () => {
+    authFetch.mockImplementation(() => answer({ ...(DATA['ticket-updates'] as object), rows: [{ engineer: 'Dan', total: 0, by_week: {} }], weekly_total: {} }));
+    const { unmount } = render(<TicketUpdatesView />);
+    expect(await screen.findByTestId('updates-all-zero')).toHaveTextContent('Every count here is zero');
+    unmount();
+    authFetch.mockImplementation((u: string) => answer(DATA['ticket-updates'] as object));
+    render(<TicketUpdatesView />);
+    await screen.findByTestId('updates-table');
+    expect(screen.queryByTestId('updates-all-zero')).toBeNull();
   });
   it('DialPad shows triage and hours by week and the calls per person', async () => {
     render(<DialpadView />);
@@ -192,6 +204,7 @@ describe('the pages with data', () => {
     const table = await screen.findByTestId('licensing-table');
     expect(within(table).getByText('Windows workstations')).toBeTruthy();
     expect(within(table).getByText('Total')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /items/ }));
     await userEvent.click(screen.getByLabelText(/Windows workstations/));
     expect(within(screen.getByTestId('licensing-table')).queryByText('Windows workstations')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Select all' }));
@@ -207,6 +220,7 @@ describe('the pages with data', () => {
     const table = await screen.findByTestId('roles-table');
     expect(within(table).getByText('Exchange Administrator')).toBeTruthy();
     expect(screen.getByText(/Bob \(disabled\)/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /roles/ }));
     await userEvent.click(screen.getByLabelText(/Exchange Administrator/));
     expect(within(screen.getByTestId('roles-table')).queryByText('Exchange Administrator')).toBeNull();
   });

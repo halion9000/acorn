@@ -5,6 +5,7 @@
  * roles from CIPP: CORE sends them about once a day and A.C.O.R.N reads its own copy.
  */
 import { useState } from 'react';
+import { MetricPicker } from './MetricPicker';
 
 import { Cards, NothingYet, Page, Panel, Periods, Table, monthShort, num, pctText, selectClass, useMetric } from './kit';
 
@@ -109,13 +110,6 @@ export function MonthlyLicensingView() {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const { data, denied, problem } = useMetric<LicensingData>(`/api/v1/reports/metrics/monthly-licensing?month=${month}`);
   const shown = (data?.items ?? []).filter((i) => !hidden.has(i.key));
-  const toggle = (k: string) =>
-    setHidden((h) => {
-      const n = new Set(h);
-      if (n.has(k)) n.delete(k);
-      else n.add(k);
-      return n;
-    });
   return (
     <Page title="Monthly licensing" subtitle="What each client had of each license and counted item, as of the end of the month chosen (this month is what is counted now)." denied={denied} problem={problem} empty={null}>
       <div className="flex flex-wrap items-center gap-3">
@@ -129,19 +123,15 @@ export function MonthlyLicensingView() {
             ))}
           </select>
         </label>
-        <button type="button" className="rounded border border-gray-700 px-2.5 py-1 text-xs text-gray-200 hover:bg-gray-800" onClick={() => setHidden(new Set())}>
-          Select all
-        </button>
+        <MetricPicker
+          noun="items"
+          options={(data?.items ?? []).map((i) => ({ value: i.key, label: i.item, hint: i.source }))}
+          selected={(data?.items ?? []).filter((i) => !hidden.has(i.key)).map((i) => i.key)}
+          onChange={(next) => setHidden(new Set((data?.items ?? []).map((i) => i.key).filter((k) => !next.includes(k))))}
+        />
       </div>
       {data && (
         <>
-          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-300" aria-label="Items">
-            {data.items.map((i) => (
-              <label key={i.key} className="flex items-center gap-1">
-                <input type="checkbox" checked={!hidden.has(i.key)} onChange={() => toggle(i.key)} /> {i.item} ({i.source})
-              </label>
-            ))}
-          </fieldset>
           {data.clients.length === 0 ? (
             <p className="text-sm text-gray-400" data-testid="licensing-empty">
               Nothing was counted for any client {data.as_of === 'now' ? 'yet' : `by the end of ${monthShort(month)}`}.
@@ -169,27 +159,16 @@ export function UserRolesView() {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const { data, denied, problem } = useMetric<RolesData>('/api/v1/reports/metrics/user-roles');
   const shown = (data?.roles ?? []).filter((r) => !hidden.has(r.role));
-  const toggle = (k: string) =>
-    setHidden((h) => {
-      const n = new Set(h);
-      if (n.has(k)) n.delete(k);
-      else n.add(k);
-      return n;
-    });
   return (
     <Page title="User roles" subtitle="How many people hold each Microsoft 365 administrator role at each client, and who." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the Microsoft 365 roles" />}>
       {data?.received_at && (
         <>
-          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-300" aria-label="Roles">
-            <button type="button" className="text-blue-300 hover:underline" onClick={() => setHidden(new Set())}>
-              Select all
-            </button>
-            {data.roles.map((r) => (
-              <label key={r.role} className="flex items-center gap-1">
-                <input type="checkbox" checked={!hidden.has(r.role)} onChange={() => toggle(r.role)} /> {r.role} ({r.total})
-              </label>
-            ))}
-          </fieldset>
+          <MetricPicker
+            noun="roles"
+            options={data.roles.map((r) => ({ value: r.role, label: r.role, hint: String(r.total) }))}
+            selected={data.roles.filter((r) => !hidden.has(r.role)).map((r) => r.role)}
+            onChange={(next) => setHidden(new Set(data.roles.map((r) => r.role).filter((k) => !next.includes(k))))}
+          />
           <Table testId="roles-table" head={['Client name', ...shown.map((r) => r.role)]} rows={data.clients.map((c) => [c.client, ...shown.map((r) => (c.counts[r.role] === undefined ? '' : num(c.counts[r.role])))])} />
           <div className="space-y-2">
             {data.clients.map((c) => (

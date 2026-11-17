@@ -1804,5 +1804,33 @@
     "needs": "claude",
     "note": "2026-11-16: moved, in that order after SLA Tracking; the guide table is updated. Remote tools stays in Threat Operations.",
     "completed_ref": "AiSOC next commit"
+  },
+  {
+    "key": "metric-pickers",
+    "title": "Metrics: a proper picker instead of walls of check boxes (ticket updates, monthly licensing, user roles)",
+    "detail": "Hal 2026-11-16: the check box lists were unreadable.",
+    "area": "Metrics",
+    "status": "completed",
+    "needs": "claude",
+    "note": "2026-11-16: one picker (a button, a search box, Select all, Clear, a scrolling list) used on all three pages.",
+    "completed_ref": "AiSOC next commit"
+  },
+  {
+    "key": "metrics-client-drilldown",
+    "title": "Metrics: click into a client to see what its numbers come from (tickets, billed and free invoice lines)",
+    "detail": "Hal 2026-11-16, Profitability and the other client tables: click a client and see exactly which tickets and which invoice lines make the numbers.",
+    "area": "Metrics",
+    "status": "in_progress",
+    "needs": "claude",
+    "note": "Started 2026-11-16."
+  },
+  {
+    "key": "metrics-agent-names-and-updates",
+    "title": "Metrics: no more Agent NN names, and ticket updates that are not all zero",
+    "detail": "Hal 2026-11-16: people show as Agent 20, 93, 98 across the pages, and Team member ticket updates is all zeros.",
+    "area": "Metrics",
+    "status": "in_progress",
+    "needs": "claude",
+    "note": "2026-11-16: CORE now asks HaloPSA for disabled agents too, names the rest from their tickets (else Former agent N), and reports when actions come back unusable. NOT VERIFIED live: whether the actions then count."
   }
 ]

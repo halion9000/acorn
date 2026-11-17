@@ -5,6 +5,7 @@
  * facts CORE sends about once a day (HaloPSA time and tickets, Dialpad calls), never read live.
  */
 import { useState } from 'react';
+import { MetricPicker } from './MetricPicker';
 
 import { BarList, Cards, Columns, NothingYet, Page, Panel, Periods, Table, num, pctText, selectClass, useMetric, weekLabel } from './kit';
 
@@ -95,25 +96,26 @@ interface UpdatesData {
 
 export function TicketUpdatesView() {
   const [months, setMonths] = useState(3);
-  const [picked, setPicked] = useState<string[]>([]);
-  const query = picked.map((m) => `&members=${encodeURIComponent(m)}`).join('');
+  // null: every member; a list: only those (an empty list shows none).
+  const [picked, setPicked] = useState<string[] | null>(null);
+  const query = (picked ?? []).map((m) => `&members=${encodeURIComponent(m)}`).join('');
   const { data, denied, problem } = useMetric<UpdatesData>(`/api/v1/reports/metrics/ticket-updates?months=${months}${query}`);
-  const toggle = (m: string) => setPicked((p) => (p.includes(m) ? p.filter((x) => x !== m) : [...p, m]));
   return (
     <Page title="Ticket updates by team member" subtitle="How many times each team member updated a ticket, week by week." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <Periods value={months} onChange={setMonths} options={[1, 3, 6, 12]} />
       {data?.received_at && (
         <>
-          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-300" aria-label="Members">
-            <button type="button" className="text-blue-300 hover:underline" onClick={() => setPicked([])}>
-              All
-            </button>
-            {data.members.map((m) => (
-              <label key={m} className="flex items-center gap-1">
-                <input type="checkbox" checked={picked.includes(m)} onChange={() => toggle(m)} /> {m}
-              </label>
-            ))}
-          </fieldset>
+          <MetricPicker
+            noun="team members"
+            options={data.members.map((m) => ({ value: m, label: m }))}
+            selected={picked ?? data.members}
+            onChange={(next) => setPicked(next.length === data.members.length ? null : next)}
+          />
+          {data.rows.every((r) => r.total === 0) && (
+            <p className="rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm text-amber-200" data-testid="updates-all-zero">
+              Every count here is zero. CORE reads these from HaloPSA's ticket actions about once a day; if they stay zero, HaloPSA is not returning the actions or not saying who made them. CORE's log says which.
+            </p>
+          )}
           <Table
             testId="updates-table"
             head={['Team member', 'Total', ...data.weeks.map(weekLabel)]}
