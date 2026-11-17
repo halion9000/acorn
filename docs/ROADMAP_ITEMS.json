@@ -1552,8 +1552,10 @@
     "key": "r7-af-33",
     "title": "Search: one box that finds alerts, devices, people, vendors and controls",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC dcddcbe7",
+    "note": "2026-11-16: the search box now also finds vendors and controls; vendor opens the vendors page, control opens Controls narrowed. Alerts, devices, people and the rest were already covered."
   },
   {
     "key": "r7-af-34",
