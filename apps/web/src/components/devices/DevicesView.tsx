@@ -605,6 +605,11 @@ export default function DevicesView() {
         <button type="button" onClick={() => void exportCsv()} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white hover:bg-gray-800">
           Export CSV
         </button>
+        {clientId && (
+          <Link href={`/devices/print?client=${encodeURIComponent(clientId)}`} className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 text-sm text-white hover:bg-gray-800">
+            Print inventory
+          </Link>
+        )}
       </div>
       {(data?.summary.long_offline ?? 0) > 0 && (
         <p data-testid="long-offline-note" className="text-xs text-gray-500">
