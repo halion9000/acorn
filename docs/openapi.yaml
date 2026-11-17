@@ -12828,7 +12828,8 @@ paths:
       tags:
       - saved-views
       summary: List Saved Views
-      description: 'Return the caller''s saved views for one list page.
+      description: 'Return the caller''s saved views for one list page, and the views
+        other people in the tenant shared.
 
 
         Sorted by ``is_default DESC, updated_at DESC`` so the default
@@ -39862,6 +39863,10 @@ components:
           type: boolean
           title: Is Default
           default: false
+        shared:
+          type: boolean
+          title: Shared
+          default: false
       type: object
       required:
       - view_type
@@ -56021,6 +56026,14 @@ components:
           type: boolean
           title: Is Default
           default: false
+        shared:
+          type: boolean
+          title: Shared
+          default: false
+        mine:
+          type: boolean
+          title: Mine
+          default: true
         created_at:
           type: string
           title: Created At
@@ -62126,6 +62139,11 @@ components:
           - type: boolean
           - type: 'null'
           title: Is Default
+        shared:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Shared
       additionalProperties: false
       type: object
       title: UpdateSavedViewRequest

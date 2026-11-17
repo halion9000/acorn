@@ -41,7 +41,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import and_, delete, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.deps import AuthUser
@@ -114,20 +114,26 @@ class SavedViewModel(BaseModel):
     filters: dict[str, Any] = Field(default_factory=dict)
     columns: list[Any] | dict[str, Any] | None = None
     is_default: bool = False
+    # Shared with the whole tenant by its owner, and whether the person asking owns it (only the owner can change it). A default is personal: another person's default is never mine.
+    shared: bool = False
+    mine: bool = True
     created_at: str
     updated_at: str
 
     model_config = ConfigDict(from_attributes=False)
 
     @classmethod
-    def from_orm(cls, row: SavedView) -> SavedViewModel:
+    def from_orm(cls, row: SavedView, viewer_id: uuid.UUID | None = None) -> SavedViewModel:
+        mine = viewer_id is None or row.user_id == viewer_id
         return cls(
             id=str(row.id),
             view_type=row.view_type,
             name=row.name,
             filters=dict(row.filters or {}),
             columns=row.columns,
-            is_default=bool(row.is_default),
+            is_default=bool(row.is_default) and mine,
+            shared=bool(getattr(row, "shared", False)),
+            mine=mine,
             created_at=row.created_at.isoformat(),
             updated_at=row.updated_at.isoformat(),
         )
@@ -139,6 +145,7 @@ class CreateSavedViewRequest(BaseModel):
     filters: dict[str, Any] = Field(default_factory=dict)
     columns: list[Any] | dict[str, Any] | None = None
     is_default: bool = False
+    shared: bool = False
 
 
 class UpdateSavedViewRequest(BaseModel):
@@ -154,6 +161,7 @@ class UpdateSavedViewRequest(BaseModel):
     filters: dict[str, Any] | None = None
     columns: list[Any] | dict[str, Any] | None = None
     is_default: bool | None = None
+    shared: bool | None = None
 
     # Track which fields the caller actually sent so we can distinguish
     # "explicit null" from "omitted" without reaching into Pydantic
@@ -175,7 +183,7 @@ async def list_saved_views(
         description=(f"Which list page to return presets for. One of: {', '.join(sorted(_VALID_VIEW_TYPES))}."),
     ),
 ) -> list[SavedViewModel]:
-    """Return the caller's saved views for one list page.
+    """Return the caller's saved views for one list page, and the views other people in the tenant shared.
 
     Sorted by ``is_default DESC, updated_at DESC`` so the default
     preset always lands first, with the rest ordered by recency. The
@@ -189,7 +197,7 @@ async def list_saved_views(
                 select(SavedView)
                 .where(
                     SavedView.tenant_id == user.tenant_id,
-                    SavedView.user_id == user.user_id,
+                    or_(SavedView.user_id == user.user_id, SavedView.shared.is_(True)),
                     SavedView.view_type == view_type,
                 )
                 .order_by(SavedView.is_default.desc(), SavedView.updated_at.desc())
@@ -199,7 +207,9 @@ async def list_saved_views(
         .all()
     )
 
-    return [SavedViewModel.from_orm(r) for r in rows]
+    out = [SavedViewModel.from_orm(r, user.user_id) for r in rows]
+    # My default first, then my other views, then what others shared; each group newest first (the database order is kept inside a group).
+    return sorted(out, key=lambda v: (0 if (v.mine and v.is_default) else 1, 0 if v.mine else 1))
 
 
 @router.post("", response_model=SavedViewModel, status_code=status.HTTP_201_CREATED)
@@ -249,6 +259,7 @@ async def create_saved_view(
         filters=dict(payload.filters or {}),
         columns=payload.columns,
         is_default=bool(payload.is_default),
+        shared=bool(payload.shared),
         created_at=now,
         updated_at=now,
     )
@@ -316,6 +327,9 @@ async def update_saved_view(
                 detail="name must not be blank",
             )
         row.name = new_name
+
+    if "shared" in fields_set and payload.shared is not None:
+        row.shared = bool(payload.shared)
 
     if "is_default" in fields_set and payload.is_default is not None:
         if payload.is_default and not row.is_default:

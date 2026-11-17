@@ -117,13 +117,14 @@ export function SavedViewsBar<TFilters extends object>({
   );
 
   const handleCreate = useCallback(
-    async (name: string, makeDefault: boolean) => {
+    async (name: string, makeDefault: boolean, share: boolean) => {
       try {
         const created = await savedViewsApi.create({
           view_type: viewType,
           name,
           filters: filters as Record<string, unknown>,
           is_default: makeDefault,
+          shared: share,
         });
         await mutate();
         setActiveViewId(created.id);
@@ -169,6 +170,21 @@ export function SavedViewsBar<TFilters extends object>({
         await savedViewsApi.update(view.id, { is_default: next });
         await mutate();
         toast.success(next ? 'Set as default' : 'Default cleared');
+        setOpenMenuId(null);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Update failed');
+      }
+    },
+    [mutate],
+  );
+
+  const handleToggleShared = useCallback(
+    async (view: SavedView) => {
+      const next = !view.shared;
+      try {
+        await savedViewsApi.update(view.id, { shared: next });
+        await mutate();
+        toast.success(next ? `"${view.name}" is shared with the team` : `"${view.name}" is private again`);
         setOpenMenuId(null);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Update failed');
@@ -249,7 +265,9 @@ export function SavedViewsBar<TFilters extends object>({
               title={
                 view.is_default
                   ? `${view.name} (default)`
-                  : `Apply ${view.name}`
+                  : view.mine === false
+                    ? `Apply ${view.name} (shared by a teammate)`
+                    : `Apply ${view.name}`
               }
               data-testid={`saved-view-chip-${view.id}`}
             >
@@ -257,9 +275,14 @@ export function SavedViewsBar<TFilters extends object>({
                 <span aria-label="default" className="text-yellow-400">★</span>
               )}
               <span className="truncate max-w-[12rem]">{view.name}</span>
+              {view.shared && (
+                <span aria-label={view.mine === false ? 'shared by a teammate' : 'shared with the team'} className="rounded-full border border-sky-500/40 px-1 text-[10px] text-sky-300">
+                  {view.mine === false ? 'team' : 'shared'}
+                </span>
+              )}
             </button>
           )}
-          {renamingViewId !== view.id && !readOnly && (
+          {renamingViewId !== view.id && !readOnly && view.mine !== false && (
             <button
               type="button"
               onClick={(e) => {
@@ -297,6 +320,9 @@ export function SavedViewsBar<TFilters extends object>({
                 }}
               >
                 Rename
+              </MenuItem>
+              <MenuItem onClick={() => handleToggleShared(view)}>
+                {view.shared ? 'Stop sharing' : 'Share with the team'}
               </MenuItem>
               <MenuItem onClick={() => handleOverwrite(view)}>
                 Update with current filters
@@ -395,18 +421,19 @@ function SaveViewDialog({
   onSubmit,
   onCancel,
 }: {
-  onSubmit: (name: string, isDefault: boolean) => void;
+  onSubmit: (name: string, isDefault: boolean, share: boolean) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState('');
   const [isDefault, setIsDefault] = useState(false);
+  const [share, setShare] = useState(false);
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         const trimmed = name.trim();
-        if (trimmed) onSubmit(trimmed, isDefault);
+        if (trimmed) onSubmit(trimmed, isDefault, share);
       }}
       className="inline-flex items-center gap-2"
       data-testid="save-view-dialog"
@@ -432,6 +459,10 @@ function SaveViewDialog({
           className="accent-blue-500"
         />
         Default
+      </label>
+      <label className="inline-flex items-center gap-1 text-xs text-gray-400 select-none">
+        <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} className="accent-blue-500" />
+        Share with the team
       </label>
       <button
         type="submit"

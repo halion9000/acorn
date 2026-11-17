@@ -81,6 +81,9 @@ class SavedView(Base):
     # we don't have to do a transactional toggle in the API.
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
 
+    # True when the owner shared this view with everyone in the tenant (migration 203). Others can apply it; only the owner can change or delete it.
+    shared: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),

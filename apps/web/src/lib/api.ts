@@ -7271,6 +7271,10 @@ export interface SavedView {
   /** Optional column override. ``null`` means "use page defaults". */
   columns: unknown[] | Record<string, unknown> | null;
   is_default: boolean;
+  /** Shared with everyone in the tenant by its owner. Absent from an older API. */
+  shared?: boolean;
+  /** Whether the person asking owns it; only the owner can change or delete it. Absent from an older API (then it is theirs). */
+  mine?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -7282,6 +7286,7 @@ export interface SavedViewCreateRequest {
   filters?: Record<string, unknown>;
   columns?: unknown[] | Record<string, unknown> | null;
   is_default?: boolean;
+  shared?: boolean;
 }
 
 /** Body for ``PATCH /saved-views/{id}`` — every field is optional. */
@@ -7291,6 +7296,7 @@ export interface SavedViewUpdateRequest {
   /** Pass ``null`` to clear a previously-saved column override. */
   columns?: unknown[] | Record<string, unknown> | null;
   is_default?: boolean;
+  shared?: boolean;
 }
 
 export const savedViewsApi = {

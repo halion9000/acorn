@@ -211,6 +211,7 @@ describe('SavedViewsBar', () => {
         name: 'My filter',
         filters: { status: 'open', q: 'phish' },
         is_default: false,
+        shared: false,
       });
     });
     expect(toastSuccess).toHaveBeenCalled();
@@ -286,5 +287,35 @@ describe('SavedViewsBar', () => {
     expect(
       screen.getByText(/save your current filters to come back to them/i),
     ).toBeInTheDocument();
+  });
+});
+
+describe('SavedViewsBar: sharing with the team', () => {
+  it('saves a view as shared when the box is ticked', async () => {
+    seedViews('alerts', []);
+    createMock.mockResolvedValue(makeView({ id: 'v-new', name: 'Team view', shared: true }));
+    const user = userEvent.setup();
+    render(<SavedViewsBar<TestFilters> viewType="alerts" filters={{ status: 'open' }} onApply={vi.fn()} />);
+    await user.click(screen.getByTestId('save-current-view-btn'));
+    await user.type(screen.getByLabelText('New saved view name'), 'Team view');
+    await user.click(screen.getByLabelText('Share with the team'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'Team view', shared: true })));
+  });
+
+  it('marks a teammate’s shared view as theirs to apply but not to change, and the owner can share or stop sharing their own', async () => {
+    seedViews('alerts', [makeView({ id: 'v-mine', name: 'Mine', shared: false, mine: true }), makeView({ id: 'v-team', name: 'From Ann', shared: true, mine: false })]);
+    updateMock.mockResolvedValue(makeView({ id: 'v-mine', shared: true }));
+    const onApply = vi.fn();
+    const user = userEvent.setup();
+    render(<SavedViewsBar<TestFilters> viewType="alerts" filters={{ status: 'open' }} onApply={onApply} />);
+    const teamChip = await screen.findByTestId('saved-view-chip-v-team');
+    expect(teamChip).toHaveTextContent('team');
+    expect(screen.queryByTestId('saved-view-menu-v-team')).toBeNull();
+    await user.click(teamChip);
+    expect(onApply).toHaveBeenCalledWith({ status: 'open', q: 'critical' });
+    await user.click(screen.getByTestId('saved-view-menu-v-mine'));
+    await user.click(screen.getByRole('menuitem', { name: 'Share with the team' }));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledWith('v-mine', { shared: true }));
   });
 });
