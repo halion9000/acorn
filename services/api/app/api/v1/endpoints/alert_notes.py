@@ -18,6 +18,7 @@ from app.api.v1.deps import AuthUser, require_permission
 from app.db.rls import TenantDBSession
 from app.models.alert import Alert
 from app.models.alert_note import AlertNote
+from app.models.case import CaseTimeline
 from app.services.alert_scope import alert_scope
 from app.services.audit import emit_audit
 
@@ -36,6 +37,12 @@ class NoteOut(BaseModel):
     author: str
     body: str
     created_at: datetime
+
+
+def timeline_text(alert_title: str | None, note: str) -> str:
+    """What the case timeline says for a note written on one of its alerts: which alert, then the note (pure)."""
+    title = (alert_title or "an alert").strip()[:120] or "an alert"
+    return f"Note on alert “{title}”: {note}"
 
 
 def clean_body(text: str) -> str:
@@ -77,7 +84,7 @@ async def add_note(
     if not text:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The note is empty.")
     async with alert_scope(db, user.tenant_id, alert_id) as tid:
-        found = (await db.execute(select(Alert.id).where(Alert.id == alert_id, Alert.tenant_id == tid))).first()
+        found = (await db.execute(select(Alert.id, Alert.case_id, Alert.title).where(Alert.id == alert_id, Alert.tenant_id == tid))).first()
         if found is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
         count = (
@@ -90,6 +97,19 @@ async def add_note(
         )
         db.add(row)
         await db.flush()
+        if found.case_id is not None:
+            # A note on an alert that belongs to a case is part of the case's story: it shows on the case timeline too.
+            db.add(
+                CaseTimeline(
+                    case_id=found.case_id,
+                    tenant_id=tid,
+                    event_type="alert_note",
+                    content=timeline_text(found.title, text),
+                    event_metadata={"alert_id": str(alert_id), "note_id": str(row.id)},
+                    user_id=user.user_id,
+                    is_automated=False,
+                )
+            )
         await emit_audit(
             db=db,
             tenant_id=tid,

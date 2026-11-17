@@ -98,3 +98,48 @@ async def test_an_unknown_alert_and_another_owners_alert_are_a_404(world):
         with pytest.raises(HTTPException) as err2:
             await list_notes(aid, user(s.info["owner"]), s)
         assert err2.value.status_code == 404
+
+
+async def test_a_note_on_an_alert_in_a_case_is_also_a_case_timeline_entry_and_a_note_on_a_loose_alert_is_not(world):
+    s = world
+    case_id = uuid.uuid4()
+    await off(s)
+    await s.execute(
+        text("insert into cases (id, tenant_id, case_number, title, status, created_at, updated_at) values (:c, :t, 'C-NOTE-1', 'Case', 'open', now(), now())"),
+        {"c": case_id, "t": s.info["client"]},
+    )
+    await s.commit()
+    try:
+        await off(s)
+        await s.execute(text("update alerts set case_id = :c where id = :a"), {"c": case_id, "a": s.info["alert"]})
+        await s.commit()
+        await off(s)
+        note = await add_note(s.info["alert"], NoteIn(body="Called the user, no answer."), None, user(s.info["owner"]), s)
+        await off(s)
+        rows = (await s.execute(text("select event_type, content, tenant_id, metadata->>'alert_id', metadata->>'note_id', is_automated from case_timeline where case_id = :c"), {"c": case_id})).all()
+        assert len(rows) == 1
+        event_type, content, tenant, alert_id, note_id, automated = rows[0]
+        assert (event_type, tenant, alert_id, note_id, automated) == ("alert_note", s.info["client"], str(s.info["alert"]), str(note.id), False)
+        assert content == "Note on alert “T”: Called the user, no answer."
+        # An alert in no case adds nothing to any timeline.
+        await off(s)
+        await s.execute(text("update alerts set case_id = null where id = :a"), {"a": s.info["alert"]})
+        await s.commit()
+        await off(s)
+        await add_note(s.info["alert"], NoteIn(body="A second note, alert out of the case."), None, user(s.info["owner"]), s)
+        await off(s)
+        after = (await s.execute(text("select count(*) from case_timeline where case_id = :c"), {"c": case_id})).scalar_one()
+        assert after == 1, "the second note was written after the alert left the case"
+    finally:
+        await off(s)
+        await s.execute(text("update alerts set case_id = null where id = :a"), {"a": s.info["alert"]})
+        await s.execute(text("delete from case_timeline where case_id = :c"), {"c": case_id})
+        await s.execute(text("delete from cases where id = :c"), {"c": case_id})
+        await s.commit()
+
+
+def test_the_timeline_line_names_the_alert_then_the_note_and_copes_with_no_title():
+    assert ep.timeline_text("Impossible travel", "Called.") == "Note on alert “Impossible travel”: Called."
+    assert ep.timeline_text(None, "x") == "Note on alert “an alert”: x"
+    assert ep.timeline_text("  ", "x") == "Note on alert “an alert”: x"
+    assert len(ep.timeline_text("t" * 500, "x")) < 150
