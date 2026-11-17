@@ -12,6 +12,8 @@ import { deviceHref, mapFileName, standaloneSvg } from './mapDownload';
 import { CLASS_LABEL, buildMap, type DeviceClass, type Tier } from './networkMap';
 
 const BAND_NAME: Record<Tier, string> = { 0: 'INTERNET EDGE', 1: 'SWITCHING', 2: 'WIRELESS', 3: 'DEVICES' };
+/** The smallest the drawing is shown at, as a share of its natural size, so the text on the cards stays readable; a narrower window scrolls sideways instead of shrinking it further. */
+export const MIN_SCALE = 0.8;
 const CARD_W = 158;
 const CARD_H = 54;
 
@@ -61,7 +63,7 @@ export function NetworkMapDrawing({ devices, clientName }: { devices: ClientEnvi
         </div>
       </div>
       <div className="overflow-x-auto">
-        <svg ref={drawing} viewBox={`0 0 ${map.width} ${map.height}`} style={{ minWidth: Math.min(map.width, 900), width: '100%' }} role="img" aria-label="How this client's network devices are connected">
+        <svg ref={drawing} viewBox={`0 0 ${map.width} ${map.height}`} style={{ minWidth: Math.round(map.width * MIN_SCALE), width: '100%' }} role="img" aria-label="How this client's network devices are connected">
           <defs>
             <linearGradient id="map-card" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#1b2740" />

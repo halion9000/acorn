@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { EnvDevice } from '@/lib/api';
 import { CLASS_COLOR, CLASS_PATHS } from './deviceIcons';
-import { NetworkMapDrawing, cablePath, statusColor } from './NetworkMapDrawing';
+import { MIN_SCALE, NetworkMapDrawing, cablePath, statusColor } from './NetworkMapDrawing';
 import { CLASS_LABEL, type DeviceClass } from './networkMap';
 
 const dev = (id: string, role: string | null, kind: string, online: boolean | null, to: string[]): EnvDevice => ({
@@ -25,6 +25,16 @@ describe('the network map drawing', () => {
     expect(screen.getAllByTestId('map-legend').map((l) => l.textContent).sort()).toEqual(['Firewall', 'Switch', 'Wireless access point', 'Workstation']);
     // Each card carries the icon of its class.
     expect(nodes.every((n) => n.querySelector(`[data-icon="${n.getAttribute('data-class')}"]`))).toBe(true);
+  });
+
+  it('is never shrunk below a readable share of its natural size: a wide map scrolls sideways instead of squeezing its text', () => {
+    const wide = [dev('sw-1', 'switch', 'network', true, []), ...Array.from({ length: 14 }, (_, i) => dev(`pc-${i}`, null, 'computer', true, ['sw-1']))];
+    render(<NetworkMapDrawing devices={wide} clientName="Acme" />);
+    const svg = screen.getByRole('img', { name: /network devices are connected/ });
+    const natural = Number((svg.getAttribute('viewBox') ?? '').split(' ')[2]);
+    expect(natural).toBeGreaterThan(1500);
+    expect(svg.style.minWidth).toBe(`${Math.round(natural * MIN_SCALE)}px`);
+    expect(svg.style.width).toBe('100%');
   });
 
   it('every class has its own colour and its own icon, so none can be mistaken for another', () => {

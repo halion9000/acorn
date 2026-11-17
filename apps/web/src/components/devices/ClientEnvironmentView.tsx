@@ -84,7 +84,7 @@ export default function ClientEnvironmentView() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-6" data-testid="client-environment">
+    <div className="w-full space-y-5 p-6" data-testid="client-environment">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-white">Client environment</h1>
         <div className="flex items-center gap-3">
