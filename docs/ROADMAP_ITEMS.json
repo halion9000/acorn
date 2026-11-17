@@ -887,8 +887,10 @@
     "key": "r7-ai-24",
     "title": "A render smoke test for every page file with mocked data, to catch a crash",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 3546040a",
+    "note": "2026-11-16: src/test/pages.smoke.test.tsx renders every page.tsx with every API call failing (503); all pass. It does not render with real data."
   },
   {
     "key": "r7-ai-25",
