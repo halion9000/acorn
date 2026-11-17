@@ -935,8 +935,10 @@
     "key": "r7-ai-31",
     "title": "Audit request templates for each framework (the usual evidence list)",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC b301c901",
+    "note": "2026-11-16: Add the usual requests button on an open audit; six framework lists, skips requests already present."
   },
   {
     "key": "r7-ai-32",
