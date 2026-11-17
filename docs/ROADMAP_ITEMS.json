@@ -1484,8 +1484,10 @@
     "key": "r7-af-21",
     "title": "Alerts: a per-client noise report listing the rules that close the most",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 1f6395a9",
+    "note": "2026-11-16: GET /alerts/noise and a Noisy rules panel on Client Posture. Quiet = false positive, closed without a ticket, hidden or stale."
   },
   {
     "key": "r7-af-22",
