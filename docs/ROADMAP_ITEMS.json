@@ -836,8 +836,10 @@
     "key": "r7-ai-18",
     "title": "Settings search also finds words inside the user guide",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 55dd9fec",
+    "note": "2026-11-16: In the guide results under the Settings search box."
   },
   {
     "key": "r7-ai-19",
