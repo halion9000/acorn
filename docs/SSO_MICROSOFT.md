@@ -36,6 +36,7 @@ Add to `/srv/acorn/AiSOC/.env`, then run the Update button (or `docker compose u
 | `MS_SSO_NEW_USER_ROLE` | role a first sign-in starts with; default `viewer`. Administrator roles are never given automatically |
 | `MS_SSO_PASSWORD_LOGIN` | `admins` (default): only administrators can still use a password. `all`: everyone can |
 | `MS_SSO_WEB_URL` | only if the sign-in page is on a different address from the redirect |
+| `MS_SSO_EXTRA_REDIRECT_URIS` | only when people reach A.C.O.R.N by more than one address (for example `https://acorn-ext.goliveoak.com/api/v1/auth/sso/microsoft/callback`): comma-separated full callback addresses, https only, each with the same path as the main one. Each must ALSO be added as a Web redirect URI in the Entra app. The address a person signs in on is used for the whole sign-in, so they land back where they started. |
 
 If the first four are empty the button does not appear and nothing changes.
 

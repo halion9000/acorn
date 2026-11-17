@@ -638,3 +638,86 @@ def test_the_callback_when_off_answers_501(monkeypatch):
         assert e.value.status_code == 501
 
     run(go)
+
+
+# ─── Reaching A.C.O.R.N by a second address (people without Timus) ────────────────────────────────────────────────────────
+
+EXT = "https://acorn-ext.example.com/api/v1/auth/sso/microsoft/callback"
+
+
+def request_for(host=None, forwarded=None):
+    headers = {k: v for k, v in {"host": host, "x-forwarded-host": forwarded}.items() if v}
+    return SimpleNamespace(headers=headers)
+
+
+def test_extra_redirect_addresses_are_only_kept_when_they_are_https_with_the_same_callback_path_and_not_repeated():
+    path = "/api/v1/auth/sso/microsoft/callback"
+    raw = f"{EXT}, {EXT},http://insecure.example.com{path},https://other.example.com/elsewhere,https://q.example.com{path}?x=1,not a url,{REDIRECT}"
+    assert sso.parse_extra_redirects(raw, REDIRECT) == [EXT]
+    assert sso.parse_extra_redirects("", REDIRECT) == []
+
+
+def test_the_address_the_person_used_picks_the_redirect_and_only_a_configured_one_can_be_picked(world):
+    world.monkeypatch.setenv("MS_SSO_EXTRA_REDIRECT_URIS", EXT)
+    cfg = sso.load_config()
+    assert cfg.extra_redirects == [EXT]
+    assert sso.pick_redirect(cfg, "acorn-ext.example.com") == EXT
+    assert sso.pick_redirect(cfg, "ACORN-EXT.example.com:443") == EXT
+    assert sso.pick_redirect(cfg, "acorn.example.com") == REDIRECT
+    for unknown in ("evil.example.com", "", None, "acorn-ext.example.com.evil.com"):
+        assert sso.pick_redirect(cfg, unknown) == REDIRECT, unknown
+    assert sso.pick_redirect(cfg, "evil.example.com, acorn-ext.example.com") == REDIRECT, "only the first host listed counts"
+    assert sso.web_for(cfg, EXT) == "https://acorn-ext.example.com"
+    assert sso.web_for(cfg, REDIRECT) == "https://acorn.example.com"
+    assert sso.web_for(cfg, "https://evil.example.com/x") == "https://acorn.example.com", "anything not configured falls back to the main address"
+
+
+def test_a_sign_in_started_on_the_second_address_goes_to_microsoft_with_that_redirect_and_comes_back_to_that_address(world):
+    world.monkeypatch.setenv("MS_SSO_EXTRA_REDIRECT_URIS", EXT)
+
+    async def go(db):
+        started = await sso.microsoft_login(request_for(host="web:3000", forwarded="acorn-ext.example.com"), next="/cases/7")
+        q = query(started)
+        assert q["redirect_uri"] == EXT
+        saved = json.loads(world.redis.data[f"aisoc:sso:state:{q['state']}"])
+        assert saved["redirect_uri"] == EXT
+        world.token.body = {"id_token": id_token(nonce=saved["nonce"])}
+        db.add(user())
+        await db.commit()
+        done = await finish(world, db, state=q["state"])
+        assert world.token.calls[-1][1]["redirect_uri"] == EXT, "Microsoft is told the same address it was sent to"
+        back = urlsplit(done.headers["location"])
+        assert f"{back.scheme}://{back.netloc}{back.path}" == "https://acorn-ext.example.com/login", "the browser returns to the address it came in by"
+        assert "sso" in query(done)
+
+    run(go)
+
+
+def test_a_failed_sign_in_on_the_second_address_also_returns_there_and_the_main_address_is_unchanged(world):
+    world.monkeypatch.setenv("MS_SSO_EXTRA_REDIRECT_URIS", EXT)
+
+    async def go(db):
+        q = query(await sso.microsoft_login(request_for(host="acorn-ext.example.com"), next=None))
+        denied = await sso.microsoft_callback(db, code=None, state=q["state"], error="access_denied")
+        assert urlsplit(denied.headers["location"]).netloc == "acorn-ext.example.com"
+        main = query(await sso.microsoft_login(request_for(host="acorn.example.com"), next=None))
+        assert main["redirect_uri"] == REDIRECT
+        refused = await sso.microsoft_callback(db, code=None, state=main["state"], error="access_denied")
+        assert urlsplit(refused.headers["location"]).netloc == "acorn.example.com"
+
+    run(go)
+
+
+def test_a_state_that_names_an_address_nobody_configured_is_ignored_in_favour_of_the_main_one(world):
+    world.monkeypatch.setenv("MS_SSO_EXTRA_REDIRECT_URIS", EXT)
+
+    async def go(db):
+        q = query(await sso.microsoft_login(request_for(host="acorn.example.com"), next=None))
+        key = f"aisoc:sso:state:{q['state']}"
+        tampered = json.loads(world.redis.data[key])
+        tampered["redirect_uri"] = "https://evil.example.com/api/v1/auth/sso/microsoft/callback"
+        world.redis.data[key] = json.dumps(tampered)
+        done = await sso.microsoft_callback(db, code=None, state=q["state"], error="access_denied")
+        assert urlsplit(done.headers["location"]).netloc == "acorn.example.com"
+
+    run(go)

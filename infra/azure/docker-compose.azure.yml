@@ -43,6 +43,7 @@ services:
       MS_SSO_CLIENT_ID: ${MS_SSO_CLIENT_ID:-}
       MS_SSO_CLIENT_SECRET: ${MS_SSO_CLIENT_SECRET:-}
       MS_SSO_REDIRECT_URI: ${MS_SSO_REDIRECT_URI:-}
+      MS_SSO_EXTRA_REDIRECT_URIS: ${MS_SSO_EXTRA_REDIRECT_URIS:-}   # other addresses people reach A.C.O.R.N by (e.g. acorn-ext), comma-separated callback addresses, each also added to the Entra app
       MS_SSO_GROUP_ID: ${MS_SSO_GROUP_ID:-}
       MS_SSO_ACORN_TENANT_ID: ${MS_SSO_ACORN_TENANT_ID:-}
       MS_SSO_NEW_USER_ROLE: ${MS_SSO_NEW_USER_ROLE:-viewer}

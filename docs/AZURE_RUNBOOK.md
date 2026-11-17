@@ -119,7 +119,7 @@ A few people cannot use Timus. For them A.C.O.R.N has a second name, `https://ac
 
 **To let another person in:** add their public IP (a /32) to the source of that rule: `az network nsg rule update -g rg-liveoak-ops --nsg-name liveoak-nsg-app -n allow-acorn-https-allowlist --source-address-prefixes <existing...> <new>/32` (the update replaces the whole list, so repeat the existing ones). To close it again, delete the rule; the load balancer then reaches nobody. Cost is about 25 dollars a month (load balancer and public address).
 
-**Sign-in on this name:** passwords work for administrators only (as everywhere), and Sign in with Microsoft sends the browser back to the one redirect address set in `MS_SSO_REDIRECT_URI`, which is the Timus name, so it does not complete for someone outside. Until the callback is made to follow the name used, only administrators can sign in from outside.
+**Sign-in on this name:** Sign in with Microsoft follows the address a person used: `MS_SSO_EXTRA_REDIRECT_URIS` in `/srv/acorn/AiSOC/.env` holds `https://acorn-ext.goliveoak.com/api/v1/auth/sso/microsoft/callback`, the same address is added as a Web redirect URI in the Entra app `A.C.O.R.N`, and a sign-in begun on the external name returns to it. After changing `.env`, recreate the api container (`docker compose ... up -d api`; `restart` does not re-read `.env`).
 
 ### https and Sign in with Microsoft (added 2026-11-01)
 

@@ -33,7 +33,7 @@ from urllib.parse import urlencode, urlsplit
 
 import httpx
 import jwt as pyjwt
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
 from redis.asyncio import Redis, from_url
@@ -76,6 +76,8 @@ class SsoConfig(BaseModel):
     new_user_role: str = "viewer"
     password_login: str = "admins"
     web_url: str
+    # Other addresses people reach A.C.O.R.N by (MS_SSO_EXTRA_REDIRECT_URIS), each a full callback address registered in the Entra app. The one matching the address a person used is chosen at login.
+    extra_redirects: list[str] = []
 
 
 def load_config(env: dict[str, str] | None = None) -> SsoConfig | None:
@@ -98,6 +100,7 @@ def load_config(env: dict[str, str] | None = None) -> SsoConfig | None:
         role = "viewer"
     policy = e.get("MS_SSO_PASSWORD_LOGIN", "admins").strip().lower()
     parts = urlsplit(redirect)
+    extras = parse_extra_redirects(e.get("MS_SSO_EXTRA_REDIRECT_URIS", ""), redirect)
     web = e.get("MS_SSO_WEB_URL", "").strip().rstrip("/") or f"{parts.scheme}://{parts.netloc}"
     return SsoConfig(
         tenant_id=tenant,
@@ -109,7 +112,45 @@ def load_config(env: dict[str, str] | None = None) -> SsoConfig | None:
         new_user_role=role,
         password_login="all" if policy == "all" else "admins",
         web_url=web,
+        extra_redirects=extras,
     )
+
+
+def parse_extra_redirects(value: str, main: str) -> list[str]:
+    """The extra redirect addresses from a comma-separated setting (pure). Only https addresses ending in the same callback path as the main one are kept, once each; anything else is ignored."""
+    path = urlsplit(main).path
+    out: list[str] = []
+    for raw in value.split(","):
+        item = raw.strip()
+        parts = urlsplit(item)
+        if parts.scheme != "https" or not parts.netloc or parts.path != path or parts.query or parts.fragment:
+            continue
+        if item != main and item not in out:
+            out.append(item)
+    return out
+
+
+def _host_of(value: str | None) -> str:
+    """A host name without port, lower case, from a Host or X-Forwarded-Host header (the first one when several are listed) (pure)."""
+    first = (value or "").split(",")[0].strip().lower()
+    return first.rsplit(":", 1)[0] if first.count(":") == 1 else first
+
+
+def pick_redirect(cfg: SsoConfig, host: str | None) -> str:
+    """The redirect address for the address the person is using: the configured one whose host matches, else the main one. Only configured addresses can ever be chosen (pure)."""
+    wanted = _host_of(host)
+    for candidate in [cfg.redirect_uri, *cfg.extra_redirects]:
+        if wanted and urlsplit(candidate).hostname == wanted:
+            return candidate
+    return cfg.redirect_uri
+
+
+def web_for(cfg: SsoConfig, redirect: str) -> str:
+    """Where the browser is sent back to after sign-in: the main web address for the main redirect, else the origin of the extra one it came in by (pure)."""
+    if redirect == cfg.redirect_uri or redirect not in cfg.extra_redirects:
+        return cfg.web_url
+    parts = urlsplit(redirect)
+    return f"{parts.scheme}://{parts.netloc}"
 
 
 def password_login_allowed(role: str, env: dict[str, str] | None = None) -> bool:
@@ -356,15 +397,19 @@ async def sso_status() -> SsoStatus:
 
 
 @router.get("/microsoft/login")
-async def microsoft_login(next: str | None = Query(default=None, max_length=300)) -> Response:  # noqa: A002
+async def microsoft_login(request: Request = None, next: str | None = Query(default=None, max_length=300)) -> Response:  # noqa: A002
     cfg = load_config()
     if cfg is None:
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Sign in with Microsoft is not set up.")
     state = secrets.token_urlsafe(32)
     nonce = secrets.token_urlsafe(32)
     verifier, challenge = _pkce()
+    headers = request.headers if request is not None else {}
+    redirect = pick_redirect(cfg, headers.get("x-forwarded-host") or headers.get("host"))
     try:
-        await _put(f"aisoc:sso:state:{state}", {"nonce": nonce, "verifier": verifier, "next": safe_next(next)}, STATE_TTL)
+        await _put(
+            f"aisoc:sso:state:{state}", {"nonce": nonce, "verifier": verifier, "next": safe_next(next), "redirect_uri": redirect}, STATE_TTL
+        )
     except Unavailable:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Sign-in is temporarily unavailable. Try again in a moment."
@@ -373,7 +418,7 @@ async def microsoft_login(next: str | None = Query(default=None, max_length=300)
         {
             "client_id": cfg.client_id,
             "response_type": "code",
-            "redirect_uri": cfg.redirect_uri,
+            "redirect_uri": redirect,
             "response_mode": "query",
             "scope": "openid profile email",
             "state": state,
@@ -386,8 +431,8 @@ async def microsoft_login(next: str | None = Query(default=None, max_length=300)
     return RedirectResponse(f"{AUTHORITY}/{cfg.tenant_id}/oauth2/v2.0/authorize?{query}", status_code=302)
 
 
-def _back_to_login(cfg: SsoConfig, **params: str) -> RedirectResponse:
-    return RedirectResponse(f"{cfg.web_url}/login?{urlencode(params)}", status_code=302)
+def _back_to_login(cfg: SsoConfig, web: str | None = None, **params: str) -> RedirectResponse:
+    return RedirectResponse(f"{web or cfg.web_url}/login?{urlencode(params)}", status_code=302)
 
 
 @router.get("/microsoft/callback")
@@ -408,9 +453,12 @@ async def microsoft_callback(
         return _back_to_login(cfg, sso_error="unavailable")
     if saved is None:  # unknown, already used or expired: a replay or a stale tab
         return _back_to_login(cfg, sso_error="state")
+    saved_redirect = str(saved.get("redirect_uri", ""))
+    redirect = saved_redirect if saved_redirect in [cfg.redirect_uri, *cfg.extra_redirects] else cfg.redirect_uri
+    web = web_for(cfg, redirect)
     if error or not code:
         logger.info("sso.microsoft_refused error=%s", (error or "no code")[:60])
-        return _back_to_login(cfg, sso_error="denied")
+        return _back_to_login(cfg, web, sso_error="denied")
 
     try:
         status_code, tokens = await _post_form(
@@ -418,7 +466,7 @@ async def microsoft_callback(
             {
                 "grant_type": "authorization_code",
                 "code": code,
-                "redirect_uri": cfg.redirect_uri,
+                "redirect_uri": redirect,
                 "client_id": cfg.client_id,
                 "client_secret": cfg.client_secret,
                 "code_verifier": str(saved.get("verifier", "")),
@@ -427,10 +475,10 @@ async def microsoft_callback(
         )
     except (httpx.HTTPError, OSError) as exc:
         logger.warning("sso.token_exchange_unreachable err=%s", type(exc).__name__)
-        return _back_to_login(cfg, sso_error="unavailable")
+        return _back_to_login(cfg, web, sso_error="unavailable")
     if status_code != 200 or not tokens.get("id_token"):
         logger.warning("sso.token_exchange_refused status=%s error=%s", status_code, str(tokens.get("error"))[:60])
-        return _back_to_login(cfg, sso_error="token")
+        return _back_to_login(cfg, web, sso_error="token")
 
     try:
         claims = await verify_id_token(cfg, str(tokens["id_token"]), str(saved.get("nonce", "")))
@@ -439,11 +487,11 @@ async def microsoft_callback(
     except SsoFailure as failure:
         logger.warning("sso.microsoft_refused reason=%s detail=%s", failure.code, str(failure)[:160])
         await db.rollback()
-        return _back_to_login(cfg, sso_error=failure.code)
+        return _back_to_login(cfg, web, sso_error=failure.code)
     except (httpx.HTTPError, OSError, KeyError) as exc:
         logger.warning("sso.microsoft_unavailable err=%s", type(exc).__name__)
         await db.rollback()
-        return _back_to_login(cfg, sso_error="unavailable")
+        return _back_to_login(cfg, web, sso_error="unavailable")
 
     await db.execute(update(User).where(User.id == user.id).values(last_login=datetime.now(UTC)))
     await emit_audit(
@@ -462,8 +510,8 @@ async def microsoft_callback(
     try:
         await _put(f"aisoc:sso:code:{one_time}", tokens_for(user), CODE_TTL)
     except Unavailable:
-        return _back_to_login(cfg, sso_error="unavailable")
-    return _back_to_login(cfg, sso=one_time, next=safe_next(str(saved.get("next", "/"))))
+        return _back_to_login(cfg, web, sso_error="unavailable")
+    return _back_to_login(cfg, web, sso=one_time, next=safe_next(str(saved.get("next", "/"))))
 
 
 class ExchangeRequest(BaseModel):
