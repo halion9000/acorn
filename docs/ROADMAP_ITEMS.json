@@ -1527,8 +1527,10 @@
     "key": "r7-af-30",
     "title": "Posture: a client comparison against the fleet median",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 8ac136e7",
+    "note": "2026-11-16: median line and Vs median column on Fleet Posture, from the clients' current scores. Not a per-client page, and no history."
   },
   {
     "key": "r7-af-31",
