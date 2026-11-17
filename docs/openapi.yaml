@@ -15116,6 +15116,129 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/access-reviews/schedules:
+    get:
+      tags:
+      - compliance
+      summary: The reviews that start themselves, one per system
+      operationId: list_schedules_api_v1_compliance_access_reviews_schedules_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScheduleOut'
+                title: Response List Schedules Api V1 Compliance Access Reviews Schedules
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - compliance
+      summary: Start a review of a system by itself every so many days (one schedule
+        per system)
+      operationId: put_schedule_api_v1_compliance_access_reviews_schedules_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleIn'
+            example:
+              system: Microsoft 365
+              reviewer: Dana Reyes
+              every_days: 90
+              enabled: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/access-reviews/schedules/{schedule_id}:
+    delete:
+      tags:
+      - compliance
+      summary: Stop a review starting itself
+      operationId: delete_schedule_api_v1_compliance_access_reviews_schedules__schedule_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: schedule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Schedule Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/access-reviews/{review_id}:
     get:
       tags:
@@ -56466,6 +56589,85 @@ components:
       - findings_closed
       - error_message
       title: ScanRunOut
+    ScheduleIn:
+      properties:
+        system:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: System
+        reviewer:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Reviewer
+        every_days:
+          type: integer
+          maximum: 400.0
+          minimum: 7.0
+          title: Every Days
+          default: 90
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+        first_start:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: First Start
+      type: object
+      required:
+      - system
+      title: ScheduleIn
+    ScheduleOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        system:
+          type: string
+          title: System
+        reviewer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reviewer
+        every_days:
+          type: integer
+          title: Every Days
+        next_start:
+          type: string
+          format: date
+          title: Next Start
+        enabled:
+          type: boolean
+          title: Enabled
+        last_review_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Last Review Id
+        last_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Error
+      type: object
+      required:
+      - id
+      - system
+      - reviewer
+      - every_days
+      - next_start
+      - enabled
+      - last_review_id
+      - last_error
+      title: ScheduleOut
     ScoreBreakdownOut:
       properties:
         client_id:

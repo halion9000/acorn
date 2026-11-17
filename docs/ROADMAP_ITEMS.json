@@ -925,8 +925,9 @@
     "key": "r7-ai-28",
     "title": "Access reviews that start themselves every quarter",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-17: per-system repeat (default 90 days), hourly worker starts due reviews, name Qn YYYY, due +30 days; migration 206."
   },
   {
     "key": "r7-ai-29",

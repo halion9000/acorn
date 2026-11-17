@@ -308,6 +308,10 @@ class Settings(BaseSettings):
     # (RETENTION_RESPONSE_ACTIONS_DEFAULT_DAYS when the tenant has set none). Alerts are swept only when RETENTION_ALERTS_DAYS is set above 0 (default 0: never); the raw-event lake has its own TTL.
     # ------------------------------------------------------------------
     RETENTION_SWEEPER_ENABLED: bool = True
+    # Access reviews that start themselves (app/workers/access_review_scheduler.py): hourly, it starts every review whose schedule (Access Reviews, Repeat) has come due.
+    ACCESS_REVIEW_SCHEDULER_ENABLED: bool = True
+    ACCESS_REVIEW_SCHEDULER_INTERVAL_SECONDS: int = 3600
+    ACCESS_REVIEW_SCHEDULER_INITIAL_DELAY_SECONDS: int = 120
     RETENTION_DRY_RUN: bool = False
     # The platform watching itself (app/workers/platform_watch_worker.py): every five minutes it checks that CORE is still reporting, that connectors that had events have not gone quiet, and that the server has disk and memory left, and emails the alert-email recipients about changes. On by default;
     # it sends mail only when recipients and the Graph credentials above are set, and always logs changes. A connector counts as quiet after PLATFORM_WATCH_CONNECTOR_SILENT_HOURS without an event (a quiet client can legitimately have none for hours).

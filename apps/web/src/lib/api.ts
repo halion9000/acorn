@@ -8121,7 +8121,24 @@ export const accessReviewsApi = {
   decideAll: (clientId: string, id: string, decision: 'keep' | 'remove', onlyUnflagged = true) =>
     request<AccessReviewDetail>(`/api/v1/compliance/access-reviews/${encodeURIComponent(id)}/decide-all?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify({ decision, only_unflagged: onlyUnflagged }) }),
   complete: (clientId: string, id: string) => request<AccessReviewDetail>(`/api/v1/compliance/access-reviews/${encodeURIComponent(id)}/complete?${riskQs(clientId)}`, { method: 'POST' }),
+  schedules: (clientId: string) => request<AccessReviewSchedule[]>(`/api/v1/compliance/access-reviews/schedules?${riskQs(clientId)}`),
+  saveSchedule: (clientId: string, body: { system: string; reviewer?: string | null; every_days: number; enabled: boolean; first_start?: string | null }) =>
+    request<AccessReviewSchedule>(`/api/v1/compliance/access-reviews/schedules?${riskQs(clientId)}`, { method: 'PUT', body: JSON.stringify(body) }),
+  removeSchedule: (clientId: string, id: string) =>
+    request<void>(`/api/v1/compliance/access-reviews/schedules/${encodeURIComponent(id)}?${riskQs(clientId)}`, { method: 'DELETE' }),
 };
+
+/** A review of one system that starts itself every so many days (GET /api/v1/compliance/access-reviews/schedules). */
+export interface AccessReviewSchedule {
+  id: string;
+  system: string;
+  reviewer: string | null;
+  every_days: number;
+  next_start: string;
+  enabled: boolean;
+  last_review_id: string | null;
+  last_error: string | null;
+}
 
 /** Controls of the frameworks that are on, with their health (GET /api/v1/compliance/controls). */
 export interface ControlRowT {

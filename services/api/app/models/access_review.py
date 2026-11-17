@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,3 +47,21 @@ class AccessReviewEntry(Base):
     note: Mapped[str] = mapped_column(Text, nullable=False, default="")
     decided_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AccessReviewSchedule(Base):
+    """A review of one system that starts itself every ``every_days`` days (migration 206)."""
+
+    __tablename__ = "access_review_schedules"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    system: Mapped[str] = mapped_column(String, nullable=False)
+    reviewer: Mapped[str | None] = mapped_column(String, nullable=True)
+    every_days: Mapped[int] = mapped_column(Integer, nullable=False, default=90)
+    next_start: Mapped[date] = mapped_column(Date, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_review_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

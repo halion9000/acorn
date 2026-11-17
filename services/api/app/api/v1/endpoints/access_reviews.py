@@ -17,15 +17,15 @@ from sqlalchemy import func, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
-from app.models.access_review import AccessReview, AccessReviewEntry
+from app.models.access_review import AccessReview, AccessReviewEntry, AccessReviewSchedule
 from app.models.identity_source import IdentitySource
 from app.models.signin import IdentityMfaUser
+from app.services import access_review_schedule as schedule
 from app.services import access_reviews as rules
 from app.services import compliance_audit as audit
+from app.services.access_review_start import M365, create_review, snapshot_lines
 
 router = APIRouter(prefix="/compliance/access-reviews", tags=["compliance"])
-
-M365 = "Microsoft 365"
 
 
 class SystemChoice(BaseModel):
@@ -201,51 +201,131 @@ async def start_review(
     body: ReviewIn, tenant: ScopeTenant, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("reports:write"))]
 ) -> ReviewDetail:
     system = body.system.strip()
-    if system == M365:
-        users = (await db.execute(select(IdentityMfaUser).where(IdentityMfaUser.tenant_id == tenant))).scalars().all()
-        lines = rules.entries_from_mfa_users(list(users))
-    elif body.people:
-        lines = rules.entries_from_names(body.people, system)
-    else:
-        rows = (
-            (await db.execute(select(IdentitySource).where(IdentitySource.tenant_id == tenant, IdentitySource.vendor == system)))
-            .scalars()
-            .all()
-        )
-        lines = rules.entries_from_identities(list(rows), system)
+    lines = await snapshot_lines(db, tenant, system, body.people)
     if not lines:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"There are no people to review for {system}. Type the names in, or choose a system A.C.O.R.N holds people for.",
         )
-    review = AccessReview(
-        id=uuid.uuid4(),
-        tenant_id=tenant,
+    review = await create_review(
+        db,
+        tenant,
         name=body.name.strip(),
         system=system,
         reviewer=body.reviewer,
         due_date=body.due_date,
         created_by=_actor(user),
-    )
-    db.add(review)
-    await db.flush()
-    for ln in lines:
-        db.add(
-            AccessReviewEntry(
-                id=uuid.uuid4(),
-                tenant_id=tenant,
-                review_id=review.id,
-                person=ln["person"],
-                name=ln["name"],
-                access=ln["access"],
-                flags=ln["flags"],
-            )
-        )
-    await audit.note(
-        db, tenant, user, "access_review:started", "access_review", review.id, name=review.name, system=review.system, people=len(lines)
+        lines=lines,
+        user=user,
     )
     await db.commit()
     return await _detail(db, tenant, review)
+
+
+class ScheduleIn(BaseModel):
+    system: str = Field(min_length=1, max_length=120)
+    reviewer: str | None = Field(default=None, max_length=200)
+    every_days: int = Field(default=90, ge=schedule.MIN_DAYS, le=schedule.MAX_DAYS)  # 90 is a quarter
+    enabled: bool = True
+    first_start: date | None = None  # the day the first review starts; today plus the interval when left out
+
+
+class ScheduleOut(BaseModel):
+    id: uuid.UUID
+    system: str
+    reviewer: str | None
+    every_days: int
+    next_start: date
+    enabled: bool
+    last_review_id: uuid.UUID | None
+    last_error: str | None
+
+
+def _schedule_out(r: AccessReviewSchedule) -> ScheduleOut:
+    return ScheduleOut(
+        id=r.id,
+        system=r.system,
+        reviewer=r.reviewer,
+        every_days=r.every_days,
+        next_start=r.next_start,
+        enabled=r.enabled,
+        last_review_id=r.last_review_id,
+        last_error=r.last_error,
+    )
+
+
+@router.get("/schedules", response_model=list[ScheduleOut], summary="The reviews that start themselves, one per system")
+async def list_schedules(
+    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+) -> list[ScheduleOut]:
+    rows = (
+        (
+            await db.execute(
+                select(AccessReviewSchedule).where(AccessReviewSchedule.tenant_id == tenant).order_by(AccessReviewSchedule.system)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [_schedule_out(r) for r in rows]
+
+
+@router.put(
+    "/schedules", response_model=ScheduleOut, summary="Start a review of a system by itself every so many days (one schedule per system)"
+)
+async def put_schedule(
+    body: ScheduleIn, tenant: ScopeTenant, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("reports:write"))]
+) -> ScheduleOut:
+    today = datetime.now(UTC).date()
+    system = body.system.strip()
+    if not system:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Name the system to review.")
+    if body.first_start is not None and body.first_start < today:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The first start day has already passed.")
+    row = (
+        await db.execute(
+            select(AccessReviewSchedule).where(AccessReviewSchedule.tenant_id == tenant, AccessReviewSchedule.system == system)
+        )
+    ).scalar_one_or_none()
+    start = body.first_start or schedule.next_start_after(today, body.every_days)
+    if row is None:
+        row = AccessReviewSchedule(id=uuid.uuid4(), tenant_id=tenant, system=system, created_by=_actor(user), next_start=start)
+        db.add(row)
+    elif body.first_start is not None or row.every_days != body.every_days:
+        row.next_start = start
+    row.reviewer = body.reviewer
+    row.every_days = body.every_days
+    row.enabled = body.enabled
+    row.last_error = None
+    await audit.note(
+        db,
+        tenant,
+        user,
+        "access_review_schedule:saved",
+        "access_review_schedule",
+        row.id,
+        system=system,
+        every_days=body.every_days,
+        enabled=body.enabled,
+    )
+    await db.commit()
+    return _schedule_out(row)
+
+
+@router.delete("/schedules/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Stop a review starting itself")
+async def delete_schedule(
+    schedule_id: uuid.UUID, tenant: ScopeTenant, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("reports:write"))]
+) -> None:
+    row = (
+        await db.execute(
+            select(AccessReviewSchedule).where(AccessReviewSchedule.id == schedule_id, AccessReviewSchedule.tenant_id == tenant)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such schedule.")
+    await audit.note(db, tenant, user, "access_review_schedule:removed", "access_review_schedule", row.id, system=row.system)
+    await db.delete(row)
+    await db.commit()
 
 
 @router.get("/{review_id}", response_model=ReviewDetail, summary="One review with every person and the decision for each")

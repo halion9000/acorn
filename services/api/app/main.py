@@ -26,9 +26,9 @@ from app.core.api_rate_limit import RateLimitMiddleware
 from app.core.config import enforce_secure_defaults, is_dev_env, settings
 from app.core.core_feed_token import CoreFeedTokenMiddleware
 from app.core.cors import build_cors_kwargs
-from app.core.openapi_examples import add_request_examples
 from app.core.db_errors import register_db_error_handlers
 from app.core.logging import configure_logging
+from app.core.openapi_examples import add_request_examples
 from app.core.scheduler_lock import scheduler_lock
 from app.core.telemetry import instrument_app
 from app.db.clickhouse import close_clickhouse
@@ -40,6 +40,7 @@ from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.demo_mode import DemoModeMiddleware
 from app.models import Base
 from app.services.plugin_manager import get_plugin_manager
+from app.workers.access_review_scheduler import run_access_review_scheduler
 from app.workers.alert_email_worker import run_forever as run_alert_email
 from app.workers.dmarc_ingest_worker import run_dmarc_ingest
 from app.workers.hunt_scheduler import run_forever as run_hunt_scheduler
@@ -449,6 +450,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             logger.warning("retention_sweeper worker failed to start", error=str(exc))
 
+    # Access reviews that start themselves every quarter (or whatever each schedule says): app/workers/access_review_scheduler.py.
+    access_review_task: asyncio.Task | None = None
+    if settings.ACCESS_REVIEW_SCHEDULER_ENABLED:
+        try:
+            access_review_task = asyncio.create_task(
+                _run_guarded_scheduler_worker(
+                    job_name="access_review_scheduler", ttl_seconds=_RETENTION_LOCK_TTL_SECONDS, worker=run_access_review_scheduler
+                ),
+                name="access_review_scheduler_worker",
+            )
+            logger.info("access_review_scheduler worker started")
+        except Exception as exc:
+            logger.warning("access_review_scheduler worker failed to start", error=str(exc))
+
     # The platform watching itself: CORE gone quiet, connectors gone quiet, low disk or memory. Emails the alert-email recipients about changes (app/workers/platform_watch_worker.py).
     platform_watch_task: asyncio.Task | None = None
     if settings.PLATFORM_WATCH_ENABLED:
@@ -588,6 +603,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     if dry_run_task is not None and not dry_run_task.done():
         dry_run_task.cancel()
+    if access_review_task is not None and not access_review_task.done():
+        access_review_task.cancel()
+        try:
+            await access_review_task
+        except asyncio.CancelledError:
+            logger.debug("access_review_scheduler worker cancelled during shutdown")
     if retention_task is not None and not retention_task.done():
         retention_task.cancel()
         try:

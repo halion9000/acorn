@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
+import { AccessReviewSchedules } from './AccessReviewSchedules';
 import { accessReviewsApi, apiErrorDetail, type AccessReviewDetail, type AccessReviewList } from '@/lib/api';
 
 const field = 'rounded border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100';
@@ -152,6 +153,7 @@ export function AccessReviewsView() {
           Start a review
         </button>
       </div>
+      {data && <AccessReviewSchedules clientId={clientId} systems={data.systems.map((s) => s.system)} />}
       {starting && data && (
         <form
           className="space-y-3 rounded-lg border border-gray-700 bg-gray-900/60 p-4"
