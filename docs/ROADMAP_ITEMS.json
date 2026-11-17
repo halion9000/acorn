@@ -716,7 +716,7 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
     "needs": "claude",
-    "note": "2026-11-16: not a database query plan: the devices list is built in Python from a cached load of every device, so a plan test does not apply. The scaling question needs a redesign (paging in the database)."
+    "note": "2026-11-16 looked at, not done: the devices list does not run a per-page query that a plan test could judge. It loads every device of the scope into memory (with a cache) and filters and pages in Python, so a query-plan test would only show an ordinary tenant index scan. The real cost is that load; fixing it means moving the filters into SQL, which is a design change for Hal to approve."
   },
   {
     "key": "r7-ai-03",
