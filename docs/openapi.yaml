@@ -2556,7 +2556,7 @@ paths:
         required: true
         schema:
           type: string
-          pattern: ^d{4}-d{2}$
+          pattern: ^\d{4}-\d{2}$
           title: Month
       responses:
         '200':
@@ -32135,6 +32135,12 @@ components:
           type: boolean
           title: Already Released
           default: false
+        data:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Data
       type: object
       required:
       - status
@@ -37618,6 +37624,7 @@ components:
           - sc_command
           - ninja_deploy
           - halo_billing_update
+          - user_lookup
           title: Action
         incident_uid:
           type: string
@@ -52472,6 +52479,14 @@ components:
           type: array
           maxItems: 60000
           title: Hours
+        tickets:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ProfitTicketIn'
+            type: array
+            maxItems: 40000
+          - type: 'null'
+          title: Tickets
         agents:
           items:
             $ref: '#/components/schemas/ProfitAgentIn'
@@ -52502,6 +52517,49 @@ components:
       - hours
       - agents
       title: ProfitSnapshotOut
+    ProfitTicketIn:
+      properties:
+        client:
+          type: string
+          maxLength: 200
+          title: Client
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        ticket_id:
+          type: string
+          pattern: ^[0-9]{1,12}$
+          title: Ticket Id
+        summary:
+          type: string
+          maxLength: 200
+          title: Summary
+          default: ''
+        hours:
+          type: number
+          maximum: 100000.0
+          minimum: 0.0
+          title: Hours
+        entries:
+          type: integer
+          maximum: 100000.0
+          minimum: 0.0
+          title: Entries
+          default: 1
+        agent_ids:
+          items:
+            type: string
+          type: array
+          maxItems: 10
+          title: Agent Ids
+      type: object
+      required:
+      - client
+      - month
+      - ticket_id
+      - hours
+      title: ProfitTicketIn
     ProposalIn:
       properties:
         agent:

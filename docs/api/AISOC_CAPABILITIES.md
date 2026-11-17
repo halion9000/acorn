@@ -81,7 +81,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | [ledger](#ledger) | 1 | 3 | `cases:read`, `cases:write` |
 | [livez](#livez) | 1 | 0 | 1 with no sign-in required |
 | [llm](#llm) | 2 | 2 | `settings_deployment:manage`, `settings_deployment:view` |
-| [me](#me) | 1 | 1 | `alerts:read` |
+| [me](#me) | 1 | 1 | `alerts:read`, `reports:read` |
 | [metrics](#metrics) | 5 | 0 | `alerts:read`; 1 with no sign-in required |
 | [mssp](#mssp) | 18 | 30 | `clients:view`, `mssp:manage`, `mssp:onboard`, `mssp:read`, `users:write` |
 | [nist-coverage](#nist-coverage) | 1 | 0 | `alerts:read` |
@@ -1096,7 +1096,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | Method | Path | What it does | Permission |
 | --- | --- | --- | --- |
 | GET | `/me/policies` | The policies assigned to me, with their text and whether I have accepted the newest version | `alerts:read` |
-| POST | `/me/policies/{item_id}/accept` | Accept the newest version of a policy assigned to me | `alerts:read` |
+| POST | `/me/policies/{item_id}/accept` | Accept the newest version of a policy assigned to me | `reports:read` |
 
 ## metrics
 

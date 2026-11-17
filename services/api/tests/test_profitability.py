@@ -274,3 +274,35 @@ def test_the_client_breakdown_route_accepts_a_real_month_and_the_per_client_mont
     pattern = month["schema"]["pattern"]
     assert re.fullmatch(pattern, "2026-11"), pattern
     assert not re.fullmatch(pattern, "dddd-dd") and not re.fullmatch(pattern, "2026-1")
+
+
+def test_the_tickets_behind_a_clients_hours_are_listed_most_hours_first_with_who_worked_them_and_the_hours_not_on_a_listed_ticket():
+    """Acme's October hours are 6.5: Dan 4.0 and Vic 2.5. CORE listed three tickets for 4.5 h (the most-worked); the other 2.0 h are on tickets it did not list."""
+    tickets = [
+        {"client": "Acme Dental, Inc.", "month": "2026-10", "ticket_id": "700", "summary": "Quarterly review", "hours": 2.5, "entries": 2, "agent_ids": ["41", "40"]},
+        {"client": "Acme Dental Inc", "month": "2026-10", "ticket_id": "9", "summary": "Printer offline", "hours": 1.5, "entries": 1, "agent_ids": ["40"]},
+        {"client": "Acme Dental, Inc.", "month": "2026-10", "ticket_id": "12", "summary": "VPN", "hours": 0.5, "entries": 1, "agent_ids": ["93"]},
+        {"client": "Acme Dental, Inc.", "month": "2026-09", "ticket_id": "5", "summary": "Last month", "hours": 9, "entries": 1, "agent_ids": ["40"]},
+        {"client": "Birch Law", "month": "2026-10", "ticket_id": "6", "summary": "Not Acme", "hours": 9, "entries": 1, "agent_ids": ["40"]},
+    ]
+    b = p.client_breakdown({**SNAP, "tickets": tickets}, LINES, HALO, [], "5", "2026-10")
+    assert b is not None
+    assert [(t["ticket_id"], t["summary"], t["hours"], t["entries"], t["agents"]) for t in b["tickets"]["rows"]] == [
+        ("700", "Quarterly review", 2.5, 2, ["Vic Cio", "Dan Kemp"]),
+        ("9", "Printer offline", 1.5, 1, ["Dan Kemp"]),
+        ("12", "VPN", 0.5, 1, ["Former agent 93"]),
+    ]
+    assert b["tickets"]["other_hours"] == 2.0, "6.5 hours worked, 4.5 on the listed tickets"
+    assert p.client_breakdown({**SNAP, "tickets": []}, LINES, HALO, [], "5", "2026-10")["tickets"] == {"rows": [], "other_hours": 6.5}
+    assert p.client_breakdown({**SNAP, "tickets": None}, LINES, HALO, [], "5", "2026-10")["tickets"] is None, "an older CORE sends none: said so, not shown as zero"
+
+
+def test_the_profitability_post_accepts_ticket_rows_and_an_older_core_without_them():
+    from app.api.v1.endpoints.inbox_core_feed import ProfitSnapshotIn
+
+    base = {"months": ["2026-10"], "invoices": [], "hours": [], "agents": []}
+    assert ProfitSnapshotIn(**base).tickets is None
+    with_rows = ProfitSnapshotIn(**base, tickets=[{"client": "Acme", "month": "2026-10", "ticket_id": "700", "summary": "x", "hours": 1.5, "entries": 2, "agent_ids": ["40"]}])
+    assert with_rows.tickets[0].ticket_id == "700"
+    with pytest.raises(ValueError):
+        ProfitSnapshotIn(**base, tickets=[{"client": "Acme", "month": "2026-10", "ticket_id": "abc", "hours": 1}])

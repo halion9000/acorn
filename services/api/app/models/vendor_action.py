@@ -27,6 +27,7 @@ class VendorAction(Base):
     status: Mapped[str] = mapped_column(String(12), default="pending", nullable=False)
     requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     result_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # the structured answer of a read request (migration 208)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

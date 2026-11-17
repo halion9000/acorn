@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { ClientProfitDetail, linesNote, type ClientDetail } from './ClientProfitDetail';
+import { ClientProfitDetail, linesNote, ticketsNote, type ClientDetail } from './ClientProfitDetail';
 
 const detail = (over: Partial<ClientDetail> = {}): ClientDetail => ({
   client_id: '5', client_name: 'Acme Dental', month: '2026-10', revenue: 1000, invoices: 2,
@@ -21,6 +21,41 @@ const detail = (over: Partial<ClientDetail> = {}): ClientDetail => ({
   tickets: null, invoice_lines_received_at: '2026-11-16T10:00:00Z', ...over,
 });
 const answer = (b: unknown, status = 200) => Promise.resolve({ ok: status < 300, status, json: () => Promise.resolve(b) });
+
+describe('the tickets behind the hours', () => {
+  beforeEach(() => authFetch.mockReset());
+  afterEach(() => cleanup());
+
+  it('words how many tickets are shown and the hours that are on tickets not listed', () => {
+    expect(ticketsNote({ rows: [], other_hours: 0 })).toBe('No hours were worked on tickets this month.');
+    expect(ticketsNote({ rows: [{ ticket_id: '1', summary: 'a', hours: 1, entries: 1, agents: [] }], other_hours: 0 })).toBe('1 ticket shown, the most-worked first.');
+    expect(ticketsNote({ rows: [{ ticket_id: '1', summary: 'a', hours: 1, entries: 1, agents: [] }, { ticket_id: '2', summary: 'b', hours: 1, entries: 1, agents: [] }], other_hours: 2.5 })).toBe(
+      '2 tickets shown, the most-worked first. 2.5 more hours are on other tickets that are not listed.',
+    );
+  });
+
+  it('lists each ticket with its number, subject, hours and who worked it', async () => {
+    authFetch.mockImplementation(() =>
+      answer(
+        detail({
+          tickets: {
+            rows: [
+              { ticket_id: '700', summary: 'Quarterly review', hours: 2.5, entries: 2, agents: ['Vic Cio', 'Dan Kemp'] },
+              { ticket_id: '12', summary: '', hours: 0.5, entries: 1, agents: ['Former agent 93'] },
+            ],
+            other_hours: 3.5,
+          },
+        }),
+      ),
+    );
+    render(<ClientProfitDetail clientId="5" month="2026-10" onClose={() => {}} />);
+    const table = await screen.findByTestId('detail-ticket-rows');
+    expect(within(table).getByText('#700').closest('tr')).toHaveTextContent('Quarterly review');
+    expect(within(table).getByText('#700').closest('tr')).toHaveTextContent('Vic Cio, Dan Kemp');
+    expect(within(table).getByText('#12').closest('tr')).toHaveTextContent('(no subject)');
+    expect(screen.getByTestId('detail-tickets')).toHaveTextContent('3.5 more hours are on other tickets');
+  });
+});
 
 describe('the client detail under Profitability', () => {
   beforeEach(() => {

@@ -75,7 +75,7 @@ A.C.O.R.N has **929** operations in **118** areas. This is a MAP, not a list of 
 - **ledger**: 1 reads, 3 changes; protection: `cases:read`, `cases:write`; e.g. Unpublish replay; Publish replay
 - **livez**: 1 reads, 0 changes; protection: 1 with no sign-in required; e.g. Livez
 - **llm**: 2 reads, 2 changes; protection: `settings_deployment:manage`, `settings_deployment:view`; e.g. Remove the tenant's BYOK LLM credential; Read the tenant's BYOK LLM credential
-- **me**: 1 reads, 1 changes; protection: `alerts:read`; e.g. The policies assigned to me, with their text and whether I have accepted the newest version; Accept the newest version of a policy assigned to me
+- **me**: 1 reads, 1 changes; protection: `alerts:read`, `reports:read`; e.g. The policies assigned to me, with their text and whether I have accepted the newest version; Accept the newest version of a policy assigned to me
 - **metrics**: 5 reads, 0 changes; protection: `alerts:read`; 1 with no sign-in required; e.g. Metrics; Get alert trend
 - **mssp**: 18 reads, 30 changes; protection: `clients:view`, `mssp:manage`, `mssp:onboard`, `mssp:read`, `users:write`; e.g. Reroute existing alerts; List child tenants
 - **nist-coverage**: 1 reads, 0 changes; protection: `alerts:read`; e.g. NIST CSF 2.0 controls with how one client stands, from live checks

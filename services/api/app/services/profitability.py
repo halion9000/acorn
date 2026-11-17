@@ -175,6 +175,26 @@ def _f(v: Any) -> float:
         return 0.0
 
 
+def _tickets_behind(rows: Any, month: str, key: str, agents: dict[str, Any], hours_total: Decimal) -> dict[str, Any] | None:
+    """The tickets one client's hours in a month went on, most hours first, and the hours not on a listed ticket. None when CORE has not sent ticket-level time (an older CORE)."""
+    if rows is None:
+        return None
+    mine = [t for t in rows if str(t.get("month")) == month and name_key(t.get("client")) == key]
+    listed = [
+        {
+            "ticket_id": str(t.get("ticket_id") or ""),
+            "summary": str(t.get("summary") or ""),
+            "hours": round(_f(t.get("hours")), 2),
+            "entries": int(t.get("entries") or 0),
+            "agents": [str((agents.get(str(a)) or {}).get("name") or f"Former agent {a}") for a in (t.get("agent_ids") or [])],
+        }
+        for t in mine
+    ]
+    listed.sort(key=lambda t: (-t["hours"], int(t["ticket_id"] or 0)))
+    other = round(max(0.0, float(hours_total) - sum(t["hours"] for t in listed)), 2)
+    return {"rows": listed, "other_hours": other}
+
+
 def client_breakdown(
     snapshot: dict[str, Any],
     lines_payload: dict[str, Any] | None,
@@ -257,5 +277,5 @@ def client_breakdown(
             ({"charge_type": k, "hours": v.quantize(Decimal("0.01"))} for k, v in by_charge.items()), key=lambda c: (-c["hours"], c["charge_type"])
         ),
         "recurring": sorted(recurring, key=lambda r: (-r["quantity"] * r["unit_price"], r["item"].lower())),
-        "tickets": None,
+        "tickets": _tickets_behind(snapshot.get("tickets"), month, key, agents, hours_total),
     }

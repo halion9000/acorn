@@ -9,6 +9,7 @@ any query, matching the pattern used by TenantDBSession in deps.py.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -47,6 +48,60 @@ async def _get_session(tenant_id: uuid.UUID) -> AsyncSession:
     mark_tenant(session, tenant_id)  # set_rls_context below lasts one transaction; the tag keeps the tenant across commits (step 4b)
     await set_rls_context(session, tenant_id)
     return session
+
+
+# --- Looking a person up through CORE ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# A.C.O.R.N has no CIPP, Huntress or Intune keys; CORE does. This queues one read-only request for CORE (see app/services/core_lookup.py) and waits for the answer: the person's sign-ins by country and day,
+# audit events, multi-factor setup, mailbox rules and devices with the network each last reported from. Needs identities:bec, the permission of the BEC search, because it reads one person's activity.
+LOOKUP_WAIT_SECONDS = 75.0
+LOOKUP_POLL_SECONDS = 1.5
+
+
+async def lookup_user(*, tenant_id: str, user_email: str = "", days: int = 30, request_id: str = "", user: Any = None) -> dict[str, Any]:
+    """Ask CORE to look one person up (their Microsoft 365 sign-ins, audit events, MFA, mailbox rules and devices). Needs identities:bec. Waits up to about 75 seconds; if CORE has not answered, returns a request_id to ask again with."""
+    from app.services import core_lookup as lk
+    from app.services.audit import emit_audit
+
+    try:
+        tid = uuid.UUID(tenant_id)
+    except ValueError:
+        return {"error": "invalid tenant_id"}
+    if request_id and str(request_id).strip():
+        async with await _get_session(tid) as db:
+            row = await lk.read_lookup(db, tid, request_id)
+        return lk.present(row) if row is not None else {"error": "No such lookup request."}
+    try:
+        upn = lk.clean_upn(user_email)
+    except lk.LookupRefused as exc:
+        return {"error": str(exc)}
+    window = lk.clamp_days(days)
+    async with await _get_session(tid) as db:
+        try:
+            row = await lk.queue_user_lookup(db, tid, getattr(user, "user_id", None), upn, window)
+        except lk.LookupRefused as exc:
+            return {"error": str(exc)}
+        await emit_audit(
+            db=db,
+            tenant_id=tid,
+            actor_id=getattr(user, "user_id", None),
+            actor_email=getattr(user, "email", None),
+            action="copilot:user_lookup",
+            resource="user",
+            resource_id=upn,
+            changes={"days": window},
+        )
+        await db.commit()
+        request = row.id
+    waited = 0.0
+    while True:
+        async with await _get_session(tid) as db:
+            row = await lk.read_lookup(db, tid, request)
+        if row is None:
+            return {"error": "The lookup request disappeared."}
+        if row.status not in lk.OPEN or waited >= LOOKUP_WAIT_SECONDS:
+            return lk.present(row)
+        await asyncio.sleep(LOOKUP_POLL_SECONDS)
+        waited += LOOKUP_POLL_SECONDS
 
 
 _SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
@@ -882,6 +937,22 @@ COPILOT_TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "lookup_user",
+            "description": "Look ONE person up through CORE, which holds the CIPP, Huntress and Intune connections: their Microsoft 365 sign-ins (by country, city, day, app, MFA and any country changes), directory audit events, multi-factor setup, mailbox rules, and their devices with the public address and network each last reported from (with where that address is and whether it is a VPN or proxy). Use it to investigate a named person: where they are working from, whether an account looks compromised, what changed on it. Give the person's e-mail address. It can take up to a minute; if it answers 'waiting', call it again with the same request_id. Sign-in logs can be unavailable for a client (the result says so); then say so rather than guessing.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_email": {"type": "string", "description": "The person's e-mail address, for example name@client.com."},
+                    "days": {"type": "integer", "description": "How many days back to look (1 to 30, default 30)."},
+                    "request_id": {"type": "string", "description": "Only to collect an earlier lookup that was still waiting: the request_id it returned."},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "delete_case",
             "description": "Not supported: cases cannot be deleted from the Copilot. To finish with a case, close or resolve it instead.",
             "parameters": {
@@ -913,6 +984,7 @@ _COPILOT_TOOL_DISPATCH: dict[str, Any] = {
     "delete_alert": delete_alert,
     "search_cases": search_cases,
     "delete_case": delete_case,
+    "lookup_user": lookup_user,
 }
 
 
@@ -1011,6 +1083,7 @@ TOOL_PERMISSIONS: dict[str, str] = {
     "delete_alert": "alerts:delete",
     "search_cases": "cases:read",
     "delete_case": "cases:delete",
+    "lookup_user": "identities:bec",
 }
 
 
@@ -1072,7 +1145,11 @@ async def execute_copilot_tool(name: str, args: dict[str, Any], tenant_id: str, 
     except HTTPException:
         return {"error": f"permission denied: {name} requires {needed}"}
     try:
-        result = await fn(tenant_id=tenant_id, **tolerant_args(fn, args))
+        kwargs = tolerant_args(fn, args)
+        kwargs.pop("user", None)  # never what the model says
+        if "user" in __import__("inspect").signature(fn).parameters:
+            kwargs["user"] = user  # the signed-in person who asked
+        result = await fn(tenant_id=tenant_id, **kwargs)
     except Exception as exc:  # noqa: BLE001
         return {"error": f"{type(exc).__name__}: {exc}"}
     if isinstance(result, dict) and _CONFIRM_KEY in result:

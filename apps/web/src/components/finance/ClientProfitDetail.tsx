@@ -24,7 +24,8 @@ export interface ClientDetail {
   by_agent: { agent_id: string; name: string; hours: number; rate: number; rate_source: string; cost: number }[];
   by_charge_type: { charge_type: string; hours: number }[];
   recurring: { item: string; quantity: number; unit_price: number; unit_cost: number; free: boolean; cost_per_run: number }[];
-  tickets: unknown[] | null;
+  /** The tickets the month's hours went on; null when CORE has not sent ticket-level time. */
+  tickets: { rows: { ticket_id: string; summary: string; hours: number; entries: number; agents: string[] }[]; other_hours: number } | null;
   invoice_lines_received_at: string | null;
 }
 
@@ -38,6 +39,13 @@ export function linesNote(d: Pick<ClientDetail, 'revenue' | 'invoice_lines' | 'i
   const gap = Math.round((d.revenue - d.invoice_lines_total) * 100) / 100;
   if (Math.abs(gap) < 1) return '';
   return `The lines add up to ${usd(d.invoice_lines_total)} and the row's revenue is ${usd(d.revenue)}: ${usd(Math.abs(gap))} ${gap > 0 ? 'more' : 'less'} than the lines. Invoice-level charges, a credit note or a line CORE does not read can cause that.`;
+}
+
+/** One sentence about the ticket list: how many are shown and the hours on tickets that are not (pure). */
+export function ticketsNote(t: NonNullable<ClientDetail['tickets']>): string {
+  if (t.rows.length === 0 && t.other_hours <= 0) return 'No hours were worked on tickets this month.';
+  const shown = `${t.rows.length} ticket${t.rows.length === 1 ? '' : 's'} shown, the most-worked first.`;
+  return t.other_hours > 0 ? `${shown} ${qty(t.other_hours)} more hours are on other tickets that are not listed.` : shown;
 }
 
 export function ClientProfitDetail({ clientId, month, onClose }: { clientId: string; month: string; onClose: () => void }) {
@@ -192,8 +200,30 @@ export function ClientProfitDetail({ clientId, month, onClose }: { clientId: str
           <div>
             <h3 className="text-sm font-medium text-gray-200">Tickets</h3>
             <p className="text-xs text-gray-500" data-testid="detail-tickets">
-              {d.tickets === null ? 'The tickets behind these hours are not sent by CORE yet, so only the people and charge types are shown.' : `${d.tickets.length} tickets.`}
+              {d.tickets === null ? 'The tickets behind these hours are not sent by CORE yet, so only the people and charge types are shown.' : ticketsNote(d.tickets)}
             </p>
+            {d.tickets !== null && d.tickets.rows.length > 0 && (
+              <table className="mt-2 w-full text-left text-sm" aria-label="Tickets behind the hours" data-testid="detail-ticket-rows">
+                <thead className="text-xs uppercase text-gray-500">
+                  <tr>
+                    <th className={cell}>Ticket</th>
+                    <th className={cell}>Subject</th>
+                    <th className={`${cell} text-right`}>Hours</th>
+                    <th className={cell}>Worked by</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800 text-gray-200">
+                  {d.tickets.rows.map((t) => (
+                    <tr key={t.ticket_id}>
+                      <td className={`${cell} tabular-nums`}>#{t.ticket_id}</td>
+                      <td className={cell}>{t.summary || '(no subject)'}</td>
+                      <td className={`${cell} text-right tabular-nums`}>{qty(t.hours)}</td>
+                      <td className={`${cell} text-xs text-gray-400`}>{t.agents.join(', ')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </>
       )}

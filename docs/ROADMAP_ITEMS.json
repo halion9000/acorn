@@ -1838,7 +1838,7 @@
     "area": "Metrics",
     "status": "in_progress",
     "needs": "claude",
-    "note": "2026-11-16 phase 1 done on Profitability: invoice lines billed and free, recurring lines, hours by person with the rate source. NOT DONE: the tickets behind the hours (CORE does not send ticket-level time yet) and the same click-through on the other client tables (Monthly invoicing, Ticket volume, Client summary).",
+    "note": "2026-11-16 phase 1 done on Profitability: invoice lines billed and free, recurring lines, hours by person with the rate source. NOT DONE: the tickets behind the hours (CORE does not send ticket-level time yet) and the same click-through on the other client tables (Monthly invoicing, Ticket volume, Client summary). 2026-11-17: CORE now sends the most-worked 15 tickets per client and month (subject, hours, who) and the drill-down lists them with the hours on other tickets; built locally, not live. The click-through on Monthly invoicing, Ticket volume and Client summary is still not built.",
     "completed_ref": "AiSOC e087c3cd"
   },
   {
@@ -1877,5 +1877,32 @@
     "status": "completed",
     "needs": "claude",
     "note": "2026-11-17. Migration 207, routes under /governance/{id}/assignments and /me/policies, an hourly reminder worker (needs the ALERT_EMAIL mail credentials), My policies page and a banner above every page. Client users (a client page of their own) come with the client-facing compliance item."
+  },
+  {
+    "key": "leafy-core-user-lookup",
+    "title": "Leafy can look a person up through CORE (sign-ins, audit, MFA, rules, devices, network)",
+    "detail": "Leafy had only client-level health summaries. Now it asks CORE, which holds CIPP, Huntress and Intune, for one person at a time (read only).",
+    "area": "copilot",
+    "status": "completed",
+    "needs": "claude",
+    "note": "2026-11-17: built and tested locally, NOT yet live (Hal asked to hold updates). A.C.O.R.N: migration 208, user_lookup action, lookup_user tool (identities:bec, 40 an hour, audited). CORE: acorn-user-lookup.ts. The sign-in log is unreadable for some tenants (Texas Advocacy Project answers 500 from Microsoft); the lookup says so. Not exposed to text-written tool calls."
+  },
+  {
+    "key": "metrics-halo-time-fix",
+    "title": "Metrics: hours were read with date parameters HaloPSA ignores (profitability and weekly labor hours)",
+    "detail": "Hal 2026-11-17: Net income costs looked wrong against finance workbooks. A.C.O.R.N held 807 hours for September against the workbook 4,060.",
+    "area": "finance",
+    "status": "completed",
+    "needs": "claude",
+    "note": "2026-11-17: cause found live: /api/TimesheetEvent reads start_date and end_date (end exclusive), not startdate/enddate, so every month got the newest days. Fixed in CORE (acorn-halo-time.ts), built and tested locally, NOT live until CORE is updated. September now 4,262 h vs workbook 4,060 (148 of 179 clients within 0.5 h; the rest is time entered after the workbook). STILL WRONG: team member ticket updates (HaloPSA /api/Actions only answers per ticket, so CORE bulk read is always empty: all zeros), and the cost columns (add-on software etc.) which come from QuickBooks and the License Database in the workbook."
+  },
+  {
+    "key": "finance-addon-software-from-licences",
+    "title": "Net income: add-on software per client from license counts and vendor bills (the workbook License Database method)",
+    "detail": "Workbook: add-on software = each client license count (Halo recurring lines) x cost per license, where cost per license = the vendor bill (QuickBooks) divided by all licenses of that vendor; items are split Ad-On or Support by the Software Master list. Needs vendor bills typed on the Inputs tab until QuickBooks is connected, the item-to-vendor-and-category list, and HaloPSA recurring lines (A.C.O.R.N holds none today: its recurring invoice snapshot has 0 clients).",
+    "area": "finance",
+    "status": "not_started",
+    "needs": "claude",
+    "note": "Found 2026-11-17 from the LO 2026.09 Profitability.xlsx sheets License Database, Software Cost, Software Master and Software Summary. First check why the recurring invoice read is empty."
   }
 ]

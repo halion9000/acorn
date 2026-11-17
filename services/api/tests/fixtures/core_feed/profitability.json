@@ -29,6 +29,19 @@
         "hours": 2.5
       }
     ],
+    "tickets": [
+      {
+        "client": "Acme Dental",
+        "month": "2026-10",
+        "ticket_id": "701",
+        "summary": "Printer offline",
+        "hours": 2.5,
+        "entries": 1,
+        "agent_ids": [
+          "40"
+        ]
+      }
+    ],
     "agents": [
       {
         "id": "40",

@@ -11,6 +11,7 @@ cannot write here. The report can only create or update this tenant's own ``core
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -587,6 +588,7 @@ class ClaimedAction(BaseModel):
         "sc_command",
         "ninja_deploy",
         "halo_billing_update",
+        "user_lookup",
     ]
     incident_uid: str
     params: dict[str, Any]
@@ -677,6 +679,10 @@ async def claim_core_feed_actions(tenant_token: str, body: ClaimRequest, db: DBS
     )
 
 
+# The most JSON a read request's answer may hold (CORE trims to well under this).
+MAX_RESULT_DATA_CHARS = 60_000
+
+
 class ActionResult(BaseModel):
     status: Literal["done", "failed"]
     message: str | None = Field(default=None, max_length=2000)
@@ -684,6 +690,15 @@ class ActionResult(BaseModel):
     ticket_id: str | None = Field(default=None, pattern=r"^[0-9]{1,12}$")
     # For a release_quarantine action: CORE looked first and the message had already been released by someone else, so it sent nothing.
     already_released: bool = False
+    # For a read request (user_lookup): the structured answer. Kept as sent, at most MAX_RESULT_DATA_CHARS of JSON.
+    data: dict[str, Any] | None = None
+
+    @field_validator("data")
+    @classmethod
+    def _data_is_small(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        if v is not None and len(json.dumps(v, default=str)) > MAX_RESULT_DATA_CHARS:
+            raise ValueError(f"data is longer than {MAX_RESULT_DATA_CHARS} characters")
+        return v
 
 
 class ActionResultResponse(BaseModel):
@@ -705,7 +720,7 @@ async def report_core_feed_action_result(
                 await db.execute(
                     update(VendorAction)
                     .where(VendorAction.id == action_id, VendorAction.tenant_id == tid, VendorAction.status == "claimed")
-                    .values(status=body.status, result_message=body.message, finished_at=now)
+                    .values(status=body.status, result_message=body.message, result_data=body.data, finished_at=now)
                     .returning(VendorAction.alert_id, VendorAction.action, VendorAction.params, VendorAction.incident_uid)
                 )
             ).first()
@@ -1172,6 +1187,16 @@ class ProfitHoursIn(BaseModel):
     hours: float = Field(ge=0, le=100000)
 
 
+class ProfitTicketIn(BaseModel):
+    client: str = Field(max_length=200)
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    ticket_id: str = Field(pattern=r"^[0-9]{1,12}$")
+    summary: str = Field(default="", max_length=200)
+    hours: float = Field(ge=0, le=100000)
+    entries: int = Field(default=1, ge=0, le=100000)
+    agent_ids: list[str] = Field(default_factory=list, max_length=10)
+
+
 class ProfitAgentIn(BaseModel):
     id: str = Field(min_length=1, max_length=20)
     name: str = Field(max_length=200)
@@ -1184,6 +1209,8 @@ class ProfitSnapshotIn(BaseModel):
     months: list[str] = Field(max_length=24)
     invoices: list[ProfitInvoiceMonthIn] = Field(max_length=20000)
     hours: list[ProfitHoursIn] = Field(max_length=60000)
+    # The tickets the hours went on (the most-worked per client and month). Absent from an older CORE: the breakdown then says they are not sent yet.
+    tickets: list[ProfitTicketIn] | None = Field(default=None, max_length=40000)
     agents: list[ProfitAgentIn] = Field(max_length=500)
 
 
