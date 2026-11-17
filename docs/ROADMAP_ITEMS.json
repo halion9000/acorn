@@ -1832,5 +1832,15 @@
     "status": "in_progress",
     "needs": "claude",
     "note": "2026-11-16: CORE now asks HaloPSA for disabled agents too, names the rest from their tickets (else Former agent N), and reports when actions come back unusable. NOT VERIFIED live: whether the actions then count."
+  },
+  {
+    "key": "metrics-billing-sync-sort-and-parts",
+    "title": "Billing sync: sortable columns and a breakdown of each counted number",
+    "detail": "Hal 2026-11-16: needs sorting by column; the ThreatMate numbers do not look right.",
+    "area": "Metrics",
+    "status": "completed",
+    "needs": "claude",
+    "note": "2026-11-16: sortable headers and a per-line breakdown of the counted number. The ThreatMate gap itself is most likely the mapping (a ThreatMate line is suggested against Internal assets at low confidence); Hal to check what those lines are billed on.",
+    "completed_ref": "AiSOC next commit"
   }
 ]
