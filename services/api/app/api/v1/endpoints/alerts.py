@@ -9,7 +9,8 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_serializer, field_validator
-from sqlalchemy import Text, and_, cast, false, func, not_, or_, select, update
+from sqlalchemy import Text, and_, bindparam, cast, false, func, not_, or_, select, update
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -31,6 +32,7 @@ from app.services.alert_rail import (
     RelatedEntity,
     build_rail_envelope,
 )
+from app.services import alert_similar
 from app.services.alert_scope import alert_scope
 from app.services.alert_status import FINISHED_ALERT_STATUSES, STALE, SUPPRESSED, is_finished
 from app.services.audit import emit_audit
@@ -1148,6 +1150,51 @@ async def earlier_outcomes(
             for r in found
         ]
     )
+
+
+@router.get("/{alert_id}/similar")
+async def similar_alerts(
+    alert_id: uuid.UUID, current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession
+) -> dict[str, Any]:
+    """Other alerts of the same client from the last 30 days that share this alert's rule or exact title, or name one of its hosts, users or addresses, each with the reasons. Describes only."""
+    async with alert_scope(db, current_user.tenant_id, alert_id) as tid:
+        row = (
+            await db.execute(
+                select(
+                    Alert.id, Alert.title, Alert.rule_id, Alert.affected_hosts, Alert.affected_users, Alert.affected_ips
+                ).where(Alert.id == alert_id, Alert.tenant_id == tid)
+            )
+        ).first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+        this = {"id": row[0], "title": row[1], "rule_id": row[2], "affected_hosts": row[3], "affected_users": row[4], "affected_ips": row[5]}
+        same: list[Any] = []
+        if this["title"]:
+            same.append(Alert.title == this["title"])
+        if this["rule_id"]:
+            same.append(Alert.rule_id == this["rule_id"])
+        for column, key in ((Alert.affected_hosts, "affected_hosts"), (Alert.affected_users, "affected_users"), (Alert.affected_ips, "affected_ips")):
+            names = [v for v in (this[key] or []) if isinstance(v, str) and v][:50]
+            if names:
+                same.append(column.op("?|")(bindparam(f"names_{key}", names, type_=ARRAY(Text))))
+        if not same:
+            return {"window_days": alert_similar.WINDOW_DAYS, "alerts": []}
+        since = datetime.now(UTC) - timedelta(days=alert_similar.WINDOW_DAYS)
+        found = (
+            await db.execute(
+                select(
+                    Alert.id, Alert.title, Alert.rule_id, Alert.severity, Alert.status, Alert.created_at, Alert.affected_hosts, Alert.affected_users, Alert.affected_ips
+                )
+                .where(Alert.tenant_id == tid, Alert.id != alert_id, Alert.created_at >= since, Alert.status.notin_(("suppressed", "stale")), or_(*same))
+                .order_by(Alert.created_at.desc())
+                .limit(300)
+            )
+        ).all()
+    candidates = [
+        {"id": r[0], "title": r[1], "rule_id": r[2], "severity": r[3], "status": r[4], "created_at": r[5], "affected_hosts": r[6], "affected_users": r[7], "affected_ips": r[8]}
+        for r in found
+    ]
+    return {"window_days": alert_similar.WINDOW_DAYS, "alerts": alert_similar.rank(this, candidates)}
 
 
 @router.get("/{alert_id}/other-clients")

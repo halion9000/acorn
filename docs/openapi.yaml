@@ -927,6 +927,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alerts/{alert_id}/similar:
+    get:
+      tags:
+      - alerts
+      summary: Similar Alerts
+      description: Other alerts of the same client from the last 30 days that share
+        this alert's rule or exact title, or name one of its hosts, users or addresses,
+        each with the reasons. Describes only.
+      operationId: similar_alerts_api_v1_alerts__alert_id__similar_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: alert_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Alert Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Similar Alerts Api V1 Alerts  Alert Id  Similar Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alerts/{alert_id}/other-clients:
     get:
       tags:

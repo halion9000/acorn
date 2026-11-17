@@ -2274,6 +2274,8 @@ export const alertsApi = {
   /** Notes on an alert (oldest first); they change nothing about it. */
   notes: (alertId: string) => request<AlertNote[]>(`/api/v1/alerts/${encodeURIComponent(alertId)}/notes`),
   addNote: (alertId: string, body: string) => request<AlertNote>(`/api/v1/alerts/${encodeURIComponent(alertId)}/notes`, { method: 'POST', body: JSON.stringify({ body }) }),
+  /** Other alerts of the same client in the last 30 days that share this one's rule, title, host, user or address. */
+  similar: (alertId: string) => request<SimilarAlerts>(`/api/v1/alerts/${encodeURIComponent(alertId)}/similar`),
   earlierOutcomes: (alertId: string) => request<EarlierOutcomes>(`/api/v1/alerts/${encodeURIComponent(alertId)}/earlier-outcomes`),
   /** The same alert (same title) at the organization's other clients in the last day. Empty for a client's own users. */
   otherClients: (alertId: string) => request<AlertAtOtherClients>(`/api/v1/alerts/${encodeURIComponent(alertId)}/other-clients`),
@@ -6505,6 +6507,20 @@ export interface AlertAtOtherClients {
   total: number;
   client_count: number;
   clients: { client_id: string; name: string; count: number; newest_at: string | null; newest_alert_id: string | null }[];
+}
+
+export interface SimilarAlert {
+  id: string;
+  title: string | null;
+  severity: string | null;
+  status: string | null;
+  created_at: string | null;
+  /** Why it is like this alert, in words: same rule, same title, same host: pc-1 ... */
+  why: string[];
+}
+export interface SimilarAlerts {
+  window_days: number;
+  alerts: SimilarAlert[];
 }
 
 export interface EarlierOutcomes {
