@@ -854,8 +854,10 @@
     "key": "r7-ai-20",
     "title": "An undo notice after a bulk alert action",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "already in AiSOC",
+    "note": "2026-11-16: found already built: the bulk close and bulk assign bars both keep an Undo strip for ten minutes (tested in BulkCloseBar and BulkAssignBar tests). Bulk ticket creation and bulk scripts cannot be undone, so they have none."
   },
   {
     "key": "r7-ai-21",
