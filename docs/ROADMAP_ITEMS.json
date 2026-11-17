@@ -1366,8 +1366,10 @@
     "key": "r7-af-07",
     "title": "Vendors: a spend field and a total by category",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 43089547",
+    "note": "2026-11-16: annual_spend on vendors (migration 201), spend total and by category on the Vendors dashboard, card, CSV and history. Dollars only."
   },
   {
     "key": "r7-af-08",
