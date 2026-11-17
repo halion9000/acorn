@@ -8,7 +8,7 @@ const csv = vi.hoisted(() => vi.fn());
 const save = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/saveFile', () => ({ saveText: save }));
 vi.mock('@/lib/api', () => ({
-  downloadCsv: csv, apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), vendorApi, detectedAppsApi: detected, msspApi: { listChildren: async () => [] } }));
+  downloadCsv: csv, apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), authApi: { currentUser: () => ({ id: 'u1', email: 'hal@goliveoak.com', account_name: 'hal', role: 'admin', tenant_id: 't1' }) }, vendorApi, detectedAppsApi: detected, msspApi: { listChildren: async () => [] } }));
 
 import { VendorsView } from './VendorsView';
 
@@ -141,5 +141,27 @@ describe('VendorsView: entering the yearly cost', () => {
     await userEvent.type(screen.getByLabelText('Yearly cost'), '1200.5');
     await userEvent.click(screen.getByRole('button', { name: 'Save vendor' }));
     await waitFor(() => expect(vendorApi.create).toHaveBeenCalledWith('', expect.objectContaining({ name: 'Zoom', annual_spend: 1200.5, clear_annual_spend: false })));
+  });
+});
+
+describe('VendorsView: my vendors', () => {
+  it('shows only the vendors whose owner is the person signed in, and says so when there are none', async () => {
+    vendorApi.list.mockResolvedValue(lists([vendor({ id: 'v1', name: 'LastPass', owner: 'Hal' }), vendor({ id: 'v2', name: 'Zoom', owner: 'ann@goliveoak.com' }), vendor({ id: 'v3', name: 'Slack', owner: null })]));
+    render(<VendorsView />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'register' }));
+    const table = await screen.findByTestId('vendor-table');
+    expect(table).toHaveTextContent('Zoom');
+    await userEvent.click(screen.getByRole('checkbox', { name: 'My vendors' }));
+    expect(screen.getByTestId('vendor-table')).toHaveTextContent('LastPass');
+    expect(screen.getByTestId('vendor-table')).not.toHaveTextContent('Zoom');
+    expect(screen.getByTestId('vendor-table')).not.toHaveTextContent('Slack');
+  });
+
+  it('says none name you when the register has vendors but none are yours', async () => {
+    vendorApi.list.mockResolvedValue(lists([vendor({ owner: 'someone else' })]));
+    render(<VendorsView />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'register' }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'My vendors' }));
+    expect(await screen.findByTestId('vendor-empty')).toHaveTextContent('None of the vendors name you as the owner.');
   });
 });

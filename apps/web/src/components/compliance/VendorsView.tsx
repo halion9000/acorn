@@ -9,7 +9,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { dollars } from '@/lib/money';
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 import { saveText } from '@/lib/saveFile';
-import { apiErrorDetail, detectedAppsApi, downloadCsv, vendorApi, type VendorDetail, type VendorInput, type VendorList, type VendorRow } from '@/lib/api';
+import { myVendors } from '@/lib/vendorOwner';
+import { apiErrorDetail, authApi, detectedAppsApi, downloadCsv, vendorApi, type VendorDetail, type VendorInput, type VendorList, type VendorRow } from '@/lib/api';
 
 type Tab = 'dashboard' | 'register' | 'archive';
 const RISK_CLASS: Record<string, string> = {
@@ -405,6 +406,10 @@ function Detail({ clientId, vendor, data, onChange, onClose }: { clientId: strin
 export function VendorsView() {
   const [clientId, setClientId] = useState('');
   const [tab, setTab] = useState<Tab>('dashboard');
+  // "My vendors": only those whose owner is the person signed in.
+  const [mine, setMine] = useState(false);
+  const me = authApi.currentUser();
+  const canFilterMine = !!(me?.email || me?.account_name || me?.username);
   const [data, setData] = useState<VendorList | null>(null);
   const [problem, setProblem] = useState('');
   const [open, setOpen] = useState<VendorDetail | null>(null);
@@ -453,6 +458,7 @@ export function VendorsView() {
     setOpen(v);
     void load();
   };
+  const shown = data ? (mine && tab === 'register' ? myVendors(data.vendors, me) : data.vendors) : [];
 
   return (
     <div className="space-y-4 p-6">
@@ -483,6 +489,12 @@ export function VendorsView() {
           </button>
         ))}
         <span className="flex-1" />
+        {tab === 'register' && canFilterMine && (
+          <label className="flex items-center gap-1.5 pb-1 text-xs text-gray-300">
+            <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} aria-label="My vendors" />
+            My vendors
+          </label>
+        )}
         {tab !== 'archive' && (
           <div className="flex gap-2 pb-1">
             <button type="button" onClick={() => void downloadCsv('/api/v1/compliance/vendors/export.csv', clientId).then((csv) => saveText('vendors.csv', csv)).catch((e) => setProblem(apiErrorDetail(e) ?? 'Could not export.'))} className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800">
@@ -516,9 +528,9 @@ export function VendorsView() {
       {data && tab === 'dashboard' && <Dashboard data={data} />}
       {data && tab !== 'dashboard' && (
         <div className="overflow-x-auto rounded-lg border border-gray-800">
-          {data.vendors.length === 0 ? (
+          {shown.length === 0 ? (
             <p className="p-4 text-sm text-gray-400" data-testid="vendor-empty">
-              {tab === 'archive' ? 'No archived vendors.' : 'No vendors yet. Add the first one.'}
+              {tab === 'archive' ? 'No archived vendors.' : mine && data.vendors.length > 0 ? 'None of the vendors name you as the owner.' : 'No vendors yet. Add the first one.'}
             </p>
           ) : (
             <table className="w-full text-left text-sm" data-testid="vendor-table">
@@ -532,7 +544,7 @@ export function VendorsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
-                {data.vendors.map((v) => (
+                {shown.map((v) => (
                   <tr key={v.id} className="cursor-pointer hover:bg-gray-800/40" onClick={() => void show(v.id)}>
                     <td className="px-3 py-2">
                       <button type="button" className="text-left text-blue-300 hover:underline" onClick={(e) => { e.stopPropagation(); void show(v.id); }}>
