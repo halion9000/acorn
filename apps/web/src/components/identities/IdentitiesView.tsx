@@ -19,6 +19,7 @@ import { AddToHalo } from './AddToHalo';
 import { MergePanel } from './MergePanel';
 import { PossibleDuplicates } from './PossibleDuplicates';
 import { BecSearch } from './BecSearch';
+import { PrivilegedExport } from './PrivilegedExport';
 
 const SEVERITY_STYLE: Record<string, string> = {
   critical: 'bg-red-500/15 text-red-300 border-red-500/30',
@@ -459,6 +460,7 @@ export function IdentitiesView() {
         {tile('Cloud account, not in Halo', summary?.cloud_not_in_halo, haloCheck === 'cloud_not_in_halo', () => setHaloCheck(haloCheck === 'cloud_not_in_halo' ? '' : 'cloud_not_in_halo'), true)}
         {tile('Gone in Halo, still enabled', summary?.halo_inactive_cloud_enabled, haloCheck === 'halo_inactive_cloud_enabled', () => setHaloCheck(haloCheck === 'halo_inactive_cloud_enabled' ? '' : 'halo_inactive_cloud_enabled'), true)}
         {tile('Administrators', summary?.admins, adminOnly, () => setAdminOnly((v) => !v))}
+        {adminOnly && <PrivilegedExport clientId={clientId} />}
         {tile('Disabled accounts', summary?.disabled, disabledOnly, () => reset(() => setState(state === 'disabled' ? '' : 'disabled')))}
         {tile('In only one tool', summary?.in_one_tool, oneTool, () => setOneTool((v) => !v))}
         {tile('External guests', summary?.guests, kind === 'guest', () => setKind(kind === 'guest' ? '' : 'guest'))}
