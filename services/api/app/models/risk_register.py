@@ -32,6 +32,8 @@ class RiskRegisterItem(Base):
     treatment_note: Mapped[str] = mapped_column(Text, nullable=False, default="")
     residual_likelihood: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     residual_impact: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    # For a risk whose treatment is accept: the day the acceptance ends and must be decided again (migration 202).
+    accepted_until: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(String(12), nullable=False, default="open")
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(320), nullable=True)

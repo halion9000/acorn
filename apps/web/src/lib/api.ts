@@ -7725,6 +7725,10 @@ export interface RiskItem {
   residual_impact: number | null;
   residual_score: number | null;
   residual_level: 'critical' | 'high' | 'medium' | 'low' | null;
+  /** For an accepted risk: the day the acceptance ends. Absent from an older API. */
+  accepted_until?: string | null;
+  /** none, current, expiring (within 30 days) or expired. Absent from an older API. */
+  acceptance_state?: 'none' | 'current' | 'expiring' | 'expired';
   status: 'open' | 'assessed' | 'archived';
   open_tasks: number;
   updated_at: string;
@@ -7736,7 +7740,7 @@ export interface RiskDetail extends RiskItem {
 }
 export interface RiskRegister {
   risks: RiskItem[];
-  summary: { total: number; by_level: Record<string, number>; matrix: number[][]; open_tasks: number; overdue_tasks: number; untreated: number };
+  summary: { total: number; by_level: Record<string, number>; matrix: number[][]; open_tasks: number; overdue_tasks: number; untreated: number; acceptance_expiring?: number; acceptance_expired?: number };
   categories: string[];
 }
 export interface RiskLibraryItem {
@@ -7771,7 +7775,7 @@ export const riskRegisterApi = {
   list: (clientId: string, archived = false) => request<RiskRegister>(`/api/v1/risk-register?${riskQs(clientId, archived ? 'archived=true' : '')}`),
   get: (clientId: string, id: string) => request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}?${riskQs(clientId)}`),
   create: (clientId: string, body: RiskInput) => request<RiskDetail>(`/api/v1/risk-register?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
-  update: (clientId: string, id: string, body: Partial<RiskInput> & { clear_residual?: boolean }) =>
+  update: (clientId: string, id: string, body: Partial<RiskInput> & { clear_residual?: boolean; accepted_until?: string | null; clear_accepted_until?: boolean }) =>
     request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
   archive: (clientId: string, id: string) => request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/archive?${riskQs(clientId)}`, { method: 'POST' }),
   restore: (clientId: string, id: string) => request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/restore?${riskQs(clientId)}`, { method: 'POST' }),
@@ -8196,7 +8200,7 @@ export interface ComplianceHealth {
   percent_healthy: number | null;
 }
 export interface ComplianceActionItem {
-  kind: 'evidence_expired' | 'risk_task' | 'vendor_review' | 'access_review' | 'audit_request' | 'vendor_contract';
+  kind: 'evidence_expired' | 'risk_task' | 'vendor_review' | 'access_review' | 'audit_request' | 'vendor_contract' | 'risk_acceptance';
   name: string;
   event: string;
   owner: string | null;

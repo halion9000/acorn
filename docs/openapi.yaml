@@ -53920,6 +53920,16 @@ components:
           - type: string
           - type: 'null'
           title: Residual Level
+        accepted_until:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Accepted Until
+        acceptance_state:
+          type: string
+          title: Acceptance State
+          default: none
         status:
           type: string
           title: Status
@@ -54033,6 +54043,12 @@ components:
             minimum: 1.0
           - type: 'null'
           title: Residual Impact
+        accepted_until:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Accepted Until
       type: object
       required:
       - title
@@ -54191,6 +54207,16 @@ components:
           - type: string
           - type: 'null'
           title: Residual Level
+        accepted_until:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Accepted Until
+        acceptance_state:
+          type: string
+          title: Acceptance State
+          default: none
         status:
           type: string
           title: Status
@@ -54302,6 +54328,16 @@ components:
             minimum: 1.0
           - type: 'null'
           title: Residual Impact
+        accepted_until:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Accepted Until
+        clear_accepted_until:
+          type: boolean
+          title: Clear Accepted Until
+          default: false
         clear_residual:
           type: boolean
           title: Clear Residual
@@ -64906,6 +64942,7 @@ components:
           - access_review
           - audit_request
           - vendor_contract
+          - risk_acceptance
           title: Kind
         name:
           type: string
@@ -67054,6 +67091,14 @@ components:
         untreated:
           type: integer
           title: Untreated
+        acceptance_expiring:
+          type: integer
+          title: Acceptance Expiring
+          default: 0
+        acceptance_expired:
+          type: integer
+          title: Acceptance Expired
+          default: 0
       type: object
       required:
       - total

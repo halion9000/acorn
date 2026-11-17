@@ -46,7 +46,7 @@ function Dashboard({ data }: { data: RiskRegister }) {
         ))}
       </div>
       <p className="text-sm text-gray-300">
-        {s.total} risk{s.total === 1 ? '' : 's'}; {s.untreated} with no treatment decided; {s.open_tasks} open task{s.open_tasks === 1 ? '' : 's'}
+        {s.total} risk{s.total === 1 ? '' : 's'}; {s.untreated} with no treatment decided;{(s.acceptance_expired ?? 0) > 0 ? <span className="text-red-300"> {s.acceptance_expired} accepted risk{s.acceptance_expired === 1 ? '' : 's'} past the end date;</span> : null} {s.open_tasks} open task{s.open_tasks === 1 ? '' : 's'}
         {s.overdue_tasks > 0 ? <span className="text-red-300"> ({s.overdue_tasks} overdue)</span> : null}.
       </p>
       <div>
@@ -241,6 +241,23 @@ function Detail({ clientId, risk, categories, onChange, onClose }: { clientId: s
               ))}
             </select>
           </label>
+          {risk.treatment === 'accept' && (
+            <label className="text-xs text-gray-400">
+              Accepted until
+              <input
+                aria-label="Accepted until"
+                type="date"
+                defaultValue={risk.accepted_until ?? ''}
+                onBlur={(e) => {
+                  const next = e.target.value;
+                  if (next !== (risk.accepted_until ?? '')) void act(() => riskRegisterApi.update(clientId, risk.id, next ? { accepted_until: next } : { clear_accepted_until: true }));
+                }}
+                className={`${field} mt-1 block w-full`}
+              />
+              {risk.acceptance_state === 'expired' && <span className="text-red-300" data-testid="acceptance-state">The acceptance ended. Decide again.</span>}
+              {risk.acceptance_state === 'expiring' && <span className="text-amber-300" data-testid="acceptance-state">The acceptance ends soon.</span>}
+            </label>
+          )}
           <ScalePick
             label="Residual likelihood"
             optional

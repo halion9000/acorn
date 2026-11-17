@@ -26,6 +26,7 @@ from app.models.trust_audit import Audit, AuditRequest
 from app.models.vendor_management import Vendor, VendorReview
 from app.services import compliance_health, evidence_age, vendor_management
 from app.services.audit import emit_audit
+from app.services import risk_register
 from app.services.risk_register import level
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
@@ -74,7 +75,7 @@ class VendorLevels(BaseModel):
 
 
 class ActionItem(BaseModel):
-    kind: Literal["evidence_expired", "risk_task", "vendor_review", "access_review", "audit_request", "vendor_contract"]
+    kind: Literal["evidence_expired", "risk_task", "vendor_review", "access_review", "audit_request", "vendor_contract", "risk_acceptance"]
     name: str
     event: str
     owner: str | None = None
@@ -218,6 +219,19 @@ async def dashboard(
     for r in risks:
         levels[level(r.likelihood * r.impact) or "low"] += 1
     refs = {r.id: r for r in risks}
+    for r in risks:
+        state = risk_register.acceptance_state(r.treatment, r.accepted_until, now.date())
+        if state in ("expired", "expiring") and r.accepted_until is not None:
+            action_items.append(
+                ActionItem(
+                    kind="risk_acceptance",
+                    name=f"Risk R-{r.ref_no}: {r.title}",
+                    event="Acceptance ended" if state == "expired" else "Acceptance ends soon",
+                    owner=r.owner,
+                    due=datetime(r.accepted_until.year, r.accepted_until.month, r.accepted_until.day, tzinfo=UTC),
+                    link="/compliance/risk-register",
+                )
+            )
     tasks = (
         (
             await db.execute(

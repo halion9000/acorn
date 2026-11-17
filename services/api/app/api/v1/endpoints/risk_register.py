@@ -13,7 +13,7 @@ from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -21,7 +21,7 @@ from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.risk_register import RiskRegisterHistory, RiskRegisterItem, RiskRegisterTask
 from app.services import csv_export
 from app.services.audit import emit_audit
-from app.services.risk_register import CATEGORIES, LIBRARY, TREATMENTS, describe_changes, level, library_item, matrix, score
+from app.services.risk_register import CATEGORIES, LIBRARY, TREATMENTS, acceptance_state, describe_changes, level, library_item, matrix, score
 
 router = APIRouter(prefix="/risk-register", tags=["risk-register"])
 
@@ -56,6 +56,9 @@ class RiskOut(BaseModel):
     residual_impact: int | None
     residual_score: int | None
     residual_level: str | None
+    accepted_until: date | None = None
+    # none, current, expiring (within 30 days) or expired; only a risk whose treatment is accept can have one.
+    acceptance_state: str = "none"
     status: str
     open_tasks: int
     updated_at: datetime
@@ -82,6 +85,8 @@ class Summary(BaseModel):
     open_tasks: int
     overdue_tasks: int
     untreated: int
+    acceptance_expiring: int = 0
+    acceptance_expired: int = 0
 
 
 class RegisterOut(BaseModel):
@@ -101,6 +106,13 @@ class RiskIn(BaseModel):
     treatment_note: str = Field(default="", max_length=4000)
     residual_likelihood: Scale | None = None
     residual_impact: Scale | None = None
+    accepted_until: date | None = None
+
+    @model_validator(mode="after")
+    def _expiry_needs_acceptance(self) -> "RiskIn":
+        if self.accepted_until is not None and self.treatment != "accept":
+            raise ValueError("An end date for the acceptance only applies to a risk whose treatment is accept.")
+        return self
 
 
 class RiskPatch(BaseModel):
@@ -114,6 +126,8 @@ class RiskPatch(BaseModel):
     treatment_note: str | None = Field(default=None, max_length=4000)
     residual_likelihood: Scale | None = None
     residual_impact: Scale | None = None
+    accepted_until: date | None = None
+    clear_accepted_until: bool = False
     clear_residual: bool = False
 
 
@@ -164,6 +178,8 @@ def _risk(row: RiskRegisterItem, open_tasks: int = 0) -> RiskOut:
         residual_impact=row.residual_impact,
         residual_score=residual,
         residual_level=level(residual),
+        accepted_until=row.accepted_until,
+        acceptance_state=acceptance_state(row.treatment, row.accepted_until, datetime.now(UTC).date()),
         status=row.status,
         open_tasks=open_tasks,
         updated_at=row.updated_at,
@@ -197,6 +213,7 @@ def _snapshot(row: RiskRegisterItem) -> dict[str, Any]:
             "treatment_note",
             "residual_likelihood",
             "residual_impact",
+            "accepted_until",
         )
     }
 
@@ -287,6 +304,8 @@ async def list_risks(
             open_tasks=sum(1 for t in tasks if t.risk_id in active_ids),
             overdue_tasks=sum(1 for t in tasks if t.risk_id in active_ids and t.due_date and t.due_date < today),
             untreated=sum(1 for r in rows if r.treatment == "undecided"),
+            acceptance_expiring=sum(1 for r in out if r.acceptance_state == "expiring"),
+            acceptance_expired=sum(1 for r in out if r.acceptance_state == "expired"),
         ),
         categories=list(CATEGORIES),
     )
@@ -464,7 +483,7 @@ async def update_risk(
     if row.status == "archived":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An archived risk cannot be changed. Restore it first.")
     before = _snapshot(row)
-    changes = body.model_dump(exclude_unset=True, exclude={"clear_residual"})
+    changes = body.model_dump(exclude_unset=True, exclude={"clear_residual", "clear_accepted_until"})
     if "category" in changes and changes["category"] not in CATEGORIES:
         changes["category"] = "Other"
     for key, value in changes.items():
@@ -474,6 +493,9 @@ async def update_risk(
     if body.clear_residual:
         row.residual_likelihood = None
         row.residual_impact = None
+    if body.clear_accepted_until or row.treatment != "accept":
+        # An end date belongs to an acceptance: it goes when the treatment is no longer accept.
+        row.accepted_until = None
     if (row.residual_likelihood is None) != (row.residual_impact is None):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

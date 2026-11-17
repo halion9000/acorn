@@ -195,3 +195,37 @@ async def test_the_dashboard_counts_levels_and_places_each_risk_on_the_grid(worl
     assert s.by_level == {"critical": 1, "high": 0, "medium": 0, "low": 1}
     assert s.matrix[0][4] == 1 and s.matrix[4][1] == 1
     assert s.untreated == 2
+
+
+async def test_an_accepted_risk_can_carry_an_end_date_that_is_flagged_when_near_or_past_and_goes_when_it_is_no_longer_accepted(world):
+    from datetime import date, timedelta
+
+    w = world
+    soon = date.today() + timedelta(days=10)
+    a = await add(w, title="Accepted, ends soon", treatment="accept", accepted_until=soon)
+    await add(w, title="Accepted, long off", treatment="accept", accepted_until=date.today() + timedelta(days=200))
+    b = await add(w, title="Accepted, lapsed", treatment="accept", accepted_until=date.today() - timedelta(days=3))
+    await add(w, title="Accepted, no end", treatment="accept")
+    out = await listing(w)
+    states = {r.title: r.acceptance_state for r in out.risks}
+    assert states == {"Accepted, ends soon": "expiring", "Accepted, long off": "current", "Accepted, lapsed": "expired", "Accepted, no end": "none"}
+    assert (out.summary.acceptance_expiring, out.summary.acceptance_expired) == (1, 1)
+    moved = await run(w.acme, lambda db: ep.update_risk(a.id, ep.RiskPatch(treatment="mitigate"), w.request, w.acme, db, w.user))
+    assert moved.accepted_until is None and moved.acceptance_state == "none", "the end date goes with the acceptance"
+    cleared = await run(w.acme, lambda db: ep.update_risk(b.id, ep.RiskPatch(clear_accepted_until=True), w.request, w.acme, db, w.user))
+    assert cleared.accepted_until is None
+    extended = await run(w.acme, lambda db: ep.update_risk(b.id, ep.RiskPatch(accepted_until=date.today() + timedelta(days=90)), w.request, w.acme, db, w.user))
+    assert extended.acceptance_state == "current"
+    line = [h.detail for h in extended.history if h.action == "changed"][0]
+    assert line.startswith("Accepted until ")
+
+
+async def test_an_end_date_without_the_accept_treatment_is_refused(world):
+    from datetime import date, timedelta
+
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        risk(treatment="mitigate", accepted_until=date.today() + timedelta(days=10))
+    with pytest.raises(ValidationError):
+        risk(accepted_until=date.today() + timedelta(days=10))

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 CATEGORIES = (
@@ -168,6 +169,18 @@ def library_item(library_id: str) -> dict[str, Any] | None:
     return next((i for i in LIBRARY if i["id"] == library_id), None)
 
 
+ACCEPTANCE_SOON_DAYS = 30
+
+
+def acceptance_state(treatment: str, accepted_until: date | None, today: date) -> str:
+    """Where an accepted risk stands: none (not accepted, or accepted with no end date), current, expiring (ends within 30 days) or expired (the end date has passed). Pure."""
+    if treatment != "accept" or accepted_until is None:
+        return "none"
+    if accepted_until < today:
+        return "expired"
+    return "expiring" if (accepted_until - today).days <= ACCEPTANCE_SOON_DAYS else "current"
+
+
 def describe_changes(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
     """One plain line for each field that changed, for the history ("Likelihood 3 to 4")."""
     labels = {
@@ -181,6 +194,7 @@ def describe_changes(before: dict[str, Any], after: dict[str, Any]) -> list[str]
         "treatment_note": "Treatment note",
         "residual_likelihood": "Residual likelihood",
         "residual_impact": "Residual impact",
+        "accepted_until": "Accepted until",
     }
     out: list[str] = []
     for key, label in labels.items():

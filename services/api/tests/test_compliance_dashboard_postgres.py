@@ -230,3 +230,21 @@ async def test_a_vendor_contract_ending_within_sixty_days_or_already_ended_is_an
     await add("No contract date", None)
     items = [(i.name, i.event) for i in (await dash(w)).action_items if i.kind == "vendor_contract"]
     assert sorted(items) == [("Vendor Already ended: contract", "Contract ended"), ("Vendor Ends soon: contract", "Contract ends soon")]
+
+
+async def test_an_accepted_risk_whose_acceptance_has_ended_or_ends_soon_is_an_action_item_and_a_distant_one_is_not(world):
+    w = world
+    mk = lambda title, days: run(  # noqa: E731
+        w.acme,
+        lambda db: rr.create_risk(
+            rr.RiskIn(title=title, likelihood=2, impact=2, treatment="accept", accepted_until=date.today() + timedelta(days=days)), w.request, w.acme, db, w.user
+        ),
+    )
+    await mk("Lapsed acceptance", -4)
+    await mk("Soon acceptance", 12)
+    await mk("Distant acceptance", 120)
+    items = {i.name: i for i in (await dash(w)).action_items if i.kind == "risk_acceptance"}
+    assert set(items) == {"Risk R-1: Lapsed acceptance", "Risk R-2: Soon acceptance"}
+    assert items["Risk R-1: Lapsed acceptance"].event == "Acceptance ended"
+    assert items["Risk R-2: Soon acceptance"].event == "Acceptance ends soon"
+    assert items["Risk R-2: Soon acceptance"].link == "/compliance/risk-register"

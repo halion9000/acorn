@@ -62,3 +62,23 @@ def test_the_history_says_what_changed_in_words_and_says_nothing_when_nothing_di
     assert "Treatment undecided to mitigate" in lines
     assert "Residual likelihood none to 2" in lines
     assert rr.describe_changes(before, dict(before)) == []
+
+
+def test_an_acceptance_is_current_expiring_within_thirty_days_or_expired_and_only_an_accepted_risk_has_one():
+    from datetime import date, timedelta
+
+    today = date(2026, 11, 16)
+    state = lambda t, d: rr.acceptance_state(t, d, today)  # noqa: E731
+    assert state("accept", today + timedelta(days=31)) == "current"
+    assert state("accept", today + timedelta(days=30)) == "expiring"
+    assert state("accept", today) == "expiring", "the last day it still holds"
+    assert state("accept", today - timedelta(days=1)) == "expired"
+    assert state("accept", None) == "none"
+    assert state("mitigate", today - timedelta(days=5)) == "none"
+    assert state("undecided", today + timedelta(days=3)) == "none"
+
+
+def test_a_change_of_the_acceptance_end_date_reads_as_one_history_line():
+    from datetime import date
+
+    assert rr.describe_changes({"accepted_until": None}, {"accepted_until": date(2027, 1, 31)}) == ["Accepted until none to 2027-01-31"]

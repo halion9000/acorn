@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const api = vi.hoisted(() => ({
@@ -159,5 +159,43 @@ describe('RiskRegisterView export', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
     expect(save).not.toHaveBeenCalled();
+  });
+});
+
+describe('RiskRegisterView: the end of an acceptance', () => {
+  const open = async () => {
+    render(<RiskRegisterView />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'register' }));
+    const table = await screen.findByTestId('risk-table');
+    await userEvent.click(within(table).getByRole('button', { name: 'Phishing leads to a taken-over account' }));
+    await screen.findByTestId('risk-detail');
+  };
+
+  it('offers an Accepted until date only for an accepted risk, saves it when the box is left, and clears it when emptied', async () => {
+    api.get.mockResolvedValue(detail({ treatment: 'accept', accepted_until: '2026-12-31', acceptance_state: 'current' }));
+    api.update.mockResolvedValue(detail({ treatment: 'accept', accepted_until: '2027-03-01', acceptance_state: 'current' }));
+    await open();
+    const box = screen.getByLabelText('Accepted until');
+    expect(box).toHaveValue('2026-12-31');
+    fireEvent.change(box, { target: { value: '2027-03-01' } });
+    fireEvent.blur(box);
+    await waitFor(() => expect(api.update).toHaveBeenCalledWith('', 'r1', { accepted_until: '2027-03-01' }));
+    api.update.mockClear();
+    fireEvent.change(screen.getByLabelText('Accepted until'), { target: { value: '' } });
+    fireEvent.blur(screen.getByLabelText('Accepted until'));
+    await waitFor(() => expect(api.update).toHaveBeenCalledWith('', 'r1', { clear_accepted_until: true }));
+  });
+
+  it('does not offer the date for a risk that is not accepted', async () => {
+    api.get.mockResolvedValue(detail({ treatment: 'mitigate' }));
+    await open();
+    expect(screen.queryByLabelText('Accepted until')).toBeNull();
+  });
+
+  it('says the acceptance ended on a risk whose date has passed', async () => {
+    api.list.mockResolvedValue(register([risk()], { acceptance_expired: 2 }));
+    api.get.mockResolvedValue(detail({ treatment: 'accept', accepted_until: '2026-11-01', acceptance_state: 'expired' }));
+    await open();
+    expect(screen.getByTestId('acceptance-state')).toHaveTextContent('The acceptance ended. Decide again.');
   });
 });
