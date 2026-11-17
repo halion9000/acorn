@@ -1351,8 +1351,10 @@
     "key": "r7-af-05",
     "title": "Compliance: evidence collection reminders by owner",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 2b1a1fc9",
+    "note": "2026-11-16: Evidence reminders by owner under the Controls list, with a copyable message per owner. It does not send them (no email or chat is wired)."
   },
   {
     "key": "r7-af-06",
