@@ -894,8 +894,14 @@ async def list_alerts(
         if source:
             filters.append(Alert.raw_event["source"].astext == source)
         if device_name:
-            # affected_hosts is a JSON list of names; match one element exactly, ignoring case.
-            filters.append(func.lower(cast(Alert.affected_hosts, Text)).like(device_like, escape="\\"))
+            # affected_hosts is a JSON list of names; match one element exactly, ignoring case. Tools that name the machine only in their own context (ThreatMate, RMM-style tools) are matched there too,
+            # the same two places the Devices page counts a machine's open alerts from, so "Show alerts" finds what the count promised.
+            filters.append(
+                or_(
+                    func.lower(cast(Alert.affected_hosts, Text)).like(device_like, escape="\\"),
+                    func.lower(Alert.raw_event["unmapped"]["context"]["device_name"].astext) == device_name.lower(),
+                )
+            )
         if user_name:
             filters.append(func.lower(cast(Alert.affected_users, Text)).like(user_like, escape="\\"))
         if min_confidence is not None:

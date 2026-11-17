@@ -139,3 +139,22 @@ def test_a_parent_collapses_each_client_separately() -> None:
         assert out.total == 2
 
     run(go)
+
+
+def test_the_device_filter_also_finds_an_alert_that_names_the_machine_only_in_its_context():
+    """ThreatMate-style alerts carry the machine in raw_event.unmapped.context.device_name, not in affected_hosts. The Devices page counts them from there, so Show alerts must find them (it showed none)."""
+
+    async def go(s):
+        t = tenant("Live Oak")
+        s.add(t)
+        await s.flush()
+        named = alert(t, "Buffer overflow in IIS", 1)
+        named.raw_event = {"source": "threatmate", "unmapped": {"context": {"device_name": "RUDY"}}}
+        s.add_all([named, alert(t, "Disk low", 2, ["PC-1"]), alert(t, "Other machine", 3)])
+        s.add(alert(t, "Another context machine", 4))
+        await s.flush()
+        assert [i.title for i in (await call(s, t.id, device="rudy")).items] == ["Buffer overflow in IIS"]
+        assert [i.title for i in (await call(s, t.id, device="pc-1")).items] == ["Disk low"]
+        assert (await call(s, t.id, device="ru")).total == 0, "a part of a name is not the machine"
+
+    run(go)
