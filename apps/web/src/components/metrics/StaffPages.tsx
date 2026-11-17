@@ -101,7 +101,7 @@ export function TicketUpdatesView() {
   const query = (picked ?? []).map((m) => `&members=${encodeURIComponent(m)}`).join('');
   const { data, denied, problem } = useMetric<UpdatesData>(`/api/v1/reports/metrics/ticket-updates?months=${months}${query}`);
   return (
-    <Page title="Ticket updates by team member" subtitle="How many times each team member updated a ticket, week by week." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
+    <Page title="Ticket updates by team member" subtitle="How many different tickets each team member logged time on, week by week. HaloPSA cannot list every note or update in bulk, so an update with no logged time is not counted." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <Periods value={months} onChange={setMonths} options={[1, 3, 6, 12]} />
       {data?.received_at && (
         <>

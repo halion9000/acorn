@@ -1846,9 +1846,9 @@
     "title": "Metrics: no more Agent NN names, and ticket updates that are not all zero",
     "detail": "Hal 2026-11-16: people show as Agent 20, 93, 98 across the pages, and Team member ticket updates is all zeros.",
     "area": "Metrics",
-    "status": "in_progress",
+    "status": "completed",
     "needs": "claude",
-    "note": "2026-11-16: CORE now asks HaloPSA for disabled agents too, names the rest from their tickets (else Former agent N), and reports when actions come back unusable. NOT VERIFIED live: whether the actions then count."
+    "note": "2026-11-16: CORE now asks HaloPSA for disabled agents too, names the rest from their tickets (else Former agent N), and reports when actions come back unusable. NOT VERIFIED live: whether the actions then count. 2026-11-17: updates were zero because /api/Actions only answers per ticket; now counted from time entries. Names: read live Halo agent list includes disabled agents."
   },
   {
     "key": "metrics-billing-sync-sort-and-parts",
@@ -1894,7 +1894,7 @@
     "area": "finance",
     "status": "completed",
     "needs": "claude",
-    "note": "2026-11-17: cause found live: /api/TimesheetEvent reads start_date and end_date (end exclusive), not startdate/enddate, so every month got the newest days. Fixed in CORE (acorn-halo-time.ts), built and tested locally, NOT live until CORE is updated. September now 4,262 h vs workbook 4,060 (148 of 179 clients within 0.5 h; the rest is time entered after the workbook). STILL WRONG: team member ticket updates (HaloPSA /api/Actions only answers per ticket, so CORE bulk read is always empty: all zeros), and the cost columns (add-on software etc.) which come from QuickBooks and the License Database in the workbook."
+    "note": "2026-11-17: cause found live: /api/TimesheetEvent reads start_date and end_date (end exclusive), not startdate/enddate, so every month got the newest days. Fixed in CORE (acorn-halo-time.ts), built and tested locally, NOT live until CORE is updated. September now 4,262 h vs workbook 4,060 (148 of 179 clients within 0.5 h; the rest is time entered after the workbook). STILL WRONG: team member ticket updates (HaloPSA /api/Actions only answers per ticket, so CORE bulk read is always empty: all zeros), and the cost columns (add-on software etc.) which come from QuickBooks and the License Database in the workbook. 2026-11-17 later: shipped (CORE b85e8aa); ticket updates now count the tickets an engineer logged time on (HaloPSA has no bulk actions read); ticket-update fix shipping next."
   },
   {
     "key": "finance-addon-software-from-licences",
