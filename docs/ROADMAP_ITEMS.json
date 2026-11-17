@@ -1375,8 +1375,10 @@
     "key": "r7-af-08",
     "title": "Vendors: shared owner view (my vendors)",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 4a0c9a98",
+    "note": "2026-11-16: My vendors box on the Vendors register, matching owner text to the signed-in person's e-mail, name or username. Not a separate shared view."
   },
   {
     "key": "r7-af-09",
