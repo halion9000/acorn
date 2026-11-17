@@ -824,8 +824,10 @@
     "key": "r7-ai-16",
     "title": "A script that checks text contrast in both themes",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 55eb4870",
+    "note": "2026-11-16: scripts/check_contrast.py (and a pytest that fails if a pair drops under 4.5:1, 3:1 for subtle text). Light fg-muted and fg-subtle darkened slightly: they were 4.2 and 2.3 to 2.6."
   },
   {
     "key": "r7-ai-17",
