@@ -6,12 +6,16 @@ import type { EnvDevice } from '@/lib/api';
 
 export type Tier = 0 | 1 | 2 | 3;
 
+/** What a device is, finer than its row: the drawing gives each class its own icon and colour so a firewall, a switch, a wireless access point and a workstation can be told apart at a glance. */
+export type DeviceClass = 'firewall' | 'router' | 'switch' | 'controller' | 'wap' | 'server' | 'workstation' | 'laptop' | 'camera' | 'printer' | 'phone' | 'other';
+
 export interface MapNode {
   id: string;
   label: string;
   role: string | null;
   kind: string;
   tier: Tier;
+  cls: DeviceClass;
   x: number;
   y: number;
   online: boolean | null;
@@ -38,7 +42,46 @@ const EDGE_TIER = new Set(['firewall', 'router', 'utm', 'securityappliance', 'mo
 const SWITCH_TIER = new Set(['switch', 'l3switch', 'stack', 'chassis', 'hub', 'voipswitch', 'loadbalancer', 'controller', 'packetprocessor']);
 const AP_TIER = new Set(['accesspoint', 'thinaccesspoint', 'bridge']);
 
-export const COL_W = 150;
+const FIREWALL = new Set(['firewall', 'utm', 'securityappliance']);
+const ROUTER = new Set(['router', 'modem', 'telecommunications', 'backhaul']);
+const SWITCH = new Set(['switch', 'l3switch', 'stack', 'chassis', 'hub', 'voipswitch']);
+const CONTROLLER = new Set(['controller', 'loadbalancer', 'packetprocessor']);
+const WAP = new Set(['accesspoint', 'thinaccesspoint', 'bridge']);
+
+/** The class of a device from its role (Auvik's device type, or the tool's own word) and kind (pure). A computer is a workstation unless its role says server or laptop. */
+export function classOf(d: Pick<EnvDevice, 'role' | 'kind'>): DeviceClass {
+  const r = (d.role ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (FIREWALL.has(r)) return 'firewall';
+  if (ROUTER.has(r)) return 'router';
+  if (SWITCH.has(r)) return 'switch';
+  if (CONTROLLER.has(r)) return 'controller';
+  if (WAP.has(r)) return 'wap';
+  if (r.includes('printer') || r.includes('mfp') || r.includes('scanner')) return 'printer';
+  if (r.includes('phone') || r.includes('voip')) return 'phone';
+  if (r.includes('camera') || r.includes('nvr') || d.kind === 'camera') return 'camera';
+  if (r.includes('server') || r.includes('hypervisor') || r.includes('vmhost') || r.includes('esx')) return 'server';
+  if (r.includes('laptop') || r.includes('notebook') || r.includes('macbook')) return 'laptop';
+  if (d.kind === 'computer' || r.includes('workstation') || r.includes('desktop') || r.includes('computer')) return 'workstation';
+  if (d.kind === 'network') return 'switch';
+  return 'other';
+}
+
+export const CLASS_LABEL: Record<DeviceClass, string> = {
+  firewall: 'Firewall',
+  router: 'Router / modem',
+  switch: 'Switch',
+  controller: 'Controller',
+  wap: 'Wireless access point',
+  server: 'Server',
+  workstation: 'Workstation',
+  laptop: 'Laptop',
+  camera: 'Camera',
+  printer: 'Printer',
+  phone: 'Phone',
+  other: 'Other device',
+};
+
+export const COL_W = 172;
 export const ROW_H = 120;
 export const PAD = 40;
 /** A row longer than this wraps onto another row, so a switch with forty computers does not make the drawing a mile wide. */
@@ -107,7 +150,7 @@ export function buildMap(devices: EnvDevice[]): NetworkMap {
     for (let start = 0; start < row.length; start += MAX_PER_ROW) {
       const slice = row.slice(start, start + MAX_PER_ROW);
       widest = Math.max(widest, slice.length);
-      slice.forEach((d, i) => nodes.push({ id: d.id, label: d.hostname, role: d.role, kind: d.kind, tier: t as Tier, x: i, y, online: d.online }));
+      slice.forEach((d, i) => nodes.push({ id: d.id, label: d.hostname, role: d.role, kind: d.kind, tier: t as Tier, cls: classOf(d), x: i, y, online: d.online }));
       y += ROW_H;
     }
   });

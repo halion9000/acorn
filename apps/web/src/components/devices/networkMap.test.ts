@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EnvDevice } from '@/lib/api';
-import { MAX_NODES, MAX_PER_ROW, buildMap, tierOf } from './networkMap';
+import { MAX_NODES, MAX_PER_ROW, buildMap, classOf, tierOf } from './networkMap';
 
 const dev = (name: string, role: string | null, kind: string, links: { name: string; port?: string; remote_port?: string }[] = []): EnvDevice => ({
   id: name,
@@ -63,5 +63,30 @@ describe('buildMap', () => {
     const capped = buildMap([dev('hub', 'switch', 'network', many.map((p) => ({ name: p.hostname }))), ...many]);
     expect(capped.nodes.length).toBe(MAX_NODES);
     expect(capped.hidden).toBe(31);
+  });
+});
+
+describe('classOf', () => {
+  it('tells a firewall, router, switch, controller and wireless access point apart, by the role the tool gives', () => {
+    const c = (role: string | null, kind = 'network') => classOf({ role, kind });
+    expect([c('firewall'), c('UTM'), c('securityAppliance')]).toEqual(['firewall', 'firewall', 'firewall']);
+    expect([c('router'), c('modem')]).toEqual(['router', 'router']);
+    expect([c('switch'), c('l3switch'), c('stack')]).toEqual(['switch', 'switch', 'switch']);
+    expect([c('controller'), c('loadBalancer')]).toEqual(['controller', 'controller']);
+    expect([c('accessPoint'), c('thinAccessPoint')]).toEqual(['wap', 'wap']);
+  });
+  it('a computer is a workstation unless its role says server or laptop, and the other kinds get their own class', () => {
+    expect(classOf({ role: null, kind: 'computer' })).toBe('workstation');
+    expect(classOf({ role: 'Windows Server 2022', kind: 'computer' })).toBe('server');
+    expect(classOf({ role: 'MacBook Pro', kind: 'computer' })).toBe('laptop');
+    expect(classOf({ role: null, kind: 'camera' })).toBe('camera');
+    expect(classOf({ role: 'printer', kind: 'other' })).toBe('printer');
+    expect(classOf({ role: 'VoIP phone', kind: 'other' })).toBe('phone');
+    expect(classOf({ role: null, kind: 'other' })).toBe('other');
+    expect(classOf({ role: null, kind: 'network' })).toBe('switch');
+  });
+  it('every node in a drawn map carries its class', () => {
+    const m = buildMap([dev('fw', 'firewall', 'network', [{ name: 'sw' }]), dev('sw', 'switch', 'network', [{ name: 'fw' }, { name: 'ap' }, { name: 'pc' }]), dev('ap', 'accesspoint', 'network', [{ name: 'sw' }]), dev('pc', null, 'computer', [{ name: 'sw' }])]);
+    expect(Object.fromEntries(m.nodes.map((n) => [n.id, n.cls]))).toEqual({ fw: 'firewall', sw: 'switch', ap: 'wap', pc: 'workstation' });
   });
 });
