@@ -1502,8 +1502,10 @@
     "key": "r7-af-23",
     "title": "Devices: a saved view shared with the team",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 1e6f21ad",
+    "note": "2026-11-16: saved_views.shared (migration 203); the list returns own plus shared views, a default stays personal, only the owner can change or delete."
   },
   {
     "key": "r7-af-24",
