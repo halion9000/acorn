@@ -17,6 +17,7 @@ import { NistCoverage } from "./NistCoverage";
 import { ConfigChanges } from "./ConfigChanges";
 import { ToolChecks, checkTitle, type PostureCheck } from "./ToolChecks";
 import { ClientSummary } from "./ClientSummary";
+import { ScoreHistory } from "./ScoreHistory";
 import { ToolExclusions } from "./ToolExclusions";
 
 export interface Posture {
@@ -238,6 +239,7 @@ export function ClientPosture() {
               <Stat label="Open cases" value={shown.open_cases} href={links.cases} />
             </div>
           </section>
+          <ScoreHistory clientId={shown.client_id} />
           <ClientSummary posture={shown} labelFor={labelFor} />
           <ToolExclusions
             clientId={shown.client_id}
