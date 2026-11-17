@@ -1468,8 +1468,10 @@
     "key": "r7-af-19",
     "title": "Alerts: a similar-alerts panel on an alert",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 5c499c89",
+    "note": "2026-11-16: GET /alerts/{id}/similar and a Similar alerts panel on the alert page; matches on rule, exact title, shared host, user or address (case differences in the shared names are only caught after the database match, which is case-sensitive)."
   },
   {
     "key": "r7-af-20",
