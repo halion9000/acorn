@@ -37,7 +37,7 @@ from app.models.metric_dataset import DATASET_KEYS, MetricDataset, merge_dataset
 from app.models.tenant import Tenant
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
 from app.models.vendor_action import VendorAction
-from app.services import core_approvals
+from app.services import core_approvals, core_heartbeat
 from app.services import vcio_risk_tickets as vcio_tickets
 from app.services.alert_settle import closed_in_tool, has_open_ticket, tickets_all_closed
 from app.services.alert_status import FINISHED_ALERT_STATUSES
@@ -88,8 +88,16 @@ class ApprovalNote(BaseModel):
     days_left: int = Field(ge=0, le=30, description="Whole days before CORE takes the card off the list.")
 
 
+class CoreInfoIn(BaseModel):
+    commit: str = Field(max_length=40)
+    uptime_seconds: int = Field(ge=0, le=10**9)
+    sweeps: int = Field(ge=0, le=10**9)
+
+
 class StatusReport(BaseModel):
     sources: list[SourceReport] = Field(max_length=50)
+    # What CORE says about itself (its commit, how long it has been up, how many feed passes it has made); absent from an older CORE.
+    core: CoreInfoIn | None = None
     # CORE's approvals waiting right now; absent from an older CORE (then nothing is stored or changed), an empty list when none are waiting.
     approvals: list[ApprovalNote] | None = Field(default=None, max_length=50)
 
@@ -243,6 +251,8 @@ async def report_core_feed_status(tenant_token: str, body: StatusReport, db: DBS
     await db.commit()
     if body.approvals is not None:
         await core_approvals.remember(tenant_id, [a.model_dump() for a in body.approvals])
+    if body.core is not None:
+        await core_heartbeat.remember(tenant_id, body.core.commit, body.core.uptime_seconds, body.core.sweeps)
     # Refresh the per-client numbers the MSSP overview shows. Best effort: it must never fail the status report itself.
     try:
         if await snapshot_children_throttled(db, tenant_id):

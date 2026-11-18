@@ -1257,6 +1257,21 @@ async def core_approvals_waiting(user: AuthUser) -> dict[str, Any]:
 
 
 @router.get(
+    "/core-heartbeat",
+    summary="The commit CORE runs, its uptime and its feed passes, as CORE last reported them",
+    dependencies=[Depends(require_permission("alerts:read"))],
+)
+async def core_heartbeat(user: AuthUser) -> dict[str, Any]:
+    """For the Platform health page: what CORE said about itself at its last status report (within 20 minutes). ``reported`` is false when CORE has not reported lately or is too old to say."""
+    from app.services import core_heartbeat as store  # noqa: PLC0415
+
+    found = await store.recall(user.tenant_id)
+    if found is None:
+        return {"reported": False, "reported_at": None, "commit": None, "uptime_seconds": None, "sweeps": None}
+    return {"reported": True, "reported_at": found.get("reported_at"), "commit": found.get("commit"), "uptime_seconds": found.get("uptime_seconds"), "sweeps": found.get("sweeps")}
+
+
+@router.get(
     "/feed-routes",
     summary="When each CORE feed route last received a report",
     dependencies=[Depends(require_permission("alerts:read"))],

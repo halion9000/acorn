@@ -12061,6 +12061,27 @@ paths:
                   Get
       security:
       - HTTPBearer: []
+  /api/v1/health/core-heartbeat:
+    get:
+      tags:
+      - health
+      summary: The commit CORE runs, its uptime and its feed passes, as CORE last
+        reported them
+      description: 'For the Platform health page: what CORE said about itself at its
+        last status report (within 20 minutes). ``reported`` is false when CORE has
+        not reported lately or is too old to say.'
+      operationId: core_heartbeat_api_v1_health_core_heartbeat_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Core Heartbeat Api V1 Health Core Heartbeat Get
+      security:
+      - HTTPBearer: []
   /api/v1/health/feed-routes:
     get:
       tags:
@@ -40929,6 +40950,28 @@ components:
       - content
       - createdAt
       title: CopilotMessageOut
+    CoreInfoIn:
+      properties:
+        commit:
+          type: string
+          maxLength: 40
+          title: Commit
+        uptime_seconds:
+          type: integer
+          maximum: 1000000000.0
+          minimum: 0.0
+          title: Uptime Seconds
+        sweeps:
+          type: integer
+          maximum: 1000000000.0
+          minimum: 0.0
+          title: Sweeps
+      type: object
+      required:
+      - commit
+      - uptime_seconds
+      - sweeps
+      title: CoreInfoIn
     CoreToolIn:
       properties:
         tool_id:
@@ -61231,6 +61274,10 @@ components:
           type: array
           maxItems: 50
           title: Sources
+        core:
+          anyOf:
+          - $ref: '#/components/schemas/CoreInfoIn'
+          - type: 'null'
         approvals:
           anyOf:
           - items:
