@@ -64,6 +64,7 @@ from app.api.v1.endpoints import (
     detection_proposals,
     detection_rules,
     detection_vendor,
+    device_reports,
     devices,
     devices_console,
     devices_ninja_deploy,
@@ -314,6 +315,7 @@ api_router.include_router(compliance_notices.router)
 api_router.include_router(compliance_tests.router)
 api_router.include_router(questionnaires.router)
 api_router.include_router(questionnaires.library_router)
+api_router.include_router(device_reports.router)
 api_router.include_router(devices.router)
 api_router.include_router(devices.ingest_router)
 api_router.include_router(remote_tools.router)

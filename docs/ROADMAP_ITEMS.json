@@ -244,8 +244,9 @@
     "title": "A6: weekly briefing paragraph",
     "area": "Reports",
     "status": "not_started",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: this is a large feature known only by its backlog number and has no written scope. Tell me in a few lines what it should do and who uses it, or point me at the backlog text, and I will plan it; otherwise it stays here."
   },
   {
     "key": "agent-tools",
@@ -263,24 +264,27 @@
     "title": "12.18: real playbooks",
     "area": "Automation",
     "status": "not_started",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: this is a large feature known only by its backlog number and has no written scope. Tell me in a few lines what it should do and who uses it, or point me at the backlog text, and I will plan it; otherwise it stays here."
   },
   {
     "key": "fim-baselines",
     "title": "12.19: file integrity monitoring baselines",
     "area": "Security",
     "status": "not_started",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: this is a large feature known only by its backlog number and has no written scope. Tell me in a few lines what it should do and who uses it, or point me at the backlog text, and I will plan it; otherwise it stays here."
   },
   {
     "key": "threat-hunting",
     "title": "12.14: threat hunting",
     "area": "Security",
     "status": "not_started",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: this is a large feature known only by its backlog number and has no written scope. Tell me in a few lines what it should do and who uses it, or point me at the backlog text, and I will plan it; otherwise it stays here."
   },
   {
     "key": "qdrant-upgrade",
@@ -393,8 +397,9 @@
     "title": "Send SOC 2, ISO 27001, PCI DSS and HIPAA requirements from CORE so their control health comes from Secureframe too",
     "area": "Compliance",
     "status": "not_started",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: this is a large feature known only by its backlog number and has no written scope. Tell me in a few lines what it should do and who uses it, or point me at the backlog text, and I will plan it; otherwise it stays here."
   },
   {
     "key": "policy-wording-review",
@@ -503,16 +508,18 @@
     "title": "update_core keeps the last three builds and offers a one-command rollback",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: keep the last three CORE builds on the VM and add a one-command rollback to update-core-vm. It changes the deploy script (which the verify gate treats as sensitive) and uses disk (about 1.5 GB a build). OK to touch the deploy script?"
   },
   {
     "key": "r7-ci-06",
     "title": "A script that simulates a bad update so the watchdog rollback is proven, not assumed",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a script that deliberately ships a build that fails its health check, to prove the watchdog rolls back. It would run on the real VM and cause a short outage. OK to run it in a quiet window, and which?"
   },
   {
     "key": "r7-ci-07",
@@ -550,16 +557,18 @@
     "title": "One module reads environment keys by name, replacing scattered process.env reads",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: one module reads environment keys by name and the scattered process.env reads move to it. A wide refactor of CORE with no visible change; risk is a missed key. OK to do it in one reviewed batch (with the rename window)?"
   },
   {
     "key": "r7-ci-11",
     "title": "Check A.C.O.R.N answers against the expected shape and log drift",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: after each A.C.O.R.N reply CORE checks it against the expected shape and logs drift. Adds a check to every send; the contract tests already cover the shapes CORE sends. Worth it, or leave to the contract tests?"
   },
   {
     "key": "r7-ci-12",
@@ -608,16 +617,18 @@
     "title": "A shared CIPP read cache keyed by tenant and endpoint to cut 429 answers",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a shared CIPP read cache keyed by tenant and endpoint to cut 429 answers. I cannot measure 429s without a live CIPP; the 429 rate over the last week would show whether it is needed. Do you see 429s in the CORE log?"
   },
   {
     "key": "r7-ci-17",
     "title": "Show each vendor's remaining daily read budget on the health page",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: show each vendor's remaining daily read budget on Platform health. Needs CORE to report each vendor's remaining quota (most vendors do not publish it). Which vendors do you hit limits with?"
   },
   {
     "key": "r7-ci-18",
@@ -676,8 +687,9 @@
     "title": "Every sweep command-line entry accepts --dry-run",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: every sweep entry accepts --dry-run (read and work out, send nothing). CORE has no command-line entry per sweep today (jobs.mjs only lists results). I would add one script, node scripts/sweep.mjs <tool> --dry-run [--client X]. OK?"
   },
   {
     "key": "r7-ci-24",
@@ -704,8 +716,9 @@
     "title": "List the modules whose Windows-only paths have no path.win32 test, then add them",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: list the modules whose Windows-only paths have no path.win32 test. That needs a tool that reads source text to find them, which the project's test rules forbid in tests; I would make it a script, not a test. OK as a script?"
   },
   {
     "key": "r7-ci-27",
@@ -713,7 +726,7 @@
     "area": "Round 7: CORE improvement",
     "status": "in_progress",
     "needs": "claude",
-    "note": "2026-11-16 (CORE 59f001f): the tool sweeps now count dropped licence counts, vulnerability and application lists and say so in the pass line. Other sweeps (CIPP, sign-ins, Huntress) still have silent catch blocks.",
+    "note": "2026-11-16 (CORE 59f001f): the tool sweeps count dropped licence counts, vulnerability and application lists. Still open: about 20 silent catch blocks in the CIPP (actions, health, identity, mail), sign-in and Huntress (checks, modules) sweeps. Each needs reading for what its failure should count as; not started.",
     "added": "2026-11-14"
   },
   {
@@ -743,8 +756,9 @@
     "title": "A module dependency graph doc and a test that fails on an import cycle",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a module dependency graph doc and a test that fails on an import cycle. The test has to read import lines from source text, which the project's test rules forbid; a script run by verify would be allowed only if you change the rules. OK as a script outside verify?"
   },
   {
     "key": "r7-ci-31",
@@ -762,8 +776,9 @@
     "title": "A test that every shell command call site is on a reviewed allowlist",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a check that every shell command call site is on a reviewed allowlist. Same source-text rule as r7-ci-30. scripts/spawn-sites.mjs already lists spawn sites; extend it with an allowlist file?"
   },
   {
     "key": "r7-ci-33",
@@ -848,16 +863,17 @@
     "title": "Say license in every text the API and CORE produce, not only in the console",
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: say license in every text the API and CORE produce. About 120 places in the API still write the British spelling, but many are field names and identifiers (licence_waste, licence_counts) that other code depends on; I would change only user-visible text and keep identifiers. OK?"
   },
   {
     "key": "r7-ai-02",
     "title": "Query-plan tests for the devices list on a table with many rows",
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
-    "needs": "claude",
-    "note": "2026-11-16 looked at, not done: the devices list does not run a per-page query that a plan test could judge. It loads every device of the scope into memory (with a cache) and filters and pages in Python, so a query-plan test would only show an ordinary tenant index scan. The real cost is that load; fixing it means moving the filters into SQL, which is a design change for Hal to approve.",
+    "needs": "signoff",
+    "note": "Proposal, reply 'go' or change it: query-plan tests for the devices list. Not possible as described: the devices list loads every device into memory and pages in Python, so there is no per-page query to plan. Close this item, or move the list to database paging (a large change)?",
     "added": "2026-11-14"
   },
   {
@@ -1254,16 +1270,20 @@
     "title": "A weekly report of every device whose Huntress organization differs from its NinjaOne client, sent to A.C.O.R.N",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a weekly report of devices whose Huntress organization differs from the NinjaOne client. The list of 141 machines was built by hand from live reads; I would move that logic into a weekly CORE report posted to A.C.O.R.N and shown on Device Versions. Needs the live reads, so I cannot test against real data tonight."
   },
   {
     "key": "r7-cf-02",
     "title": "Deploy NinjaOne: remember the last organization, location and role chosen",
     "area": "Round 7: CORE feature",
-    "status": "new",
+    "status": "completed",
     "needs": "claude",
-    "added": "2026-11-14"
+    "added": "2026-11-14",
+    "note": "2026-11-18: Deploy NinjaOne starts from the machine's suggested organization, else the last organization used, with the last location and the last role for the chosen package (Windows and Mac separately), kept in the browser.",
+    "completed": "2026-11-18",
+    "completed_ref": "AiSOC 2026-11-18"
   },
   {
     "key": "r7-cf-03",
@@ -1279,56 +1299,65 @@
     "title": "Send a ScreenConnect command to several machines at once with each answer listed",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: send a ScreenConnect command to several machines at once with each answer listed. Remote command execution on many machines; needs the approval path and a cap. Who may use it and what cap?"
   },
   {
     "key": "r7-cf-05",
     "title": "Saved ScreenConnect commands (reboot, flush DNS, gpupdate) with a confirm step",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: saved ScreenConnect commands (reboot, flush DNS, gpupdate) with a confirm step. Remote command execution; which commands and who may run them?"
   },
   {
     "key": "r7-cf-06",
     "title": "A Huntress agent report: version spread and agents more than two releases old",
     "area": "Round 7: CORE feature",
-    "status": "new",
+    "status": "completed",
     "needs": "claude",
-    "added": "2026-11-14"
+    "added": "2026-11-14",
+    "completed": "2026-11-18",
+    "completed_ref": "AiSOC 2026-11-18",
+    "note": "2026-11-18: Reports > Device Versions lists the Huntress agent versions across the clients (newest first, with the number of agents) and every agent more than two releases behind the newest version the fleet runs (there is no list of Huntress releases, so old is relative to the fleet). GET /device-reports/huntress-versions."
   },
   {
     "key": "r7-cf-07",
     "title": "A NinjaOne report of machines with no recent patch scan",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started: A.C.O.R.N does not hold the data this needs, so CORE would have to read it from the vendor first, and I cannot verify a vendor read without a live look at the account. Reply 'go' in the box and I build it from the vendor's published API, marked NOT VERIFIED until you see real numbers. Device records carry NinjaOne's last contact but not the last patch scan; I would read NinjaOne's OS patch report."
   },
   {
     "key": "r7-cf-08",
     "title": "CIPP: list guest users older than a year for each client",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started: A.C.O.R.N does not hold the data this needs, so CORE would have to read it from the vendor first, and I cannot verify a vendor read without a live look at the account. Reply 'go' in the box and I build it from the vendor's published API, marked NOT VERIFIED until you see real numbers. I would read each client's guest users with their creation date through CIPP."
   },
   {
     "key": "r7-cf-09",
     "title": "CIPP: list shared mailboxes with a sign-in enabled",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started: A.C.O.R.N does not hold the data this needs, so CORE would have to read it from the vendor first, and I cannot verify a vendor read without a live look at the account. Reply 'go' in the box and I build it from the vendor's published API, marked NOT VERIFIED until you see real numbers. I would read shared mailboxes and whether sign-in is enabled through CIPP."
   },
   {
     "key": "r7-cf-10",
     "title": "CIPP: list mailboxes with a forwarding rule to an outside address (extend the existing check to a list)",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started: A.C.O.R.N does not hold the data this needs, so CORE would have to read it from the vendor first, and I cannot verify a vendor read without a live look at the account. Reply 'go' in the box and I build it from the vendor's published API, marked NOT VERIFIED until you see real numbers. The existing check only reports a count; I would list the mailboxes and the outside addresses through CIPP."
   },
   {
     "key": "r7-cf-11",
@@ -1343,41 +1372,48 @@
     "key": "r7-cf-12",
     "title": "Auvik: report switches and firewalls with a firmware older than the vendor's current",
     "area": "Round 7: CORE feature",
-    "status": "new",
+    "status": "completed",
     "needs": "claude",
-    "added": "2026-11-14"
+    "added": "2026-11-14",
+    "completed": "2026-11-18",
+    "completed_ref": "AiSOC 2026-11-18",
+    "note": "2026-11-18: Reports > Device Versions lists network devices (Auvik) running older firmware than another device of the same make and model, with the models and the versions seen. Behind the newest firmware the fleet runs, not the vendor's current release (not known to A.C.O.R.N). GET /device-reports/network-firmware."
   },
   {
     "key": "r7-cf-13",
     "title": "Meraki: list SSIDs with no encryption and clients that use them",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started: A.C.O.R.N does not hold the data this needs, so CORE would have to read it from the vendor first, and I cannot verify a vendor read without a live look at the account. Reply 'go' in the box and I build it from the vendor's published API, marked NOT VERIFIED until you see real numbers. Meraki devices carry status and tags, not wireless settings; I would read each network's SSIDs and encryption setting."
   },
   {
     "key": "r7-cf-14",
     "title": "UniFi: report devices offline for more than a week",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started: A.C.O.R.N does not hold the data this needs, so CORE would have to read it from the vendor first, and I cannot verify a vendor read without a live look at the account. Reply 'go' in the box and I build it from the vendor's published API, marked NOT VERIFIED until you see real numbers. UniFi devices carry status but not how long they have been offline; I would keep when a device was first seen offline."
   },
   {
     "key": "r7-cf-15",
     "title": "ThreatMate: weekly change report (new exposed services and vulnerabilities)",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started: A.C.O.R.N does not hold the data this needs, so CORE would have to read it from the vendor first, and I cannot verify a vendor read without a live look at the account. Reply 'go' in the box and I build it from the vendor's published API, marked NOT VERIFIED until you see real numbers. A weekly change report needs last week's list of exposed services and vulnerabilities to compare with; A.C.O.R.N keeps only the latest, so I would start keeping a weekly copy and the first report would be a week away."
   },
   {
     "key": "r7-cf-16",
     "title": "IT Glue: find clients with no documented backup or no network diagram",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started: A.C.O.R.N does not hold the data this needs, so CORE would have to read it from the vendor first, and I cannot verify a vendor read without a live look at the account. Reply 'go' in the box and I build it from the vendor's published API, marked NOT VERIFIED until you see real numbers. IT Glue documents are not read by A.C.O.R.N today; I would read each client's documents and flag clients with none titled like backup or network diagram."
   },
   {
     "key": "r7-cf-17",
@@ -1411,40 +1447,44 @@
     "title": "A daily CORE self-report: what ran, what failed, what changed",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a daily CORE self-report (what ran, what failed, what changed). The heartbeat on Platform health now shows commit, uptime and passes. Where should the report go: a Platform health panel, an e-mail, or a Slack message?"
   },
   {
     "key": "r7-cf-21",
     "title": "A Cipher job that drafts the weekly client review paragraph from the data",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a Cipher job that drafts the weekly client review paragraph from the data. Each scheduled agent job costs a model run per client per week and its text goes to a person. How many clients, and where should it be delivered?"
   },
   {
     "key": "r7-cf-22",
     "title": "A Jax job that lists integrations whose last read is older than a day",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a Jax job that lists integrations whose last read is older than a day. Platform health and Connectors already show this; a scheduled agent adds a model run a day. Wanted as a message, or is the page enough?"
   },
   {
     "key": "r7-cf-23",
     "title": "A Vera job that checks every client has a Halo contact for security notices",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a Vera job that checks every client has a Halo contact for security notices. Needs CORE to read each client's HaloPSA contacts; where should gaps be reported?"
   },
   {
     "key": "r7-cf-24",
     "title": "An agent skill for answering a customer security questionnaire from the answer library",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data.",
+    "needs": "signoff",
+    "note": "Decision for Hal: these four agent skills need a read tool for A.C.O.R.N's compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool widens what CORE's key and the agents can reach (the same key reaches every client). Question: may agents read compliance data, for all clients or only the one in the conversation? My recommendation: read-only, one client at a time, through a new narrow key scope.",
     "added": "2026-11-14"
   },
   {
@@ -1452,8 +1492,8 @@
     "title": "An agent skill for writing the evidence note for an access review",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data.",
+    "needs": "signoff",
+    "note": "Decision for Hal: these four agent skills need a read tool for A.C.O.R.N's compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool widens what CORE's key and the agents can reach (the same key reaches every client). Question: may agents read compliance data, for all clients or only the one in the conversation? My recommendation: read-only, one client at a time, through a new narrow key scope.",
     "added": "2026-11-14"
   },
   {
@@ -1461,8 +1501,8 @@
     "title": "An agent skill for the quarterly vendor review",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data.",
+    "needs": "signoff",
+    "note": "Decision for Hal: these four agent skills need a read tool for A.C.O.R.N's compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool widens what CORE's key and the agents can reach (the same key reaches every client). Question: may agents read compliance data, for all clients or only the one in the conversation? My recommendation: read-only, one client at a time, through a new narrow key scope.",
     "added": "2026-11-14"
   },
   {
@@ -1470,8 +1510,8 @@
     "title": "An agent skill that explains an automated control test failure and the fix",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data.",
+    "needs": "signoff",
+    "note": "Decision for Hal: these four agent skills need a read tool for A.C.O.R.N's compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool widens what CORE's key and the agents can reach (the same key reaches every client). Question: may agents read compliance data, for all clients or only the one in the conversation? My recommendation: read-only, one client at a time, through a new narrow key scope.",
     "added": "2026-11-14"
   },
   {
@@ -1490,8 +1530,9 @@
     "title": "Windows: a tray menu entry showing sweep status and the last update",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a Windows tray menu entry showing sweep status and the last update. CORE already has a window; a tray icon adds an always-on process. Wanted?"
   },
   {
     "key": "r7-cf-30",
@@ -1507,8 +1548,9 @@
     "title": "A local read-only page listing the connectors and when each last read",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a local read-only page listing the connectors and when each last read. Platform health shows this in A.C.O.R.N; a local page helps only when A.C.O.R.N is unreachable. Wanted?"
   },
   {
     "key": "r7-cf-32",
@@ -1526,32 +1568,36 @@
     "title": "Offline mode: queue feed posts while A.C.O.R.N is unreachable and send them in order",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: offline mode: queue feed posts while A.C.O.R.N is unreachable and send them in order. It must not resend stale data or fill the disk; proposal: keep at most 24 hours, newest state per route. OK?"
   },
   {
     "key": "r7-cf-34",
     "title": "A command to replay one sweep for one client for debugging",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a command to replay one sweep for one client for debugging. Same entry as r7-ci-23 (a sweep script); do both together?"
   },
   {
     "key": "r7-cf-35",
     "title": "A command that prints what CORE would send for one client without sending it",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a command that prints what CORE would send for one client without sending it. Same entry as r7-ci-23 (--dry-run)."
   },
   {
     "key": "r7-cf-36",
     "title": "Support bundle: a zip of logs and settings names with secrets masked",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Proposal, reply 'go' or change it: a support bundle: a zip of logs and settings names with secrets masked. Needs a rule for what counts as a secret in a log line. Proposal: mask anything matching the existing secret scanner and never include .env. OK?"
   },
   {
     "key": "r7-cf-37",
@@ -1740,8 +1786,9 @@
     "title": "Personnel: training completion from Huntress awareness training",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started, needs data: Huntress awareness training gives learner counts, not who has finished. Question: is completion per person available in your Huntress SAT account (an API scope or an export)? If not, this cannot be built."
   },
   {
     "key": "r7-af-16",
@@ -1808,8 +1855,9 @@
     "title": "Devices: a lifecycle view (age by purchase date, warranty, replacement plan)",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started, needs data: Devices show warranty end dates when NinjaOne carries them, but no purchase date. Question: where is the purchase date kept (HaloPSA assets, Ninja custom field, a spreadsheet)? Without it age can only be shown from first seen."
   },
   {
     "key": "r7-af-23",
@@ -1838,8 +1886,9 @@
     "title": "Identities: a joiner and leaver report from the directory",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started, needs a history: a joiner and leaver report needs to know when each directory account appeared and disappeared; A.C.O.R.N keeps the current identities and first seen dates only. I would use first seen as the join date and mark an account as a leaver when it was disabled or left the directory (recording the day from now on). OK to start that way?"
   },
   {
     "key": "r7-af-26",
@@ -1900,16 +1949,18 @@
     "title": "Reports: a quarterly business review pack per client",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started, needs a decision: the Client review page is a security review (tool coverage, MFA, secure score, alerts, insurance checklist). A quarterly business review pack would add tickets, hours and satisfaction (Metrics > Client summary) and the finance view (revenue, margin) to it as one printable page per client. Question: include the finance numbers in something a client may see? Recommend: tickets, hours, satisfaction, security and what we did this quarter, without margin."
   },
   {
     "key": "r7-af-32",
     "title": "Reports: schedule any report by email",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started, needs a decision: which reports can be scheduled (Executive digest, Client review, Net income tabs?), who receives them (a fixed list per report), the day and time, and whether client names may go out by e-mail. The mail sender used for the compliance notice can carry them."
   },
   {
     "key": "r7-af-33",
@@ -1965,8 +2016,9 @@
     "title": "Billing: a margin forecast from the license counts",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude",
-    "added": "2026-11-14"
+    "needs": "signoff",
+    "added": "2026-11-14",
+    "note": "Not started, needs a definition: what should the forecast show? My reading: for each client, next month's revenue from its HaloPSA recurring invoice lines, the cost of the licenses counted for it (counts times each vendor's cost per license from Settings > Finance > Software costs) and the margin between them, flagged where the counts have changed since the invoice. Tell me if that is right, or what else (a trend over months? per vendor?). It also depends on vendors having counts chosen."
   },
   {
     "key": "r7-af-39",

@@ -24,9 +24,9 @@ describe('the Compliance and vCIO sidebar sections', () => {
 
   it('Compliance is a section of its own with the pages that are built, and vCIO no longer holds it', () => {
     expect(labels('Compliance')).toEqual(['Overview', 'Frameworks', 'Controls', 'Tests', 'Policies', 'Risk Management', 'Vendors', 'Access Reviews', 'People', 'Questionnaires', 'Audits', 'Calendar', 'Trust Center', 'Asset Inventory']);
-    expect(labels('vCIO')).toEqual(['Executive Digest', 'Client Review', 'Client Risk Score']);
+    expect(labels('vCIO')).toEqual(['Executive Digest', 'Client Review', 'Device Versions', 'Client Risk Score']);
     const platform = labels('Platform') ?? [];
-    for (const moved of ['Compliance', 'Executive Digest', 'Client Review', 'Client Risk Score']) expect(platform).not.toContain(moved);
+    for (const moved of ['Compliance', 'Executive Digest', 'Client Review', 'Device Versions', 'Client Risk Score']) expect(platform).not.toContain(moved);
   });
 
   it('Compliance sits after Automation and before vCIO, and each page keeps its address', () => {
@@ -34,6 +34,6 @@ describe('the Compliance and vCIO sidebar sections', () => {
     expect(titles.indexOf('Compliance')).toBe(titles.indexOf('Automation') + 1);
     expect(titles.indexOf('vCIO')).toBe(titles.indexOf('Compliance') + 1);
     expect(NAV_CATALOG.find((s) => s.title === 'Compliance')?.items.map((i) => i.href)).toEqual(['/compliance', '/compliance/frameworks', '/compliance/controls', '/compliance/tests', '/compliance/policies', '/compliance/risk-register', '/compliance/vendors', '/compliance/access-reviews', '/compliance/people', '/compliance/questionnaires', '/compliance/audits', '/compliance/calendar', '/compliance/trust-center', '/inventory']);
-    expect(NAV_CATALOG.find((s) => s.title === 'vCIO')?.items.map((i) => i.href)).toEqual(['/reports/digest', '/reports/client-review', '/vcio-risk-scoring']);
+    expect(NAV_CATALOG.find((s) => s.title === 'vCIO')?.items.map((i) => i.href)).toEqual(['/reports/digest', '/reports/client-review', '/reports/device-versions', '/vcio-risk-scoring']);
   });
 });

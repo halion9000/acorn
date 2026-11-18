@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const api = vi.hoisted(() => ({ deployOptions: vi.fn(), deployNinja: vi.fn(), consoleLine: vi.fn() }));
 vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), devicesApi: api }));
 
-import { DeployNinja, rolesFor } from './DeployNinja';
+import { DeployNinja, readLast, rolesFor, startingChoice } from './DeployNinja';
 
 const options = (over: Record<string, unknown> = {}) => ({
   device_id: 'd1',
@@ -27,6 +27,7 @@ const options = (over: Record<string, unknown> = {}) => ({
 const line = (over: Record<string, unknown> = {}) => ({ request_id: 'r1', command: 'Install the NinjaOne agent', status: 'pending', output: null, requested_at: '2026-11-14T10:00:00Z', finished_at: null, ...over });
 
 beforeEach(() => {
+  window.localStorage.clear();
   Object.values(api).forEach((m) => m.mockReset());
   api.deployOptions.mockResolvedValue(options());
 });
@@ -85,5 +86,30 @@ describe('DeployNinja', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Install NinjaOne' }));
     await userEvent.click(screen.getByRole('button', { name: 'Yes, install' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('still waiting for an answer');
+  });
+});
+
+describe('remembering the last choice', () => {
+  it('starts from the machine suggested organization, else the last one used, with the last location and the last role of the package when they still exist', () => {
+    const o = options() as never;
+    const last = { orgId: 22, locationId: 22, roles: { msi: 1004, pkg: 206 } };
+    expect(startingChoice(o, last, 'msi')).toEqual({ orgId: 27, locationId: 28, roleId: 1004 });
+    const unmapped = options({ suggested_org_id: null }) as never;
+    expect(startingChoice(unmapped, last, 'msi')).toEqual({ orgId: 22, locationId: 22, roleId: 1004 });
+    expect(startingChoice(unmapped, { orgId: 27, locationId: 27, roles: {} }, 'pkg')).toEqual({ orgId: 27, locationId: 27, roleId: null });
+    expect(startingChoice(unmapped, { orgId: 99, locationId: 1, roles: { msi: 5 } }, 'msi')).toEqual({ orgId: null, locationId: null, roleId: null });
+    expect(startingChoice(unmapped, null, 'msi')).toEqual({ orgId: null, locationId: null, roleId: null });
+  });
+
+  it('keeps what was deployed and offers it again next time', async () => {
+    api.deployOptions.mockResolvedValue(options({ suggested_org_id: null }));
+    api.deployNinja.mockResolvedValue(line());
+    render(<DeployNinja deviceId="d1" hostname="PC-1" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Deploy NinjaOne' }));
+    await userEvent.selectOptions(await screen.findByLabelText('Organization'), '22');
+    await userEvent.selectOptions(screen.getByLabelText('Role'), '1004');
+    await userEvent.click(screen.getByRole('button', { name: 'Install NinjaOne' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, install' }));
+    await waitFor(() => expect(readLast()).toEqual({ orgId: 22, locationId: 22, roles: { msi: 1004 } }));
   });
 });

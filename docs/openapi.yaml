@@ -18194,6 +18194,76 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/device-reports/huntress-versions:
+    get:
+      tags:
+      - devices
+      summary: Huntress agent versions across the clients, and the agents more than
+        two releases behind the newest
+      operationId: huntress_versions_api_v1_device_reports_huntress_versions_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Huntress Versions Api V1 Device Reports Huntress Versions
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/device-reports/network-firmware:
+    get:
+      tags:
+      - devices
+      summary: Network devices (Auvik) running older firmware than another device
+        of the same make and model
+      operationId: network_firmware_api_v1_device_reports_network_firmware_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Network Firmware Api V1 Device Reports Network Firmware
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/devices/settings:
     get:
       tags:

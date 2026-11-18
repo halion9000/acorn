@@ -11,6 +11,40 @@ const POLL_MS = 3000;
 const PACKAGE_LABEL = { msi: 'Windows installer (MSI)', pkg: 'Mac package (PKG)' } as const;
 const CLASSES: Record<'msi' | 'pkg', string[]> = { msi: ['WINDOWS_WORKSTATION', 'WINDOWS_SERVER'], pkg: ['MAC', 'MAC_SERVER'] };
 
+const LAST_KEY = 'acorn.deployNinja.last';
+export interface LastChoice {
+  orgId: number | null;
+  locationId: number | null;
+  roles: { msi?: number; pkg?: number };
+}
+
+/** What was chosen last time, from the browser (empty when there is none or storage is blocked). */
+export function readLast(): LastChoice | null {
+  try {
+    const raw = window.localStorage.getItem(LAST_KEY);
+    return raw ? (JSON.parse(raw) as LastChoice) : null;
+  } catch {
+    return null;
+  }
+}
+function saveLast(next: LastChoice): void {
+  try {
+    window.localStorage.setItem(LAST_KEY, JSON.stringify(next));
+  } catch {
+    /* a private window: nothing is remembered */
+  }
+}
+
+/** The organization, location and role to start from (pure): the machine's own suggested organization first, else the last one used; the location and the role of the chosen package are the last used when they still exist. */
+export function startingChoice(options: NinjaDeployOptions, last: LastChoice | null, pkg: 'msi' | 'pkg'): { orgId: number | null; locationId: number | null; roleId: number | null } {
+  const suggested = options.organizations.find((x) => x.id === options.suggested_org_id) ?? null;
+  const org = suggested ?? options.organizations.find((x) => x.id === last?.orgId) ?? null;
+  const location = org?.locations.find((l) => l.id === last?.locationId) ?? org?.locations[0] ?? null;
+  const wanted = last?.roles?.[pkg];
+  const role = rolesFor(options, pkg).find((r) => r.id === wanted) ?? null;
+  return { orgId: org?.id ?? null, locationId: location?.id ?? null, roleId: role?.id ?? null };
+}
+
 /** The roles that fit a package: Windows roles for an MSI, Mac roles for a PKG (pure). */
 export function rolesFor(options: NinjaDeployOptions, pkg: 'msi' | 'pkg') {
   return options.roles.filter((r) => CLASSES[pkg].includes(r.node_class));
@@ -36,10 +70,10 @@ export function DeployNinja({ deviceId, hostname }: { deviceId: string; hostname
         if (!live) return;
         setOptions(o);
         setPkg(o.suggested_package);
-        const org = o.organizations.find((x) => x.id === o.suggested_org_id) ?? null;
-        setOrgId(org?.id ?? null);
-        setLocationId(org?.locations[0]?.id ?? null);
-        setRoleId(null);
+        const start = startingChoice(o, readLast(), o.suggested_package);
+        setOrgId(start.orgId);
+        setLocationId(start.locationId);
+        setRoleId(start.roleId);
       })
       .catch((e) => live && setProblem(apiErrorDetail(e) ?? (e instanceof Error ? e.message : 'Could not load the choices.')));
     return () => {
@@ -69,6 +103,8 @@ export function DeployNinja({ deviceId, hostname }: { deviceId: string; hostname
     setProblem('');
     try {
       setLine(await devicesApi.deployNinja(deviceId, { package: pkg, org_id: orgId!, location_id: locationId!, role_id: roleId! }));
+      const was = readLast();
+      saveLast({ orgId, locationId, roles: { ...(was?.roles ?? {}), [pkg]: roleId! } });
       setConfirming(false);
     } catch (e) {
       setProblem(apiErrorDetail(e) ?? (e instanceof Error ? e.message : 'Could not start the install.'));
@@ -103,7 +139,7 @@ export function DeployNinja({ deviceId, hostname }: { deviceId: string; hostname
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-xs text-gray-400">
             Package
-            <select aria-label="Package" value={pkg} onChange={(e) => { setPkg(e.target.value as 'msi' | 'pkg'); setRoleId(null); }} className={field}>
+            <select aria-label="Package" value={pkg} onChange={(e) => { const next = e.target.value as 'msi' | 'pkg'; setPkg(next); setRoleId(startingChoice(options, readLast(), next).roleId); }} className={field}>
               {(Object.keys(PACKAGE_LABEL) as ('msi' | 'pkg')[]).map((p) => (
                 <option key={p} value={p}>
                   {PACKAGE_LABEL[p]}

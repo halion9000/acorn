@@ -414,6 +414,11 @@ const navSections: NavSection[] = [
         icon: <DocumentReportIcon />,
       },
       {
+        label: 'Device Versions',
+        href: '/reports/device-versions',
+        icon: <DocumentReportIcon />,
+      },
+      {
         label: 'Client Risk Score',
         href: '/vcio-risk-scoring',
         icon: <DocumentReportIcon />,
