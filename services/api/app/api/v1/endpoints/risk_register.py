@@ -17,8 +17,9 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
-from app.api.v1.endpoints.compliance import ScopeTenant
-from app.models.risk_register import RiskRegisterHistory, RiskRegisterItem, RiskRegisterLevel, RiskRegisterTask
+from app.api.v1.endpoints.compliance import FRAMEWORKS, ScopeTenant
+from app.models.risk_register import RiskRegisterHistory, RiskRegisterItem, RiskRegisterLevel, RiskRegisterLink, RiskRegisterTask
+from app.models.vendor_management import Vendor
 from app.services import risk_heatmap as hm
 from app.services import csv_export
 from app.services.audit import emit_audit
@@ -73,9 +74,24 @@ class HistoryOut(BaseModel):
     created_at: datetime
 
 
+class LinkOut(BaseModel):
+    id: uuid.UUID
+    kind: Literal["control", "vendor"]
+    framework: str | None  # for a control
+    ref: str  # the control id, or the vendor id
+    label: str  # the control title or the vendor name; empty when what it pointed at is gone
+
+
+class LinkIn(BaseModel):
+    kind: Literal["control", "vendor"]
+    framework: str | None = Field(default=None, max_length=20)
+    ref: str = Field(min_length=1, max_length=80)
+
+
 class RiskDetail(RiskOut):
     tasks: list[TaskOut]
     history: list[HistoryOut]
+    links: list[LinkOut] = []
 
 
 class Summary(BaseModel):
@@ -451,6 +467,18 @@ async def from_library(
     return await _create(db, tenant, user, request, data, source="from the library")
 
 
+def link_out(k: RiskRegisterLink, vendor_names: dict[Any, str]) -> LinkOut:
+    """One link as shown: a control carries its title from the catalog, a vendor its name (pure)."""
+    if k.kind == "control":
+        label = FRAMEWORKS.get(k.framework or "", {}).get(k.ref, "")
+    else:
+        try:
+            label = vendor_names.get(uuid.UUID(k.ref), "")
+        except ValueError:
+            label = ""
+    return LinkOut(id=k.id, kind=k.kind, framework=k.framework, ref=k.ref, label=label)
+
+
 async def _detail(db: Any, tenant: uuid.UUID, risk_id: uuid.UUID) -> RiskDetail:
     row = await _get(db, tenant, risk_id)
     today = datetime.now(UTC).date()
@@ -478,8 +506,15 @@ async def _detail(db: Any, tenant: uuid.UUID, risk_id: uuid.UUID) -> RiskDetail:
         .all()
     )
     base = _risk(row, sum(1 for t in tasks if not t.done))
+    links = (
+        (await db.execute(select(RiskRegisterLink).where(RiskRegisterLink.risk_id == risk_id, RiskRegisterLink.tenant_id == tenant).order_by(RiskRegisterLink.created_at)))
+        .scalars()
+        .all()
+    )
+    names = {v.id: v.name for v in (await db.execute(select(Vendor).where(Vendor.tenant_id == tenant))).scalars().all()} if any(k.kind == "vendor" for k in links) else {}
     return RiskDetail(
         **base.model_dump(),
+        links=[link_out(k, names) for k in links],
         tasks=[_task(t, today) for t in tasks],
         history=[HistoryOut(actor=h.actor, action=h.action, detail=h.detail, created_at=h.created_at) for h in history],
     )
@@ -640,6 +675,69 @@ async def add_task(
         )
     )
     await _note(db, tenant, risk_id, user, "task_added", body.title.strip())
+    await db.commit()
+    return await _detail(db, tenant, risk_id)
+
+
+@router.post("/{risk_id}/links", response_model=RiskDetail, status_code=status.HTTP_201_CREATED, summary="Link this risk to a control or a vendor it concerns")
+async def add_link(
+    risk_id: uuid.UUID,
+    body: LinkIn,
+    tenant: ScopeTenant,
+    db: DBSession,
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+) -> RiskDetail:
+    row = await _get(db, tenant, risk_id)
+    if row.status == "archived":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An archived risk cannot take new links. Restore it first.")
+    ref, framework = body.ref.strip(), None
+    if body.kind == "control":
+        framework = body.framework or ""
+        if ref not in FRAMEWORKS.get(framework, {}):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="That control is not in the list for that framework.")
+        label = FRAMEWORKS[framework][ref]
+    else:
+        try:
+            vendor_id = uuid.UUID(ref)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="That is not a vendor.") from None
+        vendor = (await db.execute(select(Vendor).where(Vendor.id == vendor_id, Vendor.tenant_id == tenant))).scalar_one_or_none()
+        if vendor is None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="That vendor is not in this client vendor list.")
+        ref, label = str(vendor.id), vendor.name
+    taken = (
+        await db.execute(
+            select(RiskRegisterLink.id).where(
+                RiskRegisterLink.risk_id == risk_id,
+                RiskRegisterLink.kind == body.kind,
+                func.coalesce(RiskRegisterLink.framework, "") == (framework or ""),
+                RiskRegisterLink.ref == ref,
+            )
+        )
+    ).first()
+    if taken is None:
+        db.add(RiskRegisterLink(id=uuid.uuid4(), tenant_id=tenant, risk_id=risk_id, kind=body.kind, framework=framework, ref=ref))
+        await _note(db, tenant, risk_id, user, "link_added", f"{body.kind}: {(framework + ' ') if framework else ''}{label or ref}")
+        await db.commit()
+    return await _detail(db, tenant, risk_id)
+
+
+@router.delete("/{risk_id}/links/{link_id}", response_model=RiskDetail, summary="Remove a link from this risk")
+async def remove_link(
+    risk_id: uuid.UUID,
+    link_id: uuid.UUID,
+    tenant: ScopeTenant,
+    db: DBSession,
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+) -> RiskDetail:
+    await _get(db, tenant, risk_id)
+    link = (
+        await db.execute(select(RiskRegisterLink).where(RiskRegisterLink.id == link_id, RiskRegisterLink.risk_id == risk_id, RiskRegisterLink.tenant_id == tenant))
+    ).scalar_one_or_none()
+    if link is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such link.")
+    await db.delete(link)
+    await _note(db, tenant, risk_id, user, "link_removed", f"{link.kind}: {link.ref}")
     await db.commit()
     return await _detail(db, tenant, risk_id)
 

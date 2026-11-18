@@ -265,3 +265,43 @@ async def test_the_heat_map_follows_each_risk_through_its_changes_archiving_and_
     assert unchanged.owner == "Hal"
     rows = (await run(w.acme, lambda db: db.execute(text("select count(*) from risk_register_levels where risk_id = :r"), {"r": r.id}))).scalar()
     assert rows == 4, "added, changed, archived, restored: a change of owner is not a change of level"
+
+
+async def vendor(w, tenant, name):
+    vid = uuid.uuid4()
+    engine = create_async_engine(PG_URL, poolclass=NullPool)
+    async with engine.begin() as conn:
+        await conn.execute(
+            text("insert into vendors (id, tenant_id, name, category, risk_level, data_access, notes, status, created_at, updated_at) values (:i, :t, :n, 'Other', 'unassessed', 'unknown', '', 'active', now(), now())"),
+            {"i": vid, "t": tenant, "n": name},
+        )
+    await engine.dispose()
+    return vid
+
+
+async def test_a_risk_links_to_controls_and_vendors_it_concerns_each_once_and_only_real_ones_of_its_own_client(world):
+    w = world
+    r = await add(w, title="Backups are never tested")
+    mine, theirs = await vendor(w, w.acme, "Datto"), await vendor(w, w.birch, "Birch only vendor")
+
+    async def link(**body):
+        return await run(w.acme, lambda db: ep.add_link(r.id, ep.LinkIn(**body), w.acme, db, w.user))
+
+    d = await link(kind="control", framework="SOC2", ref="A1.3")
+    d = await link(kind="vendor", ref=str(mine))
+    d = await link(kind="control", framework="SOC2", ref="A1.3")
+    assert [(k.kind, k.framework, k.ref, k.label) for k in d.links] == [("control", "SOC2", "A1.3", "Tests recovery plan procedures"), ("vendor", None, str(mine), "Datto")], "a repeat adds nothing"
+    for bad in ({"kind": "control", "framework": "SOC2", "ref": "ZZ9.9"}, {"kind": "control", "framework": "NOPE", "ref": "A1.3"}, {"kind": "vendor", "ref": str(theirs)}, {"kind": "vendor", "ref": "not-an-id"}):
+        with pytest.raises(HTTPException) as e:
+            await link(**bad)
+        assert e.value.status_code == 422, bad
+    with pytest.raises(HTTPException) as e:
+        await run(w.birch, lambda db: ep.add_link(r.id, ep.LinkIn(kind="control", framework="SOC2", ref="A1.2"), w.birch, db, w.user))
+    assert e.value.status_code == 404, "another client cannot link to this risk"
+    d = await run(w.acme, lambda db: ep.remove_link(r.id, d.links[0].id, w.acme, db, w.user))
+    assert [k.kind for k in d.links] == ["vendor"]
+    assert [h.action for h in d.history][:3] == ["link_removed", "link_added", "link_added"]
+    await run(w.acme, lambda db: ep.archive_risk(r.id, w.request, w.acme, db, w.user))
+    with pytest.raises(HTTPException) as e:
+        await link(kind="control", framework="SOC2", ref="A1.2")
+    assert e.value.status_code == 409

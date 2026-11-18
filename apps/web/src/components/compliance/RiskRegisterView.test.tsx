@@ -20,7 +20,7 @@ const csv = vi.hoisted(() => vi.fn());
 const save = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/saveFile', () => ({ saveText: save }));
 vi.mock('@/lib/api', () => ({
-  downloadCsv: csv, apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), riskRegisterApi: api, msspApi: { listChildren: async () => [] } }));
+  downloadCsv: csv, apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), riskRegisterApi: api, vendorApi: { list: async () => ({ vendors: [] }) }, msspApi: { listChildren: async () => [] } }));
 
 import { RiskRegisterView, cellLevel } from './RiskRegisterView';
 

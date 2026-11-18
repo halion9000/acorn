@@ -7756,7 +7756,15 @@ export interface RiskItem {
   updated_at: string;
   archived_at: string | null;
 }
+export interface RiskLink {
+  id: string;
+  kind: 'control' | 'vendor';
+  framework: string | null;
+  ref: string;
+  label: string;
+}
 export interface RiskDetail extends RiskItem {
+  links?: RiskLink[];
   tasks: RiskTask[];
   history: { actor: string | null; action: string; detail: string; created_at: string }[];
 }
@@ -7820,6 +7828,10 @@ export const riskRegisterApi = {
     request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteTask: (clientId: string, id: string, taskId: string) =>
     request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}?${riskQs(clientId)}`, { method: 'DELETE' }),
+  addLink: (clientId: string, id: string, body: { kind: 'control' | 'vendor'; framework?: string; ref: string }) =>
+    request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/links?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  removeLink: (clientId: string, id: string, linkId: string) =>
+    request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}/links/${encodeURIComponent(linkId)}?${riskQs(clientId)}`, { method: 'DELETE' }),
 };
 
 /** The roadmap at Settings > Upcoming improvements (GET/POST /api/v1/roadmap, PATCH /api/v1/roadmap/{id}). */

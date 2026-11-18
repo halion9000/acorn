@@ -2298,7 +2298,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LinkOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__client_status__LinkOut'
         '422':
           description: Validation Error
           content:
@@ -2327,7 +2327,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LinkOut'
+                $ref: '#/components/schemas/app__api__v1__endpoints__client_status__LinkOut'
         '422':
           description: Validation Error
           content:
@@ -14827,6 +14827,103 @@ paths:
               $ref: '#/components/schemas/TaskIn'
       responses:
         '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/risk-register/{risk_id}/links:
+    post:
+      tags:
+      - risk-register
+      summary: Link this risk to a control or a vendor it concerns
+      operationId: add_link_api_v1_risk_register__risk_id__links_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: risk_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Risk Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__risk_register__LinkIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/risk-register/{risk_id}/links/{link_id}:
+    delete:
+      tags:
+      - risk-register
+      summary: Remove a link from this risk
+      operationId: remove_link_api_v1_risk_register__risk_id__links__link_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: risk_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Risk Id
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Link Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
           description: Successful Response
           content:
             application/json:
@@ -49107,66 +49204,6 @@ components:
       - state
       - token
       title: LinkCreated
-    LinkOut:
-      properties:
-        id:
-          type: string
-          format: uuid
-          title: Id
-        client_id:
-          type: string
-          format: uuid
-          title: Client Id
-        client_name:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Client Name
-        label:
-          type: string
-          title: Label
-        created_at:
-          type: string
-          format: date-time
-          title: Created At
-        expires_at:
-          type: string
-          format: date-time
-          title: Expires At
-        reviewed_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Reviewed At
-        revoked_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Revoked At
-        last_opened_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Last Opened At
-        state:
-          type: string
-          title: State
-      type: object
-      required:
-      - id
-      - client_id
-      - client_name
-      - label
-      - created_at
-      - expires_at
-      - reviewed_at
-      - revoked_at
-      - last_opened_at
-      - state
-      title: LinkOut
     LinkedAlertOut:
       properties:
         id:
@@ -49290,7 +49327,7 @@ components:
       properties:
         links:
           items:
-            $ref: '#/components/schemas/LinkOut'
+            $ref: '#/components/schemas/app__api__v1__endpoints__client_status__LinkOut'
           type: array
           title: Links
         clients:
@@ -56142,6 +56179,12 @@ components:
             $ref: '#/components/schemas/HistoryOut'
           type: array
           title: History
+        links:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__risk_register__LinkOut'
+          type: array
+          title: Links
+          default: []
       type: object
       required:
       - id
@@ -67226,6 +67269,66 @@ components:
       required:
       - client_id
       title: LinkIn
+    app__api__v1__endpoints__client_status__LinkOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        label:
+          type: string
+          title: Label
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+        reviewed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Reviewed At
+        revoked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Revoked At
+        last_opened_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Opened At
+        state:
+          type: string
+          title: State
+      type: object
+      required:
+      - id
+      - client_id
+      - client_name
+      - label
+      - created_at
+      - expires_at
+      - reviewed_at
+      - revoked_at
+      - last_opened_at
+      - state
+      title: LinkOut
     app__api__v1__endpoints__client_vulnerabilities__VulnerabilityOut:
       properties:
         client_id:
@@ -69654,6 +69757,61 @@ components:
       - created_at
       - updated_at
       title: TemplateOut
+    app__api__v1__endpoints__risk_register__LinkIn:
+      properties:
+        kind:
+          type: string
+          enum:
+          - control
+          - vendor
+          title: Kind
+        framework:
+          anyOf:
+          - type: string
+            maxLength: 20
+          - type: 'null'
+          title: Framework
+        ref:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Ref
+      type: object
+      required:
+      - kind
+      - ref
+      title: LinkIn
+    app__api__v1__endpoints__risk_register__LinkOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        kind:
+          type: string
+          enum:
+          - control
+          - vendor
+          title: Kind
+        framework:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Framework
+        ref:
+          type: string
+          title: Ref
+        label:
+          type: string
+          title: Label
+      type: object
+      required:
+      - id
+      - kind
+      - framework
+      - ref
+      - label
+      title: LinkOut
     app__api__v1__endpoints__risk_register__Summary:
       properties:
         total:

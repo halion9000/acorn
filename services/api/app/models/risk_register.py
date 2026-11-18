@@ -81,3 +81,17 @@ class RiskRegisterLevel(Base):
     residual_likelihood: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     residual_impact: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class RiskRegisterLink(Base):
+    """A link from a risk to a control (framework and control id) or a vendor (its id) it concerns (migration 217)."""
+
+    __tablename__ = "risk_register_links"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    risk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("risk_register_items.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    framework: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    ref: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

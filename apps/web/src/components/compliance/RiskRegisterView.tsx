@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
 import { SecureframeRegisters } from './SecureframeRegisters';
 import { RiskHeatMap } from './RiskHeatMap';
+import { RiskLinks } from './RiskLinks';
 import { saveText } from '@/lib/saveFile';
 import { apiErrorDetail, downloadCsv, riskRegisterApi, type RiskDetail, type RiskInput, type RiskItem, type RiskLibraryItem, type RiskRegister } from '@/lib/api';
 
@@ -312,6 +313,7 @@ function Detail({ clientId, risk, categories, onChange, onClose }: { clientId: s
           </form>
         )}
       </div>
+      <RiskLinks clientId={clientId} risk={risk} archived={archived} onChange={onChange} />
       <div>
         <h4 className="mb-1 text-xs font-semibold uppercase text-gray-400">History</h4>
         <ul className="max-h-40 space-y-0.5 overflow-y-auto text-xs text-gray-400" data-testid="risk-history">
