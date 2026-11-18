@@ -22,6 +22,7 @@ from app.services.addon_software import Change, CountRow, allocate, count_as_of
 from app.services.profitability import name_key
 
 ADDON_ACCOUNT = "5500"
+SUPPORT_ACCOUNT = "5100"
 
 
 def month_end(month: str) -> datetime:
@@ -46,9 +47,9 @@ async def client_keys(db: Any, owner: uuid.UUID, snapshot: dict[str, Any]) -> di
     return {t.id: name_key(by_alias.get(t.id) or t.name) for t in tenants}
 
 
-async def allocation_by_month(db: Any, owner: uuid.UUID, snapshot: dict[str, Any], months: list[str]) -> dict[str, dict[str, Any]]:
-    """For each month with a vendor bill and a map behind it: the allocation (``per_client``, ``per_vendor``, ``unallocated``, see ``allocate``). Months with nothing to go on are left out."""
-    costs = (await db.execute(select(FinanceVendorCost).where(FinanceVendorCost.tenant_id == owner, FinanceVendorCost.account == ADDON_ACCOUNT, FinanceVendorCost.month.in_(months)))).scalars().all()
+async def allocation_by_month(db: Any, owner: uuid.UUID, snapshot: dict[str, Any], months: list[str], account: str = ADDON_ACCOUNT) -> dict[str, dict[str, Any]]:
+    """For each month with a vendor bill (of the add-on software account, or of the support and maintenance one) and a map behind it: the allocation (``per_client``, ``per_vendor``, ``unallocated``, see ``allocate``). Months with nothing to go on are left out."""
+    costs = (await db.execute(select(FinanceVendorCost).where(FinanceVendorCost.tenant_id == owner, FinanceVendorCost.account == account, FinanceVendorCost.month.in_(months)))).scalars().all()
     if not costs:
         return {}
     vmap = await vendor_map(db, owner)
@@ -88,3 +89,8 @@ async def allocation_by_month(db: Any, owner: uuid.UUID, snapshot: dict[str, Any
 async def add_on_by_month(db: Any, owner: uuid.UUID, snapshot: dict[str, Any], months: list[str]) -> dict[str, dict[str, Decimal]]:
     """For each month with a vendor bill and a map behind it: the add-on software cost of each client by key. Months with nothing to go on are left out (Net income then spreads the whole add-on cost by revenue)."""
     return {m: a["per_client"] for m, a in (await allocation_by_month(db, owner, snapshot, months)).items()}
+
+
+async def support_by_month(db: Any, owner: uuid.UUID, snapshot: dict[str, Any], months: list[str]) -> dict[str, dict[str, Decimal]]:
+    """The same for the support and maintenance software bills (account 5100): each client's share by key, month by month. Months with nothing to go on are left out (Net income then spreads the whole cost by revenue)."""
+    return {m: a["per_client"] for m, a in (await allocation_by_month(db, owner, snapshot, months, SUPPORT_ACCOUNT)).items()}

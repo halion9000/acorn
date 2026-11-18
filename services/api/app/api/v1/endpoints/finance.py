@@ -515,11 +515,12 @@ async def software_costs(user: AuthUser, db: DBSession) -> dict[str, Any]:
     # Each vendor is shown for the month of ITS latest bill (a vendor not billed in the newest month overall would otherwise show no licenses at all).
     detail: dict[str, Any] = {}
     if snap:
-        wanted = sorted({c.month for (a, _v), c in latest.items() if a == "5500"})
-        by_month = await allocation_by_month(db, user.tenant_id, snap.payload, wanted) if wanted else {}
-        for (a, v), c in latest.items():
-            if a == "5500" and v in ((by_month.get(c.month) or {}).get("per_vendor") or {}):
-                detail[v] = by_month[c.month]["per_vendor"][v]
+        for account in ("5500", "5100"):
+            wanted = sorted({c.month for (a, _v), c in latest.items() if a == account})
+            by_month = await allocation_by_month(db, user.tenant_id, snap.payload, wanted, account) if wanted else {}
+            for (a, v), c in latest.items():
+                if a == account and v in ((by_month.get(c.month) or {}).get("per_vendor") or {}):
+                    detail[v] = by_month[c.month]["per_vendor"][v]
     ids, _ = await _scope(db, user.tenant_id, None)
     items: set[tuple[str, str]] = set()
     if ids[1:]:
@@ -632,19 +633,20 @@ async def profitability_analysis(
     if chosen is None:
         return {"received_at": row.received_at, "months": months, "report": None, "industries": [], "hours": None, "annual": None}
     rates, costs, master = await _rates(db, user.tenant_id), await _costs(db, user.tenant_id), await _master(db, user.tenant_id)
-    from app.services.addon_loader import add_on_by_month
+    from app.services.addon_loader import add_on_by_month, support_by_month
 
     annual_months = [m for m in months if m <= chosen][-12:]
     addon_direct_months = await add_on_by_month(db, user.tenant_id, row.payload, annual_months)
+    support_direct_months = await support_by_month(db, user.tenant_id, row.payload, annual_months)
     groups = await _groups(db, user.tenant_id)
-    report = pf.full_month(row.payload, rates, chosen, costs, master, addon_direct_months.get(chosen), groups)
+    report = pf.full_month(row.payload, rates, chosen, costs, master, addon_direct_months.get(chosen), groups, support_direct_months.get(chosen))
     return {
         "received_at": row.received_at,
         "months": months,
         "report": report,
         "industries": pf.by_industry(report),
         "hours": pf.hours_report(row.payload, rates, chosen, await _available_hours(db, user.tenant_id)),
-        "annual": pf.annual(row.payload, rates, costs, master, chosen, addon_direct_months, groups),
+        "annual": pf.annual(row.payload, rates, costs, master, chosen, addon_direct_months, groups, support_direct_months),
         "note": (
             "Costs are shared out to the cent: an entry with a client goes to that client, one without is spread by each client's revenue for the month (the workbook spreads by monthly recurring revenue; the Halo summary "
             "holds invoiced revenue). Sales and marketing is split evenly across clients whose first revenue is this month."
@@ -695,10 +697,11 @@ async def qbo_profitability(
     groups = await _groups(db, user.tenant_id)
     snapshot = qb.profit_snapshot(row.payload, by_month, groups)
     rates, costs, master = await _rates(db, user.tenant_id), await _costs(db, user.tenant_id), await _master(db, user.tenant_id)
-    from app.services.addon_loader import add_on_by_month
+    from app.services.addon_loader import add_on_by_month, support_by_month
 
     addon = await add_on_by_month(db, user.tenant_id, row.payload, [chosen])
-    report = pf.full_month(snapshot, rates, chosen, costs, master, addon.get(chosen), groups)
+    support = await support_by_month(db, user.tenant_id, row.payload, [chosen])
+    report = pf.full_month(snapshot, rates, chosen, costs, master, addon.get(chosen), groups, support.get(chosen))
     active = qb.months_active(by_month, groups, chosen)
     for r in report["rows"]:
         r["months_active"] = active.get(profit.name_key(r["client_name"]), 0)

@@ -79,6 +79,7 @@ def full_month(
     master: dict[str, dict[str, Any]],
     addon_direct: dict[str, Decimal] | None = None,
     groups: dict[str, str] | None = None,
+    support_direct: dict[str, Decimal] | None = None,
 ) -> dict[str, Any]:
     base = profit_for_month(snapshot, rates, month)
     months = sorted({str(m) for m in snapshot.get("months") or []})
@@ -120,6 +121,12 @@ def full_month(
         for k, v in direct.items():
             rows[k]["addon_software"] += v
         company["addon_software"] -= sum(direct.values(), ZERO)
+    # The same for support and maintenance software: a vendor whose bill and counts tie to clients goes to them by count; the rest is spread by revenue.
+    sdirect = {k: v for k, v in (support_direct or {}).items() if k in rows and v != 0}
+    if sdirect and company["support_software"] != 0:
+        for k, v in sdirect.items():
+            rows[k]["support_software"] += v
+        company["support_software"] -= sum(sdirect.values())
     for cat in ("support_software", "travel", "equipment", "hardware", "addon_software"):
         place(cat, cat, company[cat], weights)
     if company["payroll_cogs"] != 0:
@@ -265,6 +272,7 @@ def annual(
     through: str | None = None,
     addon_by_month: dict[str, dict[str, Decimal]] | None = None,
     groups: dict[str, str] | None = None,
+    support_by_month: dict[str, dict[str, Decimal]] | None = None,
 ) -> dict[str, Any]:
     """Twelve months (or as many as the summary holds) ending at ``through``: each client's revenue and net income, ranked by net income, with the size tier (Top 20 ... Top 120) and whether it reaches its target net margin (20% unless the client master sets one)."""
     months = sorted({str(m) for m in snapshot.get("months") or []})
@@ -273,7 +281,7 @@ def annual(
     months = months[-12:]
     acc: dict[str, dict[str, Any]] = {}
     for m in months:
-        for r in full_month(snapshot, rates, m, costs, master, (addon_by_month or {}).get(m), groups)["rows"]:
+        for r in full_month(snapshot, rates, m, costs, master, (addon_by_month or {}).get(m), groups, (support_by_month or {}).get(m))["rows"]:
             a = acc.setdefault(
                 r["client_key"],
                 {

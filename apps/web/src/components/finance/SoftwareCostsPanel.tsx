@@ -35,8 +35,6 @@ export const ACCOUNT_LABEL = { '5500': 'Add-on', '5100': 'Support and maintenanc
 
 /** How a vendor stands, in words (pure): what it billed, how many licenses are counted behind it and what one costs, or that nothing is counted. */
 export function vendorSummary(v: VendorRow): string {
-  // Counts carry the add-on software bills to clients; the support and maintenance software bills are spread by revenue whatever is chosen.
-  if (v.account === '5100') return 'Support software is spread by revenue (counts apply to add-on software)';
   if (v.mapped.length === 0) return 'No count chosen: spread by revenue';
   if (!v.licenses) return 'Counts chosen but none are held: spread by revenue';
   return `${v.licenses} licenses, about $${Number(v.per_license ?? 0).toFixed(2)} each`;
@@ -108,7 +106,7 @@ export function SoftwareCostsPanel() {
     <section className="space-y-2" data-testid="software-costs">
       <h2 className="text-sm font-semibold text-gray-200">Software costs</h2>
       <p className="text-xs text-gray-500">
-        What each software vendor billed in {data.latest_month ?? 'the latest month'} (from QuickBooks, read only). Choose the counts that say how many licenses of a vendor each client has, and Net income carries the bill to those clients in proportion; a vendor with no count is spread by revenue.
+        What each software vendor billed in {data.latest_month ?? 'the latest month'} (from QuickBooks, read only). Choose the counts that say how many licenses of a vendor each client has (the billable ones: leave out free or included licenses, and prefer the tool's own count to the quantity on the invoice), and Net income carries the bill to those clients in proportion, for add-on and for support and maintenance software; a vendor with no count is spread by revenue.
       </p>
       {!data.have_costs ? <p className="text-xs text-amber-300">QuickBooks has not sent the vendor bills yet (CORE reads them once a day).</p> : null}
       {problem ? <p className="text-sm text-red-300" role="alert">{problem}</p> : null}

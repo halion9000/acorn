@@ -389,6 +389,18 @@ def test_add_on_software_tied_to_a_client_by_license_counts_goes_to_that_client_
     assert sum(x["addon_software"] for x in no_company_total["rows"]) == D("0.00"), "with no add-on total there is nothing to share out"
 
 
+def test_support_software_tied_to_a_client_by_license_counts_goes_to_that_client_and_the_rest_is_spread_by_revenue():
+    costs = [{**cost("support_software", "100"), "source": "quickbooks"}]
+    plain = pf.full_month(SNAP, [], "2026-10", costs, MASTER)
+    assert {r["client_key"]: r["support_software"] for r in plain["rows"]} == {"acmedentalinc": D("71.40"), "birchlaw": D("28.60")}
+    r = pf.full_month(SNAP, [], "2026-10", costs, MASTER, None, None, {"birchlaw": D("60.00"), "nobodyinvoiced": D("25.00")})
+    assert {x["client_key"]: x["support_software"] for x in r["rows"]} == {"acmedentalinc": D("28.56"), "birchlaw": D("71.44")}
+    assert {x["client_key"]: x["addon_software"] for x in r["rows"]} == {"acmedentalinc": D("0.00"), "birchlaw": D("0.00")}, "add-on is not touched"
+    annual = pf.annual(SNAP, [], costs, MASTER, "2026-10", None, None, {"2026-10": {"birchlaw": D("100.00")}})
+    plain_annual = pf.annual(SNAP, [], costs, MASTER, "2026-10")
+    assert next(x for x in annual["rows"] if x["client_key"] == "birchlaw")["net_income"] < next(x for x in plain_annual["rows"] if x["client_key"] == "birchlaw")["net_income"]
+
+
 def test_the_ranking_uses_each_months_add_on_allocation():
     costs = [{**cost("addon_software", "100", month="2026-10"), "source": "quickbooks"}]
     plain = pf.annual(SNAP, [], costs, MASTER, "2026-10")
