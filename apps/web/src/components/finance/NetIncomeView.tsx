@@ -210,7 +210,7 @@ export function NetIncomeView() {
       <div>
         <h1 className="text-2xl font-bold text-white">Net income</h1>
         <p className="mt-1 text-sm text-gray-400">
-          Each client from revenue to net income, after finance&apos;s workbook. Revenue and hours come from HaloPSA about once a day; the cost lines are typed in on the Inputs tab until QuickBooks is connected.
+          Each client from revenue to net income, after finance&apos;s workbook. Revenue and hours come from HaloPSA about once a day; the company-wide cost lines come from QuickBooks (read only) about once a day, and anything you type on the Inputs tab for a client is added on top. A typed company-wide line is not used for a month and category QuickBooks has filled.
         </p>
       </div>
       {problem && <p className="text-sm text-amber-300">{problem}</p>}

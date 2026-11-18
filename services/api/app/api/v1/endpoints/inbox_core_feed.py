@@ -17,11 +17,12 @@ import re
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import ARRAY, Text, cast, func, literal, select, text, update
+from sqlalchemy import ARRAY, Text, cast, delete, func, literal, select, text, update
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.api.v1.deps import DBSession
@@ -31,7 +32,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
-from app.models.finance_profit import FinanceProfitSnapshot
+from app.models.finance_profit import FinanceCostEntry, FinanceProfitSnapshot
 from app.models.metric_dataset import DATASET_KEYS, MetricDataset, merge_dataset
 from app.models.tenant import Tenant
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
@@ -1218,6 +1219,67 @@ class ProfitSnapshotOut(BaseModel):
     invoices: int
     hours: int
     agents: int
+
+
+BOOKS_CATEGORIES = ("payroll_cogs", "addon_software", "support_software", "travel", "equipment", "hardware", "sales_marketing", "overhead")
+BOOKS_AMOUNT = {"ge": -100_000_000, "le": 100_000_000}
+
+
+class BooksMonthIn(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    payroll_cogs: float = Field(default=0, **BOOKS_AMOUNT)
+    addon_software: float = Field(default=0, **BOOKS_AMOUNT)
+    support_software: float = Field(default=0, **BOOKS_AMOUNT)
+    travel: float = Field(default=0, **BOOKS_AMOUNT)
+    equipment: float = Field(default=0, **BOOKS_AMOUNT)
+    hardware: float = Field(default=0, **BOOKS_AMOUNT)
+    sales_marketing: float = Field(default=0, **BOOKS_AMOUNT)
+    overhead: float = Field(default=0, **BOOKS_AMOUNT)
+
+
+class BooksIn(BaseModel):
+    months: list[BooksMonthIn] = Field(max_length=36)
+    unmapped: list[str] = Field(default_factory=list, max_length=50)
+
+
+class BooksOut(BaseModel):
+    months: int
+    entries: int
+
+
+@router.post("/core-feed/{tenant_token}/books", response_model=BooksOut)
+async def report_core_feed_books(tenant_token: str, body: BooksIn, db: DBSession) -> BooksOut:
+    """Keep the company-wide cost per month CORE read from QuickBooks' profit and loss, as the cost entries of the Net income page (source ``quickbooks``). For each month sent the earlier QuickBooks entries are replaced,
+    so a correction in the books reaches the page; a typed (``manual``) company-wide entry for the same month and category stays on file but the QuickBooks figure is the one used. Months not sent are left as they were."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    months = sorted({m.month for m in body.months})
+    if months:
+        await db.execute(delete(FinanceCostEntry).where(FinanceCostEntry.tenant_id == tenant_id, FinanceCostEntry.source == "quickbooks", FinanceCostEntry.month.in_(months)))
+    entries = 0
+    for m in {m.month: m for m in body.months}.values():
+        for category in BOOKS_CATEGORIES:
+            amount = Decimal(str(round(getattr(m, category), 2)))
+            if amount == 0:
+                continue
+            db.add(
+                FinanceCostEntry(
+                    tenant_id=tenant_id,
+                    month=m.month,
+                    category=category,
+                    client_key="",
+                    client_name="",
+                    source="quickbooks",
+                    amount=amount,
+                    note="From QuickBooks",
+                    updated_by=None,
+                    updated_at=now,
+                )
+            )
+            entries += 1
+    await db.commit()
+    return BooksOut(months=len(months), entries=entries)
 
 
 @router.post("/core-feed/{tenant_token}/profitability", response_model=ProfitSnapshotOut)

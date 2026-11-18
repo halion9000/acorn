@@ -30905,6 +30905,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/books:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Books
+      description: 'Keep the company-wide cost per month CORE read from QuickBooks''
+        profit and loss, as the cost entries of the Net income page (source ``quickbooks``).
+        For each month sent the earlier QuickBooks entries are replaced,
+
+        so a correction in the books reaches the page; a typed (``manual``) company-wide
+        entry for the same month and category stays on file but the QuickBooks figure
+        is the one used. Months not sent are left as they were.'
+      operationId: report_core_feed_books_api_v1_inbox_core_feed__tenant_token__books_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BooksIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BooksOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/profitability:
     post:
       tags:
@@ -36080,6 +36119,95 @@ components:
       - listed
       - not_checked
       title: Blocklists
+    BooksIn:
+      properties:
+        months:
+          items:
+            $ref: '#/components/schemas/BooksMonthIn'
+          type: array
+          maxItems: 36
+          title: Months
+        unmapped:
+          items:
+            type: string
+          type: array
+          maxItems: 50
+          title: Unmapped
+      type: object
+      required:
+      - months
+      title: BooksIn
+    BooksMonthIn:
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        payroll_cogs:
+          type: number
+          maximum: 100000000.0
+          minimum: -100000000.0
+          title: Payroll Cogs
+          default: 0
+        addon_software:
+          type: number
+          maximum: 100000000.0
+          minimum: -100000000.0
+          title: Addon Software
+          default: 0
+        support_software:
+          type: number
+          maximum: 100000000.0
+          minimum: -100000000.0
+          title: Support Software
+          default: 0
+        travel:
+          type: number
+          maximum: 100000000.0
+          minimum: -100000000.0
+          title: Travel
+          default: 0
+        equipment:
+          type: number
+          maximum: 100000000.0
+          minimum: -100000000.0
+          title: Equipment
+          default: 0
+        hardware:
+          type: number
+          maximum: 100000000.0
+          minimum: -100000000.0
+          title: Hardware
+          default: 0
+        sales_marketing:
+          type: number
+          maximum: 100000000.0
+          minimum: -100000000.0
+          title: Sales Marketing
+          default: 0
+        overhead:
+          type: number
+          maximum: 100000000.0
+          minimum: -100000000.0
+          title: Overhead
+          default: 0
+      type: object
+      required:
+      - month
+      title: BooksMonthIn
+    BooksOut:
+      properties:
+        months:
+          type: integer
+          title: Months
+        entries:
+          type: integer
+          title: Entries
+      type: object
+      required:
+      - months
+      - entries
+      title: BooksOut
     BuildTimelineRequest:
       properties:
         identity_kind:

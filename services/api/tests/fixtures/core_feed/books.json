@@ -1,0 +1,22 @@
+{
+  "route": "books",
+  "method": "POST",
+  "body": {
+    "months": [
+      {
+        "month": "2026-10",
+        "payroll_cogs": 0,
+        "addon_software": 0,
+        "support_software": 1200.5,
+        "travel": 0,
+        "equipment": 0,
+        "hardware": 0,
+        "sales_marketing": 0,
+        "overhead": -100
+      }
+    ],
+    "unmapped": [
+      "5951 New Vendor"
+    ]
+  }
+}

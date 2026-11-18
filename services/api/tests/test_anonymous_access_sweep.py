@@ -113,6 +113,9 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/finance"): (
         "CORE's daily snapshot of HaloPSA's recurring invoices and owed invoices: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own snapshot, which only people with the finance permissions can read."
     ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/books"): (
+        "CORE's daily summary of QuickBooks' monthly costs (one amount per cost category per month, no vendor or customer detail): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own QuickBooks cost entries for the months sent, and never a typed one.",
+    ),
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/ticket-stats"): (
         "CORE's daily summary of HaloPSA ticket statistics (counts per client per month and what is open, no ticket text): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own summary."
     ),

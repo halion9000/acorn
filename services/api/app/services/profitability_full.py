@@ -71,6 +71,9 @@ def full_month(
         row["hours"] += r["hours"]
         row["direct_labor"] += r["labor"]
     mine = [c for c in costs if str(c.get("month")) == month]
+    # The books win: a typed company-wide entry for a category QuickBooks has filled for this month stays on file but is not used (it would be counted twice). An entry for a client is a different thing and still counts.
+    from_books = {str(c["category"]) for c in mine if c.get("source") == "quickbooks"}
+    mine = [c for c in mine if not (c.get("source", "manual") == "manual" and not c.get("client_key") and str(c["category"]) in from_books)]
     company: dict[str, Decimal] = {c: ZERO for c in CATEGORIES}
     for c in mine:
         cat, key, amount = str(c["category"]), str(c.get("client_key") or ""), money(c.get("amount"))

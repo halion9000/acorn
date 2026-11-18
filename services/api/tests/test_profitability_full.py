@@ -324,3 +324,19 @@ async def test_inputs_typed_on_the_page_change_the_analysis_and_replace_rather_t
         )["industry"]
         == "Law firm"
     ), "importing again updates rather than duplicates"
+
+
+def test_what_quickbooks_filled_replaces_a_typed_company_wide_entry_for_the_same_month_and_category_but_not_one_for_a_client():
+    typed = [cost("overhead", "999"), cost("travel", "70", "Acme Dental, Inc."), cost("payroll_cogs", "10")]
+    books = [{**cost("overhead", "140.05"), "source": "quickbooks"}, {**cost("travel", "20"), "source": "quickbooks"}]
+    r = pf.full_month(SNAP, [], "2026-10", [{**c, "source": "manual"} for c in typed] + books, MASTER)
+    assert sum(x["overhead"] for x in r["rows"]) == D("140.05"), "the books' overhead, not the typed one as well"
+    assert sum(x["travel"] for x in r["rows"]) == D("90.00"), "QuickBooks' company travel 20 plus the 70 typed for Acme"
+    assert r["totals"]["labor_trueup"] == D("10") - r["totals"]["direct_labor"], "a category QuickBooks did not fill keeps its typed entry"
+    only_typed = pf.full_month(SNAP, [], "2026-10", [{**c, "source": "manual"} for c in typed], MASTER)
+    assert sum(x["overhead"] for x in only_typed["rows"]) == D("999.00"), "with no books the typed entry is used"
+
+
+def test_overhead_may_be_negative_when_other_income_is_more_than_the_expenses_and_is_still_shared_out():
+    r = pf.full_month(SNAP, [], "2026-10", [{**cost("overhead", "-100.01"), "source": "quickbooks"}], MASTER)
+    assert sum(x["overhead"] for x in r["rows"]) == D("-100.01")
