@@ -223,9 +223,9 @@
     "detail": "ThreatMate cannot scan mailboxes; the light Google check is on hold.",
     "area": "Security",
     "status": "not_started",
-    "needs": "claude",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Approved by hal@goliveoak.com on 2026-11-18."
+    "note": "Approved by hal@goliveoak.com on 2026-11-18. Blocked on access: a full mailbox scan needs Google Workspace admin to grant a service account domain-wide delegation with Gmail read scope (or Google Vault export) per client; ThreatMate cannot read mailboxes. Question: do you want to grant that, and for which clients first? Until then nothing can be built that reads mail."
   },
   {
     "key": "tokens-out-of-storage",
@@ -1335,8 +1335,8 @@
     "title": "Liongard: turn the disk and backup inspections into per-device lines with names",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude",
-    "note": "Needs your decision before it is built. Approved by hal@goliveoak.com on 2026-11-18.",
+    "needs": "hal",
+    "note": "Approved by hal@goliveoak.com on 2026-11-18. Question before I build, answer in the box below: Liongard alerts already name the affected disks and devices (the Datto backup check lists each system and its days since last backup). What is missing? (a) a row on the Devices page for each device Liongard flags, (b) one alert per device instead of one per client, or (c) the device names shown on the Client posture page checks? Tell me which, or describe it.",
     "added": "2026-11-14"
   },
   {
@@ -2041,13 +2041,13 @@
   },
   {
     "status": "not_started",
-    "needs": "claude",
+    "needs": "hal",
     "area": "Security",
     "key": "rw-toolbox",
     "title": "Employee toolbox (from Rewst Tool Portal): client picker and Microsoft 365 action tiles",
     "detail": "User management (group membership, OneDrive permissions, attributes, onboarding, offboarding), password and security (change password, compromised user remediation, reset MFA), mail and permissions (out of office, mailbox permissions, forwarding, shared mailbox, litigation hold, calendar permissions), scheduled workflows. A launcher over A.C.O.R.N CIPP actions with the existing approval path.",
     "added": "2026-11-15",
-    "note": "Approved by hal@goliveoak.com on 2026-11-18."
+    "note": "Approved by hal@goliveoak.com on 2026-11-18. Questions before I build, answer in the box below: (1) Which actions first? I suggest reset MFA, change password, compromised-user remediation, out of office and mailbox permissions, because CORE already has CIPP actions for them (Settings, CIPP actions lists them). (2) Who may press a tile (which role), and must every press go through the approval path, or only the high-risk ones (reset MFA, remediation)? Today CORE holds the safety rules: a live switch, opted-in clients, protected accounts and an hourly cap. (3) Should the user picker list the client's identities from A.C.O.R.N? (4) Leave scheduled workflows out of the first version? If I hear nothing I will start with those five tiles, every press creating an approval request and nothing running without it."
   },
   {
     "status": "completed",
