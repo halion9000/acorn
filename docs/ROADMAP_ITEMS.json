@@ -2304,5 +2304,14 @@
     "needs": "hal",
     "note": "Question for Hal: the Onboarding tab is a list of time entries on onboarding projects (columns: TimeEntryId, Date, UserName, RoleName, CustomerName, ProjectName, PhaseName, TaskOrActivityName, Effort, TrackedTime, Billable, CategoryName, Notes, Approved), 773 rows from April 2026. Which system is it exported from (HaloPSA projects, or another tool), and what should the section show: onboarding hours and labor cost per client, by phase? Once I know the source I can have CORE read it.",
     "added": "2026-11-18"
+  },
+  {
+    "key": "finance-profitability-version",
+    "title": "Net income: the other version of Profitability in the finance workbook",
+    "area": "Finance",
+    "status": "new",
+    "needs": "hal",
+    "added": "2026-11-18",
+    "note": "Question for Hal: which tab is the other Profitability you mean? The workbook has these: (1) Revenue to Net Income / Client Profitability, built as the main Net income table; (2) QBO Profitability_Sort this one, built as QBO Profitability; (3) QBO Profitability_Do not sort, the same table with a different split of Live Oak internally coded personnel cost (about $344 flat on many clients against a revenue-weighted share on the sorted one) and a helper column of names, not built as its own section; (4) Profitability Summary by Industry, built as By industry; (5) Halo Summary (May to August files), hours by time type with QBO cost against the cost allocated per Halo hour and the difference, not built; (6) Sheet3 (August), clients by employee-count band and margin band, not built. Tell me the number, or describe it, in the box below."
   }
 ]
