@@ -941,9 +941,12 @@
     "key": "r7-ai-11",
     "title": "Record the automated control tests nightly when a setting turns it on",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
+    "status": "completed",
     "needs": "claude",
-    "added": "2026-11-14"
+    "added": "2026-11-14",
+    "completed": "2026-11-18",
+    "completed_ref": "AiSOC 2026-11-18",
+    "note": "2026-11-18: compliance_test_schedule (migration 219), an hourly worker records the tests for each client that switched it on (at most once every 20 hours), GET/PUT /compliance/tests/schedule and a check box on Automated tests."
   },
   {
     "key": "r7-ai-12",

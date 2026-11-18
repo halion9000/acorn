@@ -40,6 +40,7 @@ EXAMPLES: dict[tuple[str, str], dict[str, Any]] = {
         "reviewer": "Dana Reyes",
         "due_date": "2026-12-01",
     },
+    ("PUT", "/api/v1/compliance/tests/schedule"): {"nightly": True},
     ("PUT", "/api/v1/compliance/notices"): {"emails": ["compliance@example.com"], "webhook_url": "https://hooks.example.com/compliance", "weekly": True},
     ("PUT", "/api/v1/compliance/access-reviews/schedules"): {"system": "Microsoft 365", "reviewer": "Dana Reyes", "every_days": 90, "enabled": True},
     ("PATCH", "/api/v1/compliance/access-reviews/{review_id}/entries/{entry_id}"): {"decision": "remove", "note": "Left the company in September."},
