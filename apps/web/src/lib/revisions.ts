@@ -10,25 +10,48 @@ export interface Revision {
 
 export const REVISIONS: Revision[] = [
   {
+    "version": "1.24",
+    "weekOf": "2026-11-16",
+    "lastChange": "2026-11-18",
+    "commits": 123,
+    "changes": [
+      "Roadmap: r7-ci-25, r7-ci-34, r7-ci-35 built in CORE and marked completed.",
+      "OpenAPI examples for the 23 compliance request bodies, validated against each route model (r7-ai-23); index-plan-tests recorded as stale; r7-ai-02 noted.",
+      "What's new page (Settings, Help): the dated 'new' entries of the user guide, newest first, each linking to its guide section (roadmap r7-ai-19). Tested; sort mutation fails all 3 parser tests.",
+      "Roadmap: r7-af-01 marked done.",
+      "Fleet Posture: the fleet median score and a Vs median column per client (roadmap r7-af-30). Tested; mutation fails 2 tests.",
+      "Roadmap: r7-ai-20 marked done (already built).",
+      "Vendors: a My vendors box on the register that shows only the vendors whose owner is the person signed in (roadmap r7-af-08). Tested; mutation fails the matching test.",
+      "Metrics: one picker (button, search, Select all, Clear, scrolling list) replaces the walls of check boxes on Ticket updates, Monthly licensing and User roles; Ticket updates says why when every count is zero. Roadmap ite",
+      "Roadmap: r7-af-20 marked done.",
+      "Fleet Posture: the fleet summary and each fleet board are sent with an ETag and answered 304 with no body when nothing in them changed (generated_at is left out of the tag) (roadmap r7-ai-04). Tested through a real FastA",
+      "Runbook: the load balancer health-probe NSG rule must stay (the deny-internet rule blocks the probe without it); how to spot it.",
+      "Alerts: View case button once an alert has a case; a new case asks CORE for a HaloPSA ticket for each of its alerts with none; ticket rules now cover every device of a type (Addigy 'MDM is disabled on <device>' never mat",
+      "Placeholder rows instead of a spinner or the word Loading on Devices, Alerts and Cases while the first answer loads.",
+      "Risk register: link a risk to the controls and vendors it concerns. Migration 217 (risk_register_links), add and remove link routes that accept only real controls of the chosen framework and vendors of that client and re"
+    ],
+    "fixes": 0
+  },
+  {
     "version": "1.23",
     "weekOf": "2026-11-09",
     "lastChange": "2026-11-15",
-    "commits": 219,
+    "commits": 230,
     "changes": [
       "Hunts: saved hunts show how many hits their last scheduled run returned",
       "Hunts: a manual run of a saved hunt stores its hit count, shown beside Last run",
-      "Change password: show the rule while typing",
-      "Detection truth table: the generator says A.C.O.R.N, as the committed file does",
-      "Agent proposal log: filter by agent and outcome, export CSV",
-      "Command palette: settings pages too",
-      "Audit log: the CSV file name says how many rows it holds",
-      "Alerts: an alert forwarded through the inbox is named by its tool, not \"Generic Generic JSON\"",
-      "Compliance: Secureframe's controls and tests under each NIST CSF and CIS IG1 requirement",
-      "Roles: See all clients is a checkbox (clients:view), on for every existing role",
-      "BEC report: tenant-wide signals shown apart; Microsoft address joins its real address when another domain holds the same name",
-      "Inventory: no separate Live Oak own-stock line; Live Oak IT Partners is one of the clients",
-      "Compliance: vendor risk ring and review action items; Detected applications (Add, Ignore, Link) from CORE's CIPP read; Controls page; US spelling of license in the console",
-      "Client posture: alerts and update for the client first, What changed shows 10 with a button for more; Data sources moved to Platform health"
+      "Case: Copy as ticket note",
+      "Docs/openapi.yaml as CI generates it",
+      "Role editor: the last ten changes to the role",
+      "Members: sort by longest since a sign-in",
+      "Digest: frameworks with compliance evidence more than a year old, and a recommendation to refresh it",
+      "Identities: a Microsoft address named by the real address is the same person",
+      "Filters: the alert and case statuses a page sends are checked against the server",
+      "Finance from HaloPSA: margin per client and invoices owed by how late they are",
+      "US spelling: organisation is organization everywhere; Deploy NinjaOne routes listed in the route-list tests; risk register API paths written so the path test can read them",
+      "Client posture: a tool a client has nothing from is ticked as not used by itself, and unticked when a device appears; a person's choice always wins",
+      "Four more control tests (email authentication, certificates, network security, asset health): 14 in all",
+      "Comments name the CORE modules by their new acorn- names"
     ],
     "fixes": 9
   },
