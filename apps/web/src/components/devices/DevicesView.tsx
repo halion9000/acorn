@@ -685,8 +685,8 @@ export default function DevicesView() {
       <DeployNinjaBar deviceIds={[...picked]} onClear={() => setPicked(new Set())} />
 
       <div className={`overflow-x-auto rounded-lg border border-gray-800 transition-opacity ${loading && data ? "opacity-50" : ""}`} aria-busy={loading} data-testid="devices-table">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-900 text-xs uppercase text-gray-400">
+        <table className="w-full text-left text-sm max-md:block">
+          <thead className="bg-gray-900 text-xs uppercase text-gray-400 max-md:hidden">
             <tr>
               <th className="w-8 px-3 py-2">
                 <input
@@ -714,7 +714,7 @@ export default function DevicesView() {
               <th className="px-3 py-2" title="When CORE last synced this device from its tools. Not when the device was online.">Last synced</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="max-md:block max-md:p-2">
             {data?.items.map((d) => (
               <DeviceRowView key={d.id} d={d} master={master} picked={picked.has(d.id)} onPick={(on) => setPicked((now) => { const next = new Set(now); if (on) next.add(d.id); else next.delete(d.id); return next; })} open={open === d.id} onToggle={() => setOpen(open === d.id ? null : d.id)} onHide={(hide) => void setHidden(d, hide)} onMerged={() => void load()} />
             ))}
@@ -775,11 +775,11 @@ function DeviceRowView({ d, master, picked, onPick, open, onToggle, onHide, onMe
   const tools = toolsOf(d);
   return (
     <>
-      <tr onClick={onToggle} className="cursor-pointer border-t border-gray-800 hover:bg-gray-900/60">
-        <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+      <tr onClick={onToggle} className="cursor-pointer border-t border-gray-800 hover:bg-gray-900/60 max-md:mb-2 max-md:block max-md:rounded-lg max-md:border max-md:border-gray-800 max-md:p-2" data-testid="device-row">
+        <td className="max-md:block max-md:px-1 max-md:py-0.5 px-3 py-2" onClick={(e) => e.stopPropagation()}>
           <input type="checkbox" aria-label={`Select ${d.hostname}`} checked={picked} onChange={(e) => onPick(e.target.checked)} />
         </td>
-        <td className="px-3 py-2 font-medium text-white">
+        <td className="max-md:block max-md:px-1 max-md:py-0.5 px-3 py-2 font-medium text-white">
           {d.online != null && (
             <span
               role="img"
@@ -822,17 +822,17 @@ function DeviceRowView({ d, master, picked, onPick, open, onToggle, onHide, onMe
             </div>
           )}
         </td>
-        <td className="px-3 py-2 text-gray-300">{d.client_name ?? '—'}</td>
-        <td className="px-3 py-2 font-mono text-xs text-gray-300">{d.serial_number ?? '—'}</td>
-        <td className="px-3 py-2 text-gray-300">{d.os ?? '—'}</td>
-        <td className="px-3 py-2">
+        <td data-label="Client" className="max-md:block max-md:px-1 max-md:py-0.5 max-md:before:mr-2 max-md:before:text-[11px] max-md:before:uppercase max-md:before:text-gray-500 max-md:before:content-[attr(data-label)] px-3 py-2 text-gray-300">{d.client_name ?? '—'}</td>
+        <td data-label="Serial" className="max-md:block max-md:px-1 max-md:py-0.5 max-md:before:mr-2 max-md:before:text-[11px] max-md:before:uppercase max-md:before:text-gray-500 max-md:before:content-[attr(data-label)] px-3 py-2 font-mono text-xs text-gray-300">{d.serial_number ?? '—'}</td>
+        <td data-label="OS" className="max-md:block max-md:px-1 max-md:py-0.5 max-md:before:mr-2 max-md:before:text-[11px] max-md:before:uppercase max-md:before:text-gray-500 max-md:before:content-[attr(data-label)] px-3 py-2 text-gray-300">{d.os ?? '—'}</td>
+        <td data-label="Fed by" className="max-md:block max-md:px-1 max-md:py-0.5 max-md:before:mr-2 max-md:before:text-[11px] max-md:before:uppercase max-md:before:text-gray-500 max-md:before:content-[attr(data-label)] px-3 py-2">
           <span className="flex gap-1">
             {tools.map((v) => (
               <VendorBadge key={v} vendor={v} struck={staleNote(d, v)} />
             ))}
           </span>
         </td>
-        <td className="px-3 py-2 text-gray-400">
+        <td data-label="Last online" className="max-md:block max-md:px-1 max-md:py-0.5 max-md:before:mr-2 max-md:before:text-[11px] max-md:before:uppercase max-md:before:text-gray-500 max-md:before:content-[attr(data-label)] px-3 py-2 text-gray-400">
           {d.last_online ? when(d.last_online) : '—'}
           {d.offline_days != null && <span className="ml-2 rounded bg-gray-700/60 px-1.5 py-0.5 text-[11px] text-gray-300">Offline {d.offline_days}d</span>}
           {d.encrypted === false && (
@@ -887,11 +887,11 @@ function DeviceRowView({ d, master, picked, onPick, open, onToggle, onHide, onMe
             )
           )}
         </td>
-        <td className="px-3 py-2 text-gray-500">{when(d.last_seen)}</td>
+        <td data-label="Last synced" className="max-md:block max-md:px-1 max-md:py-0.5 max-md:before:mr-2 max-md:before:text-[11px] max-md:before:uppercase max-md:before:text-gray-500 max-md:before:content-[attr(data-label)] px-3 py-2 text-gray-500">{when(d.last_seen)}</td>
       </tr>
       {open && (
-        <tr className="border-t border-gray-800 bg-gray-900/40">
-          <td colSpan={8} className="px-4 py-3 text-sm text-gray-300">
+        <tr className="border-t border-gray-800 bg-gray-900/40 max-md:block">
+          <td colSpan={8} className="px-4 py-3 text-sm text-gray-300 max-md:block">
             <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
               <Field label="Serial number" value={d.serial_number} />
               <Field label="Manufacturer" value={d.manufacturer} />

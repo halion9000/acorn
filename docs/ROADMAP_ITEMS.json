@@ -837,8 +837,9 @@
     "key": "r7-ai-17",
     "title": "Card layout for the Devices table on a phone",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Cards below the medium breakpoint; labels tested, the layout itself not looked at on a phone."
   },
   {
     "key": "r7-ai-18",

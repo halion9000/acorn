@@ -65,3 +65,14 @@ describe('the page and its address', () => {
     expect(window.location.search).toContain('search=PC-1');
   });
 });
+
+describe('the device list on a phone', () => {
+  it('names each cell of a row (Client, Serial, OS, Fed by, Last online, Last synced) so a row can show as a card with its labels', async () => {
+    render(<DevicesView />);
+    await screen.findByText('PC-1');
+    const row = screen.getByTestId('device-row');
+    const labels = [...row.querySelectorAll('td[data-label]')].map((c) => c.getAttribute('data-label'));
+    expect(labels).toEqual(['Client', 'Serial', 'OS', 'Fed by', 'Last online', 'Last synced']);
+    expect(row.querySelectorAll('td')).toHaveLength(8);
+  });
+});
