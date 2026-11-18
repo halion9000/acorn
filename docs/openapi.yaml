@@ -59472,6 +59472,12 @@ components:
             type: string
           type: array
           title: Addresses
+        trend:
+          items:
+            $ref: '#/components/schemas/SenderWeek'
+          type: array
+          title: Trend
+          default: []
       type: object
       required:
       - spf_domains
@@ -59521,6 +59527,31 @@ components:
       - failed
       - status
       title: SenderRow
+    SenderWeek:
+      properties:
+        week:
+          type: string
+          title: Week
+        messages:
+          type: integer
+          title: Messages
+        failed:
+          type: integer
+          title: Failed
+        spf_failed:
+          type: integer
+          title: Spf Failed
+        dkim_failed:
+          type: integer
+          title: Dkim Failed
+      type: object
+      required:
+      - week
+      - messages
+      - failed
+      - spf_failed
+      - dkim_failed
+      title: SenderWeek
     SendingDomainRow:
       properties:
         domain:

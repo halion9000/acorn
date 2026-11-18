@@ -16,7 +16,7 @@ import structlog
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.services import worker_heartbeat
-from app.services.dmarc_alerts import run_pass_rate_detection
+from app.services.dmarc_alerts import run_new_sender_detection, run_pass_rate_detection
 from app.services.dmarc_mailbox import GraphMailboxReader, ingest_once
 from app.services.dmarc_store import store_report, store_tls_policy
 from app.services.domain_expiry import run_expiry_check
@@ -43,13 +43,13 @@ def make_reader() -> GraphMailboxReader:
 
 
 async def raise_alerts() -> int:
-    """After reports were stored: alert on any client whose pass rate fell. Its own session and its own failure handling, so it can never fail the read of the mailbox."""
+    """After reports were stored: alert on any client whose pass rate fell, and on any sender that has just started sending as a client's domain. Its own session and its own failure handling, so it can never fail the read of the mailbox."""
     from app.db.rls_sessions import mark_platform
 
     try:
         async with AsyncSessionLocal() as db:
             mark_platform(db)
-            made = await run_pass_rate_detection(db)
+            made = await run_pass_rate_detection(db) + await run_new_sender_detection(db)
             await db.commit()
             return made
     except Exception:  # noqa: BLE001

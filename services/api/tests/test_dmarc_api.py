@@ -1109,3 +1109,22 @@ def test_the_address_lookup_answers_for_public_addresses_only():
 
     got, errors = asyncio.run(body())
     assert (got.reverse_dns, got.owner) == ("mail.vendor.example", "Vendor Inc") and errors == [422, 422, 422]
+
+
+def test_a_senders_detail_carries_its_week_by_week_history_from_the_stored_reports():
+    old = [line_row("2.2.2.2", 20, ok=True), line_row("1.1.1.1", 5)]
+    new = [line_row("2.2.2.2", 20, ok=False, dkim=False, spf=True)]
+
+    async def body(s):
+        owner = await tenant(s, "Owner")
+        acme = await tenant(s, "Acme", owner.id)
+        s.add_all([rep(acme.id, "acme.com", 25, 25, days_ago=15, rows=old), rep(acme.id, "acme.com", 20, 0, days_ago=2, rows=new)])
+        await s.commit()
+        return await ep.insights(caller(owner), s, days=60, domain=None, client_id=None)
+
+    out = run(body)
+    sender = next(x for x in out.senders if x.detail.addresses[:1] == ["2.2.2.2"])
+    weeks = sender.detail.trend
+    assert len(weeks) == 2 and weeks[0].week < weeks[1].week
+    assert (weeks[0].messages, weeks[0].failed) == (20, 0)
+    assert (weeks[1].messages, weeks[1].failed, weeks[1].dkim_failed, weeks[1].spf_failed) == (20, 20, 20, 0), "the later week failed DKIM on all of its mail"

@@ -803,8 +803,9 @@
     "key": "r7-ai-13",
     "title": "Keep the history of SPF and DKIM results for failing senders to show a trend",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-18 from the stored reports (no new table): new-sender alert and a week-by-week history in each sender's detail."
   },
   {
     "key": "r7-ai-14",
@@ -1555,8 +1556,9 @@
     "key": "r7-af-28",
     "title": "DMARC: alerts when a new sender appears for a domain",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-18 from the stored reports (no new table): new-sender alert and a week-by-week history in each sender's detail."
   },
   {
     "key": "r7-af-29",

@@ -421,6 +421,14 @@ class SenderCause(BaseModel):
     count: int
 
 
+class SenderWeek(BaseModel):
+    week: str  # the Monday the week began
+    messages: int
+    failed: int  # failed DMARC
+    spf_failed: int
+    dkim_failed: int
+
+
 class SenderDetail(BaseModel):
     """What a person opens on a sender: how it authenticated, who it said it was, and exactly how its failing mail failed."""
 
@@ -435,6 +443,7 @@ class SenderDetail(BaseModel):
     dispositions: dict[str, int]  # what receivers did: none, quarantine, reject
     reasons: list[str]  # why a receiver set the policy aside (forwarded, mailing_list...)
     addresses: list[str]
+    trend: list[SenderWeek] = []  # how its mail authenticated week by week (the newest weeks), from the stored reports
 
 
 class SenderRow(BaseModel):
@@ -1069,7 +1078,7 @@ async def insights(
             )
             key = (name, "named") if name else (str(row.get("ip") or "unknown"), "address")
             senders[key][0 if ok else 1] += count
-            sender_stats[key].add(row, count, r.domain)
+            sender_stats[key].add(row, count, r.domain, r.end_at)
             from_domains[str(row.get("header_from") or r.domain)][0 if ok else 1] += count
 
     sender_rows = [
@@ -1084,6 +1093,7 @@ async def insights(
                 **{
                     **sender_stats[(name, kind)].detail(),
                     "causes": [SenderCause(**c) for c in sender_stats[(name, kind)].detail()["causes"]],
+                    "trend": [SenderWeek(**w) for w in sender_stats[(name, kind)].detail()["trend"]],
                 }
             ),
         )

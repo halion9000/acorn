@@ -74,6 +74,8 @@ export interface DmarcSenderDetail {
   dispositions: Record<string, number>;
   reasons: string[];
   addresses: string[];
+  /** Week by week (the Monday it began): how its mail authenticated. Absent from an older server. */
+  trend?: { week: string; messages: number; failed: number; spf_failed: number; dkim_failed: number }[];
 }
 export interface DmarcSender {
   name: string;
@@ -736,9 +738,54 @@ export function SenderDetailPanel({ sender }: { sender: DmarcSender }) {
         Receivers: {Object.entries(d.dispositions).map(([k, v]) => `${v.toLocaleString()} ${DISPOSITION_LABEL[k] ?? k}`).join(', ') || 'no data'}
         {d.reasons.length > 0 ? `; policy set aside because ${d.reasons.join(', ').replace(/_/g, ' ')}` : ''}
       </p>
+      {(d.trend ?? []).length > 1 && (
+        <div data-testid="sender-trend">
+          <p className="mt-1 font-medium text-gray-200">Week by week</p>
+          <table className="mt-1 w-full text-right text-[11px]">
+            <thead className="text-gray-500">
+              <tr>
+                <th className="text-left font-normal">Week of</th>
+                <th className="font-normal">Messages</th>
+                <th className="font-normal">Failed DMARC</th>
+                <th className="font-normal">SPF failed</th>
+                <th className="font-normal">DKIM failed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(d.trend ?? []).map((w) => (
+                <tr key={w.week} className={w.failed > 0 ? 'text-amber-300' : ''}>
+                  <td className="text-left">{w.week}</td>
+                  <td>{w.messages.toLocaleString()}</td>
+                  <td>{w.failed.toLocaleString()} ({trendPercent(w.failed, w.messages)})</td>
+                  <td>{w.spf_failed.toLocaleString()}</td>
+                  <td>{w.dkim_failed.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-1 text-gray-500">{trendWords(d.trend ?? [])}</p>
+        </div>
+      )}
       {!sender.identified && d.addresses.slice(0, 1).map((ip) => <AddressWho key={ip} ip={ip} />)}
     </div>
   );
+}
+
+/** A share as a whole percent, "0%" when there was no mail (pure). */
+export function trendPercent(part: number, whole: number): string {
+  return whole > 0 ? `${Math.round((part / whole) * 100)}%` : '0%';
+}
+
+/** One sentence on where a sender's failures are heading: the share of failed mail in the newest week against the oldest shown (pure). */
+export function trendWords(trend: { messages: number; failed: number }[]): string {
+  const first = trend[0];
+  const last = trend[trend.length - 1];
+  if (!first || !last || trend.length < 2) return '';
+  const a = first.messages > 0 ? first.failed / first.messages : 0;
+  const b = last.messages > 0 ? last.failed / last.messages : 0;
+  const delta = Math.round((b - a) * 100);
+  if (Math.abs(delta) < 5) return `Failures are steady: ${trendPercent(first.failed, first.messages)} at first, ${trendPercent(last.failed, last.messages)} now.`;
+  return delta > 0 ? `Failures are rising: ${trendPercent(first.failed, first.messages)} at first, ${trendPercent(last.failed, last.messages)} now.` : `Failures are falling: ${trendPercent(first.failed, first.messages)} at first, ${trendPercent(last.failed, last.messages)} now.`;
 }
 
 /** What happened to the mail, how often it failed, who sends it. Shown only when the server has insights and there is mail to show: a failure here never hides the table below. */

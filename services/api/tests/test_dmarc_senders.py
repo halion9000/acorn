@@ -124,3 +124,27 @@ def test_who_owns_an_address_comes_from_the_registry_record_and_nothing_else_is_
     assert parse_ip_rdap(b"not json") is None
     assert parse_ip_rdap(b"[]") is None
     assert parse_ip_rdap(json.dumps({"name": ""}).encode()) is None
+
+
+def test_a_sender_keeps_its_history_week_by_week_with_how_much_failed_and_on_what():
+    from datetime import UTC, datetime
+
+    from app.services.dmarc_senders import TREND_WEEKS, SenderStats
+
+    ok = {"pass": True, "spf": True, "dkim": True, "ip": "1.2.3.4"}
+    spf_bad = {"pass": False, "spf": False, "dkim": True, "ip": "1.2.3.4"}
+    both_bad = {"pass": False, "spf": False, "dkim": False, "ip": "1.2.3.4"}
+    s = SenderStats()
+    s.add(ok, 90, "acme.com", datetime(2026, 11, 3, 9, tzinfo=UTC))  # a Monday
+    s.add(spf_bad, 10, "acme.com", datetime(2026, 11, 8, 23, tzinfo=UTC))  # the Sunday of the same week
+    s.add(both_bad, 4, "acme.com", datetime(2026, 11, 10, 1, tzinfo=UTC))  # the next Monday
+    s.add(ok, 5, "acme.com")  # no date: counted everywhere else, never in a week
+    t = s.detail()["trend"]
+    assert t == [
+        {"week": "2026-11-02", "messages": 100, "failed": 10, "spf_failed": 10, "dkim_failed": 0},
+        {"week": "2026-11-09", "messages": 4, "failed": 4, "spf_failed": 4, "dkim_failed": 4},
+    ]
+    many = SenderStats()
+    for i in range(TREND_WEEKS + 5):
+        many.add(ok, 1, "acme.com", datetime(2026, 1, 5, tzinfo=UTC) + __import__("datetime").timedelta(weeks=i))
+    assert len(many.detail()["trend"]) == TREND_WEEKS and many.detail()["trend"][-1]["week"] > many.detail()["trend"][0]["week"], "the newest weeks, oldest first"

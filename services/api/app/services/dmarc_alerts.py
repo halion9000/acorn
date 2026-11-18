@@ -151,3 +151,121 @@ async def run_pass_rate_detection(db: Any, now: datetime | None = None) -> int:
     except Exception:  # noqa: BLE001
         logger.warning("dmarc pass-rate detection failed", exc_info=True)
         return 0
+
+
+# ---- A sender that has never sent as the domain before, and sends now --------------------------------------------------------------------------------------------------
+
+NEW_SENDER_RULE_ID = "aisoc-dmarc-new-sender"
+NEW_SENDER_RULE_NAME = "New sender for a domain"
+MIN_HISTORY_DAYS = 21  # a domain's reports must go back this far before anyone is called new (the first weeks would call every sender new)
+MIN_NEW_MESSAGES_ADDRESS = 10  # an unknown address must send this many messages in the week to be a sender and not a stray
+MIN_NEW_MESSAGES_SERVICE = 5  # a named service (a known mail service) needs fewer, since who it is is not in doubt
+BASELINE_DAYS = 180
+
+
+@dataclass
+class NewSender:
+    tenant_id: uuid.UUID
+    finding: Finding
+
+
+def _sender_key(row: dict[str, Any]) -> tuple[str, bool]:
+    """Who a line of a report is, and whether that is a named service: the service its authenticating domains name, else the provider that owns its address, else the address itself (pure)."""
+    from app.services.dmarc_senders import identify_by_address, identify_sender
+
+    named = identify_sender(list(row.get("spf_domains") or []), list(row.get("dkim_domains") or [])) or identify_by_address(str(row.get("ip") or ""))
+    if named:
+        return named, True
+    return str(row.get("ip") or ""), False
+
+
+def detect_new_senders(reports: list[Any], now: datetime) -> list[NewSender]:
+    """One finding for each sender that sent as a client's domain in the last seven days and in none of the reports before them, for a domain whose reports go back ``MIN_HISTORY_DAYS`` or more."""
+    now = _utc(now)
+    start_this = now - WINDOW
+    by_domain: dict[tuple[uuid.UUID, str], list[Any]] = defaultdict(list)
+    for r in reports:
+        by_domain[(r.tenant_id, r.domain)].append(r)
+    out: list[NewSender] = []
+    for (tenant_id, domain), rs in sorted(by_domain.items(), key=lambda kv: (str(kv[0][0]), kv[0][1])):
+        oldest = min(_utc(r.end_at) for r in rs)
+        if now - oldest < timedelta(days=MIN_HISTORY_DAYS):
+            continue
+        before: set[str] = set()
+        this: dict[str, dict[str, Any]] = {}
+        for r in rs:
+            recent = _utc(r.end_at) > start_this
+            for row in r.rows or []:
+                key, named = _sender_key(row)
+                if not key:
+                    continue
+                n = int(row.get("count", 0))
+                if not recent:
+                    before.add(key)
+                    continue
+                s = this.setdefault(key, {"named": named, "total": 0, "failed": 0, "ips": defaultdict(int)})
+                s["total"] += n
+                if not row.get("pass"):
+                    s["failed"] += n
+                if row.get("ip"):
+                    s["ips"][str(row["ip"])] += n
+        for key, s in sorted(this.items()):
+            if key in before or s["total"] < (MIN_NEW_MESSAGES_SERVICE if s["named"] else MIN_NEW_MESSAGES_ADDRESS):
+                continue
+            failed_share = s["failed"] / s["total"] if s["total"] else 0.0
+            severity = "high" if failed_share >= 0.5 else "medium" if s["failed"] else "low"
+            ips = [ip for ip, _ in sorted(s["ips"].items(), key=lambda kv: (-kv[1], kv[0]))][:5]
+            outcome = f"{s['total']}, of which {s['failed']} failed DMARC" if s["failed"] else f"{s['total']}, all passed DMARC"
+            out.append(
+                NewSender(
+                    tenant_id,
+                    Finding(
+                        rule_id=NEW_SENDER_RULE_ID,
+                        rule_name=NEW_SENDER_RULE_NAME,
+                        title=f"A new sender is sending as {domain}: {key}",
+                        severity=severity,
+                        tactic="Initial Access",
+                        technique="T1566",
+                        key=f"{domain}:{key}",
+                        occurred_at=now,
+                        summary=(
+                            f"{key} sent mail as {domain} in the last seven days and in none of the reports before (the domain's reports go back {(now - oldest).days} days). "
+                            "If you know it (a service someone signed up for), make sure the domain's SPF and DKIM cover it; if not, someone may be sending as the domain."
+                        ),
+                        fields=[("Domain", domain), ("Sender", key), ("Messages in the last 7 days", outcome), ("Addresses", ", ".join(ips) or "none named")],
+                        ips=ips,
+                        source_ids=[],
+                    ),
+                )
+            )
+    return out
+
+
+async def run_new_sender_detection(db: Any, now: datetime | None = None) -> int:
+    """Load the reports of the last ``BASELINE_DAYS`` days for every client, raise an alert for each new sender, and return how many alerts were new. Never raises: a failure here must not stop the mailbox reader."""
+    from sqlalchemy import select
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    from app.models.alert import Alert
+    from app.models.dmarc import DmarcReport
+
+    now = now or datetime.now(UTC)
+    try:
+        reports = (await db.execute(select(DmarcReport).where(DmarcReport.matched.is_(True), DmarcReport.end_at >= now - timedelta(days=BASELINE_DAYS)))).scalars().all()
+        found = detect_new_senders(list(reports), now)
+        made = 0
+        async with db.begin_nested():
+            for d in found:
+                values = alert_values(d.tenant_id, d.finding, now)
+                values.update(
+                    category="email",
+                    connector_type="dmarc",
+                    tags=["email", "dmarc", NEW_SENDER_RULE_ID],
+                    raw_event={"source": "aisoc-dmarc", "finding": {"uid": f"{NEW_SENDER_RULE_ID}:{d.finding.key}", "title": d.finding.title}},
+                )
+                res = await db.execute(pg_insert(Alert).values(**values).on_conflict_do_nothing(index_elements=["id"]))
+                made += res.rowcount or 0
+        return made
+    except Exception:  # noqa: BLE001
+        logger.warning("dmarc new-sender detection failed", exc_info=True)
+        return 0

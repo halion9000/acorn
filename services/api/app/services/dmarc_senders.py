@@ -9,7 +9,10 @@ from __future__ import annotations
 import ipaddress
 import json
 from collections import Counter
+from datetime import timedelta
 from typing import Any
+
+TREND_WEEKS = 12  # how many of the newest weeks a sender's trend shows
 
 # (a domain the service signs with or sends from, the name to show). A domain matches itself and every subdomain of it. First match wins, so more specific entries come first.
 KNOWN_SENDERS: tuple[tuple[str, str], ...] = (
@@ -168,8 +171,20 @@ class SenderStats:
         self.reasons: Counter[str] = Counter()
         self.ips: Counter[str] = Counter()
         self.spf_failed = self.dkim_failed = self.both_failed = 0
+        # Week (the Monday it began) to [messages, failed DMARC, failed SPF, failed DKIM]: the history of how the sender's mail has authenticated.
+        self.weeks: dict[str, list[int]] = {}
 
-    def add(self, row: dict[str, Any], count: int, default_from: str = "") -> None:
+    def add(self, row: dict[str, Any], count: int, default_from: str = "", when: Any = None) -> None:
+        if when is not None:
+            monday = (when - timedelta(days=when.weekday())).date().isoformat()
+            w = self.weeks.setdefault(monday, [0, 0, 0, 0])
+            w[0] += count
+            if not row.get("pass"):
+                w[1] += count
+            if not row.get("spf"):
+                w[2] += count
+            if not row.get("dkim"):
+                w[3] += count
         for d in row.get("spf_domains") or []:
             self.spf[d] += count
         for d in row.get("dkim_domains") or []:
@@ -207,6 +222,7 @@ class SenderStats:
             "dispositions": dict(self.dispositions),
             "reasons": _top(self.reasons, 4),
             "addresses": _top(self.ips, 5),
+            "trend": [{"week": k, "messages": v[0], "failed": v[1], "spf_failed": v[2], "dkim_failed": v[3]} for k, v in sorted(self.weeks.items())][-TREND_WEEKS:],
         }
 
 
