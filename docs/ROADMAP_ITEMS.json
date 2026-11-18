@@ -1361,7 +1361,7 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "AiSOC crosswalk commit",
+    "completed_ref": "AiSOC 6ac859f9",
     "note": "2026-11-18: 25 topics mapped to controls in all six frameworks (compliance_crosswalk.py, every id checked against the catalog); each control lists the others it shares a topic with. Per control only: no framework-by-framework overlap table."
   },
   {
