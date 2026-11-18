@@ -16900,6 +16900,123 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/notices:
+    get:
+      tags:
+      - compliance
+      summary: Get Notice
+      operationId: get_notice_api_v1_compliance_notices_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoticeOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - compliance
+      summary: Save Notice
+      operationId: save_notice_api_v1_compliance_notices_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoticeIn'
+            example:
+              emails:
+              - compliance@example.com
+              webhook_url: https://hooks.example.com/compliance
+              weekly: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoticeOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/notices/send:
+    post:
+      tags:
+      - compliance
+      summary: Send Now
+      description: Send the notice now, whether or not a week has passed, to the people
+        and the web address saved here.
+      operationId: send_now_api_v1_compliance_notices_send_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/tests:
     get:
       tags:
@@ -51449,6 +51566,60 @@ components:
       - body
       - created_at
       title: NoteOut
+    NoticeIn:
+      properties:
+        emails:
+          items:
+            type: string
+          type: array
+          maxItems: 60
+          title: Emails
+        webhook_url:
+          anyOf:
+          - type: string
+            maxLength: 600
+          - type: 'null'
+          title: Webhook Url
+        weekly:
+          type: boolean
+          title: Weekly
+          default: false
+      type: object
+      title: NoticeIn
+    NoticeOut:
+      properties:
+        emails:
+          items:
+            type: string
+          type: array
+          title: Emails
+        webhook_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Webhook Url
+        weekly:
+          type: boolean
+          title: Weekly
+        last_sent_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Sent At
+        last_result:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Result
+      type: object
+      required:
+      - emails
+      - webhook_url
+      - weekly
+      - last_sent_at
+      - last_result
+      title: NoticeOut
     NucSyncOut:
       properties:
         dry_run:
@@ -59216,6 +59387,27 @@ components:
           default: false
       type: object
       title: Selection
+    SendOut:
+      properties:
+        sent:
+          type: boolean
+          title: Sent
+        items:
+          type: integer
+          title: Items
+        email:
+          type: string
+          title: Email
+        webhook:
+          type: string
+          title: Webhook
+      type: object
+      required:
+      - sent
+      - items
+      - email
+      - webhook
+      title: SendOut
     SenderCause:
       properties:
         text:

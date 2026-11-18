@@ -11,6 +11,7 @@ import useSWR from 'swr';
 
 import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
 import { apiErrorDetail, complianceDashboardApi, msspApi, type ComplianceDashboard } from '@/lib/api';
+import { ComplianceNotice } from './ComplianceNotice';
 import { authFetch } from '@/lib/auth-session';
 import { Donut } from './Donut';
 import { FRAMEWORK_LIST } from './frameworkList';
@@ -359,6 +360,7 @@ export function ComplianceDashboard() {
           </div>
         )}
       </section>
+      <ComplianceNotice clientId={clientId} />
     </div>
   );
 }

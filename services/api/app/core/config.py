@@ -316,6 +316,10 @@ class Settings(BaseSettings):
     POLICY_REMINDERS_ENABLED: bool = True
     POLICY_REMINDER_INTERVAL_SECONDS: int = 3600
     POLICY_REMINDER_INITIAL_DELAY_SECONDS: int = 300
+    # Weekly compliance notice (app/workers/compliance_notice_worker.py): hourly, sends the compliance action items to the e-mail list and web address saved under Compliance, Notices, at most once a week and only when something is waiting.
+    COMPLIANCE_NOTICES_ENABLED: bool = True
+    COMPLIANCE_NOTICE_INTERVAL_SECONDS: int = 3600
+    COMPLIANCE_NOTICE_INITIAL_DELAY_SECONDS: int = 420
     RETENTION_DRY_RUN: bool = False
     # The platform watching itself (app/workers/platform_watch_worker.py): every five minutes it checks that CORE is still reporting, that connectors that had events have not gone quiet, and that the server has disk and memory left, and emails the alert-email recipients about changes. On by default;
     # it sends mail only when recipients and the Graph credentials above are set, and always logs changes. A connector counts as quiet after PLATFORM_WATCH_CONNECTOR_SILENT_HOURS without an event (a quiet client can legitimately have none for hours).

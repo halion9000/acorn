@@ -47,6 +47,7 @@ from app.workers.hunt_scheduler import run_forever as run_hunt_scheduler
 from app.workers.oauth_refresh import run_forever as run_oauth_refresh
 from app.workers.platform_watch_worker import run_platform_watch
 from app.workers.playbook_dry_run_worker import run_playbook_dry_runs
+from app.workers.compliance_notice_worker import run_compliance_notices
 from app.workers.policy_reminder_worker import run_policy_reminders
 from app.workers.retention_sweeper import run_retention_sweeper
 from app.workers.suppression_sweeper import run_suppression_sweeper
@@ -477,6 +478,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             logger.warning("policy_reminders worker failed to start", error=str(exc))
 
+    # The weekly compliance notice: sends the action items to the saved e-mail list and web address (app/workers/compliance_notice_worker.py).
+    compliance_notice_task: asyncio.Task | None = None
+    if settings.COMPLIANCE_NOTICES_ENABLED:
+        try:
+            compliance_notice_task = asyncio.create_task(
+                _run_guarded_scheduler_worker(job_name="compliance_notices", ttl_seconds=_RETENTION_LOCK_TTL_SECONDS, worker=run_compliance_notices),
+                name="compliance_notices_worker",
+            )
+            logger.info("compliance_notices worker started")
+        except Exception as exc:
+            logger.warning("compliance_notices worker failed to start", error=str(exc))
+
     # The platform watching itself: CORE gone quiet, connectors gone quiet, low disk or memory. Emails the alert-email recipients about changes (app/workers/platform_watch_worker.py).
     platform_watch_task: asyncio.Task | None = None
     if settings.PLATFORM_WATCH_ENABLED:
@@ -616,6 +629,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     if dry_run_task is not None and not dry_run_task.done():
         dry_run_task.cancel()
+    if compliance_notice_task is not None and not compliance_notice_task.done():
+        compliance_notice_task.cancel()
+        try:
+            await compliance_notice_task
+        except asyncio.CancelledError:
+            logger.debug("compliance_notices worker cancelled during shutdown")
     if policy_reminder_task is not None and not policy_reminder_task.done():
         policy_reminder_task.cancel()
         try:

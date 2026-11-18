@@ -1001,8 +1001,9 @@
     "key": "r7-ai-37",
     "title": "A weekly email of the compliance action items",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-18: one weekly notice (e-mail list and an https web address with the same list as JSON); not yet seen sending against the real mailer."
   },
   {
     "key": "r7-ai-38",
@@ -1650,8 +1651,9 @@
     "key": "r7-af-40",
     "title": "Webhook out: send compliance action items to any URL",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Built 2026-11-18: one weekly notice (e-mail list and an https web address with the same list as JSON); not yet seen sending against the real mailer."
   },
   {
     "key": "inky-link",

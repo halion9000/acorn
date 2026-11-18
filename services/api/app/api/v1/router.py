@@ -50,6 +50,7 @@ from app.api.v1.endpoints import (
     compliance,
     compliance_controls,
     compliance_dashboard,
+    compliance_notices,
     compliance_tests,
     connectors,
     copilot,
@@ -309,6 +310,7 @@ api_router.include_router(audits.router)
 api_router.include_router(trust_center.router)
 api_router.include_router(compliance_controls.router)
 api_router.include_router(compliance_dashboard.router)
+api_router.include_router(compliance_notices.router)
 api_router.include_router(compliance_tests.router)
 api_router.include_router(questionnaires.router)
 api_router.include_router(questionnaires.library_router)

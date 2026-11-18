@@ -161,6 +161,11 @@ async def set_enabled_frameworks(
 async def dashboard(
     tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
 ) -> DashboardOut:
+    return await build_dashboard(db, tenant)
+
+
+async def build_dashboard(db: Any, tenant: uuid.UUID) -> DashboardOut:
+    """The dashboard for one organization or client (also what the weekly notice sends its action items from)."""
     now = datetime.now(UTC)
     enabled = await _enabled(db, tenant)
     by_framework: list[FrameworkHealth] = []
