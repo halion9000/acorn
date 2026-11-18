@@ -67,6 +67,7 @@ describe('Sidebar', () => {
       ['Risk Management', '/compliance/risk-register'],
       ['Vendors', '/compliance/vendors'],
       ['Access Reviews', '/compliance/access-reviews'],
+      ['People', '/compliance/people'],
       ['Questionnaires', '/compliance/questionnaires'],
       ['Audits', '/compliance/audits'],
       ['Calendar', '/compliance/calendar'],

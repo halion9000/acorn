@@ -392,6 +392,7 @@ const navSections: NavSection[] = [
       { label: 'Risk Management', href: '/compliance/risk-register', icon: <ScanIcon /> },
       { label: 'Vendors', href: '/compliance/vendors', icon: <InboxIcon /> },
       { label: 'Access Reviews', href: '/compliance/access-reviews', icon: <ShieldIcon /> },
+      { label: 'People', href: '/compliance/people', icon: <InboxIcon /> },
       { label: 'Questionnaires', href: '/compliance/questionnaires', icon: <DocumentReportIcon /> },
       { label: 'Audits', href: '/compliance/audits', icon: <ScanIcon /> },
       { label: 'Calendar', href: '/compliance/calendar', icon: <ScanIcon /> },

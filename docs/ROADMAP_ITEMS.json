@@ -43,9 +43,9 @@
     "title": "Personnel: onboarding, offboarding and training tasks per person (access reviews are built)",
     "detail": "Access reviews are built (start a review for a system, decide keep or remove for each person, complete it). Still to do: a people list with onboarding, offboarding and security-training tasks per person.",
     "area": "Compliance",
-    "status": "not_started",
+    "status": "in_progress",
     "needs": "claude",
-    "note": "Access reviews done (this commit). The people tasks need to know where training completion comes from (Huntress awareness training is already read)."
+    "note": "Onboarding and offboarding checklists built (People page). Training completion from Huntress awareness training still to do."
   },
   {
     "key": "tests-controls-engine",
@@ -1436,7 +1436,7 @@
     "key": "r7-af-14",
     "title": "Personnel: a people list with onboarding and offboarding checklists",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
+    "status": "completed",
     "needs": "claude"
   },
   {

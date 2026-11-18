@@ -3886,6 +3886,278 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/personnel:
+    get:
+      tags:
+      - compliance
+      summary: List People
+      description: Each active person, and anyone with a checklist, with how their
+        onboarding and offboarding stand.
+      operationId: list_people_api_v1_personnel_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/app__api__v1__endpoints__personnel__PersonOut'
+                title: Response List People Api V1 Personnel Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/personnel/{email}/tasks:
+    get:
+      tags:
+      - compliance
+      summary: Person Tasks
+      operationId: person_tasks_api_v1_personnel__email__tasks_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: email
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Email
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/app__api__v1__endpoints__personnel__TaskOut'
+                title: Response Person Tasks Api V1 Personnel  Email  Tasks Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Add Task
+      description: Add one task of your own to a person's checklist.
+      operationId: add_task_api_v1_personnel__email__tasks_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: email
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Email
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__personnel__TaskOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/personnel/{email}/tasks/start:
+    post:
+      tags:
+      - compliance
+      summary: Start Checklist
+      description: Start the built-in onboarding or offboarding list for a person.
+        Starting it again only adds the tasks the person does not have.
+      operationId: start_checklist_api_v1_personnel__email__tasks_start_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: email
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Email
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/app__api__v1__endpoints__personnel__TaskOut'
+                title: Response Start Checklist Api V1 Personnel  Email  Tasks Start
+                  Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/personnel/tasks/{task_id}/done:
+    post:
+      tags:
+      - compliance
+      summary: Mark Task
+      description: Tick a task off (who and when are kept), or put it back.
+      operationId: mark_task_api_v1_personnel_tasks__task_id__done_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Task Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoneIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__personnel__TaskOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/personnel/tasks/{task_id}:
+    delete:
+      tags:
+      - compliance
+      summary: Remove Task
+      description: Remove a task from a list (one that was added by mistake).
+      operationId: remove_task_api_v1_personnel_tasks__task_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Task Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/agent-proposals:
     get:
       tags:
@@ -32476,6 +32748,30 @@ components:
       required:
       - findings
       title: AddFindingsRequest
+    AddIn:
+      properties:
+        kind:
+          type: string
+          enum:
+          - onboarding
+          - offboarding
+          title: Kind
+        title:
+          type: string
+          maxLength: 200
+          minLength: 3
+          title: Title
+        due_on:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due On
+      type: object
+      required:
+      - kind
+      - title
+      title: AddIn
     AddressBlocklists:
       properties:
         ip:
@@ -43270,6 +43566,15 @@ components:
           default: true
       type: object
       title: Done
+    DoneIn:
+      properties:
+        done:
+          type: boolean
+          title: Done
+      type: object
+      required:
+      - done
+      title: DoneIn
     DriftEntry:
       properties:
         ruleId:
@@ -43467,9 +43772,9 @@ components:
           - type: 'null'
           title: Client Name
         a:
-          $ref: '#/components/schemas/PersonOut'
+          $ref: '#/components/schemas/app__api__v1__endpoints__identities__PersonOut'
         b:
-          $ref: '#/components/schemas/PersonOut'
+          $ref: '#/components/schemas/app__api__v1__endpoints__identities__PersonOut'
         score:
           type: integer
           title: Score
@@ -46884,7 +47189,7 @@ components:
           $ref: '#/components/schemas/app__api__v1__endpoints__identities__IdentitySummary'
         items:
           items:
-            $ref: '#/components/schemas/PersonOut'
+            $ref: '#/components/schemas/app__api__v1__endpoints__identities__PersonOut'
           type: array
           title: Items
         total:
@@ -51828,7 +52133,7 @@ components:
     PersonDetail:
       properties:
         person:
-          $ref: '#/components/schemas/PersonOut'
+          $ref: '#/components/schemas/app__api__v1__endpoints__identities__PersonOut'
         alerts:
           items:
             $ref: '#/components/schemas/AlertBrief'
@@ -51857,134 +52162,6 @@ components:
       - alerts
       - signins
       title: PersonDetail
-    PersonOut:
-      properties:
-        key:
-          type: string
-          title: Key
-        client_id:
-          type: string
-          format: uuid
-          title: Client Id
-        client_name:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Client Name
-        email:
-          type: string
-          title: Email
-        display_name:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Display Name
-        kind:
-          type: string
-          title: Kind
-        enabled:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Enabled
-        admin:
-          type: boolean
-          title: Admin
-          default: false
-        licensed:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Licensed
-        mfa:
-          type: string
-          title: Mfa
-        mfa_methods:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Mfa Methods
-        password_never_expires:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Password Never Expires
-        signin_state:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Signin State
-        days_since_signin:
-          anyOf:
-          - type: integer
-          - type: 'null'
-          title: Days Since Signin
-        tools:
-          items:
-            type: string
-          type: array
-          title: Tools
-        sources:
-          items:
-            $ref: '#/components/schemas/SourceOut'
-          type: array
-          title: Sources
-        open_alerts:
-          type: integer
-          title: Open Alerts
-          default: 0
-        top_severity:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Top Severity
-        alerts_by_source:
-          additionalProperties:
-            type: integer
-          type: object
-          title: Alerts By Source
-        backups:
-          items:
-            $ref: '#/components/schemas/BackupOut'
-          type: array
-          title: Backups
-        exposure:
-          anyOf:
-          - $ref: '#/components/schemas/ExposureOut'
-          - type: 'null'
-        halo_check:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Halo Check
-        tickets:
-          type: integer
-          title: Tickets
-          default: 0
-        last_ticket_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Last Ticket At
-        aliases:
-          items:
-            $ref: '#/components/schemas/AliasOut'
-          type: array
-          title: Aliases
-        bec:
-          anyOf:
-          - $ref: '#/components/schemas/BecBadge'
-          - type: 'null'
-      type: object
-      required:
-      - key
-      - client_id
-      - email
-      - kind
-      - mfa
-      - tools
-      title: PersonOut
     PersonTicketIn:
       properties:
         vendor_client_id:
@@ -52935,6 +53112,31 @@ components:
       - ticket_id
       - hours
       title: ProfitTicketIn
+    ProgressOut:
+      properties:
+        started:
+          type: boolean
+          title: Started
+        total:
+          type: integer
+          title: Total
+        done:
+          type: integer
+          title: Done
+        open:
+          type: integer
+          title: Open
+        overdue:
+          type: integer
+          title: Overdue
+      type: object
+      required:
+      - started
+      - total
+      - done
+      - open
+      - overdue
+      title: ProgressOut
     ProposalIn:
       properties:
         agent:
@@ -55288,7 +55490,7 @@ components:
           title: Archived At
         tasks:
           items:
-            $ref: '#/components/schemas/TaskOut'
+            $ref: '#/components/schemas/app__api__v1__endpoints__risk_register__TaskOut'
           type: array
           title: Tasks
         history:
@@ -59857,6 +60059,18 @@ components:
       - client_id
       - email
       title: StartBody
+    StartIn:
+      properties:
+        kind:
+          type: string
+          enum:
+          - onboarding
+          - offboarding
+          title: Kind
+      type: object
+      required:
+      - kind
+      title: StartIn
     StateItem:
       properties:
         uid:
@@ -60702,48 +60916,6 @@ components:
       required:
       - title
       title: TaskIn
-    TaskOut:
-      properties:
-        id:
-          type: string
-          format: uuid
-          title: Id
-        title:
-          type: string
-          title: Title
-        owner:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Owner
-        due_date:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Due Date
-        done:
-          type: boolean
-          title: Done
-        done_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-          title: Done At
-        overdue:
-          type: boolean
-          title: Overdue
-      type: object
-      required:
-      - id
-      - title
-      - owner
-      - due_date
-      - done
-      - done_at
-      - overdue
-      title: TaskOut
     TaskPatch:
       properties:
         title:
@@ -67138,6 +67310,134 @@ components:
       - disabled
       - in_one_tool
       title: IdentitySummary
+    app__api__v1__endpoints__identities__PersonOut:
+      properties:
+        key:
+          type: string
+          title: Key
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Name
+        email:
+          type: string
+          title: Email
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Display Name
+        kind:
+          type: string
+          title: Kind
+        enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Enabled
+        admin:
+          type: boolean
+          title: Admin
+          default: false
+        licensed:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Licensed
+        mfa:
+          type: string
+          title: Mfa
+        mfa_methods:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mfa Methods
+        password_never_expires:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Password Never Expires
+        signin_state:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Signin State
+        days_since_signin:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Days Since Signin
+        tools:
+          items:
+            type: string
+          type: array
+          title: Tools
+        sources:
+          items:
+            $ref: '#/components/schemas/SourceOut'
+          type: array
+          title: Sources
+        open_alerts:
+          type: integer
+          title: Open Alerts
+          default: 0
+        top_severity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Top Severity
+        alerts_by_source:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Alerts By Source
+        backups:
+          items:
+            $ref: '#/components/schemas/BackupOut'
+          type: array
+          title: Backups
+        exposure:
+          anyOf:
+          - $ref: '#/components/schemas/ExposureOut'
+          - type: 'null'
+        halo_check:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Halo Check
+        tickets:
+          type: integer
+          title: Tickets
+          default: 0
+        last_ticket_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Ticket At
+        aliases:
+          items:
+            $ref: '#/components/schemas/AliasOut'
+          type: array
+          title: Aliases
+        bec:
+          anyOf:
+          - $ref: '#/components/schemas/BecBadge'
+          - type: 'null'
+      type: object
+      required:
+      - key
+      - client_id
+      - email
+      - kind
+      - mfa
+      - tools
+      title: PersonOut
     app__api__v1__endpoints__identities__SigninRow:
       properties:
         at:
@@ -68271,6 +68571,73 @@ components:
       - target
       - remapped
       title: MergeOut
+    app__api__v1__endpoints__personnel__PersonOut:
+      properties:
+        email:
+          type: string
+          title: Email
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        active:
+          type: boolean
+          title: Active
+        onboarding:
+          $ref: '#/components/schemas/ProgressOut'
+        offboarding:
+          $ref: '#/components/schemas/ProgressOut'
+      type: object
+      required:
+      - email
+      - name
+      - active
+      - onboarding
+      - offboarding
+      title: PersonOut
+    app__api__v1__endpoints__personnel__TaskOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        email:
+          type: string
+          title: Email
+        kind:
+          type: string
+          title: Kind
+        title:
+          type: string
+          title: Title
+        due_on:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due On
+        done_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Done At
+        done_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Done By
+      type: object
+      required:
+      - id
+      - email
+      - kind
+      - title
+      - due_on
+      - done_at
+      - done_by
+      title: TaskOut
     app__api__v1__endpoints__questionnaires__ItemOut:
       properties:
         id:
@@ -68550,6 +68917,48 @@ components:
       - overdue_tasks
       - untreated
       title: Summary
+    app__api__v1__endpoints__risk_register__TaskOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        title:
+          type: string
+          title: Title
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+        done:
+          type: boolean
+          title: Done
+        done_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Done At
+        overdue:
+          type: boolean
+          title: Overdue
+      type: object
+      required:
+      - id
+      - title
+      - owner
+      - due_date
+      - done
+      - done_at
+      - overdue
+      title: TaskOut
     app__api__v1__endpoints__roadmap__ItemIn:
       properties:
         title:

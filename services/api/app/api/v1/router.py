@@ -77,6 +77,7 @@ from app.api.v1.endpoints import (
     fusion,
     global_search,
     governance,
+    personnel,
     graph,
     graph_ws,
     health,
@@ -185,6 +186,7 @@ api_router.include_router(finance.router)
 api_router.include_router(ticket_metrics.router)
 api_router.include_router(nist_coverage.router)
 api_router.include_router(governance.router)
+api_router.include_router(personnel.router)
 api_router.include_router(agent_proposals.router)
 api_router.include_router(alert_notes.router)
 api_router.include_router(client_vulnerabilities.ingest_router)
