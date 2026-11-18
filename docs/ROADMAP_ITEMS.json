@@ -724,10 +724,12 @@
     "key": "r7-ci-27",
     "title": "Replace silent catch blocks in sweeps with counted dropped metrics",
     "area": "Round 7: CORE improvement",
-    "status": "in_progress",
+    "status": "completed",
     "needs": "claude",
-    "note": "2026-11-16 (CORE 59f001f): the tool sweeps count dropped licence counts, vulnerability and application lists. Still open: about 20 silent catch blocks in the CIPP (actions, health, identity, mail), sign-in and Huntress (checks, modules) sweeps. Each needs reading for what its failure should count as; not started.",
-    "added": "2026-11-14"
+    "note": "2026-11-18: the CIPP tenant list and Huntress organizations and incident reports, the reads a whole pass shares and carries on without, are now noted under the tool and shown in the pass line. The remaining catch blocks are cursor-file and JSON fallbacks (fine) and per-alert person lookups (best effort by design). Not live until CORE is updated.",
+    "added": "2026-11-14",
+    "completed": "2026-11-18",
+    "completed_ref": "CORE 0b5fc32"
   },
   {
     "key": "r7-ci-28",
@@ -2196,12 +2198,12 @@
   },
   {
     "status": "in_progress",
-    "needs": "claude",
+    "needs": "hal",
     "area": "Devices",
     "key": "ninja-warranty",
     "title": "NinjaOne warranty dates on devices",
     "detail": "Devices show the warranty end date when NinjaOne's device list carries one, and the maker's own warranty page for Dell and Lenovo from the serial number. Whether NinjaOne's device list really carries a warranty date is not confirmed.",
-    "note": "",
+    "note": "Checked against the live device records 2026-11-18: NinjaOne devices carry a link to the maker's warranty lookup (warranty_lookup_url) but NO warranty end date, so the date cannot come from NinjaOne. The maker route needs each maker's API: Dell (TechDirect) and Lenovo require an API key or registration. Question for Hal: do you want me to use them (you register and give me a key for Dell and for Lenovo), or leave the link as it is on the device page?",
     "completed_ref": null,
     "added": "2026-11-15"
   },
@@ -2258,7 +2260,7 @@
     "area": "Metrics",
     "status": "in_progress",
     "needs": "claude",
-    "note": "2026-11-16 phase 1 done on Profitability: invoice lines billed and free, recurring lines, hours by person with the rate source. NOT DONE: the tickets behind the hours (CORE does not send ticket-level time yet) and the same click-through on the other client tables (Monthly invoicing, Ticket volume, Client summary). 2026-11-17: CORE now sends the most-worked 15 tickets per client and month (subject, hours, who) and the drill-down lists them with the hours on other tickets; built locally, not live. The click-through on Monthly invoicing, Ticket volume and Client summary is still not built.",
+    "note": "2026-11-16 phase 1 done on Profitability: invoice lines billed and free, recurring lines, hours by person with the rate source. NOT DONE: the tickets behind the hours (CORE does not send ticket-level time yet) and the same click-through on the other client tables (Monthly invoicing, Ticket volume, Client summary). 2026-11-17: CORE now sends the most-worked 15 tickets per client and month (subject, hours, who) and the drill-down lists them with the hours on other tickets; built locally, not live. The click-through on Monthly invoicing, Ticket volume and Client summary is still not built. 2026-11-18: the Net income tables group clients by name (and by client group) while the drill-down is keyed by the HaloPSA client id, so a click-through from Net income needs a drill-down by client name key; that, plus Monthly invoicing, Ticket volume and Client summary, is still to build.",
     "completed_ref": "AiSOC e087c3cd",
     "added": "2026-11-16"
   },
