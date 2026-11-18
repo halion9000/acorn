@@ -2314,5 +2314,16 @@
     "added": "2026-11-18",
     "note": "2026-11-18: Hal's screenshots show this is the version meant. Built as the QBO Profitability tab (client table on QuickBooks-booked revenue) with Historical client revenue beside it; live after the deploy that follows CORE verify. The Do not sort tab, Halo Summary and Sheet3 are not built (they repeat or pivot data already shown).",
     "completed": "2026-11-18"
+  },
+  {
+    "key": "addigy-mdm-elsewhere",
+    "title": "Alerts: clients whose MDM is managed by another tool do not alert for Addigy MDM disabled",
+    "area": "Alerts",
+    "status": "completed",
+    "needs": "claude",
+    "added": "2026-11-18",
+    "completed": "2026-11-18",
+    "completed_ref": "AiSOC 2026-11-18",
+    "note": "Requested by Hal 2026-11-18. Tick clients on Alerts > Hidden: a client-scope rule with a prefix signature (alerts of the tool addigy whose title starts MDM is disabled on) hides them now and, through the sweep, new ones; GET/PUT /alert-suppressions/addigy-mdm-clients."
   }
 ]

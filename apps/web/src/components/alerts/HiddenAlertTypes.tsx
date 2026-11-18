@@ -9,6 +9,7 @@ import { alertsApi, type AlertSuppression } from '@/lib/api';
 import { safeFormat } from '@/lib/safe-date';
 import { MaintenanceWindowForm } from './MaintenanceWindowForm';
 import { NoisyRules } from './NoisyRules';
+import { MdmElsewhere } from './MdmElsewhere';
 
 /** The API lists at most this many rules (newest first): a list that long may be cut. */
 export const RULE_LIST_CAP = 500;
@@ -59,6 +60,7 @@ export function HiddenAlertTypes() {
         </Link>
       </div>
 
+      <MdmElsewhere />
       <MaintenanceWindowForm onStarted={() => void mutate()} />
       <NoisyRules />
 

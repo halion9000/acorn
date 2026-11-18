@@ -22,6 +22,8 @@ from app.models.tenant import Tenant
 from app.services.alert_scope import alert_scope
 from app.services.alert_suppression import (
     MAX_DAYS,
+    MDM_SIGNATURE,
+    MDM_SOURCE,
     MAX_WINDOW_HOURS,
     SUGGEST_AFTER,
     SUGGEST_WINDOW_DAYS,
@@ -322,6 +324,103 @@ async def noisy_rules(
             )
         ).all()
     return [noisy_row(str(r[0])[:200], r[1], int(r[2]), int(r[3]), int(r[4]), r[5]) for r in rows]
+
+
+class MdmClient(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    elsewhere: bool  # the client's MDM is managed by another tool, so Addigy's "MDM is disabled" alerts are hidden for it
+    hidden_alerts: int
+
+
+class MdmClientsOut(BaseModel):
+    clients: list[MdmClient]
+
+
+class MdmClientsIn(BaseModel):
+    client_ids: list[uuid.UUID] = Field(max_length=2000)
+
+
+async def _mdm_rules(db: DBSession, owner: uuid.UUID) -> dict[uuid.UUID, AlertSuppression]:
+    rows = (
+        await db.execute(
+            select(AlertSuppression).where(
+                AlertSuppression.tenant_id == owner,
+                AlertSuppression.scope == "client",
+                AlertSuppression.signature == MDM_SIGNATURE,
+                AlertSuppression.source == MDM_SOURCE,
+                AlertSuppression.revoked_at.is_(None),
+                AlertSuppression.expires_at.is_(None),
+            )
+        )
+    ).scalars().all()
+    return {r.client_tenant_id: r for r in rows if r.client_tenant_id is not None}
+
+
+@router.get(
+    "/addigy-mdm-clients",
+    response_model=MdmClientsOut,
+    summary="Which clients have their MDM managed by another tool, so Addigy's MDM-disabled alerts are hidden for them",
+    dependencies=[Depends(require_permission("alerts:read"))],
+)
+async def mdm_clients(user: AuthUser, db: DBSession) -> MdmClientsOut:
+    kids = (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id).order_by(Tenant.name))).all()
+    rules = await _mdm_rules(db, user.tenant_id)
+    counts = {
+        cid: n
+        for cid, n in (
+            await db.execute(
+                select(Alert.suppression_id, func.count()).where(Alert.suppression_id.in_([r.id for r in rules.values()] or [uuid.uuid4()])).group_by(Alert.suppression_id)
+            )
+        ).all()
+    } if rules else {}
+    by_rule = {r.id: cid for cid, r in rules.items()}
+    hidden = {by_rule[rid]: n for rid, n in counts.items() if rid in by_rule}
+    return MdmClientsOut(clients=[MdmClient(client_id=k.id, client_name=k.name, elsewhere=k.id in rules, hidden_alerts=hidden.get(k.id, 0)) for k in kids])
+
+
+@router.put(
+    "/addigy-mdm-clients",
+    response_model=MdmClientsOut,
+    summary="Set exactly which clients have their MDM managed by another tool: their Addigy MDM-disabled alerts are hidden (kept, not deleted) and come back if the client is taken off the list",
+    dependencies=[Depends(require_permission("alerts:write"))],
+)
+async def set_mdm_clients(body: MdmClientsIn, user: AuthUser, db: DBSession) -> MdmClientsOut:
+    kids = {r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == user.tenant_id))).all()}
+    wanted = set(body.client_ids)
+    if not wanted <= set(kids):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only this organization's own clients can be chosen")
+    rules = await _mdm_rules(db, user.tenant_id)
+    added = removed = hidden = restored = 0
+    for cid in sorted(wanted - set(rules), key=str):
+        rule = AlertSuppression(
+            tenant_id=user.tenant_id,
+            scope="client",
+            client_tenant_id=cid,
+            source=MDM_SOURCE,
+            signature=MDM_SIGNATURE,
+            title="MDM is disabled on a device in Addigy (MDM managed by another tool)",
+            created_by=user.user_id,
+        )
+        db.add(rule)
+        await db.flush()
+        hidden += await apply_rule(db, rule, user.tenant_id)
+        added += 1
+    for cid in set(rules) - wanted:
+        restored += await release_rule(db, rules[cid], user.tenant_id)
+        rules[cid].revoked_at, rules[cid].revoked_reason = datetime.now(UTC), "lifted"
+        removed += 1
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="alert_suppression:mdm_clients",
+        resource="alert_suppression",
+        resource_id="addigy-mdm",
+        changes={"added": added, "removed": removed, "hidden_alerts": hidden, "restored_alerts": restored},
+    )
+    await db.commit()
+    return await mdm_clients(user, db)
 
 
 @router.get("", response_model=list[SuppressionOut], dependencies=[Depends(require_permission("alerts:read"))])

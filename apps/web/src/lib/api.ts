@@ -2281,6 +2281,8 @@ export const alertsApi = {
   otherClients: (alertId: string) => request<AlertAtOtherClients>(`/api/v1/alerts/${encodeURIComponent(alertId)}/other-clients`),
   /** Stop hiding an alert type: its alerts come back as they were. */
   liftSuppression: (id: string) => request<AlertSuppression>(`/api/v1/alert-suppressions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  mdmClients: () => request<{ clients: MdmClient[] }>('/api/v1/alert-suppressions/addigy-mdm-clients'),
+  setMdmClients: (clientIds: string[]) => request<{ clients: MdmClient[] }>('/api/v1/alert-suppressions/addigy-mdm-clients', { method: 'PUT', body: JSON.stringify({ client_ids: clientIds }) }),
   /** Enter one alert by hand (the same endpoint `aisoc submit` uses). */
   create: (body: Record<string, unknown>) => request<{ id: string }>('/api/v1/alerts/submit', { method: 'POST', body: JSON.stringify(body) }),
   list: async (filters: AlertFilters = {}) => {
@@ -7858,6 +7860,13 @@ export interface RoadmapItem {
 export interface Roadmap {
   items: RoadmapItem[];
   counts: Record<RoadmapItem['status'], number>;
+}
+/** A client and whether its MDM is managed by another tool, so Addigy's MDM-disabled alert is hidden for it. */
+export interface MdmClient {
+  client_id: string;
+  client_name: string;
+  elsewhere: boolean;
+  hidden_alerts: number;
 }
 export const roadmapApi = {
   list: () => request<Roadmap>('/api/v1/roadmap'),

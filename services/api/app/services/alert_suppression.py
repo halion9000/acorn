@@ -40,6 +40,13 @@ def signature_of(rule_id: str | None, title: str | None) -> str:
     return f"rule:{rid}" if rid else f"title:{(title or '').strip()}"
 
 
+# The Addigy "MDM is disabled" alert is named after its device ("MDM is disabled on Brian's MacBook Air"), so no single title covers it: a rule of kind ``prefix`` hides every alert of the tool
+# whose title starts with the text, for one client. Used for the clients whose MDM is managed by another tool.
+MDM_PREFIX = "MDM is disabled on "
+MDM_SIGNATURE = f"prefix:{MDM_PREFIX}"
+MDM_SOURCE = "addigy"
+
+
 def source_of(raw_event: Any, connector_type: str | None = None) -> str | None:
     """The tool that raised the alert, as CORE names it, else the connector type; None when neither is known."""
     src = raw_event.get("source") if isinstance(raw_event, dict) else None
@@ -92,9 +99,17 @@ def is_active(rule: Any, now: datetime) -> bool:
     return has_started(rule, now) and not has_ended(rule, now)
 
 
+def _same_type(signature: str, rule_id: str | None, title: str | None) -> bool:
+    """Whether an alert is of the type a signature names (pure): an exact rule id or title, or, for a ``prefix`` signature, an alert with no rule id whose title starts with the text."""
+    kind, _, value = signature.partition(":")
+    if kind == "prefix":
+        return not (rule_id or "").strip() and (title or "").startswith(value)
+    return signature_of(rule_id, title) == signature
+
+
 def matches(rule: Any, *, tenant_id: uuid.UUID, rule_id: str | None, title: str | None, source: str | None, hosts: Any) -> bool:
     """Whether an alert (given by its tenant, rule id, title, tool and machine names) is of the type the rule hides, in the place the rule covers. The rule's own timing is checked by ``is_active``."""
-    if not is_window(rule) and (signature_of(rule_id, title) != rule.signature or (rule.source or None) != (source or None)):
+    if not is_window(rule) and (not _same_type(rule.signature, rule_id, title) or (rule.source or None) != (source or None)):
         return False
     if rule.scope == "all":
         return True
@@ -117,6 +132,8 @@ def _type_filter(rule: Any) -> Any:
     if is_window(rule):
         return Alert.severity != NEVER_WINDOWED_SEVERITY  # a maintenance window covers every type, except what is critical
     kind, _, value = rule.signature.partition(":")
+    if kind == "prefix":
+        return and_(or_(Alert.rule_id.is_(None), Alert.rule_id == ""), Alert.title.startswith(value, autoescape=True))
     return Alert.rule_id == value if kind == "rule" else and_(or_(Alert.rule_id.is_(None), Alert.rule_id == ""), Alert.title == value)
 
 

@@ -5049,6 +5049,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-suppressions/addigy-mdm-clients:
+    get:
+      tags:
+      - alerts
+      summary: Which clients have their MDM managed by another tool, so Addigy's MDM-disabled
+        alerts are hidden for them
+      operationId: mdm_clients_api_v1_alert_suppressions_addigy_mdm_clients_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MdmClientsOut'
+      security:
+      - HTTPBearer: []
+    put:
+      tags:
+      - alerts
+      summary: 'Set exactly which clients have their MDM managed by another tool:
+        their Addigy MDM-disabled alerts are hidden (kept, not deleted) and come back
+        if the client is taken off the list'
+      operationId: set_mdm_clients_api_v1_alert_suppressions_addigy_mdm_clients_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MdmClientsIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MdmClientsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/alert-suppressions/{suppression_id}:
     delete:
       tags:
@@ -50707,6 +50751,52 @@ components:
       - changed_at
       - created_at
       title: MaturityOut
+    MdmClient:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        elsewhere:
+          type: boolean
+          title: Elsewhere
+        hidden_alerts:
+          type: integer
+          title: Hidden Alerts
+      type: object
+      required:
+      - client_id
+      - client_name
+      - elsewhere
+      - hidden_alerts
+      title: MdmClient
+    MdmClientsIn:
+      properties:
+        client_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 2000
+          title: Client Ids
+      type: object
+      required:
+      - client_ids
+      title: MdmClientsIn
+    MdmClientsOut:
+      properties:
+        clients:
+          items:
+            $ref: '#/components/schemas/MdmClient'
+          type: array
+          title: Clients
+      type: object
+      required:
+      - clients
+      title: MdmClientsOut
     MergeBody:
       properties:
         client_id:
