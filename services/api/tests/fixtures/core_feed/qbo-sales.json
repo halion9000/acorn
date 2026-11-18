@@ -1,0 +1,21 @@
+{
+  "route": "qbo-sales",
+  "method": "POST",
+  "body": {
+    "months": [
+      {
+        "month": "2026-10",
+        "customers": [
+          {
+            "name": "Acme Dental",
+            "amount": 3598.1
+          },
+          {
+            "name": "Sandler Corp",
+            "amount": 453.4
+          }
+        ]
+      }
+    ]
+  }
+}

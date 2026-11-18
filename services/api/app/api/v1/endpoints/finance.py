@@ -25,8 +25,10 @@ from app.models.finance_profit import (
     FinanceClientMaster,
     FinanceCostEntry,
     FinanceLaborRate,
+    FinancePnlMonth,
     FinanceProfitSnapshot,
     FinanceProfitTickets,
+    FinanceQboSales,
     FinanceSettings,
     FinanceVendorCost,
     FinanceVendorMap,
@@ -36,6 +38,7 @@ from app.services import finance as fin
 from app.services import finance_halo as fh
 from app.services import profitability as profit
 from app.services import profitability_full as pf
+from app.services import qbo_books as qb
 from app.services.audit import emit_audit
 
 router = APIRouter(prefix="/finance", tags=["finance"])
@@ -642,6 +645,84 @@ async def profitability_analysis(
             "holds invoiced revenue). Sales and marketing is split evenly across clients whose first revenue is this month."
         ),
     }
+
+
+@router.get("/profitability/pnl", dependencies=[Depends(require_permission("finance:view"))])
+async def profit_and_loss(user: AuthUser, db: DBSession, month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$")) -> dict[str, Any]:
+    """QuickBooks' profit and loss for a month (the newest complete one unless asked), line by line as QuickBooks shows it. ``months`` lists the months held."""
+    rows = (await db.execute(select(FinancePnlMonth).where(FinancePnlMonth.tenant_id == user.tenant_id))).scalars().all()
+    held = {r.month: r for r in rows}
+    months = sorted(held)
+    if not months:
+        return {"months": [], "month": None, "lines": [], "received_at": None}
+    chosen = month if month in held else (months[-2] if len(months) > 1 else months[-1])
+    return {"months": months, "month": chosen, "lines": held[chosen].payload, "received_at": held[chosen].received_at}
+
+
+async def _qbo_sales(db: DBSession, tenant: Any) -> dict[str, list[dict[str, Any]]]:
+    rows = (await db.execute(select(FinanceQboSales).where(FinanceQboSales.tenant_id == tenant))).scalars().all()
+    return {r.month: list(r.payload or []) for r in rows}
+
+
+@router.get("/profitability/qbo-history", dependencies=[Depends(require_permission("finance:view"))])
+async def qbo_history(user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """What QuickBooks invoiced each client in each month it holds (sales by customer, accrual): every client with its amount per month and total, and the QuickBooks customers behind it."""
+    by_month = await _qbo_sales(db, user.tenant_id)
+    groups = await _groups(db, user.tenant_id)
+    out = qb.pivot(qb.history_rows(by_month, groups))
+    return {
+        "months": out["months"],
+        "clients": [{"client": c["client"], "total": c["total"], "by_month": c["by_month"], "qbo_names": c["qbo_names"]} for c in out["clients"]],
+    }
+
+
+@router.get("/profitability/qbo", dependencies=[Depends(require_permission("finance:view"))])
+async def qbo_profitability(
+    user: AuthUser, db: DBSession, month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$")
+) -> dict[str, Any]:
+    """Profit by client for a month with the revenue taken from QuickBooks (sales by customer) instead of HaloPSA's invoices; hours, labor and the cost allocations are the same as on the main table."""
+    row = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    by_month = await _qbo_sales(db, user.tenant_id)
+    months = sorted(by_month)
+    if row is None or not months:
+        return {"months": months, "report": None, "received_at": row.received_at if row else None}
+    chosen = month if month in by_month else (months[-2] if len(months) > 1 else months[-1])
+    groups = await _groups(db, user.tenant_id)
+    snapshot = qb.profit_snapshot(row.payload, by_month, groups)
+    rates, costs, master = await _rates(db, user.tenant_id), await _costs(db, user.tenant_id), await _master(db, user.tenant_id)
+    from app.services.addon_loader import add_on_by_month
+
+    addon = await add_on_by_month(db, user.tenant_id, row.payload, [chosen])
+    report = pf.full_month(snapshot, rates, chosen, costs, master, addon.get(chosen), groups)
+    active = qb.months_active(by_month, groups, chosen)
+    for r in report["rows"]:
+        r["months_active"] = active.get(profit.name_key(r["client_name"]), 0)
+    return {"months": months, "report": report, "received_at": row.received_at}
+
+
+@router.get("/client-names", dependencies=[Depends(require_permission("finance:view"))])
+async def client_names(user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """Every client name Net income has seen, from HaloPSA (invoices and hours) and from QuickBooks (sales by customer), each with the Primary Name it is filed under (None when it is on its own): what the client groups are chosen from."""
+    row = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    groups = await _groups(db, user.tenant_id)
+    names: dict[str, str] = {}
+    snap = row.payload if row is not None else {}
+    for inv in snap.get("invoices") or []:
+        if inv.get("client_name"):
+            names.setdefault(profit.name_key(inv["client_name"]), " ".join(str(inv["client_name"]).split()))
+    for h in snap.get("hours") or []:
+        if h.get("client"):
+            names.setdefault(profit.name_key(h["client"]), " ".join(str(h["client"]).split()))
+    for customers in (await _qbo_sales(db, user.tenant_id)).values():
+        for c in customers:
+            if c.get("name"):
+                names.setdefault(profit.name_key(c["name"]), " ".join(str(c["name"]).split()))
+    members = {r.member_key: r.member_name for r in (await db.execute(select(FinanceClientGroup).where(FinanceClientGroup.tenant_id == user.tenant_id))).scalars().all()}
+    for k, n in members.items():
+        names.setdefault(k, n)
+    out = [{"name": n, "group": groups.get(k)} for k, n in names.items() if k]
+    out.sort(key=lambda x: x["name"].lower())
+    return {"names": out}
 
 
 @router.get("/profitability/inputs", dependencies=[Depends(require_permission("finance:view"))])

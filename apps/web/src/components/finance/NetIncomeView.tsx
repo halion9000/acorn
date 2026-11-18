@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
 import { money, monthLabel, pct } from './ProfitabilityView';
+import { HistoryPanel, PnlPanel, QboProfitPanel } from './QboSections';
 
 export interface FullRow {
   client_key: string;
@@ -139,13 +140,16 @@ export function parseMasterCsv(text: string): { client_name: string; industry: s
   return rows;
 }
 
-type Tab = 'net' | 'new' | 'industry' | 'hours' | 'rank' | 'inputs';
+type Tab = 'net' | 'new' | 'industry' | 'hours' | 'rank' | 'pnl' | 'qbo' | 'history' | 'inputs';
 const TABS: [Tab, string][] = [
   ['net', 'Revenue to net income'],
   ['new', 'New clients'],
   ['industry', 'By industry'],
   ['hours', 'Hours and utilization'],
   ['rank', 'Ranking'],
+  ['pnl', 'P&L'],
+  ['qbo', 'QBO Profitability'],
+  ['history', 'Historical client revenue'],
   ['inputs', 'Inputs'],
 ];
 const input = 'rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 text-sm text-gray-100';
@@ -228,7 +232,7 @@ export function NetIncomeView() {
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        {report && data && (
+        {report && data && tab !== 'pnl' && tab !== 'qbo' && tab !== 'history' && (
           <label className="flex items-center gap-2 text-sm text-gray-300">
             Month
             <select aria-label="Month" className={input} value={month} onChange={(e) => { setMonth(e.target.value); void load(e.target.value); }}>
@@ -312,6 +316,10 @@ export function NetIncomeView() {
           {data?.note && <p className="text-xs text-gray-500">{data.note}</p>}
         </>
       )}
+
+      {tab === 'pnl' && <PnlPanel />}
+      {tab === 'qbo' && <QboProfitPanel />}
+      {tab === 'history' && <HistoryPanel />}
 
       {tab === 'new' && report && (
         <div data-testid="new-clients">
@@ -439,8 +447,9 @@ export function NetIncomeView() {
                   <td className="px-3 py-1.5 text-left">{r.client_name}</td>
                   <td className={td}>{money(r.revenue)}</td>
                   <td className={`${td} ${r.net_income < 0 ? 'text-red-300' : ''}`}>{money(r.net_income)}</td>
+                  <td className={`${td} ${r.meets_target ? 'text-emerald-300' : 'text-amber-300'}`}>{pct(r.net_margin)}</td>
                   <td className={`${td} ${r.meets_target ? 'text-emerald-300' : 'text-amber-300'}`}>
-                    {pct(r.net_margin)} {r.meets_target ? 'meets' : 'below'} {r.target_margin}%
+                    {r.meets_target ? 'meets' : 'below'} {r.target_margin}%
                   </td>
                   <td className={td}>{r.bottom_20 ? 'Bottom 20' : r.tier}</td>
                 </tr>

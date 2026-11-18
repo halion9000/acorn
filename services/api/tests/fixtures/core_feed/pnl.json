@@ -1,0 +1,31 @@
+{
+  "route": "pnl",
+  "method": "POST",
+  "body": {
+    "months": [
+      {
+        "month": "2026-10",
+        "lines": [
+          {
+            "depth": 0,
+            "kind": "line",
+            "label": "5100 Support & Maintenance Software",
+            "amount": 1200.5
+          },
+          {
+            "depth": 0,
+            "kind": "line",
+            "label": "5951 New Vendor",
+            "amount": 4
+          },
+          {
+            "depth": 0,
+            "kind": "total",
+            "label": "Total Other Income",
+            "amount": 100
+          }
+        ]
+      }
+    ]
+  }
+}

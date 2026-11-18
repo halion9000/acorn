@@ -117,3 +117,25 @@ class FinanceVendorMap(Base):
     item: Mapped[str] = mapped_column(String, primary_key=True)
     updated_by: Mapped[str | None] = mapped_column(String, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
+class FinancePnlMonth(Base):
+    """QuickBooks' profit and loss for one month, line by line (migration 218): depth, kind (header, line or total), label and amount."""
+
+    __tablename__ = "finance_pnl_months"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    month: Mapped[str] = mapped_column(String, primary_key=True)
+    payload: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
+class FinanceQboSales(Base):
+    """What each QuickBooks customer was invoiced in one month (migration 218): a list of name and amount."""
+
+    __tablename__ = "finance_qbo_sales"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    month: Mapped[str] = mapped_column(String, primary_key=True)
+    payload: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)

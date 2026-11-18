@@ -914,8 +914,10 @@
     "key": "r7-ai-26",
     "title": "Link risks to the controls and vendors they concern",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC 98a49ff1",
+    "note": "2026-11-18: risk_register_links (migration 217); link a risk to a control (checked against its framework catalog) or one of the client vendors; shown, added and removed in the risk detail."
   },
   {
     "key": "r7-ai-27",

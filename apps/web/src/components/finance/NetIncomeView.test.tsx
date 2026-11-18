@@ -119,8 +119,10 @@ describe('the Net income page', () => {
     expect(within(screen.getByTestId('hours-tab')).getByText('3.1%')).toBeTruthy();
     await userEvent.click(screen.getByRole('tab', { name: 'Ranking' }));
     const rank = screen.getByTestId('rank-table');
-    expect(within(rank).getByText(/26.2% meets 25%/)).toBeTruthy();
-    expect(within(rank).getByText(/-19.2% below 20%/)).toBeTruthy();
+    expect(within(rank).getByText('26.2%')).toBeTruthy();
+    expect(within(rank).getByText(/meets 25%/)).toBeTruthy();
+    expect(within(rank).getByText('-19.2%')).toBeTruthy();
+    expect(within(rank).getByText(/below 20%/)).toBeTruthy();
   });
 
   it('saves a company-wide cost without a client, and a client cost with one', async () => {

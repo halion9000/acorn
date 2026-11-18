@@ -165,6 +165,14 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's daily summary of what each software vendor billed per month: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own bills for the months sent, readable only with the finance permissions.",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/pnl",
+    ): "CORE's daily copy of QuickBooks' profit and loss per month: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own lines for the months sent, readable only with the finance permissions.",
+    (
+        "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/qbo-sales",
+    ): "CORE's daily copy of QuickBooks' sales by customer per month: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own amounts for the months sent, readable only with the finance permissions.",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/profit-tickets",
     ): "CORE's daily list of the tickets each client's hours in one month went on: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own list for the month sent, readable only with the finance permissions.",
     (

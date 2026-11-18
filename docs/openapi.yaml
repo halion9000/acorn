@@ -2852,6 +2852,121 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/profitability/pnl:
+    get:
+      tags:
+      - finance
+      summary: Profit And Loss
+      description: QuickBooks' profit and loss for a month (the newest complete one
+        unless asked), line by line as QuickBooks shows it. ``months`` lists the months
+        held.
+      operationId: profit_and_loss_api_v1_finance_profitability_pnl_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: month
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^\d{4}-\d{2}$
+          - type: 'null'
+          title: Month
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Profit And Loss Api V1 Finance Profitability Pnl Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/profitability/qbo-history:
+    get:
+      tags:
+      - finance
+      summary: Qbo History
+      description: 'What QuickBooks invoiced each client in each month it holds (sales
+        by customer, accrual): every client with its amount per month and total, and
+        the QuickBooks customers behind it.'
+      operationId: qbo_history_api_v1_finance_profitability_qbo_history_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Qbo History Api V1 Finance Profitability Qbo History
+                  Get
+      security:
+      - HTTPBearer: []
+  /api/v1/finance/profitability/qbo:
+    get:
+      tags:
+      - finance
+      summary: Qbo Profitability
+      description: Profit by client for a month with the revenue taken from QuickBooks
+        (sales by customer) instead of HaloPSA's invoices; hours, labor and the cost
+        allocations are the same as on the main table.
+      operationId: qbo_profitability_api_v1_finance_profitability_qbo_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: month
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^\d{4}-\d{2}$
+          - type: 'null'
+          title: Month
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Qbo Profitability Api V1 Finance Profitability Qbo
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/client-names:
+    get:
+      tags:
+      - finance
+      summary: Client Names
+      description: 'Every client name Net income has seen, from HaloPSA (invoices
+        and hours) and from QuickBooks (sales by customer), each with the Primary
+        Name it is filed under (None when it is on its own): what the client groups
+        are chosen from.'
+      operationId: client_names_api_v1_finance_client_names_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Client Names Api V1 Finance Client Names Get
+      security:
+      - HTTPBearer: []
   /api/v1/finance/profitability/inputs:
     get:
       tags:
@@ -31832,6 +31947,76 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/pnl:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Pnl
+      description: Keep QuickBooks' profit and loss as it reads, line by line, for
+        each month sent (accrual basis). A month sent again is replaced; months not
+        sent are left as they were. Read only by people with the finance permissions.
+      operationId: report_core_feed_pnl_api_v1_inbox_core_feed__tenant_token__pnl_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PnlIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PnlOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/qbo-sales:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Qbo Sales
+      description: Keep what each QuickBooks customer was invoiced per month (sales
+        by customer, accrual basis). A month sent again is replaced; months not sent
+        are left as they were. Read only by people with the finance permissions.
+      operationId: report_core_feed_qbo_sales_api_v1_inbox_core_feed__tenant_token__qbo_sales_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QboSalesIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QboSalesOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/profit-tickets:
     post:
       tags:
@@ -53024,6 +53209,80 @@ components:
       - loaded_at
       - error
       title: PluginOut
+    PnlIn:
+      properties:
+        months:
+          items:
+            $ref: '#/components/schemas/PnlMonthIn'
+          type: array
+          maxItems: 36
+          title: Months
+      type: object
+      required:
+      - months
+      title: PnlIn
+    PnlLineIn:
+      properties:
+        depth:
+          type: integer
+          maximum: 8.0
+          minimum: 0.0
+          title: Depth
+        kind:
+          type: string
+          enum:
+          - header
+          - line
+          - total
+          title: Kind
+        label:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Label
+        amount:
+          anyOf:
+          - type: number
+            maximum: 100000000000.0
+            minimum: -100000000000.0
+          - type: 'null'
+          title: Amount
+      type: object
+      required:
+      - depth
+      - kind
+      - label
+      title: PnlLineIn
+    PnlMonthIn:
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        lines:
+          items:
+            $ref: '#/components/schemas/PnlLineIn'
+          type: array
+          maxItems: 600
+          title: Lines
+      type: object
+      required:
+      - month
+      - lines
+      title: PnlMonthIn
+    PnlOut:
+      properties:
+        months:
+          type: integer
+          title: Months
+        lines:
+          type: integer
+          title: Lines
+      type: object
+      required:
+      - months
+      - lines
+      title: PnlOut
     PolicyChoice:
       properties:
         id:
@@ -54170,6 +54429,65 @@ components:
       - device_id
       - tool
       title: PushIn
+    QboCustomerIn:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+        amount:
+          type: number
+          maximum: 100000000000.0
+          minimum: -100000000000.0
+          title: Amount
+      type: object
+      required:
+      - name
+      - amount
+      title: QboCustomerIn
+    QboSalesIn:
+      properties:
+        months:
+          items:
+            $ref: '#/components/schemas/QboSalesMonthIn'
+          type: array
+          maxItems: 36
+          title: Months
+      type: object
+      required:
+      - months
+      title: QboSalesIn
+    QboSalesMonthIn:
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        customers:
+          items:
+            $ref: '#/components/schemas/QboCustomerIn'
+          type: array
+          maxItems: 3000
+          title: Customers
+      type: object
+      required:
+      - month
+      - customers
+      title: QboSalesMonthIn
+    QboSalesOut:
+      properties:
+        months:
+          type: integer
+          title: Months
+        customers:
+          type: integer
+          title: Customers
+      type: object
+      required:
+      - months
+      - customers
+      title: QboSalesOut
     QuarantineInfo:
       properties:
         available:

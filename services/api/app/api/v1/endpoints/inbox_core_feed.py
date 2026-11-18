@@ -32,7 +32,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
-from app.models.finance_profit import FinanceCostEntry, FinanceProfitSnapshot, FinanceProfitTickets, FinanceVendorCost
+from app.models.finance_profit import FinanceCostEntry, FinancePnlMonth, FinanceProfitSnapshot, FinanceProfitTickets, FinanceQboSales, FinanceVendorCost
 from app.models.metric_dataset import DATASET_KEYS, MetricDataset, merge_dataset
 from app.models.tenant import Tenant
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
@@ -1323,6 +1323,86 @@ async def report_core_feed_vendor_costs(tenant_token: str, body: VendorCostsIn, 
                 total += 1
     await db.commit()
     return VendorCostsOut(months=len(months), rows=total)
+
+
+class PnlLineIn(BaseModel):
+    depth: int = Field(ge=0, le=8)
+    kind: Literal["header", "line", "total"]
+    label: str = Field(min_length=1, max_length=200)
+    amount: float | None = Field(default=None, ge=-100_000_000_000, le=100_000_000_000)
+
+
+class PnlMonthIn(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    lines: list[PnlLineIn] = Field(max_length=600)
+
+
+class PnlIn(BaseModel):
+    months: list[PnlMonthIn] = Field(max_length=36)
+
+
+class PnlOut(BaseModel):
+    months: int
+    lines: int
+
+
+@router.post("/core-feed/{tenant_token}/pnl", response_model=PnlOut)
+async def report_core_feed_pnl(tenant_token: str, body: PnlIn, db: DBSession) -> PnlOut:
+    """Keep QuickBooks' profit and loss as it reads, line by line, for each month sent (accrual basis). A month sent again is replaced; months not sent are left as they were. Read only by people with the finance permissions."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    by_month = {m.month: m for m in body.months}
+    if by_month:
+        await db.execute(delete(FinancePnlMonth).where(FinancePnlMonth.tenant_id == tenant_id, FinancePnlMonth.month.in_(list(by_month))))
+    total = 0
+    for month, m in by_month.items():
+        lines = [{"depth": ln.depth, "kind": ln.kind, "label": " ".join(ln.label.split()), "amount": None if ln.amount is None else round(ln.amount, 2)} for ln in m.lines]
+        db.add(FinancePnlMonth(tenant_id=tenant_id, month=month, payload=lines, received_at=now))
+        total += len(lines)
+    await db.commit()
+    return PnlOut(months=len(by_month), lines=total)
+
+
+class QboCustomerIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    amount: float = Field(ge=-100_000_000_000, le=100_000_000_000)
+
+
+class QboSalesMonthIn(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    customers: list[QboCustomerIn] = Field(max_length=3000)
+
+
+class QboSalesIn(BaseModel):
+    months: list[QboSalesMonthIn] = Field(max_length=36)
+
+
+class QboSalesOut(BaseModel):
+    months: int
+    customers: int
+
+
+@router.post("/core-feed/{tenant_token}/qbo-sales", response_model=QboSalesOut)
+async def report_core_feed_qbo_sales(tenant_token: str, body: QboSalesIn, db: DBSession) -> QboSalesOut:
+    """Keep what each QuickBooks customer was invoiced per month (sales by customer, accrual basis). A month sent again is replaced; months not sent are left as they were. Read only by people with the finance permissions."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    by_month = {m.month: m for m in body.months}
+    if by_month:
+        await db.execute(delete(FinanceQboSales).where(FinanceQboSales.tenant_id == tenant_id, FinanceQboSales.month.in_(list(by_month))))
+    total = 0
+    for month, m in by_month.items():
+        merged: dict[str, float] = {}
+        for c in m.customers:
+            name = " ".join(c.name.split())
+            merged[name] = merged.get(name, 0.0) + c.amount
+        rows = [{"name": n, "amount": round(a, 2)} for n, a in sorted(merged.items()) if round(a, 2) != 0]
+        db.add(FinanceQboSales(tenant_id=tenant_id, month=month, payload=rows, received_at=now))
+        total += len(rows)
+    await db.commit()
+    return QboSalesOut(months=len(by_month), customers=total)
 
 
 class ProfitTicketsIn(BaseModel):

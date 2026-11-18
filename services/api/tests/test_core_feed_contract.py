@@ -48,6 +48,8 @@ MODELS = {
     "risk-tickets-status": feed.RiskTicketStatuses,
     "finance": feed.FinanceSnapshotIn,
     "books": feed.BooksIn,
+    "pnl": feed.PnlIn,
+    "qbo-sales": feed.QboSalesIn,
     "profit-tickets": feed.ProfitTicketsIn,
     "vendor-costs": feed.VendorCostsIn,
     "profitability": feed.ProfitSnapshotIn,
