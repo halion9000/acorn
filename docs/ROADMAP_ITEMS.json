@@ -754,8 +754,9 @@
     "key": "r7-ai-07",
     "title": "Keep table sort and filters in the address on Devices and Alerts",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Devices writes its filters into the address; Alerts has Copy link (a date range or assignee cannot be carried in an address, so Alerts does not rewrite the address itself)."
   },
   {
     "key": "r7-ai-08",

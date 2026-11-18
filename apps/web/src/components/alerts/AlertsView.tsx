@@ -508,6 +508,21 @@ export function filtersFromUrl(params: URLSearchParams | null): AlertFilters {
   return { page: 1, pageSize: 25, ...(status ? { status } : {}), ...(device ? { device } : {}), ...(user ? { user } : {}), ...(client ? { clientId: client } : {}), ...(severity ? { severity } : {}), ...(ticket ? { ticket } : {}), ...(source ? { source } : {}), ...(search ? { search } : {}) };
 }
 
+/** The address query that opens the list with these filters (pure): the inverse of ``filtersFromUrl`` for what an address can say (status, device, user, client, severity, source, ticket and the search). A status of Open all is the default and is left out; no status at all is written as ``status=all``. */
+export function filtersToUrl(f: AlertFilters): string {
+  const p = new URLSearchParams();
+  if (!f.status) p.set('status', 'all');
+  else if (f.status !== 'open') p.set('status', f.status);
+  if (f.device) p.set('device', f.device);
+  if (f.user) p.set('user', f.user);
+  if (f.clientId) p.set('client', f.clientId);
+  if (f.severity) p.set('severity', f.severity);
+  if (f.source) p.set('source', f.source);
+  if (f.ticket) p.set('ticket', f.ticket);
+  if (f.search) p.set('q', f.search);
+  return p.toString();
+}
+
 export function AlertsView() {
   // Reading window.location during a client-side navigation gives the PREVIOUS page's address, so the router's parameters are used.
   const urlParams = useSearchParams();
@@ -593,6 +608,21 @@ export function AlertsView() {
             className="text-xs text-gray-400 hover:text-gray-200 underline disabled:opacity-40"
           >
             Export CSV
+          </button>
+          <button
+            type="button"
+            title="Copy a link that opens this list with the filters it has now (a date range or an assignee cannot be carried in a link)"
+            onClick={() => {
+              const q = filtersToUrl(filters);
+              const link = `${window.location.origin}${window.location.pathname}${q ? `?${q}` : ''}`;
+              void navigator.clipboard?.writeText(link).then(
+                () => setExportNote('Link copied.'),
+                () => setExportNote(`Could not copy; the link is ${link}`),
+              );
+            }}
+            className="text-xs text-gray-400 hover:text-gray-200 underline"
+          >
+            Copy link
           </button>
           {total > alerts.length ? (
             <button

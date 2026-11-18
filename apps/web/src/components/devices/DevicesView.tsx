@@ -88,7 +88,36 @@ export function filtersFromParams(params: URLSearchParams | null): Partial<Saved
   if (mdm === 'disabled' || mdm === 'not_ade') out.mdm = mdm;
   if (params.get('offline') === '1') out.offlineOnly = true;
   if (params.get('alerts') === '1') out.alertsOnly = true;
+  const show = params.get('show');
+  if (show === 'online' || show === 'offline' || show === 'all') out.presence = show;
   return Object.keys(out).length > 0 ? out : null;
+}
+
+/** The parameters that carry the page's filters in its address: the inverse of ``filtersFromParams`` (pure), so a link to the page as it is now opens it the same way. Only what is set appears. */
+export function filtersToParams(f: Partial<SavedDeviceFilters>): URLSearchParams {
+  const p = new URLSearchParams();
+  if (f.clientId) p.set('client', f.clientId);
+  if (f.vendor) p.set('tool', f.vendor);
+  if (f.os) p.set('os', f.os);
+  if (f.kind) p.set('kind', f.kind);
+  if (f.missing) p.set('missing', f.missing);
+  if (f.attentionOnly) p.set('attention', '1');
+  if (f.staleOnly) p.set('stale', '1');
+  if (f.followedOnly) p.set('followed', '1');
+  if (f.notEncryptedOnly) p.set('encryption', 'not_encrypted');
+  if (f.mdm) p.set('mdm', f.mdm);
+  if (f.offlineOnly) p.set('offline', '1');
+  if (f.alertsOnly) p.set('alerts', '1');
+  if (f.presence) p.set('show', f.presence);
+  return p;
+}
+
+/** The address query after the page's filters are put in it (pure): every parameter the filters own is replaced by the filters' own, and any other (the search a link carried, say) is left alone. */
+export function withFilterParams(current: string, f: Partial<SavedDeviceFilters>): string {
+  const keep = new URLSearchParams(current);
+  for (const k of ['client', 'tool', 'os', 'kind', 'missing', 'attention', 'stale', 'followed', 'encryption', 'mdm', 'offline', 'alerts', 'show']) keep.delete(k);
+  for (const [k, v] of filtersToParams(f)) keep.set(k, v);
+  return keep.toString();
 }
 
 /** The kinds of device the page can show, in tab order. Other (printers, UPSes...) only shows once there is one. */
@@ -230,6 +259,14 @@ export default function DevicesView() {
   // Following another link to this page while already on it (a different client or tool): the page stays mounted, so the new link's filters are applied here, not only on first show.
   const linkKey = urlParams?.toString() ?? '';
   const seenLinkKey = useRef(linkKey);
+  // The filters go into the address as they change, so the page can be shared or come back as it was. The key written is noted first so the effect below does not take it for a new link.
+  useEffect(() => {
+    if (!filtersRestored || typeof window === 'undefined') return;
+    const next = withFilterParams(window.location.search.replace(/^\?/, ''), { clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, followedOnly, mdm, offlineOnly, alertsOnly, ...(presencePicked ? { presence: presencePicked } : {}) });
+    if (next === window.location.search.replace(/^\?/, '')) return;
+    seenLinkKey.current = next;
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${next ? `?${next}` : ''}`);
+  }, [filtersRestored, clientId, vendor, os, kind, missing, gapsOnly, attentionOnly, staleOnly, notEncryptedOnly, followedOnly, mdm, offlineOnly, alertsOnly, presencePicked]);
   useEffect(() => {
     if (seenLinkKey.current === linkKey) return;
     seenLinkKey.current = linkKey;
