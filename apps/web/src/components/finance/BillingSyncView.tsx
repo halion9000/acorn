@@ -249,6 +249,9 @@ export function BillingSyncView() {
                     <button type="button" className={ghost} disabled={busy || !canApprove(r)} onClick={() => void approve([r])}>
                       Approve
                     </button>
+                    <button type="button" className={`${ghost} ml-1`} disabled={busy} onClick={() => void hide([r], !r.hidden)}>
+                      {r.hidden ? 'Unhide' : 'Hide'}
+                    </button>
                   </td>
                 </tr>
                 {open === rowKey(r) && (

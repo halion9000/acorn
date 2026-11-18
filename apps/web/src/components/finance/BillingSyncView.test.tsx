@@ -83,6 +83,17 @@ describe('the Billing sync page', () => {
     expect((within(birch).getByRole('button', { name: 'Approve' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('hides one line with the Hide button next to its Approve button', async () => {
+    render(<BillingSyncView />);
+    const table = await screen.findByTestId('sync-table');
+    const acme = within(table).getByText('Acme Dental').closest('tr')!;
+    await userEvent.click(within(acme).getByRole('button', { name: 'Hide' }));
+    await waitFor(() => {
+      const post = authFetch.mock.calls.find(([u]) => String(u).endsWith('/billing/sync/hide'));
+      expect(JSON.parse(post![1].body)).toEqual({ items: [{ client_id: 'c1', invoice_item: 'Microsoft 365 Business Premium' }], hidden: true });
+    });
+  });
+
   it('approves only the selected lines that can be approved, and hides the selection', async () => {
     render(<BillingSyncView />);
     await screen.findByTestId('sync-table');
