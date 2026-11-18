@@ -50,6 +50,7 @@ MODELS = {
     "books": feed.BooksIn,
     "pnl": feed.PnlIn,
     "qbo-sales": feed.QboSalesIn,
+    "cost-transactions": feed.CostTransactionsIn,
     "profit-tickets": feed.ProfitTicketsIn,
     "vendor-costs": feed.VendorCostsIn,
     "profitability": feed.ProfitSnapshotIn,

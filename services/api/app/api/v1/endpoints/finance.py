@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
@@ -24,6 +24,7 @@ from app.models.finance_profit import (
     FinanceClientGroup,
     FinanceClientMaster,
     FinanceCostEntry,
+    FinanceCostTransactions,
     FinanceLaborRate,
     FinancePnlMonth,
     FinanceProfitSnapshot,
@@ -669,6 +670,70 @@ async def profit_and_loss(user: AuthUser, db: DBSession, month: str | None = Que
 async def _qbo_sales(db: DBSession, tenant: Any) -> dict[str, list[dict[str, Any]]]:
     rows = (await db.execute(select(FinanceQboSales).where(FinanceQboSales.tenant_id == tenant))).scalars().all()
     return {r.month: list(r.payload or []) for r in rows}
+
+
+@router.get("/profitability/summary", dependencies=[Depends(require_permission("finance:view"))])
+async def profitability_summary(
+    user: AuthUser, db: DBSession, month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$")
+) -> dict[str, Any]:
+    """Every client across the last twelve months to a chosen month (the newest complete one unless asked), after finance's Summary tab: industry, for-profit, months with revenue, the year to date, the margin band, and each month's revenue and net income."""
+    row = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    if row is None:
+        return {"received_at": None, "months": [], "through": None, "rows": []}
+    months = profit.available_months(row.payload)
+    if not months:
+        return {"received_at": row.received_at, "months": [], "through": None, "rows": []}
+    chosen = month if month in months else (months[-2] if len(months) > 1 else months[-1])
+    used = [m for m in months if m <= chosen][-12:]
+    first_of_year = [m for m in months if m[:4] == chosen[:4] and m <= chosen]
+    needed = sorted(set(used) | set(first_of_year))
+    rates, costs, master = await _rates(db, user.tenant_id), await _costs(db, user.tenant_id), await _master(db, user.tenant_id)
+    from app.services.addon_loader import add_on_by_month, support_by_month
+
+    addon = await add_on_by_month(db, user.tenant_id, row.payload, needed)
+    support = await support_by_month(db, user.tenant_id, row.payload, needed)
+    groups = await _groups(db, user.tenant_id)
+    reports = {m: pf.full_month(row.payload, rates, m, costs, master, addon.get(m), groups, support.get(m)) for m in needed}
+    out = pf.client_summary(reports, chosen)
+    return {"received_at": row.received_at, "available": months, **out}
+
+
+@router.get("/profitability/transactions", dependencies=[Depends(require_permission("finance:view"))])
+async def cost_transactions(
+    user: AuthUser,
+    db: DBSession,
+    kind: Literal["travel", "hardware"] = Query(default="travel"),
+    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+) -> dict[str, Any]:
+    """The transactions behind the travel (5800, 5805) or hardware (5600) cost of a month (the newest held unless asked), as QuickBooks booked them, each with the client its customer is counted under, and the total for each client."""
+    rows = (await db.execute(select(FinanceCostTransactions).where(FinanceCostTransactions.tenant_id == user.tenant_id))).scalars().all()
+    held = {r.month: r for r in rows}
+    months = sorted(held)
+    if not months:
+        return {"months": [], "month": None, "kind": kind, "rows": [], "by_client": [], "total": Decimal(0), "received_at": None}
+    chosen = month if month in held else months[-1]
+    accounts = {"5800", "5805"} if kind == "travel" else {"5600"}
+    groups = await _groups(db, user.tenant_id)
+    out = []
+    for r in held[chosen].payload:
+        if r.get("account") not in accounts:
+            continue
+        customer = str(r.get("customer") or "")
+        client = qb.group_name(customer, qb.key_groups(groups)) if customer else ""
+        out.append({**r, "client": client})
+    out.sort(key=lambda r: (str(r.get("date")), str(r.get("name"))))
+    totals: dict[str, Decimal] = {}
+    for r in out:
+        totals[r["client"] or "(no customer)"] = totals.get(r["client"] or "(no customer)", Decimal(0)) + Decimal(str(r["amount"]))
+    return {
+        "months": months,
+        "month": chosen,
+        "kind": kind,
+        "rows": out,
+        "by_client": [{"client": c, "total": t} for c, t in sorted(totals.items(), key=lambda kv: (-kv[1], kv[0].lower()))],
+        "total": sum(totals.values(), Decimal(0)),
+        "received_at": held[chosen].received_at,
+    }
 
 
 @router.get("/profitability/qbo-history", dependencies=[Depends(require_permission("finance:view"))])

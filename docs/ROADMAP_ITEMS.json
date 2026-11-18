@@ -2285,5 +2285,24 @@
     "note": "Built 2026-11-18: vendor bills from QuickBooks (read only), vendor-to-counts map in Settings > Finance > Software costs, allocation by month-end license counts.",
     "added": "2026-11-17",
     "completed": "2026-11-17"
+  },
+  {
+    "key": "finance-sheet-tabs",
+    "title": "Net income: every presentable tab of the finance workbook has a section",
+    "area": "Finance",
+    "status": "completed",
+    "needs": "claude",
+    "note": "2026-11-18: Revenue to Net Income, New Clients, Profitability Summary by Industry, Hours by Function, Hours and Utilization, Sheet1 (Ranking), Client Master and Burdened Labor Rate were built earlier; P&L, QBO Profitability, Historical Client Revenue, Summary (Client summary), QBO Travel and Hardware COGS today. Software Summary, Software Cost and Software Master are covered by Settings > Finance > Software costs (counts, vendors and per-license cost). Halo, Original Halo Data, License Database, Sheet2 and Sheet6 are raw data or pivots of data already shown.",
+    "added": "2026-11-18",
+    "completed": "2026-11-18"
+  },
+  {
+    "key": "finance-onboarding-tab",
+    "title": "Net income: an Onboarding section (the workbook's Onboarding tab)",
+    "area": "Finance",
+    "status": "new",
+    "needs": "hal",
+    "note": "Question for Hal: the Onboarding tab is a list of time entries on onboarding projects (columns: TimeEntryId, Date, UserName, RoleName, CustomerName, ProjectName, PhaseName, TaskOrActivityName, Effort, TrackedTime, Billable, CategoryName, Notes, Approved), 773 rows from April 2026. Which system is it exported from (HaloPSA projects, or another tool), and what should the section show: onboarding hours and labor cost per client, by phase? Once I know the source I can have CORE read it.",
+    "added": "2026-11-18"
   }
 ]

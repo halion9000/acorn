@@ -12,6 +12,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { authFetch } from '@/lib/auth-session';
 import { money, monthLabel, pct } from './ProfitabilityView';
 import { HistoryPanel, PnlPanel, QboProfitPanel } from './QboSections';
+import { ClientSummaryPanel } from './ClientSummaryPanel';
+import { CostTransactionsPanel } from './CostTransactionsPanel';
 
 export interface FullRow {
   client_key: string;
@@ -140,16 +142,19 @@ export function parseMasterCsv(text: string): { client_name: string; industry: s
   return rows;
 }
 
-type Tab = 'net' | 'new' | 'industry' | 'hours' | 'rank' | 'pnl' | 'qbo' | 'history' | 'inputs';
+type Tab = 'net' | 'new' | 'industry' | 'hours' | 'rank' | 'summary' | 'pnl' | 'qbo' | 'history' | 'travel' | 'hardware' | 'inputs';
 const TABS: [Tab, string][] = [
   ['net', 'Revenue to net income'],
   ['new', 'New clients'],
   ['industry', 'By industry'],
   ['hours', 'Hours and utilization'],
   ['rank', 'Ranking'],
+  ['summary', 'Client summary'],
   ['pnl', 'P&L'],
   ['qbo', 'QBO Profitability'],
   ['history', 'Historical client revenue'],
+  ['travel', 'QBO Travel'],
+  ['hardware', 'Hardware COGS'],
   ['inputs', 'Inputs'],
 ];
 const input = 'rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 text-sm text-gray-100';
@@ -232,7 +237,7 @@ export function NetIncomeView() {
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        {report && data && tab !== 'pnl' && tab !== 'qbo' && tab !== 'history' && (
+        {report && data && tab !== 'summary' && tab !== 'pnl' && tab !== 'qbo' && tab !== 'history' && tab !== 'travel' && tab !== 'hardware' && (
           <label className="flex items-center gap-2 text-sm text-gray-300">
             Month
             <select aria-label="Month" className={input} value={month} onChange={(e) => { setMonth(e.target.value); void load(e.target.value); }}>
@@ -317,9 +322,12 @@ export function NetIncomeView() {
         </>
       )}
 
+      {tab === 'summary' && <ClientSummaryPanel />}
       {tab === 'pnl' && <PnlPanel />}
       {tab === 'qbo' && <QboProfitPanel />}
       {tab === 'history' && <HistoryPanel />}
+      {tab === 'travel' && <CostTransactionsPanel kind="travel" />}
+      {tab === 'hardware' && <CostTransactionsPanel kind="hardware" />}
 
       {tab === 'new' && report && (
         <div data-testid="new-clients">

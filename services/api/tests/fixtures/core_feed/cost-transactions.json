@@ -1,0 +1,23 @@
+{
+  "route": "cost-transactions",
+  "method": "POST",
+  "body": {
+    "months": [
+      {
+        "month": "2026-10",
+        "rows": [
+          {
+            "account": "5600",
+            "date": "2026-10-02",
+            "type": "Expense",
+            "name": "Starlink",
+            "customer": "Talking Monkey, Inc.",
+            "memo": "Dish",
+            "split": "Ramp Card",
+            "amount": 399.4
+          }
+        ]
+      }
+    ]
+  }
+}

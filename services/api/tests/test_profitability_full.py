@@ -490,3 +490,31 @@ async def test_client_groups_are_filed_listed_removed_and_folded_into_the_net_in
     assert gone == {"saved": 0, "removed": 1, "skipped": 0}
     after = await with_db(tenant.id, lambda db: ep.profitability_analysis(tenant.user, db, "2026-10"))
     assert len(after["report"]["rows"]) == 3, "Talking Monkey stands alone again"
+
+
+def test_a_net_margin_falls_in_the_band_finances_summary_uses():
+    cases = [(None, "No revenue"), (-5, "Not profitable"), (-0.1, "Not profitable"), (0, "0% to 9%"), (9.99, "0% to 9%"), (10, "10% to 19%"), (19.9, "10% to 19%"), (20, "20% to 29%"), (35.5, "30% to 39%"), (40, "40% and over"), (97, "40% and over")]
+    assert [(m, pf.margin_bracket(m)) for m, _ in cases] == cases
+
+
+def row(key, name, revenue, net, **over):
+    return {"client_key": key, "client_name": name, "revenue": D(revenue), "net_income": D(net), "net_margin": (float(D(net) / D(revenue) * 100) if D(revenue) else None), "industry": "", "non_profit": False, **over}
+
+
+def test_the_client_summary_adds_the_year_to_date_counts_months_with_revenue_and_keeps_the_last_months():
+    reports = {
+        "2025-12": {"rows": [row("a", "Acme", "100", "10")]},
+        "2026-01": {"rows": [row("a", "Acme", "100", "20", industry="Dental"), row("b", "Birch", "0", "-5", non_profit=True)]},
+        "2026-02": {"rows": [row("a", "Acme", "200", "60"), row("b", "Birch", "50", "-10", non_profit=True)]},
+        "2026-03": {"rows": [row("a", "Acme", "999", "999")]},
+    }
+    out = pf.client_summary(reports, "2026-02", window=2)
+    assert out["months"] == ["2026-01", "2026-02"] and out["through"] == "2026-02"
+    acme, birch = out["rows"]
+    assert acme["client_name"] == "Acme" and acme["industry"] == "Dental" and acme["for_profit"] is True
+    assert (acme["ytd_revenue"], acme["ytd_net_income"], acme["months_active"]) == (D("300"), D("80"), 3), "March is after the month asked for; December counts as a month with revenue but not in the year"
+    assert acme["ytd_net_margin"] == pytest.approx(26.7) and acme["bracket"] == "20% to 29%"
+    assert set(acme["by_month"]) == {"2026-01", "2026-02"}
+    assert birch["for_profit"] is False and birch["months_active"] == 1 and (birch["ytd_net_income"], birch["ytd_revenue"]) == (D("-15"), D("50")) and birch["bracket"] == "Not profitable"
+    assert [r["client_name"] for r in out["rows"]] == ["Acme", "Birch"], "highest year-to-date net income first"
+

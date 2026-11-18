@@ -2888,6 +2888,92 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/profitability/summary:
+    get:
+      tags:
+      - finance
+      summary: Profitability Summary
+      description: 'Every client across the last twelve months to a chosen month (the
+        newest complete one unless asked), after finance''s Summary tab: industry,
+        for-profit, months with revenue, the year to date, the margin band, and each
+        month''s revenue and net income.'
+      operationId: profitability_summary_api_v1_finance_profitability_summary_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: month
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^\d{4}-\d{2}$
+          - type: 'null'
+          title: Month
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Profitability Summary Api V1 Finance Profitability
+                  Summary Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/profitability/transactions:
+    get:
+      tags:
+      - finance
+      summary: Cost Transactions
+      description: The transactions behind the travel (5800, 5805) or hardware (5600)
+        cost of a month (the newest held unless asked), as QuickBooks booked them,
+        each with the client its customer is counted under, and the total for each
+        client.
+      operationId: cost_transactions_api_v1_finance_profitability_transactions_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: kind
+        in: query
+        required: false
+        schema:
+          enum:
+          - travel
+          - hardware
+          type: string
+          default: travel
+          title: Kind
+      - name: month
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^\d{4}-\d{2}$
+          - type: 'null'
+          title: Month
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Cost Transactions Api V1 Finance Profitability Transactions
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/finance/profitability/qbo-history:
     get:
       tags:
@@ -32110,6 +32196,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/cost-transactions:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Cost Transactions
+      description: Keep the transactions behind the travel and hardware costs per
+        month, as QuickBooks booked them. A month sent again is replaced; months not
+        sent are left as they were. Read only by people with the finance permissions.
+      operationId: report_core_feed_cost_transactions_api_v1_inbox_core_feed__tenant_token__cost_transactions_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostTransactionsIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostTransactionsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/qbo-sales:
     post:
       tags:
@@ -41337,6 +41458,97 @@ components:
       - category
       - amount
       title: CostIn
+    CostTransactionIn:
+      properties:
+        account:
+          type: string
+          enum:
+          - '5600'
+          - '5800'
+          - '5805'
+          title: Account
+        date:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}$
+          title: Date
+        type:
+          type: string
+          maxLength: 40
+          title: Type
+          default: ''
+        name:
+          type: string
+          maxLength: 120
+          title: Name
+          default: ''
+        customer:
+          type: string
+          maxLength: 200
+          title: Customer
+          default: ''
+        memo:
+          type: string
+          maxLength: 300
+          title: Memo
+          default: ''
+        split:
+          type: string
+          maxLength: 120
+          title: Split
+          default: ''
+        amount:
+          type: number
+          maximum: 100000000000.0
+          minimum: -100000000000.0
+          title: Amount
+      type: object
+      required:
+      - account
+      - date
+      - amount
+      title: CostTransactionIn
+    CostTransactionsIn:
+      properties:
+        months:
+          items:
+            $ref: '#/components/schemas/CostTransactionsMonthIn'
+          type: array
+          maxItems: 36
+          title: Months
+      type: object
+      required:
+      - months
+      title: CostTransactionsIn
+    CostTransactionsMonthIn:
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        rows:
+          items:
+            $ref: '#/components/schemas/CostTransactionIn'
+          type: array
+          maxItems: 5000
+          title: Rows
+      type: object
+      required:
+      - month
+      - rows
+      title: CostTransactionsMonthIn
+    CostTransactionsOut:
+      properties:
+        months:
+          type: integer
+          title: Months
+        rows:
+          type: integer
+          title: Rows
+      type: object
+      required:
+      - months
+      - rows
+      title: CostTransactionsOut
     CountRow:
       properties:
         source:

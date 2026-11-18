@@ -122,6 +122,9 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/pnl"): (
         "CORE's daily copy of QuickBooks' profit and loss, line by line per month (account names and amounts, no customer or vendor detail): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own lines for the months sent, readable only with the finance permissions.",
     ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/cost-transactions"): (
+        "CORE's daily copy of the QuickBooks transactions behind the travel and hardware costs (date, who was paid, the customer, memo, amount): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own transactions for the months sent, readable only with the finance permissions.",
+    ),
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/qbo-sales"): (
         "CORE's daily copy of QuickBooks' sales by customer per month (customer name and amount): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own amounts for the months sent, readable only with the finance permissions.",
     ),

@@ -58,7 +58,7 @@ async def world(monkeypatch):
     finally:
         async with owner.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-            for table in ("finance_pnl_months", "finance_qbo_sales", "finance_client_groups", "finance_profit_snapshots"):
+            for table in ("finance_pnl_months", "finance_cost_transactions", "finance_qbo_sales", "finance_client_groups", "finance_profit_snapshots"):
                 await conn.execute(text(f"delete from {table} where tenant_id = any(:ids)"), {"ids": [a, b]})
             await conn.execute(text("delete from tenants where id = any(:ids)"), {"ids": [a, b]})
         await owner.dispose()
@@ -132,3 +132,62 @@ async def test_sales_by_customer_are_grouped_into_clients_with_a_typed_group_and
     assert {"Acme Dental", "Halo Only"} <= set(by), "the names come from HaloPSA (invoices, hours) and QuickBooks (sales by customer)"
     empty = await with_db(w.b, lambda db: fin.qbo_profitability(user(w.b), db, None))
     assert empty["report"] is None and empty["months"] == []
+
+
+async def test_the_client_summary_covers_the_last_months_with_year_to_date_and_is_private_to_the_organization(world):
+    w = world
+    snap = {
+        "months": ["2026-08", "2026-09", "2026-10"],
+        "invoices": [
+            {"client_id": "5", "client_name": "Acme Dental", "month": "2026-09", "revenue": 1000, "invoices": 1},
+            {"client_id": "5", "client_name": "Acme Dental", "month": "2026-10", "revenue": 1200, "invoices": 1},
+            {"client_id": "6", "client_name": "Birch Law", "month": "2026-10", "revenue": 300, "invoices": 1},
+        ],
+        "hours": [{"month": "2026-10", "client": "Acme Dental", "agent_id": "9", "hours": 4}],
+        "agents": [{"id": "9", "name": "Pat"}],
+    }
+
+    async def ingest(db):
+        db.add(FinanceProfitSnapshot(tenant_id=w.a, payload=snap))
+        await db.commit()
+
+    await with_db(w.a, ingest)
+    out = await with_db(w.a, lambda db: fin.profitability_summary(user(w.a), db, "2026-10"))
+    assert out["through"] == "2026-10" and out["months"] == ["2026-08", "2026-09", "2026-10"] and out["available"] == ["2026-08", "2026-09", "2026-10"]
+    by = {r["client_name"]: r for r in out["rows"]}
+    assert by["Acme Dental"]["ytd_revenue"] == Decimal("2200") and by["Acme Dental"]["months_active"] == 2
+    assert by["Birch Law"]["ytd_revenue"] == Decimal("300") and set(by["Birch Law"]["by_month"]) == {"2026-10"}
+    assert by["Acme Dental"]["bracket"] in ("20% to 29%", "30% to 39%", "40% and over", "10% to 19%", "0% to 9%", "Not profitable")
+    default = await with_db(w.a, lambda db: fin.profitability_summary(user(w.a), db, None))
+    assert default["through"] == "2026-09", "the newest complete month when none is asked for"
+    other = await with_db(w.b, lambda db: fin.profitability_summary(user(w.b), db, None))
+    assert other == {"received_at": None, "months": [], "through": None, "rows": []}
+
+
+def tx(account, date, name, customer, amount, memo="m", split="Ramp Card", type_="Expense"):
+    return feed.CostTransactionIn(account=account, date=date, type=type_, name=name, customer=customer, memo=memo, split=split, amount=amount)
+
+
+async def test_travel_and_hardware_transactions_are_kept_per_month_grouped_under_clients_and_private(world):
+    w = world
+    sent = await with_db(w.a, lambda db: feed.report_core_feed_cost_transactions("tok-a", feed.CostTransactionsIn(months=[
+        feed.CostTransactionsMonthIn(month="2026-09", rows=[tx("5805", "2026-09-02", "Urban Bird", "Live Oak IT Partners", 23.4), tx("5800", "2026-09-03", "Hotel", "Acme Annex", 200), tx("5600", "2026-09-04", "Starlink", "Acme Dental", 399.4), tx("5600", "2026-09-05", "Zero", "Acme Dental", 0), tx("5600", "2026-08-31", "Wrong month", "Acme Dental", 5)]),
+        feed.CostTransactionsMonthIn(month="2026-10", rows=[tx("5805", "2026-10-01", "Gas", "", 40)]),
+    ]), db))
+    assert (sent.months, sent.rows) == (2, 4), "a zero amount and a transaction dated outside its month are left out"
+    await with_db(w.a, lambda db: fin.import_client_groups(fin.GroupsImportIn(rows=[fin.GroupRowIn(name="Acme Annex", primary="Acme Dental")]), SimpleNamespace(client=None, headers={}), user(w.a), db))
+    travel = await with_db(w.a, lambda db: fin.cost_transactions(user(w.a), db, "travel", "2026-09"))
+    assert travel["months"] == ["2026-09", "2026-10"] and travel["month"] == "2026-09" and travel["kind"] == "travel"
+    assert [(r["date"], r["name"], r["client"]) for r in travel["rows"]] == [("2026-09-02", "Urban Bird", "Live Oak IT Partners"), ("2026-09-03", "Hotel", "Acme Dental")], "travel is 5800 and 5805, and a customer is counted under its client group"
+    assert [(c["client"], c["total"]) for c in travel["by_client"]] == [("Acme Dental", Decimal("200")), ("Live Oak IT Partners", Decimal("23.4"))] and travel["total"] == Decimal("223.4")
+    hardware = await with_db(w.a, lambda db: fin.cost_transactions(user(w.a), db, "hardware", None))
+    assert hardware["month"] == "2026-10" and hardware["rows"] == [] and hardware["total"] == 0, "the newest month held, and none of its transactions are hardware"
+    replaced = await with_db(w.a, lambda db: feed.report_core_feed_cost_transactions("tok-a", feed.CostTransactionsIn(months=[feed.CostTransactionsMonthIn(month="2026-09", rows=[tx("5600", "2026-09-09", "New", "X", 10)])]), db))
+    assert replaced.rows == 1
+    after = await with_db(w.a, lambda db: fin.cost_transactions(user(w.a), db, "travel", "2026-09"))
+    assert after["rows"] == [], "September was replaced"
+    october = await with_db(w.a, lambda db: fin.cost_transactions(user(w.a), db, "travel", "2026-10"))
+    assert october["rows"][0]["client"] == "" and [c["client"] for c in october["by_client"]] == ["(no customer)"], "a transaction with no customer is listed under that label"
+    other = await with_db(w.b, lambda db: fin.cost_transactions(user(w.b), db, "travel", None))
+    assert other["months"] == [] and other["rows"] == []
+

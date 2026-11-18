@@ -305,3 +305,46 @@ def annual(
         a["target_margin"] = float(target) if target is not None else float(DEFAULT_TARGET)
         a["meets_target"] = a["net_margin"] is not None and a["net_margin"] >= a["target_margin"]
     return {"months": months, "rows": ranked}
+
+
+BRACKETS = (("Not profitable", None, Decimal(0)), ("0% to 9%", Decimal(0), Decimal(10)), ("10% to 19%", Decimal(10), Decimal(20)), ("20% to 29%", Decimal(20), Decimal(30)), ("30% to 39%", Decimal(30), Decimal(40)), ("40% and over", Decimal(40), None))
+
+
+def margin_bracket(net_margin: float | Decimal | None) -> str:
+    """The band a net margin (a percent) falls in, as finance's Summary tab words it (pure): below 0 is not profitable, then ten-point bands, 40% and over; no margin (no revenue) is ``No revenue``."""
+    if net_margin is None:
+        return "No revenue"
+    m = Decimal(str(net_margin))
+    for label, low, high in BRACKETS:
+        if (low is None or m >= low) and (high is None or m < high):
+            return label
+    return "No revenue"
+
+
+def client_summary(reports: dict[str, dict[str, Any]], through: str, window: int = 12) -> dict[str, Any]:
+    """Each client across the months of ``reports`` (a month to its ``full_month`` report) up to ``through``: industry, for-profit, months with revenue, the year to date (the months of ``through``'s year) revenue, net income
+    and average net margin, the band that margin falls in, and each of the last ``window`` months' revenue and net income (pure). Clients are ordered by year-to-date net income, highest first."""
+    months = sorted(m for m in reports if m <= through)
+    year_months = [m for m in months if m[:4] == through[:4]]
+    shown = months[-window:]
+    acc: dict[str, dict[str, Any]] = {}
+    for m in months:
+        for r in reports[m]["rows"]:
+            a = acc.setdefault(
+                r["client_key"],
+                {"client_key": r["client_key"], "client_name": r["client_name"], "industry": r["industry"], "non_profit": r["non_profit"], "months_active": 0, "ytd_revenue": ZERO, "ytd_net_income": ZERO, "by_month": {}},
+            )
+            a["client_name"], a["industry"], a["non_profit"] = r["client_name"], r["industry"] or a["industry"], r["non_profit"]
+            if r["revenue"] > 0:
+                a["months_active"] += 1
+            if m in year_months:
+                a["ytd_revenue"] += r["revenue"]
+                a["ytd_net_income"] += r["net_income"]
+            if m in shown:
+                a["by_month"][m] = {"revenue": r["revenue"], "net_income": r["net_income"], "net_margin": r["net_margin"]}
+    rows = []
+    for a in acc.values():
+        margin = _pct(a["ytd_net_income"], a["ytd_revenue"])
+        rows.append({**a, "for_profit": not a["non_profit"], "ytd_net_margin": margin, "bracket": margin_bracket(margin)})
+    rows.sort(key=lambda r: (-r["ytd_net_income"], r["client_name"].lower()))
+    return {"through": through, "months": shown, "rows": rows}

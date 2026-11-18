@@ -32,7 +32,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
-from app.models.finance_profit import FinanceCostEntry, FinancePnlMonth, FinanceProfitSnapshot, FinanceProfitTickets, FinanceQboSales, FinanceVendorCost
+from app.models.finance_profit import FinanceCostEntry, FinanceCostTransactions, FinancePnlMonth, FinanceProfitSnapshot, FinanceProfitTickets, FinanceQboSales, FinanceVendorCost
 from app.models.metric_dataset import DATASET_KEYS, MetricDataset, merge_dataset
 from app.models.tenant import Tenant
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
@@ -1372,6 +1372,53 @@ async def report_core_feed_pnl(tenant_token: str, body: PnlIn, db: DBSession) ->
         total += len(lines)
     await db.commit()
     return PnlOut(months=len(by_month), lines=total)
+
+
+class CostTransactionIn(BaseModel):
+    account: Literal["5600", "5800", "5805"]
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    type: str = Field(default="", max_length=40)
+    name: str = Field(default="", max_length=120)
+    customer: str = Field(default="", max_length=200)
+    memo: str = Field(default="", max_length=300)
+    split: str = Field(default="", max_length=120)
+    amount: float = Field(ge=-100_000_000_000, le=100_000_000_000)
+
+
+class CostTransactionsMonthIn(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    rows: list[CostTransactionIn] = Field(max_length=5000)
+
+
+class CostTransactionsIn(BaseModel):
+    months: list[CostTransactionsMonthIn] = Field(max_length=36)
+
+
+class CostTransactionsOut(BaseModel):
+    months: int
+    rows: int
+
+
+@router.post("/core-feed/{tenant_token}/cost-transactions", response_model=CostTransactionsOut)
+async def report_core_feed_cost_transactions(tenant_token: str, body: CostTransactionsIn, db: DBSession) -> CostTransactionsOut:
+    """Keep the transactions behind the travel and hardware costs per month, as QuickBooks booked them. A month sent again is replaced; months not sent are left as they were. Read only by people with the finance permissions."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    by_month = {m.month: m for m in body.months}
+    if by_month:
+        await db.execute(delete(FinanceCostTransactions).where(FinanceCostTransactions.tenant_id == tenant_id, FinanceCostTransactions.month.in_(list(by_month))))
+    total = 0
+    for month, m in by_month.items():
+        rows = [
+            {"account": r.account, "date": r.date, "type": r.type, "name": r.name, "customer": r.customer, "memo": r.memo, "split": r.split, "amount": round(r.amount, 2)}
+            for r in m.rows
+            if r.date[:7] == month and round(r.amount, 2) != 0
+        ]
+        db.add(FinanceCostTransactions(tenant_id=tenant_id, month=month, payload=rows, received_at=now))
+        total += len(rows)
+    await db.commit()
+    return CostTransactionsOut(months=len(by_month), rows=total)
 
 
 class QboCustomerIn(BaseModel):

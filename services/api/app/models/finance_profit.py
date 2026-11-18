@@ -139,3 +139,14 @@ class FinanceQboSales(Base):
     month: Mapped[str] = mapped_column(String, primary_key=True)
     payload: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
+class FinanceCostTransactions(Base):
+    """The transactions behind the travel and hardware costs in one month, as QuickBooks booked them (migration 222)."""
+
+    __tablename__ = "finance_cost_transactions"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    month: Mapped[str] = mapped_column(String, primary_key=True)
+    payload: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
