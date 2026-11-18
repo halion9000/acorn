@@ -1363,28 +1363,28 @@
     "key": "r7-cf-08",
     "title": "CIPP: list guest users older than a year for each client",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): OK: CIPP list of guest users older than a year per client. Approved: I build it (Hal does not need to act)."
+    "note": "Built (CIPP posture check with the names listed under Settings > Client posture > Microsoft 365 / CIPP). NOT VERIFIED against the live CIPP: after CORE's next CIPP pass, open a client's checks and see whether the list looks right. Check name: Guest accounts older than a year."
   },
   {
     "key": "r7-cf-09",
     "title": "CIPP: list shared mailboxes with a sign-in enabled",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): GO: CIPP list of shared mailboxes with sign-in enabled. Approved: I build it (Hal does not need to act)."
+    "note": "Built (CIPP posture check with the names listed under Settings > Client posture > Microsoft 365 / CIPP). NOT VERIFIED against the live CIPP: after CORE's next CIPP pass, open a client's checks and see whether the list looks right. Check name: Shared mailboxes with sign-in on."
   },
   {
     "key": "r7-cf-10",
     "title": "CIPP: list mailboxes with a forwarding rule to an outside address (extend the existing check to a list)",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): GO: CIPP list of mailboxes forwarding outside the company. Approved: I build it (Hal does not need to act)."
+    "note": "Built (CIPP posture check with the names listed under Settings > Client posture > Microsoft 365 / CIPP). NOT VERIFIED against the live CIPP: after CORE's next CIPP pass, open a client's checks and see whether the list looks right. Check name: Mailboxes forwarding outside (separate from the mailbox-rule check)."
   },
   {
     "key": "r7-cf-11",
