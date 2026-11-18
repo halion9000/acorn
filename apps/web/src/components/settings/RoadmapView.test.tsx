@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const api = vi.hoisted(() => ({ list: vi.fn(), add: vi.fn(), update: vi.fn(), remove: vi.fn(), approve: vi.fn() }));
 vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), roadmapApi: api }));
 
-import { RoadmapView, canApproveItem, datesText, dayText, sortedItems, tagCounts, visibleItems } from './RoadmapView';
+import { RoadmapView, canApproveItem, datesText, replyOpen, dayText, sortedItems, tagCounts, visibleItems } from './RoadmapView';
 
 const item = (over: Record<string, unknown> = {}) => ({
   id: 'i1', key: 'a', title: 'Vendor detected apps', detail: 'Scan the tenant', area: 'Compliance', status: 'not_started', needs: 'claude', priority: 'normal', note: '',
@@ -180,5 +180,30 @@ describe('approving an item that waits on sign-off', () => {
     await waitFor(() => expect(api.approve).toHaveBeenCalledWith('s1'));
     expect(await screen.findByTestId('dates-s1')).toHaveTextContent('Approved by hal@goliveoak.com Nov 18, 2026');
     expect(screen.queryByRole('button', { name: 'Approve Needs sign-off' })).toBeNull();
+  });
+});
+
+describe('your answer or question on an item', () => {
+  it('starts open when the item waits on you or sign-off or you already wrote something, and shut otherwise', () => {
+    expect(replyOpen({ needs: 'hal', status: 'new' })).toBe(true);
+    expect(replyOpen({ needs: 'signoff', status: 'not_started' })).toBe(true);
+    expect(replyOpen({ needs: 'claude', status: 'new', reply: 'yes' })).toBe(true);
+    expect(replyOpen({ needs: 'claude', status: 'new' })).toBe(false);
+    expect(replyOpen({ needs: 'hal', status: 'completed' })).toBe(false);
+  });
+
+  it('saves what is written, only when it changed, and shows who wrote it and when', async () => {
+    api.list.mockResolvedValue(roadmap([item({ id: 'q1', key: 'q1', title: 'Ask me', needs: 'hal', note: 'Which vendor?', reply: '', reply_at: null })]));
+    api.update.mockResolvedValue(item());
+    render(<RoadmapView />);
+    const box = await screen.findByLabelText('Your answer or question for Ask me');
+    const save = screen.getByRole('button', { name: 'Save answer' });
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.type(box, 'Use Huntress.');
+    expect((save as HTMLButtonElement).disabled).toBe(false);
+    api.list.mockResolvedValue(roadmap([item({ id: 'q1', key: 'q1', title: 'Ask me', needs: 'hal', note: 'Which vendor?', reply: 'Use Huntress.', reply_at: '2026-11-18T12:00:00Z', reply_by: 'hal@goliveoak.com' })]));
+    await userEvent.click(save);
+    await waitFor(() => expect(api.update).toHaveBeenCalledWith('q1', { reply: 'Use Huntress.' }));
+    expect(await screen.findByText('Saved Nov 18, 2026 by hal@goliveoak.com')).toBeTruthy();
   });
 });

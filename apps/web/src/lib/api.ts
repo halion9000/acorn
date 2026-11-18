@@ -7851,6 +7851,9 @@ export interface RoadmapItem {
   completed_at: string | null;
   approved_at?: string | null;
   approved_by?: string | null;
+  reply?: string;
+  reply_at?: string | null;
+  reply_by?: string | null;
 }
 export interface Roadmap {
   items: RoadmapItem[];
@@ -7860,7 +7863,7 @@ export const roadmapApi = {
   list: () => request<Roadmap>('/api/v1/roadmap'),
   add: (body: { title: string; detail?: string; area?: string; needs?: RoadmapItem['needs']; priority?: RoadmapItem['priority'] }) =>
     request<RoadmapItem>('/api/v1/roadmap', { method: 'POST', body: JSON.stringify(body) }),
-  update: (id: string, body: { priority?: RoadmapItem['priority']; status?: RoadmapItem['status']; needs?: RoadmapItem['needs']; note?: string }) =>
+  update: (id: string, body: { priority?: RoadmapItem['priority']; status?: RoadmapItem['status']; needs?: RoadmapItem['needs']; note?: string; reply?: string }) =>
     request<RoadmapItem>(`/api/v1/roadmap/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) }),
   remove: (id: string) => request<void>(`/api/v1/roadmap/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   approve: (id: string) => request<RoadmapItem>(`/api/v1/roadmap/${encodeURIComponent(id)}/approve`, { method: 'POST' }),

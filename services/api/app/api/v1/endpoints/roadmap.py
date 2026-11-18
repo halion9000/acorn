@@ -43,6 +43,9 @@ class ItemOut(BaseModel):
     completed_at: datetime | None
     approved_at: datetime | None = None
     approved_by: str | None = None
+    reply: str = ""
+    reply_at: datetime | None = None
+    reply_by: str | None = None
 
 
 class ItemIn(BaseModel):
@@ -58,6 +61,8 @@ class ItemPatch(BaseModel):
     status: Status | None = None
     needs: Needs | None = None
     note: str | None = Field(default=None, max_length=4000)
+    # The person's own answer or question; an empty text clears it.
+    reply: str | None = Field(default=None, max_length=4000)
 
 
 class RoadmapOut(BaseModel):
@@ -121,7 +126,9 @@ async def update_item(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
     changes = body.model_dump(exclude_none=True)
     for key, value in changes.items():
-        setattr(row, key, value)
+        setattr(row, key, value.strip() if key == "reply" else value)
+    if "reply" in changes:
+        row.reply_at, row.reply_by = (datetime.now(UTC), getattr(user, "email", None)) if row.reply else (None, None)
     if "status" in changes:
         row.completed_at = datetime.now(UTC) if changes["status"] == "completed" else None
         row.person_status = row.key is not None

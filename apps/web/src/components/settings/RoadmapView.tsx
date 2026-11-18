@@ -70,6 +70,37 @@ export function canApproveItem(item: { needs: string; status: string }): boolean
   return item.needs === 'signoff' && item.status !== 'completed';
 }
 
+/** Your answer or question on an item (pure): whether the box starts open (the item waits on you or sign-off, or you already wrote something). */
+export function replyOpen(item: { needs: string; reply?: string; status: string }): boolean {
+  return Boolean(item.reply) || (item.status !== 'completed' && item.needs !== 'claude');
+}
+
+function ReplyBox({ item, onSave }: { item: RoadmapItem; onSave: (id: string, body: Parameters<typeof roadmapApi.update>[1]) => Promise<void> }) {
+  const [draft, setDraft] = useState(item.reply ?? '');
+  useEffect(() => setDraft(item.reply ?? ''), [item.reply]);
+  const changed = draft.trim() !== (item.reply ?? '');
+  return (
+    <details open={replyOpen(item)} className="text-xs text-gray-400" data-testid={`reply-${item.key ?? item.id}`}>
+      <summary className="cursor-pointer">{item.reply ? 'Your answer or question' : 'Add an answer or question'}</summary>
+      <textarea
+        aria-label={`Your answer or question for ${item.title}`}
+        rows={2}
+        maxLength={4000}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="Write an answer to the status line above, or a question. It is read and the status line is updated."
+        className="mt-1 block w-full rounded border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100"
+      />
+      <div className="mt-1 flex items-center gap-2">
+        <button type="button" disabled={!changed} onClick={() => void onSave(item.id, { reply: draft.trim() })} className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800 disabled:opacity-40">
+          Save answer
+        </button>
+        {item.reply_at ? <span className="text-gray-500">Saved {dayText(item.reply_at)}{item.reply_by ? ` by ${item.reply_by}` : ''}</span> : null}
+      </div>
+    </details>
+  );
+}
+
 function Row({ item, onSave, onRemove, onApprove }: { item: RoadmapItem; onSave: (id: string, body: Parameters<typeof roadmapApi.update>[1]) => Promise<void>; onRemove: (id: string) => Promise<void>; onApprove: (id: string) => Promise<void> }) {
   const done = item.status === 'completed';
   const [confirming, setConfirming] = useState(false);
@@ -125,6 +156,7 @@ function Row({ item, onSave, onRemove, onApprove }: { item: RoadmapItem; onSave:
       </div>
       {item.detail && <p className="whitespace-pre-wrap text-sm text-gray-300">{item.detail}</p>}
       {item.note && <p className="text-xs text-amber-200/80">{item.note}</p>}
+      <ReplyBox item={item} onSave={onSave} />
     </li>
   );
 }

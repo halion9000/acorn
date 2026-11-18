@@ -70512,6 +70512,21 @@ components:
           - type: string
           - type: 'null'
           title: Approved By
+        reply:
+          type: string
+          title: Reply
+          default: ''
+        reply_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Reply At
+        reply_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reply By
       type: object
       required:
       - id
@@ -70564,6 +70579,12 @@ components:
             maxLength: 4000
           - type: 'null'
           title: Note
+        reply:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Reply
       type: object
       title: ItemPatch
     app__api__v1__endpoints__secureframe__PolicyLine:

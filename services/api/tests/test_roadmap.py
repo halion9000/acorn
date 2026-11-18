@@ -228,3 +228,23 @@ async def test_approving_an_item_that_waits_on_signoff_moves_it_to_ready_records
     later = {i.key: i for i in (await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items}
     assert later["s"].needs == "hal", "a different need in the file is followed"
 
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_a_reply_written_on_the_page_is_kept_cleared_and_never_touched_by_the_sync(world):
+    w = world
+    entries = [{"key": "q", "title": "Question item", "needs": "hal", "note": "Which vendor?"}]
+    await run(w.acme, lambda db: rs.sync(db, w.acme, entries))
+    item = (await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items[0]
+    assert item.reply == "" and item.reply_at is None
+    out = await run(w.acme, lambda db: ep.update_item(item.id, ep.ItemPatch(reply="  Use Huntress.  "), db, user(w.acme)))
+    assert out.reply == "Use Huntress." and out.reply_by == "hal@goliveoak.com" and out.reply_at is not None
+    changed = [{**entries[0], "note": "Which vendor? Asked again.", "title": "Question item renamed"}]
+    assert await run(w.acme, lambda db: rs.sync(db, w.acme, changed)) == {"added": 0, "changed": 1, "unchanged": 0}
+    after = (await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items[0]
+    assert after.reply == "Use Huntress." and after.note == "Which vendor? Asked again.", "the status line follows the file, the reply stays"
+    cleared = await run(w.acme, lambda db: ep.update_item(item.id, ep.ItemPatch(reply=""), db, user(w.acme)))
+    assert cleared.reply == "" and cleared.reply_at is None and cleared.reply_by is None
+    other = await run(w.birch, lambda db: ep.list_items(db, user(w.birch)))
+    assert other.items == [], "another organization sees none of it"
+
