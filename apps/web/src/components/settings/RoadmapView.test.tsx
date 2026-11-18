@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), add: vi.fn(), update: vi.fn(), remove: vi.fn() }));
+const api = vi.hoisted(() => ({ list: vi.fn(), add: vi.fn(), update: vi.fn(), remove: vi.fn(), approve: vi.fn() }));
 vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), roadmapApi: api }));
 
-import { RoadmapView, datesText, dayText, sortedItems, tagCounts, visibleItems } from './RoadmapView';
+import { RoadmapView, canApproveItem, datesText, dayText, sortedItems, tagCounts, visibleItems } from './RoadmapView';
 
 const item = (over: Record<string, unknown> = {}) => ({
   id: 'i1', key: 'a', title: 'Vendor detected apps', detail: 'Scan the tenant', area: 'Compliance', status: 'not_started', needs: 'claude', priority: 'normal', note: '',
@@ -157,5 +157,28 @@ describe('the dates under an item', () => {
     render(<RoadmapView />);
     expect(await screen.findByTestId('dates-d1')).toHaveTextContent('Added Nov 3, 2026');
     expect(screen.getByTestId('dates-d2')).toHaveTextContent('Added Nov 4, 2026 · Completed Nov 10, 2026');
+  });
+});
+
+describe('approving an item that waits on sign-off', () => {
+  const signoff = item({ id: 's1', key: 's1', title: 'Needs sign-off', needs: 'signoff', status: 'not_started' });
+  it('offers Approve only on an open item that waits on sign-off', () => {
+    expect(canApproveItem({ needs: 'signoff', status: 'new' })).toBe(true);
+    expect(canApproveItem({ needs: 'signoff', status: 'completed' })).toBe(false);
+    expect(canApproveItem({ needs: 'hal', status: 'new' })).toBe(false);
+    expect(canApproveItem({ needs: 'claude', status: 'new' })).toBe(false);
+  });
+
+  it('shows the button next to the item, approves it and loads the list again', async () => {
+    api.list.mockResolvedValue(roadmap([signoff, item({ id: 'c1', key: 'c1', title: 'Ready item' })]));
+    api.approve.mockResolvedValue({ ...signoff, needs: 'claude' });
+    render(<RoadmapView />);
+    expect(await screen.findByRole('button', { name: 'Approve Needs sign-off' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Approve Ready item' })).toBeNull();
+    api.list.mockResolvedValue(roadmap([item({ id: 's1', key: 's1', title: 'Needs sign-off', needs: 'claude', approved_at: '2026-11-18T12:00:00Z', approved_by: 'hal@goliveoak.com' })]));
+    await userEvent.click(screen.getByRole('button', { name: 'Approve Needs sign-off' }));
+    await waitFor(() => expect(api.approve).toHaveBeenCalledWith('s1'));
+    expect(await screen.findByTestId('dates-s1')).toHaveTextContent('Approved by hal@goliveoak.com Nov 18, 2026');
+    expect(screen.queryByRole('button', { name: 'Approve Needs sign-off' })).toBeNull();
   });
 });

@@ -36,3 +36,6 @@ class RoadmapItem(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     person_status: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Who approved an item that waited on sign-off, and when (migration 220); the sync keeps an approved item out of sign-off.
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_by: Mapped[str | None] = mapped_column(String(320), nullable=True)

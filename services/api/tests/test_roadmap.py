@@ -199,3 +199,32 @@ async def test_a_removed_item_is_hidden_and_never_brought_back_and_a_status_a_pe
     await run(w.acme, lambda db: rs.sync(db, w.acme, [{**done[0], "status": "completed", "completed_ref": "abc"}]))
     again = (await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items[0]
     assert again.status == "completed" and again.completed_ref == "abc"
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_approving_an_item_that_waits_on_signoff_moves_it_to_ready_records_who_and_survives_the_sync(world):
+    w = world
+    entries = [{"key": "s", "title": "Needs sign-off", "needs": "signoff", "note": "waits"}, {"key": "h", "title": "Needs Hal", "needs": "hal", "note": "x"}, {"key": "d", "title": "Done", "needs": "signoff", "status": "completed"}]
+    await run(w.acme, lambda db: rs.sync(db, w.acme, entries))
+    items = {i.key: i for i in (await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items}
+    ok = await run(w.acme, lambda db: ep.approve_item(items["s"].id, db, user(w.acme)))
+    assert ok.needs == "claude" and ok.approved_by == "hal@goliveoak.com" and ok.approved_at is not None
+    for refused in ("h", "d"):
+        with pytest.raises(HTTPException) as e:
+            await run(w.acme, lambda db: ep.approve_item(items[refused].id, db, user(w.acme)))
+        assert e.value.status_code == 409
+    with pytest.raises(HTTPException) as e:
+        await run(w.acme, lambda db: ep.approve_item(items["s"].id, db, user(w.acme)))
+    assert e.value.status_code == 409, "approving twice is refused: it no longer waits"
+    with pytest.raises(HTTPException) as e:
+        await run(w.birch, lambda db: ep.approve_item(items["s"].id, db, user(w.birch)))
+    assert e.value.status_code == 404, "another organization cannot approve it"
+    assert await run(w.acme, lambda db: rs.sync(db, w.acme, entries)) == {"added": 0, "changed": 0, "unchanged": 3}, "the file still says signoff and the sync leaves the approval alone"
+    after = {i.key: i for i in (await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items}
+    assert after["s"].needs == "claude"
+    moved = [{**entries[0], "needs": "hal"}] + entries[1:]
+    await run(w.acme, lambda db: rs.sync(db, w.acme, moved))
+    later = {i.key: i for i in (await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items}
+    assert later["s"].needs == "hal", "a different need in the file is followed"
+

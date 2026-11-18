@@ -41,6 +41,8 @@ class ItemOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
+    approved_at: datetime | None = None
+    approved_by: str | None = None
 
 
 class ItemIn(BaseModel):
@@ -125,6 +127,24 @@ async def update_item(
         row.person_status = row.key is not None
     row.updated_at = datetime.now(UTC)
     await audit.note(db, user.tenant_id, user, "roadmap:changed", "roadmap_item", item_id, changes=sorted(changes))
+    await db.commit()
+    return _out(row)
+
+
+@router.post("/{item_id}/approve", response_model=ItemOut, summary="Approve an item that waits on sign-off: it moves to ready to build, with who approved it and when")
+async def approve_item(
+    item_id: uuid.UUID, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("settings_workspace:manage"))]
+) -> ItemOut:
+    row = (
+        await db.execute(select(RoadmapItem).where(RoadmapItem.id == item_id, RoadmapItem.tenant_id == user.tenant_id, RoadmapItem.removed_at.is_(None)))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    if row.needs != "signoff" or row.status == "completed":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only an item that is waiting on sign-off can be approved.")
+    now = datetime.now(UTC)
+    row.needs, row.approved_at, row.approved_by, row.updated_at = "claude", now, getattr(user, "email", None), now
+    await audit.note(db, user.tenant_id, user, "roadmap:approved", "roadmap_item", item_id, title=row.title)
     await db.commit()
     return _out(row)
 

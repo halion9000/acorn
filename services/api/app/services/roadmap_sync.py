@@ -89,7 +89,9 @@ async def sync(db: AsyncSession, tenant: uuid.UUID, entries: list[dict[str, Any]
             continue
         # A status a person set on the page is theirs, unless the file now says the work is finished.
         keep_status = row.person_status and w["status"] != "completed"
-        diff = {k: w[k] for k in OWNED if not (k == "status" and keep_status) and getattr(row, k) != w[k]}
+        # An item the person approved stays approved: the file still saying "signoff" does not take it back.
+        keep_needs = row.approved_at is not None and w["needs"] == "signoff"
+        diff = {k: w[k] for k in OWNED if not (k == "status" and keep_status) and not (k == "needs" and keep_needs) and getattr(row, k) != w[k]}
         # The days the file gives are the truth about when the item was added and finished.
         dates = {}
         if added_at and row.created_at != added_at:

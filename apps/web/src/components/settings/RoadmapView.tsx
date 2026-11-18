@@ -65,7 +65,12 @@ export function datesText(item: { created_at: string; completed_at: string | nul
   return [added ? `Added ${added}` : '', done ? `Completed ${done}` : ''].filter(Boolean).join(' · ');
 }
 
-function Row({ item, onSave, onRemove }: { item: RoadmapItem; onSave: (id: string, body: Parameters<typeof roadmapApi.update>[1]) => Promise<void>; onRemove: (id: string) => Promise<void> }) {
+/** Whether an item shows the Approve button (pure): it waits on sign-off and is not finished. */
+export function canApproveItem(item: { needs: string; status: string }): boolean {
+  return item.needs === 'signoff' && item.status !== 'completed';
+}
+
+function Row({ item, onSave, onRemove, onApprove }: { item: RoadmapItem; onSave: (id: string, body: Parameters<typeof roadmapApi.update>[1]) => Promise<void>; onRemove: (id: string) => Promise<void>; onApprove: (id: string) => Promise<void> }) {
   const done = item.status === 'completed';
   const [confirming, setConfirming] = useState(false);
   return (
@@ -79,6 +84,7 @@ function Row({ item, onSave, onRemove }: { item: RoadmapItem; onSave: (id: strin
           </p>
           <p className="text-xs text-gray-500" data-testid={`dates-${item.key ?? item.id}`}>
             {datesText(item)}
+            {item.approved_at ? `${datesText(item) ? ' · ' : ''}Approved${item.approved_by ? ` by ${item.approved_by}` : ''} ${dayText(item.approved_at)}` : ''}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -92,6 +98,11 @@ function Row({ item, onSave, onRemove }: { item: RoadmapItem; onSave: (id: strin
               <option value="low">Low priority</option>
             </select>
           </label>
+          {canApproveItem(item) ? (
+            <button type="button" aria-label={`Approve ${item.title}`} onClick={() => void onApprove(item.id)} className="rounded bg-emerald-700 px-2 py-1 text-xs text-white hover:bg-emerald-600">
+              Approve
+            </button>
+          ) : null}
           <button type="button" onClick={() => void onSave(item.id, { status: done ? 'not_started' : 'completed' })} className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800">
             {done ? 'Reopen' : 'Mark complete'}
           </button>
@@ -146,6 +157,14 @@ export function RoadmapView() {
       await load();
     } catch (e) {
       setProblem(apiErrorDetail(e) ?? 'Could not save that change.');
+    }
+  };
+  const approve = async (id: string) => {
+    try {
+      await roadmapApi.approve(id);
+      await load();
+    } catch (e) {
+      setProblem(apiErrorDetail(e) ?? 'Could not approve that.');
     }
   };
   const remove = async (id: string) => {
@@ -247,7 +266,7 @@ export function RoadmapView() {
       )}
       <ul className="space-y-2" data-testid="roadmap-list">
         {shown.map((i) => (
-          <Row key={i.id} item={i} onSave={save} onRemove={remove} />
+          <Row key={i.id} item={i} onSave={save} onRemove={remove} onApprove={approve} />
         ))}
       </ul>
     </div>
