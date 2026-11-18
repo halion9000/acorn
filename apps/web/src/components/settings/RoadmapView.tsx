@@ -51,6 +51,20 @@ export function sortedItems(items: RoadmapItem[], sort: SortKey): RoadmapItem[] 
   return items;
 }
 
+/** A day as people read it ("14 Nov 2026"), from an ISO timestamp (pure); empty when there is none. */
+export function dayText(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+/** The line under an item: when it was added and, once it is done, when it was completed (pure). */
+export function datesText(item: { created_at: string; completed_at: string | null; status: string }): string {
+  const added = dayText(item.created_at);
+  const done = item.status === 'completed' ? dayText(item.completed_at) : '';
+  return [added ? `Added ${added}` : '', done ? `Completed ${done}` : ''].filter(Boolean).join(' · ');
+}
+
 function Row({ item, onSave, onRemove }: { item: RoadmapItem; onSave: (id: string, body: Parameters<typeof roadmapApi.update>[1]) => Promise<void>; onRemove: (id: string) => Promise<void> }) {
   const done = item.status === 'completed';
   const [confirming, setConfirming] = useState(false);
@@ -62,6 +76,9 @@ function Row({ item, onSave, onRemove }: { item: RoadmapItem; onSave: (id: strin
           <p className="text-xs text-gray-500">
             {item.area}
             {item.completed_ref ? ` · ${item.completed_ref}` : ''}
+          </p>
+          <p className="text-xs text-gray-500" data-testid={`dates-${item.key ?? item.id}`}>
+            {datesText(item)}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

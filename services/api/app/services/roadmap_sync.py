@@ -21,6 +21,15 @@ PRIORITIES = ("high", "normal", "low")
 OWNED = ("title", "detail", "area", "status", "needs", "note", "completed_ref")
 
 
+def _day(value: Any) -> datetime | None:
+    """A day written YYYY-MM-DD in the file as midday UTC (so it reads as that day in any time zone), or None; anything else is ignored (pure)."""
+    text = str(value or "").strip()
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").replace(hour=12, tzinfo=UTC) if text else None
+    except ValueError:
+        return None
+
+
 def clean(entry: dict[str, Any]) -> dict[str, Any]:
     """One file entry made safe: unknown status or needs refused, text trimmed to the column sizes (pure)."""
     key = str(entry.get("key") or "").strip()
@@ -34,6 +43,8 @@ def clean(entry: dict[str, Any]) -> dict[str, Any]:
     if needs not in NEEDS:
         raise ValueError(f"{key}: needs {needs!r} is not one of {NEEDS}")
     return {
+        "added": _day(entry.get("added")),
+        "done": _day(entry.get("completed")),
         "key": key[:80],
         "title": title[:200],
         "detail": str(entry.get("detail") or ""),
@@ -57,6 +68,7 @@ async def sync(db: AsyncSession, tenant: uuid.UUID, entries: list[dict[str, Any]
     added = changed = same = 0
     now = datetime.now(UTC)
     for w in wanted:
+        added_at, done_at = w.pop("added"), w.pop("done")
         row = rows.get(w["key"])
         if row is None:
             db.add(
@@ -64,9 +76,9 @@ async def sync(db: AsyncSession, tenant: uuid.UUID, entries: list[dict[str, Any]
                     id=uuid.uuid4(),
                     tenant_id=tenant,
                     created_by="assistant",
-                    created_at=now,
+                    created_at=added_at or now,
                     updated_at=now,
-                    completed_at=now if w["status"] == "completed" else None,
+                    completed_at=(done_at or now) if w["status"] == "completed" else None,
                     **w,
                 )
             )
@@ -78,13 +90,21 @@ async def sync(db: AsyncSession, tenant: uuid.UUID, entries: list[dict[str, Any]
         # A status a person set on the page is theirs, unless the file now says the work is finished.
         keep_status = row.person_status and w["status"] != "completed"
         diff = {k: w[k] for k in OWNED if not (k == "status" and keep_status) and getattr(row, k) != w[k]}
-        if not diff:
+        # The days the file gives are the truth about when the item was added and finished.
+        dates = {}
+        if added_at and row.created_at != added_at:
+            dates["created_at"] = added_at
+        if done_at and (w["status"] == "completed" or row.status == "completed") and row.completed_at != done_at:
+            dates["completed_at"] = done_at
+        if not diff and not dates:
             same += 1
             continue
+        for k, v in dates.items():
+            setattr(row, k, v)
         for k, v in diff.items():
             setattr(row, k, v)
         if "status" in diff:
-            row.completed_at = now if w["status"] == "completed" else None
+            row.completed_at = ((done_at or now) if w["status"] == "completed" else None)
             row.person_status = False
         row.updated_at = now
         changed += 1

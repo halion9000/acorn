@@ -7,7 +7,9 @@
     "status": "completed",
     "needs": "hal",
     "note": "Built and tested. NOT checked against a live tenant: after the next CORE read of a client's Microsoft 365 tenant, open Compliance, Vendors and see whether the banner and the list look right.",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "vendor-dashboard-ring",
@@ -16,7 +18,9 @@
     "area": "Compliance",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "control-health-own-tenant",
@@ -26,7 +30,9 @@
     "status": "completed",
     "needs": "claude",
     "note": "Done for NIST CSF 2.0 and CIS IG1 (the frameworks CORE sends requirements for). SOC 2, ISO, PCI and HIPAA need CORE to send their requirements too.",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "policy-templates",
@@ -36,7 +42,9 @@
     "status": "completed",
     "needs": "claude",
     "note": "Six templates built. Your review of the wording is still wanted before any is shown to a client.",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "personnel-access-reviews",
@@ -45,7 +53,8 @@
     "area": "Compliance",
     "status": "in_progress",
     "needs": "claude",
-    "note": "Onboarding and offboarding checklists built (People page). Training completion from Huntress awareness training still to do."
+    "note": "Onboarding and offboarding checklists built (People page). Training completion from Huntress awareness training still to do.",
+    "added": "2026-11-14"
   },
   {
     "key": "tests-controls-engine",
@@ -55,7 +64,9 @@
     "status": "completed",
     "needs": "claude",
     "note": "Recording is by a button for now so you can see what it writes before it moves control health.",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "audits-data-room",
@@ -64,7 +75,8 @@
     "area": "Compliance",
     "status": "in_progress",
     "needs": "signoff",
-    "note": "Decision: does the auditor get their own sign-in (a role that sees only one audit), and where should the files live?"
+    "note": "Decision: does the auditor get their own sign-in (a role that sees only one audit), and where should the files live?",
+    "added": "2026-11-14"
   },
   {
     "key": "trust-center",
@@ -73,7 +85,8 @@
     "area": "Compliance",
     "status": "in_progress",
     "needs": "signoff",
-    "note": "Decision: do you want a public link at all, and if so one per client with a way to turn it off?"
+    "note": "Decision: do you want a public link at all, and if so one per client with a way to turn it off?",
+    "added": "2026-11-14"
   },
   {
     "key": "questionnaires",
@@ -83,7 +96,9 @@
     "status": "completed",
     "needs": "claude",
     "note": "Built: answers are drafted from your own library by shared words, never from a language model, and are never final until you approve them. Drafting with an AI model is a possible next step.",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "client-facing-compliance",
@@ -92,7 +107,8 @@
     "area": "Compliance",
     "status": "not_started",
     "needs": "signoff",
-    "note": "The Compliance section is built for Live Oak and for clients chosen with the client picker. Showing it to clients in their own sign-in needs your decision on who sees what."
+    "note": "The Compliance section is built for Live Oak and for clients chosen with the client picker. Showing it to clients in their own sign-in needs your decision on who sees what.",
+    "added": "2026-11-14"
   },
   {
     "key": "vendor-management",
@@ -101,7 +117,9 @@
     "area": "Compliance",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "4fd4d03e"
+    "completed_ref": "4fd4d03e",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "risk-register",
@@ -109,14 +127,18 @@
     "detail": "Risks with likelihood, impact, treatment, tasks and history.",
     "area": "Compliance",
     "status": "completed",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "compliance-section",
     "title": "Compliance as its own sidebar section with a dashboard and framework toggles",
     "area": "Compliance",
     "status": "completed",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "policies-section",
@@ -124,7 +146,9 @@
     "area": "Compliance",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "4fd4d03e"
+    "completed_ref": "4fd4d03e",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "huntress-family",
@@ -133,7 +157,8 @@
     "area": "Devices",
     "status": "not_started",
     "needs": "signoff",
-    "note": "Held for later at your request. Covers every system, not only Huntress."
+    "note": "Held for later at your request. Covers every system, not only Huntress.",
+    "added": "2026-11-14"
   },
   {
     "key": "huntress-moves",
@@ -142,14 +167,16 @@
     "area": "Devices",
     "status": "not_started",
     "needs": "hal",
-    "note": "Decision made: move the agents by hand in the Huntress console. List sent (141 machines; 22 have no target organization mapped yet, mostly the 21 Texas Subs machines)."
+    "note": "Decision made: move the agents by hand in the Huntress console. List sent (141 machines; 22 have no target organization mapped yet, mostly the 21 Texas Subs machines).",
+    "added": "2026-11-14"
   },
   {
     "key": "name-only-follow",
     "title": "Follow a machine by name alone when it has a random Windows default name",
     "area": "Devices",
     "status": "not_started",
-    "needs": "signoff"
+    "needs": "signoff",
+    "added": "2026-11-14"
   },
   {
     "key": "merge-search-sibling",
@@ -157,7 +184,8 @@
     "area": "Devices",
     "status": "not_started",
     "needs": "signoff",
-    "note": "Held with the families design: a merge across clients moves a record between clients, so it is decided together with Huntress families (which also covers every other tool)."
+    "note": "Held with the families design: a merge across clients moves a record between clients, so it is decided together with Huntress families (which also covers every other tool).",
+    "added": "2026-11-14"
   },
   {
     "key": "ninja-deploy-test",
@@ -166,7 +194,8 @@
     "area": "Devices",
     "status": "in_progress",
     "needs": "hal",
-    "note": "Fixed again: the install now runs detached (CORE bc25a2c). Press Deploy NinjaOne on SCHKNOWCROSS and report what the machine printed."
+    "note": "Fixed again: the install now runs detached (CORE bc25a2c). Press Deploy NinjaOne on SCHKNOWCROSS and report what the machine printed.",
+    "added": "2026-11-14"
   },
   {
     "key": "ninja-console",
@@ -174,7 +203,8 @@
     "area": "Devices",
     "status": "not_started",
     "needs": "signoff",
-    "note": "On hold at your request."
+    "note": "On hold at your request.",
+    "added": "2026-11-14"
   },
   {
     "key": "liongard-device-names",
@@ -183,7 +213,9 @@
     "area": "Alerts",
     "status": "completed",
     "needs": "hal",
-    "note": "Built 2026-11-17: CORE reads the affected devices through Liongard's metrics (bulk read with the metric id) and the alert shows them; verify on the next Liongard disk alert."
+    "note": "Built 2026-11-17: CORE reads the affected devices through Liongard's metrics (bulk read with the metric id) and the alert shows them; verify on the next Liongard disk alert.",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "google-bec-scan",
@@ -191,7 +223,8 @@
     "detail": "ThreatMate cannot scan mailboxes; the light Google check is on hold.",
     "area": "Security",
     "status": "not_started",
-    "needs": "signoff"
+    "needs": "signoff",
+    "added": "2026-11-14"
   },
   {
     "key": "tokens-out-of-storage",
@@ -201,14 +234,17 @@
     "status": "completed",
     "needs": "claude",
     "note": "Built with a fallback. Please sign in once after the deploy and tell me if anything looks wrong.",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "weekly-briefing",
     "title": "A6: weekly briefing paragraph",
     "area": "Reports",
     "status": "not_started",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "agent-tools",
@@ -217,28 +253,33 @@
     "status": "completed",
     "needs": "claude",
     "note": "The person and client filters and the device-attention skill already existed; the onboarding tool is now added (aisoc_client_onboarding).",
-    "completed_ref": "CORE commit"
+    "completed_ref": "CORE commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "real-playbooks",
     "title": "12.18: real playbooks",
     "area": "Automation",
     "status": "not_started",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "fim-baselines",
     "title": "12.19: file integrity monitoring baselines",
     "area": "Security",
     "status": "not_started",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "threat-hunting",
     "title": "12.14: threat hunting",
     "area": "Security",
     "status": "not_started",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "qdrant-upgrade",
@@ -247,7 +288,8 @@
     "area": "Platform",
     "status": "not_started",
     "needs": "hal",
-    "note": "Waiting on the calendar."
+    "note": "Waiting on the calendar.",
+    "added": "2026-11-14"
   },
   {
     "key": "rate-limits-enforce",
@@ -255,7 +297,8 @@
     "detail": "Log-only mode has run for over a week; look at the Platform health line and decide.",
     "area": "Platform",
     "status": "not_started",
-    "needs": "signoff"
+    "needs": "signoff",
+    "added": "2026-11-14"
   },
   {
     "key": "licences-spelling",
@@ -264,7 +307,9 @@
     "status": "completed",
     "needs": "claude",
     "note": "The console and the user guide now say license. Texts that come from CORE and from the API (check evidence, some reports) still say licence.",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "cases-work-permission-test",
@@ -272,7 +317,9 @@
     "area": "Quality",
     "status": "completed",
     "needs": "claude",
-    "note": "Fixed 2026-11-16: the two AI investigation routes that create a case need cases:write; the test now lists them."
+    "note": "Fixed 2026-11-16: the two AI investigation routes that create a case need cases:write; the test now lists them.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "index-plan-tests",
@@ -280,7 +327,9 @@
     "area": "Quality",
     "status": "completed",
     "needs": "claude",
-    "note": "Checked 2026-11-16: both index-plan tests pass on an empty, fully migrated local Postgres (they turn sequential scans off, so table size does not matter). The entry was stale."
+    "note": "Checked 2026-11-16: both index-plan tests pass on an empty, fully migrated local Postgres (they turn sequential scans off, so table size does not matter). The entry was stale.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "roadmap-page",
@@ -288,7 +337,9 @@
     "area": "Platform",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "ninja-deploy-bulk",
@@ -296,7 +347,9 @@
     "area": "Devices",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "remove-huntress-move-tool",
@@ -306,7 +359,9 @@
     "status": "completed",
     "needs": "claude",
     "note": "",
-    "completed_ref": "CORE de2ea6e"
+    "completed_ref": "CORE de2ea6e",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "auto-tool-exclusions",
@@ -314,7 +369,9 @@
     "area": "Devices",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "55e39e0c"
+    "completed_ref": "55e39e0c",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "dmarc-sender-detail",
@@ -323,14 +380,17 @@
     "area": "Security",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "secureframe-other-frameworks",
     "title": "Send SOC 2, ISO 27001, PCI DSS and HIPAA requirements from CORE so their control health comes from Secureframe too",
     "area": "Compliance",
     "status": "not_started",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "policy-wording-review",
@@ -339,7 +399,8 @@
     "area": "Compliance",
     "status": "not_started",
     "needs": "signoff",
-    "note": "Not urgent: clients will not see Compliance for a while."
+    "note": "Not urgent: clients will not see Compliance for a while.",
+    "added": "2026-11-14"
   },
   {
     "key": "a15-live-check",
@@ -348,7 +409,8 @@
     "area": "Platform",
     "status": "not_started",
     "needs": "hal",
-    "note": "Needs you to try it and say what you see."
+    "note": "Needs you to try it and say what you see.",
+    "added": "2026-11-14"
   },
   {
     "key": "controls-page",
@@ -356,7 +418,9 @@
     "area": "Compliance",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "access-reviews",
@@ -364,7 +428,9 @@
     "area": "Compliance",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "audits-tracker",
@@ -372,7 +438,9 @@
     "area": "Compliance",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "trust-center-page",
@@ -380,7 +448,9 @@
     "area": "Compliance",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "r7-ci-01",
@@ -389,7 +459,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "CORE (previous commit)",
-    "note": "2026-11-16: the startup self-test line also names connectors started but missing a required key, and says so when the saved keys cannot be read."
+    "note": "2026-11-16: the startup self-test line also names connectors started but missing a required key, and says so when the saved keys cannot be read.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ci-02",
@@ -397,7 +469,9 @@
     "area": "Round 7: CORE improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Already built: hud/src/acorn-retry.ts (one retry policy for vendor reads: 429 and 502 to 504, Retry-After honored, longer waits for a vendor that pushed back, reads only). Checked 2026-11-16."
+    "note": "Already built: hud/src/acorn-retry.ts (one retry policy for vendor reads: 429 and 502 to 504, Retry-After honored, longer waits for a vendor that pushed back, reads only). Checked 2026-11-16.",
+    "added": "2026-11-14",
+    "completed": "2026-11-15"
   },
   {
     "key": "r7-ci-03",
@@ -405,7 +479,9 @@
     "area": "Round 7: CORE improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16 (CORE 189401d): fourteen pass durations kept per tool; the doctor warns when the latest took twice the median of the earlier ones (a pass-line warning already existed)."
+    "note": "Built 2026-11-16 (CORE 189401d): fourteen pass durations kept per tool; the doctor warns when the latest took twice the median of the earlier ones (a pass-line warning already existed).",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ci-04",
@@ -414,21 +490,25 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit",
-    "note": "CORE: log scrubbing table covers labelled and unlabelled key shapes; clock skew per host (A.C.O.R.N included) already on the health report; case-clash test"
+    "note": "CORE: log scrubbing table covers labelled and unlabelled key shapes; clock skew per host (A.C.O.R.N included) already on the health report; case-clash test",
+    "added": "2026-11-14",
+    "completed": "2026-11-15"
   },
   {
     "key": "r7-ci-05",
     "title": "update_core keeps the last three builds and offers a one-command rollback",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-06",
     "title": "A script that simulates a bad update so the watchdog rollback is proven, not assumed",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-07",
@@ -436,7 +516,9 @@
     "area": "Round 7: CORE improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16 (CORE 16e7acb): three passes in a row that read nothing pause a tool for an hour (said once); a good pass closes it."
+    "note": "Built 2026-11-16 (CORE 16e7acb): three passes in a row that read nothing pause a tool for an hour (said once); a good pass closes it.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ci-08",
@@ -444,7 +526,9 @@
     "area": "Round 7: CORE improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16 (CORE 6d46991): the health file lists the passes running now with their start times; the doctor warns on one over 90 minutes."
+    "note": "Built 2026-11-16 (CORE 6d46991): the health file lists the passes running now with their start times; the doctor warns on one over 90 minutes.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ci-09",
@@ -453,21 +537,25 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit",
-    "note": "CORE e624527 and 7c430bc"
+    "note": "CORE e624527 and 7c430bc",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "r7-ci-10",
     "title": "One module reads environment keys by name, replacing scattered process.env reads",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-11",
     "title": "Check A.C.O.R.N answers against the expected shape and log drift",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-12",
@@ -476,7 +564,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit",
-    "note": "CORE test skill-tools-exist: every aisoc_ and hud_ tool a skill names is offered by the real MCP server"
+    "note": "CORE test skill-tools-exist: every aisoc_ and hud_ tool a skill names is offered by the real MCP server",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "r7-ci-13",
@@ -485,7 +575,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "CORE 8d08e72",
-    "note": "2026-11-16: node scripts/jobs.mjs prints every job with last result, duration, last good pass and running-since from CORE's health file."
+    "note": "2026-11-16: node scripts/jobs.mjs prints every job with last result, duration, last good pass and running-since from CORE's health file.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ci-14",
@@ -494,7 +586,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit",
-    "note": "CORE scripts/export-settings-names.mjs"
+    "note": "CORE scripts/export-settings-names.mjs",
+    "added": "2026-11-14",
+    "completed": "2026-11-15"
   },
   {
     "key": "r7-ci-15",
@@ -502,21 +596,24 @@
     "area": "Round 7: CORE improvement",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-16",
     "title": "A shared CIPP read cache keyed by tenant and endpoint to cut 429 answers",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-17",
     "title": "Show each vendor's remaining daily read budget on the health page",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-18",
@@ -524,7 +621,9 @@
     "area": "Round 7: CORE improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16 as scripts/update-core-vm.mjs (CORE 703335c): checks the commit is pushed, no BEC search is running, runs the update and confirms CORE is back on the new commit."
+    "note": "Built 2026-11-16 as scripts/update-core-vm.mjs (CORE 703335c): checks the commit is pushed, no BEC search is running, runs the update and confirms CORE is back on the new commit.",
+    "added": "2026-11-14",
+    "completed": "2026-11-15"
   },
   {
     "key": "r7-ci-19",
@@ -533,7 +632,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit",
-    "note": "CORE: log scrubbing table covers labelled and unlabelled key shapes; clock skew per host (A.C.O.R.N included) already on the health report; case-clash test"
+    "note": "CORE: log scrubbing table covers labelled and unlabelled key shapes; clock skew per host (A.C.O.R.N included) already on the health report; case-clash test",
+    "added": "2026-11-14",
+    "completed": "2026-11-15"
   },
   {
     "key": "r7-ci-20",
@@ -542,7 +643,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit",
-    "note": "CORE doctor log size check"
+    "note": "CORE doctor log size check",
+    "added": "2026-11-14",
+    "completed": "2026-11-15"
   },
   {
     "key": "r7-ci-21",
@@ -550,7 +653,9 @@
     "area": "Round 7: CORE improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16 (CORE 39da894): reports A.C.O.R.N refuses with 400, 413, 415 or 422 are kept in aisoc-dead-letters.json, counted on the health file and warned on by the doctor."
+    "note": "Built 2026-11-16 (CORE 39da894): reports A.C.O.R.N refuses with 400, 413, 415 or 422 are kept in aisoc-dead-letters.json, counted on the health file and warned on by the doctor.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ci-22",
@@ -558,14 +663,17 @@
     "area": "Round 7: CORE improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16 (CORE 30b2490): an action result A.C.O.R.N did not get after three tries is kept in aisoc-action-results.json and sent again next round by the action id; the action is never run again (A.C.O.R.N already hands an action over once)."
+    "note": "Built 2026-11-16 (CORE 30b2490): an action result A.C.O.R.N did not get after three tries is kept in aisoc-action-results.json and sent again next round by the action id; the action is never run again (A.C.O.R.N already hands an action over once).",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ci-23",
     "title": "Every sweep command-line entry accepts --dry-run",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-24",
@@ -573,7 +681,9 @@
     "area": "Round 7: CORE improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16 (CORE): no scheduled sweep begins in the first two minutes after CORE starts (each tool also keeps its own offset of up to four minutes)."
+    "note": "Built 2026-11-16 (CORE): no scheduled sweep begins in the first two minutes after CORE starts (each tool also keeps its own offset of up to four minutes).",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ci-25",
@@ -581,14 +691,17 @@
     "area": "Round 7: CORE improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16 (CORE 1e73fad): hourly memory samples in the health file; the doctor warns when memory climbs steadily for six hours."
+    "note": "Built 2026-11-16 (CORE 1e73fad): hourly memory samples in the health file; the doctor warns when memory climbs steadily for six hours.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ci-26",
     "title": "List the modules whose Windows-only paths have no path.win32 test, then add them",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-27",
@@ -596,7 +709,8 @@
     "area": "Round 7: CORE improvement",
     "status": "in_progress",
     "needs": "claude",
-    "note": "2026-11-16 (CORE 59f001f): the tool sweeps now count dropped licence counts, vulnerability and application lists and say so in the pass line. Other sweeps (CIPP, sign-ins, Huntress) still have silent catch blocks."
+    "note": "2026-11-16 (CORE 59f001f): the tool sweeps now count dropped licence counts, vulnerability and application lists and say so in the pass line. Other sweeps (CIPP, sign-ins, Huntress) still have silent catch blocks.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-28",
@@ -605,7 +719,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit",
-    "note": "CORE doctor: node and pnpm version checks"
+    "note": "CORE doctor: node and pnpm version checks",
+    "added": "2026-11-14",
+    "completed": "2026-11-15"
   },
   {
     "key": "r7-ci-29",
@@ -614,28 +730,36 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit",
-    "note": "CORE doctor: agent port and docker engine checks"
+    "note": "CORE doctor: agent port and docker engine checks",
+    "added": "2026-11-14",
+    "completed": "2026-11-15"
   },
   {
     "key": "r7-ci-30",
     "title": "A module dependency graph doc and a test that fails on an import cycle",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-31",
     "title": "The heartbeat carries commit, uptime and sweep count; A.C.O.R.N shows them",
     "area": "Round 7: CORE improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "CORE and AiSOC 2026-11-18",
+    "note": "2026-11-18: CORE adds core {commit, uptime_seconds, sweeps} to its status report; A.C.O.R.N keeps it 20 minutes in Redis (core_heartbeat) and Platform health shows it. Sweeps are feed passes since start.",
+    "added": "2026-11-14",
+    "completed": "2026-11-18"
   },
   {
     "key": "r7-ci-32",
     "title": "A test that every shell command call site is on a reviewed allowlist",
     "area": "Round 7: CORE improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-33",
@@ -643,7 +767,8 @@
     "area": "Round 7: CORE improvement",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-34",
@@ -651,7 +776,9 @@
     "area": "Round 7: CORE improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16 (CORE 6a07a7c): a failing sweep is filed as auth, rate, shape, network, server or other in the health file and the doctor report."
+    "note": "Built 2026-11-16 (CORE 6a07a7c): a failing sweep is filed as auth, rate, shape, network, server or other in the health file and the doctor report.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ci-35",
@@ -659,7 +786,9 @@
     "area": "Round 7: CORE improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16 (CORE 6a07a7c): the health file keeps when each tool last finished well; the doctor report says how many hours ago."
+    "note": "Built 2026-11-16 (CORE 6a07a7c): the health file keeps when each tool last finished well; the doctor report says how many hours ago.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ci-36",
@@ -667,7 +796,8 @@
     "area": "Round 7: CORE improvement",
     "status": "new",
     "needs": "hal",
-    "note": "Needs you to do or provide something."
+    "note": "Needs you to do or provide something.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-37",
@@ -675,7 +805,8 @@
     "area": "Round 7: CORE improvement",
     "status": "new",
     "needs": "hal",
-    "note": "Needs you to do or provide something."
+    "note": "Needs you to do or provide something.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-38",
@@ -683,7 +814,8 @@
     "area": "Round 7: CORE improvement",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ci-39",
@@ -692,7 +824,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit",
-    "note": "CORE: log scrubbing table covers labelled and unlabelled key shapes; clock skew per host (A.C.O.R.N included) already on the health report; case-clash test"
+    "note": "CORE: log scrubbing table covers labelled and unlabelled key shapes; clock skew per host (A.C.O.R.N included) already on the health report; case-clash test",
+    "added": "2026-11-14",
+    "completed": "2026-11-15"
   },
   {
     "key": "r7-ci-40",
@@ -701,14 +835,17 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit",
-    "note": "CORE e624527 and 7c430bc"
+    "note": "CORE e624527 and 7c430bc",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "r7-ai-01",
     "title": "Say license in every text the API and CORE produce, not only in the console",
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ai-02",
@@ -716,7 +853,8 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
     "needs": "claude",
-    "note": "2026-11-16 looked at, not done: the devices list does not run a per-page query that a plan test could judge. It loads every device of the scope into memory (with a cache) and filters and pages in Python, so a query-plan test would only show an ordinary tenant index scan. The real cost is that load; fixing it means moving the filters into SQL, which is a design change for Hal to approve."
+    "note": "2026-11-16 looked at, not done: the devices list does not run a per-page query that a plan test could judge. It loads every device of the scope into memory (with a cache) and filters and pages in Python, so a query-plan test would only show an ordinary tenant index scan. The real cost is that load; fixing it means moving the filters into SQL, which is a design change for Hal to approve.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ai-03",
@@ -724,7 +862,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Page size covered 2026-11-16: services/api/tests/test_list_endpoints_cap_page_size.py reads the API schema and fails on any list endpoint without a page-size maximum or one above 10000. The response-size half is not tested."
+    "note": "Page size covered 2026-11-16: services/api/tests/test_list_endpoints_cap_page_size.py reads the API schema and fails on any list endpoint without a page-size maximum or one above 10000. The response-size half is not tested.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-04",
@@ -733,7 +873,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 83d3072d",
-    "note": "2026-11-16: ETag and If-None-Match on /client-posture/fleet/summary and /fleet/boards/{board}; the answer is still worked out each time, so it saves what is sent and drawn, not the database work."
+    "note": "2026-11-16: ETag and If-None-Match on /client-posture/fleet/summary and /fleet/boards/{board}; the answer is still worked out each time, so it saves what is sent and drawn, not the database work.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-05",
@@ -741,7 +883,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Devices, Alerts and Cases show placeholder rows while the first answer loads."
+    "note": "Devices, Alerts and Cases show placeholder rows while the first answer loads.",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "r7-ai-06",
@@ -749,7 +893,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16: the ? key opens a list of the keyboard shortcuts that exist (Ctrl or Cmd K, ?, Esc) from anywhere that is not a text box."
+    "note": "Built 2026-11-16: the ? key opens a list of the keyboard shortcuts that exist (Ctrl or Cmd K, ?, Esc) from anywhere that is not a text box.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-07",
@@ -757,7 +903,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Devices writes its filters into the address; Alerts has Copy link (a date range or assignee cannot be carried in an address, so Alerts does not rewrite the address itself)."
+    "note": "Devices writes its filters into the address; Alerts has Copy link (a date range or assignee cannot be carried in an address, so Alerts does not rewrite the address itself).",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "r7-ai-08",
@@ -765,7 +913,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "r7-ai-09",
@@ -773,7 +923,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "r7-ai-10",
@@ -781,14 +933,17 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "r7-ai-11",
     "title": "Record the automated control tests nightly when a setting turns it on",
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ai-12",
@@ -797,7 +952,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "this commit",
-    "note": "Four more tests (email domain protection, certificates and domains, network equipment, device health): fourteen in all."
+    "note": "Four more tests (email domain protection, certificates and domains, network equipment, device health): fourteen in all.",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "r7-ai-13",
@@ -805,7 +962,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-18 from the stored reports (no new table): new-sender alert and a week-by-week history in each sender's detail."
+    "note": "Built 2026-11-18 from the stored reports (no new table): new-sender alert and a week-by-week history in each sender's detail.",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "r7-ai-14",
@@ -814,7 +973,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 2a3a12b9",
-    "note": "2026-11-16: DMARC detail lists the five failing senders to fix first plus the next policy step. Built from the failing sources (From domain and return path), not from the per-cause counts."
+    "note": "2026-11-16: DMARC detail lists the five failing senders to fix first plus the next policy step. Built from the failing sources (From domain and return path), not from the per-cause counts.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-15",
@@ -823,7 +984,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 807a47ad",
-    "note": "2026-11-16: src/test/pages.a11y.test.tsx runs axe label/role rules over all 127 pages (API down state) and found 12 unlabelled controls on 11 pages, now fixed. Contrast is r7-ai-16, not done."
+    "note": "2026-11-16: src/test/pages.a11y.test.tsx runs axe label/role rules over all 127 pages (API down state) and found 12 unlabelled controls on 11 pages, now fixed. Contrast is r7-ai-16, not done.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-16",
@@ -832,7 +995,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 55eb4870",
-    "note": "2026-11-16: scripts/check_contrast.py (and a pytest that fails if a pair drops under 4.5:1, 3:1 for subtle text). Light fg-muted and fg-subtle darkened slightly: they were 4.2 and 2.3 to 2.6."
+    "note": "2026-11-16: scripts/check_contrast.py (and a pytest that fails if a pair drops under 4.5:1, 3:1 for subtle text). Light fg-muted and fg-subtle darkened slightly: they were 4.2 and 2.3 to 2.6.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-17",
@@ -840,7 +1005,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Cards below the medium breakpoint; labels tested, the layout itself not looked at on a phone."
+    "note": "Cards below the medium breakpoint; labels tested, the layout itself not looked at on a phone.",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "r7-ai-18",
@@ -849,7 +1016,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 55dd9fec",
-    "note": "2026-11-16: In the guide results under the Settings search box."
+    "note": "2026-11-16: In the guide results under the Settings search box.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-19",
@@ -858,7 +1027,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 8cc2846a",
-    "note": "2026-11-16: Settings, Help, What's new built from the guide's dated new tags."
+    "note": "2026-11-16: Settings, Help, What's new built from the guide's dated new tags.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-20",
@@ -867,7 +1038,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "already in AiSOC",
-    "note": "2026-11-16: found already built: the bulk close and bulk assign bars both keep an Undo strip for ten minutes (tested in BulkCloseBar and BulkAssignBar tests). Bulk ticket creation and bulk scripts cannot be undone, so they have none."
+    "note": "2026-11-16: found already built: the bulk close and bulk assign bars both keep an Undo strip for ten minutes (tested in BulkCloseBar and BulkAssignBar tests). Bulk ticket creation and bulk scripts cannot be undone, so they have none.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-21",
@@ -875,7 +1048,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16: the Platform health request-limit line lists the five busiest callers in the last minute with their share of the limit (hashed key or address, never a token)."
+    "note": "Built 2026-11-16: the Platform health request-limit line lists the five busiest callers in the last minute with their share of the limit (hashed key or address, never a token).",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-22",
@@ -883,7 +1058,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Already built: the retention sweeper (services/api/app/workers/retention_sweeper.py) deletes old check status changes, count changes and score history (opt-in window); core_sweep_runs holds only the latest pass per source so it does not grow. Checked 2026-11-16."
+    "note": "Already built: the retention sweeper (services/api/app/workers/retention_sweeper.py) deletes old check status changes, count changes and score history (opt-in window); core_sweep_runs holds only the latest pass per source so it does not grow. Checked 2026-11-16.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-23",
@@ -891,7 +1068,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16: all 23 compliance request bodies carry an example in the API document (app/core/openapi_examples.py); a test validates each against the route own model and fails on a compliance body with none."
+    "note": "Built 2026-11-16: all 23 compliance request bodies carry an example in the API document (app/core/openapi_examples.py); a test validates each against the route own model and fails on a compliance body with none.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-24",
@@ -900,7 +1079,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 3546040a",
-    "note": "2026-11-16: src/test/pages.smoke.test.tsx renders every page.tsx with every API call failing (503); all pass. It does not render with real data."
+    "note": "2026-11-16: src/test/pages.smoke.test.tsx renders every page.tsx with every API call failing (503); all pass. It does not render with real data.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-25",
@@ -908,7 +1089,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "r7-ai-26",
@@ -917,7 +1100,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 98a49ff1",
-    "note": "2026-11-18: risk_register_links (migration 217); link a risk to a control (checked against its framework catalog) or one of the client vendors; shown, added and removed in the risk detail."
+    "note": "2026-11-18: risk_register_links (migration 217); link a risk to a control (checked against its framework catalog) or one of the client vendors; shown, added and removed in the risk detail.",
+    "added": "2026-11-14",
+    "completed": "2026-11-18"
   },
   {
     "key": "r7-ai-27",
@@ -925,7 +1110,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-17: Policies, Acceptance on each policy (who accepted the newest version, who has not, older-version acceptances shown, record one or paste several). Migration 205; tests pure + Postgres."
+    "note": "Built 2026-11-17: Policies, Acceptance on each policy (who accepted the newest version, who has not, older-version acceptances shown, record one or paste several). Migration 205; tests pure + Postgres.",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "r7-ai-28",
@@ -933,7 +1120,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-17: per-system repeat (default 90 days), hourly worker starts due reviews, name Qn YYYY, due +30 days; migration 206."
+    "note": "Built 2026-11-17: per-system repeat (default 90 days), hourly worker starts due reviews, name Qn YYYY, due +30 days; migration 206.",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "r7-ai-29",
@@ -941,7 +1130,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16: a questionnaire can start from a CSV file (the Question column, or the first column); the page has a file picker and the API takes format csv."
+    "note": "Built 2026-11-16: a questionnaire can start from a CSV file (the Question column, or the first column); the page has a file picker and the API takes format csv.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-30",
@@ -949,7 +1140,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16: the Trust center has Print or save as PDF; the editor and page heading stay off the paper so only what a customer sees is printed."
+    "note": "Built 2026-11-16: the Trust center has Print or save as PDF; the editor and page heading stay off the paper so only what a customer sees is printed.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-31",
@@ -958,7 +1151,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC b301c901",
-    "note": "2026-11-16: Add the usual requests button on an open audit; six framework lists, skips requests already present."
+    "note": "2026-11-16: Add the usual requests button on an open audit; six framework lists, skips requests already present.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-32",
@@ -966,7 +1161,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16: the Controls page has Add evidence on each control (kind and summary); it is saved as pending through the existing evidence route."
+    "note": "Built 2026-11-16: the Controls page has Add evidence on each control (kind and summary); it is saved as pending through the existing evidence route.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-33",
@@ -974,7 +1171,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-16 (migration 197): each control can have an owner, named on the Controls page, searchable, in the CSV export; tested on a real Postgres including that another client sees none."
+    "note": "Built 2026-11-16 (migration 197): each control can have an owner, named on the Controls page, searchable, in the CSV export; tested on a real Postgres including that another client sees none.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-34",
@@ -982,7 +1181,8 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ai-35",
@@ -990,7 +1190,8 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ai-36",
@@ -998,7 +1199,8 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
     "needs": "hal",
-    "note": "Needs you to do or provide something."
+    "note": "Needs you to do or provide something.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-ai-37",
@@ -1006,7 +1208,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-18: one weekly notice (e-mail list and an https web address with the same list as JSON); not yet seen sending against the real mailer."
+    "note": "Built 2026-11-18: one weekly notice (e-mail list and an https web address with the same list as JSON); not yet seen sending against the real mailer.",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "r7-ai-38",
@@ -1015,7 +1219,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 0d10c056",
-    "note": "2026-11-16: note above the Devices tiles; suggests only, never ticks. Uses the computer count and the per-tool missing counts of the Devices summary."
+    "note": "2026-11-16: note above the Devices tiles; suggests only, never ticks. Uses the computer count and the per-tool missing counts of the Devices summary.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-ai-39",
@@ -1023,7 +1229,9 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "this commit"
+    "completed_ref": "this commit",
+    "added": "2026-11-14",
+    "completed": "2026-11-14"
   },
   {
     "key": "r7-ai-40",
@@ -1031,21 +1239,24 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-01",
     "title": "A weekly report of every device whose Huntress organization differs from its NinjaOne client, sent to A.C.O.R.N",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-02",
     "title": "Deploy NinjaOne: remember the last organization, location and role chosen",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-03",
@@ -1053,56 +1264,64 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "hal",
-    "note": "Needs you to do or provide something."
+    "note": "Needs you to do or provide something.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-04",
     "title": "Send a ScreenConnect command to several machines at once with each answer listed",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-05",
     "title": "Saved ScreenConnect commands (reboot, flush DNS, gpupdate) with a confirm step",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-06",
     "title": "A Huntress agent report: version spread and agents more than two releases old",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-07",
     "title": "A NinjaOne report of machines with no recent patch scan",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-08",
     "title": "CIPP: list guest users older than a year for each client",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-09",
     "title": "CIPP: list shared mailboxes with a sign-in enabled",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-10",
     "title": "CIPP: list mailboxes with a forwarding rule to an outside address (extend the existing check to a list)",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-11",
@@ -1110,42 +1329,48 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-12",
     "title": "Auvik: report switches and firewalls with a firmware older than the vendor's current",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-13",
     "title": "Meraki: list SSIDs with no encryption and clients that use them",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-14",
     "title": "UniFi: report devices offline for more than a week",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-15",
     "title": "ThreatMate: weekly change report (new exposed services and vulnerabilities)",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-16",
     "title": "IT Glue: find clients with no documented backup or no network diagram",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-17",
@@ -1153,7 +1378,8 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-18",
@@ -1161,7 +1387,8 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-19",
@@ -1169,35 +1396,40 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-20",
     "title": "A daily CORE self-report: what ran, what failed, what changed",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-21",
     "title": "A Cipher job that drafts the weekly client review paragraph from the data",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-22",
     "title": "A Jax job that lists integrations whose last read is older than a day",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-23",
     "title": "A Vera job that checks every client has a Halo contact for security notices",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-24",
@@ -1205,7 +1437,8 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "claude",
-    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data."
+    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-25",
@@ -1213,7 +1446,8 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "claude",
-    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data."
+    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-26",
@@ -1221,7 +1455,8 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "claude",
-    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data."
+    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-27",
@@ -1229,7 +1464,8 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "claude",
-    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data."
+    "note": "2026-11-16 NEEDS-HUMAN: the skill needs a read tool for this A.C.O.R.N compliance data (questionnaires and answer library, access reviews, vendors, control tests). Agents have no compliance tools today, and a new read tool means widening what CORE's key and the agent surface may read (acorn-read-tools.ts and test_cipher_tool_contract.py). Hal to decide whether agents may read compliance data.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-28",
@@ -1237,14 +1473,16 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-29",
     "title": "Windows: a tray menu entry showing sweep status and the last update",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-30",
@@ -1252,14 +1490,16 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-31",
     "title": "A local read-only page listing the connectors and when each last read",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-32",
@@ -1268,35 +1508,41 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "CORE 8d08e72",
-    "note": "2026-11-16: node scripts/jobs.mjs --csv exports the per-tool job health (result, duration, last ok, line) as CSV. Not a button in A.C.O.R.N."
+    "note": "2026-11-16: node scripts/jobs.mjs --csv exports the per-tool job health (result, duration, last ok, line) as CSV. Not a button in A.C.O.R.N.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-cf-33",
     "title": "Offline mode: queue feed posts while A.C.O.R.N is unreachable and send them in order",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-34",
     "title": "A command to replay one sweep for one client for debugging",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-35",
     "title": "A command that prints what CORE would send for one client without sending it",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-36",
     "title": "Support bundle: a zip of logs and settings names with secrets masked",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-37",
@@ -1304,7 +1550,8 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-38",
@@ -1312,7 +1559,8 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "hal",
-    "note": "Needs you to do or provide something."
+    "note": "Needs you to do or provide something.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-39",
@@ -1320,7 +1568,8 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "hal",
-    "note": "Needs you to do or provide something."
+    "note": "Needs you to do or provide something.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-cf-40",
@@ -1328,7 +1577,8 @@
     "area": "Round 7: CORE feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-01",
@@ -1337,7 +1587,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 4ab40148",
-    "note": "2026-11-16: Compliance > Calendar. Covers policy/vendor reviews, scheduled items, open access reviews and audit period ends. Contracts are not included (no due date in the contract data)."
+    "note": "2026-11-16: Compliance > Calendar. Covers policy/vendor reviews, scheduled items, open access reviews and audit period ends. Contracts are not included (no due date in the contract data).",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-02",
@@ -1346,7 +1598,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 27f64bd9",
-    "note": "2026-11-16: print button and a print-only title on the Compliance overview; uses the browser's print to PDF and the existing print style. Not a server-made PDF file."
+    "note": "2026-11-16: print button and a print-only title on the Compliance overview; uses the browser's print to PDF and the existing print style. Not a server-made PDF file.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-03",
@@ -1355,7 +1609,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 33293151",
-    "note": "2026-11-16: Controls page Gap report with per-framework counts and a CSV of controls with neither evidence nor owner."
+    "note": "2026-11-16: Controls page Gap report with per-framework counts and a CSV of controls with neither evidence nor owner.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-04",
@@ -1364,7 +1620,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 6ac859f9",
-    "note": "2026-11-18: 25 topics mapped to controls in all six frameworks (compliance_crosswalk.py, every id checked against the catalog); each control lists the others it shares a topic with. Per control only: no framework-by-framework overlap table."
+    "note": "2026-11-18: 25 topics mapped to controls in all six frameworks (compliance_crosswalk.py, every id checked against the catalog); each control lists the others it shares a topic with. Per control only: no framework-by-framework overlap table.",
+    "added": "2026-11-14",
+    "completed": "2026-11-18"
   },
   {
     "key": "r7-af-05",
@@ -1373,7 +1631,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 2b1a1fc9",
-    "note": "2026-11-16: Evidence reminders by owner under the Controls list, with a copyable message per owner. It does not send them (no email or chat is wired)."
+    "note": "2026-11-16: Evidence reminders by owner under the Controls list, with a copyable message per owner. It does not send them (no email or chat is wired).",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-06",
@@ -1381,7 +1641,8 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-07",
@@ -1390,7 +1651,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 43089547",
-    "note": "2026-11-16: annual_spend on vendors (migration 201), spend total and by category on the Vendors dashboard, card, CSV and history. Dollars only."
+    "note": "2026-11-16: annual_spend on vendors (migration 201), spend total and by category on the Vendors dashboard, card, CSV and history. Dollars only.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-08",
@@ -1399,7 +1662,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 4a0c9a98",
-    "note": "2026-11-16: My vendors box on the Vendors register, matching owner text to the signed-in person's e-mail, name or username. Not a separate shared view."
+    "note": "2026-11-16: My vendors box on the Vendors register, matching owner text to the signed-in person's e-mail, name or username. Not a separate shared view.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-09",
@@ -1408,7 +1673,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 8a35d9f6",
-    "note": "2026-11-18: risk_register_levels (migration 216) keeps each risk's levels with a date; GET /risk-register/heatmap and a grid with month-end trend on the dashboard. History before 2026-11-18 is only the baseline row."
+    "note": "2026-11-18: risk_register_levels (migration 216) keeps each risk's levels with a date; GET /risk-register/heatmap and a grid with month-end trend on the dashboard. History before 2026-11-18 is only the baseline row.",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "r7-af-10",
@@ -1417,7 +1684,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 4e668406",
-    "note": "2026-11-16: accepted_until on risks (migration 202) with an action item on the Compliance overview as the reminder. No email reminder."
+    "note": "2026-11-16: accepted_until on risks (migration 202) with an action item on the Compliance overview as the reminder. No email reminder.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-11",
@@ -1426,14 +1695,18 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 93d90065",
-    "note": "2026-11-16: line diff between a policy version and the one before it, in the Versions list."
+    "note": "2026-11-16: line diff between a policy version and the one before it, in the Versions list.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-12",
     "title": "Policies: a review workflow with an approver and an approval record",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "completed",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "r7-af-13",
@@ -1441,21 +1714,25 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-14",
     "title": "Personnel: a people list with onboarding and offboarding checklists",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "completed",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "r7-af-15",
     "title": "Personnel: training completion from Huntress awareness training",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-16",
@@ -1463,7 +1740,8 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-17",
@@ -1471,7 +1749,8 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-18",
@@ -1479,7 +1758,8 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-19",
@@ -1488,7 +1768,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 5c499c89",
-    "note": "2026-11-16: GET /alerts/{id}/similar and a Similar alerts panel on the alert page; matches on rule, exact title, shared host, user or address (case differences in the shared names are only caught after the database match, which is case-sensitive)."
+    "note": "2026-11-16: GET /alerts/{id}/similar and a Similar alerts panel on the alert page; matches on rule, exact title, shared host, user or address (case differences in the shared names are only caught after the database match, which is case-sensitive).",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-20",
@@ -1497,7 +1779,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 711207dd",
-    "note": "2026-11-16: add_note also writes a case_timeline entry (alert_note) when the alert is in a case; earlier notes are not back-filled."
+    "note": "2026-11-16: add_note also writes a case_timeline entry (alert_note) when the alert is in a case; earlier notes are not back-filled.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-21",
@@ -1506,14 +1790,17 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 1f6395a9",
-    "note": "2026-11-16: GET /alerts/noise and a Noisy rules panel on Client Posture. Quiet = false positive, closed without a ticket, hidden or stale."
+    "note": "2026-11-16: GET /alerts/noise and a Noisy rules panel on Client Posture. Quiet = false positive, closed without a ticket, hidden or stale.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-22",
     "title": "Devices: a lifecycle view (age by purchase date, warranty, replacement plan)",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-23",
@@ -1522,7 +1809,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 1e6f21ad",
-    "note": "2026-11-16: saved_views.shared (migration 203); the list returns own plus shared views, a default stays personal, only the owner can change or delete."
+    "note": "2026-11-16: saved_views.shared (migration 203); the list returns own plus shared views, a default stays personal, only the owner can change or delete.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-24",
@@ -1531,14 +1820,17 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC ec9a94ad",
-    "note": "2026-11-16: /devices/print?client= and a Print inventory link on Devices when a client is chosen. Not checked on a real printer."
+    "note": "2026-11-16: /devices/print?client= and a Print inventory link on Devices when a client is chosen. Not checked on a real printer.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-25",
     "title": "Identities: a joiner and leaver report from the directory",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-26",
@@ -1547,7 +1839,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC fe9d40fd",
-    "note": "2026-11-16: Download administrators (CSV) on the Identities page when the Administrators tile is on."
+    "note": "2026-11-16: Download administrators (CSV) on the Identities page when the Administrators tile is on.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-27",
@@ -1556,7 +1850,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 2a3a12b9",
-    "note": "2026-11-16: DMARC detail panel builds the recommended TXT line (next policy step, pct, rua) with a Copy button."
+    "note": "2026-11-16: DMARC detail panel builds the recommended TXT line (next policy step, pct, rua) with a Copy button.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-28",
@@ -1564,7 +1860,9 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-18 from the stored reports (no new table): new-sender alert and a week-by-week history in each sender's detail."
+    "note": "Built 2026-11-18 from the stored reports (no new table): new-sender alert and a week-by-week history in each sender's detail.",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "r7-af-29",
@@ -1573,7 +1871,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 43970fdb",
-    "note": "2026-11-16: line chart of the daily score on Client Posture. Not a table of the earlier scorecard, and no target line."
+    "note": "2026-11-16: line chart of the daily score on Client Posture. Not a table of the earlier scorecard, and no target line.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-30",
@@ -1582,21 +1882,25 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 8ac136e7",
-    "note": "2026-11-16: median line and Vs median column on Fleet Posture, from the clients' current scores. Not a per-client page, and no history."
+    "note": "2026-11-16: median line and Vs median column on Fleet Posture, from the clients' current scores. Not a per-client page, and no history.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-31",
     "title": "Reports: a quarterly business review pack per client",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-32",
     "title": "Reports: schedule any report by email",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-33",
@@ -1605,7 +1909,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC dcddcbe7",
-    "note": "2026-11-16: the search box now also finds vendors and controls; vendor opens the vendors page, control opens Controls narrowed. Alerts, devices, people and the rest were already covered."
+    "note": "2026-11-16: the search box now also finds vendors and controls; vendor opens the vendors page, control opens Controls narrowed. Alerts, devices, people and the rest were already covered.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-34",
@@ -1613,7 +1919,8 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-35",
@@ -1621,7 +1928,8 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-36",
@@ -1630,7 +1938,9 @@
     "status": "completed",
     "needs": "claude",
     "completed_ref": "AiSOC 8d3d6177",
-    "note": "2026-11-16: announcements table (migration 204), GET/POST/DELETE /announcements (read: alerts:read, post and remove: settings_workspace:manage), banner in the app shell and a Settings, Announcements page."
+    "note": "2026-11-16: announcements table (migration 204), GET/POST/DELETE /announcements (read: alerts:read, post and remove: settings_workspace:manage), banner in the app shell and a Settings, Announcements page.",
+    "added": "2026-11-14",
+    "completed": "2026-11-16"
   },
   {
     "key": "r7-af-37",
@@ -1638,14 +1948,16 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Needs your decision before it is built."
+    "note": "Needs your decision before it is built.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-38",
     "title": "Billing: a margin forecast from the license counts",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "claude"
+    "needs": "claude",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-39",
@@ -1653,7 +1965,8 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
     "needs": "hal",
-    "note": "Needs you to do or provide something."
+    "note": "Needs you to do or provide something.",
+    "added": "2026-11-14"
   },
   {
     "key": "r7-af-40",
@@ -1661,7 +1974,9 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-18: one weekly notice (e-mail list and an https web address with the same list as JSON); not yet seen sending against the real mailer."
+    "note": "Built 2026-11-18: one weekly notice (e-mail list and an https web address with the same list as JSON); not yet seen sending against the real mailer.",
+    "added": "2026-11-14",
+    "completed": "2026-11-17"
   },
   {
     "key": "inky-link",
@@ -1671,7 +1986,9 @@
     "needs": "claude",
     "completed_ref": "5749ef77, 92a3c732",
     "note": "Read live 2026-11-15: 73 teams, usage, statistics all answer",
-    "detail": "INKY is mapped per client with mailbox counts, two checks (active, mail flow), an alert, the email-protection control test, and an INKY badge on each person whose mailbox it scans (never creates a person)."
+    "detail": "INKY is mapped per client with mailbox counts, two checks (active, mail flow), an alert, the email-protection control test, and an INKY badge on each person whose mailbox it scans (never creates a person).",
+    "added": "2026-11-15",
+    "completed": "2026-11-15"
   },
   {
     "status": "in_progress",
@@ -1680,7 +1997,8 @@
     "key": "rw-profitability",
     "title": "Sales and Finance > Profitability and Net income: client profit by month from Halo, typed or QuickBooks costs, and the finance workbook's other sheets",
     "detail": "Built: Profitability (Halo revenue, hours, labor at a rate per agent, team or default 65.00, what is left after labor) and Net income with six tabs: revenue to net income per client (direct labor, payroll true-up, add-on and support software, travel, equipment, hardware, sales and marketing split across new clients, overhead), new clients, by industry, hours and utilization, a twelve-month ranking with size tiers and the 20% target, and an Inputs tab for the costs, the client master and available hours. Costs are typed until QuickBooks is connected; a missing cost counts as zero and is named. Still to add: the QuickBooks sync that fills the cost lines, and spreading by monthly recurring revenue instead of invoiced revenue.",
-    "note": "24 months, every ticket behind the hours, sortable columns and Settings > Finance (burdened rates) built 2026-11-18. Still to do: add-on software per client from license counts, and client master and burdened rates from the workbook's tabs."
+    "note": "24 months, every ticket behind the hours, sortable columns and Settings > Finance (burdened rates) built 2026-11-18. Still to do: add-on software per client from license counts, and client master and burdened rates from the workbook's tabs.",
+    "added": "2026-11-15"
   },
   {
     "status": "in_progress",
@@ -1689,7 +2007,8 @@
     "key": "rw-metrics",
     "title": "Metrics dashboards (from Rewst): tickets, staff, finance and customer-insight pages",
     "detail": "Built: all 13 pages of the Rewst metric dashboards plus Client summary in A.C.O.R.N, and CORE's daily collectors that fill them (weekly staff facts, weekly ticket facts with stale tickets, invoice lines, Microsoft 365 roles, and Dialpad calls per engineer per week) into A.C.O.R.N's own database. CORE's read-only Dialpad connector (2026-11-15) fills the DialPad page and the scorecard's Calls Made and Call Time. Still to build: time off so days off and holidays are real.",
-    "note": "NOT VERIFIED against the live HaloPSA: Hal to check the pages once CORE's first daily read has run (about 40 minutes after the CORE restart plus the read time) and tell me which numbers look wrong. The Dialpad connector is NOT VERIFIED against a live Dialpad: its CSV column names could not be read from Dialpad's docs, so the first export may name a column CORE does not know (the CORE feed log says which and lists the columns); Hal adds the Dialpad API key (and the triage call center id) in CORE first. Utilization is billable hours over eight-hour days (Rewst's formula is unknown); survey scores are positive 5, neutral 3, negative 1."
+    "note": "NOT VERIFIED against the live HaloPSA: Hal to check the pages once CORE's first daily read has run (about 40 minutes after the CORE restart plus the read time) and tell me which numbers look wrong. The Dialpad connector is NOT VERIFIED against a live Dialpad: its CSV column names could not be read from Dialpad's docs, so the first export may name a column CORE does not know (the CORE feed log says which and lists the columns); Hal adds the Dialpad API key (and the triage call center id) in CORE first. Utilization is billable hours over eight-hour days (Rewst's formula is unknown); survey scores are positive 5, neutral 3, negative 1.",
+    "added": "2026-11-15"
   },
   {
     "status": "in_progress",
@@ -1698,7 +2017,8 @@
     "key": "rw-customer-dashboard",
     "title": "Customer-facing dashboard (from Rewst End User Dashboard): summary, labor hours, customer satisfaction per client",
     "detail": "Built the staff-side version: Metrics > Client summary (tickets, hours and satisfaction for one client on a printable page). Built the client sign-in (Hal's decision 2026-11-15): the built-in client_viewer role on a user of the client's own tenant, an authenticator app required before anything shows, and /client-portal showing only that company's tickets, hours and satisfaction (the company comes from the HaloPSA link in client_aliases, never from the request). Every other API route refuses that role. Staff create, reset and turn off the sign-ins in Settings > Workspace, Client dashboard sign-ins.",
-    "note": "NOT VERIFIED live: Hal to create one client sign-in for a client linked to HaloPSA, sign in with it, set up the authenticator app and check the numbers match that client's Metrics > Client summary. Reset of a lost second step needs the staff button; no email invite yet (the temporary password is handed over by staff)."
+    "note": "NOT VERIFIED live: Hal to create one client sign-in for a client linked to HaloPSA, sign in with it, set up the authenticator app and check the numbers match that client's Metrics > Client summary. Reset of a lost second step needs the staff button; no email invite yet (the temporary password is handed over by staff).",
+    "added": "2026-11-15"
   },
   {
     "status": "in_progress",
@@ -1707,7 +2027,8 @@
     "key": "rw-billing-sync",
     "title": "SaaS billing sync (from Rewst saas-billing): approve license-count differences and push them to HaloPSA",
     "detail": "Built: Sales and Finance > Billing sync (differences list, filters, Approve, Approve selected, Hide, Show hidden, Refresh) and the built-in Billing role (Viewer reads plus billing:push, no second approval). CORE's halo_billing_update sets the client's recurring invoice line to the counted quantity with read-before-write checks and a read-back that restores the lines if Halo did not end up as expected.",
-    "note": "NOT VERIFIED against the live HaloPSA: Hal to give someone the Billing role and watch the first approval in Halo (the quantity, and that the other lines stayed)."
+    "note": "NOT VERIFIED against the live HaloPSA: Hal to give someone the Billing role and watch the first approval in Halo (the quantity, and that the other lines stayed).",
+    "added": "2026-11-15"
   },
   {
     "status": "not_started",
@@ -1715,7 +2036,8 @@
     "area": "Security",
     "key": "rw-toolbox",
     "title": "Employee toolbox (from Rewst Tool Portal): client picker and Microsoft 365 action tiles",
-    "detail": "User management (group membership, OneDrive permissions, attributes, onboarding, offboarding), password and security (change password, compromised user remediation, reset MFA), mail and permissions (out of office, mailbox permissions, forwarding, shared mailbox, litigation hold, calendar permissions), scheduled workflows. A launcher over A.C.O.R.N CIPP actions with the existing approval path."
+    "detail": "User management (group membership, OneDrive permissions, attributes, onboarding, offboarding), password and security (change password, compromised user remediation, reset MFA), mail and permissions (out of office, mailbox permissions, forwarding, shared mailbox, litigation hold, calendar permissions), scheduled workflows. A launcher over A.C.O.R.N CIPP actions with the existing approval path.",
+    "added": "2026-11-15"
   },
   {
     "status": "completed",
@@ -1724,7 +2046,9 @@
     "key": "qbo-live-check",
     "title": "QuickBooks Online: authorize and test the new connector live",
     "detail": "Create the Intuit app keys, authorize once in the OAuth Playground, save the four settings in CORE, then I read one profit and loss by customer to check the shapes.",
-    "note": "Read live 2026-11-18: 109 cost entries from QuickBooks (read only); September ties to finance's workbook on income, sales and marketing and other income/expenses."
+    "note": "Read live 2026-11-18: 109 cost entries from QuickBooks (read only); September ties to finance's workbook on income, sales and marketing and other income/expenses.",
+    "added": "2026-11-15",
+    "completed": "2026-11-17"
   },
   {
     "status": "in_progress",
@@ -1734,7 +2058,8 @@
     "title": "SimpleSat: customer satisfaction in CORE and A.C.O.R.N, with reviews on each person",
     "detail": "CORE reads SimpleSat (responses with the written comments), sends a daily CSAT summary, maps its companies as clients and its respondents as people with their newest reviews; A.C.O.R.N shows them on Metrics and on the person (Customer reviews). Built from SimpleSat's published API file, NOT yet read against the live account.",
     "note": "Needs Hal: confirm the first daily read works once CORE restarts, and send the SimpleSat logo in a new message so it can be added.",
-    "completed_ref": null
+    "completed_ref": null,
+    "added": "2026-11-15"
   },
   {
     "status": "completed",
@@ -1744,7 +2069,9 @@
     "title": "Secureframe health also written to Live Oak IT Partners so its controls map",
     "detail": "Secureframe control tests, policies and risks are now also stored against the home client so Live Oak's own controls fill in.",
     "note": "",
-    "completed_ref": "9499b2d7"
+    "completed_ref": "9499b2d7",
+    "added": "2026-11-15",
+    "completed": "2026-11-15"
   },
   {
     "status": "completed",
@@ -1754,7 +2081,9 @@
     "title": "Case Investigation tab keeps its earlier run after a refresh; client cases open Attack Chain and Attack Path",
     "detail": "The tab falls back to the durable investigation ledger when the in-memory run is gone, and the attack chain and path routes now accept a client's case.",
     "note": "",
-    "completed_ref": "4146e9f0"
+    "completed_ref": "4146e9f0",
+    "added": "2026-11-15",
+    "completed": "2026-11-15"
   },
   {
     "status": "completed",
@@ -1764,7 +2093,9 @@
     "title": "Frameworks lists only frameworks; Secureframe controls, policies and risks moved to their own pages",
     "detail": "Controls, Policies and Risk Management hold what Secureframe sent; the Frameworks page lists frameworks only.",
     "note": "",
-    "completed_ref": "db53eea1"
+    "completed_ref": "db53eea1",
+    "added": "2026-11-15",
+    "completed": "2026-11-15"
   },
   {
     "status": "completed",
@@ -1774,7 +2105,9 @@
     "title": "Client posture: alerts and update first, What changed shows 10 with More, Data sources moved to Platform health",
     "detail": "Reordered as asked; Data sources now live under Settings > Platform health.",
     "note": "",
-    "completed_ref": "b7458f9f"
+    "completed_ref": "b7458f9f",
+    "added": "2026-11-15",
+    "completed": "2026-11-15"
   },
   {
     "status": "completed",
@@ -1784,7 +2117,9 @@
     "title": "Questionnaires: delete one, and no customer field on a new one",
     "detail": "A questionnaire can be deleted, and a new one no longer asks for a customer name since it is made under the client.",
     "note": "",
-    "completed_ref": "aab2ea89"
+    "completed_ref": "aab2ea89",
+    "added": "2026-11-15",
+    "completed": "2026-11-15"
   },
   {
     "status": "in_progress",
@@ -1794,7 +2129,8 @@
     "title": "Rename AiSOC and Jarvis to A.C.O.R.N and CORE (steps 3 to 6)",
     "detail": "Steps 1 and 2 are done (text and the 251 CORE hud modules). Steps 3 to 6 of docs/RENAME_AUDIT_2026-11-15.md change names other things depend on.",
     "note": "Needs Hal's go-ahead, one step at a time.",
-    "completed_ref": null
+    "completed_ref": null,
+    "added": "2026-11-15"
   },
   {
     "status": "in_progress",
@@ -1804,7 +2140,8 @@
     "title": "NinjaOne warranty dates on devices",
     "detail": "Devices show the warranty end date when NinjaOne's device list carries one, and the maker's own warranty page for Dell and Lenovo from the serial number. Whether NinjaOne's device list really carries a warranty date is not confirmed.",
     "note": "",
-    "completed_ref": null
+    "completed_ref": null,
+    "added": "2026-11-15"
   },
   {
     "status": "completed",
@@ -1814,7 +2151,9 @@
     "title": "QuickBooks sync that fills the Net income cost lines",
     "detail": "Once QuickBooks is authorized (qbo-live-check), a daily read of the P&L by customer fills finance_cost_entries (source quickbooks) for payroll COGS, travel, hardware and overhead; typed entries are never overwritten.",
     "note": "Read live 2026-11-18: 109 cost entries from QuickBooks (read only); September ties to finance's workbook on income, sales and marketing and other income/expenses.",
-    "completed_ref": null
+    "completed_ref": null,
+    "added": "2026-11-15",
+    "completed": "2026-11-17"
   },
   {
     "key": "hal-updates-2026-11-16",
@@ -1822,7 +2161,9 @@
     "area": "Hal requests",
     "status": "completed",
     "needs": "claude",
-    "note": "All seven built 2026-11-16. Tenant name separation is an interpretation (row dividers, shading, a divider after the name); ThreatMate finding fields and per-address alerts are from the published schema, not verified live."
+    "note": "All seven built 2026-11-16. Tenant name separation is an interpretation (row dividers, shading, a divider after the name); ThreatMate finding fields and per-address alerts are from the published schema, not verified live.",
+    "added": "2026-11-16",
+    "completed": "2026-11-16"
   },
   {
     "key": "nav-devices-identities-platform",
@@ -1832,7 +2173,9 @@
     "status": "completed",
     "needs": "claude",
     "note": "2026-11-16: moved, in that order after SLA Tracking; the guide table is updated. Remote tools stays in Threat Operations.",
-    "completed_ref": "AiSOC next commit"
+    "completed_ref": "AiSOC next commit",
+    "added": "2026-11-16",
+    "completed": "2026-11-16"
   },
   {
     "key": "metric-pickers",
@@ -1842,7 +2185,9 @@
     "status": "completed",
     "needs": "claude",
     "note": "2026-11-16: one picker (a button, a search box, Select all, Clear, a scrolling list) used on all three pages.",
-    "completed_ref": "AiSOC next commit"
+    "completed_ref": "AiSOC next commit",
+    "added": "2026-11-16",
+    "completed": "2026-11-16"
   },
   {
     "key": "metrics-client-drilldown",
@@ -1852,7 +2197,8 @@
     "status": "in_progress",
     "needs": "claude",
     "note": "2026-11-16 phase 1 done on Profitability: invoice lines billed and free, recurring lines, hours by person with the rate source. NOT DONE: the tickets behind the hours (CORE does not send ticket-level time yet) and the same click-through on the other client tables (Monthly invoicing, Ticket volume, Client summary). 2026-11-17: CORE now sends the most-worked 15 tickets per client and month (subject, hours, who) and the drill-down lists them with the hours on other tickets; built locally, not live. The click-through on Monthly invoicing, Ticket volume and Client summary is still not built.",
-    "completed_ref": "AiSOC e087c3cd"
+    "completed_ref": "AiSOC e087c3cd",
+    "added": "2026-11-16"
   },
   {
     "key": "metrics-agent-names-and-updates",
@@ -1861,7 +2207,9 @@
     "area": "Metrics",
     "status": "completed",
     "needs": "claude",
-    "note": "2026-11-16: CORE now asks HaloPSA for disabled agents too, names the rest from their tickets (else Former agent N), and reports when actions come back unusable. NOT VERIFIED live: whether the actions then count. 2026-11-17: updates were zero because /api/Actions only answers per ticket; now counted from time entries. Names: read live Halo agent list includes disabled agents."
+    "note": "2026-11-16: CORE now asks HaloPSA for disabled agents too, names the rest from their tickets (else Former agent N), and reports when actions come back unusable. NOT VERIFIED live: whether the actions then count. 2026-11-17: updates were zero because /api/Actions only answers per ticket; now counted from time entries. Names: read live Halo agent list includes disabled agents.",
+    "added": "2026-11-16",
+    "completed": "2026-11-17"
   },
   {
     "key": "metrics-billing-sync-sort-and-parts",
@@ -1871,7 +2219,9 @@
     "status": "completed",
     "needs": "claude",
     "note": "2026-11-16: sortable headers and a per-line breakdown of the counted number. The ThreatMate gap itself is most likely the mapping (a ThreatMate line is suggested against Internal assets at low confidence); Hal to check what those lines are billed on.",
-    "completed_ref": "AiSOC next commit"
+    "completed_ref": "AiSOC next commit",
+    "added": "2026-11-16",
+    "completed": "2026-11-16"
   },
   {
     "key": "metrics-billing-threatmate-basis",
@@ -1880,7 +2230,9 @@
     "area": "Metrics",
     "status": "completed",
     "needs": "claude",
-    "note": "2026-11-17. Other vendors read from Rewst SaaS Billing Count workflows: Inky counts billingSnapshot.childAllocations billableMailboxes split Pro/Advanced (CORE reads usage mailboxes: compare live); Datto SaaS counts User seats split M365/Google; Petra skips paused tenants; Liongard counts systems updated in the last 3 months. Not compared live."
+    "note": "2026-11-17. Other vendors read from Rewst SaaS Billing Count workflows: Inky counts billingSnapshot.childAllocations billableMailboxes split Pro/Advanced (CORE reads usage mailboxes: compare live); Datto SaaS counts User seats split M365/Google; Petra skips paused tenants; Liongard counts systems updated in the last 3 months. Not compared live.",
+    "added": "2026-11-17",
+    "completed": "2026-11-17"
   },
   {
     "key": "policy-assignment-reminders",
@@ -1889,7 +2241,9 @@
     "area": "compliance",
     "status": "completed",
     "needs": "claude",
-    "note": "2026-11-17. Migration 207, routes under /governance/{id}/assignments and /me/policies, an hourly reminder worker (needs the ALERT_EMAIL mail credentials), My policies page and a banner above every page. Client users (a client page of their own) come with the client-facing compliance item."
+    "note": "2026-11-17. Migration 207, routes under /governance/{id}/assignments and /me/policies, an hourly reminder worker (needs the ALERT_EMAIL mail credentials), My policies page and a banner above every page. Client users (a client page of their own) come with the client-facing compliance item.",
+    "added": "2026-11-17",
+    "completed": "2026-11-17"
   },
   {
     "key": "leafy-core-user-lookup",
@@ -1898,7 +2252,9 @@
     "area": "copilot",
     "status": "completed",
     "needs": "claude",
-    "note": "2026-11-17: built and tested locally, NOT yet live (Hal asked to hold updates). A.C.O.R.N: migration 208, user_lookup action, lookup_user tool (identities:bec, 40 an hour, audited). CORE: acorn-user-lookup.ts. The sign-in log is unreadable for some tenants (Texas Advocacy Project answers 500 from Microsoft); the lookup says so. Not exposed to text-written tool calls."
+    "note": "2026-11-17: built and tested locally, NOT yet live (Hal asked to hold updates). A.C.O.R.N: migration 208, user_lookup action, lookup_user tool (identities:bec, 40 an hour, audited). CORE: acorn-user-lookup.ts. The sign-in log is unreadable for some tenants (Texas Advocacy Project answers 500 from Microsoft); the lookup says so. Not exposed to text-written tool calls.",
+    "added": "2026-11-17",
+    "completed": "2026-11-17"
   },
   {
     "key": "metrics-halo-time-fix",
@@ -1907,7 +2263,9 @@
     "area": "finance",
     "status": "completed",
     "needs": "claude",
-    "note": "2026-11-17: cause found live: /api/TimesheetEvent reads start_date and end_date (end exclusive), not startdate/enddate, so every month got the newest days. Fixed in CORE (acorn-halo-time.ts), built and tested locally, NOT live until CORE is updated. September now 4,262 h vs workbook 4,060 (148 of 179 clients within 0.5 h; the rest is time entered after the workbook). STILL WRONG: team member ticket updates (HaloPSA /api/Actions only answers per ticket, so CORE bulk read is always empty: all zeros), and the cost columns (add-on software etc.) which come from QuickBooks and the License Database in the workbook. 2026-11-17 later: shipped (CORE b85e8aa); ticket updates now count the tickets an engineer logged time on (HaloPSA has no bulk actions read); ticket-update fix shipping next."
+    "note": "2026-11-17: cause found live: /api/TimesheetEvent reads start_date and end_date (end exclusive), not startdate/enddate, so every month got the newest days. Fixed in CORE (acorn-halo-time.ts), built and tested locally, NOT live until CORE is updated. September now 4,262 h vs workbook 4,060 (148 of 179 clients within 0.5 h; the rest is time entered after the workbook). STILL WRONG: team member ticket updates (HaloPSA /api/Actions only answers per ticket, so CORE bulk read is always empty: all zeros), and the cost columns (add-on software etc.) which come from QuickBooks and the License Database in the workbook. 2026-11-17 later: shipped (CORE b85e8aa); ticket updates now count the tickets an engineer logged time on (HaloPSA has no bulk actions read); ticket-update fix shipping next.",
+    "added": "2026-11-17",
+    "completed": "2026-11-17"
   },
   {
     "key": "finance-addon-software-from-licences",
@@ -1916,6 +2274,8 @@
     "area": "finance",
     "status": "completed",
     "needs": "claude",
-    "note": "Built 2026-11-18: vendor bills from QuickBooks (read only), vendor-to-counts map in Settings > Finance > Software costs, allocation by month-end license counts."
+    "note": "Built 2026-11-18: vendor bills from QuickBooks (read only), vendor-to-counts map in Settings > Finance > Software costs, allocation by month-end license counts.",
+    "added": "2026-11-17",
+    "completed": "2026-11-17"
   }
 ]

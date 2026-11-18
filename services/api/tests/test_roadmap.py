@@ -35,6 +35,14 @@ def test_clean_refuses_unknown_status_or_needs_and_missing_key_and_trims_text():
     assert (out["status"], out["needs"], out["area"]) == ("not_started", "claude", "General")
 
 
+def test_the_days_in_the_file_are_read_as_midday_utc_and_anything_else_is_ignored():
+    out = rs.clean({"key": "k", "title": "t", "added": "2026-11-03", "completed": "2026-11-16"})
+    assert (out["added"].isoformat(), out["done"].isoformat()) == ("2026-11-03T12:00:00+00:00", "2026-11-16T12:00:00+00:00")
+    bad = rs.clean({"key": "k", "title": "t", "added": "03/11/2026", "completed": "soon"})
+    assert bad["added"] is None and bad["done"] is None
+    assert rs.clean({"key": "k", "title": "t"})["added"] is None
+
+
 def test_the_repository_file_is_valid_with_unique_keys_and_nothing_started_without_a_reason():
     entries = json.loads(FILE.read_text(encoding="utf-8"))
     cleaned = [rs.clean(e) for e in entries]
@@ -124,6 +132,22 @@ async def test_sync_adds_updates_the_file_owned_fields_but_never_the_priority_or
     assert out.items[-1].key == "a", "the finished item is last"
     await run(w.acme, lambda db: rs.sync(db, w.acme, [first[1]]))
     assert len((await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items) == 3, "a key that leaves the file stays"
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_the_days_the_file_gives_become_the_date_added_and_the_date_completed_and_a_later_correction_is_followed(world):
+    w = world
+    entries = [{"key": "a", "title": "Item A", "status": "completed", "added": "2026-11-03", "completed": "2026-11-16"}, {"key": "b", "title": "Item B", "status": "not_started", "added": "2026-11-05"}]
+    await run(w.acme, lambda db: rs.sync(db, w.acme, entries))
+    items = {i.key: i for i in (await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items}
+    assert items["a"].created_at.date().isoformat() == "2026-11-03" and items["a"].completed_at.date().isoformat() == "2026-11-16"
+    assert items["b"].created_at.date().isoformat() == "2026-11-05" and items["b"].completed_at is None
+    fixed = [{**entries[0], "completed": "2026-11-17"}, {**entries[1], "status": "completed", "completed": "2026-11-18"}]
+    assert await run(w.acme, lambda db: rs.sync(db, w.acme, fixed)) == {"added": 0, "changed": 2, "unchanged": 0}
+    items = {i.key: i for i in (await run(w.acme, lambda db: ep.list_items(db, user(w.acme)))).items}
+    assert items["a"].completed_at.date().isoformat() == "2026-11-17" and items["b"].completed_at.date().isoformat() == "2026-11-18"
+    assert await run(w.acme, lambda db: rs.sync(db, w.acme, fixed)) == {"added": 0, "changed": 0, "unchanged": 2}
 
 
 @needs_pg

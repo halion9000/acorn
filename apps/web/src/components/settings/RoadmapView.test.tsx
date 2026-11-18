@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const api = vi.hoisted(() => ({ list: vi.fn(), add: vi.fn(), update: vi.fn(), remove: vi.fn() }));
 vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), roadmapApi: api }));
 
-import { RoadmapView, sortedItems, tagCounts, visibleItems } from './RoadmapView';
+import { RoadmapView, datesText, dayText, sortedItems, tagCounts, visibleItems } from './RoadmapView';
 
 const item = (over: Record<string, unknown> = {}) => ({
   id: 'i1', key: 'a', title: 'Vendor detected apps', detail: 'Scan the tenant', area: 'Compliance', status: 'not_started', needs: 'claude', priority: 'normal', note: '',
@@ -143,3 +143,19 @@ describe('roadmap filters and sorting', () => {
   });
 });
 
+describe('the dates under an item', () => {
+  it('says when an item was added and, once it is finished, when it was completed', () => {
+    expect(datesText({ created_at: '2026-11-03T12:00:00Z', completed_at: null, status: 'new' })).toBe('Added Nov 3, 2026');
+    expect(datesText({ created_at: '2026-11-03T12:00:00Z', completed_at: '2026-11-16T12:00:00Z', status: 'completed' })).toBe('Added Nov 3, 2026 · Completed Nov 16, 2026');
+    expect(datesText({ created_at: '2026-11-03T12:00:00Z', completed_at: '2026-11-16T12:00:00Z', status: 'in_progress' })).toBe('Added Nov 3, 2026');
+    expect(datesText({ created_at: 'nonsense', completed_at: null, status: 'new' })).toBe('');
+    expect(dayText(null)).toBe('');
+  });
+
+  it('shows the line on each item of the page', async () => {
+    api.list.mockResolvedValue(roadmap([item({ id: 'd1', key: 'd1', title: 'Dated item', created_at: '2026-11-03T12:00:00Z' }), item({ id: 'd2', key: 'd2', title: 'Done item', status: 'completed', created_at: '2026-11-04T12:00:00Z', completed_at: '2026-11-10T12:00:00Z' })]));
+    render(<RoadmapView />);
+    expect(await screen.findByTestId('dates-d1')).toHaveTextContent('Added Nov 3, 2026');
+    expect(screen.getByTestId('dates-d2')).toHaveTextContent('Added Nov 4, 2026 · Completed Nov 10, 2026');
+  });
+});
