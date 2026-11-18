@@ -64,6 +64,7 @@ export function FinanceSettingsView() {
   const [teamName, setTeamName] = useState('');
   const [teamText, setTeamText] = useState('');
   const [paste, setPaste] = useState('');
+  const [showLeft, setShowLeft] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -131,7 +132,8 @@ export function FinanceSettingsView() {
     await load();
   };
 
-  const agents = useMemo(() => (data ? sortedBy(data.agents, (a) => (sort ? ((a as unknown as Record<string, unknown>)[sort.key] as SortValue) : a.name), sort?.desc ?? false) : []), [data, sort]);
+  const agents = useMemo(() => (data ? sortedBy(data.agents.filter((a) => showLeft || a.active), (a) => (sort ? ((a as unknown as Record<string, unknown>)[sort.key] as SortValue) : a.name), sort?.desc ?? false) : []), [data, sort, showLeft]);
+  const leftCount = data ? data.agents.filter((a) => !a.active).length : 0;
 
   if (denied) return <p className="p-6 text-sm text-gray-400">You do not have access to the finance settings.</p>;
   return (
@@ -181,7 +183,14 @@ export function FinanceSettingsView() {
           </section>
 
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-gray-200">Each person</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-gray-200">Each person</h2>
+              {leftCount > 0 ? (
+                <button type="button" className={ghost} aria-pressed={showLeft} onClick={() => setShowLeft((v) => !v)}>
+                  {showLeft ? `Hide ${leftCount} who left` : `Show ${leftCount} who left`}
+                </button>
+              ) : null}
+            </div>
             <div className="overflow-x-auto rounded-lg border border-gray-800">
               <table className="w-full text-sm" data-testid="agent-rates">
                 <thead className="bg-gray-900/60 text-xs uppercase text-gray-500">

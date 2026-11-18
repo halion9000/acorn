@@ -47,7 +47,12 @@ describe('the finance settings page', () => {
     render(<FinanceSettingsView />);
     const table = await screen.findByTestId('agent-rates');
     const names = () => within(table).getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0]!.textContent);
+    expect(names()).toEqual(['Dan Kemp', 'Vic Cio']);
+    await userEvent.click(screen.getByRole('button', { name: 'Show 1 who left' }));
     expect(names()).toEqual(['Dan Kemp', 'Vic Cio', 'Zed Old (left)']);
+    await userEvent.click(screen.getByRole('button', { name: 'Hide 1 who left' }));
+    expect(names()).toEqual(['Dan Kemp', 'Vic Cio']);
+    await userEvent.click(screen.getByRole('button', { name: 'Show 1 who left' }));
     expect(within(table).getByText('their own rate')).toBeInTheDocument();
     expect(within(table).getByText("their team's rate")).toBeInTheDocument();
     expect(screen.getByLabelText('Default rate ($ an hour)')).toHaveValue('65.00');

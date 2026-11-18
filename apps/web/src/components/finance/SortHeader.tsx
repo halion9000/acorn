@@ -23,7 +23,7 @@ export function SortHeader({
     <th className={className} aria-sort={active ? (sort!.desc ? 'descending' : 'ascending') : 'none'}>
       <button type="button" className="uppercase hover:text-gray-200" onClick={() => onSort(nextSort(sort, field, text))}>
         {label}
-        {sortArrow(sort, field)}
+        {active ? sortArrow(sort, field) : <span className="ml-1 text-gray-600" aria-hidden="true">↕</span>}
       </button>
     </th>
   );
