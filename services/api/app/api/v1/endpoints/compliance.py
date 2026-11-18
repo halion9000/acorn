@@ -35,6 +35,7 @@ from app.models.tenant import Tenant
 from app.services import evidence_age
 from app.services.alert_status import HANDLED_ALERT_STATUSES, sql_in
 from app.services.compliance_catalog import CATALOGS
+from app.services.compliance_crosswalk import related
 from app.services.compliance_guidance import guidance_for
 
 logger = logging.getLogger(__name__)
@@ -126,6 +127,8 @@ class ControlItem(BaseModel):
     meaning: str | None = None
     to_meet: list[str] = Field(default_factory=list)
     evidence_examples: list[str] = Field(default_factory=list)
+    # The controls of the other frameworks on the same topics, so the same work and evidence can be seen to count toward them too (``compliance_crosswalk``): framework id to control ids.
+    also_in: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class ControlsResponse(BaseModel):
@@ -229,6 +232,7 @@ def _control_item(framework_id: str, control_id: str, title: str) -> ControlItem
         meaning=g.meaning if g else None,
         to_meet=list(g.to_meet) if g else [],
         evidence_examples=list(g.evidence) if g else [],
+        also_in=related(framework_id, control_id),
     )
 
 

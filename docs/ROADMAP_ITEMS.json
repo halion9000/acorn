@@ -1359,8 +1359,10 @@
     "key": "r7-af-04",
     "title": "Compliance: map one control to several frameworks and show the overlap",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC crosswalk commit",
+    "note": "2026-11-18: 25 topics mapped to controls in all six frameworks (compliance_crosswalk.py, every id checked against the catalog); each control lists the others it shares a topic with. Per control only: no framework-by-framework overlap table."
   },
   {
     "key": "r7-af-05",

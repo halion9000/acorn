@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SWRConfig } from 'swr';
 
-import { FrameworkView, failingDays, sfLabel, sfTally, testKind, type SecureframeMapping } from './FrameworkView';
+import { FrameworkView, alsoCountsToward, failingDays, sfLabel, sfTally, testKind, type SecureframeMapping } from './FrameworkView';
 
 const authFetch = vi.fn();
 vi.mock('@/lib/auth-session', () => ({ authFetch: (...a: unknown[]) => authFetch(...a) }));
@@ -262,6 +262,18 @@ describe('what a control means and what it takes', () => {
       if (url.includes('/report')) return json([{ total_evidence: 0, accepted: 0, pending: 0, rejected: 0, coverage_pct: 0, controls_covered: [], controls_missing: [] }]);
       return json([]);
     });
+
+  it('names the controls of the other frameworks the same work counts toward, and nothing when there are none', async () => {
+    serve([{ ...guided, also_in: { ISO27001: ['A.5.2'], 'PCI-DSS': ['Req-12.4', 'Req-12.5'] } }, { ...plain, also_in: {} }]);
+    render(<FrameworkView framework="soc2" />);
+    expect((await screen.findByTestId('also-CC1.1')).textContent).toContain('The same work also counts toward: ISO 27001 A.5.2; PCI DSS Req-12.4, Req-12.5');
+    expect(screen.queryByTestId('also-A.5.1')).toBeNull();
+  });
+
+  it('alsoCountsToward writes one clause per framework and skips empty ones', () => {
+    expect(alsoCountsToward({ HIPAA: ['164.312(d)'], SOC2: [] })).toBe('HIPAA 164.312(d)');
+    expect(alsoCountsToward(undefined)).toBe('');
+  });
 
   it('shows under a control what it means, what it takes to meet it and what to attach', async () => {
     serve([guided]);

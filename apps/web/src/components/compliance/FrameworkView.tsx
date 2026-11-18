@@ -162,7 +162,19 @@ interface Control {
   to_meet?: string[];
   /** What to attach as evidence. */
   evidence_examples?: string[];
+  /** The controls of the other frameworks on the same topics: framework id to control ids. */
+  also_in?: Record<string, string[]>;
 }
+
+/** The line under a control naming where else the same work counts (pure); empty when nothing else asks for it. */
+export function alsoCountsToward(also: Record<string, string[]> | undefined): string {
+  return Object.entries(also ?? {})
+    .filter(([, ids]) => ids.length > 0)
+    .map(([fw, ids]) => `${FRAMEWORK_LABEL[fw] ?? fw} ${ids.join(', ')}`)
+    .join('; ');
+}
+
+const FRAMEWORK_LABEL: Record<string, string> = { SOC2: 'SOC 2', ISO27001: 'ISO 27001', 'NIST-CSF': 'NIST CSF', 'PCI-DSS': 'PCI DSS', HIPAA: 'HIPAA', 'CIS-IG1': 'CIS IG1' };
 
 /** The controls under the headings the framework itself uses (SOC 2 criteria, ISO Annex A themes, NIST functions, PCI requirements, HIPAA safeguards), in the order the API sent them. A control with no heading goes under "Controls". */
 export function groupControls(controls: Control[]): { name: string; controls: Control[] }[] {
@@ -466,6 +478,11 @@ export function FrameworkView({ framework, now }: Props & { /** The time to coun
                     </div>
                   )}
                 </div>
+              ) : null}
+              {alsoCountsToward(c.also_in) ? (
+                <p className="mt-1 text-xs text-sky-300" data-testid={`also-${c.control_id}`}>
+                  The same work also counts toward: {alsoCountsToward(c.also_in)}
+                </p>
               ) : null}
               {evidenceAgeNote(evidenceFor(c.control_id)) ? (
                 <p className="mt-1 text-xs text-amber-300" data-testid={`stale-${c.control_id}`}>

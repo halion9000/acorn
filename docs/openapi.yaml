@@ -40307,6 +40307,13 @@ components:
             type: string
           type: array
           title: Evidence Examples
+        also_in:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          type: object
+          title: Also In
       type: object
       required:
       - control_id
