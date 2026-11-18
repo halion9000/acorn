@@ -106,7 +106,7 @@ export function SoftwareCostsPanel() {
     <section className="space-y-2" data-testid="software-costs">
       <h2 className="text-sm font-semibold text-gray-200">Software costs</h2>
       <p className="text-xs text-gray-500">
-        What each software vendor billed in {data.latest_month ?? 'the latest month'} (from QuickBooks, read only). Choose the counts that say how many licenses of a vendor each client has (the billable ones: leave out free or included licenses, and prefer the tool's own count to the quantity on the invoice), and Net income carries the bill to those clients in proportion, for add-on and for support and maintenance software; a vendor with no count is spread by revenue.
+        What each software vendor billed in {data.latest_month ?? 'the latest month'} (from QuickBooks, read only). Choose the counts that say how many licenses of a vendor each client has (the count the vendor charges us on, including licenses we do not bill the client for: prefer the tool's own count to the quantity on the invoice, which leaves those out), and Net income carries the bill to those clients in proportion, for add-on and for support and maintenance software; a vendor with no count is spread by revenue.
       </p>
       {!data.have_costs ? <p className="text-xs text-amber-300">QuickBooks has not sent the vendor bills yet (CORE reads them once a day).</p> : null}
       {problem ? <p className="text-sm text-red-300" role="alert">{problem}</p> : null}
