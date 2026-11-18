@@ -81,6 +81,18 @@ class FinanceSettings(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
 
 
+class FinanceClientGroup(Base):
+    """A client name filed under a Primary Name, so Net income counts them as one client (migration 214)."""
+
+    __tablename__ = "finance_client_groups"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    member_key: Mapped[str] = mapped_column(String, primary_key=True)
+    member_name: Mapped[str] = mapped_column(String, nullable=False)
+    primary_name: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
 class FinanceVendorCost(Base):
     """What one software vendor billed in a month, as QuickBooks booked it (migration 213)."""
 

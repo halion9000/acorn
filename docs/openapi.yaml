@@ -2711,6 +2711,60 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/finance/client-groups:
+    get:
+      tags:
+      - finance
+      summary: Client Groups
+      description: 'The client names filed under a Primary Name, by group: each group
+        with the names in it (only groups of more than one name, or one whose name
+        differs from its Primary Name, are listed).'
+      operationId: client_groups_api_v1_finance_client_groups_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Client Groups Api V1 Finance Client Groups Get
+      security:
+      - HTTPBearer: []
+  /api/v1/finance/client-groups/import:
+    put:
+      tags:
+      - finance
+      summary: Import Client Groups
+      description: File client names under Primary Names (a pasted sheet of name and
+        Primary Name). A name with no Primary Name, or the same as its own, is taken
+        out of any group. The last row for a name wins.
+      operationId: import_client_groups_api_v1_finance_client_groups_import_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupsImportIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: integer
+                type: object
+                title: Response Import Client Groups Api V1 Finance Client Groups
+                  Import Put
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/finance/software:
     get:
       tags:
@@ -46613,6 +46667,35 @@ components:
       - id
       - label
       title: GraphNode
+    GroupRowIn:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+        primary:
+          type: string
+          maxLength: 200
+          title: Primary
+          default: ''
+      type: object
+      required:
+      - name
+      title: GroupRowIn
+    GroupsImportIn:
+      properties:
+        rows:
+          items:
+            $ref: '#/components/schemas/GroupRowIn'
+          type: array
+          maxItems: 2000
+          minItems: 1
+          title: Rows
+      type: object
+      required:
+      - rows
+      title: GroupsImportIn
     HTTPValidationError:
       properties:
         detail:

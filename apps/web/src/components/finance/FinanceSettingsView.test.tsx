@@ -24,6 +24,7 @@ beforeEach(() => {
     if (init?.method === 'PUT' && String(url).endsWith('/import')) return answer({ saved: 2, unmatched: ['Nobody Known'] });
     if (init?.method) return answer({}, 204);
     if (String(url).endsWith('/software')) return answer({ have_costs: false, latest_month: null, vendors: [], counted_items: [] });
+    if (String(url).endsWith('/client-groups')) return answer({ groups: [] });
     return answer(overview());
   });
 });

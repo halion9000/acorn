@@ -212,6 +212,7 @@ async def tenant():
             "finance_settings",
             "finance_labor_rates",
             "finance_profit_snapshots",
+            "finance_client_groups",
         ):
             await conn.execute(text(f"delete from {table} where tenant_id = :t"), {"t": tid})
         await conn.execute(text("delete from tenants where id = :t"), {"t": tid})
@@ -395,3 +396,85 @@ def test_the_ranking_uses_each_months_add_on_allocation():
     birch_plain = next(x for x in plain["rows"] if x["client_key"] == "birchlaw")["net_income"]
     birch_tied = next(x for x in tied["rows"] if x["client_key"] == "birchlaw")["net_income"]
     assert birch_tied < birch_plain, "Birch carries all 100.00 instead of a share"
+
+
+GROUP_SNAP = {
+    "months": ["2026-09", "2026-10"],
+    "invoices": [
+        {"client_id": "5", "client_name": "Talking Monkey, Inc.", "month": "2026-10", "revenue": 600, "invoices": 1},
+        {"client_id": "6", "client_name": "Asylum CC LLC dba Comedy Mothership", "month": "2026-10", "revenue": 400, "invoices": 1},
+        {"client_id": "7", "client_name": "Birch Law", "month": "2026-10", "revenue": 1000, "invoices": 1},
+        {"client_id": "6", "client_name": "Asylum CC LLC dba Comedy Mothership", "month": "2026-09", "revenue": 400, "invoices": 1},
+    ],
+    "hours": [
+        {"client": "Talking Monkey, Inc.", "month": "2026-10", "agent_id": "40", "charge_type": "Remote Support", "hours": 2},
+        {"client": "Asylum CC LLC dba Comedy Mothership", "month": "2026-10", "agent_id": "40", "charge_type": "Remote Support", "hours": 3},
+    ],
+    "agents": [{"id": "40", "name": "Dan Kemp", "team": "Support"}],
+}
+GROUPS = {pf.name_key("Talking Monkey, Inc."): "Asylum / Talking Monkey", pf.name_key("Asylum CC LLC dba Comedy Mothership"): "Asylum / Talking Monkey"}
+
+
+def test_names_filed_under_one_primary_name_are_one_client_with_their_revenue_hours_and_costs_added():
+    plain = pf.full_month(GROUP_SNAP, [], "2026-10", [], {})
+    assert len(plain["rows"]) == 3
+    r = pf.full_month(GROUP_SNAP, [], "2026-10", [cost("travel", "30", "Talking Monkey, Inc."), cost("travel", "20", "Asylum CC LLC dba Comedy Mothership")], {}, None, GROUPS)
+    assert [(x["client_name"], x["revenue"], x["hours"], x["travel"]) for x in r["rows"]] == [
+        ("Asylum / Talking Monkey", D("1000.00"), D("5.00"), D("50.00")),
+        ("Birch Law", D("1000.00"), D("0.00"), D("0.00")),
+    ], "one row, both names' revenue, hours and typed travel; the display name is the primary name"
+    assert r["totals"]["revenue"] == plain["totals"]["revenue"] and r["totals"]["direct_labor"] == plain["totals"]["direct_labor"], "folding moves nothing out of the totals"
+
+
+def test_a_group_is_new_when_the_first_name_of_the_group_first_billed_and_takes_the_industry_of_any_member():
+    # Asylum billed in 2026-09 already, so the group is not new in 2026-10 even though Talking Monkey first billed then.
+    r = pf.full_month(GROUP_SNAP, [], "2026-10", [{**cost("sales_marketing", "90"), "source": "quickbooks"}], {pf.name_key("Talking Monkey, Inc."): {"industry": "Hospitality", "non_profit": False, "target_margin": None}}, None, GROUPS)
+    group = next(x for x in r["rows"] if x["client_name"] == "Asylum / Talking Monkey")
+    assert group["new_client"] is False and group["industry"] == "Hospitality"
+    assert [n["client_name"] for n in r["new_clients"]] == ["Birch Law"], "only Birch Law is new: the group billed in September"
+    alone = pf.full_month(GROUP_SNAP, [], "2026-10", [{**cost("sales_marketing", "90"), "source": "quickbooks"}], {})
+    assert sorted(n["client_name"] for n in alone["new_clients"]) == ["Birch Law", "Talking Monkey, Inc."], "without the grouping Talking Monkey looks new too"
+
+
+def test_the_ranking_counts_a_group_once():
+    ranked = pf.annual(GROUP_SNAP, [], [], {}, "2026-10", None, GROUPS)
+    assert sorted(r["client_name"] for r in ranked["rows"]) == ["Asylum / Talking Monkey", "Birch Law"]
+    assert next(r for r in ranked["rows"] if r["client_name"] == "Asylum / Talking Monkey")["revenue"] == D("1400.00"), "September's 400 and October's 1000"
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_client_groups_are_filed_listed_removed_and_folded_into_the_net_income_page(tenant):
+    req = SimpleNamespace(client=None, headers={})
+
+    async def ingest(db):
+        db.add(FinanceProfitSnapshot(tenant_id=tenant.id, payload=GROUP_SNAP))
+        await db.commit()
+
+    await with_db(tenant.id, ingest)
+    out = await with_db(
+        tenant.id,
+        lambda db: ep.import_client_groups(
+            ep.GroupsImportIn(
+                rows=[
+                    ep.GroupRowIn(name="Talking Monkey, Inc.", primary="Asylum / Talking Monkey"),
+                    ep.GroupRowIn(name="Asylum CC LLC dba Comedy Mothership", primary="Asylum / Talking Monkey"),
+                    ep.GroupRowIn(name="Birch Law", primary="Birch Law"),
+                    ep.GroupRowIn(name="!!!", primary="x"),
+                ]
+            ),
+            req,
+            tenant.user,
+            db,
+        ),
+    )
+    assert out == {"saved": 2, "removed": 0, "skipped": 1}, "a name filed under itself is no group; a row with no usable name is skipped"
+    listed = await with_db(tenant.id, lambda db: ep.client_groups(tenant.user, db))
+    assert listed == {"groups": [{"primary": "Asylum / Talking Monkey", "members": ["Asylum CC LLC dba Comedy Mothership", "Talking Monkey, Inc."]}]}
+    page = await with_db(tenant.id, lambda db: ep.profitability_analysis(tenant.user, db, "2026-10"))
+    assert [r["client_name"] for r in page["report"]["rows"]] == ["Asylum / Talking Monkey", "Birch Law"]
+    assert page["report"]["rows"][0]["revenue"] == D("1000.00")
+    gone = await with_db(tenant.id, lambda db: ep.import_client_groups(ep.GroupsImportIn(rows=[ep.GroupRowIn(name="Talking Monkey, Inc.", primary="")]), req, tenant.user, db))
+    assert gone == {"saved": 0, "removed": 1, "skipped": 0}
+    after = await with_db(tenant.id, lambda db: ep.profitability_analysis(tenant.user, db, "2026-10"))
+    assert len(after["report"]["rows"]) == 3, "Talking Monkey stands alone again"

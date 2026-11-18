@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { authFetch } from '@/lib/auth-session';
 import { sortedBy, type SortState, type SortValue } from '@/lib/tableSort';
 import { SortHeader } from './SortHeader';
+import { ClientGroupsPanel } from './ClientGroupsPanel';
 import { SoftwareCostsPanel } from './SoftwareCostsPanel';
 
 export interface AgentRate {
@@ -220,6 +221,7 @@ export function FinanceSettingsView() {
         </>
       ) : null}
       <SoftwareCostsPanel />
+      <ClientGroupsPanel />
     </div>
   );
 }

@@ -21,6 +21,7 @@ from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.metric_dataset import MetricDataset
 from app.models.finance_price import FinanceItemPrice
 from app.models.finance_profit import (
+    FinanceClientGroup,
     FinanceClientMaster,
     FinanceCostEntry,
     FinanceLaborRate,
@@ -423,6 +424,66 @@ async def save_agent_rates(db: DBSession, tenant: Any, rates: list[tuple[str, De
     return saved
 
 
+async def _groups(db: DBSession, tenant: Any) -> dict[str, str]:
+    """Each client name key to the Primary Name it is filed under."""
+    rows = (await db.execute(select(FinanceClientGroup).where(FinanceClientGroup.tenant_id == tenant))).scalars().all()
+    return {r.member_key: r.primary_name for r in rows}
+
+
+class GroupRowIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    primary: str = Field(default="", max_length=200)
+
+
+class GroupsImportIn(BaseModel):
+    rows: list[GroupRowIn] = Field(min_length=1, max_length=2000)
+
+
+@router.get("/client-groups", dependencies=[Depends(require_permission("finance:view"))])
+async def client_groups(user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """The client names filed under a Primary Name, by group: each group with the names in it (only groups of more than one name, or one whose name differs from its Primary Name, are listed)."""
+    rows = (await db.execute(select(FinanceClientGroup).where(FinanceClientGroup.tenant_id == user.tenant_id))).scalars().all()
+    by: dict[str, list[str]] = {}
+    for r in rows:
+        by.setdefault(r.primary_name, []).append(r.member_name)
+    return {"groups": [{"primary": p, "members": sorted(m, key=str.lower)} for p, m in sorted(by.items(), key=lambda kv: kv[0].lower())]}
+
+
+@router.put("/client-groups/import")
+async def import_client_groups(
+    body: GroupsImportIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession
+) -> dict[str, int]:
+    """File client names under Primary Names (a pasted sheet of name and Primary Name). A name with no Primary Name, or the same as its own, is taken out of any group. The last row for a name wins."""
+    existing = {r.member_key: r for r in (await db.execute(select(FinanceClientGroup).where(FinanceClientGroup.tenant_id == user.tenant_id))).scalars().all()}
+    wanted: dict[str, GroupRowIn] = {}
+    skipped = 0
+    for row in body.rows:
+        key = profit.name_key(row.name)
+        if not key:
+            skipped += 1
+            continue
+        wanted[key] = row
+    saved = removed = 0
+    now = datetime.now(UTC)
+    for key, row in wanted.items():
+        name, primary = " ".join(row.name.split()), " ".join(row.primary.split())
+        found = existing.get(key)
+        if not primary or profit.name_key(primary) == key:
+            if found is not None:
+                await db.delete(found)
+                removed += 1
+            continue
+        if found is None:
+            db.add(FinanceClientGroup(tenant_id=user.tenant_id, member_key=key, member_name=name, primary_name=primary, updated_at=now))
+        else:
+            found.member_name, found.primary_name, found.updated_at = name, primary, now
+        saved += 1
+    await db.flush()
+    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="finance_client_groups:imported", resource="finance_client_group", resource_id="import", changes={"saved": saved, "removed": removed, "skipped": skipped}, request=request)
+    await db.commit()
+    return {"saved": saved, "removed": removed, "skipped": skipped}
+
+
 class CountedRefIn(BaseModel):
     source: str = Field(min_length=1, max_length=40)
     item: str = Field(min_length=1, max_length=80)
@@ -567,14 +628,15 @@ async def profitability_analysis(
 
     annual_months = [m for m in months if m <= chosen][-12:]
     addon_direct_months = await add_on_by_month(db, user.tenant_id, row.payload, annual_months)
-    report = pf.full_month(row.payload, rates, chosen, costs, master, addon_direct_months.get(chosen))
+    groups = await _groups(db, user.tenant_id)
+    report = pf.full_month(row.payload, rates, chosen, costs, master, addon_direct_months.get(chosen), groups)
     return {
         "received_at": row.received_at,
         "months": months,
         "report": report,
         "industries": pf.by_industry(report),
         "hours": pf.hours_report(row.payload, rates, chosen, await _available_hours(db, user.tenant_id)),
-        "annual": pf.annual(row.payload, rates, costs, master, chosen, addon_direct_months),
+        "annual": pf.annual(row.payload, rates, costs, master, chosen, addon_direct_months, groups),
         "note": (
             "Costs are shared out to the cent: an entry with a client goes to that client, one without is spread by each client's revenue for the month (the workbook spreads by monthly recurring revenue; the Halo summary "
             "holds invoiced revenue). Sales and marketing is split evenly across clients whose first revenue is this month."

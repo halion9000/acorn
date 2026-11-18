@@ -47,11 +47,25 @@ def _blank(key: str, name: str) -> dict[str, Any]:
     }
 
 
-def first_months(snapshot: dict[str, Any]) -> dict[str, str]:
+def group_of(groups: dict[str, str] | None) -> tuple[Any, dict[str, str]]:
+    """The way client names are folded into the one client finance means (pure). ``groups`` maps a member's name key to its Primary Name; the result is a function from a name key to the key of the group it belongs to
+    (itself when it is in none) and the display name of each group key."""
+    shown: dict[str, str] = {}
+    folded: dict[str, str] = {}
+    for member, primary in (groups or {}).items():
+        gk = name_key(primary)
+        if gk and member:
+            folded[member] = gk
+            shown[gk] = primary
+    return (lambda key: folded.get(key, key)), shown
+
+
+def first_months(snapshot: dict[str, Any], fold: Any = None) -> dict[str, str]:
     """The first month each client (by name key) has revenue in the summary."""
     first: dict[str, str] = {}
     for inv in snapshot.get("invoices") or []:
         key, month = name_key(inv.get("client_name")), str(inv.get("month"))
+        key = fold(key) if fold else key
         if key and (key not in first or month < first[key]):
             first[key] = month
     return first
@@ -64,14 +78,16 @@ def full_month(
     costs: list[dict[str, Any]],
     master: dict[str, dict[str, Any]],
     addon_direct: dict[str, Decimal] | None = None,
+    groups: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     base = profit_for_month(snapshot, rates, month)
     months = sorted({str(m) for m in snapshot.get("months") or []})
-    first = first_months(snapshot)
+    fold, shown = group_of(groups)
+    first = first_months(snapshot, fold)
     rows: dict[str, dict[str, Any]] = {}
     for r in base["rows"]:
-        key = name_key(r["client_name"])
-        row = rows.setdefault(key, _blank(key, r["client_name"]))
+        key = fold(name_key(r["client_name"]))
+        row = rows.setdefault(key, _blank(key, shown.get(key, r["client_name"])))
         row["revenue"] += r["revenue"]
         row["hours"] += r["hours"]
         row["direct_labor"] += r["labor"]
@@ -82,6 +98,7 @@ def full_month(
     company: dict[str, Decimal] = {c: ZERO for c in CATEGORIES}
     for c in mine:
         cat, key, amount = str(c["category"]), str(c.get("client_key") or ""), money(c.get("amount"))
+        key = fold(key) if key else key
         if cat in ("payroll_cogs", "sales_marketing", "overhead") or not key:
             company[cat] += amount
         else:
@@ -112,6 +129,7 @@ def full_month(
     new_keys = sorted(k for k, r in rows.items() if first.get(k) == month and month != first_of_all and r["revenue"] > 0)
     place("sales_marketing", "sales_marketing", company["sales_marketing"], {k: Decimal(1) for k in new_keys})
     place("overhead", "overhead", company["overhead"], weights)
+    fold_members = {k: fold(k) for k in master} | {m: fold(m) for m in (groups or {})}
     out_rows: list[dict[str, Any]] = []
     for key, r in rows.items():
         cost = sum(
@@ -119,7 +137,7 @@ def full_month(
         )
         gross = r["revenue"] - cost
         net = gross - r["sales_marketing"] - r["overhead"]
-        m = master.get(key) or {}
+        m = master.get(key) or next((master[k] for k, g in (fold_members.items()) if g == key and k in master), {})
         out_rows.append(
             r
             | {
@@ -246,6 +264,7 @@ def annual(
     master: dict[str, dict[str, Any]],
     through: str | None = None,
     addon_by_month: dict[str, dict[str, Decimal]] | None = None,
+    groups: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Twelve months (or as many as the summary holds) ending at ``through``: each client's revenue and net income, ranked by net income, with the size tier (Top 20 ... Top 120) and whether it reaches its target net margin (20% unless the client master sets one)."""
     months = sorted({str(m) for m in snapshot.get("months") or []})
@@ -254,7 +273,7 @@ def annual(
     months = months[-12:]
     acc: dict[str, dict[str, Any]] = {}
     for m in months:
-        for r in full_month(snapshot, rates, m, costs, master, (addon_by_month or {}).get(m))["rows"]:
+        for r in full_month(snapshot, rates, m, costs, master, (addon_by_month or {}).get(m), groups)["rows"]:
             a = acc.setdefault(
                 r["client_key"],
                 {
