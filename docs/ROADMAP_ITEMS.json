@@ -1401,8 +1401,10 @@
     "key": "r7-af-09",
     "title": "Risk register: a heat map over time",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "completed_ref": "AiSOC pending commit",
+    "note": "2026-11-18: risk_register_levels (migration 216) keeps each risk's levels with a date; GET /risk-register/heatmap and a grid with month-end trend on the dashboard. History before 2026-11-18 is only the baseline row."
   },
   {
     "key": "r7-af-10",

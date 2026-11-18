@@ -18,7 +18,8 @@ from sqlalchemy import func, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
-from app.models.risk_register import RiskRegisterHistory, RiskRegisterItem, RiskRegisterTask
+from app.models.risk_register import RiskRegisterHistory, RiskRegisterItem, RiskRegisterLevel, RiskRegisterTask
+from app.services import risk_heatmap as hm
 from app.services import csv_export
 from app.services.audit import emit_audit
 from app.services.risk_register import CATEGORIES, LIBRARY, TREATMENTS, acceptance_state, describe_changes, level, library_item, matrix, score
@@ -226,6 +227,23 @@ async def _note(db: Any, tenant: uuid.UUID, risk_id: uuid.UUID, user: Any, actio
     db.add(RiskRegisterHistory(id=uuid.uuid4(), tenant_id=tenant, risk_id=risk_id, actor=_actor(user), action=action, detail=detail[:2000]))
 
 
+async def _levels(db: Any, tenant: uuid.UUID, row: RiskRegisterItem, at: datetime, active: bool = True) -> None:
+    """Keep the levels the risk has from ``at`` on, for the heat map over time."""
+    db.add(
+        RiskRegisterLevel(
+            id=uuid.uuid4(),
+            tenant_id=tenant,
+            risk_id=row.id,
+            at=at,
+            likelihood=row.likelihood,
+            impact=row.impact,
+            residual_likelihood=row.residual_likelihood,
+            residual_impact=row.residual_impact,
+            active=active,
+        )
+    )
+
+
 async def _next_ref(db: Any, tenant: uuid.UUID) -> int:
     # One writer at a time per organization, so two people adding a risk at once do not get the same number.
     await db.execute(select(func.pg_advisory_xact_lock(func.hashtext(f"risk-register:{tenant}"))))
@@ -311,6 +329,57 @@ async def list_risks(
     )
 
 
+# The day the register began keeping each risk's levels as they changed; a risk older than this is shown at the levels it had then, whatever they were before.
+LEVELS_RECORDED_FROM = date(2026, 11, 18)
+
+
+class HeatCell(BaseModel):
+    likelihood: int
+    impact: int
+    count: int
+    level: str | None
+    titles: list[str]  # the risks in the cell (up to a few), so a person can see what they are
+
+
+class HeatMap(BaseModel):
+    as_of: date
+    kind: Literal["inherent", "residual"]
+    total: int
+    by_level: dict[str, int]
+    cells: list[HeatCell]
+    trend: list[dict[str, Any]]  # for each of the last twelve month ends and today: the total and the count at each level
+    approximate_before: date | None  # levels before this day were not recorded as they changed, so the map for an earlier date is approximate
+
+
+async def _level_rows(db: Any, tenant: uuid.UUID) -> list[hm.Levels]:
+    rows = (await db.execute(select(RiskRegisterLevel).where(RiskRegisterLevel.tenant_id == tenant))).scalars().all()
+    return [hm.Levels(r.risk_id, r.at, r.likelihood, r.impact, r.residual_likelihood, r.residual_impact, r.active) for r in rows]
+
+
+@router.get("/heatmap", response_model=HeatMap, summary="The risk heat map for a date (today unless asked), before or after treatment, and how the levels moved month by month")
+async def heat_map(
+    tenant: ScopeTenant,
+    db: DBSession,
+    _user: Annotated[AuthUser, Depends(require_permission("reports:read"))],
+    as_of: date | None = Query(default=None),
+    kind: Literal["inherent", "residual"] = Query(default="inherent"),
+) -> HeatMap:
+    today = datetime.now(UTC).date()
+    day = min(as_of or today, today)
+    rows = await _level_rows(db, tenant)
+    titles = {r.id: r.title for r in (await db.execute(select(RiskRegisterItem).where(RiskRegisterItem.tenant_id == tenant))).scalars().all()}
+    h = hm.heatmap(rows, hm.end_of_day(day), kind)
+    return HeatMap(
+        as_of=day,
+        kind=kind,
+        total=h["total"],
+        by_level=h["by_level"],
+        cells=[HeatCell(likelihood=c["likelihood"], impact=c["impact"], count=c["count"], level=c["level"], titles=[titles.get(i, "") for i in c["risk_ids"]][:6]) for c in h["cells"]],
+        trend=hm.monthly(rows, today, kind),
+        approximate_before=LEVELS_RECORDED_FROM,
+    )
+
+
 @router.get("/library", response_model=list[LibraryItem], summary="Common risks to start from")
 async def library(
     tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
@@ -355,6 +424,7 @@ async def _create(db: Any, tenant: uuid.UUID, user: AuthUser, request: Request, 
         row.status = "assessed"
     db.add(row)
     await db.flush()
+    await _levels(db, tenant, row, now)
     await _note(db, tenant, row.id, user, "created", f"{source}; inherent {score(row.likelihood, row.impact)}")
     await _audit(db, tenant, user, request, "created", row)
     await db.commit()
@@ -504,6 +574,8 @@ async def update_risk(
     row.status = "assessed" if row.residual_likelihood is not None else "open"
     row.updated_at = datetime.now(UTC)
     lines = describe_changes(before, _snapshot(row))
+    if any(before[k] != getattr(row, k) for k in ("likelihood", "impact", "residual_likelihood", "residual_impact")):
+        await _levels(db, tenant, row, row.updated_at)
     if lines:
         await _note(db, tenant, row.id, user, "changed", "; ".join(lines))
         await _audit(db, tenant, user, request, "changed", row, {"changes": lines})
@@ -524,6 +596,7 @@ async def archive_risk(
         row.status = "archived"
         row.archived_at = datetime.now(UTC)
         row.updated_at = row.archived_at
+        await _levels(db, tenant, row, row.archived_at, active=False)
         await _note(db, tenant, row.id, user, "archived")
         await _audit(db, tenant, user, request, "archived", row)
         await db.commit()
@@ -543,6 +616,7 @@ async def restore_risk(
         row.status = "assessed" if row.residual_likelihood is not None else "open"
         row.archived_at = None
         row.updated_at = datetime.now(UTC)
+        await _levels(db, tenant, row, row.updated_at)
         await _note(db, tenant, row.id, user, "restored")
         await _audit(db, tenant, user, request, "restored", row)
         await db.commit()

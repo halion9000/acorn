@@ -65,3 +65,19 @@ class RiskRegisterHistory(Base):
     action: Mapped[str] = mapped_column(String(40), nullable=False)
     detail: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class RiskRegisterLevel(Base):
+    """The levels a risk had from a moment on (migration 216): the heat map for a date is the newest row of each risk on or before it."""
+
+    __tablename__ = "risk_register_levels"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    risk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("risk_register_items.id", ondelete="CASCADE"), nullable=False)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    likelihood: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    impact: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    residual_likelihood: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    residual_impact: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
+  heatmap: vi.fn(),
   get: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),

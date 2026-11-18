@@ -7793,7 +7793,18 @@ const riskQs = (clientId: string, extra = ''): string => {
   return p.toString();
 };
 
+export interface RiskHeatMapData {
+  as_of: string;
+  kind: 'inherent' | 'residual';
+  total: number;
+  by_level: Record<'critical' | 'high' | 'medium' | 'low', number>;
+  cells: { likelihood: number; impact: number; count: number; level: string | null; titles: string[] }[];
+  trend: { date: string; total: number; critical: number; high: number; medium: number; low: number }[];
+  approximate_before: string | null;
+}
+
 export const riskRegisterApi = {
+  heatmap: (clientId: string, kind: 'inherent' | 'residual', asOf = '') => request<RiskHeatMapData>(`/api/v1/risk-register/heatmap?${riskQs(clientId, `kind=${kind}${asOf ? `&as_of=${asOf}` : ''}`)}`),
   list: (clientId: string, archived = false) => request<RiskRegister>(`/api/v1/risk-register?${riskQs(clientId, archived ? 'archived=true' : '')}`),
   get: (clientId: string, id: string) => request<RiskDetail>(`/api/v1/risk-register/${encodeURIComponent(id)}?${riskQs(clientId)}`),
   create: (clientId: string, body: RiskInput) => request<RiskDetail>(`/api/v1/risk-register?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),

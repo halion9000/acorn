@@ -14442,6 +14442,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/risk-register/heatmap:
+    get:
+      tags:
+      - risk-register
+      summary: The risk heat map for a date (today unless asked), before or after
+        treatment, and how the levels moved month by month
+      operationId: heat_map_api_v1_risk_register_heatmap_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: as_of
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: As Of
+      - name: kind
+        in: query
+        required: false
+        schema:
+          enum:
+          - inherent
+          - residual
+          type: string
+          default: inherent
+          title: Kind
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeatMap'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/risk-register/library:
     get:
       tags:
@@ -46986,6 +47041,82 @@ components:
       - total
       - percent_healthy
       title: Health
+    HeatCell:
+      properties:
+        likelihood:
+          type: integer
+          title: Likelihood
+        impact:
+          type: integer
+          title: Impact
+        count:
+          type: integer
+          title: Count
+        level:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Level
+        titles:
+          items:
+            type: string
+          type: array
+          title: Titles
+      type: object
+      required:
+      - likelihood
+      - impact
+      - count
+      - level
+      - titles
+      title: HeatCell
+    HeatMap:
+      properties:
+        as_of:
+          type: string
+          format: date
+          title: As Of
+        kind:
+          type: string
+          enum:
+          - inherent
+          - residual
+          title: Kind
+        total:
+          type: integer
+          title: Total
+        by_level:
+          additionalProperties:
+            type: integer
+          type: object
+          title: By Level
+        cells:
+          items:
+            $ref: '#/components/schemas/HeatCell'
+          type: array
+          title: Cells
+        trend:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Trend
+        approximate_before:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Approximate Before
+      type: object
+      required:
+      - as_of
+      - kind
+      - total
+      - by_level
+      - cells
+      - trend
+      - approximate_before
+      title: HeatMap
     HiddenRequest:
       properties:
         hidden:

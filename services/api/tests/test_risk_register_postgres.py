@@ -229,3 +229,39 @@ async def test_an_end_date_without_the_accept_treatment_is_refused(world):
         risk(treatment="mitigate", accepted_until=date.today() + timedelta(days=10))
     with pytest.raises(ValidationError):
         risk(accepted_until=date.today() + timedelta(days=10))
+
+
+async def heat(w, tenant=None, **q):
+    t = tenant or w.acme
+    return await run(t, lambda db: ep.heat_map(t, db, w.user, q.get("as_of"), q.get("kind", "inherent")))
+
+
+def cell_at(h, l, i):
+    return next(c for c in h.cells if c.likelihood == l and c.impact == i)
+
+
+async def test_the_heat_map_follows_each_risk_through_its_changes_archiving_and_restoring_and_never_shows_another_clients_risks(world):
+    w = world
+    r = await add(w, title="Phishing", likelihood=4, impact=4)
+    other = await add(w, tenant=w.birch, title="Birch only", likelihood=1, impact=1)
+    now = await heat(w)
+    assert now.total == 1 and cell_at(now, 4, 4).titles == ["Phishing"] and now.by_level["critical"] == 1
+    assert cell_at(now, 1, 1).count == 0, "another client's risk is not on this map"
+    await run(w.acme, lambda db: ep.update_risk(r.id, ep.RiskPatch(likelihood=2, impact=3, residual_likelihood=1, residual_impact=2), w.request, w.acme, db, w.user))
+    after = await heat(w)
+    assert cell_at(after, 2, 3).titles == ["Phishing"] and cell_at(after, 4, 4).count == 0
+    residual = await heat(w, kind="residual")
+    assert cell_at(residual, 1, 2).titles == ["Phishing"], "after treatment it counts at its residual levels"
+    long_ago = await heat(w, as_of=date(2020, 1, 1))
+    assert long_ago.total == 0, "before the register existed there is nothing on the map"
+    await run(w.acme, lambda db: ep.archive_risk(r.id, w.request, w.acme, db, w.user))
+    assert (await heat(w)).total == 0, "an archived risk is off the map"
+    await run(w.acme, lambda db: ep.restore_risk(r.id, w.request, w.acme, db, w.user))
+    back = await heat(w)
+    assert back.total == 1 and cell_at(back, 2, 3).titles == ["Phishing"]
+    assert [t["total"] for t in back.trend][-1] == 1 and len(back.trend) == 13
+    assert other.id != r.id
+    unchanged = await run(w.acme, lambda db: ep.update_risk(r.id, ep.RiskPatch(owner="Hal"), w.request, w.acme, db, w.user))
+    assert unchanged.owner == "Hal"
+    rows = (await run(w.acme, lambda db: db.execute(text("select count(*) from risk_register_levels where risk_id = :r"), {"r": r.id}))).scalar()
+    assert rows == 4, "added, changed, archived, restored: a change of owner is not a change of level"

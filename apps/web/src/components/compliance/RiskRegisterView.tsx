@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress, useIsHomeClient } from '@/components/mssp/ClientPicker';
 import { SecureframeRegisters } from './SecureframeRegisters';
+import { RiskHeatMap } from './RiskHeatMap';
 import { saveText } from '@/lib/saveFile';
 import { apiErrorDetail, downloadCsv, riskRegisterApi, type RiskDetail, type RiskInput, type RiskItem, type RiskLibraryItem, type RiskRegister } from '@/lib/api';
 
@@ -489,6 +490,7 @@ export function RiskRegisterView() {
       {library && <Library clientId={clientId} onAdded={changed} onClose={() => setLibrary(false)} />}
       {data === null && !problem && <p className="text-sm text-gray-400">Loading...</p>}
       {data && tab === 'dashboard' && <Dashboard data={data} />}
+      {data && tab === 'dashboard' && <RiskHeatMap clientId={clientId} />}
       {data && tab !== 'dashboard' && (
         <div className="overflow-x-auto rounded-lg border border-gray-800">
           {data.risks.length === 0 ? (
