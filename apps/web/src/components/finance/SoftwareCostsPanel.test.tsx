@@ -29,6 +29,7 @@ beforeEach(() => {
 describe('the pure parts', () => {
   it('words how a vendor stands', () => {
     expect(vendorSummary(vendor())).toBe('No count chosen: spread by revenue');
+    expect(vendorSummary(vendor({ account: '5100', mapped: [{ source: 'a', item: 'b' }], licenses: 0 }))).toBe('Support software is spread by revenue (counts apply to add-on software)');
     expect(vendorSummary(vendor({ mapped: [{ source: 'a', item: 'b' }], licenses: 0 }))).toBe('Counts chosen but none are held: spread by revenue');
     expect(vendorSummary(vendor({ mapped: [{ source: 'a', item: 'b' }], licenses: 40, per_license: '2.5' }))).toBe('40 licenses, about $2.50 each');
   });
@@ -48,7 +49,8 @@ describe('the software costs panel', () => {
     const names = () => within(table).getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0]!.textContent);
     expect(names()).toEqual(['Kaseya', 'Ninjaone LLC', 'Huntress']);
     expect(within(table).getByText('100 licenses, about $140.48 each')).toBeInTheDocument();
-    expect(within(table).getAllByText('No count chosen: spread by revenue')).toHaveLength(2);
+    expect(within(table).getAllByText('No count chosen: spread by revenue')).toHaveLength(1);
+    expect(within(table).getByText('Support software is spread by revenue (counts apply to add-on software)')).toBeInTheDocument();
     await userEvent.click(within(table).getByRole('button', { name: 'Vendor' }));
     expect(names()).toEqual(['Huntress', 'Kaseya', 'Ninjaone LLC']);
   });

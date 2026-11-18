@@ -142,3 +142,20 @@ async def test_the_software_overview_lists_the_vendors_the_counts_to_choose_from
     await with_db(w.owner, lambda db: fin.save_vendor_map(fin.VendorMapIn(vendor="Huntress", counted=[]), req, user, db))
     cleared = await with_db(w.owner, lambda db: fin.software_costs(user, db))
     assert next(v for v in cleared["vendors"] if v["vendor"] == "Huntress")["mapped"] == []
+
+
+async def test_a_vendor_not_billed_in_the_newest_month_still_shows_its_licenses_for_its_own_latest_month(world):
+    w = world
+    user = SimpleNamespace(tenant_id=w.owner, user_id=None, email="hal@x")
+    req = SimpleNamespace(client=None, headers={})
+    await with_db(w.owner, lambda db: feed.report_core_feed_vendor_costs("tok", feed.VendorCostsIn(months=[cost_month("2026-09", ("5500", "Huntress", 120.0)), cost_month("2026-10", ("5500", "Other Vendor", 5.0))]), db))
+
+    async def ingest(db):
+        db.add(FinanceProfitSnapshot(tenant_id=w.owner, payload=SNAP))
+        await db.commit()
+
+    await with_db(w.owner, ingest)
+    await with_db(w.owner, lambda db: fin.save_vendor_map(fin.VendorMapIn(vendor="Huntress", counted=[fin.CountedRefIn(source="halopsa", item="Huntress EDR")]), req, user, db))
+    out = await with_db(w.owner, lambda db: fin.software_costs(user, db))
+    huntress = next(v for v in out["vendors"] if v["vendor"] == "Huntress")
+    assert huntress["latest_month"] == "2026-09" and huntress["licenses"] == 60 and huntress["per_license"] == D("2.0000"), "September: Acme 30 and Birch 30 held"

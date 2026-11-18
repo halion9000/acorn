@@ -35,6 +35,8 @@ export const ACCOUNT_LABEL = { '5500': 'Add-on', '5100': 'Support and maintenanc
 
 /** How a vendor stands, in words (pure): what it billed, how many licenses are counted behind it and what one costs, or that nothing is counted. */
 export function vendorSummary(v: VendorRow): string {
+  // Counts carry the add-on software bills to clients; the support and maintenance software bills are spread by revenue whatever is chosen.
+  if (v.account === '5100') return 'Support software is spread by revenue (counts apply to add-on software)';
   if (v.mapped.length === 0) return 'No count chosen: spread by revenue';
   if (!v.licenses) return 'Counts chosen but none are held: spread by revenue';
   return `${v.licenses} licenses, about $${Number(v.per_license ?? 0).toFixed(2)} each`;

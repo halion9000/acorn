@@ -512,9 +512,14 @@ async def software_costs(user: AuthUser, db: DBSession) -> dict[str, Any]:
     for c in costs:
         latest.setdefault((c.account, c.vendor), c)
     newest = max((c.month for c in costs), default=None)
+    # Each vendor is shown for the month of ITS latest bill (a vendor not billed in the newest month overall would otherwise show no licenses at all).
     detail: dict[str, Any] = {}
-    if newest and snap:
-        detail = ((await allocation_by_month(db, user.tenant_id, snap.payload, [newest])).get(newest) or {}).get("per_vendor", {})
+    if snap:
+        wanted = sorted({c.month for (a, _v), c in latest.items() if a == "5500"})
+        by_month = await allocation_by_month(db, user.tenant_id, snap.payload, wanted) if wanted else {}
+        for (a, v), c in latest.items():
+            if a == "5500" and v in ((by_month.get(c.month) or {}).get("per_vendor") or {}):
+                detail[v] = by_month[c.month]["per_vendor"][v]
     ids, _ = await _scope(db, user.tenant_id, None)
     items: set[tuple[str, str]] = set()
     if ids[1:]:
