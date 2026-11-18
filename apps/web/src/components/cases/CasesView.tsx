@@ -15,6 +15,7 @@ import { SavedViewsBar } from '@/components/saved-views/SavedViewsBar';
 import { CreateCaseModal } from './CreateCaseModal';
 import { ActNowBoard } from './ActNowBoard';
 import { useOpenOnNew } from '@/lib/openNew';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 // WS-F3 — the saved-views API stores an opaque filter blob per view, so we
 // flatten the three filter slices Cases tracks today into a single shape the
@@ -354,8 +355,10 @@ export function CasesView({ initialCases }: CasesViewProps = {}) {
 
       {/* Cases List */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-48">
-          <div className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+        <div className="space-y-2" role="status" aria-label="Loading cases" data-testid="cases-loading">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
         </div>
       ) : cases.length === 0 ? (
         // WS-F5 — distinguish "filter miss" from "no cases ever". The former

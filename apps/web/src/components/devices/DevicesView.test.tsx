@@ -475,6 +475,7 @@ describe('clearer rows and messages', () => {
     listMock.mockReturnValue(new Promise(() => {}));
     render(<DevicesView />);
     expect(await screen.findByTestId('devices-loading')).toHaveTextContent('Loading devices');
+    expect(screen.getAllByTestId('devices-skeleton-row')).toHaveLength(8);
   });
 
   it('explains a failed load with the API reason and offers to try again', async () => {

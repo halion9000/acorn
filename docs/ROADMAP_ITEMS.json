@@ -739,8 +739,9 @@
     "key": "r7-ai-05",
     "title": "Skeleton placeholders instead of the word Loading on the main pages",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "new",
-    "needs": "claude"
+    "status": "completed",
+    "needs": "claude",
+    "note": "Devices, Alerts and Cases show placeholder rows while the first answer loads."
   },
   {
     "key": "r7-ai-06",

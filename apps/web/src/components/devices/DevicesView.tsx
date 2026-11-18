@@ -2,6 +2,8 @@
 
 import { UnusedToolNotice } from './UnusedToolNotice';
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { Skeleton } from '@/components/ui/Skeleton';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -717,11 +719,20 @@ export default function DevicesView() {
               <DeviceRowView key={d.id} d={d} master={master} picked={picked.has(d.id)} onPick={(on) => setPicked((now) => { const next = new Set(now); if (on) next.add(d.id); else next.delete(d.id); return next; })} open={open === d.id} onToggle={() => setOpen(open === d.id ? null : d.id)} onHide={(hide) => void setHidden(d, hide)} onMerged={() => void load()} />
             ))}
             {loading && !data && (
-              <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-gray-400" data-testid="devices-loading">
-                  Loading devices... a large estate can take several seconds the first time.
-                </td>
-              </tr>
+              <>
+                <tr>
+                  <td colSpan={8} className="px-3 py-2" data-testid="devices-loading">
+                    <span className="sr-only">Loading devices... a large estate can take several seconds the first time.</span>
+                  </td>
+                </tr>
+                {Array.from({ length: 8 }, (_, i) => (
+                  <tr key={`skeleton-${i}`} aria-hidden="true" data-testid="devices-skeleton-row">
+                    <td colSpan={8} className="px-3 py-2">
+                      <Skeleton className="h-5 w-full" />
+                    </td>
+                  </tr>
+                ))}
+              </>
             )}
             {!loading && data?.items.length === 0 && (
               <tr>

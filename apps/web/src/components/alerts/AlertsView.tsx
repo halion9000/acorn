@@ -26,6 +26,7 @@ import { sourceLink } from './AlertContext';
 import { StaleReview } from './StaleReview';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { useOpenOnNew } from '@/lib/openNew';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 // Wave 1 of the A.C.O.R.N v6 capability roadmap. The "entities" tab renders the
 // rolled-up Risk-Based Alerting queue — alerts contribute time-decayed risk
@@ -943,8 +944,10 @@ export function AlertsTableGrid({
       )}
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="space-y-2 p-4" role="status" aria-label="Loading alerts" data-testid="alerts-loading">
+          {Array.from({ length: 8 }, (_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
         </div>
       ) : error ? (
         <div className="p-4">
