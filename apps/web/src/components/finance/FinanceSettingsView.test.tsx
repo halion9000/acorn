@@ -23,6 +23,7 @@ beforeEach(() => {
   authFetch.mockImplementation((url: string, init?: RequestInit) => {
     if (init?.method === 'PUT' && String(url).endsWith('/import')) return answer({ saved: 2, unmatched: ['Nobody Known'] });
     if (init?.method) return answer({}, 204);
+    if (String(url).endsWith('/software')) return answer({ have_costs: false, latest_month: null, vendors: [], counted_items: [] });
     return answer(overview());
   });
 });
@@ -86,7 +87,7 @@ describe('the finance settings page', () => {
   });
 
   it('says so when the page is not for this person, and when CORE has not sent the agents yet', async () => {
-    authFetch.mockImplementationOnce(() => answer({}, 403));
+    authFetch.mockImplementation((u: string) => (String(u).includes('overview') ? answer({}, 403) : answer({ have_costs: false, vendors: [], counted_items: [] })));
     const { unmount } = render(<FinanceSettingsView />);
     expect(await screen.findByText('You do not have access to the finance settings.')).toBeInTheDocument();
     unmount();

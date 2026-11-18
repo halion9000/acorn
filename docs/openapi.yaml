@@ -2711,6 +2711,53 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/finance/software:
+    get:
+      tags:
+      - finance
+      summary: Software Costs
+      description: The software vendors QuickBooks booked costs to (add-on and support),
+        what each billed lately, which counts say how many licenses of it each client
+        has, and what one license costs on that basis. ``counted_items`` are the counts
+        that can be chosen.
+      operationId: software_costs_api_v1_finance_software_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Software Costs Api V1 Finance Software Get
+      security:
+      - HTTPBearer: []
+  /api/v1/finance/software/map:
+    put:
+      tags:
+      - finance
+      summary: Save Vendor Map
+      description: 'Say which counts stand behind a vendor (replacing what was there).
+        An empty list takes the vendor out of the allocation: its bill is then spread
+        by revenue.'
+      operationId: save_vendor_map_api_v1_finance_software_map_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorMapIn'
+        required: true
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/finance/profitability/analysis:
     get:
       tags:
@@ -31426,6 +31473,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/vendor-costs:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Vendor Costs
+      description: Keep what each software vendor billed per month, as QuickBooks
+        booked it (the add-on and the support and maintenance software accounts).
+        A month sent again is replaced; months not sent are left as they were. Net
+        income carries each vendor's bill to the clients that use it.
+      operationId: report_core_feed_vendor_costs_api_v1_inbox_core_feed__tenant_token__vendor_costs_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorCostsIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorCostsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/profit-tickets:
     post:
       tags:
@@ -40679,6 +40762,23 @@ components:
       - source
       - item
       title: CountedRef
+    CountedRefIn:
+      properties:
+        source:
+          type: string
+          maxLength: 40
+          minLength: 1
+          title: Source
+        item:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Item
+      type: object
+      required:
+      - source
+      - item
+      title: CountedRefIn
     Countries:
       properties:
         days:
@@ -64453,6 +64553,72 @@ components:
       - id
       - name
       title: VendorChoice
+    VendorCostMonthIn:
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        rows:
+          items:
+            $ref: '#/components/schemas/VendorCostRowIn'
+          type: array
+          maxItems: 400
+          title: Rows
+      type: object
+      required:
+      - month
+      - rows
+      title: VendorCostMonthIn
+    VendorCostRowIn:
+      properties:
+        account:
+          type: string
+          enum:
+          - '5100'
+          - '5500'
+          title: Account
+        vendor:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Vendor
+        amount:
+          type: number
+          maximum: 100000000.0
+          minimum: -100000000.0
+          title: Amount
+      type: object
+      required:
+      - account
+      - vendor
+      - amount
+      title: VendorCostRowIn
+    VendorCostsIn:
+      properties:
+        months:
+          items:
+            $ref: '#/components/schemas/VendorCostMonthIn'
+          type: array
+          maxItems: 36
+          title: Months
+      type: object
+      required:
+      - months
+      title: VendorCostsIn
+    VendorCostsOut:
+      properties:
+        months:
+          type: integer
+          title: Months
+        rows:
+          type: integer
+          title: Rows
+      type: object
+      required:
+      - months
+      - rows
+      title: VendorCostsOut
     VendorDetail:
       properties:
         id:
@@ -64840,6 +65006,24 @@ components:
       - categories
       - document_types
       title: VendorList
+    VendorMapIn:
+      properties:
+        vendor:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Vendor
+        counted:
+          items:
+            $ref: '#/components/schemas/CountedRefIn'
+          type: array
+          maxItems: 30
+          title: Counted
+      type: object
+      required:
+      - vendor
+      - counted
+      title: VendorMapIn
     VendorOut:
       properties:
         id:

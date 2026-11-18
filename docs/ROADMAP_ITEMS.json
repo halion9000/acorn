@@ -1901,8 +1901,8 @@
     "title": "Net income: add-on software per client from license counts and vendor bills (the workbook License Database method)",
     "detail": "Workbook: add-on software = each client license count (Halo recurring lines) x cost per license, where cost per license = the vendor bill (QuickBooks) divided by all licenses of that vendor; items are split Ad-On or Support by the Software Master list. Needs vendor bills typed on the Inputs tab until QuickBooks is connected, the item-to-vendor-and-category list, and HaloPSA recurring lines (A.C.O.R.N holds none today: its recurring invoice snapshot has 0 clients).",
     "area": "finance",
-    "status": "not_started",
+    "status": "completed",
     "needs": "claude",
-    "note": "Found 2026-11-17 from the LO 2026.09 Profitability.xlsx sheets License Database, Software Cost, Software Master and Software Summary. First check why the recurring invoice read is empty."
+    "note": "Built 2026-11-18: vendor bills from QuickBooks (read only), vendor-to-counts map in Settings > Finance > Software costs, allocation by month-end license counts."
   }
 ]

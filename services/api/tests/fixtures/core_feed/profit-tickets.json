@@ -2,7 +2,19 @@
   "route": "profit-tickets",
   "method": "POST",
   "body": {
-    "month": "2026-02",
-    "tickets": []
+    "month": "2026-10",
+    "tickets": [
+      {
+        "client": "Acme Dental",
+        "month": "2026-10",
+        "ticket_id": "701",
+        "summary": "Printer offline",
+        "hours": 2.5,
+        "entries": 1,
+        "agent_ids": [
+          "40"
+        ]
+      }
+    ]
   }
 }

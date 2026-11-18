@@ -161,6 +161,10 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's daily snapshot of HaloPSA's recurring and owed invoices: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own snapshot, readable only with the finance permissions.",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/vendor-costs",
+    ): "CORE's daily summary of what each software vendor billed per month: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own bills for the months sent, readable only with the finance permissions.",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/profit-tickets",
     ): "CORE's daily list of the tickets each client's hours in one month went on: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own list for the month sent, readable only with the finance permissions.",
     (

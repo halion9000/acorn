@@ -79,3 +79,29 @@ class FinanceSettings(Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
     available_hours_per_month: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False, default=Decimal("160"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
+class FinanceVendorCost(Base):
+    """What one software vendor billed in a month, as QuickBooks booked it (migration 213)."""
+
+    __tablename__ = "finance_vendor_costs"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    month: Mapped[str] = mapped_column(String, primary_key=True)
+    account: Mapped[str] = mapped_column(String, primary_key=True)
+    vendor: Mapped[str] = mapped_column(String, primary_key=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
+class FinanceVendorMap(Base):
+    """A count (a tool and an item) that says how many licenses of a vendor each client has (migration 213)."""
+
+    __tablename__ = "finance_vendor_map"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    vendor: Mapped[str] = mapped_column(String, primary_key=True)
+    source: Mapped[str] = mapped_column(String, primary_key=True)
+    item: Mapped[str] = mapped_column(String, primary_key=True)
+    updated_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)

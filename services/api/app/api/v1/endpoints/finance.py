@@ -20,7 +20,16 @@ from app.api.v1.endpoints.billing import BILLED_SOURCE, _all_client_counts
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.metric_dataset import MetricDataset
 from app.models.finance_price import FinanceItemPrice
-from app.models.finance_profit import FinanceClientMaster, FinanceCostEntry, FinanceLaborRate, FinanceProfitSnapshot, FinanceProfitTickets, FinanceSettings
+from app.models.finance_profit import (
+    FinanceClientMaster,
+    FinanceCostEntry,
+    FinanceLaborRate,
+    FinanceProfitSnapshot,
+    FinanceProfitTickets,
+    FinanceSettings,
+    FinanceVendorCost,
+    FinanceVendorMap,
+)
 from app.services import csv_export
 from app.services import finance as fin
 from app.services import finance_halo as fh
@@ -414,6 +423,75 @@ async def save_agent_rates(db: DBSession, tenant: Any, rates: list[tuple[str, De
     return saved
 
 
+class CountedRefIn(BaseModel):
+    source: str = Field(min_length=1, max_length=40)
+    item: str = Field(min_length=1, max_length=80)
+
+
+class VendorMapIn(BaseModel):
+    vendor: str = Field(min_length=1, max_length=120)
+    counted: list[CountedRefIn] = Field(max_length=30)
+
+
+@router.get("/software", dependencies=[Depends(require_permission("finance:view"))])
+async def software_costs(user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """The software vendors QuickBooks booked costs to (add-on and support), what each billed lately, which counts say how many licenses of it each client has, and what one license costs on that basis. ``counted_items`` are the counts that can be chosen."""
+    from app.api.v1.endpoints.devices import _scope
+    from app.db.rls_scope import cross_tenant_reads
+    from app.models.signin import ClientLicenseCount
+    from app.services.addon_loader import allocation_by_month, vendor_map
+
+    costs = (await db.execute(select(FinanceVendorCost).where(FinanceVendorCost.tenant_id == user.tenant_id).order_by(FinanceVendorCost.month.desc()))).scalars().all()
+    vmap = await vendor_map(db, user.tenant_id)
+    snap = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    latest: dict[tuple[str, str], FinanceVendorCost] = {}
+    for c in costs:
+        latest.setdefault((c.account, c.vendor), c)
+    newest = max((c.month for c in costs), default=None)
+    detail: dict[str, Any] = {}
+    if newest and snap:
+        detail = ((await allocation_by_month(db, user.tenant_id, snap.payload, [newest])).get(newest) or {}).get("per_vendor", {})
+    ids, _ = await _scope(db, user.tenant_id, None)
+    items: set[tuple[str, str]] = set()
+    if ids[1:]:
+        async with cross_tenant_reads(db):
+            for source, item in (await db.execute(select(ClientLicenseCount.source, ClientLicenseCount.item).where(ClientLicenseCount.tenant_id.in_(ids[1:])).distinct())).all():
+                items.add((source, item))
+    vendors = [
+        {
+            "vendor": v,
+            "account": a,
+            "latest_month": c.month,
+            "latest_amount": c.amount,
+            "mapped": [{"source": s, "item": i} for s, i in sorted(vmap.get(v, []))],
+            "licenses": (detail.get(v) or {}).get("licenses"),
+            "per_license": (detail.get(v) or {}).get("per_license"),
+        }
+        for (a, v), c in sorted(latest.items(), key=lambda kv: (kv[0][0] != "5500", -float(kv[1].amount)))
+    ]
+    return {
+        "have_costs": bool(costs),
+        "latest_month": newest,
+        "vendors": vendors,
+        "counted_items": [{"source": s, "item": i} for s, i in sorted(items)],
+    }
+
+
+@router.put("/software/map", status_code=status.HTTP_204_NO_CONTENT)
+async def save_vendor_map(
+    body: VendorMapIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession
+) -> None:
+    """Say which counts stand behind a vendor (replacing what was there). An empty list takes the vendor out of the allocation: its bill is then spread by revenue."""
+    vendor = " ".join(body.vendor.split())
+    await db.execute(delete(FinanceVendorMap).where(FinanceVendorMap.tenant_id == user.tenant_id, FinanceVendorMap.vendor == vendor))
+    now = datetime.now(UTC)
+    for ref in {(c.source, c.item) for c in body.counted}:
+        db.add(FinanceVendorMap(tenant_id=user.tenant_id, vendor=vendor, source=ref[0], item=ref[1], updated_by=str(user.user_id) if user.user_id else None, updated_at=now))
+    await db.flush()
+    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="finance_vendor_map:saved", resource="finance_vendor_map", resource_id=vendor, changes={"counts": len(body.counted)}, request=request)
+    await db.commit()
+
+
 # ---- The full model: cost inputs, client master, analysis ----------------------------------------------------------------------------------------------------
 
 
@@ -485,14 +563,18 @@ async def profitability_analysis(
     if chosen is None:
         return {"received_at": row.received_at, "months": months, "report": None, "industries": [], "hours": None, "annual": None}
     rates, costs, master = await _rates(db, user.tenant_id), await _costs(db, user.tenant_id), await _master(db, user.tenant_id)
-    report = pf.full_month(row.payload, rates, chosen, costs, master)
+    from app.services.addon_loader import add_on_by_month
+
+    annual_months = [m for m in months if m <= chosen][-12:]
+    addon_direct_months = await add_on_by_month(db, user.tenant_id, row.payload, annual_months)
+    report = pf.full_month(row.payload, rates, chosen, costs, master, addon_direct_months.get(chosen))
     return {
         "received_at": row.received_at,
         "months": months,
         "report": report,
         "industries": pf.by_industry(report),
         "hours": pf.hours_report(row.payload, rates, chosen, await _available_hours(db, user.tenant_id)),
-        "annual": pf.annual(row.payload, rates, costs, master, chosen),
+        "annual": pf.annual(row.payload, rates, costs, master, chosen, addon_direct_months),
         "note": (
             "Costs are shared out to the cent: an entry with a client goes to that client, one without is spread by each client's revenue for the month (the workbook spreads by monthly recurring revenue; the Halo summary "
             "holds invoiced revenue). Sales and marketing is split evenly across clients whose first revenue is this month."

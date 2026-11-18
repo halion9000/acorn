@@ -49,6 +49,7 @@ MODELS = {
     "finance": feed.FinanceSnapshotIn,
     "books": feed.BooksIn,
     "profit-tickets": feed.ProfitTicketsIn,
+    "vendor-costs": feed.VendorCostsIn,
     "profitability": feed.ProfitSnapshotIn,
     "ticket-stats": feed.TicketStatsIn,
     "csat": feed.CsatIn,

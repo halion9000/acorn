@@ -58,7 +58,12 @@ def first_months(snapshot: dict[str, Any]) -> dict[str, str]:
 
 
 def full_month(
-    snapshot: dict[str, Any], rates: list[dict[str, Any]], month: str, costs: list[dict[str, Any]], master: dict[str, dict[str, Any]]
+    snapshot: dict[str, Any],
+    rates: list[dict[str, Any]],
+    month: str,
+    costs: list[dict[str, Any]],
+    master: dict[str, dict[str, Any]],
+    addon_direct: dict[str, Decimal] | None = None,
 ) -> dict[str, Any]:
     base = profit_for_month(snapshot, rates, month)
     months = sorted({str(m) for m in snapshot.get("months") or []})
@@ -92,6 +97,12 @@ def full_month(
         if left != 0:
             unplaced[cat] = unplaced.get(cat, ZERO) + left
 
+    # Add-on software that vendor bills and license counts tie to a client goes to that client; what no count stands behind is spread by revenue like the other company-wide costs.
+    direct = {k: v for k, v in (addon_direct or {}).items() if k in rows and v != 0}
+    if direct and company["addon_software"] != 0:
+        for k, v in direct.items():
+            rows[k]["addon_software"] += v
+        company["addon_software"] -= sum(direct.values(), ZERO)
     for cat in ("support_software", "travel", "equipment", "hardware", "addon_software"):
         place(cat, cat, company[cat], weights)
     if company["payroll_cogs"] != 0:
@@ -234,6 +245,7 @@ def annual(
     costs: list[dict[str, Any]],
     master: dict[str, dict[str, Any]],
     through: str | None = None,
+    addon_by_month: dict[str, dict[str, Decimal]] | None = None,
 ) -> dict[str, Any]:
     """Twelve months (or as many as the summary holds) ending at ``through``: each client's revenue and net income, ranked by net income, with the size tier (Top 20 ... Top 120) and whether it reaches its target net margin (20% unless the client master sets one)."""
     months = sorted({str(m) for m in snapshot.get("months") or []})
@@ -242,7 +254,7 @@ def annual(
     months = months[-12:]
     acc: dict[str, dict[str, Any]] = {}
     for m in months:
-        for r in full_month(snapshot, rates, m, costs, master)["rows"]:
+        for r in full_month(snapshot, rates, m, costs, master, (addon_by_month or {}).get(m))["rows"]:
             a = acc.setdefault(
                 r["client_key"],
                 {

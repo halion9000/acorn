@@ -374,3 +374,24 @@ async def test_rates_are_imported_by_name_to_the_agents_halo_has_and_the_overvie
     assert again["saved"] == 1
     rates = [r for r in (await with_db(tenant.id, lambda db: ep._rates(db, tenant.id))) if r["scope"] == "agent"]
     assert [(r["key"], r["hourly_rate"]) for r in rates] == [("40", D("72.00"))], "importing again replaces, never piles up"
+
+
+def test_add_on_software_tied_to_a_client_by_license_counts_goes_to_that_client_and_the_rest_is_spread_by_revenue():
+    costs = [{**cost("addon_software", "100"), "source": "quickbooks"}]
+    plain = pf.full_month(SNAP, [], "2026-10", costs, MASTER)
+    assert {r["client_key"]: r["addon_software"] for r in plain["rows"]} == {"acmedentalinc": D("71.40"), "birchlaw": D("28.60")}
+    r = pf.full_month(SNAP, [], "2026-10", costs, MASTER, {"birchlaw": D("60.00"), "nobodyinvoiced": D("25.00")})
+    by = {x["client_key"]: x["addon_software"] for x in r["rows"]}
+    assert by == {"acmedentalinc": D("28.56"), "birchlaw": D("71.44")}, "Birch carries its own 60.00 and a revenue share of the other 40.00; Acme carries only its share"
+    assert r["unplaced"] == {}, "an amount for a client with no revenue this month goes back into the spread"
+    no_company_total = pf.full_month(SNAP, [], "2026-10", [], MASTER, {"birchlaw": D("60.00")})
+    assert sum(x["addon_software"] for x in no_company_total["rows"]) == D("0.00"), "with no add-on total there is nothing to share out"
+
+
+def test_the_ranking_uses_each_months_add_on_allocation():
+    costs = [{**cost("addon_software", "100", month="2026-10"), "source": "quickbooks"}]
+    plain = pf.annual(SNAP, [], costs, MASTER, "2026-10")
+    tied = pf.annual(SNAP, [], costs, MASTER, "2026-10", {"2026-10": {"birchlaw": D("100.00")}})
+    birch_plain = next(x for x in plain["rows"] if x["client_key"] == "birchlaw")["net_income"]
+    birch_tied = next(x for x in tied["rows"] if x["client_key"] == "birchlaw")["net_income"]
+    assert birch_tied < birch_plain, "Birch carries all 100.00 instead of a share"

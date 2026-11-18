@@ -1,0 +1,23 @@
+{
+  "route": "vendor-costs",
+  "method": "POST",
+  "body": {
+    "months": [
+      {
+        "month": "2026-10",
+        "rows": [
+          {
+            "account": "5500",
+            "vendor": "Huntress",
+            "amount": 1170.65
+          },
+          {
+            "account": "5100",
+            "vendor": "Ninjaone LLC",
+            "amount": 1170.65
+          }
+        ]
+      }
+    ]
+  }
+}

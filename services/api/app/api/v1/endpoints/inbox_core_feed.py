@@ -32,7 +32,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
-from app.models.finance_profit import FinanceCostEntry, FinanceProfitSnapshot, FinanceProfitTickets
+from app.models.finance_profit import FinanceCostEntry, FinanceProfitSnapshot, FinanceProfitTickets, FinanceVendorCost
 from app.models.metric_dataset import DATASET_KEYS, MetricDataset, merge_dataset
 from app.models.tenant import Tenant
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
@@ -1280,6 +1280,49 @@ async def report_core_feed_books(tenant_token: str, body: BooksIn, db: DBSession
             entries += 1
     await db.commit()
     return BooksOut(months=len(months), entries=entries)
+
+
+class VendorCostRowIn(BaseModel):
+    account: Literal["5100", "5500"]
+    vendor: str = Field(min_length=1, max_length=120)
+    amount: float = Field(ge=-100_000_000, le=100_000_000)
+
+
+class VendorCostMonthIn(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    rows: list[VendorCostRowIn] = Field(max_length=400)
+
+
+class VendorCostsIn(BaseModel):
+    months: list[VendorCostMonthIn] = Field(max_length=36)
+
+
+class VendorCostsOut(BaseModel):
+    months: int
+    rows: int
+
+
+@router.post("/core-feed/{tenant_token}/vendor-costs", response_model=VendorCostsOut)
+async def report_core_feed_vendor_costs(tenant_token: str, body: VendorCostsIn, db: DBSession) -> VendorCostsOut:
+    """Keep what each software vendor billed per month, as QuickBooks booked it (the add-on and the support and maintenance software accounts). A month sent again is replaced; months not sent are left as they were. Net income carries each vendor's bill to the clients that use it."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    months = sorted({m.month for m in body.months})
+    if months:
+        await db.execute(delete(FinanceVendorCost).where(FinanceVendorCost.tenant_id == tenant_id, FinanceVendorCost.month.in_(months)))
+    total = 0
+    for m in {m.month: m for m in body.months}.values():
+        merged: dict[tuple[str, str], Decimal] = {}
+        for r in m.rows:
+            key = (r.account, " ".join(r.vendor.split()))
+            merged[key] = merged.get(key, Decimal(0)) + Decimal(str(round(r.amount, 2)))
+        for (account, vendor), amount in merged.items():
+            if amount != 0:
+                db.add(FinanceVendorCost(tenant_id=tenant_id, month=m.month, account=account, vendor=vendor, amount=amount, received_at=now))
+                total += 1
+    await db.commit()
+    return VendorCostsOut(months=len(months), rows=total)
 
 
 class ProfitTicketsIn(BaseModel):
