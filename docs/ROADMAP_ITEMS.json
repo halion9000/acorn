@@ -181,9 +181,9 @@
     "title": "Device names on Liongard disk tickets",
     "detail": "The Liongard API does not render the dynamic content that carries the device name.",
     "area": "Alerts",
-    "status": "not_started",
+    "status": "completed",
     "needs": "hal",
-    "note": "Needs a Liongard-side change or another source for the name."
+    "note": "Built 2026-11-17: CORE reads the affected devices through Liongard's metrics (bulk read with the metric id) and the alert shows them; verify on the next Liongard disk alert."
   },
   {
     "key": "google-bec-scan",
