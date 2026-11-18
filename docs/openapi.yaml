@@ -3354,6 +3354,162 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/governance/{item_id}/approvals:
+    get:
+      tags:
+      - compliance
+      summary: List Approvals
+      description: Every request to approve a version of this policy and what was
+        decided, newest first.
+      operationId: list_approvals_api_v1_governance__item_id__approvals_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApprovalOut'
+                title: Response List Approvals Api V1 Governance  Item Id  Approvals
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Request Approval
+      description: Ask a person to approve a version of a policy (the newest unless
+        named). The person asking cannot be the approver, and a version waits on one
+        request at a time.
+      operationId: request_approval_api_v1_governance__item_id__approvals_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequestIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/governance/{item_id}/approvals/{approval_id}/decision:
+    post:
+      tags:
+      - compliance
+      summary: Decide Approval
+      description: Approve or reject a version. Only the person named as approver
+        can, once; a rejection says why. The decision, who made it and when stay on
+        file.
+      operationId: decide_approval_api_v1_governance__item_id__approvals__approval_id__decision_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: approval_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Approval Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecisionIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/governance/{item_id}/acceptances:
     get:
       tags:
@@ -33957,6 +34113,23 @@ components:
       - title
       - summary
       title: ApprovalCreateRequest
+    ApprovalDecisionIn:
+      properties:
+        decision:
+          type: string
+          enum:
+          - approved
+          - rejected
+          title: Decision
+        comment:
+          type: string
+          maxLength: 1000
+          title: Comment
+          default: ''
+      type: object
+      required:
+      - decision
+      title: ApprovalDecisionIn
     ApprovalDecisionRequest:
       properties:
         decision:
@@ -34026,6 +34199,80 @@ components:
       title: ApprovalNote
       description: One approval waiting for the owner in CORE. Only what the bell
         shows.
+    ApprovalOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        version:
+          type: integer
+          title: Version
+        approver:
+          type: string
+          title: Approver
+        requested_by:
+          type: string
+          title: Requested By
+        requested_at:
+          type: string
+          format: date-time
+          title: Requested At
+        note:
+          type: string
+          title: Note
+        decision:
+          type: string
+          title: Decision
+        decided_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Decided By
+        decided_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Decided At
+        comment:
+          type: string
+          title: Comment
+      type: object
+      required:
+      - id
+      - version
+      - approver
+      - requested_by
+      - requested_at
+      - note
+      - decision
+      - decided_by
+      - decided_at
+      - comment
+      title: ApprovalOut
+    ApprovalRequestIn:
+      properties:
+        approver_email:
+          type: string
+          maxLength: 200
+          minLength: 3
+          title: Approver Email
+        version:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Version
+        note:
+          type: string
+          maxLength: 300
+          title: Note
+          default: ''
+      type: object
+      required:
+      - approver_email
+      title: ApprovalRequestIn
     ApprovalResponse:
       properties:
         id:
@@ -64618,6 +64865,10 @@ components:
           type: string
           format: date-time
           title: Created At
+        approval:
+          type: string
+          title: Approval
+          default: none
       type: object
       required:
       - version

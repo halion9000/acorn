@@ -1421,7 +1421,7 @@
     "key": "r7-af-12",
     "title": "Policies: a review workflow with an approver and an approval record",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
+    "status": "completed",
     "needs": "claude"
   },
   {
@@ -1705,13 +1705,13 @@
     "detail": "User management (group membership, OneDrive permissions, attributes, onboarding, offboarding), password and security (change password, compromised user remediation, reset MFA), mail and permissions (out of office, mailbox permissions, forwarding, shared mailbox, litigation hold, calendar permissions), scheduled workflows. A launcher over A.C.O.R.N CIPP actions with the existing approval path."
   },
   {
-    "status": "not_started",
+    "status": "completed",
     "needs": "hal",
     "area": "Sales and Finance",
     "key": "qbo-live-check",
     "title": "QuickBooks Online: authorize and test the new connector live",
     "detail": "Create the Intuit app keys, authorize once in the OAuth Playground, save the four settings in CORE, then I read one profit and loss by customer to check the shapes.",
-    "note": "Needs Hal: the Intuit app keys and the one-time authorization; then the connector is read once against the real account."
+    "note": "Read live 2026-11-18: 109 cost entries from QuickBooks (read only); September ties to finance's workbook on income, sales and marketing and other income/expenses."
   },
   {
     "status": "in_progress",
@@ -1794,13 +1794,13 @@
     "completed_ref": null
   },
   {
-    "status": "not_started",
+    "status": "completed",
     "needs": "hal",
     "area": "Sales and Finance",
     "key": "qbo-cost-sync",
     "title": "QuickBooks sync that fills the Net income cost lines",
     "detail": "Once QuickBooks is authorized (qbo-live-check), a daily read of the P&L by customer fills finance_cost_entries (source quickbooks) for payroll COGS, travel, hardware and overhead; typed entries are never overwritten.",
-    "note": "Waits on qbo-live-check.",
+    "note": "Read live 2026-11-18: 109 cost entries from QuickBooks (read only); September ties to finance's workbook on income, sales and marketing and other income/expenses.",
     "completed_ref": null
   },
   {

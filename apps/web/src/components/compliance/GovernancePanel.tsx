@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { PolicyAcceptance } from './PolicyAcceptance';
+import { PolicyApproval, approvalBadge } from './PolicyApproval';
 import { PolicyVersionDiff } from './PolicyVersionDiff';
 import { authFetch } from '@/lib/auth-session';
 
@@ -42,6 +43,7 @@ interface Version {
   body: string;
   change_note: string;
   created_at: string;
+  approval?: string;
 }
 
 const KIND: Record<GovItem['kind'], string> = { policy: 'Policy', vendor: 'Vendor review', evidence: 'Evidence', other: 'Other' };
@@ -74,6 +76,7 @@ export function GovernancePanel({ clientId = '' }: { clientId?: string } = {}) {
   const [showTemplates, setShowTemplates] = useState(false);
   const [filled, setFilled] = useState<Filled | null>(null);
   const [acceptOf, setAcceptOf] = useState<string | null>(null);
+  const [approvalOf, setApprovalOf] = useState<string | null>(null);
   const [diffOf, setDiffOf] = useState<{ id: string; version: number } | null>(null);
 
   const load = useCallback(async () => {
@@ -235,18 +238,20 @@ export function GovernancePanel({ clientId = '' }: { clientId?: string } = {}) {
                 </span>
                 <span className="flex gap-2">
                   {i.kind === 'policy' ? <button type="button" className={ghost} onClick={() => void toggleVersions(i.id)}>Versions ({i.versions})</button> : null}
+                  {i.kind === 'policy' && i.versions > 0 ? <button type="button" className={ghost} onClick={() => setApprovalOf(approvalOf === i.id ? null : i.id)}>Approval</button> : null}
                   {i.kind === 'policy' ? <button type="button" className={ghost} onClick={() => setAcceptOf(acceptOf === i.id ? null : i.id)}>Acceptance</button> : null}
                   <button type="button" className={ghost} disabled={busy} onClick={() => void (async () => { if (await send(`/api/v1/governance/${i.id}/reviewed`, 'POST')) await load(); })()}>Reviewed</button>
                   <button type="button" className={ghost} disabled={busy} onClick={() => void (async () => { if (await send(`/api/v1/governance/${i.id}`, 'DELETE')) await load(); })()}>Archive</button>
                 </span>
               </div>
               {acceptOf === i.id ? <PolicyAcceptance itemId={i.id} scoped={scoped} /> : null}
+              {approvalOf === i.id ? <PolicyApproval itemId={i.id} scoped={scoped} onChange={() => { if (open?.id === i.id) void loadVersions(i.id); }} /> : null}
               {open?.id === i.id ? (
                 <div className="mt-2 rounded border border-gray-700 bg-gray-950/60 p-3" data-testid="gov-versions">
                   {open.versions.length === 0 ? <p className="text-xs text-gray-500">No text saved yet.</p> : null}
                   {open.versions.map((v) => (
                     <div key={v.version} className="mb-2 text-xs text-gray-300">
-                      <div className="font-semibold text-gray-100">Version {v.version} · {v.created_at.slice(0, 10)}{v.change_note ? ` · ${v.change_note}` : ''}</div>
+                      <div className="font-semibold text-gray-100">Version {v.version} · {v.created_at.slice(0, 10)}{v.change_note ? ` · ${v.change_note}` : ''} · <span className={v.approval === 'approved' ? 'text-emerald-300' : v.approval === 'rejected' ? 'text-red-300' : v.approval === 'pending' ? 'text-amber-300' : 'text-gray-500'}>{approvalBadge(v.approval)}</span></div>
                       <button type="button" className={`${ghost} mt-1`} onClick={() => void showFilled(i.id, v.version)}>
                         {filled?.id === i.id && filled.version === v.version ? 'Show as written' : 'Show filled in'}
                       </button>

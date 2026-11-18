@@ -17,10 +17,11 @@ from sqlalchemy import func, select
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.governance import GovernanceItem, GovernanceVersion
-from app.models.policy_acceptance import PolicyAcceptance, PolicyAssignment
+from app.models.policy_acceptance import PolicyAcceptance, PolicyApproval, PolicyAssignment
 from app.models.tenant import Tenant
 from app.services import governance as gov
 from app.services import policy_acceptance as pa
+from app.services import policy_approval as pap
 from app.services import policy_assignment as pas
 from app.services import policy_templates as pt
 from app.services.audit import emit_audit
@@ -73,6 +74,7 @@ class VersionOut(BaseModel):
     body: str
     change_note: str
     created_at: datetime
+    approval: str = "none"  # none / pending / approved / rejected: the newest request for this version
 
 
 def _today() -> date:
@@ -268,7 +270,8 @@ async def list_versions(tenant: ScopeTenant, item_id: uuid.UUID, user: AuthUser,
         .scalars()
         .all()
     )
-    return [VersionOut(version=r.version, body=r.body, change_note=r.change_note, created_at=r.created_at) for r in rows]
+    standing = pap.status_by_version(await _approval_rows(db, tenant, item_id))
+    return [VersionOut(version=r.version, body=r.body, change_note=r.change_note, created_at=r.created_at, approval=standing.get(r.version, "none")) for r in rows]
 
 
 @router.post("/{item_id}/versions", response_model=VersionOut, status_code=status.HTTP_201_CREATED)
@@ -310,6 +313,159 @@ async def add_version(
     await db.commit()
     await db.refresh(v)
     return VersionOut(version=v.version, body=v.body, change_note=v.change_note, created_at=v.created_at)
+
+
+class ApprovalRequestIn(BaseModel):
+    approver_email: str = Field(min_length=3, max_length=200)
+    version: int | None = Field(default=None, ge=1)  # the newest version when left out
+    note: str = Field(default="", max_length=300)
+
+
+class ApprovalDecisionIn(BaseModel):
+    decision: Literal["approved", "rejected"]
+    comment: str = Field(default="", max_length=pap.COMMENT_MAX)
+
+
+class ApprovalOut(BaseModel):
+    id: uuid.UUID
+    version: int
+    approver: str
+    requested_by: str
+    requested_at: datetime
+    note: str
+    decision: str
+    decided_by: str | None
+    decided_at: datetime | None
+    comment: str
+
+
+def _approval_out(r: PolicyApproval) -> ApprovalOut:
+    return ApprovalOut(
+        id=r.id,
+        version=r.version,
+        approver=r.approver_email,
+        requested_by=r.requested_by,
+        requested_at=r.requested_at,
+        note=r.note,
+        decision=r.decision,
+        decided_by=r.decided_by,
+        decided_at=r.decided_at,
+        comment=r.comment,
+    )
+
+
+async def _approval_rows(db: DBSession, tenant: uuid.UUID, item_id: uuid.UUID) -> list[pap.Approval]:
+    rows = (await db.execute(select(PolicyApproval).where(PolicyApproval.item_id == item_id, PolicyApproval.tenant_id == tenant))).scalars().all()
+    return [
+        pap.Approval(str(r.id), r.version, r.approver_email, r.requested_by, r.requested_at, r.decision, r.decided_by, r.decided_at, r.comment) for r in rows
+    ]
+
+
+def _person(user: AuthUser) -> str:
+    """The signed-in person's address. Approving is a person's own act: an API key (CORE's, an agent's) never asks for or gives an approval, even if it were given the permission."""
+    if getattr(user, "scopes", None) is not None or not pap.norm(getattr(user, "email", None)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="An approval is asked for and given by a signed-in person, not by an API key.")
+    return pap.norm(getattr(user, "email", None))
+
+
+@router.get("/{item_id}/approvals", response_model=list[ApprovalOut], dependencies=[Depends(require_permission("reports:read"))])
+async def list_approvals(tenant: ScopeTenant, item_id: uuid.UUID, db: DBSession) -> list[ApprovalOut]:
+    """Every request to approve a version of this policy and what was decided, newest first."""
+    await _item(db, tenant, item_id)
+    rows = (
+        (await db.execute(select(PolicyApproval).where(PolicyApproval.item_id == item_id, PolicyApproval.tenant_id == tenant).order_by(PolicyApproval.requested_at.desc())))
+        .scalars()
+        .all()
+    )
+    return [_approval_out(r) for r in rows]
+
+
+@router.post("/{item_id}/approvals", response_model=ApprovalOut, status_code=status.HTTP_201_CREATED)
+async def request_approval(
+    tenant: ScopeTenant,
+    item_id: uuid.UUID,
+    body: ApprovalRequestIn,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+    db: DBSession,
+) -> ApprovalOut:
+    """Ask a person to approve a version of a policy (the newest unless named). The person asking cannot be the approver, and a version waits on one request at a time."""
+    me = _person(user)
+    row = await _item(db, tenant, item_id)
+    if row.kind != "policy":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only a policy is approved.")
+    latest = (await db.execute(select(func.max(GovernanceVersion.version)).where(GovernanceVersion.item_id == item_id))).scalar_one()
+    if latest is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Save the policy's text first; there is nothing to approve yet.")
+    version = body.version or latest
+    pending = (
+        await db.execute(
+            select(PolicyApproval.id).where(PolicyApproval.item_id == item_id, PolicyApproval.version == version, PolicyApproval.decision == "pending")
+        )
+    ).first() is not None
+    problem = pap.request_problem(me, body.approver_email, pending, version <= latest)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=problem)
+    r = PolicyApproval(
+        id=uuid.uuid4(),
+        tenant_id=tenant,
+        item_id=item_id,
+        version=version,
+        approver_email=pap.norm(body.approver_email),
+        requested_by=me,
+        note=body.note.strip(),
+    )
+    db.add(r)
+    await db.flush()
+    await emit_audit(
+        db=db,
+        tenant_id=tenant,
+        actor_id=user.user_id,
+        action="policy_approval:requested",
+        resource="governance_item",
+        resource_id=str(item_id),
+        changes={"version": version, "approver": r.approver_email},
+        request=request,
+    )
+    await db.commit()
+    return _approval_out(r)
+
+
+@router.post("/{item_id}/approvals/{approval_id}/decision", response_model=ApprovalOut)
+async def decide_approval(
+    tenant: ScopeTenant,
+    item_id: uuid.UUID,
+    approval_id: uuid.UUID,
+    body: ApprovalDecisionIn,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("reports:read"))],
+    db: DBSession,
+) -> ApprovalOut:
+    """Approve or reject a version. Only the person named as approver can, once; a rejection says why. The decision, who made it and when stay on file."""
+    me = _person(user)
+    await _item(db, tenant, item_id)
+    r = (
+        await db.execute(select(PolicyApproval).where(PolicyApproval.id == approval_id, PolicyApproval.item_id == item_id, PolicyApproval.tenant_id == tenant).with_for_update())
+    ).scalar_one_or_none()
+    if r is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such request for approval.")
+    problem = pap.decision_problem(me, r.approver_email, r.decision, body.decision, body.comment)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN if "Only the person named" in problem else status.HTTP_422_UNPROCESSABLE_ENTITY, detail=problem)
+    r.decision, r.decided_by, r.decided_at, r.comment = body.decision, me, datetime.now(UTC), body.comment.strip()
+    await db.flush()
+    await emit_audit(
+        db=db,
+        tenant_id=tenant,
+        actor_id=user.user_id,
+        action=f"policy_approval:{body.decision}",
+        resource="governance_item",
+        resource_id=str(item_id),
+        changes={"version": r.version},
+        request=request,
+    )
+    await db.commit()
+    return _approval_out(r)
 
 
 class AcceptanceIn(BaseModel):
