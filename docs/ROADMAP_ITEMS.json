@@ -1403,7 +1403,7 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "completed",
     "needs": "claude",
-    "completed_ref": "AiSOC pending commit",
+    "completed_ref": "AiSOC 8a35d9f6",
     "note": "2026-11-18: risk_register_levels (migration 216) keeps each risk's levels with a date; GET /risk-register/heatmap and a grid with month-end trend on the dashboard. History before 2026-11-18 is only the baseline row."
   },
   {
