@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
-import { apiErrorDetail, controlTestsApi, type ControlTests } from '@/lib/api';
+import { apiErrorDetail, controlTestsApi, type TestSchedule, type ControlTests } from '@/lib/api';
 
 type State = 'all' | 'fail' | 'partly' | 'pass' | 'not_tested';
 export const STATE_LABEL: Record<Exclude<State, 'all'>, string> = { fail: 'Failing', partly: 'Partly met', pass: 'Passing', not_tested: 'Not tested' };
@@ -24,6 +24,7 @@ export function ControlTestsView() {
   const [data, setData] = useState<ControlTests | null>(null);
   const [problem, setProblem] = useState('');
   const [note, setNote] = useState('');
+  const [schedule, setSchedule] = useState<TestSchedule | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -41,6 +42,28 @@ export function ControlTestsView() {
     setNote('');
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const s = await controlTestsApi.schedule(clientId);
+        if (live && s) setSchedule(s);
+      } catch {
+        /* the switch is simply not shown */
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [clientId]);
+  const switchNightly = async (nightly: boolean) => {
+    try {
+      setSchedule(await controlTestsApi.saveSchedule(clientId, nightly));
+    } catch (e) {
+      setProblem(apiErrorDetail(e) ?? (e instanceof Error ? e.message : 'Could not save that.'));
+    }
+  };
 
   const record = async () => {
     setBusy(true);
@@ -82,6 +105,13 @@ export function ControlTestsView() {
           Record as evidence
         </button>
       </div>
+      {schedule && (
+        <label className="flex flex-wrap items-center gap-2 text-sm text-gray-300" data-testid="tests-schedule">
+          <input type="checkbox" checked={schedule.nightly} onChange={(e) => void switchNightly(e.target.checked)} />
+          Record the results as evidence every night
+          {schedule.last_run_at ? <span className="text-xs text-gray-500">Last run {new Date(schedule.last_run_at).toISOString().slice(0, 16).replace('T', ' ')} UTC. {schedule.last_result ?? ''}</span> : null}
+        </label>
+      )}
       {note && (
         <p role="status" className="text-sm text-emerald-300" data-testid="tests-note">
           {note}

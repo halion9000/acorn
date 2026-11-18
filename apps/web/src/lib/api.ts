@@ -7849,6 +7849,8 @@ export interface RoadmapItem {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
 }
 export interface Roadmap {
   items: RoadmapItem[];
@@ -7861,6 +7863,7 @@ export const roadmapApi = {
   update: (id: string, body: { priority?: RoadmapItem['priority']; status?: RoadmapItem['status']; needs?: RoadmapItem['needs']; note?: string }) =>
     request<RoadmapItem>(`/api/v1/roadmap/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) }),
   remove: (id: string) => request<void>(`/api/v1/roadmap/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  approve: (id: string) => request<RoadmapItem>(`/api/v1/roadmap/${encodeURIComponent(id)}/approve`, { method: 'POST' }),
 };
 
 /** Vendor management (GET/POST /api/v1/compliance/vendors ...). `clientId` reads or writes one client. */
@@ -7957,7 +7960,14 @@ export interface ControlTests {
   enabled: string[];
   checks_held: number;
 }
+export interface TestSchedule {
+  nightly: boolean;
+  last_run_at: string | null;
+  last_result: string | null;
+}
 export const controlTestsApi = {
+  schedule: (clientId: string) => request<TestSchedule>(`/api/v1/compliance/tests/schedule?${riskQs(clientId)}`),
+  saveSchedule: (clientId: string, nightly: boolean) => request<TestSchedule>(`/api/v1/compliance/tests/schedule?${riskQs(clientId)}`, { method: 'PUT', body: JSON.stringify({ nightly }) }),
   list: (clientId: string) => request<ControlTests>(`/api/v1/compliance/tests?${riskQs(clientId)}`),
   record: (clientId: string) => request<{ written: number; replaced: number; results: ControlTests }>(`/api/v1/compliance/tests/record?${riskQs(clientId)}`, { method: 'POST' }),
 };

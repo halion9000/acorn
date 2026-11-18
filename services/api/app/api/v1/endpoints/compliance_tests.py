@@ -16,6 +16,7 @@ from sqlalchemy import select
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.compliance_enabled_framework import ComplianceEnabledFramework
+from app.models.governance import ComplianceTestSchedule
 from app.models.signin import ClientM365Check
 from app.services import compliance_audit as audit
 from app.services import compliance_tests as engine
@@ -116,3 +117,37 @@ async def record_tests(
     )
     await db.commit()
     return RecordOut(**done, results=_out(results, enabled, len(checks)))
+
+
+class ScheduleOut(BaseModel):
+    nightly: bool
+    last_run_at: datetime | None
+    last_result: str | None
+
+
+class ScheduleIn(BaseModel):
+    nightly: bool
+
+
+@router.get("/schedule", response_model=ScheduleOut, summary="Whether the results are recorded as evidence every night")
+async def get_schedule(
+    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+) -> ScheduleOut:
+    row = (await db.execute(select(ComplianceTestSchedule).where(ComplianceTestSchedule.tenant_id == tenant))).scalar_one_or_none()
+    return ScheduleOut(nightly=bool(row and row.nightly), last_run_at=row.last_run_at if row else None, last_result=row.last_result if row else None)
+
+
+@router.put("/schedule", response_model=ScheduleOut, summary="Switch nightly recording of the results on or off")
+async def save_schedule(
+    body: ScheduleIn, tenant: ScopeTenant, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("reports:write"))]
+) -> ScheduleOut:
+    row = (await db.execute(select(ComplianceTestSchedule).where(ComplianceTestSchedule.tenant_id == tenant))).scalar_one_or_none()
+    now = datetime.now(UTC)
+    if row is None:
+        row = ComplianceTestSchedule(tenant_id=tenant, nightly=body.nightly, updated_by=getattr(user, "email", None), updated_at=now)
+        db.add(row)
+    else:
+        row.nightly, row.updated_by, row.updated_at = body.nightly, getattr(user, "email", None), now
+    await audit.note(db, tenant, user, "compliance_tests:schedule", "compliance_tests", tenant, nightly=body.nightly)
+    await db.commit()
+    return ScheduleOut(nightly=row.nightly, last_run_at=row.last_run_at, last_result=row.last_result)

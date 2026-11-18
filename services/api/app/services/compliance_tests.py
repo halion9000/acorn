@@ -21,6 +21,16 @@ from typing import Any
 from sqlalchemy import text
 
 SOURCE = "checks"
+NIGHTLY_GAP_HOURS = 20
+
+
+def nightly_due(nightly: bool, last_run_at: datetime | None, now: datetime) -> bool:
+    """Whether a schedule that may be switched on should run now (pure): it is on, and it has never run or last ran at least ``NIGHTLY_GAP_HOURS`` ago."""
+    if not nightly:
+        return False
+    if last_run_at is None:
+        return True
+    return (now - last_run_at).total_seconds() >= NIGHTLY_GAP_HOURS * 3600
 
 
 @dataclass(frozen=True)

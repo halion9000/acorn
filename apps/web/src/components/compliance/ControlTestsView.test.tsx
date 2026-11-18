@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), record: vi.fn() }));
+const api = vi.hoisted(() => ({ list: vi.fn(), record: vi.fn(), schedule: vi.fn(), saveSchedule: vi.fn() }));
 vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), controlTestsApi: api, msspApi: { listChildren: async () => [] } }));
 
 import { ControlTestsView } from './ControlTestsView';
@@ -18,6 +18,9 @@ const tests = (results = [result(), result({ id: 'mfa', title: 'Multi-factor sig
 beforeEach(() => {
   api.list.mockReset();
   api.record.mockReset();
+  api.schedule.mockReset();
+  api.saveSchedule.mockReset();
+  api.schedule.mockResolvedValue({ nightly: false, last_run_at: null, last_result: null });
   api.list.mockResolvedValue(tests());
   window.history.replaceState(null, '', '/compliance/tests');
 });
@@ -68,3 +71,17 @@ describe('ControlTestsView', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
   });
 });
+
+describe('recording every night', () => {
+  it('shows the switch, saves it when pressed and says when it last ran', async () => {
+    api.saveSchedule.mockResolvedValue({ nightly: true, last_run_at: '2026-11-18T03:00:00Z', last_result: 'Recorded 5 results for the frameworks that are on, replacing 5.' });
+    render(<ControlTestsView />);
+    const box = await screen.findByLabelText('Record the results as evidence every night');
+    expect((box as HTMLInputElement).checked).toBe(false);
+    await userEvent.click(box);
+    await waitFor(() => expect(api.saveSchedule).toHaveBeenCalledWith('', true));
+    expect(await screen.findByTestId('tests-schedule')).toHaveTextContent('Last run 2026-11-18 03:00 UTC. Recorded 5 results');
+    expect((screen.getByLabelText(/Record the results as evidence every night/) as HTMLInputElement).checked).toBe(true);
+  });
+});
+
