@@ -2121,7 +2121,7 @@
     "key": "simplesat-connector",
     "title": "SimpleSat: customer satisfaction in CORE and A.C.O.R.N, with reviews on each person",
     "detail": "CORE reads SimpleSat (responses with the written comments), sends a daily CSAT summary, maps its companies as clients and its respondents as people with their newest reviews; A.C.O.R.N shows them on Metrics and on the person (Customer reviews). Built from SimpleSat's published API file, NOT yet read against the live account.",
-    "note": "Needs Hal: confirm the first daily read works once CORE restarts, and send the SimpleSat logo in a new message so it can be added.",
+    "note": "The SimpleSat logo is already in both projects (CORE connector-logos and the A.C.O.R.N vendor badge, since 2026-11-15); the copy Hal sent 2026-11-18 is the same image at a smaller size, so nothing changed. Still needs Hal: confirm CORE's first daily SimpleSat read worked (Metrics, customer reviews on a person).",
     "completed_ref": null,
     "added": "2026-11-15"
   },
