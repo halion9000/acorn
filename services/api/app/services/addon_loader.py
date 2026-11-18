@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 
 from app.db.rls_scope import cross_tenant_reads
 from app.models.client_alias import ClientAlias
@@ -60,13 +60,14 @@ async def allocation_by_month(db: Any, owner: uuid.UUID, snapshot: dict[str, Any
         return {}
     ids = list(keys)
     async with cross_tenant_reads(db):
-        held = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id.in_(ids)))).scalars().all()
-        hist = (await db.execute(select(ClientLicenseHistory).where(ClientLicenseHistory.tenant_id.in_(ids)))).scalars().all()
-    held = [h for h in held if (h.source, h.item) in pairs]
+        # Only the mapped counts, and only the columns used: the history table is large, and building an object for every row made a page load take ten seconds.
+        wanted = tuple_(ClientLicenseCount.source, ClientLicenseCount.item).in_(list(pairs))
+        held = (await db.execute(select(ClientLicenseCount.tenant_id, ClientLicenseCount.source, ClientLicenseCount.item, ClientLicenseCount.count).where(ClientLicenseCount.tenant_id.in_(ids), wanted))).all()
+        wanted_h = tuple_(ClientLicenseHistory.source, ClientLicenseHistory.item).in_(list(pairs))
+        hist = (await db.execute(select(ClientLicenseHistory.tenant_id, ClientLicenseHistory.source, ClientLicenseHistory.item, ClientLicenseHistory.observed_at, ClientLicenseHistory.count).where(ClientLicenseHistory.tenant_id.in_(ids), wanted_h))).all()
     history: dict[tuple[uuid.UUID, str, str], list[Change]] = {}
     for h in hist:
-        if (h.source, h.item) in pairs:
-            history.setdefault((h.tenant_id, h.source, h.item), []).append(Change(h.observed_at, h.count))
+        history.setdefault((h.tenant_id, h.source, h.item), []).append(Change(h.observed_at, h.count))
     current = {(h.tenant_id, h.source, h.item): h.count for h in held}
     # A count that has since been removed has no current row but still counted in the months it was there.
     universe = sorted(set(current) | set(history), key=str)
