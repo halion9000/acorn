@@ -223,8 +223,9 @@
     "detail": "ThreatMate cannot scan mailboxes; the light Google check is on hold.",
     "area": "Security",
     "status": "not_started",
-    "needs": "signoff",
-    "added": "2026-11-14"
+    "needs": "claude",
+    "added": "2026-11-14",
+    "note": "Approved by hal@goliveoak.com on 2026-11-18."
   },
   {
     "key": "tokens-out-of-storage",
@@ -296,9 +297,12 @@
     "title": "Enforce the API rate limits (6FA39)",
     "detail": "Log-only mode has run for over a week; look at the Platform health line and decide.",
     "area": "Platform",
-    "status": "not_started",
-    "needs": "signoff",
-    "added": "2026-11-14"
+    "status": "completed",
+    "needs": "claude",
+    "added": "2026-11-14",
+    "note": "Approved by hal@goliveoak.com on 2026-11-18. Enforce is the default on the Azure VM (docker-compose.azure.yml); set AISOC_RATE_LIMIT_MODE=log in the VM .env to undo. The log-only tally resets with each deploy, so the week of evidence was not available; 300 a minute per caller, CORE feed and health never limited.",
+    "completed": "2026-11-18",
+    "completed_ref": "AiSOC 2026-11-18"
   },
   {
     "key": "licences-spelling",
@@ -1331,8 +1335,8 @@
     "title": "Liongard: turn the disk and backup inspections into per-device lines with names",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "signoff",
-    "note": "Needs your decision before it is built.",
+    "needs": "claude",
+    "note": "Needs your decision before it is built. Approved by hal@goliveoak.com on 2026-11-18.",
     "added": "2026-11-14"
   },
   {
@@ -1475,8 +1479,8 @@
     "title": "Agent memory of which alerts a person always closes as noise (per client), proposed as rules",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "signoff",
-    "note": "Needs your decision before it is built.",
+    "needs": "claude",
+    "note": "Needs your decision before it is built. Approved by hal@goliveoak.com on 2026-11-18.",
     "added": "2026-11-14"
   },
   {
@@ -2035,12 +2039,13 @@
   },
   {
     "status": "not_started",
-    "needs": "signoff",
+    "needs": "claude",
     "area": "Security",
     "key": "rw-toolbox",
     "title": "Employee toolbox (from Rewst Tool Portal): client picker and Microsoft 365 action tiles",
     "detail": "User management (group membership, OneDrive permissions, attributes, onboarding, offboarding), password and security (change password, compromised user remediation, reset MFA), mail and permissions (out of office, mailbox permissions, forwarding, shared mailbox, litigation hold, calendar permissions), scheduled workflows. A launcher over A.C.O.R.N CIPP actions with the existing approval path.",
-    "added": "2026-11-15"
+    "added": "2026-11-15",
+    "note": "Approved by hal@goliveoak.com on 2026-11-18."
   },
   {
     "status": "completed",
