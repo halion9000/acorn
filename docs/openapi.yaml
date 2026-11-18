@@ -5049,6 +5049,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-suppressions/suggestions:
+    get:
+      tags:
+      - alerts
+      summary: Alert types a client's alerts of which are nearly always closed as
+        false positives, proposed as hide rules for that client
+      description: 'What people always close as noise, client by client: for each
+        client and alert type (rule, or exact title, and tool) in the last ``days``,
+        how many alerts were closed as false positives and how many were finished
+        any other way. A type with at
+
+        least five false positives and nine in ten of everything finished is proposed
+        as a hide rule for that client, unless a rule already hides it. Nothing is
+        hidden by asking: pressing Hide on the sample alert makes the rule.'
+      operationId: suggestions_api_v1_alert_suppressions_suggestions_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 7
+          default: 90
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RuleSuggestion'
+                title: Response Suggestions Api V1 Alert Suppressions Suggestions
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/alert-suppressions/addigy-mdm-clients:
     get:
       tags:
@@ -57837,6 +57890,47 @@ components:
           title: Is Default
       type: object
       title: RulePackUpdate
+    RuleSuggestion:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        client_name:
+          type: string
+          title: Client Name
+        title:
+          type: string
+          title: Title
+        source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source
+        false_positives:
+          type: integer
+          title: False Positives
+        other_finished:
+          type: integer
+          title: Other Finished
+        open_now:
+          type: integer
+          title: Open Now
+        sample_alert_id:
+          type: string
+          format: uuid
+          title: Sample Alert Id
+      type: object
+      required:
+      - client_id
+      - client_name
+      - title
+      - source
+      - false_positives
+      - other_finished
+      - open_now
+      - sample_alert_id
+      title: RuleSuggestion
     RuleWire:
       properties:
         id:

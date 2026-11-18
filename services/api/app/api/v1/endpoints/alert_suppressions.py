@@ -13,7 +13,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import String, cast, func, or_, select
+from sqlalchemy import String, case, cast, func, or_, select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.models.alert import Alert
@@ -24,6 +24,8 @@ from app.services.alert_suppression import (
     MAX_DAYS,
     MDM_SIGNATURE,
     MDM_SOURCE,
+    matches,
+    should_propose_rule,
     MAX_WINDOW_HOURS,
     SUGGEST_AFTER,
     SUGGEST_WINDOW_DAYS,
@@ -324,6 +326,82 @@ async def noisy_rules(
             )
         ).all()
     return [noisy_row(str(r[0])[:200], r[1], int(r[2]), int(r[3]), int(r[4]), r[5]) for r in rows]
+
+
+class RuleSuggestion(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    title: str
+    source: str | None
+    false_positives: int
+    other_finished: int
+    open_now: int
+    sample_alert_id: uuid.UUID  # the alert to press Hide on: scope client, no end
+
+
+@router.get(
+    "/suggestions",
+    response_model=list[RuleSuggestion],
+    summary="Alert types a client's alerts of which are nearly always closed as false positives, proposed as hide rules for that client",
+    dependencies=[Depends(require_permission("alerts:read"))],
+)
+async def suggestions(
+    user: AuthUser, db: DBSession, client_id: uuid.UUID | None = None, days: int = Query(default=90, ge=7, le=365)
+) -> list[RuleSuggestion]:
+    """What people always close as noise, client by client: for each client and alert type (rule, or exact title, and tool) in the last ``days``, how many alerts were closed as false positives and how many were finished any other way. A type with at
+    least five false positives and nine in ten of everything finished is proposed as a hide rule for that client, unless a rule already hides it. Nothing is hidden by asking: pressing Hide on the sample alert makes the rule."""
+    from app.api.v1.endpoints.devices import _scope  # noqa: PLC0415
+    from app.db.rls_scope import cross_tenant_reads  # noqa: PLC0415
+    from app.services.alert_status import FINISHED_ALERT_STATUSES, STALE  # noqa: PLC0415
+
+    scope, _ = await _scope(db, user.tenant_id, client_id)
+    since = datetime.now(UTC) - timedelta(days=days)
+    # coalesce: an alert with no disposition must read as "not a false positive", not as unknown, or its negation would drop it from the count of the others.
+    is_fp = or_(Alert.status.in_(("false_positive", "fp")), func.coalesce(Alert.disposition, "") == "false_positive")
+    key_rule = func.coalesce(func.nullif(Alert.rule_id, ""), "")
+    title_key = case((key_rule != "", ""), else_=Alert.title)  # an alert with a rule id is of that rule whatever its title says
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(
+                    Alert.tenant_id,
+                    key_rule.label("rule"),
+                    func.max(Alert.title),
+                    func.max(func.coalesce(Alert.raw_event["source"].astext, Alert.connector_type)),
+                    func.count().filter(is_fp),
+                    func.count().filter(Alert.status.in_(FINISHED_ALERT_STATUSES), ~is_fp, Alert.status.notin_((SUPPRESSED, STALE))),
+                    func.count().filter(Alert.status.notin_(FINISHED_ALERT_STATUSES)),
+                    func.max(cast(Alert.id, String)),
+                )
+                .where(Alert.tenant_id.in_(scope), Alert.created_at >= since, Alert.status.notin_((SUPPRESSED, STALE)))
+                .group_by(Alert.tenant_id, key_rule, title_key)
+                .having(func.count().filter(is_fp) >= 5)
+            )
+        ).all()
+    if not rows:
+        return []
+    names = {r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.id.in_({r[0] for r in rows})))).all()}
+    live = [
+        r
+        for r in (
+            await db.execute(select(AlertSuppression).where(AlertSuppression.tenant_id == user.tenant_id, AlertSuppression.revoked_at.is_(None)))
+        ).scalars()
+        if r.scope in ("client", "all")
+    ]
+    out: list[RuleSuggestion] = []
+    for tenant, rule, title, source, fps, other, open_now, sample in rows:
+        if not should_propose_rule(int(fps), int(other)):
+            continue
+        src = source_of({"source": source}, None)
+        if any(matches(r, tenant_id=tenant, rule_id=rule or None, title=title, source=src, hosts=[]) for r in live):
+            continue
+        out.append(
+            RuleSuggestion(
+                client_id=tenant, client_name=names.get(tenant, str(tenant)), title=str(title)[:300], source=src, false_positives=int(fps), other_finished=int(other), open_now=int(open_now), sample_alert_id=uuid.UUID(sample)
+            )
+        )
+    out.sort(key=lambda s: (-s.false_positives, s.client_name.lower(), s.title))
+    return out[:100]
 
 
 class MdmClient(BaseModel):

@@ -1478,10 +1478,12 @@
     "key": "r7-cf-28",
     "title": "Agent memory of which alerts a person always closes as noise (per client), proposed as rules",
     "area": "Round 7: CORE feature",
-    "status": "new",
+    "status": "completed",
     "needs": "claude",
-    "note": "Needs your decision before it is built. Approved by hal@goliveoak.com on 2026-11-18.",
-    "added": "2026-11-14"
+    "note": "Approved by hal@goliveoak.com on 2026-11-18. Built from the alerts themselves, which already record how each was closed: GET /alert-suppressions/suggestions proposes a client-scope hide rule for each client and alert type with 5+ false positives and 90% of what was finished; the Proposed hide rules panel on Alerts > Hidden asks before hiding. No separate agent memory store was needed.",
+    "added": "2026-11-14",
+    "completed": "2026-11-18",
+    "completed_ref": "AiSOC 2026-11-18"
   },
   {
     "key": "r7-cf-29",

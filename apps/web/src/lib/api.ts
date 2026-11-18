@@ -2281,6 +2281,7 @@ export const alertsApi = {
   otherClients: (alertId: string) => request<AlertAtOtherClients>(`/api/v1/alerts/${encodeURIComponent(alertId)}/other-clients`),
   /** Stop hiding an alert type: its alerts come back as they were. */
   liftSuppression: (id: string) => request<AlertSuppression>(`/api/v1/alert-suppressions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  ruleSuggestions: () => request<RuleSuggestion[]>('/api/v1/alert-suppressions/suggestions'),
   mdmClients: () => request<{ clients: MdmClient[] }>('/api/v1/alert-suppressions/addigy-mdm-clients'),
   setMdmClients: (clientIds: string[]) => request<{ clients: MdmClient[] }>('/api/v1/alert-suppressions/addigy-mdm-clients', { method: 'PUT', body: JSON.stringify({ client_ids: clientIds }) }),
   /** Enter one alert by hand (the same endpoint `aisoc submit` uses). */
@@ -7860,6 +7861,17 @@ export interface RoadmapItem {
 export interface Roadmap {
   items: RoadmapItem[];
   counts: Record<RoadmapItem['status'], number>;
+}
+/** A hide rule proposed from what people always close as noise: one client and alert type. */
+export interface RuleSuggestion {
+  client_id: string;
+  client_name: string;
+  title: string;
+  source: string | null;
+  false_positives: number;
+  other_finished: number;
+  open_now: number;
+  sample_alert_id: string;
 }
 /** A client and whether its MDM is managed by another tool, so Addigy's MDM-disabled alert is hidden for it. */
 export interface MdmClient {

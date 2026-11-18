@@ -10,6 +10,7 @@ import { safeFormat } from '@/lib/safe-date';
 import { MaintenanceWindowForm } from './MaintenanceWindowForm';
 import { NoisyRules } from './NoisyRules';
 import { MdmElsewhere } from './MdmElsewhere';
+import { RuleSuggestions } from './RuleSuggestions';
 
 /** The API lists at most this many rules (newest first): a list that long may be cut. */
 export const RULE_LIST_CAP = 500;
@@ -60,6 +61,7 @@ export function HiddenAlertTypes() {
         </Link>
       </div>
 
+      <RuleSuggestions onHidden={() => void mutate()} />
       <MdmElsewhere />
       <MaintenanceWindowForm onStarted={() => void mutate()} />
       <NoisyRules />

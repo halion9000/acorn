@@ -74,6 +74,17 @@ SUGGEST_AFTER = 3  # false-positive closes of one alert type, for one client, th
 SUGGEST_WINDOW_DAYS = 90
 
 
+# What a person has done with one client's alerts of one type decides whether a hide rule is proposed for it: closed as a false positive at least this many times, and at least this share of the alerts they finished.
+PROPOSE_MIN_FALSE_POSITIVES = 5
+PROPOSE_MIN_SHARE = 0.9
+
+
+def should_propose_rule(false_positives: int, other_finished: int) -> bool:
+    """Whether a client's alerts of one type look like noise a person always closes the same way (pure): at least ``PROPOSE_MIN_FALSE_POSITIVES`` closed as false positives, and at least ``PROPOSE_MIN_SHARE`` of everything finished."""
+    total = false_positives + other_finished
+    return false_positives >= PROPOSE_MIN_FALSE_POSITIVES and total > 0 and false_positives / total >= PROPOSE_MIN_SHARE
+
+
 def should_suggest_hiding(false_positives: int, already_hidden: bool) -> bool:
     """Suggest hiding an alert type once people have closed it as a false positive SUGGEST_AFTER times lately, unless a rule already hides it."""
     return false_positives >= SUGGEST_AFTER and not already_hidden
