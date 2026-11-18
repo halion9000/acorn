@@ -1225,6 +1225,7 @@ class TestCapabilities:
             "manage_users": "users:write",
             "respond_identities": "identities:respond",
             "run_bec": "identities:bec",
+            "finance_view": "finance:view",
             # The Settings areas (a View each): the console shows an area only to a person who may open it.
             "settings_automation": "settings_automation:view",
             "settings_clients": "settings_clients:view",
@@ -1236,6 +1237,7 @@ class TestCapabilities:
             "settings_workspace": "settings_workspace:view",
         }
         assert capabilities_for_role("platform_admin") == [
+            "finance_view",
             "manage_users",
             "platform_admin",
             "respond_identities",
@@ -1257,6 +1259,7 @@ class TestCapabilities:
             (
                 "platform",
                 [
+                    "finance_view",
                     "manage_users",
                     "platform_admin",
                     "respond_identities",
@@ -1274,6 +1277,7 @@ class TestCapabilities:
             (
                 "p_admin",
                 [
+                    "finance_view",
                     "manage_users",
                     "respond_identities",
                     "run_bec",
@@ -1290,6 +1294,7 @@ class TestCapabilities:
             (
                 "c1_admin",
                 [
+                    "finance_view",
                     "manage_users",
                     "respond_identities",
                     "run_bec",
@@ -1320,6 +1325,7 @@ class TestCapabilities:
         assert got == {
             "custom": [],  # a custom-role person's capabilities come from that role (capabilities_for_permissions)
             "platform_admin": [
+                "finance_view",
                 "manage_users",
                 "platform_admin",
                 "respond_identities",
@@ -1334,6 +1340,7 @@ class TestCapabilities:
                 "settings_workspace",
             ],
             "admin": [
+                "finance_view",
                 "manage_users",
                 "respond_identities",
                 "run_bec",
@@ -1347,6 +1354,7 @@ class TestCapabilities:
                 "settings_workspace",
             ],
             "tenant_admin": [
+                "finance_view",
                 "manage_users",
                 "settings_automation",
                 "settings_clients",
@@ -1377,6 +1385,7 @@ class TestCapabilities:
     def test_saving_a_preference_does_not_make_the_console_lose_them(self, world):
         r = world.client.patch("/api/v1/auth/me/preferences", headers=world.auth("p_admin"), json={"preferences": {"theme": "dark"}})
         assert r.status_code == 200 and r.json()["capabilities"] == [
+            "finance_view",
             "manage_users",
             "respond_identities",
             "run_bec",

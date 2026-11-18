@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -28,9 +28,9 @@ describe('the tickets behind the hours', () => {
 
   it('words how many tickets are shown and the hours that are on tickets not listed', () => {
     expect(ticketsNote({ rows: [], other_hours: 0 })).toBe('No hours were worked on tickets this month.');
-    expect(ticketsNote({ rows: [{ ticket_id: '1', summary: 'a', hours: 1, entries: 1, agents: [] }], other_hours: 0 })).toBe('1 ticket shown, the most-worked first.');
+    expect(ticketsNote({ rows: [{ ticket_id: '1', summary: 'a', hours: 1, entries: 1, agents: [] }], other_hours: 0 })).toBe('1 ticket has time logged on it this month; press a heading to sort.');
     expect(ticketsNote({ rows: [{ ticket_id: '1', summary: 'a', hours: 1, entries: 1, agents: [] }, { ticket_id: '2', summary: 'b', hours: 1, entries: 1, agents: [] }], other_hours: 2.5 })).toBe(
-      '2 tickets shown, the most-worked first. 2.5 more hours are on other tickets that are not listed.',
+      '2 tickets have time logged on them this month; press a heading to sort. 2.5 more hours are not on a ticket listed here.',
     );
   });
 
@@ -53,7 +53,43 @@ describe('the tickets behind the hours', () => {
     expect(within(table).getByText('#700').closest('tr')).toHaveTextContent('Quarterly review');
     expect(within(table).getByText('#700').closest('tr')).toHaveTextContent('Vic Cio, Dan Kemp');
     expect(within(table).getByText('#12').closest('tr')).toHaveTextContent('(no subject)');
-    expect(screen.getByTestId('detail-tickets')).toHaveTextContent('3.5 more hours are on other tickets');
+    expect(screen.getByTestId('detail-tickets')).toHaveTextContent('3.5 more hours are not on a ticket listed here');
+  });
+});
+
+describe('the ticket list', () => {
+  beforeEach(() => {
+    authFetch.mockReset();
+  });
+  afterEach(() => cleanup());
+
+  const many = (n: number) => Array.from({ length: n }, (_, i) => ({ ticket_id: String(1000 + i), summary: `Ticket ${i}`, hours: i === 7 ? 9 : 0.25, entries: 1, agents: ['Dan Kemp'] }));
+  const order = (table: HTMLElement) => within(table).getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0]!.textContent);
+
+  it('lists every ticket, however many, the most hours first, and sorts by any column on request', async () => {
+    authFetch.mockImplementation(() => answer(detail({ tickets: { rows: [...many(180), { ticket_id: '9', summary: 'Zebra', hours: '1.50' as unknown as number, entries: 4, agents: ['Vic Cio'] }], other_hours: 0 } })));
+    render(<ClientProfitDetail clientId="5" month="2026-10" onClose={() => {}} />);
+    const table = await screen.findByTestId('detail-ticket-rows');
+    expect(within(table).getAllByRole('row')).toHaveLength(1 + 181);
+    expect(order(table)[0]).toBe('#1007');
+    expect(order(table)[1]).toBe('#9');
+    await userEvent.click(within(table).getByRole('button', { name: /^Ticket/ }));
+    expect(order(table)[0]).toBe('#1179'); // a figure column starts high to low
+    await userEvent.click(within(table).getByRole('button', { name: /^Ticket/ }));
+    expect(order(table)[0]).toBe('#9'); // pressed again: low to high, by number, not as text
+    await userEvent.click(within(table).getByRole('button', { name: 'Entries' }));
+    expect(order(table)[0]).toBe('#9');
+    await userEvent.click(within(table).getByRole('button', { name: 'Subject' }));
+    expect(order(table)[0]).toBe('#1000');
+  });
+
+  it('takes the person to the tickets when opened from the hours', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    authFetch.mockImplementation(() => answer(detail({ tickets: { rows: many(3), other_hours: 0 } })));
+    render(<ClientProfitDetail clientId="5" month="2026-10" focus="tickets" onClose={() => {}} />);
+    await screen.findByTestId('detail-ticket-rows');
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
   });
 });
 

@@ -20,7 +20,7 @@ from app.api.v1.endpoints.billing import BILLED_SOURCE, _all_client_counts
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.metric_dataset import MetricDataset
 from app.models.finance_price import FinanceItemPrice
-from app.models.finance_profit import FinanceClientMaster, FinanceCostEntry, FinanceLaborRate, FinanceProfitSnapshot, FinanceSettings
+from app.models.finance_profit import FinanceClientMaster, FinanceCostEntry, FinanceLaborRate, FinanceProfitSnapshot, FinanceProfitTickets, FinanceSettings
 from app.services import csv_export
 from app.services import finance as fin
 from app.services import finance_halo as fh
@@ -220,8 +220,15 @@ async def profitability_client(
         await db.execute(select(MetricDataset).where(MetricDataset.tenant_id == user.tenant_id, MetricDataset.key == "invoice-lines"))
     ).scalar_one_or_none()
     halo = (await db.execute(select(FinanceHaloSnapshot).where(FinanceHaloSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    tickets = (await db.execute(select(FinanceProfitTickets).where(FinanceProfitTickets.tenant_id == user.tenant_id, FinanceProfitTickets.month == month))).scalar_one_or_none()
     out = profit.client_breakdown(
-        snap.payload, lines.payload if lines else None, halo.payload if halo else None, await _rates(db, user.tenant_id), client_id, month
+        snap.payload,
+        lines.payload if lines else None,
+        halo.payload if halo else None,
+        await _rates(db, user.tenant_id),
+        client_id,
+        month,
+        tickets.payload if tickets else None,
     )
     if out is None:
         raise HTTPException(status_code=404, detail="That client was not invoiced in that month")
@@ -317,6 +324,94 @@ async def delete_labor_rate(
         request=request,
     )
     await db.commit()
+
+
+class RateRowIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    hourly_rate: str | float | int = Field(description="The hourly cost: a number or text such as 72.24 or $72.24.")
+
+
+class RatesImportIn(BaseModel):
+    rows: list[RateRowIn] = Field(min_length=1, max_length=500)
+
+
+async def _snapshot_agents(db: DBSession, tenant: Any) -> list[dict[str, Any]]:
+    row = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == tenant))).scalar_one_or_none()
+    return [a for a in ((row.payload or {}).get("agents") or []) if isinstance(a, dict)] if row else []
+
+
+@router.get("/labor-rates/overview", dependencies=[Depends(require_permission("finance:view"))])
+async def labor_rates_overview(user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """The hourly cost A.C.O.R.N prices time with: the default, each team's, and every HaloPSA agent with the rate that applies to them and where it comes from (their own, their team's, the default)."""
+    rates = await _rates(db, user.tenant_id)
+    table = profit.resolve_rates(rates)
+    agents = await _snapshot_agents(db, user.tenant_id)
+    by_id = {str(a.get("id")): a for a in agents}
+    out = []
+    for a in agents:
+        aid = str(a.get("id") or "")
+        rate, source = profit.rate_for(aid, by_id, table)
+        out.append(
+            {
+                "agent_id": aid,
+                "name": str(a.get("name") or ""),
+                "team": str(a.get("team") or ""),
+                "active": bool(a.get("active", True)),
+                "rate": rate,
+                "source": source,
+                "own_rate": table["agent"].get(aid),
+            }
+        )
+    out.sort(key=lambda r: (not r["active"], r["name"].lower()))
+    return {
+        "default_rate": table["default"],
+        "teams": [{"team": k, "rate": v} for k, v in sorted(table["team"].items())],
+        "agents": out,
+        "have_agents": bool(agents),
+    }
+
+
+@router.put("/labor-rates/import")
+async def import_labor_rates(
+    body: RatesImportIn, request: Request, user: Annotated[AuthUser, Depends(require_permission("finance:write"))], db: DBSession
+) -> dict[str, Any]:
+    """Set agents' own hourly rates from a list of names and rates (a pasted sheet). Names are matched to HaloPSA agents; one that fits none or several is returned in ``unmatched`` and nothing is guessed."""
+    agents = await _snapshot_agents(db, user.tenant_id)
+    if not agents:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CORE has not sent the HaloPSA agents yet, so names cannot be matched. Try again after its next daily read.")
+    from app.services.labor_rate_import import match_rates
+
+    matched, unmatched = match_rates(agents, [(r.name, r.hourly_rate) for r in body.rows])
+    count = await save_agent_rates(db, user.tenant_id, [(m.agent_id, m.rate) for m in matched], str(user.user_id) if user.user_id else None)
+    await emit_audit(
+        db=db,
+        tenant_id=user.tenant_id,
+        actor_id=user.user_id,
+        action="finance_labor_rate:imported",
+        resource="finance_labor_rate",
+        resource_id="agent",
+        changes={"saved": count, "unmatched": len(unmatched)},
+        request=request,
+    )
+    await db.commit()
+    return {"saved": count, "unmatched": unmatched}
+
+
+async def save_agent_rates(db: DBSession, tenant: Any, rates: list[tuple[str, Decimal]], by: str | None) -> int:
+    """Set each agent's own hourly rate (insert or replace); returns how many. The caller commits."""
+    now = datetime.now(UTC)
+    saved = 0
+    for agent_id, rate in rates:
+        row = (
+            await db.execute(select(FinanceLaborRate).where(FinanceLaborRate.tenant_id == tenant, FinanceLaborRate.scope == "agent", FinanceLaborRate.key == agent_id))
+        ).scalar_one_or_none()
+        if row is None:
+            db.add(FinanceLaborRate(tenant_id=tenant, scope="agent", key=agent_id, hourly_rate=rate, updated_by=by, updated_at=now))
+        else:
+            row.hourly_rate, row.updated_by, row.updated_at = rate, by, now
+        saved += 1
+    await db.flush()
+    return saved
 
 
 # ---- The full model: cost inputs, client master, analysis ----------------------------------------------------------------------------------------------------

@@ -9,6 +9,7 @@ export const MORE_SETTINGS: { href: string; label: string; description: string; 
   { href: '/settings/platform-health', label: 'Platform health', description: 'Whether every service is answering' },
   { href: '/settings/onboarding', label: 'Client onboarding', description: 'How far each client has got: tools linked, devices, people, checks and alerts' },
   { href: '/settings/retention', label: 'Data retention', description: 'What is kept, for how long, and what ends it', requires: 'settings_data' },
+  { href: '/settings/finance', label: 'Finance', description: 'The hourly cost (burdened rate) of each person, team and the default, used to price time in Profitability and Net income', requires: 'finance_view' },
   { href: '/settings/costs', label: 'Cost dashboard', description: 'AI spend, automation activity and savings from bringing your own key' },
   { href: '/settings/triage', label: 'Auto-close', description: 'How sure AI triage must be to close an alert itself', requires: 'settings_automation' },
   { href: '/settings/cipp-actions', label: 'CIPP actions', description: 'What CORE can do to client Microsoft 365 tenants through CIPP, whether it is switched on, and what it has been asked to do' },

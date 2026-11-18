@@ -202,6 +202,7 @@ def client_breakdown(
     rates: list[dict[str, Any]],
     client_id: str,
     month: str,
+    month_tickets: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """What one client's Profitability row for a month is made of, or None when the client was not invoiced that month.
 
@@ -277,5 +278,6 @@ def client_breakdown(
             ({"charge_type": k, "hours": v.quantize(Decimal("0.01"))} for k, v in by_charge.items()), key=lambda c: (-c["hours"], c["charge_type"])
         ),
         "recurring": sorted(recurring, key=lambda r: (-r["quantity"] * r["unit_price"], r["item"].lower())),
-        "tickets": _tickets_behind(snapshot.get("tickets"), month, key, agents, hours_total),
+        # The tickets of the month as CORE sends them on their own route; only an older CORE put them in the summary.
+        "tickets": _tickets_behind(month_tickets if month_tickets is not None else snapshot.get("tickets"), month, key, agents, hours_total),
     }

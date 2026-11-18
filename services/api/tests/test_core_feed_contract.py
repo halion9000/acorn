@@ -48,6 +48,7 @@ MODELS = {
     "risk-tickets-status": feed.RiskTicketStatuses,
     "finance": feed.FinanceSnapshotIn,
     "books": feed.BooksIn,
+    "profit-tickets": feed.ProfitTicketsIn,
     "profitability": feed.ProfitSnapshotIn,
     "ticket-stats": feed.TicketStatsIn,
     "csat": feed.CsatIn,

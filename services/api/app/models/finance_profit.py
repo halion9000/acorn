@@ -33,6 +33,17 @@ class FinanceLaborRate(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
 
 
+class FinanceProfitTickets(Base):
+    """The tickets a month's hours went on, as CORE sent them (migration 212): one row per month, replaced when the month is sent again."""
+
+    __tablename__ = "finance_profit_tickets"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    month: Mapped[str] = mapped_column(String, primary_key=True)
+    payload: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
 class FinanceCostEntry(Base):
     """One cost amount for a month, category and optional client (migration 194)."""
 

@@ -47,6 +47,13 @@ describe('the pure parts', () => {
     expect(sortRows(rows, 'margin_percent', false).map((r) => r.client_name)).toEqual(['A', 'C', 'B']);
     expect(sortRows(rows, 'client_name', false).map((r) => r.client_name)).toEqual(['A', 'B', 'C']);
   });
+  it('sorts the amounts the API sends as text by their value, so 977.12 is not placed between 9820.00 and 9810.27', () => {
+    const text = (client_name: string, revenue: string, hours: string) => row({ client_name, revenue: revenue as unknown as number, hours: hours as unknown as number });
+    const rows = [text('A', '977.12', '8.41'), text('B', '9820.00', '146.46'), text('C', '9810.27', '46.71'), text('D', '91.56', '1.63')];
+    expect(sortRows(rows, 'revenue', true).map((r) => r.client_name)).toEqual(['B', 'C', 'A', 'D']);
+    expect(sortRows(rows, 'hours', true).map((r) => r.client_name)).toEqual(['B', 'C', 'A', 'D']);
+    expect(sortRows(rows, 'revenue', false).map((r) => r.client_name)).toEqual(['D', 'A', 'C', 'B']);
+  });
 });
 
 describe('ProfitabilityView', () => {
@@ -119,5 +126,20 @@ describe('Profitability: opening a client', () => {
     expect(authFetch.mock.calls.some(([u]) => String(u).includes('/profitability/client?client_id=5&month=2026-10'))).toBe(true);
     await userEvent.click(within(screen.getByTestId('client-profit-detail')).getByRole('button', { name: 'Close' }));
     expect(screen.queryByTestId('client-profit-detail')).toBeNull();
+  });
+
+  it('opens the same detail, at its tickets, when the hours are pressed', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    authFetch.mockImplementation((u: string) =>
+      String(u).includes('/profitability/client')
+        ? answer({ client_id: '5', client_name: 'Acme Dental', month: '2026-10', revenue: 1000, invoices: 2, invoice_lines: [], invoice_lines_total: 0, free_lines: 0, hours: 6.5, labor: 0, after_labor: 0, by_agent: [], by_charge_type: [], recurring: [], tickets: { rows: [{ ticket_id: '700', summary: 'Quarterly review', hours: 2.5, entries: 2, agents: ['Dan Kemp'] }], other_hours: 0 }, invoice_lines_received_at: null })
+        : answer(body()),
+    );
+    render(<ProfitabilityView />);
+    await screen.findByTestId('profit-table');
+    await userEvent.click(screen.getAllByRole('button', { name: /Every ticket behind the .* hours of Acme Dental/ })[0]!);
+    expect(await screen.findByTestId('detail-ticket-rows')).toHaveTextContent('Quarterly review');
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
   });
 });

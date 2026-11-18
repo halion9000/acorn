@@ -5,9 +5,11 @@
  * unit cost, and the hours by agent with the hourly cost used and where it came from. Nothing here is a new number; each part adds up to a figure on the row. Reads
  * GET /api/v1/finance/profitability/client.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { sortedBy, type SortState, type SortValue } from '@/lib/tableSort';
+import { SortHeader } from './SortHeader';
 
 export interface ClientDetail {
   client_id: string;
@@ -44,12 +46,22 @@ export function linesNote(d: Pick<ClientDetail, 'revenue' | 'invoice_lines' | 'i
 /** One sentence about the ticket list: how many are shown and the hours on tickets that are not (pure). */
 export function ticketsNote(t: NonNullable<ClientDetail['tickets']>): string {
   if (t.rows.length === 0 && t.other_hours <= 0) return 'No hours were worked on tickets this month.';
-  const shown = `${t.rows.length} ticket${t.rows.length === 1 ? '' : 's'} shown, the most-worked first.`;
-  return t.other_hours > 0 ? `${shown} ${qty(t.other_hours)} more hours are on other tickets that are not listed.` : shown;
+  const shown = `${t.rows.length} ticket${t.rows.length === 1 ? ' has' : 's have'} time logged on ${t.rows.length === 1 ? 'it' : 'them'} this month; press a heading to sort.`;
+  return t.other_hours > 0 ? `${shown} ${qty(t.other_hours)} more hours are not on a ticket listed here.` : shown;
 }
 
-export function ClientProfitDetail({ clientId, month, onClose }: { clientId: string; month: string; onClose: () => void }) {
+export function ClientProfitDetail({ clientId, month, onClose, focus }: { clientId: string; month: string; onClose: () => void; focus?: 'tickets' }) {
   const [d, setD] = useState<ClientDetail | null>(null);
+  const [ticketSort, setTicketSort] = useState<SortState | null>({ key: 'hours', desc: true });
+  const ticketsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // Opened by pressing the hours: take the person to the tickets those hours went on.
+    if (focus === 'tickets' && d) ticketsRef.current?.scrollIntoView?.({ block: 'start' });
+  }, [focus, d]);
+  const ticketRows = useMemo(
+    () => (d?.tickets ? sortedBy(d.tickets.rows, (t) => (ticketSort ? ((t as unknown as Record<string, unknown>)[ticketSort.key] as SortValue) : t.hours), ticketSort?.desc ?? true) : []),
+    [d, ticketSort],
+  );
   const [problem, setProblem] = useState('');
   useEffect(() => {
     let live = true;
@@ -197,7 +209,7 @@ export function ClientProfitDetail({ clientId, month, onClose }: { clientId: str
             )}
           </div>
 
-          <div>
+          <div ref={ticketsRef}>
             <h3 className="text-sm font-medium text-gray-200">Tickets</h3>
             <p className="text-xs text-gray-500" data-testid="detail-tickets">
               {d.tickets === null ? 'The tickets behind these hours are not sent by CORE yet, so only the people and charge types are shown.' : ticketsNote(d.tickets)}
@@ -206,18 +218,20 @@ export function ClientProfitDetail({ clientId, month, onClose }: { clientId: str
               <table className="mt-2 w-full text-left text-sm" aria-label="Tickets behind the hours" data-testid="detail-ticket-rows">
                 <thead className="text-xs uppercase text-gray-500">
                   <tr>
-                    <th className={cell}>Ticket</th>
-                    <th className={cell}>Subject</th>
-                    <th className={`${cell} text-right`}>Hours</th>
+                    <SortHeader label="Ticket" field="ticket_id" sort={ticketSort} onSort={setTicketSort} className={cell} />
+                    <SortHeader label="Subject" field="summary" sort={ticketSort} onSort={setTicketSort} text className={cell} />
+                    <SortHeader label="Hours" field="hours" sort={ticketSort} onSort={setTicketSort} className={`${cell} text-right`} />
+                    <SortHeader label="Entries" field="entries" sort={ticketSort} onSort={setTicketSort} className={`${cell} text-right`} />
                     <th className={cell}>Worked by</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800 text-gray-200">
-                  {d.tickets.rows.map((t) => (
+                  {ticketRows.map((t) => (
                     <tr key={t.ticket_id}>
                       <td className={`${cell} tabular-nums`}>#{t.ticket_id}</td>
                       <td className={cell}>{t.summary || '(no subject)'}</td>
                       <td className={`${cell} text-right tabular-nums`}>{qty(t.hours)}</td>
+                      <td className={`${cell} text-right tabular-nums`}>{t.entries}</td>
                       <td className={`${cell} text-xs text-gray-400`}>{t.agents.join(', ')}</td>
                     </tr>
                   ))}

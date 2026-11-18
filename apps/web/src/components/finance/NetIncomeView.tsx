@@ -5,6 +5,8 @@
  * sales and marketing, overhead), then new clients, the summary by industry, hours by function and utilization, and the twelve-month ranking. The cost lines are typed in on the Inputs tab (QuickBooks fills
  * them when it is connected); a cost that has not been entered is zero and the page says which. Needs the finance permission; without it the API answers 403 and this says so.
  */
+import { sortedBy, type SortState, type SortValue } from '@/lib/tableSort';
+import { SortHeader } from './SortHeader';
 import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
@@ -152,6 +154,12 @@ const th = 'px-3 py-2 text-right';
 const td = 'px-3 py-1.5 text-right tabular-nums';
 
 export function NetIncomeView() {
+  const [netSort, setNetSort] = useState<SortState | null>(null);
+  const [industrySort, setIndustrySort] = useState<SortState | null>(null);
+  const [functionSort, setFunctionSort] = useState<SortState | null>(null);
+  const [personSort, setPersonSort] = useState<SortState | null>(null);
+  const [rankSort, setRankSort] = useState<SortState | null>(null);
+  const ordered = <T,>(rows: T[], sort: SortState | null): T[] => (sort ? sortedBy(rows, (r) => (r as Record<string, unknown>)[sort.key] as SortValue, sort.desc) : rows);
   const [denied, setDenied] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [data, setData] = useState<Analysis | null>(null);
@@ -255,16 +263,16 @@ export function NetIncomeView() {
             <table className="w-full text-sm" data-testid="net-table">
               <thead className="bg-gray-900/60 text-xs uppercase text-gray-500">
                 <tr>
-                  <th className="px-3 py-2 text-left">Client</th>
-                  {['Revenue', 'Direct labor', 'True-up', 'Add-on sw', 'Support sw', 'Travel', 'Equipment', 'Gross profit', 'Gross %', 'Sales/mktg', 'Overhead', 'Net income', 'Net %'].map((h) => (
-                    <th key={h} className={th}>
-                      {h}
-                    </th>
+                  <SortHeader label="Client" field="client_name" sort={netSort} onSort={setNetSort} text className="px-3 py-2 text-left" />
+                  {(
+                    [['Revenue', 'revenue'], ['Direct labor', 'direct_labor'], ['True-up', 'labor_trueup'], ['Add-on sw', 'addon_software'], ['Support sw', 'support_software'], ['Travel', 'travel'], ['Equipment', 'equipment'], ['Gross profit', 'gross_profit'], ['Gross %', 'gross_margin'], ['Sales/mktg', 'sales_marketing'], ['Overhead', 'overhead'], ['Net income', 'net_income'], ['Net %', 'net_margin']] as const
+                  ).map(([h, f]) => (
+                    <SortHeader key={f} label={h} field={f} sort={netSort} onSort={setNetSort} className={th} />
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800 text-gray-200">
-                {report.rows.map((r) => (
+                {ordered(report.rows, netSort).map((r) => (
                   <tr key={r.client_key}>
                     <td className="px-3 py-1.5 text-left">
                       {r.client_name}
@@ -327,16 +335,16 @@ export function NetIncomeView() {
           <table className="w-full text-sm" data-testid="industry-table">
             <thead className="bg-gray-900/60 text-xs uppercase text-gray-500">
               <tr>
-                <th className="px-3 py-2 text-left">Industry</th>
-                {['Clients', 'Non-profit', 'Revenue', 'Gross profit', 'Gross %', 'Net income', 'Net %'].map((h) => (
-                  <th key={h} className={th}>
-                    {h}
-                  </th>
+                <SortHeader label="Industry" field="industry" sort={industrySort} onSort={setIndustrySort} text className="px-3 py-2 text-left" />
+                {(
+                  [['Clients', 'clients'], ['Non-profit', 'non_profit_clients'], ['Revenue', 'revenue'], ['Gross profit', 'gross_profit'], ['Gross %', 'gross_margin'], ['Net income', 'net_income'], ['Net %', 'net_margin']] as const
+                ).map(([h, f]) => (
+                  <SortHeader key={f} label={h} field={f} sort={industrySort} onSort={setIndustrySort} className={th} />
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800 text-gray-200">
-              {data?.industries.map((g) => (
+              {ordered(data?.industries ?? [], industrySort).map((g) => (
                 <tr key={g.industry}>
                   <td className="px-3 py-1.5 text-left">{g.industry}</td>
                   <td className={td}>{g.clients}</td>
@@ -363,14 +371,14 @@ export function NetIncomeView() {
             <table className="w-full text-sm">
               <thead className="bg-gray-900/60 text-xs uppercase text-gray-500">
                 <tr>
-                  <th className="px-3 py-2 text-left">Function</th>
-                  <th className={th}>Hours</th>
-                  <th className={th}>Share</th>
-                  <th className={th}>Cost</th>
+                  <SortHeader label="Function" field="function" sort={functionSort} onSort={setFunctionSort} text className="px-3 py-2 text-left" />
+                  <SortHeader label="Hours" field="hours" sort={functionSort} onSort={setFunctionSort} className={th} />
+                  <SortHeader label="Share" field="share_percent" sort={functionSort} onSort={setFunctionSort} className={th} />
+                  <SortHeader label="Cost" field="cost" sort={functionSort} onSort={setFunctionSort} className={th} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800 text-gray-200">
-                {data.hours.by_function.map((f) => (
+                {ordered(data.hours.by_function, functionSort).map((f) => (
                   <tr key={f.function}>
                     <td className="px-3 py-1.5 text-left">
                       {f.function}
@@ -386,14 +394,14 @@ export function NetIncomeView() {
             <table className="w-full text-sm">
               <thead className="bg-gray-900/60 text-xs uppercase text-gray-500">
                 <tr>
-                  <th className="px-3 py-2 text-left">Person</th>
-                  <th className={th}>Hours</th>
-                  <th className={th}>Billable</th>
-                  <th className={th}>Utilization</th>
+                  <SortHeader label="Person" field="name" sort={personSort} onSort={setPersonSort} text className="px-3 py-2 text-left" />
+                  <SortHeader label="Hours" field="hours" sort={personSort} onSort={setPersonSort} className={th} />
+                  <SortHeader label="Billable" field="billable_hours" sort={personSort} onSort={setPersonSort} className={th} />
+                  <SortHeader label="Utilization" field="utilization_percent" sort={personSort} onSort={setPersonSort} className={th} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800 text-gray-200">
-                {data.hours.by_person.map((p) => (
+                {ordered(data.hours.by_person, personSort).map((p) => (
                   <tr key={p.agent_id}>
                     <td className="px-3 py-1.5 text-left">
                       {p.name}
@@ -415,17 +423,17 @@ export function NetIncomeView() {
           <table className="w-full text-sm" data-testid="rank-table">
             <thead className="bg-gray-900/60 text-xs uppercase text-gray-500">
               <tr>
-                <th className="px-3 py-2 text-left">#</th>
-                <th className="px-3 py-2 text-left">Client</th>
-                {['Revenue', 'Net income', 'Net %', 'Target', 'Size'].map((h) => (
-                  <th key={h} className={th}>
-                    {h}
-                  </th>
+                <SortHeader label="#" field="rank" sort={rankSort} onSort={setRankSort} text className="px-3 py-2 text-left" />
+                <SortHeader label="Client" field="client_name" sort={rankSort} onSort={setRankSort} text className="px-3 py-2 text-left" />
+                {(
+                  [['Revenue', 'revenue'], ['Net income', 'net_income'], ['Net %', 'net_margin'], ['Target', 'target_margin'], ['Size', 'tier']] as const
+                ).map(([h, f]) => (
+                  <SortHeader key={f} label={h} field={f} sort={rankSort} onSort={setRankSort} className={th} />
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800 text-gray-200">
-              {data.annual.rows.map((r) => (
+              {ordered(data.annual.rows, rankSort).map((r) => (
                 <tr key={r.client_key}>
                   <td className="px-3 py-1.5 text-left">{r.rank}</td>
                   <td className="px-3 py-1.5 text-left">{r.client_name}</td>

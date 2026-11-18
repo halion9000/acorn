@@ -2657,6 +2657,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/labor-rates/overview:
+    get:
+      tags:
+      - finance
+      summary: Labor Rates Overview
+      description: 'The hourly cost A.C.O.R.N prices time with: the default, each
+        team''s, and every HaloPSA agent with the rate that applies to them and where
+        it comes from (their own, their team''s, the default).'
+      operationId: labor_rates_overview_api_v1_finance_labor_rates_overview_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Labor Rates Overview Api V1 Finance Labor Rates Overview
+                  Get
+      security:
+      - HTTPBearer: []
+  /api/v1/finance/labor-rates/import:
+    put:
+      tags:
+      - finance
+      summary: Import Labor Rates
+      description: Set agents' own hourly rates from a list of names and rates (a
+        pasted sheet). Names are matched to HaloPSA agents; one that fits none or
+        several is returned in ``unmatched`` and nothing is guessed.
+      operationId: import_labor_rates_api_v1_finance_labor_rates_import_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RatesImportIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Import Labor Rates Api V1 Finance Labor Rates Import
+                  Put
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/finance/profitability/analysis:
     get:
       tags:
@@ -31372,6 +31426,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/profit-tickets:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Profit Tickets
+      description: Keep every ticket a client's hours went on in one month, as CORE
+        read them from HaloPSA's time entries. Sending a month again replaces that
+        month's list; other months are untouched. The Profitability client detail
+        lists them.
+      operationId: report_core_feed_profit_tickets_api_v1_inbox_core_feed__tenant_token__profit_tickets_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfitTicketsIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfitTicketsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/profitability:
     post:
       tags:
@@ -53029,7 +53119,7 @@ components:
           items:
             $ref: '#/components/schemas/ProfitHoursIn'
           type: array
-          maxItems: 60000
+          maxItems: 250000
           title: Hours
         tickets:
           anyOf:
@@ -53112,6 +53202,36 @@ components:
       - ticket_id
       - hours
       title: ProfitTicketIn
+    ProfitTicketsIn:
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        tickets:
+          items:
+            $ref: '#/components/schemas/ProfitTicketIn'
+          type: array
+          maxItems: 100000
+          title: Tickets
+      type: object
+      required:
+      - month
+      - tickets
+      title: ProfitTicketsIn
+    ProfitTicketsOut:
+      properties:
+        month:
+          type: string
+          title: Month
+        tickets:
+          type: integer
+          title: Tickets
+      type: object
+      required:
+      - month
+      - tickets
+      title: ProfitTicketsOut
     ProgressOut:
       properties:
         started:
@@ -54141,6 +54261,38 @@ components:
       - dkim_fail
       - spf_fail
       title: RatePoint
+    RateRowIn:
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Name
+        hourly_rate:
+          anyOf:
+          - type: string
+          - type: number
+          - type: integer
+          title: Hourly Rate
+          description: 'The hourly cost: a number or text such as 72.24 or $72.24.'
+      type: object
+      required:
+      - name
+      - hourly_rate
+      title: RateRowIn
+    RatesImportIn:
+      properties:
+        rows:
+          items:
+            $ref: '#/components/schemas/RateRowIn'
+          type: array
+          maxItems: 500
+          minItems: 1
+          title: Rows
+      type: object
+      required:
+      - rows
+      title: RatesImportIn
     Readiness:
       properties:
         met:

@@ -32,7 +32,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.alert import Alert
 from app.models.connector import Connector
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
-from app.models.finance_profit import FinanceCostEntry, FinanceProfitSnapshot
+from app.models.finance_profit import FinanceCostEntry, FinanceProfitSnapshot, FinanceProfitTickets
 from app.models.metric_dataset import DATASET_KEYS, MetricDataset, merge_dataset
 from app.models.tenant import Tenant
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
@@ -1209,7 +1209,7 @@ class ProfitAgentIn(BaseModel):
 class ProfitSnapshotIn(BaseModel):
     months: list[str] = Field(max_length=24)
     invoices: list[ProfitInvoiceMonthIn] = Field(max_length=20000)
-    hours: list[ProfitHoursIn] = Field(max_length=60000)
+    hours: list[ProfitHoursIn] = Field(max_length=250000)
     # The tickets the hours went on (the most-worked per client and month). Absent from an older CORE: the breakdown then says they are not sent yet.
     tickets: list[ProfitTicketIn] | None = Field(default=None, max_length=40000)
     agents: list[ProfitAgentIn] = Field(max_length=500)
@@ -1280,6 +1280,32 @@ async def report_core_feed_books(tenant_token: str, body: BooksIn, db: DBSession
             entries += 1
     await db.commit()
     return BooksOut(months=len(months), entries=entries)
+
+
+class ProfitTicketsIn(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    tickets: list[ProfitTicketIn] = Field(max_length=100000)
+
+
+class ProfitTicketsOut(BaseModel):
+    month: str
+    tickets: int
+
+
+@router.post("/core-feed/{tenant_token}/profit-tickets", response_model=ProfitTicketsOut)
+async def report_core_feed_profit_tickets(tenant_token: str, body: ProfitTicketsIn, db: DBSession) -> ProfitTicketsOut:
+    """Keep every ticket a client's hours went on in one month, as CORE read them from HaloPSA's time entries. Sending a month again replaces that month's list; other months are untouched. The Profitability client detail lists them."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    now = datetime.now(UTC)
+    payload = [t.model_dump() for t in body.tickets]
+    row = (await db.execute(select(FinanceProfitTickets).where(FinanceProfitTickets.tenant_id == tenant_id, FinanceProfitTickets.month == body.month))).scalar_one_or_none()
+    if row is None:
+        db.add(FinanceProfitTickets(tenant_id=tenant_id, month=body.month, payload=payload, received_at=now))
+    else:
+        row.payload, row.received_at = payload, now
+    await db.commit()
+    return ProfitTicketsOut(month=body.month, tickets=len(payload))
 
 
 @router.post("/core-feed/{tenant_token}/profitability", response_model=ProfitSnapshotOut)

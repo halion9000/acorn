@@ -4,6 +4,7 @@
  * Sales and Finance > Profitability: for one month, what each client was invoiced, the hours worked for them, what those hours cost and what is left after labor. The numbers come from the HaloPSA summary
  * CORE sends about once a day. Software, hardware, travel and overhead are not in it (the page says so). Needs the finance permission; without it the API answers 403 and this says so.
  */
+import { sortedBy, type SortValue } from '@/lib/tableSort';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
@@ -56,17 +57,9 @@ export const monthLabel = (m: string): string => {
   return new Date(Date.UTC(y, mo - 1, 1)).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 };
 export type SortKey = 'client_name' | 'revenue' | 'hours' | 'labor' | 'after_labor' | 'margin_percent';
-/** The rows in the order the person chose (pure); a missing margin sorts last either way. */
+/** The rows in the order the person chose (pure): amounts sent as text ("9820.00") are compared by value, and a missing value sorts last either way. */
 export function sortRows(rows: Row[], key: SortKey, desc: boolean): Row[] {
-  const dir = desc ? -1 : 1;
-  return [...rows].sort((a, b) => {
-    const x = a[key];
-    const y = b[key];
-    if (x === null && y === null) return 0;
-    if (x === null) return 1;
-    if (y === null) return -1;
-    return (typeof x === 'string' ? x.localeCompare(y as string) : (x as number) - (y as number)) * dir;
-  });
+  return sortedBy(rows, (r) => r[key] as SortValue, desc);
 }
 
 const input = 'rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 text-sm text-gray-100';
@@ -84,6 +77,7 @@ export function ProfitabilityView() {
   const [busy, setBusy] = useState(false);
   // The client whose numbers are opened below the table.
   const [openClient, setOpenClient] = useState<string | null>(null);
+  const [openFocus, setOpenFocus] = useState<'tickets' | undefined>(undefined);
 
   const load = useCallback(async (m: string) => {
     try {
@@ -208,12 +202,16 @@ export function ProfitabilityView() {
                 {rows.map((r) => (
                   <tr key={r.client_id} data-testid="profit-row">
                     <td className="px-3 py-2 text-gray-100">
-                      <button type="button" className="text-left text-blue-300 hover:underline" aria-label={`Where the numbers of ${r.client_name} come from`} onClick={() => setOpenClient(r.client_id)}>
+                      <button type="button" className="text-left text-blue-300 hover:underline" aria-label={`Where the numbers of ${r.client_name} come from`} onClick={() => { setOpenFocus(undefined); setOpenClient(r.client_id); }}>
                         {r.client_name}
                       </button>
                     </td>
                     <td className="px-3 py-2 text-gray-300">{money(r.revenue)}</td>
-                    <td className="px-3 py-2 text-gray-300">{r.hours}</td>
+                    <td className="px-3 py-2 text-gray-300">
+                      <button type="button" className="tabular-nums text-blue-300 hover:underline" aria-label={`Every ticket behind the ${r.hours} hours of ${r.client_name}`} onClick={() => { setOpenFocus('tickets'); setOpenClient(r.client_id); }}>
+                        {r.hours}
+                      </button>
+                    </td>
                     <td className="px-3 py-2 text-gray-300">{money(r.labor)}</td>
                     <td className={`px-3 py-2 ${r.after_labor < 0 ? 'text-red-300' : 'text-gray-100'}`}>{money(r.after_labor)}</td>
                     <td className={`px-3 py-2 ${r.margin_percent !== null && r.margin_percent < 0 ? 'text-red-300' : 'text-gray-300'}`}>{pct(r.margin_percent)}</td>
@@ -223,7 +221,7 @@ export function ProfitabilityView() {
               </tbody>
             </table>
           </div>
-          {openClient && <ClientProfitDetail clientId={openClient} month={data.report.month} onClose={() => setOpenClient(null)} />}
+          {openClient && <ClientProfitDetail clientId={openClient} month={data.report.month} focus={openFocus} onClose={() => setOpenClient(null)} />}
           {data.note && <p className="text-xs text-gray-500">{data.note}</p>}
           {data.report.unmatched_hours.length > 0 && (
             <section className="rounded-lg border border-gray-700 bg-gray-900/60 p-4" data-testid="profit-unmatched">

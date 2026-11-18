@@ -173,3 +173,59 @@ describe('the Net income page', () => {
     });
   });
 });
+
+describe('sorting the tables', () => {
+  const names = (table: HTMLElement) => within(table).getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0]!.textContent?.replace('new', '').trim()).filter((n) => n !== 'Total');
+
+  it('sorts the client table by any column, amounts sent as text by their value, and flips on a second press', async () => {
+    const text = (client_name: string, client_key: string, revenue: string, net_income: string) => row({ client_key, client_name, revenue, net_income });
+    authFetch.mockImplementation((url: string) =>
+      answer(
+        url.includes('/inputs')
+          ? inputs()
+          : analysis({ report: { ...analysis().report, rows: [text('A', 'a', '977.12', '10.00'), text('B', 'b', '9820.00', '-5.00'), text('C', 'c', '9810.27', '300.50'), text('D', 'd', '91.56', '2.00')] } }),
+      ),
+    );
+    render(<NetIncomeView />);
+    const table = await screen.findByTestId('net-table');
+    expect(names(table)).toEqual(['A', 'B', 'C', 'D']); // as sent until a column is chosen
+    await userEvent.click(within(table).getByRole('button', { name: 'Revenue' }));
+    expect(names(table)).toEqual(['B', 'C', 'A', 'D']);
+    await userEvent.click(within(table).getByRole('button', { name: /^Revenue/ }));
+    expect(names(table)).toEqual(['D', 'A', 'C', 'B']);
+    await userEvent.click(within(table).getByRole('button', { name: 'Net income' }));
+    expect(names(table)).toEqual(['C', 'A', 'D', 'B']);
+    await userEvent.click(within(table).getByRole('button', { name: 'Client' }));
+    expect(names(table)).toEqual(['A', 'B', 'C', 'D']);
+    expect(within(table).getByRole('columnheader', { name: /Client/ })).toHaveAttribute('aria-sort', 'ascending');
+  });
+
+  it('sorts the industry and ranking tables too', async () => {
+    authFetch.mockImplementation((url: string) =>
+      answer(
+        url.includes('/inputs')
+          ? inputs()
+          : analysis({
+              industries: [
+                { industry: 'Dental', clients: 1, non_profit_clients: 0, revenue: '1000.00', gross_profit: 1, net_income: 1, gross_margin: 1, net_margin: 1 },
+                { industry: 'Legal', clients: 3, non_profit_clients: 1, revenue: '95.50', gross_profit: 1, net_income: 1, gross_margin: 1, net_margin: 1 },
+              ],
+            }),
+      ),
+    );
+    render(<NetIncomeView />);
+    await screen.findByTestId('net-table');
+    await userEvent.click(screen.getByRole('tab', { name: 'By industry' }));
+    const industry = await screen.findByTestId('industry-table');
+    await userEvent.click(within(industry).getByRole('button', { name: 'Revenue' }));
+    expect(names(industry)).toEqual(['Dental', 'Legal']);
+    await userEvent.click(within(industry).getByRole('button', { name: 'Clients' }));
+    expect(names(industry)).toEqual(['Legal', 'Dental']);
+    await userEvent.click(screen.getByRole('tab', { name: 'Ranking' }));
+    const rank = await screen.findByTestId('rank-table');
+    await userEvent.click(within(rank).getByRole('button', { name: 'Net income' }));
+    expect(within(rank).getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[1]!.textContent)).toEqual(['Acme Dental', 'Birch Law']);
+    await userEvent.click(within(rank).getByRole('button', { name: /^Net income/ }));
+    expect(within(rank).getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[1]!.textContent)).toEqual(['Birch Law', 'Acme Dental']);
+  });
+});

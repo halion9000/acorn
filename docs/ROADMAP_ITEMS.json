@@ -1667,7 +1667,7 @@
     "key": "rw-profitability",
     "title": "Sales and Finance > Profitability and Net income: client profit by month from Halo, typed or QuickBooks costs, and the finance workbook's other sheets",
     "detail": "Built: Profitability (Halo revenue, hours, labor at a rate per agent, team or default 65.00, what is left after labor) and Net income with six tabs: revenue to net income per client (direct labor, payroll true-up, add-on and support software, travel, equipment, hardware, sales and marketing split across new clients, overhead), new clients, by industry, hours and utilization, a twelve-month ranking with size tiers and the 20% target, and an Inputs tab for the costs, the client master and available hours. Costs are typed until QuickBooks is connected; a missing cost counts as zero and is named. Still to add: the QuickBooks sync that fills the cost lines, and spreading by monthly recurring revenue instead of invoiced revenue.",
-    "note": "Needs from Hal: burdened hourly rates by role (until then the 65.00 default). Hardware is passthrough (no cost line). The client master is imported from the Client Master sheet on the Inputs tab."
+    "note": "24 months, every ticket behind the hours, sortable columns and Settings > Finance (burdened rates) built 2026-11-18. Still to do: add-on software per client from license counts, and client master and burdened rates from the workbook's tabs."
   },
   {
     "status": "in_progress",

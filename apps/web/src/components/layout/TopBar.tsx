@@ -25,6 +25,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/settings/announcements': { title: 'Announcements', description: 'A banner message for the whole team' },
   '/settings/rbac': { title: 'Roles & Permissions', description: 'Access control and team management' },
   '/settings/client-posture': { title: 'Client Posture', description: 'Devices, Multi-Factor, alerts and cases for one client' },
+  '/settings/finance': { title: 'Finance settings', description: 'The hourly cost of each person, team and the default' },
   '/settings/billing': { title: 'Licenses & Counts', description: 'What each tool counts for each client, and every change, to check an invoice against' },
   '/settings/fleet-posture': { title: 'Fleet Posture', description: 'Every client\'s tool checks side by side, with what is about to lapse and what changed' },
   '/vulnerabilities': { title: 'Vulnerabilities', description: 'Software and operating-system vulnerabilities the connected tools report, each linked to its alert' },

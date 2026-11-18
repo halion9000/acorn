@@ -1,0 +1,8 @@
+{
+  "route": "profit-tickets",
+  "method": "POST",
+  "body": {
+    "month": "2026-02",
+    "tickets": []
+  }
+}

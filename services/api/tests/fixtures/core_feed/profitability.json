@@ -3,6 +3,9 @@
   "method": "POST",
   "body": {
     "months": [
+      "2026-02",
+      "2026-03",
+      "2026-04",
       "2026-05",
       "2026-06",
       "2026-07",
@@ -27,19 +30,6 @@
         "agent_id": "40",
         "charge_type": "Remote Support",
         "hours": 2.5
-      }
-    ],
-    "tickets": [
-      {
-        "client": "Acme Dental",
-        "month": "2026-10",
-        "ticket_id": "701",
-        "summary": "Printer offline",
-        "hours": 2.5,
-        "entries": 1,
-        "agent_ids": [
-          "40"
-        ]
       }
     ],
     "agents": [

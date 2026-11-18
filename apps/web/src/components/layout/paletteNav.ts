@@ -1,5 +1,6 @@
 /** Other words people use for a sidebar page, by its address, so typing "billing" or "2fa" in the palette finds the page that is called something else. */
 export const PAGE_WORDS: Record<string, string[]> = {
+  '/settings/finance': ['finance settings', 'burdened rate', 'labor rate', 'hourly rate', 'hourly cost', 'wages', 'payroll cost'],
   '/settings/billing': ['billing', 'invoice', 'invoices', 'licenses', 'licenses', 'seats', 'counts', 'charges', 'margin'],
   '/settings/mfa': ['mfa', '2fa', 'two-factor', 'second factor', 'authenticator', 'multi factor'],
   '/settings/secure-score': ['secure score', 'microsoft score', 'posture score'],

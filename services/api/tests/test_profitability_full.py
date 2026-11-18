@@ -340,3 +340,37 @@ def test_what_quickbooks_filled_replaces_a_typed_company_wide_entry_for_the_same
 def test_overhead_may_be_negative_when_other_income_is_more_than_the_expenses_and_is_still_shared_out():
     r = pf.full_month(SNAP, [], "2026-10", [{**cost("overhead", "-100.01"), "source": "quickbooks"}], MASTER)
     assert sum(x["overhead"] for x in r["rows"]) == D("-100.01")
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_rates_are_imported_by_name_to_the_agents_halo_has_and_the_overview_shows_where_each_rate_comes_from(tenant):
+    req = SimpleNamespace(client=None, headers={})
+
+    async def ingest(db):
+        db.add(FinanceProfitSnapshot(tenant_id=tenant.id, payload=SNAP))
+        await db.commit()
+
+    nothing = await with_db(tenant.id, lambda db: ep.labor_rates_overview(tenant.user, db))
+    assert nothing["have_agents"] is False and nothing["agents"] == []
+    with pytest.raises(HTTPException) as early:
+        await with_db(tenant.id, lambda db: ep.import_labor_rates(ep.RatesImportIn(rows=[ep.RateRowIn(name="Dan Kemp", hourly_rate="70")]), req, tenant.user, db))
+    assert early.value.status_code == 409, "names cannot be matched before CORE has sent the agents"
+    await with_db(tenant.id, ingest)
+    await with_db(tenant.id, lambda db: ep.save_labor_rate(ep.RateIn(scope="team", key="vCIO", hourly_rate=D("90")), req, tenant.user, db))
+    out = await with_db(
+        tenant.id,
+        lambda db: ep.import_labor_rates(
+            ep.RatesImportIn(rows=[ep.RateRowIn(name="dan  KEMP", hourly_rate="$71.239"), ep.RateRowIn(name="Nobody Known", hourly_rate=50), ep.RateRowIn(name="Vic Cio", hourly_rate="free")]), req, tenant.user, db
+        ),
+    )
+    assert out == {"saved": 1, "unmatched": ["Nobody Known", "Vic Cio"]}
+    view = await with_db(tenant.id, lambda db: ep.labor_rates_overview(tenant.user, db))
+    by = {a["name"]: a for a in view["agents"]}
+    assert (by["Dan Kemp"]["rate"], by["Dan Kemp"]["source"], by["Dan Kemp"]["own_rate"]) == (D("71.24"), "agent", D("71.24"))
+    assert (by["Vic Cio"]["rate"], by["Vic Cio"]["source"], by["Vic Cio"]["own_rate"]) == (D("90.00"), "team", None), "no own rate: the team's applies"
+    assert view["default_rate"] == D("65.00") and view["teams"] == [{"team": "vCIO", "rate": D("90.00")}]
+    again = await with_db(tenant.id, lambda db: ep.import_labor_rates(ep.RatesImportIn(rows=[ep.RateRowIn(name="Dan Kemp", hourly_rate=72)]), req, tenant.user, db))
+    assert again["saved"] == 1
+    rates = [r for r in (await with_db(tenant.id, lambda db: ep._rates(db, tenant.id))) if r["scope"] == "agent"]
+    assert [(r["key"], r["hourly_rate"]) for r in rates] == [("40", D("72.00"))], "importing again replaces, never piles up"

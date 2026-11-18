@@ -496,6 +496,7 @@ UI_CAPABILITIES: dict[str, str] = {
     "settings_data": "settings_data:view",
     "settings_reports": "settings_reports:view",
     "settings_security": "settings_security:view",
+    "finance_view": "finance:view",
 }
 
 

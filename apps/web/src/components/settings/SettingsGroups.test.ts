@@ -44,6 +44,7 @@ describe('settings groups', () => {
     const gated = MORE_SETTINGS.filter((m) => m.requires);
     expect(gated.map((m) => [m.href, m.requires])).toEqual([
       ['/settings/retention', 'settings_data'],
+      ['/settings/finance', 'finance_view'],
       ['/settings/triage', 'settings_automation'],
       ['/settings/tickets', 'settings_tickets'],
       ['/settings/vcio-risk-scoring', 'settings_clients'],

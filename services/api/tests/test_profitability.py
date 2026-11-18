@@ -306,3 +306,23 @@ def test_the_profitability_post_accepts_ticket_rows_and_an_older_core_without_th
     assert with_rows.tickets[0].ticket_id == "700"
     with pytest.raises(ValueError):
         ProfitSnapshotIn(**base, tickets=[{"client": "Acme", "month": "2026-10", "ticket_id": "abc", "hours": 1}])
+
+
+def test_the_tickets_of_the_month_sent_on_their_own_route_are_the_ones_listed_and_a_month_with_none_sent_says_so():
+    month_rows = [
+        {"client": "Acme Dental, Inc.", "month": "2026-10", "ticket_id": "700", "summary": "Quarterly review", "hours": 2.5, "entries": 2, "agent_ids": ["41", "40"]},
+        {"client": "Acme Dental, Inc.", "month": "2026-10", "ticket_id": "9", "summary": "Printer offline", "hours": 4.0, "entries": 3, "agent_ids": ["40"]},
+        {"client": "Birch Law", "month": "2026-10", "ticket_id": "6", "summary": "Not Acme", "hours": 9, "entries": 1, "agent_ids": ["40"]},
+    ]
+    old = [{"client": "Acme Dental, Inc.", "month": "2026-10", "ticket_id": "1", "summary": "From the summary", "hours": 1, "entries": 1, "agent_ids": ["40"]}]
+    b = p.client_breakdown({**SNAP, "tickets": old}, LINES, HALO, [], "5", "2026-10", month_rows)
+    assert [t["ticket_id"] for t in b["tickets"]["rows"]] == ["9", "700"], "the month's own rows win over any in the summary, most hours first"
+    assert b["tickets"]["other_hours"] == 0.0, "all 6.5 hours are on listed tickets now"
+    assert p.client_breakdown(SNAP, LINES, HALO, [], "5", "2026-10", [])["tickets"] == {"rows": [], "other_hours": 6.5}
+    assert p.client_breakdown(SNAP, LINES, HALO, [], "5", "2026-10", None)["tickets"] is None, "nothing sent for the month and none in the summary: said so"
+
+
+def test_a_clients_every_ticket_is_listed_however_many_there_are():
+    rows = [{"client": "Acme Dental, Inc.", "month": "2026-10", "ticket_id": str(1000 + i), "summary": f"T{i}", "hours": 0.01, "entries": 1, "agent_ids": ["40"]} for i in range(250)]
+    b = p.client_breakdown(SNAP, LINES, HALO, [], "5", "2026-10", rows)
+    assert len(b["tickets"]["rows"]) == 250
