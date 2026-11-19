@@ -99,6 +99,7 @@ const TITLE: Record<string, string> = {
   ninjaone_disk_health: 'Disk and RAID health',
   cipp_mailbox_forwarding: 'Mailbox forwarding rules',
   cipp_old_guests: 'Guest accounts older than a year',
+  itglue_documentation: 'Backup and network diagram documents',
   cipp_shared_mailbox_signin: 'Shared mailboxes with sign-in on',
   cipp_mailbox_forward_outside: 'Mailboxes forwarding outside',
   halopsa_agreement: 'Support agreement',
