@@ -205,8 +205,8 @@ export function BillingSyncView() {
                   [
                     ['client_name', 'Organization', ''],
                     ['invoice_item', 'Type', ''],
-                    ['billed', 'Billed', 'text-right'],
-                    ['counted', 'Counted', 'text-right'],
+                    ['billed', 'Halo', 'text-right'],
+                    ['counted', 'Tool Count', 'text-right'],
                     ['difference', 'Difference', 'text-right'],
                     ['status', 'Status', ''],
                   ] as [SortKey, string, string][]

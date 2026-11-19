@@ -68,6 +68,15 @@ describe('the Billing sync page', () => {
     expect(await screen.findByTestId('sync-empty')).toBeTruthy();
   });
 
+  it('names the two numbers by where they come from: Halo and Tool Count', async () => {
+    render(<BillingSyncView />);
+    const table = await screen.findByTestId('sync-table');
+    const heads = within(table).getAllByRole('columnheader').map((h) => (h.textContent ?? '').replace(/[^A-Za-z ]/g, '').trim());
+    expect(heads).toEqual(expect.arrayContaining(['Halo', 'Tool Count']));
+    expect(heads).not.toContain('Billed');
+    expect(heads).not.toContain('Counted');
+  });
+
   it('lists the differences, marks an unmapped client, and approves one line', async () => {
     render(<BillingSyncView />);
     const table = await screen.findByTestId('sync-table');
