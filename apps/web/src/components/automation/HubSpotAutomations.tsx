@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { type SweepRun, failureKind } from '@/components/settings/SourceHealth';
 import { authFetch } from '@/lib/auth-session';
+import { PageHeader } from '@/components/ui/kit';
 
 export const HALO_HUBSPOT_SOURCE = 'halo-hubspot';
 
@@ -87,10 +88,7 @@ export function HubSpotAutomations({ refreshAfterSyncMs = REFRESH_AFTER_SYNC_MS 
   const kind = run?.first_error ? failureKind(run.first_error) : null;
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6" data-testid="hubspot-automations">
-      <div>
-        <h1 className="text-2xl font-bold text-white">HubSpot</h1>
-        <p className="mt-1 text-sm text-gray-400">Automations that work with HubSpot. CORE runs them and reports here. They are set up in CORE, on its HubSpot connector, where the HubSpot token is kept.</p>
-      </div>
+      <PageHeader title="HubSpot" subtitle="Automations that work with HubSpot. CORE runs them and reports here. They are set up in CORE, on its HubSpot connector, where the HubSpot token is kept." />
       {problem && (
         <p role="alert" className="text-sm text-red-300">
           {problem}

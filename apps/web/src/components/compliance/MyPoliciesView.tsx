@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { PageHeader } from '@/components/ui/kit';
 
 export interface MyPolicy {
   item_id: string;
@@ -72,10 +73,7 @@ export function MyPoliciesView() {
   const todo = rows ? rows.filter((r) => r.state !== 'accepted').length : 0;
   return (
     <div className="space-y-4 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">My policies</h1>
-        <p className="mt-1 text-sm text-gray-400">The policies your organization has asked you to read and accept. Read each one, then press Accept. Your acceptance is recorded with today's date.</p>
-      </div>
+      <PageHeader title="My policies" subtitle="The policies your organization has asked you to read and accept. Read each one, then press Accept. Your acceptance is recorded with today's date." />
       {problem && (
         <p role="alert" className="text-sm text-red-300">
           {problem}

@@ -8,6 +8,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { PageHeader } from '@/components/ui/kit';
 
 export interface SyncRow {
   client_id: string;
@@ -155,12 +156,7 @@ export function BillingSyncView() {
 
   return (
     <div className="space-y-4 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Billing sync</h1>
-        <p className="mt-1 text-sm text-gray-400">
-          Where what HaloPSA bills a client and what the tools count disagree. Approve a line and CORE sets the client&apos;s recurring invoice in HaloPSA to the counted number. Hiding a line changes nothing in HaloPSA.
-        </p>
-      </div>
+      <PageHeader title="Billing sync" subtitle="Where what HaloPSA bills a client and what the tools count disagree. Approve a line and CORE sets the client&apos;s recurring invoice in HaloPSA to the counted number. Hiding a line changes nothing in HaloPSA." />
       {problem && <p className="text-sm text-amber-300">{problem}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <input aria-label="Organization" className={input} placeholder="Filter by organization" value={text} onChange={(e) => setText(e.target.value)} />

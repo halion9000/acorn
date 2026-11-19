@@ -21,6 +21,7 @@ import { ClientRollupTable } from './ClientRollupTable';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
 import { SavedViewsBar } from '@/components/saved-views/SavedViewsBar';
 import { loadFilters, pickString, saveFilters } from '@/lib/remembered-filters';
+import { PageHeader } from '@/components/ui/kit';
 
 /**
  * Every machine across your clients, one row per device. The same laptop reported by NinjaOne, Addigy and Huntress is ONE row (matched on serial number) and shows
@@ -334,10 +335,7 @@ export default function DevicesView() {
   return (
     <div className="space-y-5 p-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">Devices</h1>
-          <p className="mt-1 text-sm text-gray-400">One row per machine, matched across tools on serial number.</p>
-        </div>
+        <PageHeader title="Devices" subtitle="One row per machine, matched across tools on serial number." />
         <label className="text-sm text-gray-300">
           Master device list
           <select

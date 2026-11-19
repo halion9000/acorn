@@ -9,6 +9,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { authFetch } from '@/lib/auth-session';
+import { PageHeader } from '@/components/ui/kit';
 
 export type Verdict = 'allowed' | 'blocked' | 'unreviewed';
 
@@ -424,12 +425,7 @@ export default function RemoteToolsView() {
 
   return (
     <div className="space-y-5 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Remote tools</h1>
-        <p className="mt-1 text-sm text-gray-400">
-          Remote management and remote access software found on client devices. Approve what you run, block what nobody should, and get an alert when a blocked tool turns up.
-        </p>
-      </div>
+      <PageHeader title="Remote tools" subtitle="Remote management and remote access software found on client devices. Approve what you run, block what nobody should, and get an alert when a blocked tool turns up." />
 
       {error && (
         <p role="alert" className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">

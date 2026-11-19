@@ -22,6 +22,7 @@ import { OrgSnapshot } from './OrgSnapshot';
 
 import { reportsApi, type ExecutiveDigest as ExecutiveDigestPayload } from '@/lib/api';
 import { dmarcHref } from '@/lib/dmarcLink';
+import { PageHeader } from '@/components/ui/kit';
 
 // The two short windows are for a shift handover: what happened since the last person was on.
 export const PERIOD_PRESETS: { label: string; days: number }[] = [
@@ -159,12 +160,7 @@ export function ExecutiveDigest() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Executive Digest</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            Board-ready weekly snapshot of SOC posture, MTT performance, and tuning recommendations.
-          </p>
-        </div>
+        <PageHeader title="Executive Digest" subtitle="Board-ready weekly snapshot of SOC posture, MTT performance, and tuning recommendations." />
         <div className="flex flex-wrap items-center gap-2">
           <ClientPicker value={clientId} onChange={setClientId} label="Digest for" />
           <select

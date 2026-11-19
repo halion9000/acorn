@@ -12,6 +12,7 @@ import { sortedBy, type SortState, type SortValue } from '@/lib/tableSort';
 import { SortHeader } from './SortHeader';
 import { ClientGroupsPanel } from './ClientGroupsPanel';
 import { SoftwareCostsPanel } from './SoftwareCostsPanel';
+import { PageHeader } from '@/components/ui/kit';
 
 export interface AgentRate {
   agent_id: string;
@@ -138,12 +139,7 @@ export function FinanceSettingsView() {
   if (denied) return <p className="p-6 text-sm text-gray-400">You do not have access to the finance settings.</p>;
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Finance settings</h1>
-        <p className="mt-1 text-sm text-gray-400">
-          The hourly cost used to price time (pay, payroll tax, benefits and 401k per hour). A person&apos;s own rate wins, then their team&apos;s, then the default. Profitability and Net income use these for direct labor.
-        </p>
-      </div>
+      <PageHeader title="Finance settings" subtitle="The hourly cost used to price time (pay, payroll tax, benefits and 401k per hour). A person&apos;s own rate wins, then their team&apos;s, then the default. Profitability and Net income use these for direct labor." />
       {problem ? <p className="text-sm text-red-300" role="alert">{problem}</p> : null}
       {note ? <p className="text-sm text-emerald-300" data-testid="import-note">{note}</p> : null}
       {data === null ? <p className="text-sm text-gray-500">Loading…</p> : null}

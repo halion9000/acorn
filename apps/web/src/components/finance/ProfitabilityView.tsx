@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { authFetch } from '@/lib/auth-session';
 import { saveText } from '@/lib/saveFile';
 import { ClientProfitDetail } from './ClientProfitDetail';
+import { PageHeader } from '@/components/ui/kit';
 
 interface Row {
   client_id: string;
@@ -149,10 +150,7 @@ export function ProfitabilityView() {
   if (denied) return <p className="p-6 text-sm text-amber-300">Profitability shows money, so it needs the finance permission. Ask the owner to add it to your role.</p>;
   return (
     <div className="space-y-4 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Profitability</h1>
-        <p className="mt-1 text-sm text-gray-400">What each client was invoiced, the hours worked for them and what is left after labor, from HaloPSA. Updated about once a day.</p>
-      </div>
+      <PageHeader title="Profitability" subtitle="What each client was invoiced, the hours worked for them and what is left after labor, from HaloPSA. Updated about once a day." />
       {problem && <p className="text-sm text-amber-300">{problem}</p>}
       {data && data.received_at === null && (
         <p className="text-sm text-gray-400" data-testid="profit-empty">

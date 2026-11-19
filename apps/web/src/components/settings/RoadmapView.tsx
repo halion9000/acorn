@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { apiErrorDetail, roadmapApi, type Roadmap, type RoadmapItem } from '@/lib/api';
+import { PageHeader } from '@/components/ui/kit';
 
 type StatusFilter = 'all' | RoadmapItem['status'];
 type NeedsFilter = 'all' | RoadmapItem['needs'];
@@ -218,12 +219,7 @@ export function RoadmapView() {
 
   return (
     <div className="space-y-4 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Upcoming improvements</h1>
-        <p className="mt-1 text-sm text-gray-400">
-          Everything waiting to be built or fixed. Set a priority on an item and the high ones are taken first. The tag says who it waits on. This list is kept up to date as work is done.
-        </p>
-      </div>
+      <PageHeader title="Upcoming improvements" subtitle="Everything waiting to be built or fixed. Set a priority on an item and the high ones are taken first. The tag says who it waits on. This list is kept up to date as work is done." />
       <div role="tablist" className="flex flex-wrap items-center gap-1 border-b border-gray-800">
         {tab('all', 'All', data ? data.items.length : undefined)}
         {tab('new', STATUS_LABEL.new, data?.counts.new)}

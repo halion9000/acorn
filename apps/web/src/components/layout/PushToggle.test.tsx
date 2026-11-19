@@ -8,7 +8,7 @@ afterEach(() => cleanup());
 describe('keyBytes', () => {
   it('turns URL-safe base64 text into the bytes the browser wants', () => {
     expect(Array.from(keyBytes('AQID'))).toEqual([1, 2, 3]);
-    expect(Array.from(keyBytes('-_8'))).toEqual([251, 255], 'URL-safe letters and missing padding are handled');
+    expect(Array.from(keyBytes('-_8'))).toEqual([251, 255]);
   });
 });
 

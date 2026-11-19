@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { authFetch } from '@/lib/auth-session';
 import { sortedBy, type SortState, type SortValue } from '@/lib/tableSort';
 import { SortHeader } from '@/components/finance/SortHeader';
+import { PageHeader } from '@/components/ui/kit';
 
 export interface HuntressReport {
   newest: string | null;
@@ -93,10 +94,7 @@ export function DeviceVersions() {
   const o = useRead<OfflineReport>('/api/v1/device-reports/offline');
   return (
     <div className="space-y-8 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Device versions</h1>
-        <p className="mt-1 text-sm text-gray-400">What the tools report for each device, compared across all clients. &quot;Newest&quot; is the newest version the fleet itself runs, since there is no list of the vendors&apos; releases.</p>
-      </div>
+      <PageHeader title="Device versions" subtitle="What the tools report for each device, compared across all clients. &quot;Newest&quot; is the newest version the fleet itself runs, since there is no list of the vendors&apos; releases." />
 
       <section className="space-y-3" data-testid="huntress-versions">
         <h2 className="text-lg font-semibold text-white">Huntress agents</h2>

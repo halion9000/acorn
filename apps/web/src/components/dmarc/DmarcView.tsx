@@ -11,6 +11,7 @@ import useSWR from 'swr';
 import { authFetch } from '@/lib/auth-session';
 import CountryMap from './CountryMap';
 import { DmarcNextStep } from './DmarcNextStep';
+import { PageHeader } from '@/components/ui/kit';
 
 export interface DmarcStatus {
   configured: boolean;
@@ -1252,10 +1253,7 @@ export function DmarcView() {
   const [tab, setTab] = useState<'results' | 'setup'>('results');
   return (
     <div className="min-w-0 max-w-full space-y-5 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">DMARC reports</h1>
-        <p className="mt-1 text-sm text-gray-400">What mail receivers saw being sent as each client&rsquo;s domains, and whether it passed. A low pass rate means real mail is failing or someone is pretending to be the client.</p>
-      </div>
+      <PageHeader title="DMARC reports" subtitle="What mail receivers saw being sent as each client&rsquo;s domains, and whether it passed. A low pass rate means real mail is failing or someone is pretending to be the client." />
       <div role="tablist" className="flex gap-1 border-b border-gray-800">
         {(['results', 'setup'] as const).map((t) => (
           <button

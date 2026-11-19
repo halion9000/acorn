@@ -3,6 +3,7 @@
 /** Settings, Announcements: post a short message that shows above every page for the team until its end day (or until removed), and remove one. At most five show at once. Needs the workspace manage permission to post or remove. */
 import { useCallback, useEffect, useState } from 'react';
 import { authFetch } from '@/lib/auth-session';
+import { PageHeader } from '@/components/ui/kit';
 
 interface Row {
   id: string;
@@ -69,10 +70,7 @@ export function AnnouncementsView() {
   };
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Announcements</h1>
-        <p className="mt-1 text-sm text-gray-400">A short message shown above every page to everyone in your organization, until its end day or until you remove it. Up to five show at once. It is plain text.</p>
-      </div>
+      <PageHeader title="Announcements" subtitle="A short message shown above every page to everyone in your organization, until its end day or until you remove it. Up to five show at once. It is plain text." />
       <form
         className="space-y-2 rounded-lg border border-gray-800 bg-gray-900/40 p-4"
         onSubmit={(e) => {

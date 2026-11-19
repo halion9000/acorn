@@ -26,6 +26,7 @@ import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 
 import { costsApi, type CostDashboard } from '@/lib/api';
+import { PageHeader } from '@/components/ui/kit';
 
 const WINDOW_PRESETS: { label: string; days: number }[] = [
   { label: 'Last 7 days', days: 7 },
@@ -87,13 +88,8 @@ export function CostDashboardView() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Cost Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            LLM spend, automation activity, and BYOK savings for the current tenant. Numbers are
-            recorded by the cost tracker — no estimation unless explicitly labelled.
-          </p>
-        </div>
+        <PageHeader title="Cost Dashboard" subtitle="LLM spend, automation activity, and BYOK savings for the current tenant. Numbers are
+            recorded by the cost tracker — no estimation unless explicitly labelled." />
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="cost-window" className="sr-only">
             Reporting window
