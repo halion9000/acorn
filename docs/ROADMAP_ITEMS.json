@@ -2430,7 +2430,7 @@
     "area": "Platform",
     "status": "not_started",
     "needs": "signoff",
-    "note": "Plan written after clicking through the live site: docs/UI_MODERNIZATION_PLAN.md. Four phases: a small design system (tokens, tabular numbers, stat cards, tables, skeletons), then the number-heavy pages (Net income first, then Ticket and Client summary, Billing sync, Devices), then the sidebar and top bar, then a light theme and visual tests. Decisions: go ahead with Phase 1 and then Net income? Light theme wanted or dark only? OK to add one chart library (Recharts)? Reply 'go' to start.",
+    "note": "Full review done: every sidebar page, the settings hub and every tab, filter and period button on them: docs/UI_REVIEW_2026-11-18.md (findings) and docs/UI_MODERNIZATION_PLAN.md (plan). Bugs to fix first: the sidebar prefetches all 80 pages (6,000+ requests per page load), the client list (6.6 s) blocks every Compliance and finance page, about 25 pages show no skeleton or empty message, nine pages scroll sideways, Investigate duplicates Hunt, Attack Graph shows an error, and three pages are 20,000 to 170,000 characters long. Decisions: go ahead with the bug fixes now (small, no look change) and then the design system and Net income? Light theme or dark only? OK to add one chart library? Reply 'go' to start.",
     "detail": "Findings: every box has the same weight, numbers are not formatted or colored, labels are tiny uppercase grey, 12 pill tabs on Net income, long paragraphs above every page, blank boxes while loading, few charts, an 80-link sidebar, a crowded phone top bar.",
     "added": "2026-11-18"
   }
